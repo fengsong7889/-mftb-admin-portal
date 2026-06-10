@@ -1,0 +1,10 @@
+.app-layout {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-content {
+  margin: 16px;
+  overflow-y: auto;
+  background: transparent;
+}

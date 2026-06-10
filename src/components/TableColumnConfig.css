@@ -1,0 +1,195 @@
+/* ========================================================================
+   表格字段配置组件
+   ======================================================================== */
+
+/* 设置按钮 */
+.table-column-config-btn {
+  color: #999;
+  font-size: 16px;
+  padding: 4px 8px;
+  margin-left: auto;
+}
+
+.table-column-config-btn:hover {
+  color: #1890ff;
+}
+
+/* 弹窗 */
+.table-column-config-modal .ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px 12px;
+}
+
+.tcc-modal-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tcc-modal-title span {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* 工具栏 */
+.tcc-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.tcc-toolbar .ant-checkbox-wrapper {
+  font-weight: 500;
+  color: #333;
+}
+
+/* 区域 */
+.tcc-zone {
+  margin-bottom: 16px;
+}
+
+.tcc-zone-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.tcc-zone-content {
+  min-height: 40px;
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  padding: 4px;
+  transition: all 0.2s;
+}
+
+.tcc-zone-content.tcc-zone-empty {
+  background: #fafafa;
+}
+
+.tcc-zone-main {
+  background: #fff;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* 空占位 */
+.tcc-zone-placeholder {
+  text-align: center;
+  padding: 12px;
+  color: #bbb;
+  font-size: 13px;
+}
+
+/* 字段项 */
+.tcc-field-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: grab;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.tcc-field-item:last-child {
+  border-bottom: none;
+}
+
+.tcc-field-item:hover {
+  background: #f0f7ff;
+}
+
+.tcc-field-item.tcc-field-dragging {
+  opacity: 0.4;
+  background: #e6f7ff;
+}
+
+.tcc-field-item.tcc-field-dragover {
+  border-top: 2px solid #1890ff;
+}
+
+.tcc-field-locked {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  margin: 4px;
+  border-radius: 6px;
+}
+
+.tcc-field-locked:hover {
+  background: #f0fae6;
+}
+
+/* 拖拽手柄 */
+.tcc-drag-handle {
+  color: #ccc;
+  font-size: 14px;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.tcc-drag-handle:hover {
+  color: #999;
+}
+
+/* 右侧拖拽图标 */
+.tcc-drag-icon {
+  margin-left: auto;
+  color: #d9d9d9;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* 解锁按钮 */
+.tcc-unlock-btn {
+  margin-left: auto;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.tcc-unlock-btn:hover {
+  color: #ff4d4f;
+}
+
+/* 底部按钮 */
+.tcc-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Checkbox 样式覆盖 */
+.tcc-field-item .ant-checkbox-wrapper {
+  flex: 1;
+  font-size: 13px;
+  color: #333;
+}
+
+.tcc-field-item .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+/* 滚动条样式 */
+.tcc-zone-main::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tcc-zone-main::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 2px;
+}
+
+.tcc-zone-main::-webkit-scrollbar-track {
+  background: transparent;
+}
