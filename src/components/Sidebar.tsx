@@ -23,7 +23,6 @@ import {
   HomeOutlined,
   ColumnHeightOutlined,
   SettingOutlined,
-  CalculatorOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -53,7 +52,6 @@ const keyToPath: Record<string, string> = {
   'hot-search-config': '/hot-search-config',
   'hot-search-preview': '/hot-search-preview',
   'search-weight-config': '/search-weight-config',
-  'search-rule-config': '/search-rule-config',
   // 搜索管理 - 搜索词库
   'word-segmentation': '/word-segmentation',
   'synonym-config': '/synonym-config',
@@ -162,11 +160,6 @@ const menuItems: MenuItem[] = [
             key: 'search-weight-config',
             icon: <ColumnHeightOutlined />,
             label: '權重管理',
-          },
-          {
-            key: 'search-rule-config',
-            icon: <CalculatorOutlined />,
-            label: '搜索規則',
           },
         ],
       },

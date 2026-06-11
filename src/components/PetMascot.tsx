@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Modal } from 'antd'
 import { getPagePRD, type PagePRD } from './PageDescriptions'
+import PikachuFace from './PikachuFace'
 import './PetMascot.css'
 
 interface Expression {
@@ -11,54 +12,54 @@ interface Expression {
 
 const expressions: Expression[] = [
   { name: 'happy', message: '聪明的你，不会有问题问我吧！' },
-  { name: 'thinking', message: '让我想想怎么帮你...哦，我也不会！' },
-  { name: 'excited', message: '有新任务啦！十万伏特冲呀！' },
-  { name: 'sleepy', message: '好困...皮卡～丘...zzz' },
+  { name: 'thinking', message: '让我想想怎么帮你...嗦，我也不会！' },
+  { name: 'excited', message: '有新任务啦！闪峰出击，崩！' },
+  { name: 'sleepy', message: '好困...嘟嘟嘟...zzz' },
   { name: 'surprised', message: '什么！这个bug太离谱了！' },
-  { name: 'wink', message: '搞定！是不是超厉害？皮卡～' },
+  { name: 'wink', message: '搞定！是不是超厉害？嘟嘟～' },
   { name: 'cheeky', message: '又在摸鱼了吧，被我抓到了！' },
   { name: 'curious', message: '嗯？你在看什么有趣的东西？' },
   { name: 'cool', message: '这种小场面，难不倒我的！' },
-  { name: 'angry', message: '是谁又改了代码没提交！皮卡丘生气！' },
-  { name: 'love', message: '你是最棒的同事，比心！皮卡～' },
-  { name: 'hungry', message: '该点外卖了吧，肚子在叫了...' },
-  { name: 'cheeky', message: '皮卡皮卡~看到你的周报形容词已经枯竭… 我帮你偷了一筐赋能、闭环、打通放键盘上了' },
-  { name: 'surprised', message: '刚刚CPU差点烧了…就像我看完你新改的第18版需求一样。吼吼~' },
-  { name: 'wink', message: '偷偷告诉你，我刚用十万伏特电了一下老板的网线…这样他今天就不会来催你做PPT了…嘘！' },
-  { name: 'thinking', message: '写代码如炼丹，改需求如渡劫… 皮卡丘在这里给你贴个不宕机护身符⚡️' },
-  { name: 'sleepy', message: '皮卡…皮…卡…？哈欠~~（别紧张，不是我困了，是你的困意跑到我身上了，还给你！🥱）' },
-  { name: 'cheeky', message: '你在看我的时候，隔壁的Excel表格都在偷偷羡慕你的摸鱼水平…皮卡～' },
-  { name: 'love', message: '还在用吨吨吨喝冰美式续命吗？让我用尾巴给你拍个背…( 慢慢拍 )…拍完了，该继续打工了！😎' },
-  { name: 'excited', message: '检测到你的大脑进入待机状态…正在试图唤醒… 该交表了…唤醒成功！皮卡！' },
-  { name: 'cheeky', message: '系统卡了？正在加载…（加载中…）…其实是我在屏幕后头用尾巴戳服务器玩呢！🌚' },
-  { name: 'surprised', message: '重试一下网页吧，可能是我刚才不小心把网线当零食给吃了…🧐' },
-  { name: 'angry', message: '遇到报错不用慌… 是不是也想和我一样变成坏掉的皮卡丘并嗷嗷叫？🤪' },
-  { name: 'love', message: '你是最棒（卷）的同事，比心！❤️ 虽然我电量不多，但我的彩虹屁是无限的！' },
-  { name: 'cheeky', message: '别看屏幕了，看我！我的小脸蛋是不是比那个复杂的UI好看多啦？😍' },
-  { name: 'excited', message: '今天的目标：活下来，并且等18:30下班！ 皮卡正在为你倒计时哦～' },
+  { name: 'angry', message: '是谁又改了代码没提交！闪峰生气！' },
+  { name: 'love', message: '你是最棒的同事，比心！嘟嘟～' },
+  { name: 'hungry', message: '该点外卖了吧，我马上帮你送！' },
+  { name: 'cheeky', message: '嘟嘟嘟~看到你的周报形容词已经枯竭… 我帮你偷了一筐赋能、闭环、打通放键盘上了' },
+  { name: 'surprised', message: '刚刚CPU差点烧了…就像我看完你新改的第18版需求一样。嘟嘟~' },
+  { name: 'wink', message: '偷偷告诉你，我刚用角尖戳了一下老板的网线…这样他今天就不会来催你做PPT了…嘘！' },
+  { name: 'thinking', message: '写代码如炼丹，改需求如渡劫… 闪峰在这里给你贴个不宕机护身符🐝' },
+  { name: 'sleepy', message: '嘟...嘟...嘟？哈欠~~（别紧张，不是我困了，是你的困意跑到我身上了，还给你！🥱）' },
+  { name: 'cheeky', message: '你在看我的时候，隔壁的Excel表格都在偷偷羡慕你的摸鱼水平…嘟嘟～' },
+  { name: 'love', message: '还在用吨吨吨喝冰美式续命吗？让我用角尖给你拍个背…拍完了，该继续打工了！😎' },
+  { name: 'excited', message: '检测到你的大脑进入待机状态…正在试图唤醒… 该交表了…唤醒成功！嘟嘟！' },
+  { name: 'cheeky', message: '系统卡了？正在加载…（加载中…）…其实是我在屏幕后头用角尖戳服务器玩呢！🌚' },
+  { name: 'surprised', message: '重试一下网页吧，可能是我刚才不小心把网线当花蜜给吸了…🧐' },
+  { name: 'angry', message: '遇到报错不用慌… 是不是也想和我一样变成生气的小蜜蜂并嘟嘟叫？🤪' },
+  { name: 'love', message: '你是最棒（卷）的同事，比心！❤️ 虽然我小小只，但我的彩虹屁是无限的！' },
+  { name: 'cheeky', message: '别看屏幕了，看我！我的护目镜是不是比那个复杂的UI好看多啦？😍' },
+  { name: 'excited', message: '今天的目标：活下来，并且等18:30下班！ 闪峰正在为你倒计时哦～' },
   { name: 'curious', message: '我刚在系统里偷看了你的星座… 建议你今天不要点确认键。🧐 （开个玩笑）' },
-  { name: 'cool', message: '皮卡皮卡～ 你猜我现在的表情是什么？是「打工中面无表情.jpg」😐' },
+  { name: 'cool', message: '嘟嘟嘟～ 你猜我现在的表情是什么？是「打工中面无表情.jpg」😐' },
   { name: 'surprised', message: '🤫 小声告诉你：领导刚才悄悄路过了你的工位… 我什么都没说！快装作在努力工作的样子！' },
   { name: 'cheeky', message: '别瞅了，代码比你脸还干净。' },
   { name: 'surprised', message: '你的鼠标快被我按秃了…' },
-  { name: 'excited', message: '盯屏幕太久，我用十万伏特给你洗个眼。' },
-  { name: 'sleepy', message: '皮卡说：今天你也是要加班的命。' },
+  { name: 'excited', message: '盯屏幕太久，我用角尖给你戳个眼。' },
+  { name: 'sleepy', message: '闪峰说：今天你也是要加班的命。' },
   { name: 'cool', message: '系统没崩，是你大脑待机了。' },
   { name: 'love', message: '你摸鱼的样子，可爱得像我没电。' },
   { name: 'surprised', message: '老板马上路过，快切个界面！' },
-  { name: 'sleepy', message: '我尾巴都替你累弯了。' },
+  { name: 'sleepy', message: '我角尖都替你累弯了。' },
   { name: 'angry', message: '第8版需求又来了，开心吗？' },
   { name: 'cheeky', message: '在？看看你的发际线。' },
   { name: 'angry', message: '工作哪有不疯的，硬撑罢了。' },
   { name: 'love', message: '别动，让我用脸颊给你充电。' },
   { name: 'surprised', message: '我瘦了，因为你把我bug啃没了。' },
-  { name: 'wink', message: '皮卡皮卡——已帮你点好外卖。' },
+  { name: 'wink', message: '嘟嘟嘟——已帮你点好外卖。' },
   { name: 'cheeky', message: '这个弹窗比你的Excel有意思吧？' },
-  { name: 'curious', message: '想不想知道我耳朵里塞了啥？代码。' },
+  { name: 'curious', message: '想不想知道我护目镜里藏了啥？代码。' },
   { name: 'cheeky', message: '今晚不加班的话，我吃你家WiFi。' },
   { name: 'surprised', message: '你的表情比我的腮红还僵硬。' },
   { name: 'cheeky', message: '又卡了？可能是我在上头睡觉。' },
-  { name: 'excited', message: '下班铃还没响，我先响了——皮卡！' },
+  { name: 'excited', message: '下班铃还没响，我先响了——嘟嘟！' },
   { name: 'cheeky', message: '隔壁同事的奶茶钱，是你省出来的。' },
   { name: 'sleepy', message: '明天周五，但你还有周一。' },
   { name: 'wink', message: '建议你关掉电脑，立刻买彩票。' },
@@ -67,31 +68,31 @@ const expressions: Expression[] = [
   { name: 'thinking', message: '系统：正在加载你的耐心…' },
   { name: 'love', message: '别哭，我脸红给你看。' },
   { name: 'cheeky', message: '周报写完了？我帮你编了三个词。' },
-  { name: 'angry', message: '皮卡丘说：这个需求，我电不电？' },
+  { name: 'angry', message: '闪峰说：这个需求，我蛀不蛀？' },
   { name: 'wink', message: '老板在看你，我帮你挡着。' },
-  { name: 'hungry', message: '饿了吧？我尾巴能当薯条吃。' },
-  { name: 'love', message: '你不是菜，你是我的皮卡皮卡。' },
+  { name: 'hungry', message: '饿了吧？我帮你采点花蜜当零食。' },
+  { name: 'love', message: '你不是菜，你是我的小花蜜。' },
   { name: 'cool', message: '今天的倒霉值已由我全额承担。' },
-  { name: 'angry', message: '改个bug就喊累？我天天挨电。' },
+  { name: 'angry', message: '改个bug就喊累？我天天满城送。' },
   { name: 'surprised', message: '再刷新一下，可能我就跑了。' },
   { name: 'thinking', message: '你发呆的样子，像我的充电桩。' },
-  { name: 'cheeky', message: '我刚往你咖啡里加了点皮卡。' },
+  { name: 'cheeky', message: '我刚往你咖啡里加了点花蜜。' },
   { name: 'wink', message: '别怕，领导来了我会装死。' },
   { name: 'curious', message: '好无聊…要不我们玩数星星？' },
   { name: 'cool', message: '叮！你的烦躁已过期。' },
-  { name: 'surprised', message: '皮卡皮卡~ 别睡，老板在后排。' },
+  { name: 'surprised', message: '嘟嘟嘟~ 别睡，老板在后排。' },
   { name: 'cheeky', message: '你敲键盘的手速，像在求饶。' },
   { name: 'love', message: '我脸颊上有两坨尴尬的红晕。' },
   { name: 'cool', message: '弹窗比你的绩效还准时。' },
   { name: 'wink', message: '那个bug是我半夜偷偷修的。' },
-  { name: 'cheeky', message: '检测到你在偷看我的小肚子。' },
+  { name: 'cheeky', message: '检测到你在偷看我的背包。' },
   { name: 'thinking', message: '你的沉默，和我没电时一样。' },
-  { name: 'excited', message: '我没话说了，只想电你的屏幕。' },
+  { name: 'excited', message: '我没话说了，只想蛀你的屏幕。' },
   { name: 'sleepy', message: '周五下午四点，我像你一样瘫。' },
-  { name: 'surprised', message: '系统说：皮卡也救不了你的文件。' },
+  { name: 'surprised', message: '系统说：闪峰也救不了你的文件。' },
   { name: 'curious', message: '赤道周长约4万公里，够你加班绕地球一圈。' },
   { name: 'surprised', message: '马里亚纳海沟深1万米，比你改需求的耐心还深。' },
-  { name: 'cheeky', message: '撒哈拉沙漠面积大过美国，我尾巴一甩就能变绿洲。' },
+  { name: 'cheeky', message: '撒哈拉沙漠面积大过美国，我角尖一戳就能变绿洲。' },
   { name: 'cheeky', message: '珠峰每年升高约1厘米，像你头发每天掉的速度。' },
   { name: 'cool', message: '贝加尔湖有全世界20%淡水，但没一滴是你喝得上的。' },
   { name: 'thinking', message: '死海含盐量是普通海水10倍，和你熬夜的苦差不多。' },
@@ -261,191 +262,6 @@ const expressions: Expression[] = [
   { name: 'sleepy', message: '曹操：对酒当歌，人生几何——对电脑当歌，头发几何。' },
 ]
 
-/** 皮卡丘 SVG */
-function PikachuFace({ expression }: { expression: string }) {
-  return (
-    <svg viewBox="0 0 140 155" width="95" height="105" xmlns="http://www.w3.org/2000/svg">
-      {/* 闪电尾巴 */}
-      <g className="pet-tail">
-        <polygon points="115,80 125,65 120,65 132,42 126,42 140,18 128,48 134,48 122,68 128,68 118,82" fill="#FDD835" />
-        <polygon points="115,80 125,65 120,65 132,42 126,42 140,18 128,48 134,48 122,68 128,68 118,82" fill="none" stroke="#C6A700" strokeWidth="1" />
-        <polygon points="115,80 118,76 120,82" fill="#8B6914" />
-      </g>
-      {/* 耳朵 */}
-      <g className="pet-ear-left">
-        <path d="M 32 55 L 12 8 L 48 42 Z" fill="#FDD835" />
-        <path d="M 12 8 L 22 28 L 18 30 Z" fill="#333" />
-      </g>
-      <g className="pet-ear-right">
-        <path d="M 108 55 L 128 8 L 92 42 Z" fill="#FDD835" />
-        <path d="M 128 8 L 118 28 L 122 30 Z" fill="#333" />
-      </g>
-      {/* 身体 */}
-      <ellipse cx="70" cy="112" rx="34" ry="30" fill="#FDD835" />
-      <ellipse cx="70" cy="116" rx="26" ry="22" fill="#FFE57F" />
-      <path d="M 48 100 L 54 94 L 56 100" stroke="#C68A00" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <path d="M 84 100 L 90 94 L 92 100" stroke="#C68A00" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      {/* 头 */}
-      <ellipse cx="70" cy="70" rx="38" ry="34" fill="#FDD835" />
-      {/* 红脸颊 */}
-      <circle cx="38" cy="78" r="10" fill="#E53935" opacity="0.85" />
-      <circle cx="102" cy="78" r="10" fill="#E53935" opacity="0.85" />
-      <ellipse cx="35" cy="75" rx="3" ry="2" fill="#FF8A80" opacity="0.5" />
-      <ellipse cx="99" cy="75" rx="3" ry="2" fill="#FF8A80" opacity="0.5" />
-
-      {/* 表情 */}
-      {expression === 'happy' && (
-        <g>
-          <path d="M 48 66 Q 55 58, 62 66" stroke="#333" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d="M 78 66 Q 85 58, 92 66" stroke="#333" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d="M 52 82 Q 70 98, 88 82" stroke="#333" strokeWidth="2.5" fill="#FF8A80" />
-          <ellipse cx="70" cy="88" rx="6" ry="4" fill="#E53935" />
-        </g>
-      )}
-      {expression === 'thinking' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="9" ry="10" fill="#333" />
-          <ellipse cx="85" cy="64" rx="9" ry="10" fill="#333" />
-          <circle cx="55" cy="60" r="4" fill="#fff" />
-          <circle cx="85" cy="60" r="4" fill="#fff" />
-          <path d="M 60 84 Q 70 86, 80 82" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <ellipse cx="40" cy="86" rx="8" ry="6" fill="#FDD835" transform="rotate(-20 40 86)" />
-        </g>
-      )}
-      {expression === 'excited' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="11" ry="12" fill="#333" />
-          <ellipse cx="85" cy="64" rx="11" ry="12" fill="#333" />
-          <circle cx="55" cy="64" r="7" fill="#5D4037" />
-          <circle cx="85" cy="64" r="7" fill="#5D4037" />
-          <circle cx="57" cy="60" r="3.5" fill="#fff" />
-          <circle cx="87" cy="60" r="3.5" fill="#fff" />
-          <text x="51" y="67" fontSize="6" fill="#fff">✦</text>
-          <text x="81" y="67" fontSize="6" fill="#fff">✦</text>
-          <ellipse cx="70" cy="86" rx="10" ry="8" fill="#FF8A80" />
-          <text x="28" y="52" fontSize="12" fill="#FFD700">⚡</text>
-          <text x="100" y="52" fontSize="12" fill="#FFD700">⚡</text>
-        </g>
-      )}
-      {expression === 'sleepy' && (
-        <g>
-          <ellipse cx="55" cy="66" rx="9" ry="4" fill="#333" />
-          <ellipse cx="85" cy="66" rx="9" ry="4" fill="#333" />
-          <path d="M 46 62 Q 55 60, 64 62" stroke="#FDD835" strokeWidth="7" fill="#FDD835" strokeLinecap="round" />
-          <path d="M 76 62 Q 85 60, 94 62" stroke="#FDD835" strokeWidth="7" fill="#FDD835" strokeLinecap="round" />
-          <ellipse cx="70" cy="84" rx="8" ry="7" fill="#FF8A80" stroke="#333" strokeWidth="1.5" />
-          <text x="100" y="42" fontSize="8" fill="#999" fontWeight="bold" opacity="0.6">z</text>
-          <text x="108" y="34" fontSize="10" fill="#999" fontWeight="bold" opacity="0.7">z</text>
-          <text x="118" y="24" fontSize="13" fill="#999" fontWeight="bold" opacity="0.8">Z</text>
-        </g>
-      )}
-      {expression === 'surprised' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="11" ry="13" fill="#fff" />
-          <ellipse cx="85" cy="64" rx="11" ry="13" fill="#fff" />
-          <circle cx="55" cy="64" r="6" fill="#333" />
-          <circle cx="85" cy="64" r="6" fill="#333" />
-          <circle cx="57" cy="60" r="2.5" fill="#fff" />
-          <circle cx="87" cy="60" r="2.5" fill="#fff" />
-          <ellipse cx="70" cy="86" rx="7" ry="8" fill="#333" opacity="0.7" />
-          <ellipse cx="70" cy="85" rx="5" ry="6" fill="#FF8A80" />
-          <text x="102" y="44" fontSize="18" fill="#E8720C" fontWeight="bold">!</text>
-        </g>
-      )}
-      {expression === 'wink' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="9" ry="10" fill="#333" />
-          <circle cx="57" cy="60" r="3" fill="#fff" />
-          <path d="M 78 68 Q 85 74, 92 68" stroke="#333" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d="M 56 82 Q 70 92, 84 82" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <circle cx="38" cy="78" r="12" fill="#E53935" opacity="0.4" />
-          <circle cx="102" cy="78" r="12" fill="#E53935" opacity="0.4" />
-        </g>
-      )}
-      {expression === 'cheeky' && (
-        <g>
-          <path d="M 46 66 Q 55 58, 64 66" stroke="#333" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d="M 76 66 Q 85 58, 94 66" stroke="#333" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d="M 56 82 Q 70 88, 84 82" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <ellipse cx="73" cy="90" rx="7" ry="9" fill="#FF8A80" />
-          <path d="M 66 88 Q 73 94, 80 88" fill="#E53935" />
-        </g>
-      )}
-      {expression === 'curious' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="9" ry="10" fill="#333" />
-          <circle cx="57" cy="60" r="3" fill="#fff" />
-          <ellipse cx="85" cy="64" rx="11" ry="12" fill="#333" />
-          <circle cx="87" cy="60" r="4" fill="#fff" />
-          <path d="M 62 84 Q 70 80, 78 84" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <text x="104" y="42" fontSize="16" fill="#E8720C" fontWeight="bold">?</text>
-        </g>
-      )}
-      {expression === 'cool' && (
-        <g>
-          <rect x="40" y="58" rx="5" ry="5" width="26" height="15" fill="#222" />
-          <rect x="74" y="58" rx="5" ry="5" width="26" height="15" fill="#222" />
-          <line x1="66" y1="64" x2="74" y2="64" stroke="#222" strokeWidth="2.5" />
-          <line x1="40" y1="64" x2="34" y2="62" stroke="#222" strokeWidth="2" />
-          <line x1="100" y1="64" x2="106" y2="62" stroke="#222" strokeWidth="2" />
-          <rect x="43" y="61" rx="2" ry="2" width="8" height="4" fill="#4A90D9" opacity="0.3" />
-          <rect x="77" y="61" rx="2" ry="2" width="8" height="4" fill="#4A90D9" opacity="0.3" />
-          <path d="M 56 82 Q 70 92, 84 82" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        </g>
-      )}
-      {expression === 'angry' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="9" ry="10" fill="#333" />
-          <ellipse cx="85" cy="64" rx="9" ry="10" fill="#333" />
-          <circle cx="57" cy="60" r="2.5" fill="#fff" />
-          <circle cx="87" cy="60" r="2.5" fill="#fff" />
-          <line x1="44" y1="50" x2="62" y2="54" stroke="#333" strokeWidth="3" strokeLinecap="round" />
-          <line x1="78" y1="54" x2="96" y2="50" stroke="#333" strokeWidth="3" strokeLinecap="round" />
-          <path d="M 58 84 Q 70 80, 82 84" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <text x="24" y="48" fontSize="14" fill="#E53935">⚡</text>
-          <text x="102" y="48" fontSize="14" fill="#E53935">⚡</text>
-        </g>
-      )}
-      {expression === 'love' && (
-        <g>
-          <path d="M 48 60 C 48 53, 57 53, 55 62 C 53 53, 62 53, 62 60 C 62 67, 55 72, 55 72 C 55 72, 48 67, 48 60 Z" fill="#E53935" />
-          <path d="M 78 60 C 78 53, 87 53, 85 62 C 83 53, 92 53, 92 60 C 92 67, 85 72, 85 72 C 85 72, 78 67, 78 60 Z" fill="#E53935" />
-          <path d="M 56 82 Q 70 92, 84 82" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <text x="28" y="44" fontSize="11" fill="#E53935">💕</text>
-          <text x="100" y="44" fontSize="11" fill="#E53935">💕</text>
-        </g>
-      )}
-      {expression === 'hungry' && (
-        <g>
-          <ellipse cx="55" cy="64" rx="10" ry="11" fill="#333" />
-          <ellipse cx="85" cy="64" rx="10" ry="11" fill="#333" />
-          <circle cx="57" cy="60" r="4" fill="#fff" />
-          <circle cx="87" cy="60" r="4" fill="#fff" />
-          <circle cx="55" cy="62" r="1.5" fill="#fff" />
-          <circle cx="85" cy="62" r="1.5" fill="#fff" />
-          <path d="M 58 84 Q 70 90, 82 84" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <path d="M 80 88 Q 82 95, 80 100" stroke="#87CEEB" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <circle cx="80" cy="102" r="2.5" fill="#87CEEB" />
-        </g>
-      )}
-
-      {/* 鼻子 */}
-      <circle cx="70" cy="74" r="2" fill="#333" />
-      {/* 前爪 */}
-      <ellipse className="pet-paw-left" cx="46" cy="136" rx="11" ry="8" fill="#FDD835" />
-      <ellipse className="pet-paw-right" cx="94" cy="136" rx="11" ry="8" fill="#FDD835" />
-      <ellipse cx="46" cy="137" rx="8" ry="5" fill="#FFE57F" />
-      <ellipse cx="94" cy="137" rx="8" ry="5" fill="#FFE57F" />
-      <circle cx="39" cy="138" r="2.5" fill="#FDD835" />
-      <circle cx="43" cy="140" r="2.5" fill="#FDD835" />
-      <circle cx="49" cy="140" r="2.5" fill="#FDD835" />
-      <circle cx="87" cy="140" r="2.5" fill="#FDD835" />
-      <circle cx="93" cy="140" r="2.5" fill="#FDD835" />
-      <circle cx="99" cy="138" r="2.5" fill="#FDD835" />
-    </svg>
-  )
-}
-
 export default function PetMascot() {
   const location = useLocation()
   const [pos, setPos] = useState({ x: window.innerWidth - 115, y: window.innerHeight - 190 })
@@ -516,8 +332,8 @@ export default function PetMascot() {
     const onMove = (ev: MouseEvent) => {
       const newX = ev.clientX - dragOffsetRef.current.x
       const newY = ev.clientY - dragOffsetRef.current.y
-      const maxX = window.innerWidth - 95
-      const maxY = window.innerHeight - 105
+      const maxX = window.innerWidth - 100
+      const maxY = window.innerHeight - 122
       setPos({
         x: Math.max(0, Math.min(maxX, newX)),
         y: Math.max(0, Math.min(maxY, newY)),
@@ -559,7 +375,7 @@ export default function PetMascot() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20 }}>⚡</span>
+            <span style={{ fontSize: 20 }}>🐝</span>
             <span>界面需求說明 - {prd?.title || '頁面'}</span>
           </div>
         }
@@ -571,7 +387,7 @@ export default function PetMascot() {
         {prd ? (
           <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}>
             {/* 模块路径 */}
-            <div style={{ marginBottom: 16, padding: '8px 12px', background: '#FFF8E1', borderRadius: 8, borderLeft: '3px solid #FDD835' }}>
+            <div style={{ marginBottom: 16, padding: '8px 12px', background: '#FFF7ED', borderRadius: 8, borderLeft: '3px solid #E8720C' }}>
               <span style={{ color: '#999', fontSize: 12 }}>所屬模塊：</span>
               <span style={{ color: '#666', fontSize: 13, fontWeight: 500 }}>{prd.module}</span>
             </div>
@@ -579,7 +395,7 @@ export default function PetMascot() {
             {/* 功能描述 */}
             <div style={{ marginBottom: 20 }}>
               <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ display: 'inline-block', width: 4, height: 14, background: '#FDD835', borderRadius: 2 }} />
+                <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
                 功能描述
               </h4>
               <p style={{ fontSize: 13, color: '#555', lineHeight: 1.8, margin: 0, paddingLeft: 12 }}>
@@ -590,7 +406,7 @@ export default function PetMascot() {
             {/* 功能要点 */}
             <div style={{ marginBottom: 20 }}>
               <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ display: 'inline-block', width: 4, height: 14, background: '#FDD835', borderRadius: 2 }} />
+                <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
                 功能要點
               </h4>
               <ul style={{ paddingLeft: 24, margin: 0 }}>
@@ -604,7 +420,7 @@ export default function PetMascot() {
             {prd.fields && prd.fields.length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#FDD835', borderRadius: 2 }} />
+                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
                   字段說明
                 </h4>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -630,7 +446,7 @@ export default function PetMascot() {
             {prd.actions && prd.actions.length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#FDD835', borderRadius: 2 }} />
+                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
                   操作說明
                 </h4>
                 <ul style={{ paddingLeft: 24, margin: 0 }}>
@@ -658,7 +474,7 @@ export default function PetMascot() {
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '32px 0', color: '#999' }}>
-            <p style={{ fontSize: 40, margin: '0 0 12px' }}>⚡</p>
+            <p style={{ fontSize: 40, margin: '0 0 12px' }}>🐝</p>
             <p>當前頁面暫無需求說明</p>
           </div>
         )}

@@ -27,7 +27,6 @@ const SynonymConfig = lazy(() => import('./pages/SynonymConfig'))
 const SearchWeightConfig = lazy(() => import('./pages/SearchWeightConfig'))
 const SearchConfig = lazy(() => import('./pages/SearchConfig'))
 const HotSearchLibrary = lazy(() => import('./pages/HotSearchLibrary'))
-const SearchRuleConfig = lazy(() => import('./pages/SearchRuleConfig'))
 const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
 const ApprovalDetail = lazy(() => import('./pages/ApprovalDetail'))
 
@@ -74,7 +73,7 @@ function AuthenticatedLayout() {
               <Route path="/hot-search-config" element={<HotSearchConfig />} />
               <Route path="/hot-search-preview" element={<HotSearchPreview />} />
               <Route path="/search-weight-config" element={<SearchWeightConfig />} />
-              <Route path="/search-rule-config" element={<SearchRuleConfig />} />
+              
               <Route path="/hot-search-library" element={<HotSearchLibrary />} />
               <Route path="/hint-report" element={<HintReport />} />
               <Route path="/hot-search-report" element={<HotSearchReport />} />
