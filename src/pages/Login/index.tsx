@@ -48,11 +48,18 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 /* ---- 视频源配置 ---- */
+// 本地开发环境:优先使用本地视频,节省流量
 // GitHub Pages部署:直接使用阿里云OSS视频
-const VIDEO_SOURCE = 'https://mftb-video-song.oss-cn-shenzhen.aliyuncs.com/%E9%80%81%E5%A4%96%E5%8D%96%E8%A7%86%E9%A2%91.mp4'
+const LOCAL_VIDEO = '/送外卖视频.mp4'
+const REMOTE_VIDEO = 'https://mftb-video-song.oss-cn-shenzhen.aliyuncs.com/%E9%80%81%E5%A4%96%E5%8D%96%E8%A7%86%E9%A2%91.mp4'
+
+// 根据环境选择默认视频源
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('192.168.')
+const DEFAULT_VIDEO = isLocalDev ? LOCAL_VIDEO : REMOTE_VIDEO
 
 /* ---- 左侧视频背景组件 ---- */
 function VideoBackground() {
+  const [videoSrc, setVideoSrc] = useState(DEFAULT_VIDEO)
   const videoRef = React.useRef<HTMLVideoElement>(null)
 
   const handleVideoLoaded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -63,8 +70,22 @@ function VideoBackground() {
   }
 
   const handleVideoError = () => {
-    console.error('视频加载失败，请检查网络或视频源')
+    // 本地视频加载失败 → 回退到阿里云OSS
+    if (videoSrc === LOCAL_VIDEO) {
+      console.warn('本地视频不存在,回退到阿里云OSS视频')
+      setVideoSrc(REMOTE_VIDEO)
+    } else {
+      console.error('视频加载失败,请检查网络或视频源')
+    }
   }
+
+  // 切换视频源后重新加载
+  React.useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load()
+      videoRef.current.play().catch(() => {})
+    }
+  }, [videoSrc])
 
   return (
     <div className="video-bg-container">
@@ -79,7 +100,7 @@ function VideoBackground() {
         onLoadedData={handleVideoLoaded}
         onError={handleVideoError}
       >
-        <source src={VIDEO_SOURCE} type="video/mp4" />
+        <source src={videoSrc} type="video/mp4" />
         您的浏览器不支持视频背景
       </video>
 
