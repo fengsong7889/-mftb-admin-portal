@@ -171,12 +171,12 @@ const menuItems: MenuItem[] = [
           {
             key: 'word-segmentation',
             icon: <ScissorOutlined />,
-            label: '分詞管理',
+            label: '分詞詞庫',
           },
           {
             key: 'synonym-config',
             icon: <SwapOutlined />,
-            label: '同義詞配置',
+            label: '同義詞庫',
           },
           {
             key: 'hot-search-library',

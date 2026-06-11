@@ -64,6 +64,14 @@ const categoryMap: Record<string, string> = {
 }
 const sourceMap: Record<string, string> = { system: '系統抓取', operation: '運營添加', merchant: '商戶提交' }
 
+/** 展示位置 */
+const displayPositionOptions = [
+  { label: '全部', value: 'all' },
+  { label: '頂部', value: 'top' },
+  { label: '底部', value: 'bottom' },
+]
+const displayPositionMap: Record<string, string> = { top: '頂部', bottom: '底部' }
+
 /* ===== 数据模型 ===== */
 
 interface HotSearchWord {
@@ -76,6 +84,7 @@ interface HotSearchWord {
   brand: string
   searchEntry: string
   searchCount: number
+  displayPosition: string
   status: 'active' | 'inactive'
   addedBy: string
   addedTime: string
@@ -87,37 +96,37 @@ interface HotSearchWord {
 function makeMockData(): HotSearchWord[] {
   const words: Omit<HotSearchWord, 'key' | 'rank'>[] = [
     // mFood - 大首页
-    { wordId: 'MF-HW001', word: '火鍋', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 45623, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '冬季熱門詞' },
-    { wordId: 'MF-HW002', word: '珍珠奶茶', category: 'dessert', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 38456, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '穩定熱門詞' },
-    { wordId: 'MF-HW003', word: '618大促', category: 'festival', source: 'operation', brand: 'mfood', searchEntry: 'home', searchCount: 35000, status: 'active', addedBy: '張曉明(E10023)', addedTime: '2026-06-05 10:30', remark: '618活動推廣' },
-    { wordId: 'MF-HW004', word: '麥當勞', category: 'brand', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 32145, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '品牌詞' },
-    { wordId: 'MF-HW005', word: '壽司', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 21000, status: 'active', addedBy: '系統', addedTime: '2026-06-07 09:00', remark: '' },
+    { wordId: 'MF-HW001', word: '火鍋', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 45623, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '冬季熱門詞' },
+    { wordId: 'MF-HW002', word: '珍珠奶茶', category: 'dessert', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 38456, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '穩定熱門詞' },
+    { wordId: 'MF-HW003', word: '618大促', category: 'festival', source: 'operation', brand: 'mfood', searchEntry: 'home', searchCount: 35000, displayPosition: 'top', status: 'active', addedBy: '張曉明(E10023)', addedTime: '2026-06-05 10:30', remark: '618活動推廣' },
+    { wordId: 'MF-HW004', word: '麥當勞', category: 'brand', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 32145, displayPosition: 'bottom', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '品牌詞' },
+    { wordId: 'MF-HW005', word: '壽司', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'home', searchCount: 21000, displayPosition: 'bottom', status: 'active', addedBy: '系統', addedTime: '2026-06-07 09:00', remark: '' },
     // mFood - 外卖搜索
-    { wordId: 'MF-HW010', word: '炸雞', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'takeaway', searchCount: 41000, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '外賣熱門' },
-    { wordId: 'MF-HW011', word: '漢堡包', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'takeaway', searchCount: 33000, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'MF-HW012', word: '燒臘飯', category: 'food', source: 'merchant', brand: 'mfood', searchEntry: 'takeaway', searchCount: 27000, status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-06 09:15', remark: '' },
-    { wordId: 'MF-HW013', word: '下午茶套餐', category: 'dessert', source: 'operation', brand: 'mfood', searchEntry: 'takeaway', searchCount: 24000, status: 'active', addedBy: '王美玲(E10089)', addedTime: '2026-06-08 14:20', remark: '下午茶時段' },
+    { wordId: 'MF-HW010', word: '炸雞', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'takeaway', searchCount: 41000, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '外賣熱門' },
+    { wordId: 'MF-HW011', word: '漢堡包', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'takeaway', searchCount: 33000, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'MF-HW012', word: '燒臘飯', category: 'food', source: 'merchant', brand: 'mfood', searchEntry: 'takeaway', searchCount: 27000, displayPosition: 'bottom', status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-06 09:15', remark: '' },
+    { wordId: 'MF-HW013', word: '下午茶套餐', category: 'dessert', source: 'operation', brand: 'mfood', searchEntry: 'takeaway', searchCount: 24000, displayPosition: 'bottom', status: 'active', addedBy: '王美玲(E10089)', addedTime: '2026-06-08 14:20', remark: '下午茶時段' },
     // mFood - 超市搜索
-    { wordId: 'MF-HW020', word: '生鮮蔬菜', category: 'supermarket', source: 'system', brand: 'mfood', searchEntry: 'supermarket', searchCount: 30000, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'MF-HW021', word: '牛奶', category: 'supermarket', source: 'system', brand: 'mfood', searchEntry: 'supermarket', searchCount: 28500, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'MF-HW022', word: '零食大禮包', category: 'supermarket', source: 'merchant', brand: 'mfood', searchEntry: 'supermarket', searchCount: 18000, status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-05 11:00', remark: '' },
+    { wordId: 'MF-HW020', word: '生鮮蔬菜', category: 'supermarket', source: 'system', brand: 'mfood', searchEntry: 'supermarket', searchCount: 30000, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'MF-HW021', word: '牛奶', category: 'supermarket', source: 'system', brand: 'mfood', searchEntry: 'supermarket', searchCount: 28500, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'MF-HW022', word: '零食大禮包', category: 'supermarket', source: 'merchant', brand: 'mfood', searchEntry: 'supermarket', searchCount: 18000, displayPosition: 'bottom', status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-05 11:00', remark: '' },
     // mFood - 团购搜索
-    { wordId: 'MF-HW030', word: '自助餐', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'groupBuy', searchCount: 37000, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'MF-HW031', word: 'SPA套餐', category: 'trending', source: 'operation', brand: 'mfood', searchEntry: 'groupBuy', searchCount: 25000, status: 'active', addedBy: '陳浩然(E10067)', addedTime: '2026-06-07 16:00', remark: '團購推廣' },
+    { wordId: 'MF-HW030', word: '自助餐', category: 'food', source: 'system', brand: 'mfood', searchEntry: 'groupBuy', searchCount: 37000, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'MF-HW031', word: 'SPA套餐', category: 'trending', source: 'operation', brand: 'mfood', searchEntry: 'groupBuy', searchCount: 25000, displayPosition: 'bottom', status: 'active', addedBy: '陳浩然(E10067)', addedTime: '2026-06-07 16:00', remark: '團購推廣' },
     // 闪峰 - 大首页
-    { wordId: 'SF-HW001', word: '端午禮盒', category: 'festival', source: 'operation', brand: 'flashBee', searchEntry: 'home', searchCount: 34000, status: 'active', addedBy: '李婉婷(E10045)', addedTime: '2026-06-07 14:30', remark: '端午節推廣' },
-    { wordId: 'SF-HW002', word: '咖啡', category: 'dessert', source: 'system', brand: 'flashBee', searchEntry: 'home', searchCount: 31500, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'SF-HW003', word: '新開業優惠', category: 'brand', source: 'operation', brand: 'flashBee', searchEntry: 'home', searchCount: 28000, status: 'active', addedBy: '陳浩然(E10067)', addedTime: '2026-06-01 09:00', remark: '新店開業' },
+    { wordId: 'SF-HW001', word: '端午禮盒', category: 'festival', source: 'operation', brand: 'flashBee', searchEntry: 'home', searchCount: 34000, displayPosition: 'top', status: 'active', addedBy: '李婉婷(E10045)', addedTime: '2026-06-07 14:30', remark: '端午節推廣' },
+    { wordId: 'SF-HW002', word: '咖啡', category: 'dessert', source: 'system', brand: 'flashBee', searchEntry: 'home', searchCount: 31500, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'SF-HW003', word: '新開業優惠', category: 'brand', source: 'operation', brand: 'flashBee', searchEntry: 'home', searchCount: 28000, displayPosition: 'bottom', status: 'active', addedBy: '陳浩然(E10067)', addedTime: '2026-06-01 09:00', remark: '新店開業' },
     // 闪峰 - 外卖搜索
-    { wordId: 'SF-HW010', word: '日式拉麵', category: 'food', source: 'system', brand: 'flashBee', searchEntry: 'takeaway', searchCount: 33200, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'SF-HW011', word: '泰式炒河', category: 'food', source: 'system', brand: 'flashBee', searchEntry: 'takeaway', searchCount: 25500, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'SF-HW012', word: '麻辣燙', category: 'food', source: 'merchant', brand: 'flashBee', searchEntry: 'takeaway', searchCount: 22000, status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-06 15:00', remark: '' },
+    { wordId: 'SF-HW010', word: '日式拉麵', category: 'food', source: 'system', brand: 'flashBee', searchEntry: 'takeaway', searchCount: 33200, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'SF-HW011', word: '泰式炒河', category: 'food', source: 'system', brand: 'flashBee', searchEntry: 'takeaway', searchCount: 25500, displayPosition: 'bottom', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'SF-HW012', word: '麻辣燙', category: 'food', source: 'merchant', brand: 'flashBee', searchEntry: 'takeaway', searchCount: 22000, displayPosition: 'bottom', status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-06 15:00', remark: '' },
     // 闪峰 - 超市搜索
-    { wordId: 'SF-HW020', word: '進口水果', category: 'supermarket', source: 'system', brand: 'flashBee', searchEntry: 'supermarket', searchCount: 27000, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'SF-HW021', word: '有機蔬菜', category: 'supermarket', source: 'merchant', brand: 'flashBee', searchEntry: 'supermarket', searchCount: 17500, status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-06 09:15', remark: '' },
+    { wordId: 'SF-HW020', word: '進口水果', category: 'supermarket', source: 'system', brand: 'flashBee', searchEntry: 'supermarket', searchCount: 27000, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'SF-HW021', word: '有機蔬菜', category: 'supermarket', source: 'merchant', brand: 'flashBee', searchEntry: 'supermarket', searchCount: 17500, displayPosition: 'bottom', status: 'inactive', addedBy: '商家提交', addedTime: '2026-06-06 09:15', remark: '' },
     // 闪峰 - 团购搜索
-    { wordId: 'SF-HW030', word: '酒店自助餐', category: 'food', source: 'system', brand: 'flashBee', searchEntry: 'groupBuy', searchCount: 36000, status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
-    { wordId: 'SF-HW031', word: '健身月卡', category: 'trending', source: 'operation', brand: 'flashBee', searchEntry: 'groupBuy', searchCount: 24000, status: 'active', addedBy: '李婉婷(E10045)', addedTime: '2026-06-04 11:00', remark: '團購推廣' },
+    { wordId: 'SF-HW030', word: '酒店自助餐', category: 'food', source: 'system', brand: 'flashBee', searchEntry: 'groupBuy', searchCount: 36000, displayPosition: 'top', status: 'active', addedBy: '系統', addedTime: '2026-06-08 10:00', remark: '' },
+    { wordId: 'SF-HW031', word: '健身月卡', category: 'trending', source: 'operation', brand: 'flashBee', searchEntry: 'groupBuy', searchCount: 24000, displayPosition: 'bottom', status: 'active', addedBy: '李婉婷(E10045)', addedTime: '2026-06-04 11:00', remark: '團購推廣' },
   ]
   return words.map((w, i) => ({ ...w, key: String(i + 1), rank: 0 }))
     .sort((a, b) => b.searchCount - a.searchCount)
@@ -182,6 +191,7 @@ export default function HotSearchLibrary() {
       searchEntry: activeEntry === 'all' ? 'home' : activeEntry,
       category: 'food',
       source: 'operation',
+      displayPosition: 'bottom',
       status: 'active',
     })
     setIsModalOpen(true)
@@ -263,6 +273,10 @@ export default function HotSearchLibrary() {
       render: (v: number) => v.toLocaleString(),
     },
     {
+      title: '展示位置', dataIndex: 'displayPosition', key: 'displayPosition', width: 80,
+      render: (v: string) => <Tag color={v === 'top' ? 'orange' : 'default'}>{displayPositionMap[v] || v}</Tag>,
+    },
+    {
       title: '狀態', dataIndex: 'status', key: 'status', width: 70,
       render: (v: string) => v === 'active' ? <Tag color="green">生效</Tag> : <Tag color="default">停用</Tag>,
     },
@@ -310,9 +324,7 @@ export default function HotSearchLibrary() {
           </Form.Item>
           <Form.Item label="搜索入口">
             <Select
-              placeholder="全部入口"
-              allowClear
-              value={activeEntry === 'all' ? undefined : activeEntry}
+              value={activeEntry}
               onChange={v => setActiveEntry(v || 'all')}
               options={entryOptions}
               style={{ width: 140 }}
@@ -419,6 +431,10 @@ export default function HotSearchLibrary() {
               <Select options={sourceOptions.filter(o => o.value !== 'all')} />
             </Form.Item>
           </div>
+
+          <Form.Item label="展示位置" name="displayPosition" rules={[{ required: true, message: '請選擇展示位置' }]}>
+            <Select options={displayPositionOptions.filter(o => o.value !== 'all')} />
+          </Form.Item>
 
           <Form.Item label="配圖" name="imageUrl" extra="建議尺寸：200×200px，支持 JPG/PNG，不超過 2MB">
             <Upload listType="picture-card" maxCount={1} accept=".jpg,.jpeg,.png" beforeUpload={() => false}>

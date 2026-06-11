@@ -21,7 +21,6 @@
   filter: drop-shadow(0 12px 28px rgba(232, 114, 12, 0.45));
 }
 
-/* 点击提示 */
 .pet-mascot-wrapper:not(.dragging) .pet-body::after {
   content: '點我查看需求';
   position: absolute;
@@ -43,12 +42,24 @@
   opacity: 1;
 }
 
-/* ===== 蜜蜂主体 - 悬浮呼吸动画 ===== */
 .pet-body {
   position: relative;
+  width: 84px;
+  height: 133px;
   animation: petFloat 3.5s ease-in-out infinite;
-  width: 100px;
-  height: 122px;
+}
+
+.pet-body::before {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68px;
+  height: 9px;
+  background: radial-gradient(ellipse, rgba(232, 114, 12, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: shadowPulse 3.5s ease-in-out infinite;
 }
 
 @keyframes petFloat {
@@ -60,50 +71,449 @@
   90% { transform: translateY(-2px) rotate(0.3deg); }
 }
 
-/* ===== 触角摇摆 ===== */
-.antenna-group {
-  transform-origin: 70px 22px;
-  animation: antennaWiggle 4s ease-in-out infinite;
-}
-
-@keyframes antennaWiggle {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(-3deg); }
-  40% { transform: rotate(2deg); }
-  60% { transform: rotate(-2deg); }
-  80% { transform: rotate(1.5deg); }
-}
-
-/* ===== 空闲呼吸（整体缩放） ===== */
-.pet-body svg {
-  animation: breathScale 4s ease-in-out infinite;
-}
-
-@keyframes breathScale {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
-}
-
-/* ===== 悬浮光晕 ===== */
-.pet-body::before {
-  content: '';
-  position: absolute;
-  bottom: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 8px;
-  background: radial-gradient(ellipse, rgba(232, 114, 12, 0.2) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: shadowPulse 3.5s ease-in-out infinite;
-}
-
 @keyframes shadowPulse {
   0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 0.8; }
   50% { transform: translateX(-50%) scaleX(1.3); opacity: 0.4; }
 }
 
-/* ========== 对话气泡（系统橙色主题） ========== */
+.uploaded-bee {
+  --motion-speed: 2.8s;
+  --signal-y: -2px;
+  --signal-rotate: 2deg;
+  --signal-scale: 1.12;
+  --motion-rotate: 7deg;
+  --motion-rotate-neg: -7deg;
+  --motion-x: 2px;
+  --motion-x-neg: -2px;
+  --motion-y: -2px;
+  --foot-y: -3px;
+  position: relative;
+  display: block;
+  isolation: isolate;
+  transform-origin: 50% 78%;
+  animation: beeBreath 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.uploaded-bee-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  transform-origin: center;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.uploaded-bee-base {
+  z-index: 1;
+}
+
+.uploaded-bee-face-repair {
+  display: none;
+}
+
+.uploaded-bee-expression {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 22%;
+  width: 56%;
+  height: 30%;
+  transform: translateX(-50%);
+  opacity: 1;
+  animation: beeExpressionBlink 3.2s ease-in-out infinite;
+  background: transparent !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.uploaded-bee-expression svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  background: transparent !important;
+}
+
+.uploaded-bee-motion {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.76;
+  will-change: transform, opacity;
+}
+
+.uploaded-bee-signal-motion {
+  left: 30%;
+  top: 0.5%;
+  width: 40%;
+  height: 25%;
+  animation: beeSignalGlow var(--motion-speed) ease-in-out infinite;
+}
+
+.uploaded-bee-signal-motion span {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 235, 59, 0.72);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.46);
+}
+
+.uploaded-bee-signal-motion span:first-child {
+  left: 2%;
+  animation: beeSignalDot calc(var(--motion-speed) * 0.82) ease-in-out infinite;
+}
+
+.uploaded-bee-signal-motion span:last-child {
+  right: 1%;
+  animation: beeSignalDot calc(var(--motion-speed) * 0.82) ease-in-out infinite 0.18s;
+}
+
+.uploaded-bee-left-wing-motion,
+.uploaded-bee-right-wing-motion {
+  top: 59%;
+  width: 21%;
+  height: 24%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.58);
+  filter: blur(0.2px);
+}
+
+.uploaded-bee-left-wing-motion {
+  left: 2%;
+  transform-origin: 100% 45%;
+  animation: beeLeftMotion calc(var(--motion-speed) * 0.72) ease-in-out infinite;
+}
+
+.uploaded-bee-right-wing-motion {
+  right: 2%;
+  transform-origin: 0 45%;
+  animation: beeRightMotion calc(var(--motion-speed) * 0.72) ease-in-out infinite;
+}
+
+.uploaded-bee-left-hand-motion,
+.uploaded-bee-right-hand-motion {
+  top: 55%;
+  width: 18%;
+  height: 28%;
+  border-radius: 999px;
+  border-top: 2px solid rgba(255, 183, 77, 0.34);
+}
+
+.uploaded-bee-left-hand-motion {
+  left: 10%;
+  transform-origin: 85% 12%;
+  animation: beeLeftMotion var(--motion-speed) ease-in-out infinite;
+}
+
+.uploaded-bee-right-hand-motion {
+  right: 10%;
+  transform-origin: 15% 12%;
+  animation: beeRightMotion var(--motion-speed) ease-in-out infinite;
+}
+
+.uploaded-bee-left-foot-motion,
+.uploaded-bee-right-foot-motion {
+  bottom: 0;
+  width: 16%;
+  height: 10%;
+  border-bottom: 2px solid rgba(232, 114, 12, 0.3);
+  border-radius: 50%;
+}
+
+.uploaded-bee-left-foot-motion {
+  left: 36%;
+  animation: beeFootLeft calc(var(--motion-speed) * 1.12) ease-in-out infinite;
+}
+
+.uploaded-bee-right-foot-motion {
+  right: 35%;
+  animation: beeFootRight calc(var(--motion-speed) * 1.12) ease-in-out infinite;
+}
+
+.uploaded-bee--excited,
+.uploaded-bee--surprised {
+  --motion-speed: 1.65s;
+  --signal-y: -3px;
+  --signal-rotate: 4deg;
+  --signal-scale: 1.18;
+  --motion-rotate: 10deg;
+  --motion-rotate-neg: -10deg;
+  --motion-x: 3px;
+  --motion-x-neg: -3px;
+  --motion-y: -3px;
+  --foot-y: -4px;
+}
+
+.uploaded-bee--sleepy {
+  --motion-speed: 4.6s;
+  --signal-y: -1px;
+  --signal-rotate: 1deg;
+  --signal-scale: 1.06;
+  --motion-rotate: 4deg;
+  --motion-rotate-neg: -4deg;
+  --motion-x: 1px;
+  --motion-x-neg: -1px;
+  --motion-y: -1px;
+  --foot-y: -1px;
+}
+
+.uploaded-bee--angry {
+  --motion-speed: 1.1s;
+  --signal-y: -4px;
+  --signal-rotate: 5deg;
+  --signal-scale: 1.2;
+  --motion-rotate: 12deg;
+  --motion-rotate-neg: -12deg;
+  --motion-x: 3px;
+  --motion-x-neg: -3px;
+  --motion-y: -3px;
+  --foot-y: -4px;
+  animation: beeBreath 3s ease-in-out infinite, beeTinyShake 0.32s ease-in-out infinite;
+}
+
+.uploaded-bee--love,
+.uploaded-bee--happy,
+.uploaded-bee--wink {
+  --motion-speed: 2.25s;
+  --signal-y: -2px;
+  --signal-rotate: 3deg;
+  --signal-scale: 1.14;
+  --motion-rotate: 8deg;
+  --motion-rotate-neg: -8deg;
+  --motion-x: 2px;
+  --motion-x-neg: -2px;
+  --motion-y: -2px;
+  --foot-y: -3px;
+}
+
+.uploaded-bee--thinking,
+.uploaded-bee--curious {
+  --motion-speed: 3s;
+  --signal-y: -2px;
+  --signal-rotate: 2deg;
+  --signal-scale: 1.1;
+  --motion-rotate: 6deg;
+  --motion-rotate-neg: -6deg;
+  --motion-x: 2px;
+  --motion-x-neg: -2px;
+  --motion-y: -2px;
+  --foot-y: -2px;
+}
+
+.uploaded-bee--cool,
+.uploaded-bee--cheeky,
+.uploaded-bee--hungry {
+  --motion-speed: 2s;
+  --signal-y: -3px;
+  --signal-rotate: 3deg;
+  --signal-scale: 1.15;
+  --motion-rotate: 9deg;
+  --motion-rotate-neg: -9deg;
+  --motion-x: 3px;
+  --motion-x-neg: -3px;
+  --motion-y: -2px;
+  --foot-y: -3px;
+}
+
+@keyframes beeBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+
+@keyframes beeTinyShake {
+  0%, 100% { translate: 0 0; }
+  35% { translate: -1px 0; }
+  70% { translate: 1px 0; }
+}
+
+@keyframes beeFaceSoftPulse {
+  0%, 100% { transform: scale(1); opacity: 0.98; }
+  50% { transform: scale(1.015); opacity: 1; }
+}
+
+@keyframes beeSignalGlow {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.52; }
+  50% { transform: translateY(var(--signal-y)) rotate(var(--signal-rotate)); opacity: 0.9; }
+}
+
+@keyframes beeSignalDot {
+  0%, 100% { transform: scale(0.92); opacity: 0.46; }
+  50% { transform: scale(var(--signal-scale)); opacity: 0.88; }
+}
+
+@keyframes beeLeftMotion {
+  0%, 100% { transform: rotate(0deg) translate(0, 0); opacity: 0.28; }
+  50% { transform: rotate(var(--motion-rotate-neg)) translate(var(--motion-x-neg), var(--motion-y)); opacity: 0.78; }
+}
+
+@keyframes beeRightMotion {
+  0%, 100% { transform: rotate(0deg) translate(0, 0); opacity: 0.28; }
+  50% { transform: rotate(var(--motion-rotate)) translate(var(--motion-x), var(--motion-y)); opacity: 0.78; }
+}
+
+@keyframes beeFootLeft {
+  0%, 100% { transform: translateY(0); opacity: 0.18; }
+  50% { transform: translateY(var(--foot-y)); opacity: 0.56; }
+}
+
+@keyframes beeFootRight {
+  0%, 100% { transform: translateY(var(--foot-y)); opacity: 0.56; }
+  50% { transform: translateY(0); opacity: 0.18; }
+}
+
+@keyframes beeExpressionBlink {
+  0%, 84%, 100% { transform: translateX(-50%) scaleY(1); }
+  88% { transform: translateX(-50%) scaleY(0.82); }
+  92% { transform: translateX(-50%) scaleY(1); }
+}
+
+.bee-eye-dot,
+.bee-eye-ring,
+.bee-eye-line,
+.bee-brow-line,
+.bee-mouth-line,
+.bee-smile-line,
+.bee-love-line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bee-eye-dot {
+  fill: #1f1209;
+}
+
+.bee-eye-ring {
+  fill: rgba(255, 255, 255, 0.86);
+  stroke: #1f1209;
+  stroke-width: 5;
+}
+
+.bee-eye-line,
+.bee-brow-line,
+.bee-mouth-line,
+.bee-smile-line {
+  fill: none;
+  stroke: #1f1209;
+  stroke-width: 8;
+}
+
+.bee-brow-line {
+  stroke-width: 10;
+}
+
+.bee-mouth-open {
+  fill: #ff2930;
+  stroke: rgba(94, 33, 8, 0.4);
+  stroke-width: 1.5;
+}
+
+.bee-mouth-soft,
+.bee-tongue {
+  fill: rgba(255, 94, 88, 0.75);
+}
+
+.bee-love-line {
+  fill: none;
+  stroke: #e91e63;
+  stroke-width: 5;
+}
+
+.bee-glass {
+  fill: rgba(36, 28, 24, 0.72);
+}
+
+.bee-glass-bridge {
+  fill: none;
+  stroke: rgba(36, 28, 24, 0.72);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.bee-drool {
+  fill: none;
+  stroke: #64B5F6;
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation: beeDrool 1s ease-in-out infinite;
+}
+
+.bee-face-mark,
+.bee-face-star,
+.bee-face-zzz,
+.bee-face-bang,
+.bee-heart-eye,
+.bee-float-heart,
+.bee-face-fire,
+.bee-food {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 800;
+  dominant-baseline: middle;
+  text-anchor: middle;
+  animation: beeFloatMark 1.8s ease-in-out infinite;
+}
+
+.bee-face-mark {
+  fill: #E8720C;
+  font-size: 27px;
+}
+
+.bee-face-mark-sub {
+  font-size: 16px;
+  opacity: 0.62;
+  animation-delay: 0.28s;
+}
+
+.bee-face-star {
+  fill: #FFB300;
+  font-size: 18px;
+}
+
+.bee-face-zzz {
+  fill: #8D6E63;
+  font-size: 16px;
+}
+
+.bee-face-zzz-big {
+  font-size: 24px;
+  animation-delay: 0.35s;
+}
+
+.bee-face-bang {
+  fill: #F44336;
+  font-size: 32px;
+}
+
+.bee-heart-eye {
+  fill: #E91E63;
+  font-size: 24px;
+}
+
+.bee-float-heart {
+  fill: #E91E63;
+  font-size: 15px;
+}
+
+.bee-face-fire,
+.bee-food {
+  font-size: 19px;
+}
+
+@keyframes beeFloatMark {
+  0%, 100% { transform: translateY(0); opacity: 0.86; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes beeDrool {
+  0%, 100% { opacity: 0.7; transform: translateY(0); }
+  50% { opacity: 0.35; transform: translateY(3px); }
+}
+
 .pet-bubble {
   position: absolute;
   bottom: 100%;
@@ -156,23 +566,12 @@
 }
 
 @keyframes bubblePop {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.3) translateY(12px);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1.12) translateY(-4px);
-  }
-  70% {
-    transform: translateX(-50%) scale(0.95) translateY(2px);
-  }
-  100% {
-    transform: translateX(-50%) scale(1) translateY(0);
-  }
+  0% { opacity: 0; transform: translateX(-50%) scale(0.3) translateY(12px); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.12) translateY(-4px); }
+  70% { transform: translateX(-50%) scale(0.95) translateY(2px); }
+  100% { transform: translateX(-50%) scale(1) translateY(0); }
 }
 
-/* ===== 气泡消失动画 ===== */
 .pet-bubble.closing {
   animation: bubbleClose 0.3s ease-in forwards;
 }

@@ -264,7 +264,7 @@ const expressions: Expression[] = [
 
 export default function PetMascot() {
   const location = useLocation()
-  const [pos, setPos] = useState({ x: window.innerWidth - 115, y: window.innerHeight - 190 })
+  const [pos, setPos] = useState({ x: window.innerWidth - 130, y: window.innerHeight - 225 })
   const [isDragging, setIsDragging] = useState(false)
   const [showBubble, setShowBubble] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -332,8 +332,8 @@ export default function PetMascot() {
     const onMove = (ev: MouseEvent) => {
       const newX = ev.clientX - dragOffsetRef.current.x
       const newY = ev.clientY - dragOffsetRef.current.y
-      const maxX = window.innerWidth - 100
-      const maxY = window.innerHeight - 122
+      const maxX = window.innerWidth - 118
+      const maxY = window.innerHeight - 180
       setPos({
         x: Math.max(0, Math.min(maxX, newX)),
         y: Math.max(0, Math.min(maxY, newY)),
@@ -367,7 +367,7 @@ export default function PetMascot() {
           </div>
         )}
         <div className="pet-body">
-          <PikachuFace expression={current.name} />
+          <PikachuFace expression={current.name} size={108} />
         </div>
       </div>
 
