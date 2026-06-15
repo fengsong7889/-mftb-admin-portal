@@ -19,9 +19,9 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 const DEFAULT_USER: UserInfo = {
   username: 'admin',
-  name: '皮卡丘',
+  name: '小蜜蜂',
   empId: 'A0001',
-  avatar: 'pikachu-default', // 默认皮卡丘头像
+  avatar: 'pikachu-default', // 默认小蜜蜂头像
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
