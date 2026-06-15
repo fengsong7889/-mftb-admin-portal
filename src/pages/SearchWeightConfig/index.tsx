@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
+import dayjs from 'dayjs'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -469,9 +470,18 @@ export default function SearchWeightConfig() {
     setEditingRecord(record)
     setModalDirection(record.interventionDirection)
     setCurrentAdjustMethod(record.adjustMethod || 'fixedBoost')
-    // 加载梯队数据
-    setBoostTiers(record.boostTiers || [])
-    setDemoteTiers(record.demoteTiers || [])
+    // 加载梯队数据，如果没有则初始化默认梯队
+    if (record.interventionDirection === 'boost') {
+      setBoostTiers(record.boostTiers && record.boostTiers.length > 0 
+        ? record.boostTiers 
+        : [{ minAmount: 0, maxAmount: undefined, boostType: 'fixed_boost', boostValue: 10 }])
+      setDemoteTiers([])
+    } else {
+      setDemoteTiers(record.demoteTiers && record.demoteTiers.length > 0 
+        ? record.demoteTiers 
+        : [{ days: 0, deductionType: 'percent_deduction', deductionValue: 10 }])
+      setBoostTiers([])
+    }
     // 先打开Modal，然后在下一个tick设置表单值
     setIsModalOpen(true)
     setTimeout(() => {
@@ -848,7 +858,7 @@ export default function SearchWeightConfig() {
             name="groupId"
             rules={[{ required: true, message: '請輸入集團ID' }]}
           >
-            <Input placeholder="請輸入集團ID" />
+            <Input placeholder="請輸入集團ID" disabled={!!editingRecord} />
           </Form.Item>
 
           <Form.Item
@@ -856,7 +866,7 @@ export default function SearchWeightConfig() {
             name="groupName"
             rules={[{ required: true, message: '請輸入集團名稱' }]}
           >
-            <Input placeholder="請輸入集團名稱搜索" />
+            <Input placeholder="請輸入集團名稱搜索" disabled={!!editingRecord} />
           </Form.Item>
 
           <Form.Item
@@ -867,6 +877,7 @@ export default function SearchWeightConfig() {
             <Select
               options={brandOptions.filter(o => o.value !== 'all')}
               placeholder="請選擇品牌"
+              disabled={!!editingRecord}
             />
           </Form.Item>
 
@@ -879,11 +890,12 @@ export default function SearchWeightConfig() {
               mode="multiple"
               options={searchChannelOptions.filter(o => o.value !== 'all')}
               placeholder="請選擇搜索頻道"
+              disabled={!!editingRecord}
             />
           </Form.Item>
 
           {/* 加分梯队配置 */}
-          {modalDirection === 'boost' && !editingRecord && (
+          {modalDirection === 'boost' && (
             <>
               <Form.Item label="加分規則配置">
                 <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
@@ -967,8 +979,8 @@ export default function SearchWeightConfig() {
             </>
           )}
 
-          {/* 减分梯队配置 */}
-          {modalDirection === 'demote' && !editingRecord && (
+          {/* 減分梯队配置 */}
+          {modalDirection === 'demote' && (
             <>
               <Form.Item label="減分規則配置">
                 <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
@@ -1058,35 +1070,7 @@ export default function SearchWeightConfig() {
             </>
           )}
 
-          {/* 旧版单规则配置（编辑模式显示） */}
-          {editingRecord && (
-            <>
-              <Form.Item
-                label="調整方式"
-                name="adjustMethod"
-                rules={[{ required: true, message: '請選擇調整方式' }]}
-              >
-                <Select
-                  options={getMethodOptionsByDirection(modalDirection)}
-                  placeholder="請選擇調整方式"
-                  onChange={handleAdjustMethodChange}
-                />
-              </Form.Item>
 
-              <Form.Item
-                label="調整數值"
-                name="adjustValue"
-                rules={[{ required: true, message: '請輸入調整數值' }]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder={adjustValueConfig.placeholder}
-                  addonAfter={adjustValueConfig.addonAfter}
-                  min={1}
-                />
-              </Form.Item>
-            </>
-          )}
 
           <Form.Item
             label="原因說明"
