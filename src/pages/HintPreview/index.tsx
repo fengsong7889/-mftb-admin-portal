@@ -347,9 +347,10 @@ export default function HintPreview() {
                         height: 24,
                         overflow: 'hidden',
                       }}>
+                        {/* 当前词 - 向上滑动消失 */}
                         <div style={{
                           position: 'absolute',
-                          bottom: isAnimating ? '-24px' : '0',
+                          bottom: isAnimating ? '24px' : '0',
                           left: 0,
                           right: 0,
                           height: 24,
@@ -367,28 +368,27 @@ export default function HintPreview() {
                             {currentHint?.hintWord || '請輸入搜索關鍵詞'}
                           </span>
                         </div>
-                        {isAnimating && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '24px',
-                            left: 0,
-                            right: 0,
-                            height: 24,
-                            display: 'flex',
-                            alignItems: 'center',
-                            transition: 'bottom 0.5s ease-in-out',
+                        {/* 下一个词 - 向上滑动显示 */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: isAnimating ? '0' : '-24px',
+                          left: 0,
+                          right: 0,
+                          height: 24,
+                          display: 'flex',
+                          alignItems: 'center',
+                          transition: 'bottom 0.5s ease-in-out',
+                        }}>
+                          <span style={{
+                            fontSize: 14,
+                            color: '#666',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                           }}>
-                            <span style={{
-                              fontSize: 14,
-                              color: '#666',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {previewItems[(currentHintIndex + 1) % previewItems.length]?.hintWord}
-                            </span>
-                          </div>
-                        )}
+                            {previewItems[(currentHintIndex + 1) % previewItems.length]?.hintWord}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
