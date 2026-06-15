@@ -603,7 +603,7 @@ export default function SearchWeightConfig() {
   /** 彈窗標題 */
   const getModalTitle = () => {
     if (editingRecord) return '編輯干預配置'
-    return modalDirection === 'boost' ? '新增加分配置' : '新增減分配置'
+    return '新增商戶配置'
   }
 
   /** 列配置元數據 */
@@ -800,22 +800,22 @@ export default function SearchWeightConfig() {
       <div className="action-section">
         <Space>
           <Button icon={<ExportOutlined />}>數據導出</Button>
-          <Tooltip title="需要加分權限">
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAddBoost}
-              disabled={!userPermissions.canBoost}
-              style={{ background: '#52c41a', borderColor: '#52c41a' }}
-            >
-              新增加分
-            </Button>
-          </Tooltip>
-          <Tooltip title="需要減分權限">
-            <Button danger icon={<PlusOutlined />} onClick={handleAddDemote} disabled={!userPermissions.canDemote}>
-              新增減分
-            </Button>
-          </Tooltip>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditingRecord(null)
+              setModalDirection('boost') // 默认加分，表单内可切换
+              setCurrentAdjustMethod('fixedBoost')
+              setBoostTiers([{ minAmount: 0, maxAmount: undefined, boostType: 'fixed_boost', boostValue: 10 }])
+              setDemoteTiers([{ days: 0, deductionType: 'percent_deduction', deductionValue: 10 }])
+              form.resetFields()
+              form.setFieldsValue({ searchChannel: ['takeaway'], interventionCategory: 'boost' })
+              setIsModalOpen(true)
+            }}
+          >
+            新增商戶
+          </Button>
         </Space>
         {configComponent}
       </div>
@@ -893,6 +893,27 @@ export default function SearchWeightConfig() {
               disabled={!!editingRecord}
             />
           </Form.Item>
+
+          {/* 新增模式下显示干预类目选择 */}
+          {!editingRecord && (
+            <Form.Item
+              label="干預類目"
+              name="interventionCategory"
+              rules={[{ required: true, message: '請選擇干預類目' }]}
+            >
+              <Select
+                placeholder="請選擇干預類目"
+                options={[
+                  { label: '加分类目', value: 'boost' },
+                  { label: '减分类目', value: 'demote' },
+                ]}
+                onChange={(val: 'boost' | 'demote') => {
+                  setModalDirection(val)
+                  setCurrentAdjustMethod(val === 'boost' ? 'fixedBoost' : 'discount')
+                }}
+              />
+            </Form.Item>
+          )}
 
           {/* 加分梯队配置 */}
           {modalDirection === 'boost' && (
