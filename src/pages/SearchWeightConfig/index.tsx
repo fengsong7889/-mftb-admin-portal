@@ -472,14 +472,17 @@ export default function SearchWeightConfig() {
     // 加载梯队数据
     setBoostTiers(record.boostTiers || [])
     setDemoteTiers(record.demoteTiers || [])
-    form.setFieldsValue({
-      ...record,
-      dateRange:
-        record.effectStartDate && record.effectEndDate
-          ? [record.effectStartDate, record.effectEndDate]
-          : undefined,
-    })
+    // 先打开Modal，然后在下一个tick设置表单值
     setIsModalOpen(true)
+    setTimeout(() => {
+      form.setFieldsValue({
+        ...record,
+        dateRange:
+          record.effectStartDate && record.effectEndDate
+            ? [dayjs(record.effectStartDate), dayjs(record.effectEndDate)]
+            : undefined,
+      })
+    }, 0)
   }
 
   /** 詳情 */
