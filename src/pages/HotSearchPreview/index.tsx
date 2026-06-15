@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Card, Select, Space, Tag, Empty, Form } from 'antd'
-import { SearchOutlined, ReloadOutlined, FireOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, FireOutlined, WifiOutlined } from '@ant-design/icons'
 
 /** 搜索界面 */
 const searchPageOptions = [
@@ -115,42 +115,91 @@ export default function HotSearchPreview() {
         <h3 style={{ marginBottom: 16, fontSize: 15, color: '#333' }}>熱搜詞預覽效果</h3>
 
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          {/* 手机模型 */}
+          {/* 手机模型 - 统一样式 */}
           <div style={{
-            width: 375, border: '1px solid #E0E0E0', borderRadius: 24, padding: '12px 16px 24px',
-            background: '#FAFAFA', flexShrink: 0,
+            width: 375,
+            height: 720,
+            background: 'linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%)',
+            borderRadius: 40,
+            padding: '60px 20px 30px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255,255,255,0.1)',
+            border: '10px solid #1a1a1a',
+            position: 'relative',
+            flexShrink: 0,
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', fontSize: 12, color: '#999', marginBottom: 12 }}>
-              <span>9:41</span><span>📶 🔋</span>
-            </div>
-            {/* 搜索框 */}
+            {/* 顶部状态栏 */}
             <div style={{
-              background: '#F0F0F0', borderRadius: 20, padding: '8px 16px',
-              display: 'flex', alignItems: 'center', gap: 8, color: '#999', fontSize: 14, marginBottom: 16,
+              position: 'absolute',
+              top: 16,
+              left: 0,
+              right: 0,
+              padding: '0 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 12,
+              color: '#333',
+              fontWeight: 600,
             }}>
-              <SearchOutlined style={{ color: '#BFBFBF' }} />
-              <span>搜索你想要的...</span>
-            </div>
-            {/* 热搜词列表 */}
-            <div style={{ padding: '0 4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
-                <FireOutlined style={{ color: '#E8720C' }} />
-                <span style={{ fontSize: 13, fontWeight: 500, color: '#333' }}>熱搜</span>
+              <span>9:41</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <WifiOutlined style={{ fontSize: 14 }} />
+                <span style={{ fontSize: 11 }}>📶</span>
+                <span style={{ fontSize: 11 }}>🔋</span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {previewItems.length > 0 ? previewItems.map((item) => (
-                  <span key={item.rank} style={{
-                    display: 'inline-block', padding: '4px 12px', borderRadius: 14, fontSize: 13,
-                    border: `1.5px solid ${item.style.borderColor}`,
-                    background: item.style.bgColor,
-                    color: item.style.fontColor,
-                  }}>
-                    {item.rank <= 3 && <span style={{ color: item.rank === 1 ? '#E8720C' : item.rank === 2 ? '#F58A2E' : '#FAAD14', fontWeight: 600, marginRight: 2 }}>{item.rank}</span>}
-                    {item.word}
-                  </span>
-                )) : (
-                  <span style={{ color: '#999', fontSize: 13 }}>暫無熱搜詞</span>
-                )}
+            </div>
+
+            {/* 屏幕内容区 */}
+            <div style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: '16px 16px 24px',
+              height: 'calc(100% - 20px)',
+              overflow: 'hidden',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
+            }}>
+              {/* 搜索框 */}
+              <div style={{
+                background: '#F5F5F5',
+                borderRadius: 20,
+                padding: '10px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                color: '#999',
+                fontSize: 14,
+                marginBottom: 20,
+                border: '1px solid #EEEEEE',
+              }}>
+                <SearchOutlined style={{ color: '#BFBFBF', fontSize: 16 }} />
+                <span style={{ color: '#BFBFBF' }}>搜索你想要的...</span>
+              </div>
+
+              {/* 热搜词列表 */}
+              <div style={{ padding: '0 4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                  <FireOutlined style={{ color: '#E8720C', fontSize: 15 }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>熱搜</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {previewItems.length > 0 ? previewItems.map((item) => (
+                    <span key={item.rank} style={{
+                      display: 'inline-block',
+                      padding: '6px 14px',
+                      borderRadius: 16,
+                      fontSize: 13,
+                      border: `2px solid ${item.style.borderColor}`,
+                      background: item.style.bgColor,
+                      color: item.style.fontColor,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    }}>
+                      {item.rank <= 3 && <span style={{ color: item.rank === 1 ? '#E8720C' : item.rank === 2 ? '#F58A2E' : '#FAAD14', fontWeight: 700, marginRight: 3 }}>{item.rank}</span>}
+                      {item.word}
+                    </span>
+                  )) : (
+                    <span style={{ color: '#999', fontSize: 13 }}>暫無熱搜詞</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

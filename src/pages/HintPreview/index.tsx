@@ -290,95 +290,83 @@ export default function HintPreview() {
               }}>
                 <div style={{
                   width: 375,
-                  height: 667,
+                  height: 720,
                   background: 'linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%)',
-                  borderRadius: 30,
-                  padding: '50px 20px 20px',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
-                  border: '8px solid #333',
+                  borderRadius: 40,
+                  padding: '60px 20px 30px',
+                  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255,255,255,0.1)',
+                  border: '10px solid #1a1a1a',
                   position: 'relative',
                 }}>
                   {/* 状态栏 */}
                   <div style={{
                     position: 'absolute',
-                    top: 15,
+                    top: 16,
                     left: 0,
                     right: 0,
                     display: 'flex',
                     justifyContent: 'space-between',
-                    padding: '0 20px',
+                    padding: '0 24px',
                     fontSize: 12,
                     color: '#333',
                     fontWeight: 600,
                   }}>
                     <span>9:41</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <span>📶</span>
-                      <span>📶</span>
-                      <span>🔋</span>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 14 }}>📶</span>
+                      <span style={{ fontSize: 11 }}>📶</span>
+                      <span style={{ fontSize: 11 }}>🔋</span>
                     </div>
                   </div>
 
-                  {/* 频道页头部 */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-                    padding: '20px 16px',
-                    borderRadius: 12,
-                    marginBottom: 16,
-                    color: '#fff',
-                    boxShadow: '0 4px 12px rgba(24, 144, 255, 0.3)',
-                  }}>
-                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
-                      {brand === 'mFood' ? 'mFood' : '閃蜂'}
-                    </div>
-                    <div style={{ fontSize: 13, opacity: 0.9 }}>
-                      {channelMap[searchChannel]}
-                    </div>
-                  </div>
-
-                  {/* 搜索框 */}
+                  {/* 屏幕内容区 */}
                   <div style={{
                     background: '#fff',
                     borderRadius: 24,
-                    padding: '4px 4px 4px 16px',
-                    marginBottom: 16,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e8e8e8',
+                    padding: '16px 16px 24px',
+                    height: 'calc(100% - 20px)',
+                    overflow: 'hidden',
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
                   }}>
-                    <SearchOutlined style={{ color: '#999', fontSize: 18 }} />
+                    {/* 频道页头部 */}
                     <div style={{
-                      flex: 1,
-                      position: 'relative',
-                      height: 40,
-                      overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                      padding: '20px 16px',
+                      borderRadius: 16,
+                      marginBottom: 16,
+                      color: '#fff',
+                      boxShadow: '0 4px 12px rgba(24, 144, 255, 0.3)',
                     }}>
-                      <div style={{
-                        position: 'absolute',
-                        top: isAnimating ? '-40px' : '0',
-                        left: 0,
-                        right: 0,
-                        height: 40,
-                        display: 'flex',
-                        alignItems: 'center',
-                        transition: 'top 0.5s ease-in-out',
-                      }}>
-                        <span style={{
-                          fontSize: 15,
-                          color: '#666',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {currentHint?.hintWord || '請輸入搜索關鍵詞'}
-                        </span>
+                      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
+                        {brand === 'mFood' ? 'mFood' : '閃蜂'}
                       </div>
-                      {isAnimating && (
+                      <div style={{ fontSize: 13, opacity: 0.9 }}>
+                        {channelMap[searchChannel]}
+                      </div>
+                    </div>
+
+                    {/* 搜索框 */}
+                    <div style={{
+                      background: '#F5F5F5',
+                      borderRadius: 20,
+                      padding: '4px 4px 4px 16px',
+                      marginBottom: 16,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                      border: '1px solid #EEEEEE',
+                    }}>
+                      <SearchOutlined style={{ color: '#999', fontSize: 18 }} />
+                      <div style={{
+                        flex: 1,
+                        position: 'relative',
+                        height: 40,
+                        overflow: 'hidden',
+                      }}>
                         <div style={{
                           position: 'absolute',
-                          top: '40px',
+                          top: isAnimating ? '-40px' : '0',
                           left: 0,
                           right: 0,
                           height: 40,
@@ -393,86 +381,108 @@ export default function HintPreview() {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}>
-                            {previewItems[(currentHintIndex + 1) % previewItems.length]?.hintWord}
+                            {currentHint?.hintWord || '請輸入搜索關鍵詞'}
                           </span>
                         </div>
-                      )}
+                        {isAnimating && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '40px',
+                            left: 0,
+                            right: 0,
+                            height: 40,
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'top 0.5s ease-in-out',
+                          }}>
+                            <span style={{
+                              fontSize: 15,
+                              color: '#666',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {previewItems[(currentHintIndex + 1) % previewItems.length]?.hintWord}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="primary"
+                        shape="round"
+                        size="large"
+                        icon={<SearchOutlined />}
+                        style={{
+                          background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                          border: 'none',
+                          boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)',
+                        }}
+                      >
+                        搜索
+                      </Button>
                     </div>
-                    <Button
-                      type="primary"
-                      shape="round"
-                      size="large"
-                      icon={<SearchOutlined />}
-                      style={{
-                        background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-                        border: 'none',
-                        boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)',
-                      }}
-                    >
-                      搜索
-                    </Button>
-                  </div>
 
-                  {/* 底纹词轮播指示器 */}
-                  {previewItems.length > 0 && (
-                    <div style={{
-                      textAlign: 'center',
-                      marginBottom: 20,
-                    }}>
+                    {/* 底纹词轮播指示器 */}
+                    {previewItems.length > 0 && (
                       <div style={{
-                        display: 'inline-flex',
-                        gap: 6,
-                        padding: '6px 12px',
-                        background: 'rgba(24, 144, 255, 0.05)',
-                        borderRadius: 12,
+                        textAlign: 'center',
+                        marginBottom: 20,
                       }}>
-                        {previewItems.map((_, index) => (
-                          <div
-                            key={index}
-                            style={{
-                              width: index === currentHintIndex ? 20 : 8,
-                              height: 8,
-                              borderRadius: 4,
-                              background: index === currentHintIndex ? '#1890ff' : '#d9d9d9',
-                              transition: 'all 0.3s ease',
-                            }}
-                          />
-                        ))}
+                        <div style={{
+                          display: 'inline-flex',
+                          gap: 6,
+                          padding: '6px 12px',
+                          background: 'rgba(24, 144, 255, 0.05)',
+                          borderRadius: 12,
+                        }}>
+                          {previewItems.map((_, index) => (
+                            <div
+                              key={index}
+                              style={{
+                                width: index === currentHintIndex ? 20 : 8,
+                                height: 8,
+                                borderRadius: 4,
+                                background: index === currentHintIndex ? '#1890ff' : '#d9d9d9',
+                                transition: 'all 0.3s ease',
+                              }}
+                            />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* 当前底纹词信息 */}
-                  {currentHint && (
-                    <div style={{
-                      background: '#fff',
-                      padding: '16px',
-                      borderRadius: 12,
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                    }}>
-                      <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>
-                        當前底紋配置
+                    {/* 当前底纹词信息 */}
+                    {currentHint && (
+                      <div style={{
+                        background: '#FAFAFA',
+                        padding: '16px',
+                        borderRadius: 12,
+                        border: '1px solid #F0F0F0',
+                      }}>
+                        <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>
+                          當前底紋配置
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff', marginBottom: 8 }}>
+                          {currentHint.hintWord}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Tag color="blue">ID: {currentHint.hintId}</Tag>
+                          <Tag color="gold">優先級 {currentHint.priority}</Tag>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff', marginBottom: 8 }}>
-                        {currentHint.hintWord}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <Tag color="blue">ID: {currentHint.hintId}</Tag>
-                        <Tag color="gold">優先級 {currentHint.priority}</Tag>
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {previewItems.length === 0 && (
-                    <div style={{
-                      textAlign: 'center',
-                      padding: '80px 20px',
-                      color: '#999',
-                    }}>
-                      <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
-                      <div style={{ fontSize: 15 }}>暫無底紋詞展示</div>
-                    </div>
-                  )}
+                    {previewItems.length === 0 && (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '80px 20px',
+                        color: '#999',
+                      }}>
+                        <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
+                        <div style={{ fontSize: 15 }}>暫無底紋詞展示</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
