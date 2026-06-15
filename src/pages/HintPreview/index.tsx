@@ -350,13 +350,13 @@ export default function HintPreview() {
                         {/* 当前词 - 向上滑动消失 */}
                         <div style={{
                           position: 'absolute',
-                          bottom: isAnimating ? '24px' : '0',
+                          top: isAnimating ? '-24px' : '0',
                           left: 0,
                           right: 0,
                           height: 24,
                           display: 'flex',
                           alignItems: 'center',
-                          transition: 'bottom 0.5s ease-in-out',
+                          transition: 'top 0.5s ease-in-out',
                         }}>
                           <span style={{
                             fontSize: 14,
@@ -368,16 +368,16 @@ export default function HintPreview() {
                             {currentHint?.hintWord || '請輸入搜索關鍵詞'}
                           </span>
                         </div>
-                        {/* 下一个词 - 向上滑动显示 */}
+                        {/* 下一个词 - 从下方往上滑入 */}
                         <div style={{
                           position: 'absolute',
-                          bottom: isAnimating ? '0' : '-24px',
+                          top: isAnimating ? '0' : '24px',
                           left: 0,
                           right: 0,
                           height: 24,
                           display: 'flex',
                           alignItems: 'center',
-                          transition: 'bottom 0.5s ease-in-out',
+                          transition: 'top 0.5s ease-in-out',
                         }}>
                           <span style={{
                             fontSize: 14,
