@@ -371,7 +371,7 @@ export default function HintPreview() {
                         {/* 下一个词 - 从下方往上滑入 */}
                         <div style={{
                           position: 'absolute',
-                          top: isAnimating ? '0' : '24px',
+                          top: isAnimating ? '0' : '100%',
                           left: 0,
                           right: 0,
                           height: 24,

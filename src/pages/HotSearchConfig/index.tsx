@@ -605,7 +605,7 @@ export default function HotSearchConfig() {
       <div className="action-section">
         <Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增熱搜詞</Button>
-          <Button icon={<EyeOutlined />} onClick={() => navigate('/hot-search-preview')}>效果預覽</Button>
+          <Button icon={<EyeOutlined />} onClick={() => navigate('/hot-search-verify')}>效果預覽</Button>
         </Space>
         {configComponent}
       </div>

@@ -25,10 +25,18 @@ const HintReport = lazy(() => import('./pages/HintReport'))
 const HotSearchReport = lazy(() => import('./pages/HotSearchReport'))
 const SynonymConfig = lazy(() => import('./pages/SynonymConfig'))
 const SearchWeightConfig = lazy(() => import('./pages/SearchWeightConfig'))
-const SearchConfig = lazy(() => import('./pages/SearchConfig'))
 const HotSearchLibrary = lazy(() => import('./pages/HotSearchLibrary'))
+const StopWords = lazy(() => import('./pages/StopWords'))
 const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
 const ApprovalDetail = lazy(() => import('./pages/ApprovalDetail'))
+const SearchVerify = lazy(() => import('./pages/SearchVerify'))
+const SearchVerifyDetail = lazy(() => import('./pages/SearchVerifyDetail'))
+const HintVerify = lazy(() => import('./pages/HintVerify'))
+const HotSearchVerify = lazy(() => import('./pages/HotSearchVerify'))
+// 搜索配置管理(新系统)
+const GlobalConfig = lazy(() => import('./pages/SearchConfigNew/GlobalConfig'))
+const ChannelStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
+const CommercialConfig = lazy(() => import('./pages/SearchConfigNew/CommercialConfig'))
 
 const { Content } = Layout
 
@@ -65,7 +73,6 @@ function AuthenticatedLayout() {
               <Route path="/approval-center" element={<ApprovalCenter />} />
               <Route path="/approval-detail" element={<ApprovalDetail />} />
               {/* 搜索管理 */}
-              <Route path="/search-config" element={<SearchConfig />} />
               <Route path="/word-segmentation" element={<WordSegmentation />} />
               <Route path="/synonym-config" element={<SynonymConfig />} />
               <Route path="/hint-config" element={<HintConfig />} />
@@ -75,8 +82,18 @@ function AuthenticatedLayout() {
               <Route path="/search-weight-config" element={<SearchWeightConfig />} />
               
               <Route path="/hot-search-library" element={<HotSearchLibrary />} />
+              <Route path="/stop-words" element={<StopWords />} />
               <Route path="/hint-report" element={<HintReport />} />
               <Route path="/hot-search-report" element={<HotSearchReport />} />
+              {/* 搜索配置校驗 */}
+              <Route path="/search-verify" element={<SearchVerify />} />
+              <Route path="/search-verify-detail/:id" element={<SearchVerifyDetail />} />
+              <Route path="/hint-verify" element={<HintVerify />} />
+              <Route path="/hot-search-verify" element={<HotSearchVerify />} />
+              {/* 搜索配置管理(新系统) */}
+              <Route path="/global-config" element={<GlobalConfig />} />
+              <Route path="/channel-strategy" element={<ChannelStrategy />} />
+              <Route path="/commercial-config" element={<CommercialConfig />} />
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -23,6 +23,11 @@ import {
   HomeOutlined,
   ColumnHeightOutlined,
   SettingOutlined,
+  GlobalOutlined,
+  ThunderboltOutlined,
+  DollarOutlined,
+  StopOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -44,8 +49,6 @@ const keyToPath: Record<string, string> = {
   // 财务管理 - 审批管理
   'approval-center': '/approval-center',
   'approval-detail': '/approval-detail',
-  // 搜索管理 - 搜索配置
-  'search-config': '/search-config',
   // 搜索管理 - 搜索引导
   'hint-config': '/hint-config',
   'hint-preview': '/hint-preview',
@@ -56,9 +59,19 @@ const keyToPath: Record<string, string> = {
   'word-segmentation': '/word-segmentation',
   'synonym-config': '/synonym-config',
   'hot-search-library': '/hot-search-library',
+  'stop-words': '/stop-words',
   // 搜索管理 - 报表统计
   'hint-report': '/hint-report',
   'hot-search-report': '/hot-search-report',
+  // 搜索配置管理(新系统)
+  'global-config': '/global-config',
+  'channel-strategy': '/channel-strategy',
+  'commercial-config': '/commercial-config',
+  // 搜索校驗
+  'search-verify': '/search-verify',
+  'search-verify-detail': '/search-verify-detail',
+  'hint-verify': '/hint-verify',
+  'hot-search-verify': '/hot-search-verify',
 }
 
 /** 路由路径 → 菜单 key 映射（用于高亮） */
@@ -137,9 +150,26 @@ const menuItems: MenuItem[] = [
     label: '搜索管理',
     children: [
       {
-        key: 'search-config',
+        key: 'search-config-new',
         icon: <SettingOutlined />,
         label: '搜索配置',
+        children: [
+          {
+            key: 'global-config',
+            icon: <GlobalOutlined />,
+            label: '全局配置',
+          },
+          {
+            key: 'channel-strategy',
+            icon: <ThunderboltOutlined />,
+            label: '頻道搜索策略',
+          },
+          {
+            key: 'commercial-config',
+            icon: <DollarOutlined />,
+            label: '商業化管理',
+          },
+        ],
       },
       {
         key: 'search-guide',
@@ -183,6 +213,11 @@ const menuItems: MenuItem[] = [
             icon: <FireOutlined />,
             label: '熱搜詞庫',
           },
+          {
+            key: 'stop-words',
+            icon: <StopOutlined />,
+            label: '停用詞庫',
+          },
         ],
       },
       {
@@ -202,6 +237,28 @@ const menuItems: MenuItem[] = [
           },
         ],
       },
+      {
+        key: 'search-verify-group',
+        icon: <SafetyCertificateOutlined />,
+        label: '搜索校驗',
+        children: [
+          {
+            key: 'search-verify',
+            icon: <SearchOutlined />,
+            label: '搜索校驗',
+          },
+          {
+            key: 'hint-verify',
+            icon: <FontSizeOutlined />,
+            label: '底紋校驗',
+          },
+          {
+            key: 'hot-search-verify',
+            icon: <FireOutlined />,
+            label: '熱搜校驗',
+          },
+        ],
+      },
     ],
   },
 ]
@@ -214,7 +271,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const selectedKey = location.pathname === '/' ? 'home' : (pathToKey[location.pathname] || 'home')
+  const selectedKey = location.pathname === '/' ? 'home'
+    : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
+    : (pathToKey[location.pathname] || 'home')
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     const path = keyToPath[key]
@@ -249,7 +308,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         items={menuItems}
         onClick={handleMenuClick}
         selectedKeys={[selectedKey]}
-        defaultOpenKeys={['finance', 'promotion', 'search', 'search-guide']}
+        defaultOpenKeys={['finance', 'promotion', 'search', 'search-guide', 'search-config-new', 'search-verify-group']}
         className="sidebar-menu"
       />
     </Sider>

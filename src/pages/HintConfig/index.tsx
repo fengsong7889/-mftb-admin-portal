@@ -379,7 +379,7 @@ export default function HintConfig() {
         <Space>
           <Button icon={<ExportOutlined />}>數據導出</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>新增</Button>
-          <Button icon={<EyeOutlined />} onClick={() => navigate('/hint-preview')}>效果預覽</Button>
+          <Button icon={<EyeOutlined />} onClick={() => navigate('/hint-verify')}>效果預覽</Button>
         </Space>
               {configComponent}
       </div>
