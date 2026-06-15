@@ -5,7 +5,7 @@ import {
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, EyeOutlined,
-  FontSizeOutlined, EnvironmentOutlined,
+  FontSizeOutlined, EnvironmentOutlined, WifiOutlined,
 } from '@ant-design/icons'
 
 // ============================
@@ -297,99 +297,92 @@ export default function HintVerify() {
 
       {/* 結果區域 */}
       {searched && results.length > 0 && (
-        <Row gutter={20}>
-          {/* 左側：手機預覽 */}
-          <Col span={10}>
-            <Card title={<span style={{ fontSize: 15, fontWeight: 600 }}>📱 手機端預覽</span>}
-              style={{ borderRadius: 8, position: 'sticky', top: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div style={{
-                  width: 375, height: 720,
-                  background: 'linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%)',
-                  borderRadius: 40, padding: '60px 20px 30px',
-                  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255,255,255,0.1)',
-                  border: '10px solid #1a1a1a', position: 'relative',
-                }}>
-                  {/* 狀態欄 */}
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          {/* 手機模型 */}
+          <div style={{
+            width: 375, height: 720, flexShrink: 0,
+            background: 'linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%)',
+            borderRadius: 40, padding: '60px 20px 30px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255,255,255,0.1)',
+            border: '10px solid #1a1a1a', position: 'relative',
+          }}>
+            {/* 頂部狀態欄 */}
+            <div style={{
+              position: 'absolute', top: 16, left: 0, right: 0,
+              padding: '0 24px', display: 'flex', justifyContent: 'space-between',
+              alignItems: 'center', fontSize: 12, color: '#333', fontWeight: 600,
+            }}>
+              <span>9:41</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <WifiOutlined style={{ fontSize: 14 }} />
+                <span style={{ fontSize: 11 }}>📶</span>
+                <span style={{ fontSize: 11 }}>🔋</span>
+              </div>
+            </div>
+            {/* 屏幕內容區 */}
+            <div style={{
+              background: '#fff', borderRadius: 24, padding: '16px 16px 24px',
+              height: 'calc(100% - 20px)', overflow: 'hidden',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
+            }}>
+              {/* 搜索框 */}
+              <div style={{
+                background: '#F5F5F5', borderRadius: 20, padding: '10px 16px',
+                display: 'flex', alignItems: 'center', gap: 8, color: '#999',
+                fontSize: 14, marginBottom: 20, border: '1px solid #EEEEEE',
+              }}>
+                <SearchOutlined style={{ color: '#BFBFBF', fontSize: 16 }} />
+                <div style={{ flex: 1, position: 'relative', height: 24, overflow: 'hidden' }}>
+                  {/* 當前詞 */}
                   <div style={{
-                    position: 'absolute', top: 16, left: 0, right: 0,
-                    display: 'flex', justifyContent: 'space-between',
-                    padding: '0 24px', fontSize: 12, color: '#333', fontWeight: 600,
+                    position: 'absolute', top: isAnimating ? '-24px' : '0',
+                    left: 0, right: 0, height: 24, display: 'flex', alignItems: 'center',
+                    transition: 'top 0.5s ease-in-out',
                   }}>
-                    <span>9:41</span>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 14 }}>📶</span>
-                      <span style={{ fontSize: 11 }}>📶</span>
-                      <span style={{ fontSize: 11 }}>🔋</span>
-                    </div>
+                    <span style={{ fontSize: 14, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {currentHint?.hintWord || '請輸入搜索關鍵詞'}
+                    </span>
                   </div>
-                  {/* 屏幕內容區 */}
+                  {/* 下一個詞 */}
                   <div style={{
-                    background: '#fff', borderRadius: 24, padding: '16px 16px 24px',
-                    height: 'calc(100% - 20px)', overflow: 'hidden',
-                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
+                    position: 'absolute', top: isAnimating ? '0' : '100%',
+                    left: 0, right: 0, height: 24, display: 'flex', alignItems: 'center',
+                    transition: 'top 0.5s ease-in-out',
                   }}>
-                    {/* 搜索框 */}
-                    <div style={{
-                      background: '#F5F5F5', borderRadius: 20, padding: '10px 16px',
-                      marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10,
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', border: '1px solid #EEEEEE',
-                    }}>
-                      <SearchOutlined style={{ color: '#BFBFBF', fontSize: 16 }} />
-                      <div style={{ flex: 1, position: 'relative', height: 24, overflow: 'hidden' }}>
-                        {/* 當前詞 */}
-                        <div style={{
-                          position: 'absolute', top: isAnimating ? '-24px' : '0',
-                          left: 0, right: 0, height: 24, display: 'flex', alignItems: 'center',
-                          transition: 'top 0.5s ease-in-out',
-                        }}>
-                          <span style={{ fontSize: 14, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {currentHint?.hintWord || '請輸入搜索關鍵詞'}
-                          </span>
-                        </div>
-                        {/* 下一個詞 */}
-                        <div style={{
-                          position: 'absolute', top: isAnimating ? '0' : '100%',
-                          left: 0, right: 0, height: 24, display: 'flex', alignItems: 'center',
-                          transition: 'top 0.5s ease-in-out',
-                        }}>
-                          <span style={{ fontSize: 14, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {results[(currentHintIndex + 1) % results.length]?.hintWord}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* 輪播指示器 */}
-                    <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                      <div style={{ display: 'inline-flex', gap: 6, padding: '6px 12px', background: 'rgba(24, 144, 255, 0.05)', borderRadius: 12 }}>
-                        {results.map((_, index) => (
-                          <div key={index} style={{
-                            width: index === currentHintIndex ? 20 : 8, height: 8, borderRadius: 4,
-                            background: index === currentHintIndex ? '#1890ff' : '#d9d9d9',
-                            transition: 'all 0.3s ease',
-                          }} />
-                        ))}
-                      </div>
-                    </div>
-                    {/* 當前底紋詞信息 */}
-                    {currentHint && (
-                      <div style={{ background: '#FAFAFA', padding: 16, borderRadius: 12, border: '1px solid #F0F0F0' }}>
-                        <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>當前底紋配置</div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff', marginBottom: 8 }}>{currentHint.hintWord}</div>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <Tag color="blue">ID: {currentHint.hintId}</Tag>
-                          <Tag color="gold">優先級 {currentHint.priority}</Tag>
-                        </div>
-                      </div>
-                    )}
+                    <span style={{ fontSize: 14, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {results[(currentHintIndex + 1) % results.length]?.hintWord}
+                    </span>
                   </div>
                 </div>
               </div>
-            </Card>
-          </Col>
+              {/* 輪播指示器 */}
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ display: 'inline-flex', gap: 6, padding: '6px 12px', background: 'rgba(24, 144, 255, 0.05)', borderRadius: 12 }}>
+                  {results.map((_, index) => (
+                    <div key={index} style={{
+                      width: index === currentHintIndex ? 20 : 8, height: 8, borderRadius: 4,
+                      background: index === currentHintIndex ? '#1890ff' : '#d9d9d9',
+                      transition: 'all 0.3s ease',
+                    }} />
+                  ))}
+                </div>
+              </div>
+              {/* 當前底紋詞信息 */}
+              {currentHint && (
+                <div style={{ background: '#FAFAFA', padding: 16, borderRadius: 12, border: '1px solid #F0F0F0' }}>
+                  <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>當前底紋配置</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff', marginBottom: 8 }}>{currentHint.hintWord}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <Tag color="blue">ID: {currentHint.hintId}</Tag>
+                    <Tag color="gold">優先級 {currentHint.priority}</Tag>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-          {/* 右側：底紋配置詳情列表 */}
-          <Col span={14}>
+          {/* 列表視圖 */}
+          <div style={{ flex: 1, minWidth: 360 }}>
             <Card
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -410,8 +403,8 @@ export default function HintVerify() {
                 rowKey="hintId"
               />
             </Card>
-          </Col>
-        </Row>
+          </div>
+        </div>
       )}
 
       {!searched && (
