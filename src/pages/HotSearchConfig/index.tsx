@@ -212,7 +212,9 @@ const mockData: HotSearchRecord[] = [
 export default function HotSearchConfig() {
   const navigate = useNavigate()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<HotSearchRecord | null>(null)
+  const [detailRecord, setDetailRecord] = useState<HotSearchRecord | null>(null)
   const [form] = Form.useForm()
   const [wordSource, setWordSource] = useState<string>('custom')
   const [libMode, setLibMode] = useState<string>('specific')
@@ -317,6 +319,11 @@ export default function HotSearchConfig() {
     setDisplayMode(record.displayMode || 'text')
     form.setFieldsValue(record)
     setIsModalOpen(true)
+  }
+
+  const handleDetail = (record: HotSearchRecord) => {
+    setDetailRecord(record)
+    setIsDetailModalOpen(true)
   }
 
   const handleDelete = (record: HotSearchRecord) => {
@@ -540,9 +547,10 @@ export default function HotSearchConfig() {
     },
     { title: '狀態', dataIndex: 'status', key: 'status', width: 65, render: (v: string) => v === 'active' ? <Tag color="green">啟用</Tag> : <Tag color="default">停用</Tag> },
     {
-      title: '操作', key: 'action', width: 110, fixed: 'right',
+      title: '操作', key: 'action', width: 160, fixed: 'right',
       render: (_: unknown, record: HotSearchRecord) => (
         <Space size={0} split={<span className="action-split">|</span>}>
+          <Button type="link" size="small" onClick={() => handleDetail(record)}>詳情</Button>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
         </Space>
@@ -944,6 +952,163 @@ export default function HotSearchConfig() {
             </div>
           )}
         </Form>
+      </Modal>
+
+      {/* ==================== 详情弹窗 ==================== */}
+      <Modal
+        title="熱搜詞詳情"
+        open={isDetailModalOpen}
+        onCancel={() => setIsDetailModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsDetailModalOpen(false)}>關閉</Button>,
+        ]}
+        width={760}
+      >
+        {detailRecord && (
+          <div style={{ marginTop: 16 }}>
+            {/* 基本信息 */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#1677FF' }}>📋 基本信息</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>配置ID</div>
+                  <div style={{ fontWeight: 'bold' }}>{detailRecord.id}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>搜索入口</div>
+                  <div>{searchEntryOptions.find(o => o.value === detailRecord.searchEntry)?.label || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>所属品牌</div>
+                  <div>{brandOptions.find(o => o.value === detailRecord.brand)?.label || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>展示终端</div>
+                  <div>
+                    {detailRecord.terminal.map(t => (
+                      <Tag key={t} style={{ marginRight: 4 }}>{terminalOptions.find(o => o.value === t)?.label || t}</Tag>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>展示模式</div>
+                  <div>{displayModeOptions.find(o => o.value === detailRecord.displayMode)?.label || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>词来源</div>
+                  <div>{wordSourceOptions.find(o => o.value === detailRecord.wordSource)?.label || '-'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 热搜词信息 */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#1677FF' }}>🔍 熱搜詞信息</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>热搜词（中文）</div>
+                  <div style={{ fontWeight: 'bold', fontSize: 14 }}>{detailRecord.word}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>热搜词（英文）</div>
+                  <div>{detailRecord.wordEn || '-'}</div>
+                </div>
+                {detailRecord.wordSource === 'hotSearchLib' && detailRecord.libMode === 'autoRank' && (
+                  <div>
+                    <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>热搜词库排名</div>
+                    <div>Top {detailRecord.hotSearchRank || '-'}</div>
+                  </div>
+                )}
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>词库模式</div>
+                  <div>{libModeOptions.find(o => o.value === detailRecord.libMode)?.label || '-'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 推广配置 */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#1677FF' }}>📢 推广配置</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>推广类型</div>
+                  <div>{promotionTypeOptions.find(o => o.value === detailRecord.promotionType)?.label || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>跳转类型</div>
+                  <div>{allJumpTypeOptions.find(o => o.value === detailRecord.jumpType)?.label || '-'}</div>
+                </div>
+                {detailRecord.jumpType && detailRecord.jumpType !== 'none' && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>跳转目标</div>
+                    <div style={{ wordBreak: 'break-all', color: '#1677FF' }}>{detailRecord.jumpTarget}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 定向设置 */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#1677FF' }}>🎯 定向设置</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>展示区域</div>
+                  <div>
+                    {detailRecord.region.map(r => (
+                      <Tag key={r} style={{ marginRight: 4 }}>{regionOptions.find(o => o.value === r)?.label || r}</Tag>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>时段设置</div>
+                  <div>
+                    {detailRecord.timeSlot.map(t => (
+                      <Tag key={t} style={{ marginRight: 4 }}>{timeSlotOptions.find(o => o.value === t)?.label || t}</Tag>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 生效时间 */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#1677FF' }}>📅 生效时间</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>生效日期</div>
+                  <div>{detailRecord.startDate} ~ {detailRecord.endDate}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>显示时间范围</div>
+                  <div>
+                    {detailRecord.displayTimeRange && detailRecord.displayTimeRange.length === 2
+                      ? `${detailRecord.displayTimeRange[0]} - ${detailRecord.displayTimeRange[1]}`
+                      : '全天'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 其他信息 */}
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#1677FF' }}>ℹ️ 其他信息</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>排序</div>
+                  <div>{detailRecord.sortOrder}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>状态</div>
+                  <div>{detailRecord.status === 'active' ? <Tag color="green">啟用</Tag> : <Tag color="default">停用</Tag>}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>最后更新</div>
+                  <div>{detailRecord.updateTime}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )
