@@ -639,7 +639,7 @@ export default function HotSearchConfig() {
           {/* ===== 行1：搜索入口 + 所属品牌 + 展示终端（置顶） ===== */}
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item label="搜索入口" name="searchEntry" rules={[{ required: true }]} style={{ flex: 1 }}>
-              <Select options={searchEntryOptions} onChange={(v) => {
+              <Select options={searchEntryOptions} disabled={!!editingRecord} onChange={(v) => {
                 // 非大首页时，自动同步业务频道
                 if (v !== 'home' && wordSource === 'hotSearchLib' && libMode === 'autoRank') {
                   setAutoRankBusiness([v])
@@ -647,19 +647,20 @@ export default function HotSearchConfig() {
               }} />
             </Form.Item>
             <Form.Item label="所屬品牌" name="brand" rules={[{ required: true }]} style={{ flex: 1 }}>
-              <Select options={brandOptions.filter(o => o.value !== 'all')} />
+              <Select options={brandOptions.filter(o => o.value !== 'all')} disabled={!!editingRecord} />
             </Form.Item>
             <Form.Item label="展示終端" name="terminal" rules={[{ required: true }]} style={{ flex: 1 }}>
-              <Select mode="multiple" options={terminalOptions} placeholder="請選擇" />
+              <Select mode="multiple" options={terminalOptions} placeholder="請選擇" disabled={!!editingRecord} />
             </Form.Item>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item label="展示模式" name="displayMode" style={{ flex: 1 }}>
               <Radio.Group options={displayModeOptions} optionType="button" buttonStyle="solid"
+                disabled={!!editingRecord}
                 onChange={(e) => setDisplayMode(e.target.value)} />
             </Form.Item>
             <Form.Item label="詞來源" name="wordSource" rules={[{ required: true }]} style={{ flex: 1 }}>
-              <Select options={wordSourceOptions} onChange={(v) => {
+              <Select options={wordSourceOptions} disabled={!!editingRecord} onChange={(v) => {
                 setWordSource(v)
                 if (v === 'custom') {
                   setLibMode('specific'); form.setFieldsValue({ libMode: 'specific' })
@@ -675,6 +676,7 @@ export default function HotSearchConfig() {
                   ? promotionTypeOptions.filter(o => o.value === 'hotSearch')
                   : promotionTypeOptions
                 }
+                disabled={!!editingRecord}
                 onChange={(v) => {
                   setPromotionType(v)
                   if (v === 'merchant' && jumpType === 'appPage') {
@@ -687,7 +689,7 @@ export default function HotSearchConfig() {
 
           {wordSource === 'hotSearchLib' && (
             <Form.Item label="詞庫模式" name="libMode" rules={[{ required: true }]}>
-              <Select options={libModeOptions} onChange={(v) => {
+              <Select options={libModeOptions} disabled={!!editingRecord} onChange={(v) => {
                 setLibMode(v)
                 if (v === 'autoRank') {
                   setJumpType('none'); form.setFieldsValue({ jumpType: 'none' })
