@@ -436,6 +436,9 @@ export default function SearchWeightConfig() {
   const [boostTiers, setBoostTiers] = useState<BoostTier[]>([])
   const [demoteTiers, setDemoteTiers] = useState<DemoteTier[]>([])
   const [form] = Form.useForm()
+  
+  // 数据状态管理
+  const [dataSource, setDataSource] = useState<InterventionRecord[]>(mockData)
 
   /** 新增加分 */
   const handleAddBoost = () => {
@@ -487,20 +490,53 @@ export default function SearchWeightConfig() {
 
   /** 切換狀態 */
   const handleToggleStatus = (record: InterventionRecord) => {
-    const newStatus = record.status === 'active' ? '失效' : '生效'
+    const newStatus = record.status === 'active' ? 'inactive' : 'active'
+    const statusText = newStatus === 'active' ? '生效' : '失效'
     Modal.confirm({
       title: '確認操作',
-      content: `確定要將集團「${record.groupName}」的干預配置設為「${newStatus}」嗎？`,
+      content: `確定要將集團「${record.groupName}」的干預配置設為「${statusText}」嗎？`,
       okText: '確定',
       cancelText: '取消',
-      onOk: () => message.success(`已${newStatus}`),
+      onOk: () => {
+        // 更新数据源中的状态
+        setDataSource(prevData => 
+          prevData.map(item => 
+            item.key === record.key ? { ...item, status: newStatus } : item
+          )
+        )
+        message.success(`已${statusText}`)
+      },
     })
   }
 
   /** 保存 */
   const handleSave = () => {
-    form.validateFields().then(() => {
-      message.success(editingRecord ? '編輯成功' : '新增成功')
+    form.validateFields().then((values) => {
+      if (editingRecord) {
+        // 编辑模式：更新现有记录
+        setDataSource(prevData => 
+          prevData.map(item => {
+            if (item.key === editingRecord.key) {
+              const [startDate, endDate] = values.dateRange || []
+              return {
+                ...item,
+                searchChannel: values.searchChannel || item.searchChannel,
+                reason: values.reason || item.reason,
+                effectStartDate: startDate ? startDate.format('YYYY-MM-DD') : item.effectStartDate,
+                effectEndDate: endDate ? endDate.format('YYYY-MM-DD') : item.effectEndDate,
+                // 更新梯队数据
+                boostTiers: modalDirection === 'boost' && boostTiers.length > 0 ? boostTiers : item.boostTiers,
+                demoteTiers: modalDirection === 'demote' && demoteTiers.length > 0 ? demoteTiers : item.demoteTiers,
+              }
+            }
+            return item
+          })
+        )
+        message.success('編輯成功')
+      } else {
+        // 新增模式
+        message.success('新增成功')
+      }
       setIsModalOpen(false)
     })
   }
@@ -766,10 +802,10 @@ export default function SearchWeightConfig() {
       <div className="table-section">
         <Table<InterventionRecord>
           columns={applyConfig(columns)}
-          dataSource={mockData}
+          dataSource={dataSource}
           rowSelection={{}}
           pagination={{
-            total: mockData.length,
+            total: dataSource.length,
             pageSize: 10,
             showTotal: total => `共 ${total} 條`,
             showSizeChanger: true,
