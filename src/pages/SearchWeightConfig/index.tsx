@@ -709,14 +709,20 @@ export default function SearchWeightConfig() {
             : userPermissions.canDemote
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
-            <Button type="link" size="small" onClick={() => handleDetail(record)}>
+            <Button type="link" size="small" onClick={(e) => {
+              e.preventDefault()
+              handleDetail(record)
+            }}>
               詳情
             </Button>
             <Button
               type="link"
               size="small"
               disabled={!canEdit}
-              onClick={() => handleEdit(record)}
+              onClick={(e) => {
+                e.preventDefault()
+                handleEdit(record)
+              }}
             >
               編輯
             </Button>
@@ -724,7 +730,10 @@ export default function SearchWeightConfig() {
               type="link"
               size="small"
               danger={record.status === 'active'}
-              onClick={() => handleToggleStatus(record)}
+              onClick={(e) => {
+                e.preventDefault()
+                handleToggleStatus(record)
+              }}
             >
               {record.status === 'active' ? '失效' : '生效'}
             </Button>
