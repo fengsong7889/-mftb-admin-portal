@@ -174,6 +174,30 @@ const mockData: SynonymRecord[] = [
     updateTime: '2026-05-26 14:30:00',
     remark: '清潔用品',
   },
+  {
+    key: '11', id: 11,
+    mainWord: '快餐',
+    synonymWords: ['速食', '快餐店', 'fast food'],
+    type: 'bidirectional',
+    scenario: '通用搜索',
+    status: 'active',
+    hitCount: 5678,
+    updatedBy: '張曉明(E10023)',
+    updateTime: '2026-05-25 10:15:00',
+    remark: '快餐類同義詞',
+  },
+  {
+    key: '12', id: 12,
+    mainWord: '甜點',
+    synonymWords: ['甜品', '甜食', 'dessert'],
+    type: 'bidirectional',
+    scenario: '通用搜索',
+    status: 'active',
+    hitCount: 4230,
+    updatedBy: '陳美琪(E10089)',
+    updateTime: '2026-05-24 16:45:00',
+    remark: '甜品類同義詞',
+  },
 ]
 
 export default function SynonymConfig() {
@@ -391,10 +415,12 @@ export default function SynonymConfig() {
             onChange: setSelectedRowKeys,
           }}
           pagination={{
-            total: data.length,
+            total: mockData.length,
             pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

@@ -63,6 +63,10 @@ const mockData: ReportData[] = [
   { key: '6', date: '2026-06-04', hintWord: '（熱搜）珍珠奶茶', hintType: '熱搜推廣', searchPage: '大首頁', brand: '閃蜂', terminal: 'APP', region: '澳門', showCount: 2450, clickCount: 334, clickRate: '13.63%', jumpCount: 0 },
   { key: '7', date: '2026-06-03', hintWord: '今日特惠外賣', hintType: '運營推廣', searchPage: '大首頁', brand: 'mFood', terminal: 'APP', region: '澳門', showCount: 3100, clickCount: 402, clickRate: '12.97%', jumpCount: 295 },
   { key: '8', date: '2026-06-03', hintWord: '（熱搜）炸雞', hintType: '熱搜推廣', searchPage: '大首頁', brand: '閃蜂', terminal: 'APP', region: '氹仔', showCount: 1670, clickCount: 223, clickRate: '13.35%', jumpCount: 0 },
+  { key: '9', date: '2026-06-02', hintWord: '宵夜狂歡', hintType: '商家推廣', searchPage: '外賣頁', brand: 'mFood', terminal: 'APP', region: '澳門', showCount: 2340, clickCount: 312, clickRate: '13.33%', jumpCount: 267 },
+  { key: '10', date: '2026-06-02', hintWord: '（熱搜）壽司', hintType: '熱搜推廣', searchPage: '大首頁', brand: '閃蜂', terminal: 'APP', region: '澳門', showCount: 1980, clickCount: 278, clickRate: '14.04%', jumpCount: 0 },
+  { key: '11', date: '2026-06-01', hintWord: '週末日特惠', hintType: '運營推廣', searchPage: '大首頁', brand: 'mFood', terminal: 'APP', region: '澳門', showCount: 2780, clickCount: 389, clickRate: '13.99%', jumpCount: 312 },
+  { key: '12', date: '2026-06-01', hintWord: '（熱搜）酸菜魚', hintType: '熱搜推廣', searchPage: '外賣頁', brand: '閃蜂', terminal: 'APP', region: '氹仔', showCount: 2150, clickCount: 298, clickRate: '13.86%', jumpCount: 0 },
 ]
 
 // 趋势数据
@@ -324,6 +328,9 @@ export default function HintReport() {
               pageSize: 10,
               showTotal: (total) => `共 ${total} 條`,
               showSizeChanger: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              defaultPageSize: 10,
+              showQuickJumper: true,
             }}
             size="middle"
             bordered={false}

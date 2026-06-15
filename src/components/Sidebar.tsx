@@ -159,7 +159,7 @@ const menuItems: MenuItem[] = [
           {
             key: 'search-weight-config',
             icon: <ColumnHeightOutlined />,
-            label: '權重管理',
+            label: '權重干預',
           },
         ],
       },

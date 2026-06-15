@@ -150,7 +150,19 @@ export default function BatchQuery() {
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (val: string) => brandMap[val] || val,
+      render: (val: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: val === '閃蜂' || val === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: val === '閃蜂' || val === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: val === '閃蜂' || val === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[val] || val}
+        </Tag>
+      ),
     },
     {
       title: '批次類型',
@@ -314,10 +326,12 @@ export default function BatchQuery() {
           columns={applyConfig(columns)}
           dataSource={mockData}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

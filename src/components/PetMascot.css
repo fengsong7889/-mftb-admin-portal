@@ -24,17 +24,17 @@
 .pet-mascot-wrapper:not(.dragging) .pet-body::after {
   content: '點我查看需求';
   position: absolute;
-  bottom: -6px;
+  bottom: -4px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 8px;
   color: #E8720C;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.3s;
   background: rgba(255, 255, 255, 0.95);
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
   box-shadow: 0 2px 8px rgba(232, 114, 12, 0.15);
 }
 
@@ -44,19 +44,19 @@
 
 .pet-body {
   position: relative;
-  width: 84px;
-  height: 133px;
+  width: 36px;
+  height: 57px;
   animation: petFloat 3.5s ease-in-out infinite;
 }
 
 .pet-body::before {
   content: '';
   position: absolute;
-  bottom: -12px;
+  bottom: -6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 68px;
-  height: 9px;
+  width: 28px;
+  height: 4px;
   background: radial-gradient(ellipse, rgba(232, 114, 12, 0.2) 0%, transparent 70%);
   border-radius: 50%;
   animation: shadowPulse 3.5s ease-in-out infinite;

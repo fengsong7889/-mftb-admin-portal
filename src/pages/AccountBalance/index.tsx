@@ -56,8 +56,8 @@ const mockData: AccountRecord[] = [
   { key: '8', groupId: 'G10008', groupName: '鵬程餐飲有限公司', brand: 'mFood', virtualBalance: 78900.00, actualBalance: 75000.00, status: 'frozen' },
   { key: '9', groupId: 'G10009', groupName: '雲端科技餐飲集團', brand: 'flashBee', virtualBalance: 112400.60, actualBalance: 110000.00, status: 'normal' },
   { key: '10', groupId: 'G10010', groupName: '合眾餐飲管理有限公司', brand: 'mFood', virtualBalance: 90560.25, actualBalance: 88000.00, status: 'normal' },
-  { key: '11', groupId: 'G10011', groupName: '華盛餐飲集團', brand: 'mFood', virtualBalance: 234500.00, actualBalance: 230000.00, status: 'normal' },
-  { key: '12', groupId: 'G10012', groupName: '新鮮蜂物流科技有限公司', brand: 'flashBee', virtualBalance: 67800.00, actualBalance: 65000.00, status: 'frozen' },
+  { key: '11', groupId: 'G10011', groupName: '星辰飲食集團', brand: 'flashBee', virtualBalance: 135600.80, actualBalance: 130000.00, status: 'normal' },
+  { key: '12', groupId: 'G10012', groupName: '萬象餐飲控股有限公司', brand: 'mFood', virtualBalance: 98750.50, actualBalance: 95000.00, status: 'normal' },
 ]
 
 /** 格式化金额 */
@@ -142,7 +142,19 @@ export default function AccountBalance() {
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (val: string) => val === 'mFood' ? 'mFood' : '閃蜂',
+      render: (val: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: val === '閃蜂' || val === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: val === '閃蜂' || val === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: val === '閃蜂' || val === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {val === 'mFood' ? 'mFood' : '閃蜂'}
+        </Tag>
+      ),
     },
     {
       title: '虛擬賬戶餘額',
@@ -242,6 +254,8 @@ export default function AccountBalance() {
             pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

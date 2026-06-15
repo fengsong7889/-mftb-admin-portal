@@ -32,6 +32,10 @@ const mockData: WordRecord[] = [
   { key: '6', id: 6, word: '葡撻', segmented: '葡/撻', corrected: '葡撻', updatedBy: '李婉婷(E10045)', updateTime: '2026-05-30 16:30:00' },
   { key: '7', id: 7, word: '水蟹粥', segmented: '水/蟹/粥', corrected: '水蟹/粥', updatedBy: '張曉明(E10023)', updateTime: '2026-05-29 08:20:00' },
   { key: '8', id: 8, word: '楊枝甘露', segmented: '楊/枝/甘/露', corrected: '楊枝甘露', updatedBy: '王建華(E10067)', updateTime: '2026-05-28 13:10:00' },
+  { key: '9', id: 9, word: '酸辣粉', segmented: '酸/辣/粉', corrected: '酸辣/粉', updatedBy: '陳美琪(E10089)', updateTime: '2026-05-27 10:00:00' },
+  { key: '10', id: 10, word: '煲仔飯', segmented: '煲/仔/飯', corrected: '煲仔/飯', updatedBy: '張曉明(E10023)', updateTime: '2026-05-26 15:30:00' },
+  { key: '11', id: 11, word: '葡撻', segmented: '葡/撻', corrected: '葡撻', updatedBy: '李婉婷(E10045)', updateTime: '2026-05-25 09:20:00' },
+  { key: '12', id: 12, word: '雞蛋仔', segmented: '雞/蛋/仔', corrected: '雞蛋/仔', updatedBy: '陳美琪(E10089)', updateTime: '2026-05-24 14:15:00' },
 ]
 
 export default function WordSegmentation() {
@@ -190,11 +194,12 @@ export default function WordSegmentation() {
           dataSource={mockData}
           rowSelection={{}}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

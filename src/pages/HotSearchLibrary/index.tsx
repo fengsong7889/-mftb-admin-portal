@@ -249,7 +249,19 @@ export default function HotSearchLibrary() {
     },
     {
       title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 90,
-      render: (v: string) => <Tag color={v === 'mfood' ? 'orange' : 'purple'}>{brandMap[v]}</Tag>,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v]}
+        </Tag>
+      ),
     },
     {
       title: '搜索入口', dataIndex: 'searchEntry', key: 'searchEntry', width: 110,

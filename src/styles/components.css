@@ -31,6 +31,15 @@
 .sidebar-menu {
   border-right: none;
 }
+/* 缩小菜单图标尺寸 */
+.sidebar-menu .ant-menu-item .anticon,
+.sidebar-menu .ant-menu-submenu-title .anticon {
+  font-size: 14px !important;
+}
+.sidebar-menu .ant-menu-item-icon {
+  font-size: 14px !important;
+  margin-right: 8px !important;
+}
 
 /* ========================================================================
    Header 顶部导航栏
@@ -1594,4 +1603,29 @@
 .login-btn-v2:disabled:hover {
   transform: none !important;
   box-shadow: none !important;
+}
+
+/* ========================================================================
+   充消对账 - 紧凑表格行间距
+   ======================================================================== */
+.writeoff-reconcile-table.ant-table-small {
+  /* 表头间距 */
+  .ant-table-thead > tr > th {
+    padding: 8px 12px !important;
+  }
+  
+  /* 表体间距 */
+  .ant-table-tbody > tr > td {
+    padding: 6px 12px !important;
+  }
+  
+  /* 表头行间距 */
+  .ant-table-thead > tr {
+    line-height: 1.3;
+  }
+  
+  /* 表体行间距 */
+  .ant-table-tbody > tr {
+    line-height: 1.4;
+  }
 }

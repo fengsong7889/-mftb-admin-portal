@@ -405,7 +405,19 @@ export default function SearchConfig() {
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     {
       title: '搜索頻道',
@@ -516,7 +528,19 @@ export default function SearchConfig() {
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     {
       title: '搜索頻道',
@@ -593,7 +617,19 @@ export default function SearchConfig() {
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     {
       title: '搜索頻道',
@@ -684,7 +720,19 @@ export default function SearchConfig() {
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     {
       title: '搜索頻道',
@@ -774,11 +822,12 @@ export default function SearchConfig() {
               columns={configColumns}
               dataSource={mockConfigData}
               pagination={{
-                total: 50,
-                pageSize: 20,
+                total: mockConfigData.length,
+                pageSize: 10,
                 showTotal: (total) => `共 ${total} 條`,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
+                pageSizeOptions: ['10', '20', '50', '100'],
+                defaultPageSize: 10,
                 showQuickJumper: true,
               }}
               size="middle"
@@ -840,11 +889,12 @@ export default function SearchConfig() {
               columns={algorithmColumns}
               dataSource={mockAlgorithmData}
               pagination={{
-                total: 30,
-                pageSize: 20,
+                total: mockAlgorithmData.length,
+                pageSize: 10,
                 showTotal: (total) => `共 ${total} 條`,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
+                pageSizeOptions: ['10', '20', '50', '100'],
+                defaultPageSize: 10,
                 showQuickJumper: true,
               }}
               size="middle"
@@ -906,11 +956,12 @@ export default function SearchConfig() {
               columns={recallColumns}
               dataSource={mockRecallData}
               pagination={{
-                total: 20,
-                pageSize: 20,
+                total: mockRecallData.length,
+                pageSize: 10,
                 showTotal: (total) => `共 ${total} 條`,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
+                pageSizeOptions: ['10', '20', '50', '100'],
+                defaultPageSize: 10,
                 showQuickJumper: true,
               }}
               size="middle"
@@ -972,11 +1023,12 @@ export default function SearchConfig() {
               columns={sortColumns}
               dataSource={mockSortData}
               pagination={{
-                total: 25,
-                pageSize: 20,
+                total: mockSortData.length,
+                pageSize: 10,
                 showTotal: (total) => `共 ${total} 條`,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
+                pageSizeOptions: ['10', '20', '50', '100'],
+                defaultPageSize: 10,
                 showQuickJumper: true,
               }}
               size="middle"

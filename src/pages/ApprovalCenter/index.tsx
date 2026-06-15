@@ -95,8 +95,8 @@ const mockData: ApprovalRecord[] = [
   { key: '8', groupId: '1008', groupName: '漢堡王', brand: 'mFood', flowNo: '20261001008', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '不符合推廣金使用規範' },
   { key: '9', groupId: '1009', groupName: '必勝客旗艦店', brand: 'flashBee', flowNo: '20261001009', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'cancelled', rejectReason: '' },
   { key: '10', groupId: '1010', groupName: '喜茶', brand: 'mFood', flowNo: '20261001010', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '11', groupId: '1011', groupName: '奈雪的茶', brand: 'flashBee', flowNo: '20261001011', approvalType: 'transfer', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '--', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '12', groupId: '1012', groupName: '瑞幸咖啡', brand: 'mFood', flowNo: '20261001012', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
+  { key: '11', groupId: '1011', groupName: '奈雪的茶', brand: 'flashBee', flowNo: '20261001011', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-17 10:20:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-17 11:30:00', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-17 14:15:00', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-17 16:45:00', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
+  { key: '12', groupId: '1012', groupName: '真功夫', brand: 'mFood', flowNo: '20261001012', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-18 08:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-18 09:45:00', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-18 11:20:00', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '品牌合併不符合規範' },
 ]
 
 export default function ApprovalCenter() {
@@ -188,7 +188,19 @@ export default function ApprovalCenter() {
       dataIndex: 'brand',
       key: 'brand',
       width: 80,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     { title: '流程編號', dataIndex: 'flowNo', key: 'flowNo', width: 130 },
     {
@@ -342,11 +354,12 @@ export default function ApprovalCenter() {
           dataSource={mockData}
           rowSelection={{}}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

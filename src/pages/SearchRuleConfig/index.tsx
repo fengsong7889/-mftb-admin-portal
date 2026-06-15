@@ -136,6 +136,20 @@ const mockData: RuleRecord[] = [
     priority: 2, status: 'inactive', effectStartDate: '2026-05-01', effectEndDate: '2026-06-01',
     updatedBy: '浩源(003)', updateTime: '2026-05-30 13:20:00', remark: '已過期，原折扣率80%',
   },
+  {
+    key: '7', ruleId: 'GR007', ruleName: '團購首頁推薦規則', ruleType: 'boost',
+    brand: 'mFood', searchChannel: ['groupBuy'], scene: 'recommendSort',
+    value: 15, maxValue: 20, condition: '参与平台团购活动',
+    priority: 1, status: 'active', effectStartDate: '2026-06-01', effectEndDate: '2026-12-31',
+    updatedBy: '古月(001)', updateTime: '2026-06-07 10:00:00', remark: '参与团购活动的商家在首页推荐中获得提权',
+  },
+  {
+    key: '8', ruleId: 'GR008', ruleName: '深夜时段加分规则', ruleType: 'boost',
+    brand: 'flashBee', searchChannel: ['takeaway'], scene: 'searchSort',
+    value: 12, maxValue: 15, condition: '夜间22:00-02:00营业',
+    priority: 2, status: 'active', effectStartDate: '2026-06-01', effectEndDate: '2026-12-31',
+    updatedBy: '加侖(002)', updateTime: '2026-06-06 15:30:00', remark: '深夜营业商家在夜间搜索时获得加分',
+  },
 ]
 
 export default function SearchRuleConfig() {
@@ -229,7 +243,19 @@ export default function SearchRuleConfig() {
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     {
       title: '搜索頻道',
@@ -382,11 +408,12 @@ export default function SearchRuleConfig() {
           dataSource={mockData}
           rowSelection={{}}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

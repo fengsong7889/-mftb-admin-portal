@@ -129,7 +129,19 @@ export default function DebtReconcile() {
     { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 120 },
     { title: '門店ID', dataIndex: 'storeId', key: 'storeId', width: 90 },
     { title: '門店名稱', dataIndex: 'storeName', key: 'storeName', width: 120 },
-    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => brandMap[v] || v },
+    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => (
+      <Tag style={{ 
+        margin: 0,
+        padding: '2px 10px',
+        border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+        color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+        background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+        borderRadius: 4,
+        fontWeight: 500
+      }}>
+        {brandMap[v] || v}
+      </Tag>
+    ) },
     { title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 130 },
     { title: '所屬BD', dataIndex: 'bd', key: 'bd', width: 90 },
     { title: '借款日期', dataIndex: 'loanDate', key: 'loanDate', width: 120 },
@@ -236,10 +248,12 @@ export default function DebtReconcile() {
           columns={applyConfig(columns)}
           dataSource={mockData}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

@@ -48,34 +48,67 @@ interface ReconcileRecord {
 /** 模拟数据 */
 const merchantNames = ['廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂']
 const brands = ['1mFood', '1mFood', '1mFood', '2閃蜂', '1mFood', '1mFood', '1mFood', '2閃蜂', '1mFood', '1mFood', '1mFood', '1mFood']
-const virtualNetAmounts = [800.21, -600.21, 750.21, 750.21, -600.21, 750.21, 800.21, -600.21, 750.21, 800.21, 750.21, 750.21]
 
-const mockData: ReconcileRecord[] = Array.from({ length: 12 }, (_, i) => ({
-  key: String(i + 1),
-  index: i + 1,
-  date: '2026/05/06',
-  merchantId: '123456',
-  merchantName: merchantNames[i],
-  brand: brands[i],
-  initVirtualBalance: 355645.01,
-  initActualBalance: 155645.01,
-  virtualRecharge: 1000.21,
-  actualRecharge: 900.21,
-  bankReceipt: 800,
-  revenuePayment: 100.21,
-  virtualActualConsumption: 300,
-  virtualConsumption: 600,
-  virtualRefund: 300,
-  actualActualConsumption: 200,
-  actualConsumption: 400,
-  actualRefund: 200,
-  virtualTransferIn: 600,
-  actualTransferIn: 100,
-  virtualTransferOut: 500,
-  actualTransferOut: 50,
-  virtualNetAmount: virtualNetAmounts[i],
-  actualNetAmount: 750.21,
-}))
+const mockData: ReconcileRecord[] = Array.from({ length: 12 }, (_, i) => {
+  // 基础数据
+  const initVirtualBalance = 355645.01
+  const initActualBalance = 155645.01
+  
+  // 1. 充值统计
+  const virtualRecharge = 1000.21  // 虚拟账户充值总额
+  const bankReceipt = 800  // 银行收款
+  const revenuePayment = 100.21  // 营业额支付
+  const actualRecharge = bankReceipt + revenuePayment  // 实收账户充值总额 = 银行收款 + 营业额支付 = 900.21
+  
+  // 2. 消费统计
+  const virtualConsumption = 600  // 虚拟账户消费
+  const virtualRefund = 300  // 虚拟账户退款
+  const virtualActualConsumption = virtualConsumption + virtualRefund  // 虚拟账户实际消费 = 消费 + 退款 = 900
+  
+  const actualConsumption = 400  // 实收账户消费
+  const actualRefund = 200  // 实收账户退款
+  const actualActualConsumption = actualConsumption + actualRefund  // 实收账户实际消费 = 消费 + 退款 = 600
+  
+  // 3. 转入转出统计
+  const virtualTransferIn = 600  // 虚拟账户转入总额
+  const actualTransferIn = 100  // 实收账户转入总额
+  const virtualTransferOut = 500  // 虚拟账户转出总额
+  const actualTransferOut = 50  // 实收账户转出总额
+  
+  // 4. 交易净额统计
+  // 虚拟账户交易净额 = 充值总额 - 实际消费总额 - 转出总额 + 转入总额
+  const virtualNetAmount = virtualRecharge - virtualActualConsumption - virtualTransferOut + virtualTransferIn  // 1000.21 - 900 - 500 + 600 = 200.21
+  
+  // 实收账户交易净额 = 充值总额 - 实际消费总额 - 转出总额 + 转入总额
+  const actualNetAmount = actualRecharge - actualActualConsumption - actualTransferOut + actualTransferIn  // 900.21 - 600 - 50 + 100 = 350.21
+  
+  return {
+    key: String(i + 1),
+    index: i + 1,
+    date: '2026/05/06',
+    merchantId: '123456',
+    merchantName: merchantNames[i],
+    brand: brands[i],
+    initVirtualBalance,
+    initActualBalance,
+    virtualRecharge,
+    actualRecharge,
+    bankReceipt,
+    revenuePayment,
+    virtualActualConsumption,
+    virtualConsumption,
+    virtualRefund,
+    actualActualConsumption,
+    actualConsumption,
+    actualRefund,
+    virtualTransferIn,
+    actualTransferIn,
+    virtualTransferOut,
+    actualTransferOut,
+    virtualNetAmount,
+    actualNetAmount,
+  }
+})
 
 /** 格式化金额 */
 const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -121,23 +154,28 @@ export default function WriteoffReconcile() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'index', title: '序號' },
-    { key: 'groupId', title: '集團ID' },
-    { key: 'groupName', title: '集團名稱' },
-    { key: 'storeId', title: '門店ID' },
-    { key: 'storeName', title: '門店名稱' },
+    { key: 'date', title: '統計日期' },
+    { key: 'merchantId', title: '商戶ID' },
+    { key: 'merchantName', title: '商戶名稱' },
     { key: 'brand', title: '所屬品牌' },
-    { key: 'channel', title: '業務頻道' },
-    { key: 'bd', title: '所屬BD' },
-    { key: 'reconcileDate', title: '對賬日期' },
-    { key: 'billNo', title: '賬單編號' },
-    { key: 'batchNo', title: '批次號' },
+    { key: 'initVirtualBalance', title: '期初虛擬賬戶餘額' },
+    { key: 'initActualBalance', title: '期初實收賬戶餘額' },
+    { key: 'virtualRecharge', title: '虛擬賬戶充值餘額' },
+    { key: 'actualRecharge', title: '實收賬戶充值餘額' },
+    { key: 'bankReceipt', title: '銀行收款' },
+    { key: 'revenuePayment', title: '營業額支付' },
     { key: 'virtualActualConsumption', title: '虛擬賬戶實際消費' },
     { key: 'virtualConsumption', title: '虛擬賬戶消費' },
     { key: 'virtualRefund', title: '虛擬賬戶退款' },
     { key: 'actualActualConsumption', title: '實收賬戶實際消費' },
     { key: 'actualConsumption', title: '實收賬戶消費' },
     { key: 'actualRefund', title: '實收賬戶退款' },
+    { key: 'virtualTransferIn', title: '虛擬賬戶轉入金額' },
+    { key: 'actualTransferIn', title: '實收賬戶轉入金額' },
+    { key: 'virtualTransferOut', title: '虛擬賬戶轉出金額' },
+    { key: 'actualTransferOut', title: '實收賬戶轉出金額' },
+    { key: 'virtualNetAmount', title: '虛擬賬戶交易淨額' },
+    { key: 'actualNetAmount', title: '實收賬戶交易淨額' },
   ], [])
 
   const { configComponent, applyConfig } = useColumnConfig('writeoff-reconcile', columnMeta)
@@ -145,11 +183,22 @@ export default function WriteoffReconcile() {
   
 
   const columns: TableColumnsType<ReconcileRecord> = [
-    { title: '序號', dataIndex: 'index', key: 'index', width: 60, align: 'center', fixed: 'left' },
     { title: '統計日期', dataIndex: 'date', key: 'date', width: 120, fixed: 'left' },
     { title: '商戶ID', dataIndex: 'merchantId', key: 'merchantId', width: 100, fixed: 'left' },
-    { title: '商戶名稱', dataIndex: 'merchantName', key: 'merchantName', width: 120 },
-    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => <Tag>{v}</Tag> },
+    { title: '商戶名稱', dataIndex: 'merchantName', key: 'merchantName', width: 120, fixed: 'left' },
+    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => (
+      <Tag style={{ 
+        margin: 0,
+        padding: '2px 10px',
+        border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+        color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+        background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+        borderRadius: 4,
+        fontWeight: 500
+      }}>
+        {v === '1mFood' || v === 'mFood' ? 'mFood' : v === 'flashBee' ? '閃蜂' : v}
+      </Tag>
+    ) },
     {
       title: '期初虛擬賬戶餘額', dataIndex: 'initVirtualBalance', key: 'initVirtualBalance', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 500 }}>{fmtAmt(v)}</span>,
@@ -316,15 +365,18 @@ export default function WriteoffReconcile() {
           columns={applyConfig(columns)}
           dataSource={mockData}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
-          size="middle"
+          size="small"
           bordered={false}
           scroll={{ x: 3400 }}
+          className="writeoff-reconcile-table"
         />
       </div>
     </div>

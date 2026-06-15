@@ -232,7 +232,19 @@ export default function HintConfig() {
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
-      render: (v: string) => brandMap[v] || v,
+      render: (v: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[v] || v}
+        </Tag>
+      ),
     },
     {
       title: '底紋詞源',
@@ -379,11 +391,12 @@ export default function HintConfig() {
           dataSource={mockData}
           rowSelection={{}}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"

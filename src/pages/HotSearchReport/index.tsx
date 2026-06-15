@@ -66,6 +66,10 @@ const mockData: ReportData[] = [
   { key: '6', date: '2026-06-04', word: '壽司', promotionType: '商家推廣', searchPage: '大首頁', brand: '閃蜂', terminal: 'APP', region: '澳門', timeSlot: '晚餐', showCount: 2980, clickCount: 534, clickRate: '17.92%', shopVisitCount: 498, isSold: '已售' },
   { key: '7', date: '2026-06-03', word: '🔥 限時火鍋優惠', promotionType: '活動推廣', searchPage: '大首頁', brand: 'mFood', terminal: 'APP', region: '澳門', timeSlot: '晚餐', showCount: 5230, clickCount: 810, clickRate: '15.49%', shopVisitCount: 689, isSold: '否' },
   { key: '8', date: '2026-06-03', word: '🧋 珍珠奶茶', promotionType: '運營推廣', searchPage: '大首頁', brand: '閃蜂', terminal: 'APP', region: '氹仔', timeSlot: '下午茶', showCount: 3100, clickCount: 445, clickRate: '14.35%', shopVisitCount: 0, isSold: '否' },
+  { key: '9', date: '2026-06-02', word: '🍰 葡撻特賣', promotionType: '活動推廣', searchPage: '團購頁', brand: 'mFood', terminal: 'APP', region: '澳門', timeSlot: '全天', showCount: 1890, clickCount: 234, clickRate: '12.38%', shopVisitCount: 198, isSold: '否' },
+  { key: '10', date: '2026-06-02', word: '拉麵', promotionType: '運營推廣', searchPage: '外賣頁', brand: '閃蜂', terminal: 'APP', region: '澳門', timeSlot: '午餐', showCount: 2450, clickCount: 378, clickRate: '15.43%', shopVisitCount: 0, isSold: '否' },
+  { key: '11', date: '2026-06-01', word: '🥤 鮮榨果汁', promotionType: '活動推廣', searchPage: '大首頁', brand: 'mFood', terminal: 'APP', region: '氹仔', timeSlot: '下午茶', showCount: 2890, clickCount: 412, clickRate: '14.25%', shopVisitCount: 356, isSold: '否' },
+  { key: '12', date: '2026-06-01', word: '燒味飯', promotionType: '運營推廣', searchPage: '外賣頁', brand: '閃蜂', terminal: 'APP', region: '澳門', timeSlot: '午餐', showCount: 2120, clickCount: 298, clickRate: '14.06%', shopVisitCount: 0, isSold: '否' },
 ]
 
 // 趋势数据
@@ -388,6 +392,9 @@ export default function HotSearchReport() {
               pageSize: 10,
               showTotal: (total) => `共 ${total} 條`,
               showSizeChanger: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              defaultPageSize: 10,
+              showQuickJumper: true,
             }}
             size="middle"
             bordered={false}

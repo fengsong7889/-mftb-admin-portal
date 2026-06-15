@@ -96,7 +96,7 @@ const actualBalances = [50000, 50800, 49808, 51308, 54308, 52708, 53608, 57108, 
 const bds = ['關山月(001)', '關山月(001)', '--', '關山月(001)', '關山月(001)', '--', '關山月(001)', '關山月(001)', '--', '關山月(001)', '關山月(001)', '--', '關山月(001)']
 const remarkList = ['商家無敵星星購充值', '新店首充獎勵', '該批次贈送有誤，需扣除', '商家充值活動', '轉賬至分店', '營業額扣款', '日常充值', '跨店轉賬', '系統扣款調整', '月度充值', '促銷充值', '扣款處理', '合併結算']
 
-const mockData: DetailRecord[] = Array.from({ length: 13 }, (_, i) => ({
+const mockData: DetailRecord[] = Array.from({ length: 12 }, (_, i) => ({
   key: String(i + 1),
   index: i + 1,
   groupId: groupIds[i],
@@ -204,7 +204,19 @@ export default function DetailQuery() {
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (val: string) => brandMap[val] || val,
+      render: (val: string) => (
+        <Tag style={{ 
+          margin: 0,
+          padding: '2px 10px',
+          border: val === '閃蜂' || val === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
+          color: val === '閃蜂' || val === 'flashBee' ? '#d4b106' : '#d46b08',
+          background: val === '閃蜂' || val === 'flashBee' ? '#fffbe6' : '#fff7e6',
+          borderRadius: 4,
+          fontWeight: 500
+        }}>
+          {brandMap[val] || val}
+        </Tag>
+      ),
     },
     {
       title: '業務頻道',
@@ -363,10 +375,12 @@ export default function DetailQuery() {
           columns={applyConfig(columns)}
           dataSource={mockData}
           pagination={{
-            total: 200,
-            pageSize: 20,
+            total: mockData.length,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
             showQuickJumper: true,
           }}
           size="middle"
