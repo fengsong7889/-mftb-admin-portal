@@ -328,54 +328,37 @@ export default function HintPreview() {
                     overflow: 'hidden',
                     boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
                   }}>
-                    {/* 频道页头部 */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-                      padding: '20px 16px',
-                      borderRadius: 16,
-                      marginBottom: 16,
-                      color: '#fff',
-                      boxShadow: '0 4px 12px rgba(24, 144, 255, 0.3)',
-                    }}>
-                      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
-                        {brand === 'mFood' ? 'mFood' : '閃蜂'}
-                      </div>
-                      <div style={{ fontSize: 13, opacity: 0.9 }}>
-                        {channelMap[searchChannel]}
-                      </div>
-                    </div>
-
-                    {/* 搜索框 */}
+                    {/* 搜索框 - 顶部直接显示 */}
                     <div style={{
                       background: '#F5F5F5',
                       borderRadius: 20,
-                      padding: '4px 4px 4px 16px',
-                      marginBottom: 16,
+                      padding: '10px 16px',
+                      marginBottom: 20,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
+                      gap: 10,
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
                       border: '1px solid #EEEEEE',
                     }}>
-                      <SearchOutlined style={{ color: '#999', fontSize: 18 }} />
+                      <SearchOutlined style={{ color: '#BFBFBF', fontSize: 16 }} />
                       <div style={{
                         flex: 1,
                         position: 'relative',
-                        height: 40,
+                        height: 24,
                         overflow: 'hidden',
                       }}>
                         <div style={{
                           position: 'absolute',
-                          top: isAnimating ? '-40px' : '0',
+                          bottom: isAnimating ? '-24px' : '0',
                           left: 0,
                           right: 0,
-                          height: 40,
+                          height: 24,
                           display: 'flex',
                           alignItems: 'center',
-                          transition: 'top 0.5s ease-in-out',
+                          transition: 'bottom 0.5s ease-in-out',
                         }}>
                           <span style={{
-                            fontSize: 15,
+                            fontSize: 14,
                             color: '#666',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -387,16 +370,16 @@ export default function HintPreview() {
                         {isAnimating && (
                           <div style={{
                             position: 'absolute',
-                            top: '40px',
+                            bottom: '24px',
                             left: 0,
                             right: 0,
-                            height: 40,
+                            height: 24,
                             display: 'flex',
                             alignItems: 'center',
-                            transition: 'top 0.5s ease-in-out',
+                            transition: 'bottom 0.5s ease-in-out',
                           }}>
                             <span style={{
-                              fontSize: 15,
+                              fontSize: 14,
                               color: '#666',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -407,19 +390,6 @@ export default function HintPreview() {
                           </div>
                         )}
                       </div>
-                      <Button
-                        type="primary"
-                        shape="round"
-                        size="large"
-                        icon={<SearchOutlined />}
-                        style={{
-                          background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-                          border: 'none',
-                          boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)',
-                        }}
-                      >
-                        搜索
-                      </Button>
                     </div>
 
                     {/* 底纹词轮播指示器 */}
