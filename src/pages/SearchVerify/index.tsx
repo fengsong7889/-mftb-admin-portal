@@ -148,7 +148,7 @@ function generateMerchantResults(keyword: string): MerchantResult[] {
       { dimension: '商業得分', score: com, maxScore: 400, weight: 30, details: [] },
       { dimension: '店鋪得分', score: sto, maxScore: 400, weight: 25, details: [] },
       { dimension: '用戶得分', score: usr, maxScore: 200, weight: 15, details: [] },
-      { dimension: '其它得分', score: oth, maxScore: 100, weight: 10, details: [] },
+      { dimension: '平台得分', score: oth, maxScore: 100, weight: 10, details: [] },
     ]
   }
 

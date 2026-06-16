@@ -79,7 +79,7 @@ const MOCK_MERCHANTS: MerchantResult[] = [
         ],
       },
       {
-        dimension: '其它得分', score: 77, maxScore: 100, weight: 10,
+        dimension: '平台得分', score: 77, maxScore: 100, weight: 10,
         details: [
           { name: '營業中加分', score: 20, description: '當前營業中 +20分', enabled: true },
           { name: '距離衰減', score: -5, description: '距離1.2km 衰減扣分', enabled: true },
@@ -127,7 +127,7 @@ const MOCK_MERCHANTS: MerchantResult[] = [
         ],
       },
       {
-        dimension: '其它得分', score: 96, maxScore: 100, weight: 10,
+        dimension: '平台得分', score: 96, maxScore: 100, weight: 10,
         details: [
           { name: '營業中加分', score: 20, description: '當前營業中 +20分', enabled: true },
           { name: '距離衰減', score: 16, description: '距離0.5km 衰減較少', enabled: true },
@@ -175,7 +175,7 @@ const MOCK_MERCHANTS: MerchantResult[] = [
         ],
       },
       {
-        dimension: '其它得分', score: 125, maxScore: 100, weight: 10,
+        dimension: '平台得分', score: 125, maxScore: 100, weight: 10,
         details: [
           { name: '營業中加分', score: 20, description: '當前營業中 +20分', enabled: true },
           { name: '距離衰減', score: 25, description: '距離0.3km 衰減極少', enabled: true },
@@ -224,7 +224,7 @@ const MOCK_MERCHANTS: MerchantResult[] = [
         ],
       },
       {
-        dimension: '其它得分', score: 100, maxScore: 100, weight: 10,
+        dimension: '平台得分', score: 100, maxScore: 100, weight: 10,
         details: [
           { name: '營業中加分', score: 20, description: '當前營業中 +20分', enabled: true },
           { name: '距離衰減', score: 10, description: '距離2km 衰減較多', enabled: true },
@@ -247,7 +247,7 @@ const dimensionColors: Record<string, string> = {
   '商業得分': '#faad14',
   '店鋪得分': '#52c41a',
   '用戶得分': '#722ed1',
-  '其它得分': '#13c2c2',
+  '平台得分': '#13c2c2',
 }
 
 // ============================

@@ -5,9 +5,18 @@
   height: 100vh;
   overflow: hidden;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  /* 使用 flex 布局，保证 logo + menu 填满侧边栏，menu 区域可滚动 */
+  display: flex;
+  flex-direction: column;
+}
+.sidebar .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 .sidebar-logo {
   height: 64px;
+  flex-shrink: 0; /* logo 区域不被压缩 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -30,6 +39,25 @@
 }
 .sidebar-menu {
   border-right: none;
+  /* 填满剩余高度，支持上下滚动查看所有菜单 */
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #001529;
+}
+/* 优化滚动条外观 */
+.sidebar-menu::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 /* 缩小菜单图标尺寸 */
 .sidebar-menu .ant-menu-item .anticon,

@@ -1,387 +1,637 @@
-import { useState } from 'react'
-import { Card, Tabs, Form, Switch, InputNumber, Slider, Button, Table, Modal, Input, Select, Tag, Space, Checkbox, message } from 'antd'
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Checkbox, Progress, Alert, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { SaveOutlined, WarningOutlined, EditOutlined } from '@ant-design/icons'
 
-const { TextArea } = Input
+/** 頻道類型（業務頻道，大首頁作為混排聚合層不在此列） */
+type DimensionChannelType = 'takeaway' | 'supermarket' | 'groupBuy'
 
-/** 適用APP選項 */
-const appOptions = [
-  { label: '閃蜂', value: 'flashBee' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '兩者', value: 'both' },
-]
-
-/** APP標籤顏色映射 */
-const appTagMap: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  flashBee: { label: '閃蜂', color: '#d4b106', bg: '#fffbe6', border: '#fadb14' },
-  mFood: { label: 'mFood', color: '#d46b08', bg: '#fff7e6', border: '#fa8c16' },
-  both: { label: '兩者', color: '#389e0d', bg: '#f6ffed', border: '#b7eb8f' },
+/** 維度權重佔比 */
+interface DimensionWeight {
+  relevance: number
+  commercial: number
+  store: number
+  user: number
+  other: number
 }
 
-interface RegionRule {
+const DIMENSION_CHANNELS: { key: DimensionChannelType; label: string }[] = [
+  { key: 'takeaway', label: '外賣頻道搜索' },
+  { key: 'groupBuy', label: '團購頻道搜索' },
+  { key: 'supermarket', label: '超市頻道搜索' },
+]
+
+const DIMENSION_LABELS: { key: keyof DimensionWeight; label: string }[] = [
+  { key: 'relevance', label: '相關性得分佔比' },
+  { key: 'commercial', label: '商業得分佔比' },
+  { key: 'store', label: '店鋪得分佔比' },
+  { key: 'user', label: '用戶得分佔比' },
+  { key: 'other', label: '平台得分佔比' },
+]
+
+function createDefaultDimensionWeight(): DimensionWeight {
+  return { relevance: 20, commercial: 30, store: 25, user: 15, other: 10 }
+}
+
+/** 粗排：門店/商品相關性加分行 */
+interface RelevanceWeightRow {
   key: string
-  ruleName: string
+  method: string
+  weight: number
   description: string
-  app: string
-  score: number
-  enabled: boolean
 }
 
-const mockRegionRules: RegionRule[] = [
-  { key: '1', ruleName: '跨區懲罰規則', description: '氹仔商家跨區澳門不加分', app: 'both', score: -50, enabled: true },
-  { key: '2', ruleName: '特殊區域加分', description: '指定區域內的商家額外加分', app: 'both', score: 30, enabled: true },
-  { key: '3', ruleName: '短單範圍加分', description: '配送距離短的商家加分', app: 'flashBee', score: 20, enabled: true },
+const defaultStoreRelevanceWeights: RelevanceWeightRow[] = [
+  { key: 's1', method: '分詞命中', weight: 100, description: '分詞後命中店名' },
+  { key: 's2', method: '用戶輸入內容命中', weight: 60, description: '用戶輸入內容，不分詞模糊匹配' },
+  { key: 's3', method: '精準匹配', weight: 200, description: '完全匹配店名' },
 ]
+
+const defaultProductRelevanceWeights: RelevanceWeightRow[] = [
+  { key: 'p1', method: '分詞命中', weight: 100, description: '分詞後命中商品名' },
+  { key: 'p2', method: '用戶輸入內容命中', weight: 60, description: '用戶輸入內容，不分詞模糊匹配' },
+  { key: 'p3', method: '精準匹配', weight: 200, description: '完全匹配商品名' },
+]
+
+/** 頻道混排：時段優先配置行 */
+interface TimePriorityItem {
+  key: string
+  timeRange: string
+  priorityChannel: string
+  weightBonus: number
+}
+
+/** 頻道混排優先級配置（僅大首頁生效） */
+interface ChannelMixingConfig {
+  takeawayWeight: number
+  supermarketWeight: number
+  groupBuyWeight: number
+  takeawayRatio: number
+  supermarketRatio: number
+  groupBuyRatio: number
+  interleaveX: number
+  interleaveY: number
+  interleaveZ: number
+  timePriorityList: TimePriorityItem[]
+}
+
+const defaultChannelMixing: ChannelMixingConfig = {
+  takeawayWeight: 100, supermarketWeight: 80, groupBuyWeight: 60,
+  takeawayRatio: 50, supermarketRatio: 30, groupBuyRatio: 20,
+  interleaveX: 3, interleaveY: 2, interleaveZ: 1,
+  timePriorityList: [
+    { key: 't1', timeRange: '07:00-09:00', priorityChannel: '外賣', weightBonus: 30 },
+    { key: 't2', timeRange: '11:00-13:00', priorityChannel: '外賣', weightBonus: 50 },
+    { key: 't3', timeRange: '17:00-19:00', priorityChannel: '外賣', weightBonus: 40 },
+    { key: 't4', timeRange: '20:00-22:00', priorityChannel: '超市', weightBonus: 25 },
+    { key: 't5', timeRange: '22:00-01:00', priorityChannel: '團購', weightBonus: 35 },
+  ],
+}
+
+
 
 export default function GlobalConfig() {
+  const navigate = useNavigate()
+
   // 詞庫管理狀態
   const [synonymEnabled, setSynonymEnabled] = useState(true)
-  const [aliasEnabled, setAliasEnabled] = useState(true)
   const [stopWordEnabled, setStopWordEnabled] = useState(false)
-  const [segmentStrength, setSegmentStrength] = useState(60)
+  const [merchantKeywordEnabled, setMerchantKeywordEnabled] = useState(true)
+  const [productKeywordEnabled, setProductKeywordEnabled] = useState(true)
 
   // 匹配策略狀態
-  const [minMatchRatio, setMinMatchRatio] = useState<number>(70)
   const [fuzzyPinyin, setFuzzyPinyin] = useState(true)
   const [fuzzySimplifiedTraditional, setFuzzySimplifiedTraditional] = useState(true)
   const [fuzzyTolerance, setFuzzyTolerance] = useState(true)
-  const [searchProductForShop, setSearchProductForShop] = useState(true)
 
-  // 區域規則狀態
-  const [regionRules, setRegionRules] = useState<RegionRule[]>(mockRegionRules)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingRule, setEditingRule] = useState<RegionRule | null>(null)
-  const [form] = Form.useForm()
+  // 維度權重佔比狀態（按業務頻道獨立配置，大首頁通過頻道混排聚合）
+  const [dimensionWeights, setDimensionWeights] = useState<Record<DimensionChannelType, DimensionWeight>>({
+    takeaway: createDefaultDimensionWeight(),
+    supermarket: createDefaultDimensionWeight(),
+    groupBuy: createDefaultDimensionWeight(),
+  })
 
-  // 區域規則操作
-  const handleAddRule = () => {
-    setEditingRule(null)
-    form.resetFields()
-    form.setFieldsValue({ app: 'both', score: 0, enabled: true })
-    setIsModalOpen(true)
+  const updateDimensionWeight = (channel: DimensionChannelType, key: keyof DimensionWeight, value: number | null) => {
+    setDimensionWeights(prev => ({
+      ...prev,
+      [channel]: { ...prev[channel], [key]: value ?? 0 },
+    }))
   }
 
-  const handleEditRule = (record: RegionRule) => {
-    setEditingRule(record)
-    form.setFieldsValue(record)
-    setIsModalOpen(true)
+  // 粗排配置狀態
+  const [storeRelevanceWeights, setStoreRelevanceWeights] = useState<RelevanceWeightRow[]>(defaultStoreRelevanceWeights)
+  const [productRelevanceWeights, setProductRelevanceWeights] = useState<RelevanceWeightRow[]>(defaultProductRelevanceWeights)
+  const [isBonusEditing, setIsBonusEditing] = useState(false)
+  const [bonusSnapshot, setBonusSnapshot] = useState<{ store: RelevanceWeightRow[], product: RelevanceWeightRow[] } | null>(null)
+
+  const handleBonusEdit = () => {
+    setBonusSnapshot({ store: storeRelevanceWeights, product: productRelevanceWeights })
+    setIsBonusEditing(true)
   }
 
-  const handleDeleteRule = (record: RegionRule) => {
-    Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除規則「${record.ruleName}」嗎？此操作不可恢復。`,
-      okText: '確定',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: () => {
-        setRegionRules(prev => prev.filter(r => r.key !== record.key))
-        message.success('刪除成功')
-      },
-    })
+  const handleBonusCancel = () => {
+    if (bonusSnapshot) {
+      setStoreRelevanceWeights(bonusSnapshot.store)
+      setProductRelevanceWeights(bonusSnapshot.product)
+    }
+    setBonusSnapshot(null)
+    setIsBonusEditing(false)
   }
 
-  const handleToggleRule = (record: RegionRule) => {
-    setRegionRules(prev =>
-      prev.map(r =>
-        r.key === record.key ? { ...r, enabled: !r.enabled } : r
-      )
+  // 維度權重佔比編輯態（快照回滾）
+  const [isDimEditing, setIsDimEditing] = useState(false)
+  const [dimSnapshot, setDimSnapshot] = useState<typeof dimensionWeights | null>(null)
+
+  const handleDimEdit = () => {
+    setDimSnapshot(dimensionWeights)
+    setIsDimEditing(true)
+  }
+
+  const handleDimCancel = () => {
+    if (dimSnapshot) setDimensionWeights(dimSnapshot)
+    setDimSnapshot(null)
+    setIsDimEditing(false)
+  }
+
+  const handleDimSave = () => {
+    setDimSnapshot(null)
+    setIsDimEditing(false)
+    message.success('維度權重佔比已保存')
+  }
+
+  // 頻道混排優先級編輯態（快照回滾）
+  const [isMixingEditing, setIsMixingEditing] = useState(false)
+  const [mixingSnapshot, setMixingSnapshot] = useState<ChannelMixingConfig | null>(null)
+
+  const handleMixingEdit = () => {
+    setMixingSnapshot(channelMixing)
+    setIsMixingEditing(true)
+  }
+
+  const handleMixingCancel = () => {
+    if (mixingSnapshot) setChannelMixing(mixingSnapshot)
+    setMixingSnapshot(null)
+    setIsMixingEditing(false)
+  }
+
+  const handleMixingSave = () => {
+    setMixingSnapshot(null)
+    setIsMixingEditing(false)
+    message.success('頻道混排優先級已保存')
+  }
+
+  const updateStoreRelevance = (rowKey: string, value: number | null) => {
+    setStoreRelevanceWeights(prev =>
+      prev.map(r => r.key === rowKey ? { ...r, weight: value ?? 0 } : r)
     )
-    const actionText = record.enabled ? '停用' : '啟用'
-    message.success(`已${actionText}規則「${record.ruleName}」`)
   }
 
-  const handleSaveRule = () => {
-    form.validateFields().then((values) => {
-      if (editingRule) {
-        setRegionRules(prev =>
-          prev.map(r => r.key === editingRule.key ? { ...r, ...values } : r)
-        )
-        message.success('編輯成功')
-      } else {
-        const newRule: RegionRule = {
-          key: Date.now().toString(),
-          ...values,
-        }
-        setRegionRules(prev => [...prev, newRule])
-        message.success('新增成功')
-      }
-      setIsModalOpen(false)
-    })
+  const updateProductRelevance = (rowKey: string, value: number | null) => {
+    setProductRelevanceWeights(prev =>
+      prev.map(r => r.key === rowKey ? { ...r, weight: value ?? 0 } : r)
+    )
   }
 
-  // 區域規則表格列
-  const regionColumns: TableColumnsType<RegionRule> = [
-    {
-      title: '規則名稱',
-      dataIndex: 'ruleName',
-      key: 'ruleName',
-      width: 180,
-      render: (text: string) => <span style={{ fontWeight: 600 }}>{text}</span>,
-    },
-    {
-      title: '說明',
-      dataIndex: 'description',
-      key: 'description',
-      width: 240,
-      ellipsis: true,
-    },
-    {
-      title: '適用APP',
-      dataIndex: 'app',
-      key: 'app',
-      width: 100,
-      render: (v: string) => {
-        const tag = appTagMap[v]
-        return tag ? (
-          <Tag style={{
-            margin: 0,
-            padding: '2px 10px',
-            border: `1px solid ${tag.border}`,
-            color: tag.color,
-            background: tag.bg,
-            borderRadius: 4,
-            fontWeight: 500,
-          }}>
-            {tag.label}
-          </Tag>
-        ) : v
-      },
-    },
-    {
-      title: '加分值',
-      dataIndex: 'score',
-      key: 'score',
-      width: 100,
-      render: (v: number) => (
-        <span style={{ color: v >= 0 ? '#389e0d' : '#cf1322', fontWeight: 600 }}>
-          {v >= 0 ? `+${v}` : v}
-        </span>
+  // 頻道混排優先級狀態（僅大首頁生效）
+  const [channelMixing, setChannelMixing] = useState<ChannelMixingConfig>(defaultChannelMixing)
+
+  const updateMixing = (field: keyof ChannelMixingConfig, value: any) => {
+    setChannelMixing(prev => ({ ...prev, [field]: value }))
+  }
+
+  const updateTimePriority = (rowKey: string, field: keyof TimePriorityItem, value: any) => {
+    setChannelMixing(prev => ({
+      ...prev,
+      timePriorityList: prev.timePriorityList.map(r =>
+        r.key === rowKey ? { ...r, [field]: value } : r
       ),
-    },
-    {
-      title: '狀態',
-      dataIndex: 'enabled',
-      key: 'enabled',
-      width: 80,
-      render: (v: boolean, record) => (
-        <Switch
-          checked={v}
-          size="small"
-          onChange={() => handleToggleRule(record)}
-        />
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 140,
-      render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditRule(record)}>
-            編輯
-          </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteRule(record)}>
-            刪除
-          </Button>
-        </Space>
-      ),
-    },
-  ]
+    }))
+  }
+
+  const totalMixingRatio = useMemo(() => {
+    return channelMixing.takeawayRatio + channelMixing.supermarketRatio + channelMixing.groupBuyRatio
+  }, [channelMixing.takeawayRatio, channelMixing.supermarketRatio, channelMixing.groupBuyRatio])
 
   const tabItems = [
     {
       key: 'library',
-      label: '詞庫管理',
+      label: '詞庫與搜索',
       children: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* 同義詞庫 */}
-          <Card title="同義詞庫" size="small">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Space>
-                <Switch
-                  checked={synonymEnabled}
-                  onChange={setSynonymEnabled}
-                  checkedChildren="開啟"
-                  unCheckedChildren="關閉"
-                />
-                <span style={{ color: synonymEnabled ? '#389e0d' : '#999', fontWeight: 500 }}>
-                  {synonymEnabled ? '已開啟' : '已關閉'}
-                </span>
-              </Space>
-              <Button type="primary" ghost>管理詞庫</Button>
-            </div>
-            <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 13 }}>
-              啟用後，搜索時會自動匹配同義詞，擴大召回範圍。例如搜「漢堡」可召回「burger」。
+          {/* 詞庫配置區域 */}
+          <Card
+            title={<span style={{ color: '#1d39c4', fontWeight: 600 }}>詞庫配置</span>}
+            size="small"
+            style={{ borderColor: '#d6e4ff' }}
+            styles={{ header: { background: '#f0f5ff', borderBottom: '1px solid #d6e4ff' } }}
+          >
+            {/* 詞庫開關 2x2 网格 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              {/* 同義詞庫 */}
+              <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Space>
+                    <span style={{ fontWeight: 600 }}>同義詞庫</span>
+                    <Switch
+                      checked={synonymEnabled}
+                      onChange={setSynonymEnabled}
+                      checkedChildren="開"
+                      unCheckedChildren="關"
+                      size="small"
+                    />
+                  </Space>
+                  <Button type="link" size="small" onClick={() => navigate('/synonym-config')}>管理詞庫</Button>
+                </div>
+                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                  搜「漢堡」可召回「burger」等同義詞
+                </div>
+              </Card>
+
+              {/* 停用詞庫 */}
+              <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Space>
+                    <span style={{ fontWeight: 600 }}>停用詞庫</span>
+                    <Switch
+                      checked={stopWordEnabled}
+                      onChange={setStopWordEnabled}
+                      checkedChildren="開"
+                      unCheckedChildren="關"
+                      size="small"
+                    />
+                  </Space>
+                  <Button type="link" size="small" onClick={() => navigate('/stop-words')}>管理詞庫</Button>
+                </div>
+                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                  過濾無意義詞，避免干擾搜索結果
+                </div>
+              </Card>
+
+              {/* 商家關鍵詞匹配 */}
+              <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Space>
+                    <span style={{ fontWeight: 600 }}>商家關鍵詞匹配</span>
+                    <Switch
+                      checked={merchantKeywordEnabled}
+                      onChange={setMerchantKeywordEnabled}
+                      checkedChildren="開"
+                      unCheckedChildren="關"
+                      size="small"
+                    />
+                  </Space>
+                </div>
+                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                  搜「快餐」可召回漢堡店、肯德基等商家
+                </div>
+              </Card>
+
+              {/* 商品關鍵詞匹配 */}
+              <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Space>
+                    <span style={{ fontWeight: 600 }}>商品關鍵詞匹配</span>
+                    <Switch
+                      checked={productKeywordEnabled}
+                      onChange={setProductKeywordEnabled}
+                      checkedChildren="開"
+                      unCheckedChildren="關"
+                      size="small"
+                    />
+                  </Space>
+                </div>
+                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                  搜「飲品」可召回奶茶、可樂等商品
+                </div>
+              </Card>
             </div>
           </Card>
 
-          {/* 商家別名庫 */}
-          <Card title="商家別名庫" size="small">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Space>
-                <Switch
-                  checked={aliasEnabled}
-                  onChange={setAliasEnabled}
-                  checkedChildren="開啟"
-                  unCheckedChildren="關閉"
-                />
-                <span style={{ color: aliasEnabled ? '#389e0d' : '#999', fontWeight: 500 }}>
-                  {aliasEnabled ? '已開啟' : '已關閉'}
-                </span>
-              </Space>
-              <Button type="primary" ghost>管理詞庫</Button>
+          {/* 用戶輸入模糊糾錯 */}
+          <Card
+            title={<span style={{ color: '#389e0d', fontWeight: 600 }}>用戶輸入模糊糾錯</span>}
+            size="small"
+            style={{ borderColor: '#d9f7be' }}
+            styles={{ header: { background: '#f6ffed', borderBottom: '1px solid #d9f7be' } }}
+          >
+            <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 10 }}>
+              用戶輸入搜索詞時的自動糾錯與模糊匹配能力，提升召回率
             </div>
-            <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 13 }}>
-              啟用後，搜索商家別名可匹配到對應商家。例如搜「KFC」可召回「肯德基」。
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>拼音匹配</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Switch
+                    checked={fuzzyPinyin}
+                    onChange={setFuzzyPinyin}
+                    checkedChildren="開"
+                    unCheckedChildren="關"
+                    size="small"
+                  />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>如搜「汉bao」召回「漢堡」</span>
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>簡繁體匹配</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Switch
+                    checked={fuzzySimplifiedTraditional}
+                    onChange={setFuzzySimplifiedTraditional}
+                    checkedChildren="開"
+                    unCheckedChildren="關"
+                    size="small"
+                  />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>如搜「汉堡」召回「漢堡」</span>
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>容錯匹配</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Switch
+                    checked={fuzzyTolerance}
+                    onChange={setFuzzyTolerance}
+                    checkedChildren="開"
+                    unCheckedChildren="關"
+                    size="small"
+                  />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>如搜「肯德鷄」召回「肯德基」</span>
+                </div>
+              </div>
             </div>
           </Card>
 
-          {/* 分詞匹配力度 */}
-          <Card title="分詞匹配力度" size="small">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <Slider
-                min={0}
-                max={100}
-                value={segmentStrength}
-                onChange={setSegmentStrength}
-                style={{ flex: 1, margin: 0 }}
-              />
-              <InputNumber
-                min={0}
-                max={100}
-                value={segmentStrength}
-                onChange={(v) => setSegmentStrength(v ?? 0)}
-                formatter={(v) => `${v}%`}
-                parser={(v) => Number(v?.replace('%', '')) || 0}
-                style={{ width: 90 }}
-              />
-            </div>
-            <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 13 }}>
-              數值越小搜索結果將泛化（內容變多），數值越大匹配結果越準確（內容變少）
-            </div>
-          </Card>
+          {/* 用戶輸入搜索詞匹配加分：門店與商品左右並排 */}
+          {(() => {
+            const bonusCols: TableColumnsType<RelevanceWeightRow> = [
+              { title: '匹配方式', dataIndex: 'method', width: 150 },
+              {
+                title: '加分值', dataIndex: 'weight', width: 130,
+                render: (v: number, r) => (
+                  <InputNumber
+                    min={0} max={9999} value={v} size="small" style={{ width: '100%' }}
+                    disabled={!isBonusEditing}
+                    onChange={val => updateStoreRelevance(r.key, val)}
+                  />
+                ),
+              },
+              { title: '說明', dataIndex: 'description' },
+            ]
 
-          {/* 停用詞庫 */}
-          <Card title="停用詞庫" size="small">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Space>
-                <Switch
-                  checked={stopWordEnabled}
-                  onChange={setStopWordEnabled}
-                  checkedChildren="開啟"
-                  unCheckedChildren="關閉"
-                />
-                <span style={{ color: stopWordEnabled ? '#389e0d' : '#999', fontWeight: 500 }}>
-                  {stopWordEnabled ? '已開啟' : '已關閉'}
-                </span>
-              </Space>
-              <Button type="primary" ghost>管理詞庫</Button>
-            </div>
-            <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 13 }}>
-              啟用後，搜索時會自動過濾停用詞，避免無意義詞干擾搜索結果。
-            </div>
-          </Card>
+            const productBonusCols: TableColumnsType<RelevanceWeightRow> = [
+              { title: '匹配方式', dataIndex: 'method', width: 150 },
+              {
+                title: '加分值', dataIndex: 'weight', width: 130,
+                render: (v: number, r) => (
+                  <InputNumber
+                    min={0} max={9999} value={v} size="small" style={{ width: '100%' }}
+                    disabled={!isBonusEditing}
+                    onChange={val => updateProductRelevance(r.key, val)}
+                  />
+                ),
+              },
+              { title: '說明', dataIndex: 'description' },
+            ]
+
+            const bonusExtra = isBonusEditing
+              ? (
+                <Space>
+                  <Button size="small" onClick={handleBonusCancel}>取消</Button>
+                  <Button type="primary" size="small" icon={<SaveOutlined />} onClick={() => {
+                    message.success('搜索詞匹配加分已保存')
+                    setBonusSnapshot(null)
+                    setIsBonusEditing(false)
+                  }}>保存</Button>
+                </Space>
+              )
+              : (
+                <Button type="primary" size="small" icon={<EditOutlined />} onClick={handleBonusEdit}>編輯加分</Button>
+              )
+
+            return (
+              <Card
+                title={<span style={{ color: '#d46b08', fontWeight: 600 }}>用戶輸入搜索詞匹配加分</span>}
+                size="small"
+                extra={bonusExtra}
+                style={{ borderColor: '#ffe7ba' }}
+                styles={{ header: { background: '#fff7e6', borderBottom: '1px solid #ffe7ba' } }}
+              >
+                <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 10 }}>
+                  基於<span style={{ fontWeight: 600 }}>用戶實際輸入內容</span>命中商家名稱或商品名稱時的加分值（與上方詞庫配置無關）
+                  {isBonusEditing && <span style={{ color: '#1677ff', marginLeft: 8 }}>（編輯中）</span>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商家名稱加分</div>
+                    <Table<RelevanceWeightRow>
+                      columns={bonusCols} dataSource={storeRelevanceWeights}
+                      pagination={false} size="small" bordered
+                    />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商品名稱加分</div>
+                    <Table<RelevanceWeightRow>
+                      columns={productBonusCols} dataSource={productRelevanceWeights}
+                      pagination={false} size="small" bordered
+                    />
+                  </div>
+                </div>
+              </Card>
+            )
+          })()}
         </div>
       ),
     },
     {
       key: 'strategy',
-      label: '匹配策略',
-      children: (
-        <Form layout="vertical" style={{ maxWidth: 600 }}>
-          <Form.Item
-            label="最少匹配比例"
-            tooltip="搜索詞至少需要匹配的比例，低於此比例的結果將被過濾"
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <InputNumber
-                min={0}
-                max={100}
-                value={minMatchRatio}
-                onChange={(v) => setMinMatchRatio(v ?? 0)}
-                formatter={(v) => `${v}%`}
-                parser={(v) => Number(v?.replace('%', '')) || 0}
-                style={{ width: 120 }}
-              />
-            </div>
-            <div style={{ marginTop: 4, color: '#8c8c8c', fontSize: 13 }}>
-              各頻道可單獨覆蓋此全局默認值
-            </div>
-          </Form.Item>
+      label: '策略權重',
+      children: (() => {
+        // 計算每個業務頻道的維度權重總和
+        const channelTotals: Record<DimensionChannelType, number> = {
+          takeaway: Object.values(dimensionWeights.takeaway).reduce((a, b) => a + b, 0),
+          supermarket: Object.values(dimensionWeights.supermarket).reduce((a, b) => a + b, 0),
+          groupBuy: Object.values(dimensionWeights.groupBuy).reduce((a, b) => a + b, 0),
+        }
 
-          <Form.Item label="模糊匹配">
-            <Space direction="vertical">
-              <Checkbox
-                checked={fuzzyPinyin}
-                onChange={(e) => setFuzzyPinyin(e.target.checked)}
-              >
-                拼音匹配
-              </Checkbox>
-              <Checkbox
-                checked={fuzzySimplifiedTraditional}
-                onChange={(e) => setFuzzySimplifiedTraditional(e.target.checked)}
-              >
-                簡繁體匹配
-              </Checkbox>
-              <Checkbox
-                checked={fuzzyTolerance}
-                onChange={(e) => setFuzzyTolerance(e.target.checked)}
-              >
-                容錯匹配
-              </Checkbox>
-            </Space>
-          </Form.Item>
-
-          <Form.Item label="商品名搜店鋪">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Switch
-                checked={searchProductForShop}
-                onChange={setSearchProductForShop}
-                checkedChildren="是"
-                unCheckedChildren="否"
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* 維度權重佔比：3 個業務頻道並排 */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ color: '#722ed1', fontWeight: 600, fontSize: 15 }}>維度權重佔比（按業務頻道獨立配置）</div>
+                {isDimEditing ? (
+                  <Space>
+                    <Button onClick={handleDimCancel}>取消</Button>
+                    <Button type="primary" icon={<SaveOutlined />} onClick={handleDimSave}>保存</Button>
+                  </Space>
+                ) : (
+                  <Button type="primary" icon={<EditOutlined />} onClick={handleDimEdit}>編輯權重</Button>
+                )}
+              </div>
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={
+                  <span style={{ fontSize: 13 }}>
+                    各業務頻道獨立配置權重：<strong>最終得分 = 相關性×% + 商業×% + 店鋪×% + 用戶×% + 平台×%</strong>；大首頁無獨立權重，透過下方「頻道混排優先級」聚合三個頻道的搜索結果
+                  </span>
+                }
               />
-              <span style={{ color: '#8c8c8c', fontSize: 13 }}>
-                是否支持搜商品名召回其所屬店鋪
-              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                {DIMENSION_CHANNELS.map(ch => {
+                  const w = dimensionWeights[ch.key]
+                  const total = channelTotals[ch.key]
+                  const ok = total === 100
+                  return (
+                    <div
+                      key={ch.key}
+                      style={{
+                        padding: '14px 16px',
+                        borderRadius: 6,
+                        border: '1px solid #efdbff',
+                        background: '#fff',
+                      }}
+                    >
+                      {/* 頻道標題 */}
+                      <div style={{
+                        fontWeight: 600, fontSize: 14,
+                        color: '#722ed1',
+                        paddingBottom: 8, marginBottom: 12,
+                        borderBottom: '2px solid #d3adf7',
+                        textAlign: 'center',
+                      }}>
+                        {ch.label}
+                      </div>
+                      {/* 五個維度權重 */}
+                      <Form layout="vertical" size="small">
+                        {DIMENSION_LABELS.map(({ key, label }) => (
+                          <Form.Item
+                            key={key}
+                            label={<span style={{ fontSize: 12 }}>{label}</span>}
+                            style={{ marginBottom: 8 }}
+                          >
+                            <InputNumber
+                              min={0} max={100} value={w[key]}
+                              disabled={!isDimEditing}
+                              onChange={v => updateDimensionWeight(ch.key, key, v)}
+                              addonAfter="%"
+                              style={{ width: '100%' }}
+                            />
+                          </Form.Item>
+                        ))}
+                      </Form>
+                      {/* 總和提示 */}
+                      <div style={{
+                        marginTop: 8, padding: '6px 10px',
+                        borderRadius: 4,
+                        background: ok ? '#f6ffed' : '#fff2f0',
+                        border: `1px solid ${ok ? '#b7eb8f' : '#ffccc7'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        fontSize: 12,
+                      }}>
+                        <span style={{ color: '#595959' }}>佔比總和</span>
+                        <span style={{ fontWeight: 600, color: ok ? '#52c41a' : '#ff4d4f' }}>
+                          {total}%{ok ? ' ✓' : ' ✗'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </Form.Item>
-        </Form>
-      ),
-    },
-    {
-      key: 'region',
-      label: '區域規則',
-      children: (
-        <>
-          <div className="action-section">
-            <Space>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRule}>
-                新增規則
-              </Button>
-            </Space>
+
+            {/* 頻道混排優先級（僅大首頁生效） */}
+            <Card
+              title={<span style={{ color: '#08979c', fontWeight: 600 }}>頻道混排優先級（僅大首頁生效）</span>}
+              size="small"
+              style={{ borderColor: '#b5f5ec' }}
+              styles={{ header: { background: '#e6fffb', borderBottom: '1px solid #b5f5ec' } }}
+              extra={
+                isMixingEditing ? (
+                  <Space>
+                    <Button onClick={handleMixingCancel}>取消</Button>
+                    <Button type="primary" icon={<SaveOutlined />} onClick={handleMixingSave}>保存</Button>
+                  </Space>
+                ) : (
+                  <Button type="primary" icon={<EditOutlined />} onClick={handleMixingEdit}>編輯權重</Button>
+                )
+              }
+            >
+              <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 12 }}>
+                大首頁聚合多個頻道內容時的排序與展示比例策略
+              </div>
+
+              <Card title="頻道基礎權重" size="small" style={{ marginBottom: 12 }}>
+                <Form layout="inline" size="small">
+                  <Form.Item label="外賣">
+                    <InputNumber min={0} max={9999} disabled={!isMixingEditing} value={channelMixing.takeawayWeight} onChange={v => updateMixing('takeawayWeight', v)} />
+                  </Form.Item>
+                  <Form.Item label="超市">
+                    <InputNumber min={0} max={9999} disabled={!isMixingEditing} value={channelMixing.supermarketWeight} onChange={v => updateMixing('supermarketWeight', v)} />
+                  </Form.Item>
+                  <Form.Item label="團購">
+                    <InputNumber min={0} max={9999} disabled={!isMixingEditing} value={channelMixing.groupBuyWeight} onChange={v => updateMixing('groupBuyWeight', v)} />
+                  </Form.Item>
+                </Form>
+              </Card>
+
+              <Card title="頻道展示比例" size="small" style={{ marginBottom: 12 }}>
+                <Form layout="inline" size="small">
+                  <Form.Item label="外賣">
+                    <InputNumber min={0} max={100} disabled={!isMixingEditing} value={channelMixing.takeawayRatio} addonAfter="%" onChange={v => updateMixing('takeawayRatio', v ?? 0)} />
+                  </Form.Item>
+                  <Form.Item label="超市">
+                    <InputNumber min={0} max={100} disabled={!isMixingEditing} value={channelMixing.supermarketRatio} addonAfter="%" onChange={v => updateMixing('supermarketRatio', v ?? 0)} />
+                  </Form.Item>
+                  <Form.Item label="團購">
+                    <InputNumber min={0} max={100} disabled={!isMixingEditing} value={channelMixing.groupBuyRatio} addonAfter="%" onChange={v => updateMixing('groupBuyRatio', v ?? 0)} />
+                  </Form.Item>
+                </Form>
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>比例總和：</span>
+                  <Tag color={totalMixingRatio === 100 ? 'success' : 'error'}>{totalMixingRatio}%</Tag>
+                  {totalMixingRatio !== 100 && <Tag color="error" icon={<WarningOutlined />}>總和必須等於100%</Tag>}
+                </div>
+              </Card>
+
+              <Card title="輪插策略" size="small" style={{ marginBottom: 12 }}>
+                <Space>
+                  <span>每</span>
+                  <InputNumber min={1} max={99} disabled={!isMixingEditing} value={channelMixing.interleaveX} onChange={v => updateMixing('interleaveX', v ?? 1)} />
+                  <span>條外賣插入</span>
+                  <InputNumber min={0} max={99} disabled={!isMixingEditing} value={channelMixing.interleaveY} onChange={v => updateMixing('interleaveY', v ?? 0)} />
+                  <span>條超市/</span>
+                  <InputNumber min={0} max={99} disabled={!isMixingEditing} value={channelMixing.interleaveZ} onChange={v => updateMixing('interleaveZ', v ?? 0)} />
+                  <span>條團購</span>
+                </Space>
+              </Card>
+
+              <Card title="時段優先" size="small">
+                <Table<TimePriorityItem>
+                  columns={[
+                    { title: '時段', dataIndex: 'timeRange', width: 160 },
+                    {
+                      title: '優先頻道', dataIndex: 'priorityChannel', width: 120,
+                      render: (v: string) => (
+                        <Tag color={v === '外賣' ? 'orange' : v === '超市' ? 'green' : 'purple'}>{v}</Tag>
+                      ),
+                    },
+                    {
+                      title: '權重加成', dataIndex: 'weightBonus', width: 140,
+                      render: (v: number, r) => (
+                        <InputNumber min={0} max={999} disabled={!isMixingEditing} value={v} onChange={val => updateTimePriority(r.key, 'weightBonus', val ?? 0)} />
+                      ),
+                    },
+                  ]}
+                  dataSource={channelMixing.timePriorityList}
+                  pagination={false} size="small" bordered
+                />
+              </Card>
+            </Card>
           </div>
-          <div className="table-section">
-            <Table<RegionRule>
-              columns={regionColumns}
-              dataSource={regionRules}
-              pagination={{
-                total: regionRules.length,
-                pageSize: 10,
-                showTotal: (total) => `共 ${total} 條`,
-                showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50', '100'],
-                defaultPageSize: 10,
-                showQuickJumper: true,
-              }}
-              size="middle"
-              bordered={false}
-              scroll={{ x: 800 }}
-            />
-          </div>
-        </>
-      ),
+        )
+      })(),
     },
   ]
 
@@ -398,53 +648,6 @@ export default function GlobalConfig() {
       </Card>
 
       <Tabs defaultActiveKey="library" items={tabItems} size="large" />
-
-      {/* 新增/編輯區域規則彈窗 */}
-      <Modal
-        title={editingRule ? '編輯區域規則' : '新增區域規則'}
-        open={isModalOpen}
-        onOk={handleSaveRule}
-        onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
-        width={560}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item
-            label="規則名稱"
-            name="ruleName"
-            rules={[{ required: true, message: '請輸入規則名稱' }]}
-          >
-            <Input placeholder="請輸入規則名稱" />
-          </Form.Item>
-          <Form.Item
-            label="說明"
-            name="description"
-            rules={[{ required: true, message: '請輸入規則說明' }]}
-          >
-            <TextArea rows={3} placeholder="請輸入規則說明" maxLength={200} showCount />
-          </Form.Item>
-          <Form.Item
-            label="適用APP"
-            name="app"
-            rules={[{ required: true, message: '請選擇適用APP' }]}
-          >
-            <Select options={appOptions} placeholder="請選擇適用APP" />
-          </Form.Item>
-          <Form.Item
-            label="加分值"
-            name="score"
-            rules={[{ required: true, message: '請輸入加分值' }]}
-            extra="負數為懲罰扣分，正數為加分"
-          >
-            <InputNumber style={{ width: '100%' }} placeholder="請輸入加分值" />
-          </Form.Item>
-          <Form.Item label="狀態" name="enabled" valuePropName="checked">
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   )
 }

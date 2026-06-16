@@ -221,23 +221,6 @@ const menuItems: MenuItem[] = [
         ],
       },
       {
-        key: 'report',
-        icon: <BarChartOutlined />,
-        label: '報表統計',
-        children: [
-          {
-            key: 'hint-report',
-            icon: <LineChartOutlined />,
-            label: '底紋報表',
-          },
-          {
-            key: 'hot-search-report',
-            icon: <LineChartOutlined />,
-            label: '熱搜報表',
-          },
-        ],
-      },
-      {
         key: 'search-verify-group',
         icon: <SafetyCertificateOutlined />,
         label: '搜索校驗',
@@ -256,6 +239,23 @@ const menuItems: MenuItem[] = [
             key: 'hot-search-verify',
             icon: <FireOutlined />,
             label: '熱搜校驗',
+          },
+        ],
+      },
+      {
+        key: 'report',
+        icon: <BarChartOutlined />,
+        label: '報表統計',
+        children: [
+          {
+            key: 'hint-report',
+            icon: <LineChartOutlined />,
+            label: '底紋報表',
+          },
+          {
+            key: 'hot-search-report',
+            icon: <LineChartOutlined />,
+            label: '熱搜報表',
           },
         ],
       },
