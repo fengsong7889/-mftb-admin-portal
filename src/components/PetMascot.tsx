@@ -303,8 +303,8 @@ export default function PetMascot() {
     const showBubblePeriodically = () => {
       const delay = 8000 + Math.random() * 8000
       bubbleTimerRef.current = window.setTimeout(() => {
-        // 30%概率显示页面提示，70%概率显示随机消息
-        if (currentPrd?.tips && currentPrd.tips.length > 0 && Math.random() < 0.3) {
+        // 90%概率显示页面提示，10%概率显示趣味话题
+        if (currentPrd?.tips && currentPrd.tips.length > 0 && Math.random() < 0.9) {
           setIsPageTip(true)
           setPageTipIndex(prev => (prev + 1) % (currentPrd.tips?.length || 1))
         } else {
