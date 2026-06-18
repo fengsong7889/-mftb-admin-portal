@@ -270,12 +270,29 @@ export default function PetMascot() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showPRD, setShowPRD] = useState(false)
   const [prd, setPrd] = useState<PagePRD | null>(null)
+  const [pageTipIndex, setPageTipIndex] = useState(0)
+  const [isPageTip, setIsPageTip] = useState(false)
   const posRef = useRef(pos)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const bubbleTimerRef = useRef<number | null>(null)
   const dragMovedRef = useRef(false)
 
   const current = expressions[currentIndex]
+
+  // 获取当前页面的PRD
+  const currentPrd = getPagePRD(location.pathname)
+
+  // 路由变化时显示页面提示
+  useEffect(() => {
+    if (currentPrd?.tips && currentPrd.tips.length > 0) {
+      setIsPageTip(true)
+      setPageTipIndex(0)
+      setShowBubble(true)
+      // 5秒后隐藏页面提示
+      const timer = setTimeout(() => setShowBubble(false), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     posRef.current = pos
@@ -284,31 +301,39 @@ export default function PetMascot() {
   // 定时切换表情 + 弹出气泡（随机展示）
   useEffect(() => {
     const showBubblePeriodically = () => {
-      const delay = 6000 + Math.random() * 6000
+      const delay = 8000 + Math.random() * 8000
       bubbleTimerRef.current = window.setTimeout(() => {
-        // 随机选择一个不同的表情
-        setCurrentIndex(prev => {
-          let newIndex
-          do {
-            newIndex = Math.floor(Math.random() * expressions.length)
-          } while (newIndex === prev && expressions.length > 1)
-          return newIndex
-        })
+        // 30%概率显示页面提示，70%概率显示随机消息
+        if (currentPrd?.tips && currentPrd.tips.length > 0 && Math.random() < 0.3) {
+          setIsPageTip(true)
+          setPageTipIndex(prev => (prev + 1) % (currentPrd.tips?.length || 1))
+        } else {
+          setIsPageTip(false)
+          setCurrentIndex(prev => {
+            let newIndex
+            do {
+              newIndex = Math.floor(Math.random() * expressions.length)
+            } while (newIndex === prev && expressions.length > 1)
+            return newIndex
+          })
+        }
         setShowBubble(true)
         setTimeout(() => setShowBubble(false), 4500)
         showBubblePeriodically()
       }, delay)
     }
     const firstTimer = setTimeout(() => {
-      setShowBubble(true)
-      setTimeout(() => setShowBubble(false), 4500)
+      if (!isPageTip) {
+        setShowBubble(true)
+        setTimeout(() => setShowBubble(false), 4500)
+      }
       showBubblePeriodically()
-    }, 2000)
+    }, 3000)
     return () => {
       clearTimeout(firstTimer)
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
     }
-  }, [])
+  }, [currentPrd, isPageTip])
 
   // 点击 - 弹出 PRD 弹窗
   const handleClick = () => {
@@ -319,6 +344,14 @@ export default function PetMascot() {
     const pagePrd = getPagePRD(location.pathname)
     setPrd(pagePrd)
     setShowPRD(true)
+  }
+
+  // 获取气泡显示内容
+  const getBubbleContent = () => {
+    if (isPageTip && currentPrd?.tips && currentPrd.tips.length > 0) {
+      return currentPrd.tips[pageTipIndex]
+    }
+    return current.message
   }
 
   // 拖拽逻辑
@@ -361,8 +394,8 @@ export default function PetMascot() {
         onClick={handleClick}
       >
         {showBubble && (
-          <div className="pet-bubble">
-            <div className="pet-bubble-text">{current.message}</div>
+          <div className={`pet-bubble ${isPageTip ? 'page-tip' : ''}`}>
+            <div className="pet-bubble-text">{getBubbleContent()}</div>
             <div className="pet-bubble-tail" />
           </div>
         )}
@@ -382,7 +415,7 @@ export default function PetMascot() {
         open={showPRD}
         onCancel={() => setShowPRD(false)}
         footer={null}
-        width={680}
+        width={720}
       >
         {prd ? (
           <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}>
@@ -459,7 +492,7 @@ export default function PetMascot() {
 
             {/* 注意事项 */}
             {prd.notes && prd.notes.length > 0 && (
-              <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 20 }}>
                 <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
                   注意事項
@@ -467,6 +500,53 @@ export default function PetMascot() {
                 <ul style={{ paddingLeft: 24, margin: 0 }}>
                   {prd.notes.map((n, i) => (
                     <li key={i} style={{ fontSize: 13, color: '#E8720C', lineHeight: 2 }}>{n}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 交互说明 */}
+            {prd.interaction && prd.interaction.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <h4 style={{ fontSize: 14, color: '#1890ff', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#1890ff', borderRadius: 2 }} />
+                  📱 交互說明
+                </h4>
+                <ul style={{ paddingLeft: 24, margin: 0 }}>
+                  {prd.interaction.map((item, i) => (
+                    <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 公式计算 */}
+            {prd.formulas && prd.formulas.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <h4 style={{ fontSize: 14, color: '#52c41a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#52c41a', borderRadius: 2 }} />
+                  📊 公式計算
+                </h4>
+                <div style={{ padding: '12px 16px', background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
+                  {prd.formulas.map((formula, i) => (
+                    <div key={i} style={{ fontSize: 13, color: '#389e0d', lineHeight: 1.8, fontFamily: 'monospace' }}>
+                      {formula}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 取值规则 */}
+            {prd.rules && prd.rules.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <h4 style={{ fontSize: 14, color: '#722ed1', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#722ed1', borderRadius: 2 }} />
+                  📏 取值規則
+                </h4>
+                <ul style={{ paddingLeft: 24, margin: 0 }}>
+                  {prd.rules.map((rule, i) => (
+                    <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{rule}</li>
                   ))}
                 </ul>
               </div>

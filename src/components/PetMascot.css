@@ -580,3 +580,22 @@
   0% { opacity: 1; transform: translateX(-50%) scale(1); }
   100% { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(6px); }
 }
+
+/* ========== 页面提示气泡样式 ========== */
+.pet-bubble.page-tip {
+  background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
+  border-color: #1890ff;
+  box-shadow: 0 4px 20px rgba(24, 144, 255, 0.25), 0 0 0 1px rgba(24, 144, 255, 0.1);
+}
+
+.pet-bubble.page-tip .pet-bubble-text {
+  color: #0958d9;
+}
+
+.pet-bubble.page-tip .pet-bubble-tail {
+  border-top-color: #1890ff;
+}
+
+.pet-bubble.page-tip .pet-bubble-tail::before {
+  border-top-color: #bae7ff;
+}
