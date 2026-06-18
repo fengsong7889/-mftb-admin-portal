@@ -11,8 +11,8 @@ import { PlusOutlined, InfoCircleOutlined, DeleteOutlined } from '@ant-design/ic
 /** 加分方式 */
 type BoostMethod = 'fixed' | 'weight_multiply'
 
-/** 適用APP */
-type AppType = 'flashBee' | 'mFood' | 'both'
+/** 適用頻道 */
+type AppChannelType = 'all' | 'flashBee' | 'mFood'
 
 /** 適用頻道 */
 type ChannelType = 'takeaway' | 'supermarket' | 'groupBuy' | 'homePage'
@@ -22,14 +22,29 @@ interface ActivityRecord {
   key: string
   activityName: string
   activityCode: string
-  appType: AppType
+  appChannel: AppChannelType
   channels: ChannelType[]
   boostValue: number
   boostMethod: BoostMethod
   status: boolean
   priority: number
+  description?: string
   weightValue?: number
   multiplyValue?: number
+}
+
+/** 廣告加分配置 */
+interface AdRecord {
+  key: string
+  adName: string
+  adCode: string
+  appChannel: AppChannelType
+  channels: ChannelType[]
+  adWeight: number
+  adMultiplier: number
+  status: boolean
+  priority: number
+  description?: string
 }
 
 /** 熱搜詞購買記錄 */
@@ -45,16 +60,16 @@ interface HotSearchPurchase {
 
 // ======== 常量映射 ========
 
-const appTypeMap: Record<AppType, string> = {
+const appChannelMap: Record<AppChannelType, string> = {
+  all: '全部',
   flashBee: '閃蜂',
   mFood: 'mFood',
-  both: '兩者',
 }
 
-const appTypeColorMap: Record<AppType, string> = {
-  flashBee: 'blue',
-  mFood: 'orange',
-  both: 'green',
+const appChannelColorMap: Record<AppChannelType, string> = {
+  all: 'blue',
+  flashBee: 'orange',
+  mFood: 'green',
 }
 
 const channelMap: Record<ChannelType, string> = {
@@ -81,27 +96,34 @@ const channelOptions = [
   { label: '大首頁', value: 'homePage' },
 ]
 
-const appTypeOptions = [
+const appChannelOptions = [
+  { label: '全部', value: 'all' },
   { label: '閃蜂', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
-  { label: '兩者', value: 'both' },
 ]
 
 // ======== Mock 數據 ========
 
+const initialAds: AdRecord[] = [
+  { key: '1', adName: '搜索結果廣告', adCode: 'SEARCH_RESULT_AD', appChannel: 'all', channels: ['takeaway', 'supermarket'], adWeight: 100, adMultiplier: 1, status: true, priority: 1, description: '在搜索結果列表中展示廣告位' },
+  { key: '2', adName: '首頁推薦廣告', adCode: 'HOME_RECOMMEND_AD', appChannel: 'all', channels: ['takeaway', 'supermarket', 'groupBuy'], adWeight: 150, adMultiplier: 1.5, status: true, priority: 2, description: '在首頁推薦位置展示廣告' },
+  { key: '3', adName: '分類頁廣告', adCode: 'CATEGORY_AD', appChannel: 'flashBee', channels: ['takeaway'], adWeight: 80, adMultiplier: 1, status: true, priority: 3, description: '在分類頁面展示廣告位' },
+  { key: '4', adName: '詳情頁廣告', adCode: 'DETAIL_AD', appChannel: 'mFood', channels: ['groupBuy'], adWeight: 120, adMultiplier: 1.2, status: true, priority: 4, description: '在商家詳情頁展示廣告' },
+]
+
 const initialActivities: ActivityRecord[] = [
-  { key: '1', activityName: '滿額立減', activityCode: 'FULL_REDUCE', appType: 'both', channels: ['takeaway', 'supermarket'], boostValue: 30, boostMethod: 'fixed', status: true, priority: 1 },
-  { key: '2', activityName: '減免運費', activityCode: 'FREE_DELIVERY', appType: 'both', channels: ['takeaway'], boostValue: 25, boostMethod: 'fixed', status: true, priority: 2 },
-  { key: '3', activityName: '進店領券', activityCode: 'STORE_COUPON', appType: 'both', channels: ['takeaway', 'supermarket', 'groupBuy'], boostValue: 20, boostMethod: 'fixed', status: true, priority: 3 },
-  { key: '4', activityName: '新客立減', activityCode: 'NEW_USER_REDUCE', appType: 'both', channels: ['takeaway', 'supermarket'], boostValue: 35, boostMethod: 'fixed', status: true, priority: 4 },
-  { key: '5', activityName: '收藏送券', activityCode: 'FAV_COUPON', appType: 'flashBee', channels: ['takeaway'], boostValue: 15, boostMethod: 'fixed', status: true, priority: 5 },
-  { key: '6', activityName: '官方勝券', activityCode: 'OFFICIAL_COUPON', appType: 'flashBee', channels: ['takeaway', 'supermarket'], boostValue: 40, boostMethod: 'fixed', status: true, priority: 6 },
-  { key: '7', activityName: '會員紅包', activityCode: 'MEMBER_BONUS', appType: 'both', channels: ['takeaway', 'supermarket', 'groupBuy'], boostValue: 25, boostMethod: 'fixed', status: true, priority: 7 },
-  { key: '8', activityName: '會員紅包按金額', activityCode: 'MEMBER_AMOUNT', appType: 'flashBee', channels: ['takeaway'], boostValue: 0, boostMethod: 'weight_multiply', status: true, priority: 8, weightValue: 10, multiplyValue: 2 },
-  { key: '9', activityName: '人氣搜索', activityCode: 'POPULAR_SEARCH', appType: 'both', channels: ['takeaway', 'supermarket'], boostValue: 50, boostMethod: 'weight_multiply', status: true, priority: 9, weightValue: 15, multiplyValue: 3 },
-  { key: '10', activityName: '神券補貼', activityCode: 'SUBSIDY_COUPON', appType: 'mFood', channels: ['groupBuy'], boostValue: 30, boostMethod: 'fixed', status: true, priority: 10 },
-  { key: '11', activityName: '免費新店', activityCode: 'FREE_NEW_STORE', appType: 'both', channels: ['groupBuy'], boostValue: 20, boostMethod: 'fixed', status: true, priority: 11 },
-  { key: '12', activityName: '付費新店', activityCode: 'PAID_NEW_STORE', appType: 'both', channels: ['groupBuy'], boostValue: 35, boostMethod: 'fixed', status: true, priority: 12 },
+  { key: '1', activityName: '滿額立減', activityCode: 'FULL_REDUCE', appChannel: 'all', channels: ['takeaway', 'supermarket'], boostValue: 30, boostMethod: 'fixed', status: true, priority: 1, description: '訂單金額達到指定門檻即可享受減免優惠' },
+  { key: '2', activityName: '減免運費', activityCode: 'FREE_DELIVERY', appChannel: 'all', channels: ['takeaway'], boostValue: 25, boostMethod: 'fixed', status: true, priority: 2, description: '用戶下單可享受免運費服務' },
+  { key: '3', activityName: '進店領券', activityCode: 'STORE_COUPON', appChannel: 'all', channels: ['takeaway', 'supermarket', 'groupBuy'], boostValue: 20, boostMethod: 'fixed', status: true, priority: 3, description: '進入店鋪頁面即可領取優惠券' },
+  { key: '4', activityName: '新客立減', activityCode: 'NEW_USER_REDUCE', appChannel: 'all', channels: ['takeaway', 'supermarket'], boostValue: 35, boostMethod: 'fixed', status: true, priority: 4, description: '首次下單的新用戶享受專屬減免' },
+  { key: '5', activityName: '收藏送券', activityCode: 'FAV_COUPON', appChannel: 'flashBee', channels: ['takeaway'], boostValue: 15, boostMethod: 'fixed', status: true, priority: 5, description: '收藏店鋪即可獲得優惠券' },
+  { key: '6', activityName: '官方勝券', activityCode: 'OFFICIAL_COUPON', appChannel: 'flashBee', channels: ['takeaway', 'supermarket'], boostValue: 40, boostMethod: 'fixed', status: true, priority: 6, description: '官方補貼的專屬優惠券' },
+  { key: '7', activityName: '會員紅包', activityCode: 'MEMBER_BONUS', appChannel: 'all', channels: ['takeaway', 'supermarket', 'groupBuy'], boostValue: 25, boostMethod: 'fixed', status: true, priority: 7, description: '會員專屬紅包獎勵' },
+  { key: '8', activityName: '會員紅包按金額', activityCode: 'MEMBER_AMOUNT', appChannel: 'flashBee', channels: ['takeaway'], boostValue: 0, boostMethod: 'weight_multiply', status: true, priority: 8, weightValue: 10, multiplyValue: 2, description: '根據會員消費金額按比例發放紅包' },
+  { key: '9', activityName: '人氣搜索', activityCode: 'POPULAR_SEARCH', appChannel: 'all', channels: ['takeaway', 'supermarket'], boostValue: 50, boostMethod: 'weight_multiply', status: true, priority: 9, weightValue: 15, multiplyValue: 3, description: '熱門搜索詞相關店鋪獲得額外曝光' },
+  { key: '10', activityName: '神券補貼', activityCode: 'SUBSIDY_COUPON', appChannel: 'mFood', channels: ['groupBuy'], boostValue: 30, boostMethod: 'fixed', status: true, priority: 10, description: '平台補貼的大額優惠券' },
+  { key: '11', activityName: '免費新店', activityCode: 'FREE_NEW_STORE', appChannel: 'all', channels: ['groupBuy'], boostValue: 20, boostMethod: 'fixed', status: true, priority: 11, description: '新入駐商家免費推廣活動' },
+  { key: '12', activityName: '付費新店', activityCode: 'PAID_NEW_STORE', appChannel: 'all', channels: ['groupBuy'], boostValue: 35, boostMethod: 'fixed', status: true, priority: 12, description: '新入駐商家付費推廣活動' },
 ]
 
 const initialHotSearchPurchases: HotSearchPurchase[] = [
@@ -127,7 +149,7 @@ function ActivityTab() {
     setEditingRecord(null)
     setCurrentBoostMethod('fixed')
     form.resetFields()
-    form.setFieldsValue({ appType: 'both', channels: ['takeaway'], boostMethod: 'fixed', status: true, priority: 1 })
+    form.setFieldsValue({ appChannel: 'all', channels: ['takeaway'], boostMethod: 'fixed', status: true, priority: 1 })
     setIsModalOpen(true)
   }
 
@@ -140,13 +162,14 @@ function ActivityTab() {
       form.setFieldsValue({
         activityName: record.activityName,
         activityCode: record.activityCode,
-        appType: record.appType,
+        appChannel: record.appChannel,
         channels: record.channels,
         boostMethod: record.boostMethod,
         boostValue: record.boostValue,
         weightValue: record.weightValue,
         multiplyValue: record.multiplyValue,
         priority: record.priority,
+        description: record.description,
         status: record.status,
       })
     }, 0)
@@ -214,13 +237,13 @@ function ActivityTab() {
       width: 150,
     },
     {
-      title: '適用APP',
-      dataIndex: 'appType',
-      key: 'appType',
-      width: 90,
-      render: (v: AppType) => (
-        <Tag style={{ margin: 0, padding: '2px 10px', borderRadius: 4, fontWeight: 500 }}>
-          {appTypeMap[v]}
+      title: '適用頻道',
+      dataIndex: 'appChannel',
+      key: 'appChannel',
+      width: 100,
+      render: (v: AppChannelType) => (
+        <Tag color={appChannelColorMap[v]} style={{ margin: 0, padding: '2px 10px', borderRadius: 4, fontWeight: 500 }}>
+          {appChannelMap[v]}
         </Tag>
       ),
     },
@@ -233,6 +256,20 @@ function ActivityTab() {
         <Space size={[4, 4]} wrap>
           {v.map(c => <Tag key={c}>{channelMap[c]}</Tag>)}
         </Space>
+      ),
+    },
+    {
+      title: '說明',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (v: string) => (
+        <Tooltip placement="topLeft" title={v}>
+          {v || '-'}
+        </Tooltip>
       ),
     },
     {
@@ -352,11 +389,11 @@ function ActivityTab() {
             </Form.Item>
 
             <Form.Item
-              label="適用APP"
-              name="appType"
-              rules={[{ required: true, message: '請選擇適用APP' }]}
+              label="適用頻道"
+              name="appChannel"
+              rules={[{ required: true, message: '請選擇適用頻道' }]}
             >
-              <Select options={appTypeOptions} placeholder="請選擇" />
+              <Select options={appChannelOptions} placeholder="請選擇" />
             </Form.Item>
 
             <Form.Item
@@ -414,6 +451,10 @@ function ActivityTab() {
               <Switch checkedChildren="啟用" unCheckedChildren="停用" />
             </Form.Item>
           </div>
+
+          <Form.Item label="說明" name="description">
+            <Input.TextArea rows={2} placeholder="請輸入活動說明（選填）" maxLength={200} showCount />
+          </Form.Item>
         </Form>
       </Modal>
     </div>
@@ -423,63 +464,301 @@ function ActivityTab() {
 // ======== Tab 2：廣告與關鍵詞 ========
 
 function AdKeywordTab() {
+  const [dataSource, setDataSource] = useState<AdRecord[]>(initialAds)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<AdRecord | null>(null)
   const [form] = Form.useForm()
 
-  const handleSave = () => {
-    form.validateFields().then(() => {
-      message.success('保存成功')
+  /** 新增廣告 */
+  const handleAdd = () => {
+    setEditingRecord(null)
+    form.resetFields()
+    form.setFieldsValue({ appChannel: 'all', channels: ['takeaway'], status: true, priority: 1 })
+    setIsModalOpen(true)
+  }
+
+  /** 編輯 */
+  const handleEdit = (record: AdRecord) => {
+    setEditingRecord(record)
+    setIsModalOpen(true)
+    setTimeout(() => {
+      form.setFieldsValue({
+        adName: record.adName,
+        adCode: record.adCode,
+        appChannel: record.appChannel,
+        channels: record.channels,
+        adWeight: record.adWeight,
+        adMultiplier: record.adMultiplier,
+        priority: record.priority,
+        description: record.description,
+        status: record.status,
+      })
+    }, 0)
+  }
+
+  /** 刪除 */
+  const handleDelete = (record: AdRecord) => {
+    Modal.confirm({
+      title: '確認刪除',
+      content: `確定要刪除廣告「${record.adName}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        setDataSource(prev => prev.filter(item => item.key !== record.key))
+        message.success('刪除成功')
+      },
     })
   }
 
-  return (
-    <Form form={form} layout="vertical">
-      <Card title="廣告配置" style={{ marginBottom: 20 }} size="small">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-          <Form.Item
-            label="廣告權重"
-            name="adWeight"
-            initialValue={100}
-            rules={[{ required: true, message: '請輸入廣告權重' }]}
-          >
-            <InputNumber style={{ width: '100%' }} min={0} max={9999} placeholder="0-9999" />
-          </Form.Item>
-          <Form.Item
-            label="廣告倍數"
-            name="adMultiplier"
-            initialValue={1}
-            rules={[{ required: true, message: '請輸入廣告倍數' }]}
-          >
-            <InputNumber style={{ width: '100%' }} min={0} max={99} placeholder="0-99" />
-          </Form.Item>
-        </div>
-        <Alert
-          type="info"
-          showIcon
-          icon={<InfoCircleOutlined />}
-          message="分值 = 廣告權重 × 倍數，再加權重佔比計算總分"
-          style={{ marginTop: 4 }}
+  /** 切換狀態 */
+  const handleToggleStatus = (record: AdRecord) => {
+    setDataSource(prev =>
+      prev.map(item =>
+        item.key === record.key ? { ...item, status: !item.status } : item
+      )
+    )
+    message.success(record.status ? '已停用' : '已啟用')
+  }
+
+  /** 保存 */
+  const handleSave = () => {
+    form.validateFields().then(values => {
+      if (editingRecord) {
+        setDataSource(prev =>
+          prev.map(item =>
+            item.key === editingRecord.key
+              ? { ...item, ...values }
+              : item
+          )
+        )
+        message.success('編輯成功')
+      } else {
+        const newRecord: AdRecord = {
+          key: String(Date.now()),
+          ...values,
+        }
+        setDataSource(prev => [...prev, newRecord])
+        message.success('新增成功')
+      }
+      setIsModalOpen(false)
+    })
+  }
+
+  const columns: TableColumnsType<AdRecord> = [
+    {
+      title: '廣告名稱',
+      dataIndex: 'adName',
+      key: 'adName',
+      width: 140,
+    },
+    {
+      title: '廣告編碼',
+      dataIndex: 'adCode',
+      key: 'adCode',
+      width: 150,
+    },
+    {
+      title: '適用頻道',
+      dataIndex: 'appChannel',
+      key: 'appChannel',
+      width: 100,
+      render: (v: AppChannelType) => (
+        <Tag color={appChannelColorMap[v]} style={{ margin: 0, padding: '2px 10px', borderRadius: 4, fontWeight: 500 }}>
+          {appChannelMap[v]}
+        </Tag>
+      ),
+    },
+    {
+      title: '適用頻道',
+      dataIndex: 'channels',
+      key: 'channels',
+      width: 180,
+      render: (v: ChannelType[]) => (
+        <Space size={[4, 4]} wrap>
+          {v.map(c => <Tag key={c}>{channelMap[c]}</Tag>)}
+        </Space>
+      ),
+    },
+    {
+      title: '廣告權重',
+      dataIndex: 'adWeight',
+      key: 'adWeight',
+      width: 100,
+    },
+    {
+      title: '廣告倍數',
+      dataIndex: 'adMultiplier',
+      key: 'adMultiplier',
+      width: 100,
+    },
+    {
+      title: '說明',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (v: string) => (
+        <Tooltip placement="topLeft" title={v}>
+          {v || '-'}
+        </Tooltip>
+      ),
+    },
+    {
+      title: '狀態',
+      dataIndex: 'status',
+      key: 'status',
+      width: 80,
+      render: (v: boolean, record: AdRecord) => (
+        <Switch
+          size="small"
+          checked={v}
+          onChange={() => handleToggleStatus(record)}
         />
-      </Card>
+      ),
+    },
+    {
+      title: '優先級',
+      dataIndex: 'priority',
+      key: 'priority',
+      width: 80,
+      sorter: (a, b) => a.priority - b.priority,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 130,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size={0} split={<span className="action-split">|</span>}>
+          <Button type="link" size="small" onClick={(e) => { e.preventDefault(); handleEdit(record) }}>
+            編輯
+          </Button>
+          <Button type="link" size="small" danger onClick={(e) => { e.preventDefault(); handleDelete(record) }}>
+            刪除
+          </Button>
+        </Space>
+      ),
+    },
+  ]
 
-      <Card title="關鍵詞購買配置" style={{ marginBottom: 20 }} size="small">
-        <Form.Item
-          label="關鍵詞命中加分"
-          name="keywordBoostScore"
-          initialValue={50}
-          rules={[{ required: true, message: '請輸入關鍵詞命中加分' }]}
-          style={{ marginBottom: 8 }}
-        >
-          <InputNumber style={{ width: 300 }} min={0} max={9999} placeholder="0-9999" />
-        </Form.Item>
-        <div style={{ color: '#8c8c8c', fontSize: 12 }}>
-          商家購買了關鍵詞，當用戶搜索內容匹配到該關鍵詞時，該商家額外加此分值
-        </div>
-      </Card>
-
-      <div style={{ textAlign: 'right' }}>
-        <Button type="primary" onClick={handleSave}>保存配置</Button>
+  return (
+    <div>
+      <div className="action-section">
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+          新增廣告
+        </Button>
       </div>
-    </Form>
+
+      <div className="table-section">
+        <Table<AdRecord>
+          columns={columns}
+          dataSource={dataSource}
+          rowKey="key"
+          pagination={{
+            total: dataSource.length,
+            pageSize: 10,
+            showTotal: total => `共 ${total} 條`,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50'],
+            showQuickJumper: true,
+          }}
+          size="middle"
+          bordered={false}
+          scroll={{ x: 1200 }}
+        />
+      </div>
+
+      {/* 新增/編輯 Modal */}
+      <Modal
+        title={editingRecord ? '編輯廣告' : '新增廣告'}
+        open={isModalOpen}
+        onOk={handleSave}
+        onCancel={() => setIsModalOpen(false)}
+        okText="確定"
+        cancelText="取消"
+        width={600}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+            <Form.Item
+              label="廣告名稱"
+              name="adName"
+              rules={[{ required: true, message: '請輸入廣告名稱' }]}
+            >
+              <Input placeholder="請輸入廣告名稱" />
+            </Form.Item>
+
+            <Form.Item
+              label="廣告編碼"
+              name="adCode"
+              rules={[
+                { required: true, message: '請輸入廣告編碼' },
+                { pattern: /^[A-Z_]+$/, message: '僅支持英文大寫字母和下劃線' },
+              ]}
+            >
+              <Input placeholder="如：SEARCH_RESULT_AD" disabled={!!editingRecord} />
+            </Form.Item>
+
+            <Form.Item
+              label="適用頻道"
+              name="appChannel"
+              rules={[{ required: true, message: '請選擇適用頻道' }]}
+            >
+              <Select options={appChannelOptions} placeholder="請選擇" />
+            </Form.Item>
+
+            <Form.Item
+              label="適用業務頻道"
+              name="channels"
+              rules={[{ required: true, message: '請選擇適用頻道' }]}
+            >
+              <Select mode="multiple" options={channelOptions} placeholder="請選擇頻道" />
+            </Form.Item>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+            <Form.Item
+              label="廣告權重"
+              name="adWeight"
+              rules={[{ required: true, message: '請輸入廣告權重' }]}
+            >
+              <InputNumber style={{ width: '100%' }} min={0} max={9999} placeholder="0-9999" />
+            </Form.Item>
+            <Form.Item
+              label="廣告倍數"
+              name="adMultiplier"
+              rules={[{ required: true, message: '請輸入廣告倍數' }]}
+            >
+              <InputNumber style={{ width: '100%' }} min={0} max={99} placeholder="0-99" />
+            </Form.Item>
+          </div>
+
+          <Alert
+            type="info"
+            showIcon
+            icon={<InfoCircleOutlined />}
+            message="分值 = 廣告權重 × 倍數，再加權重佔比計算總分"
+            style={{ marginBottom: 16 }}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+            <Form.Item label="優先級" name="priority">
+              <InputNumber style={{ width: '100%' }} min={1} max={999} placeholder="數字越小優先級越高" />
+            </Form.Item>
+            <Form.Item label="狀態" name="status" valuePropName="checked">
+              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+            </Form.Item>
+          </div>
+
+          <Form.Item label="說明" name="description">
+            <Input.TextArea rows={2} placeholder="請輸入廣告說明（選填）" maxLength={200} showCount />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
   )
 }
 
@@ -699,7 +978,7 @@ function HotSearchCommercialTab() {
           </Form.Item>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item label="所屬品牌" name="brand">
-              <Select options={appTypeOptions.filter(o => o.value !== 'both')} placeholder="請選擇" />
+              <Select options={appChannelOptions.filter((o: { label: string; value: string }) => o.value !== 'all')} placeholder="請選擇" />
             </Form.Item>
             <Form.Item label="購買頻道" name="channel" rules={[{ required: true, message: '請選擇頻道' }]}>
               <Select options={channelOptions} placeholder="請選擇" />

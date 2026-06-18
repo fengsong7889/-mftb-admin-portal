@@ -323,7 +323,6 @@ export default function HotSearchLibrary() {
               allowClear
               value={filterWord}
               onChange={e => setFilterWord(e.target.value)}
-              style={{ width: 140 }}
             />
           </Form.Item>
           <Form.Item label="所屬品牌">
@@ -331,7 +330,6 @@ export default function HotSearchLibrary() {
               value={filterBrand}
               onChange={v => { setFilterBrand(v); setActiveEntry('all') }}
               options={brandOptions}
-              style={{ width: 140 }}
             />
           </Form.Item>
           <Form.Item label="搜索入口">
@@ -339,7 +337,6 @@ export default function HotSearchLibrary() {
               value={activeEntry}
               onChange={v => setActiveEntry(v || 'all')}
               options={entryOptions}
-              style={{ width: 140 }}
             />
           </Form.Item>
           <Form.Item label="分類">
@@ -349,7 +346,6 @@ export default function HotSearchLibrary() {
               value={filterCategory}
               onChange={setFilterCategory}
               options={categoryOptions}
-              style={{ width: 140 }}
             />
           </Form.Item>
           <Form.Item label="詞來源">
@@ -359,7 +355,6 @@ export default function HotSearchLibrary() {
               value={filterSource}
               onChange={setFilterSource}
               options={sourceOptions}
-              style={{ width: 140 }}
             />
           </Form.Item>
           <Form.Item label="狀態">
@@ -369,7 +364,6 @@ export default function HotSearchLibrary() {
               value={filterStatus}
               onChange={setFilterStatus}
               options={statusOptions}
-              style={{ width: 140 }}
             />
           </Form.Item>
           <Form.Item>

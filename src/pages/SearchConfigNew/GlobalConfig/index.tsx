@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Checkbox, Progress, Alert, message } from 'antd'
+import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Checkbox, Progress, Alert, message, Input, Select, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { SaveOutlined, WarningOutlined, EditOutlined } from '@ant-design/icons'
+import { SaveOutlined, WarningOutlined, EditOutlined, DeleteOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 
 /** 頻道類型（業務頻道，大首頁作為混排聚合層不在此列） */
 type DimensionChannelType = 'takeaway' | 'supermarket' | 'groupBuy'
@@ -23,7 +23,7 @@ const DIMENSION_CHANNELS: { key: DimensionChannelType; label: string }[] = [
 ]
 
 const DIMENSION_LABELS: { key: keyof DimensionWeight; label: string }[] = [
-  { key: 'relevance', label: '相關性得分佔比' },
+  { key: 'relevance', label: '搜索詞匹配得分佔比' },
   { key: 'commercial', label: '商業得分佔比' },
   { key: 'store', label: '店鋪得分佔比' },
   { key: 'user', label: '用戶得分佔比' },
@@ -43,52 +43,64 @@ interface RelevanceWeightRow {
 }
 
 const defaultStoreRelevanceWeights: RelevanceWeightRow[] = [
-  { key: 's1', method: '分詞命中', weight: 100, description: '分詞後命中店名' },
-  { key: 's2', method: '用戶輸入內容命中', weight: 60, description: '用戶輸入內容，不分詞模糊匹配' },
-  { key: 's3', method: '精準匹配', weight: 200, description: '完全匹配店名' },
+  { key: 's1', method: '分詞命中', weight: 100, description: '分詞後，分詞命中店鋪名稱加分' },
+  { key: 's2', method: '用戶輸入內容（模糊匹配）', weight: 60, description: '用戶輸入的內容，模糊匹配店鋪名稱加分' },
+  { key: 's3', method: '用戶輸入內容（精準匹配）', weight: 200, description: '用戶輸入的內容，精準匹配店鋪名稱加分' },
 ]
 
 const defaultProductRelevanceWeights: RelevanceWeightRow[] = [
-  { key: 'p1', method: '分詞命中', weight: 100, description: '分詞後命中商品名' },
-  { key: 'p2', method: '用戶輸入內容命中', weight: 60, description: '用戶輸入內容，不分詞模糊匹配' },
-  { key: 'p3', method: '精準匹配', weight: 200, description: '完全匹配商品名' },
+  { key: 'p1', method: '分詞命中', weight: 100, description: '分詞後，分詞命中商品名稱加分' },
+  { key: 'p2', method: '用戶輸入內容（模糊匹配）', weight: 60, description: '用戶輸入的內容，模糊匹配商品名稱加分' },
+  { key: 'p3', method: '用戶輸入內容（精準匹配）', weight: 200, description: '用戶輸入的內容，精準匹配商品名稱加分' },
 ]
 
-/** 頻道混排：時段優先配置行 */
-interface TimePriorityItem {
-  key: string
-  timeRange: string
-  priorityChannel: string
-  weightBonus: number
+/** 時段類型枚舉（固定5個，不可重複配置） */
+type TimePeriodKey = 'breakfast' | 'lunch' | 'afternoonTea' | 'dinner' | 'supper'
+
+/** 時段枚舉配置 */
+const TIME_PERIOD_ENUM: Record<TimePeriodKey, { label: string; timeRange: string }> = {
+  breakfast: { label: '早餐時段', timeRange: '07:00-09:00' },
+  lunch: { label: '午餐時段', timeRange: '11:00-13:00' },
+  afternoonTea: { label: '下午茶時段', timeRange: '14:00-17:00' },
+  dinner: { label: '晚餐時段', timeRange: '17:00-19:00' },
+  supper: { label: '宵夜時段', timeRange: '22:00-01:00' },
 }
 
-/** 頻道混排優先級配置（僅大首頁生效） */
-interface ChannelMixingConfig {
-  takeawayWeight: number
-  supermarketWeight: number
-  groupBuyWeight: number
+const TIME_PERIOD_KEYS = Object.keys(TIME_PERIOD_ENUM) as TimePeriodKey[]
+
+/** 時段優先配置行 */
+interface TimePeriodItem {
+  key: TimePeriodKey | null  // null 表示待選擇狀態
   takeawayRatio: number
   supermarketRatio: number
   groupBuyRatio: number
+}
+
+/** 頻道混排優先級配置（僅大首頁生效） */
+interface ChannelMixingPriorityConfig {
+  // 全時段默認展示比例
+  baseTakeawayRatio: number
+  baseSupermarketRatio: number
+  baseGroupBuyRatio: number
+  // 輪插策略
   interleaveX: number
   interleaveY: number
   interleaveZ: number
-  timePriorityList: TimePriorityItem[]
+  // 時段規則列表（不可重複）
+  timePeriodList: TimePeriodItem[]
 }
 
-const defaultChannelMixing: ChannelMixingConfig = {
-  takeawayWeight: 100, supermarketWeight: 80, groupBuyWeight: 60,
-  takeawayRatio: 50, supermarketRatio: 30, groupBuyRatio: 20,
-  interleaveX: 3, interleaveY: 2, interleaveZ: 1,
-  timePriorityList: [
-    { key: 't1', timeRange: '07:00-09:00', priorityChannel: '外賣', weightBonus: 30 },
-    { key: 't2', timeRange: '11:00-13:00', priorityChannel: '外賣', weightBonus: 50 },
-    { key: 't3', timeRange: '17:00-19:00', priorityChannel: '外賣', weightBonus: 40 },
-    { key: 't4', timeRange: '20:00-22:00', priorityChannel: '超市', weightBonus: 25 },
-    { key: 't5', timeRange: '22:00-01:00', priorityChannel: '團購', weightBonus: 35 },
-  ],
-}
+const MAX_TIME_PERIODS = 5
 
+const defaultChannelMixingPriority: ChannelMixingPriorityConfig = {
+  baseTakeawayRatio: 50,
+  baseSupermarketRatio: 30,
+  baseGroupBuyRatio: 20,
+  interleaveX: 3,
+  interleaveY: 2,
+  interleaveZ: 1,
+  timePeriodList: [],
+}
 
 
 export default function GlobalConfig() {
@@ -123,10 +135,20 @@ export default function GlobalConfig() {
   const [storeRelevanceWeights, setStoreRelevanceWeights] = useState<RelevanceWeightRow[]>(defaultStoreRelevanceWeights)
   const [productRelevanceWeights, setProductRelevanceWeights] = useState<RelevanceWeightRow[]>(defaultProductRelevanceWeights)
   const [isBonusEditing, setIsBonusEditing] = useState(false)
-  const [bonusSnapshot, setBonusSnapshot] = useState<{ store: RelevanceWeightRow[], product: RelevanceWeightRow[] } | null>(null)
+  const [bonusSnapshot, setBonusSnapshot] = useState<{
+    store: RelevanceWeightRow[]; product: RelevanceWeightRow[];
+    merchantBonus: number; productBonus: number;
+  } | null>(null)
+
+  // 命中商家/商品關鍵詞加分配置（內嵌於加分表格中）
+  const [merchantKeywordBonus, setMerchantKeywordBonus] = useState(50)
+  const [productKeywordBonus, setProductKeywordBonus] = useState(50)
 
   const handleBonusEdit = () => {
-    setBonusSnapshot({ store: storeRelevanceWeights, product: productRelevanceWeights })
+    setBonusSnapshot({
+      store: storeRelevanceWeights, product: productRelevanceWeights,
+      merchantBonus: merchantKeywordBonus, productBonus: productKeywordBonus,
+    })
     setIsBonusEditing(true)
   }
 
@@ -134,6 +156,8 @@ export default function GlobalConfig() {
     if (bonusSnapshot) {
       setStoreRelevanceWeights(bonusSnapshot.store)
       setProductRelevanceWeights(bonusSnapshot.product)
+      setMerchantKeywordBonus(bonusSnapshot.merchantBonus)
+      setProductKeywordBonus(bonusSnapshot.productBonus)
     }
     setBonusSnapshot(null)
     setIsBonusEditing(false)
@@ -162,15 +186,18 @@ export default function GlobalConfig() {
 
   // 頻道混排優先級編輯態（快照回滾）
   const [isMixingEditing, setIsMixingEditing] = useState(false)
-  const [mixingSnapshot, setMixingSnapshot] = useState<ChannelMixingConfig | null>(null)
+  const [mixingSnapshot, setMixingSnapshot] = useState<ChannelMixingPriorityConfig | null>(null)
+  const [showInterleaveHelp, setShowInterleaveHelp] = useState(false)
+  const [showRatioHelp, setShowRatioHelp] = useState(false)
+  const [showTimePeriodHelp, setShowTimePeriodHelp] = useState(false)
 
   const handleMixingEdit = () => {
-    setMixingSnapshot(channelMixing)
+    setMixingSnapshot(mixingPriority)
     setIsMixingEditing(true)
   }
 
   const handleMixingCancel = () => {
-    if (mixingSnapshot) setChannelMixing(mixingSnapshot)
+    if (mixingSnapshot) setMixingPriority(mixingSnapshot)
     setMixingSnapshot(null)
     setIsMixingEditing(false)
   }
@@ -182,36 +209,119 @@ export default function GlobalConfig() {
   }
 
   const updateStoreRelevance = (rowKey: string, value: number | null) => {
+    if (rowKey === 'merchant_kw') {
+      setMerchantKeywordBonus(value ?? 0)
+      return
+    }
     setStoreRelevanceWeights(prev =>
       prev.map(r => r.key === rowKey ? { ...r, weight: value ?? 0 } : r)
     )
   }
 
   const updateProductRelevance = (rowKey: string, value: number | null) => {
+    if (rowKey === 'product_kw') {
+      setProductKeywordBonus(value ?? 0)
+      return
+    }
     setProductRelevanceWeights(prev =>
       prev.map(r => r.key === rowKey ? { ...r, weight: value ?? 0 } : r)
     )
   }
 
   // 頻道混排優先級狀態（僅大首頁生效）
-  const [channelMixing, setChannelMixing] = useState<ChannelMixingConfig>(defaultChannelMixing)
+  const [mixingPriority, setMixingPriority] = useState<ChannelMixingPriorityConfig>(defaultChannelMixingPriority)
 
-  const updateMixing = (field: keyof ChannelMixingConfig, value: any) => {
-    setChannelMixing(prev => ({ ...prev, [field]: value }))
+  const updateMixingPriority = <K extends keyof ChannelMixingPriorityConfig>(
+    field: K,
+    value: ChannelMixingPriorityConfig[K]
+  ) => {
+    setMixingPriority(prev => ({ ...prev, [field]: value }))
   }
 
-  const updateTimePriority = (rowKey: string, field: keyof TimePriorityItem, value: any) => {
-    setChannelMixing(prev => ({
+  const updateTimePeriod = (periodKey: TimePeriodKey, field: keyof TimePeriodItem, value: any) => {
+    setMixingPriority(prev => ({
       ...prev,
-      timePriorityList: prev.timePriorityList.map(r =>
-        r.key === rowKey ? { ...r, [field]: value } : r
+      timePeriodList: prev.timePeriodList.map(item =>
+        item.key === periodKey ? { ...item, [field]: value } : item
       ),
     }))
   }
 
-  const totalMixingRatio = useMemo(() => {
-    return channelMixing.takeawayRatio + channelMixing.supermarketRatio + channelMixing.groupBuyRatio
-  }, [channelMixing.takeawayRatio, channelMixing.supermarketRatio, channelMixing.groupBuyRatio])
+  const addTimePeriod = () => {
+    if (mixingPriority.timePeriodList.length >= MAX_TIME_PERIODS) {
+      message.warning(`最多只能新增 ${MAX_TIME_PERIODS} 個時段`)
+      return
+    }
+    const newPeriod: TimePeriodItem = {
+      key: null,  // 待選擇狀態
+      takeawayRatio: 50,
+      supermarketRatio: 30,
+      groupBuyRatio: 20,
+    }
+    setMixingPriority(prev => ({
+      ...prev,
+      timePeriodList: [...prev.timePeriodList, newPeriod],
+    }))
+  }
+
+  const updateTimePeriodKey = (index: number, newKey: TimePeriodKey | null) => {
+    setMixingPriority(prev => {
+      const newList = [...prev.timePeriodList]
+      // 檢查是否重複（排除當前編輯的行）
+      if (newKey !== null && newList.some((p, i) => i !== index && p.key === newKey)) {
+        message.warning(`${TIME_PERIOD_ENUM[newKey].label} 已存在，請選擇其他時段`)
+        return prev
+      }
+      newList[index] = { ...newList[index], key: newKey }
+      return { ...prev, timePeriodList: newList }
+    })
+  }
+
+  const removeTimePeriod = (index: number) => {
+    setMixingPriority(prev => ({
+      ...prev,
+      timePeriodList: prev.timePeriodList.filter((_, i) => i !== index),
+    }))
+  }
+
+  const baseTotalRatio = useMemo(() => {
+    return mixingPriority.baseTakeawayRatio + mixingPriority.baseSupermarketRatio + mixingPriority.baseGroupBuyRatio
+  }, [mixingPriority.baseTakeawayRatio, mixingPriority.baseSupermarketRatio, mixingPriority.baseGroupBuyRatio])
+
+  // 計算當前生效時段
+  const currentActivePeriod = useMemo(() => {
+    const now = new Date()
+    const currentHour = now.getHours()
+    const currentMinute = now.getMinutes()
+    const currentTimeValue = currentHour * 60 + currentMinute
+
+    for (const period of mixingPriority.timePeriodList) {
+      // 跳過待選擇狀態的時段
+      if (period.key === null) continue
+
+      const enumConfig = TIME_PERIOD_ENUM[period.key]
+      const [startStr, endStr] = enumConfig.timeRange.split('-')
+      const [startHour, startMinute] = startStr.split(':').map(Number)
+      const [endHour, endMinute] = endStr.split(':').map(Number)
+
+      const startValue = startHour * 60 + startMinute
+      let endValue = endHour * 60 + endMinute
+
+      // 處理跨天時段（如22:00-01:00）
+      if (endValue < startValue) {
+        endValue += 24 * 60
+      }
+
+      if (currentTimeValue >= startValue && currentTimeValue < endValue) {
+        return { ...period, label: enumConfig.label, timeRange: enumConfig.timeRange }
+      }
+      // 處理跨天時段的另一種情況（當前時間在第二天凌晨）
+      if (endValue > 24 * 60 && currentTimeValue + 24 * 60 >= startValue && currentTimeValue + 24 * 60 < endValue) {
+        return { ...period, label: enumConfig.label, timeRange: enumConfig.timeRange }
+      }
+    }
+    return null
+  }, [mixingPriority.timePeriodList])
 
   const tabItems = [
     {
@@ -364,7 +474,7 @@ export default function GlobalConfig() {
           {/* 用戶輸入搜索詞匹配加分：門店與商品左右並排 */}
           {(() => {
             const bonusCols: TableColumnsType<RelevanceWeightRow> = [
-              { title: '匹配方式', dataIndex: 'method', width: 150 },
+              { title: '匹配方式', dataIndex: 'method', width: 200 },
               {
                 title: '加分值', dataIndex: 'weight', width: 130,
                 render: (v: number, r) => (
@@ -379,7 +489,7 @@ export default function GlobalConfig() {
             ]
 
             const productBonusCols: TableColumnsType<RelevanceWeightRow> = [
-              { title: '匹配方式', dataIndex: 'method', width: 150 },
+              { title: '匹配方式', dataIndex: 'method', width: 200 },
               {
                 title: '加分值', dataIndex: 'weight', width: 130,
                 render: (v: number, r) => (
@@ -422,16 +532,24 @@ export default function GlobalConfig() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商家名稱加分</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商家相關信息加分</div>
                     <Table<RelevanceWeightRow>
-                      columns={bonusCols} dataSource={storeRelevanceWeights}
+                      columns={bonusCols}
+                      dataSource={[
+                        ...storeRelevanceWeights,
+                        ...(merchantKeywordEnabled ? [{ key: 'merchant_kw', method: '商家關鍵詞命中', weight: merchantKeywordBonus, description: '用戶輸入內容，匹配商家關鍵詞加分' }] : []),
+                      ]}
                       pagination={false} size="small" bordered
                     />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商品名稱加分</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商品相關信息加分</div>
                     <Table<RelevanceWeightRow>
-                      columns={productBonusCols} dataSource={productRelevanceWeights}
+                      columns={productBonusCols}
+                      dataSource={[
+                        ...productRelevanceWeights,
+                        ...(productKeywordEnabled ? [{ key: 'product_kw', method: '商品關鍵詞命中', weight: productKeywordBonus, description: '用戶輸入內容，匹配商品關鍵詞加分' }] : []),
+                      ]}
                       pagination={false} size="small" bordered
                     />
                   </div>
@@ -554,7 +672,7 @@ export default function GlobalConfig() {
                     <Button type="primary" icon={<SaveOutlined />} onClick={handleMixingSave}>保存</Button>
                   </Space>
                 ) : (
-                  <Button type="primary" icon={<EditOutlined />} onClick={handleMixingEdit}>編輯權重</Button>
+                  <Button type="primary" icon={<EditOutlined />} onClick={handleMixingEdit}>編輯配置</Button>
                 )
               }
             >
@@ -562,72 +680,389 @@ export default function GlobalConfig() {
                 大首頁聚合多個頻道內容時的排序與展示比例策略
               </div>
 
-              <Card title="頻道基礎權重" size="small" style={{ marginBottom: 12 }}>
-                <Form layout="inline" size="small">
-                  <Form.Item label="外賣">
-                    <InputNumber min={0} max={9999} disabled={!isMixingEditing} value={channelMixing.takeawayWeight} onChange={v => updateMixing('takeawayWeight', v)} />
-                  </Form.Item>
-                  <Form.Item label="超市">
-                    <InputNumber min={0} max={9999} disabled={!isMixingEditing} value={channelMixing.supermarketWeight} onChange={v => updateMixing('supermarketWeight', v)} />
-                  </Form.Item>
-                  <Form.Item label="團購">
-                    <InputNumber min={0} max={9999} disabled={!isMixingEditing} value={channelMixing.groupBuyWeight} onChange={v => updateMixing('groupBuyWeight', v)} />
-                  </Form.Item>
-                </Form>
-              </Card>
+              {/* 當前生效時段提示 */}
+              {currentActivePeriod && (
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message={
+                    <span style={{ fontSize: 13 }}>
+                      🕐 當前時段：<strong>{currentActivePeriod.label}</strong>（{currentActivePeriod.timeRange}）
+                      <span style={{ marginLeft: 16 }}>
+                        生效配置：外賣 {currentActivePeriod.takeawayRatio}%
+                        {' '}超市 {currentActivePeriod.supermarketRatio}%
+                        {' '}團購 {currentActivePeriod.groupBuyRatio}%
+                      </span>
+                    </span>
+                  }
+                />
+              )}
 
-              <Card title="頻道展示比例" size="small" style={{ marginBottom: 12 }}>
-                <Form layout="inline" size="small">
-                  <Form.Item label="外賣">
-                    <InputNumber min={0} max={100} disabled={!isMixingEditing} value={channelMixing.takeawayRatio} addonAfter="%" onChange={v => updateMixing('takeawayRatio', v ?? 0)} />
-                  </Form.Item>
-                  <Form.Item label="超市">
-                    <InputNumber min={0} max={100} disabled={!isMixingEditing} value={channelMixing.supermarketRatio} addonAfter="%" onChange={v => updateMixing('supermarketRatio', v ?? 0)} />
-                  </Form.Item>
-                  <Form.Item label="團購">
-                    <InputNumber min={0} max={100} disabled={!isMixingEditing} value={channelMixing.groupBuyRatio} addonAfter="%" onChange={v => updateMixing('groupBuyRatio', v ?? 0)} />
-                  </Form.Item>
-                </Form>
-                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>比例總和：</span>
-                  <Tag color={totalMixingRatio === 100 ? 'success' : 'error'}>{totalMixingRatio}%</Tag>
-                  {totalMixingRatio !== 100 && <Tag color="error" icon={<WarningOutlined />}>總和必須等於100%</Tag>}
+              {/* 展示比例規則（基準 + 時段合併展示） */}
+              <Card 
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>📋 展示比例規則</span>
+                    <QuestionCircleOutlined 
+                      style={{ color: '#1677ff', cursor: 'pointer', fontSize: 14 }} 
+                      onClick={() => setShowRatioHelp(true)}
+                    />
+                  </div>
+                }
+                size="small" 
+                style={{ marginBottom: 12 }}
+              >
+                {/* 全時段默認展示比例 */}
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: 6,
+                    border: `1px solid ${!currentActivePeriod ? '#52c41a' : '#e8e8e8'}`,
+                    background: !currentActivePeriod ? '#f6ffed' : '#fafafa',
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <Tag color="blue" style={{ margin: 0 }}>
+                      全時段展示比例
+                      {!currentActivePeriod && <span style={{ marginLeft: 6, color: '#52c41a' }}>（當前生效）</span>}
+                    </Tag>
+                    <span style={{ color: '#8c8c8c', fontSize: 12 }}>默認配置，無時段規則時生效</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span>
+                      外賣：
+                      <InputNumber
+                        min={0} max={100} size="small"
+                        disabled={!isMixingEditing}
+                        value={mixingPriority.baseTakeawayRatio}
+                        addonAfter="%"
+                        style={{ width: 90 }}
+                        onChange={v => updateMixingPriority('baseTakeawayRatio', v ?? 0)}
+                      />
+                    </span>
+                    <span>
+                      超市：
+                      <InputNumber
+                        min={0} max={100} size="small"
+                        disabled={!isMixingEditing}
+                        value={mixingPriority.baseSupermarketRatio}
+                        addonAfter="%"
+                        style={{ width: 90 }}
+                        onChange={v => updateMixingPriority('baseSupermarketRatio', v ?? 0)}
+                      />
+                    </span>
+                    <span>
+                      團購：
+                      <InputNumber
+                        min={0} max={100} size="small"
+                        disabled={!isMixingEditing}
+                        value={mixingPriority.baseGroupBuyRatio}
+                        addonAfter="%"
+                        style={{ width: 90 }}
+                        onChange={v => updateMixingPriority('baseGroupBuyRatio', v ?? 0)}
+                      />
+                    </span>
+                    <Tag color={baseTotalRatio === 100 ? 'success' : 'error'}>
+                      {baseTotalRatio === 100 ? '✓' : '✗'} {baseTotalRatio}%
+                    </Tag>
+                  </div>
+                </div>
+
+                {/* 時段規則列表 */}
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 600, color: '#595959' }}>時段優先規則</span>
+                      <QuestionCircleOutlined 
+                        style={{ color: '#1677ff', cursor: 'pointer', fontSize: 14 }} 
+                        onClick={() => setShowTimePeriodHelp(true)}
+                      />
+                    </div>
+                    {isMixingEditing && (
+                      <Button 
+                        type="primary" 
+                        size="small" 
+                        icon={<PlusOutlined />}
+                        onClick={addTimePeriod}
+                        disabled={mixingPriority.timePeriodList.length >= MAX_TIME_PERIODS}
+                      >
+                        新增時段
+                      </Button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {mixingPriority.timePeriodList.map((period, index) => {
+                      const enumConfig = period.key ? TIME_PERIOD_ENUM[period.key] : null
+                      const isActive = period.key !== null && currentActivePeriod?.key === period.key
+                      const ratioTotal = period.takeawayRatio + period.supermarketRatio + period.groupBuyRatio
+                      const ratioOk = ratioTotal === 100
+                      
+                      // 計算可選時段（排除已配置的）
+                      const availableKeys = TIME_PERIOD_KEYS.filter(key => 
+                        !mixingPriority.timePeriodList.some((p, i) => i !== index && p.key === key)
+                      )
+
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: 6,
+                            border: `1px solid ${isActive ? '#52c41a' : '#e8e8e8'}`,
+                            background: isActive ? '#f6ffed' : '#fafafa',
+                            transition: 'all 0.3s',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                            {/* 時段選擇下拉框 */}
+                            {isMixingEditing ? (
+                              <Select
+                                size="small"
+                                placeholder="請選擇時段"
+                                value={period.key}
+                                style={{ width: 140 }}
+                                onChange={value => updateTimePeriodKey(index, value)}
+                                options={[
+                                  // 當前已選擇的時段（如果在列表中）
+                                  ...(period.key && !availableKeys.includes(period.key)
+                                    ? [{ label: TIME_PERIOD_ENUM[period.key].label, value: period.key }]
+                                    : []),
+                                  // 可選時段
+                                  ...availableKeys.map(key => ({
+                                    label: TIME_PERIOD_ENUM[key].label,
+                                    value: key,
+                                  })),
+                                ]}
+                              />
+                            ) : (
+                              <Tag color="cyan" style={{ margin: 0 }}>
+                                {enumConfig?.label || '待選擇'}
+                                {isActive && <span style={{ marginLeft: 6, color: '#52c41a' }}>（當前生效）</span>}
+                              </Tag>
+                            )}
+                            {/* 時間範圍 */}
+                            {enumConfig && (
+                              <span style={{ color: '#595959', fontSize: 13 }}>{enumConfig.timeRange}</span>
+                            )}
+                            {/* 當前生效標籤（查看模式） */}
+                            {!isMixingEditing && isActive && (
+                              <Tag color="success" style={{ margin: 0 }}>當前生效</Tag>
+                            )}
+                            {/* 刪除按鈕 */}
+                            {isMixingEditing && (
+                              <Button 
+                                type="text" 
+                                danger
+                                size="small" 
+                                icon={<DeleteOutlined />}
+                                style={{ marginLeft: 'auto' }}
+                                onClick={() => removeTimePeriod(index)}
+                              >
+                                刪除
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            <span>
+                              外賣：
+                              <InputNumber
+                                min={0} max={100} size="small"
+                                disabled={!isMixingEditing}
+                                value={period.takeawayRatio}
+                                addonAfter="%"
+                                style={{ width: 90 }}
+                                onChange={v => updateTimePeriod(period.key!, 'takeawayRatio', v ?? 0)}
+                              />
+                            </span>
+                            <span>
+                              超市：
+                              <InputNumber
+                                min={0} max={100} size="small"
+                                disabled={!isMixingEditing}
+                                value={period.supermarketRatio}
+                                addonAfter="%"
+                                style={{ width: 90 }}
+                                onChange={v => updateTimePeriod(period.key!, 'supermarketRatio', v ?? 0)}
+                              />
+                            </span>
+                            <span>
+                              團購：
+                              <InputNumber
+                                min={0} max={100} size="small"
+                                disabled={!isMixingEditing}
+                                value={period.groupBuyRatio}
+                                addonAfter="%"
+                                style={{ width: 90 }}
+                                onChange={v => updateTimePeriod(period.key!, 'groupBuyRatio', v ?? 0)}
+                              />
+                            </span>
+                            <Tag color={ratioOk ? 'success' : 'error'}>
+                              {ratioOk ? '✓' : '✗'} {ratioTotal}%
+                            </Tag>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {mixingPriority.timePeriodList.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '16px', color: '#8c8c8c', border: '1px dashed #d9d9d9', borderRadius: 6 }}>
+                        暫無時段規則，使用「全時段展示比例」作為默認配置
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Card>
 
-              <Card title="輪插策略" size="small" style={{ marginBottom: 12 }}>
-                <Space>
+              {/* 輪插策略 */}
+              <Card 
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>輪插策略</span>
+                    <QuestionCircleOutlined 
+                      style={{ 
+                        color: '#1677ff', 
+                        cursor: 'pointer',
+                        fontSize: 14,
+                      }} 
+                      onClick={() => setShowInterleaveHelp(true)}
+                    />
+                  </div>
+                } 
+                size="small" 
+                style={{ marginBottom: 12 }}
+              >
+                <Space wrap>
                   <span>每</span>
-                  <InputNumber min={1} max={99} disabled={!isMixingEditing} value={channelMixing.interleaveX} onChange={v => updateMixing('interleaveX', v ?? 1)} />
-                  <span>條外賣插入</span>
-                  <InputNumber min={0} max={99} disabled={!isMixingEditing} value={channelMixing.interleaveY} onChange={v => updateMixing('interleaveY', v ?? 0)} />
-                  <span>條超市/</span>
-                  <InputNumber min={0} max={99} disabled={!isMixingEditing} value={channelMixing.interleaveZ} onChange={v => updateMixing('interleaveZ', v ?? 0)} />
-                  <span>條團購</span>
+                  <InputNumber min={1} max={99} disabled={!isMixingEditing} value={mixingPriority.interleaveX} onChange={v => updateMixingPriority('interleaveX', v ?? 1)} />
+                  <span>條外賣，插入</span>
+                  <InputNumber min={0} max={99} disabled={!isMixingEditing} value={mixingPriority.interleaveZ} onChange={v => updateMixingPriority('interleaveZ', v ?? 0)} />
+                  <span>條團購 /</span>
+                  <InputNumber min={0} max={99} disabled={!isMixingEditing} value={mixingPriority.interleaveY} onChange={v => updateMixingPriority('interleaveY', v ?? 0)} />
+                  <span>條超市</span>
                 </Space>
               </Card>
 
-              <Card title="時段優先" size="small">
-                <Table<TimePriorityItem>
-                  columns={[
-                    { title: '時段', dataIndex: 'timeRange', width: 160 },
-                    {
-                      title: '優先頻道', dataIndex: 'priorityChannel', width: 120,
-                      render: (v: string) => (
-                        <Tag color={v === '外賣' ? 'orange' : v === '超市' ? 'green' : 'purple'}>{v}</Tag>
-                      ),
-                    },
-                    {
-                      title: '權重加成', dataIndex: 'weightBonus', width: 140,
-                      render: (v: number, r) => (
-                        <InputNumber min={0} max={999} disabled={!isMixingEditing} value={v} onChange={val => updateTimePriority(r.key, 'weightBonus', val ?? 0)} />
-                      ),
-                    },
-                  ]}
-                  dataSource={channelMixing.timePriorityList}
-                  pagination={false} size="small" bordered
-                />
-              </Card>
+              {/* 輪插策略說明彈窗 */}
+              <Modal
+                title="輪插策略說明"
+                open={showInterleaveHelp}
+                onCancel={() => setShowInterleaveHelp(false)}
+                footer={[
+                  <Button key="close" type="primary" onClick={() => setShowInterleaveHelp(false)}>
+                    知道了
+                  </Button>
+                ]}
+                width={480}
+              >
+                <div style={{ lineHeight: 1.8, fontSize: 14 }}>
+                  <div style={{ marginBottom: 16, color: '#595959' }}>
+                    控制各頻道內容的穿插順序，避免單一頻道壟斷前排位置
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>🔄 運作方式</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                    <div>• 按照配置的比例循環插入各頻道結果</div>
+                    <div>• 例如「3條外賣 + 1條團購 + 2條超市」循環展示</div>
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>⚠️ 特殊場景處理</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                    <div>• 若某頻道無結果 → 自動跳過該頻道</div>
+                    <div>• 若某頻道結果不足 → 展示該頻道全部結果後繼續</div>
+                    <div>• 若僅有一個頻道有結果 → 直接展示該頻道全部結果</div>
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>📊 順序說明</div>
+                  <div style={{ paddingLeft: 12, color: '#595959' }}>
+                    按照「外賣 → 團購 → 超市」順序循環插入
+                  </div>
+                </div>
+              </Modal>
+
+              {/* 展示比例規則說明彈窗 */}
+              <Modal
+                title="展示比例規則說明"
+                open={showRatioHelp}
+                onCancel={() => setShowRatioHelp(false)}
+                footer={[
+                  <Button key="close" type="primary" onClick={() => setShowRatioHelp(false)}>
+                    知道了
+                  </Button>
+                ]}
+                width={480}
+              >
+                <div style={{ lineHeight: 1.8, fontSize: 14 }}>
+                  <div style={{ marginBottom: 16, color: '#595959' }}>
+                    配置大首頁搜索結果中各頻道的展示比例，包括默認比例和時段優先比例
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>📋 全時段展示比例</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                    <div>• 默認配置，無時段規則時生效</div>
+                    <div>• 配置外賣、超市、團購三個頻道的展示比例</div>
+                    <div>• 比例總和必須等於 100%</div>
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>⏰ 時段優先規則</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                    <div>• 可配置不同時段的專屬展示比例</div>
+                    <div>• 系統會根據當前時間自動匹配對應時段</div>
+                    <div>• 命中時段時使用該時段配置，否則使用全時段比例</div>
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>💡 使用建議</div>
+                  <div style={{ paddingLeft: 12, color: '#595959' }}>
+                    <div>• 午晚餐時間可提高外賣比例</div>
+                    <div>• 下午茶時間可提高超市比例</div>
+                    <div>• 宵夜時間可提高團購比例</div>
+                  </div>
+                </div>
+              </Modal>
+
+              {/* 時段優先規則說明彈窗 */}
+              <Modal
+                title="時段優先規則說明"
+                open={showTimePeriodHelp}
+                onCancel={() => setShowTimePeriodHelp(false)}
+                footer={[
+                  <Button key="close" type="primary" onClick={() => setShowTimePeriodHelp(false)}>
+                    知道了
+                  </Button>
+                ]}
+                width={480}
+              >
+                <div style={{ lineHeight: 1.8, fontSize: 14 }}>
+                  <div style={{ marginBottom: 16, color: '#595959' }}>
+                    配置不同時段的專屬展示比例，系統會根據當前時間自動匹配
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>📅 可用時段</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                    <div>• 早餐時段（07:00-09:00）</div>
+                    <div>• 午餐時段（11:00-13:00）</div>
+                    <div>• 下午茶時段（14:00-17:00）</div>
+                    <div>• 晚餐時段（17:00-19:00）</div>
+                    <div>• 宵夜時段（22:00-01:00）</div>
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>⚙️ 配置規則</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                    <div>• 每個時段最多配置一次，不可重複</div>
+                    <div>• 每個時段的展示比例總和必須等於 100%</div>
+                    <div>• 最多可配置 5 個時段</div>
+                  </div>
+
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>🔄 匹配邏輯</div>
+                  <div style={{ paddingLeft: 12, color: '#595959' }}>
+                    <div>• 系統根據當前時間匹配對應時段</div>
+                    <div>• 命中時段 → 使用該時段配置</div>
+                    <div>• 未命中 → 使用「全時段展示比例」</div>
+                  </div>
+                </div>
+              </Modal>
             </Card>
           </div>
         )

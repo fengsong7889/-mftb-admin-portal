@@ -572,25 +572,25 @@ export default function HotSearchConfig() {
       <div className="search-section">
         <Form layout="inline">
           <Form.Item label="熱搜詞">
-            <Input placeholder="請輸入熱搜詞" allowClear style={{ width: 140 }} />
+            <Input placeholder="請輸入熱搜詞" allowClear />
           </Form.Item>
           <Form.Item label="詞來源">
-            <Select placeholder="請選擇" allowClear options={wordSourceOptions} style={{ width: 140 }} />
+            <Select placeholder="請選擇" allowClear options={wordSourceOptions} />
           </Form.Item>
           <Form.Item label="推廣類型">
-            <Select placeholder="請選擇" allowClear options={promotionTypeOptions} style={{ width: 140 }} />
+            <Select placeholder="請選擇" allowClear options={promotionTypeOptions} />
           </Form.Item>
           <Form.Item label="搜索入口">
-            <Select placeholder="請選擇" allowClear options={searchEntryOptions} style={{ width: 140 }} />
+            <Select placeholder="請選擇" allowClear options={searchEntryOptions} />
           </Form.Item>
           <Form.Item label="所屬品牌">
-            <Select placeholder="請選擇" allowClear options={brandOptions} style={{ width: 140 }} />
+            <Select placeholder="請選擇" allowClear options={brandOptions} />
           </Form.Item>
           <Form.Item label="展示區域">
-            <Select placeholder="請選擇" allowClear options={regionOptions} style={{ width: 140 }} />
+            <Select placeholder="請選擇" allowClear options={regionOptions} />
           </Form.Item>
           <Form.Item label="狀態">
-            <Select placeholder="請選擇" allowClear options={[{ label: '啟用', value: 'active' }, { label: '停用', value: 'inactive' }]} style={{ width: 140 }} />
+            <Select placeholder="請選擇" allowClear options={[{ label: '啟用', value: 'active' }, { label: '停用', value: 'inactive' }]} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

@@ -25,7 +25,6 @@ import {
   SettingOutlined,
   GlobalOutlined,
   ThunderboltOutlined,
-  DollarOutlined,
   StopOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
@@ -66,7 +65,6 @@ const keyToPath: Record<string, string> = {
   // 搜索配置管理(新系统)
   'global-config': '/global-config',
   'channel-strategy': '/channel-strategy',
-  'commercial-config': '/commercial-config',
   // 搜索校驗
   'search-verify': '/search-verify',
   'search-verify-detail': '/search-verify-detail',
@@ -162,12 +160,7 @@ const menuItems: MenuItem[] = [
           {
             key: 'channel-strategy',
             icon: <ThunderboltOutlined />,
-            label: '頻道搜索策略',
-          },
-          {
-            key: 'commercial-config',
-            icon: <DollarOutlined />,
-            label: '商業化管理',
+            label: '維度策略',
           },
         ],
       },
@@ -223,7 +216,7 @@ const menuItems: MenuItem[] = [
       {
         key: 'search-verify-group',
         icon: <SafetyCertificateOutlined />,
-        label: '搜索校驗',
+        label: '效果校驗',
         children: [
           {
             key: 'search-verify',

@@ -35,8 +35,7 @@ const HintVerify = lazy(() => import('./pages/HintVerify'))
 const HotSearchVerify = lazy(() => import('./pages/HotSearchVerify'))
 // 搜索配置管理(新系统)
 const GlobalConfig = lazy(() => import('./pages/SearchConfigNew/GlobalConfig'))
-const ChannelStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
-const CommercialConfig = lazy(() => import('./pages/SearchConfigNew/CommercialConfig'))
+const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
 
 const { Content } = Layout
 
@@ -92,8 +91,7 @@ function AuthenticatedLayout() {
               <Route path="/hot-search-verify" element={<HotSearchVerify />} />
               {/* 搜索配置管理(新系统) */}
               <Route path="/global-config" element={<GlobalConfig />} />
-              <Route path="/channel-strategy" element={<ChannelStrategy />} />
-              <Route path="/commercial-config" element={<CommercialConfig />} />
+              <Route path="/channel-strategy" element={<DimensionStrategy />} />
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -1657,3 +1657,141 @@
     line-height: 1.4;
   }
 }
+
+/* ========================================================================
+   欠款对账详情页
+   ======================================================================== */
+.debt-detail-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.debt-detail-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.debt-detail-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #2D3436;
+  margin: 0;
+}
+
+.debt-detail-back-link {
+  font-size: 14px;
+}
+
+.debt-detail-progress-card {
+  background: linear-gradient(135deg, #F8FAFF 0%, #EBF3FF 100%);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.debt-detail-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.debt-detail-bill-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debt-detail-bill-label {
+  font-size: 13px;
+  color: #636E72;
+}
+
+.debt-detail-bill-no {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2D3436;
+}
+
+.debt-detail-status-tag {
+  font-size: 12px;
+}
+
+.debt-detail-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.debt-detail-progress-label {
+  font-size: 13px;
+  color: #636E72;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.debt-detail-progress {
+  flex: 1;
+}
+
+.debt-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.debt-detail-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: #FAFAFA;
+  border-radius: 8px;
+}
+
+.debt-detail-metric-label {
+  font-size: 12px;
+  color: #636E72;
+}
+
+.debt-detail-metric-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.debt-detail-table-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.debt-detail-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.debt-detail-subtitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2D3436;
+  margin: 0;
+}
+
+.debt-detail-footer {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.debt-detail-back-btn {
+  min-width: 120px;
+}
