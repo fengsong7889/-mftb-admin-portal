@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Modal } from 'antd'
+import { Modal, Form, Input, Button, message, Space, Tag } from 'antd'
+import { EditOutlined, DeleteOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons'
 import { getPagePRD, type PagePRD } from './PageDescriptions'
+import { getCustomTips, saveCustomTips, deleteCustomTips, mergeTips, type CustomPageTips } from '../utils/customTipsStorage'
 import PikachuFace from './PikachuFace'
 import './PetMascot.css'
 
@@ -272,6 +274,9 @@ export default function PetMascot() {
   const [prd, setPrd] = useState<PagePRD | null>(null)
   const [pageTipIndex, setPageTipIndex] = useState(0)
   const [isPageTip, setIsPageTip] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editForm] = Form.useForm()
+  const [customTips, setCustomTips] = useState<CustomPageTips | null>(null)
   const posRef = useRef(pos)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const bubbleTimerRef = useRef<number | null>(null)
@@ -280,15 +285,27 @@ export default function PetMascot() {
   const current = expressions[currentIndex]
 
   // 获取当前页面的PRD
-  const currentPrd = getPagePRD(location.pathname)
+  const defaultPrd = getPagePRD(location.pathname)
+
+  // 加载自定义提示
+  useEffect(() => {
+    const custom = getCustomTips(location.pathname)
+    setCustomTips(custom)
+  }, [location.pathname])
+
+  // 合并默认和自定义提示
+  const currentPrd: PagePRD | null = defaultPrd ? {
+    ...defaultPrd,
+    ...mergeTips(defaultPrd, customTips),
+  } : null
 
   // 路由变化时显示页面提示
   useEffect(() => {
-    if (currentPrd?.tips && currentPrd.tips.length > 0) {
+    const tips = currentPrd?.tips || defaultPrd?.tips
+    if (tips && tips.length > 0) {
       setIsPageTip(true)
       setPageTipIndex(0)
       setShowBubble(true)
-      // 5秒后隐藏页面提示
       const timer = setTimeout(() => setShowBubble(false), 5000)
       return () => clearTimeout(timer)
     }
@@ -300,13 +317,14 @@ export default function PetMascot() {
 
   // 定时切换表情 + 弹出气泡（随机展示）
   useEffect(() => {
+    const tips = currentPrd?.tips || defaultPrd?.tips
     const showBubblePeriodically = () => {
       const delay = 8000 + Math.random() * 8000
       bubbleTimerRef.current = window.setTimeout(() => {
         // 90%概率显示页面提示，10%概率显示趣味话题
-        if (currentPrd?.tips && currentPrd.tips.length > 0 && Math.random() < 0.9) {
+        if (tips && tips.length > 0 && Math.random() < 0.9) {
           setIsPageTip(true)
-          setPageTipIndex(prev => (prev + 1) % (currentPrd.tips?.length || 1))
+          setPageTipIndex(prev => (prev + 1) % (tips.length || 1))
         } else {
           setIsPageTip(false)
           setCurrentIndex(prev => {
@@ -333,7 +351,7 @@ export default function PetMascot() {
       clearTimeout(firstTimer)
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
     }
-  }, [currentPrd, isPageTip])
+  }, [currentPrd, defaultPrd, isPageTip])
 
   // 点击 - 弹出 PRD 弹窗
   const handleClick = () => {
@@ -342,14 +360,73 @@ export default function PetMascot() {
       return
     }
     const pagePrd = getPagePRD(location.pathname)
-    setPrd(pagePrd)
+    const custom = getCustomTips(location.pathname)
+    setCustomTips(custom)
+    if (pagePrd) {
+      setPrd({ ...pagePrd, ...mergeTips(pagePrd, custom) })
+    } else {
+      setPrd(null)
+    }
     setShowPRD(true)
+  }
+
+  // 打开编辑弹窗
+  const handleOpenEdit = () => {
+    const custom = getCustomTips(location.pathname)
+    setCustomTips(custom)
+    editForm.setFieldsValue({
+      tips: custom?.tips?.join('\n') || '',
+      interaction: custom?.interaction?.join('\n') || '',
+      formulas: custom?.formulas?.join('\n') || '',
+      rules: custom?.rules?.join('\n') || '',
+    })
+    setShowEditModal(true)
+  }
+
+  // 保存编辑
+  const handleSaveEdit = () => {
+    editForm.validateFields().then(values => {
+      const tips: CustomPageTips = {
+        tips: values.tips ? values.tips.split('\n').filter((s: string) => s.trim()) : undefined,
+        interaction: values.interaction ? values.interaction.split('\n').filter((s: string) => s.trim()) : undefined,
+        formulas: values.formulas ? values.formulas.split('\n').filter((s: string) => s.trim()) : undefined,
+        rules: values.rules ? values.rules.split('\n').filter((s: string) => s.trim()) : undefined,
+      }
+      saveCustomTips(location.pathname, tips)
+      setCustomTips(tips)
+      message.success('保存成功！刷新页面后生效')
+      setShowEditModal(false)
+      // 刷新PRD弹窗内容
+      const pagePrd = getPagePRD(location.pathname)
+      if (pagePrd) {
+        setPrd({ ...pagePrd, ...mergeTips(pagePrd, tips) })
+      }
+    })
+  }
+
+  // 恢复默认
+  const handleResetDefault = () => {
+    Modal.confirm({
+      title: '確認恢復默認？',
+      content: '將清除所有自定義內容，恢復為系統默認說明',
+      okText: '確認',
+      cancelText: '取消',
+      onOk: () => {
+        deleteCustomTips(location.pathname)
+        setCustomTips(null)
+        message.success('已恢復默認')
+        setShowEditModal(false)
+        const pagePrd = getPagePRD(location.pathname)
+        setPrd(pagePrd)
+      },
+    })
   }
 
   // 获取气泡显示内容
   const getBubbleContent = () => {
-    if (isPageTip && currentPrd?.tips && currentPrd.tips.length > 0) {
-      return currentPrd.tips[pageTipIndex]
+    const tips = currentPrd?.tips || defaultPrd?.tips
+    if (isPageTip && tips && tips.length > 0) {
+      return tips[pageTipIndex]
     }
     return current.message
   }
@@ -407,9 +484,20 @@ export default function PetMascot() {
       {/* PRD 需求文档弹窗 */}
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20 }}>🐝</span>
-            <span>界面需求說明 - {prd?.title || '頁面'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 20 }}>🐝</span>
+              <span>界面需求說明 - {prd?.title || '頁面'}</span>
+              {customTips && <Tag color="orange">自定義</Tag>}
+            </div>
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              size="small"
+              onClick={handleOpenEdit}
+            >
+              編輯說明
+            </Button>
           </div>
         }
         open={showPRD}
@@ -556,6 +644,102 @@ export default function PetMascot() {
           <div style={{ textAlign: 'center', padding: '32px 0', color: '#999' }}>
             <p style={{ fontSize: 40, margin: '0 0 12px' }}>🐝</p>
             <p>當前頁面暫無需求說明</p>
+          </div>
+        )}
+      </Modal>
+
+      {/* 编辑说明弹窗 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <EditOutlined style={{ color: '#1890ff' }} />
+            <span>編輯界面說明 - {defaultPrd?.title || location.pathname}</span>
+          </div>
+        }
+        open={showEditModal}
+        onCancel={() => setShowEditModal(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setShowEditModal(false)}>取消</Button>
+            <Button danger icon={<UndoOutlined />} onClick={handleResetDefault}>
+              恢復默認
+            </Button>
+            <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveEdit}>
+              保存
+            </Button>
+          </Space>
+        }
+        width={640}
+      >
+        <Form form={editForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            name="tips"
+            label={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: '#1890ff' }}>💡</span>
+                <span>氣泡提示（每行一條，會自動輪播）</span>
+              </div>
+            }
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={defaultPrd?.tips?.join('\n') || '輸入氣泡提示內容，每行一條...'}
+              style={{ fontFamily: 'monospace' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="interaction"
+            label={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: '#1890ff' }}>📱</span>
+                <span>交互說明（每行一條）</span>
+              </div>
+            }
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder={defaultPrd?.interaction?.join('\n') || '輸入交互說明，每行一條...'}
+              style={{ fontFamily: 'monospace' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="formulas"
+            label={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: '#52c41a' }}>📊</span>
+                <span>公式計算（每行一條）</span>
+              </div>
+            }
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder={defaultPrd?.formulas?.join('\n') || '輸入公式計算，每行一條...'}
+              style={{ fontFamily: 'monospace' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="rules"
+            label={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: '#722ed1' }}>📏</span>
+                <span>取值規則（每行一條）</span>
+              </div>
+            }
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder={defaultPrd?.rules?.join('\n') || '輸入取值規則，每行一條...'}
+              style={{ fontFamily: 'monospace' }}
+            />
+          </Form.Item>
+        </Form>
+
+        {customTips?.lastEdited && (
+          <div style={{ textAlign: 'right', fontSize: 12, color: '#999', marginTop: 8 }}>
+            上次編輯：{customTips.lastEdited}
           </div>
         )}
       </Modal>
