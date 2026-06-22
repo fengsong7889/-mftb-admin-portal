@@ -43,7 +43,11 @@ export default function PageDescriptionEditor() {
     setCustomTips(custom)
     
     // 加载PRD结构化内容
-    setPrdContent(custom?.prdContent || {})
+    if (custom?.prdContent && typeof custom.prdContent === 'object') {
+      setPrdContent(custom.prdContent)
+    } else {
+      setPrdContent({})
+    }
     
     // 填充表单:优先显示自定义内容,如果没有则显示系统默认内容
     const formData = {
