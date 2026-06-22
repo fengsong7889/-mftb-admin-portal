@@ -33,9 +33,21 @@ const SearchVerify = lazy(() => import('./pages/SearchVerify'))
 const SearchVerifyDetail = lazy(() => import('./pages/SearchVerifyDetail'))
 const HintVerify = lazy(() => import('./pages/HintVerify'))
 const HotSearchVerify = lazy(() => import('./pages/HotSearchVerify'))
+const PageDescriptionEditor = lazy(() => import('./pages/PageDescriptionEditor'))
 // 搜索配置管理(新系统)
 const GlobalConfig = lazy(() => import('./pages/SearchConfigNew/GlobalConfig'))
 const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
+// 推荐管理
+const RecommendDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
+const RecommendAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
+const RecommendAlgorithmMonitor = lazy(() => import('./pages/Recommend/AlgorithmMonitor'))
+const RecommendSlot = lazy(() => import('./pages/Recommend/Slot'))
+const RecommendPricing = lazy(() => import('./pages/Recommend/Pricing'))
+const RecommendPackage = lazy(() => import('./pages/Recommend/Package'))
+const RecommendOrder = lazy(() => import('./pages/Recommend/Order'))
+const RecommendCalendar = lazy(() => import('./pages/Recommend/Calendar'))
+const RecommendEffectReport = lazy(() => import('./pages/Recommend/EffectReport'))
+const RecommendRevenueReport = lazy(() => import('./pages/Recommend/RevenueReport'))
 
 const { Content } = Layout
 
@@ -92,6 +104,19 @@ function AuthenticatedLayout() {
               {/* 搜索配置管理(新系统) */}
               <Route path="/global-config" element={<GlobalConfig />} />
               <Route path="/channel-strategy" element={<DimensionStrategy />} />
+              {/* 推荐管理 */}
+              <Route path="/recommend-dashboard" element={<RecommendDashboard />} />
+              <Route path="/recommend-algorithm" element={<RecommendAlgorithm />} />
+              <Route path="/recommend-algorithm-monitor" element={<RecommendAlgorithmMonitor />} />
+              <Route path="/recommend-slot" element={<RecommendSlot />} />
+              <Route path="/recommend-pricing" element={<RecommendPricing />} />
+              <Route path="/recommend-package" element={<RecommendPackage />} />
+              <Route path="/recommend-order" element={<RecommendOrder />} />
+              <Route path="/recommend-calendar" element={<RecommendCalendar />} />
+              <Route path="/recommend-effect-report" element={<RecommendEffectReport />} />
+              <Route path="/recommend-revenue-report" element={<RecommendRevenueReport />} />
+              {/* 页面说明编辑 */}
+              <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

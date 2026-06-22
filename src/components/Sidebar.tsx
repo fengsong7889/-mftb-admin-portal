@@ -27,6 +27,15 @@ import {
   ThunderboltOutlined,
   StopOutlined,
   SafetyCertificateOutlined,
+  RocketOutlined,
+  AppstoreOutlined,
+  DollarOutlined,
+  OrderedListOutlined,
+  CalendarOutlined,
+  PieChartOutlined,
+  ExperimentOutlined,
+  BlockOutlined,
+  GiftOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -70,6 +79,17 @@ const keyToPath: Record<string, string> = {
   'search-verify-detail': '/search-verify-detail',
   'hint-verify': '/hint-verify',
   'hot-search-verify': '/hot-search-verify',
+  // 推薦管理
+  'recommend-dashboard': '/recommend-dashboard',
+  'recommend-algorithm': '/recommend-algorithm',
+  'recommend-algorithm-monitor': '/recommend-algorithm-monitor',
+  'recommend-slot': '/recommend-slot',
+  'recommend-pricing': '/recommend-pricing',
+  'recommend-package': '/recommend-package',
+  'recommend-order': '/recommend-order',
+  'recommend-calendar': '/recommend-calendar',
+  'recommend-effect-report': '/recommend-effect-report',
+  'recommend-revenue-report': '/recommend-revenue-report',
 }
 
 /** 路由路径 → 菜单 key 映射（用于高亮） */
@@ -85,58 +105,68 @@ const menuItems: MenuItem[] = [
     label: '首頁',
   },
   {
-    key: 'finance',
-    icon: <FundOutlined />,
-    label: '財務管理',
+    key: 'recommend',
+    icon: <RocketOutlined />,
+    label: '商戶推廣工具',
     children: [
       {
-        key: 'promotion',
-        icon: <WalletOutlined />,
-        label: '推廣金管理',
+        key: 'recommend-dashboard',
+        icon: <PieChartOutlined />,
+        label: '數據看板',
+      },
+      {
+        key: 'recommend-algorithm',
+        icon: <AppstoreOutlined />,
+        label: '算法配置',
+      },
+      {
+        key: 'recommend-slot-group',
+        icon: <BlockOutlined />,
+        label: '瀑布流配置',
         children: [
           {
-            key: 'account-balance',
-            icon: <AccountBookOutlined />,
-            label: '賬戶餘額',
+            key: 'recommend-slot',
+            icon: <OrderedListOutlined />,
+            label: '坑位配置',
           },
           {
-            key: 'batch-query',
-            icon: <SearchOutlined />,
-            label: '批次查詢',
+            key: 'recommend-pricing',
+            icon: <DollarOutlined />,
+            label: '銷售價格',
           },
+        ],
+      },
+      {
+        key: 'recommend-order-group',
+        icon: <OrderedListOutlined />,
+        label: '訂單管理',
+        children: [
           {
-            key: 'detail-query',
+            key: 'recommend-order',
             icon: <FileSearchOutlined />,
-            label: '明細查詢',
+            label: '訂單列表',
+          },
+          {
+            key: 'recommend-calendar',
+            icon: <CalendarOutlined />,
+            label: '投放日曆',
           },
         ],
       },
       {
-        key: 'merchant-reconcile',
-        icon: <SwapOutlined />,
-        label: '商戶通對賬',
+        key: 'recommend-report-group',
+        icon: <BarChartOutlined />,
+        label: '統計報表',
         children: [
           {
-            key: 'writeoff-reconcile',
-            icon: <AuditOutlined />,
-            label: '充消對賬',
+            key: 'recommend-effect-report',
+            icon: <LineChartOutlined />,
+            label: '效果報表',
           },
           {
-            key: 'debt-reconcile',
-            icon: <CheckCircleOutlined />,
-            label: '欠款對賬',
-          },
-        ],
-      },
-      {
-        key: 'approval',
-        icon: <CheckCircleOutlined />,
-        label: '審批管理',
-        children: [
-          {
-            key: 'approval-center',
-            icon: <AuditOutlined />,
-            label: '審批中心',
+            key: 'recommend-revenue-report',
+            icon: <FundOutlined />,
+            label: '營收報表',
           },
         ],
       },
@@ -254,6 +284,64 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
+  {
+    key: 'finance',
+    icon: <FundOutlined />,
+    label: '財務管理',
+    children: [
+      {
+        key: 'promotion',
+        icon: <WalletOutlined />,
+        label: '商戶推廣工具',
+        children: [
+          {
+            key: 'account-balance',
+            icon: <AccountBookOutlined />,
+            label: '賬戶餘額',
+          },
+          {
+            key: 'batch-query',
+            icon: <SearchOutlined />,
+            label: '批次查詢',
+          },
+          {
+            key: 'detail-query',
+            icon: <FileSearchOutlined />,
+            label: '明細查詢',
+          },
+        ],
+      },
+      {
+        key: 'merchant-reconcile',
+        icon: <SwapOutlined />,
+        label: '商戶通對賬',
+        children: [
+          {
+            key: 'writeoff-reconcile',
+            icon: <AuditOutlined />,
+            label: '充消對賬',
+          },
+          {
+            key: 'debt-reconcile',
+            icon: <CheckCircleOutlined />,
+            label: '欠款對賬',
+          },
+        ],
+      },
+      {
+        key: 'approval',
+        icon: <CheckCircleOutlined />,
+        label: '審批管理',
+        children: [
+          {
+            key: 'approval-center',
+            icon: <AuditOutlined />,
+            label: '審批中心',
+          },
+        ],
+      },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -301,7 +389,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         items={menuItems}
         onClick={handleMenuClick}
         selectedKeys={[selectedKey]}
-        defaultOpenKeys={['finance', 'promotion', 'search', 'search-guide', 'search-config-new', 'search-verify-group']}
+        defaultOpenKeys={['recommend', 'recommend-slot-group', 'search', 'search-guide', 'search-config-new', 'search-verify-group', 'finance', 'promotion']}
         className="sidebar-menu"
       />
     </Sider>

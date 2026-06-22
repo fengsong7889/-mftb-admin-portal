@@ -1,0 +1,114 @@
+.prd-editor {
+  background: #fff;
+}
+
+.prd-section {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.prd-section .ant-card-head {
+  border-bottom: 2px solid #f0f0f0;
+  padding: 12px 24px;
+}
+
+.prd-section .ant-card-head-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* 字段说明表格样式 */
+.fields-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #666;
+  font-size: 13px;
+}
+
+.fields-header .field-label {
+  min-width: 160px;
+}
+
+.fields-header .field-desc {
+  flex: 1;
+}
+
+.fields-header .field-action {
+  min-width: 60px;
+  text-align: center;
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-row .ant-form-item {
+  margin-bottom: 0;
+}
+
+.field-row .ant-form-item:first-child {
+  min-width: 160px;
+}
+
+/* 列表项样式 */
+.list-item {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.list-item:hover {
+  background: #f5f5f5;
+}
+
+/* 表单标签样式 */
+.prd-editor .ant-form-item-label > label {
+  font-weight: 500;
+  color: #555;
+}
+
+/* 输入框样式 */
+.prd-editor .ant-input,
+.prd-editor .ant-input-textarea {
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.prd-editor .ant-input:hover,
+.prd-editor .ant-input-textarea:hover {
+  border-color: #40a9ff;
+}
+
+.prd-editor .ant-input:focus,
+.prd-editor .ant-input-textarea:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* 添加按钮样式 */
+.prd-editor .ant-btn-dashed {
+  border-color: #d9d9d9;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.prd-editor .ant-btn-dashed:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+}

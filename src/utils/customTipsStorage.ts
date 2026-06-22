@@ -4,14 +4,16 @@
  */
 
 export interface CustomPageTips {
-  /** 自定义气泡提示 */
+  /** PRD需求文档（结构化数据或富文本HTML） */
+  prdContent?: {
+    description?: string
+    features?: { label: string; desc: string }[]
+    searchConditions?: { label: string; desc: string }[]
+    fields?: { label: string; desc: string }[]
+    actions?: string[]
+  } | string
+  /** 小蜜蜂知识库（气泡提示） */
   tips?: string[]
-  /** 自定义交互说明 */
-  interaction?: string[]
-  /** 自定义公式计算 */
-  formulas?: string[]
-  /** 自定义取值规则 */
-  rules?: string[]
   /** 最后编辑时间 */
   lastEdited?: string
   /** 最后编辑人 */
@@ -72,13 +74,8 @@ export function mergeTips(
   if (!customTips) return defaultTips
 
   return {
+    prdContent: customTips.prdContent || defaultTips.prdContent,
     tips: customTips.tips && customTips.tips.length > 0 ? customTips.tips : defaultTips.tips,
-    interaction: customTips.interaction && customTips.interaction.length > 0
-      ? customTips.interaction : defaultTips.interaction,
-    formulas: customTips.formulas && customTips.formulas.length > 0
-      ? customTips.formulas : defaultTips.formulas,
-    rules: customTips.rules && customTips.rules.length > 0
-      ? customTips.rules : defaultTips.rules,
     lastEdited: customTips.lastEdited,
     lastEditedBy: customTips.lastEditedBy,
   }

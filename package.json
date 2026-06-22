@@ -13,11 +13,21 @@
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
     "@ant-design/icons": "^5.5.1",
+    "@lexical/code": "^0.45.0",
+    "@lexical/link": "^0.45.0",
+    "@lexical/list": "^0.45.0",
+    "@lexical/markdown": "^0.45.0",
+    "@lexical/react": "^0.45.0",
+    "@lexical/table": "^0.45.0",
+    "@tinymce/tinymce-react": "^6.3.0",
     "antd": "^5.22.0",
     "dayjs": "^1.11.21",
+    "lexical": "^0.45.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
+    "react-quill": "^2.0.0",
+    "react-router-dom": "^6.28.0",
+    "tinymce": "^8.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

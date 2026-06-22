@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Modal, Form, Input, Button, message, Space, Tag } from 'antd'
 import { EditOutlined, DeleteOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons'
 import { getPagePRD, type PagePRD } from './PageDescriptions'
 import { getCustomTips, saveCustomTips, deleteCustomTips, mergeTips, type CustomPageTips } from '../utils/customTipsStorage'
+import { useAuth } from '../contexts/AuthContext'
 import PikachuFace from './PikachuFace'
 import './PetMascot.css'
 
@@ -266,6 +267,8 @@ const expressions: Expression[] = [
 
 export default function PetMascot() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [pos, setPos] = useState({ x: window.innerWidth - 110, y: window.innerHeight - 180 })
   const [isDragging, setIsDragging] = useState(false)
   const [showBubble, setShowBubble] = useState(false)
@@ -274,8 +277,6 @@ export default function PetMascot() {
   const [prd, setPrd] = useState<PagePRD | null>(null)
   const [pageTipIndex, setPageTipIndex] = useState(0)
   const [isPageTip, setIsPageTip] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editForm] = Form.useForm()
   const [customTips, setCustomTips] = useState<CustomPageTips | null>(null)
   const posRef = useRef(pos)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
@@ -370,56 +371,22 @@ export default function PetMascot() {
     setShowPRD(true)
   }
 
-  // 打开编辑弹窗
+  // 打开编辑页面
   const handleOpenEdit = () => {
-    const custom = getCustomTips(location.pathname)
-    setCustomTips(custom)
-    editForm.setFieldsValue({
-      tips: custom?.tips?.join('\n') || '',
-      interaction: custom?.interaction?.join('\n') || '',
-      formulas: custom?.formulas?.join('\n') || '',
-      rules: custom?.rules?.join('\n') || '',
-    })
-    setShowEditModal(true)
+    // 先关闭PRD弹窗
+    setShowPRD(false)
+    // 跳转到编辑页面，并传递当前页面路径
+    navigate(`/page-description-editor?path=${encodeURIComponent(location.pathname)}`)
   }
 
-  // 保存编辑
+  // 保存编辑（此功能已移至独立页面，保留以兼容旧代码）
   const handleSaveEdit = () => {
-    editForm.validateFields().then(values => {
-      const tips: CustomPageTips = {
-        tips: values.tips ? values.tips.split('\n').filter((s: string) => s.trim()) : undefined,
-        interaction: values.interaction ? values.interaction.split('\n').filter((s: string) => s.trim()) : undefined,
-        formulas: values.formulas ? values.formulas.split('\n').filter((s: string) => s.trim()) : undefined,
-        rules: values.rules ? values.rules.split('\n').filter((s: string) => s.trim()) : undefined,
-      }
-      saveCustomTips(location.pathname, tips)
-      setCustomTips(tips)
-      message.success('保存成功！刷新页面后生效')
-      setShowEditModal(false)
-      // 刷新PRD弹窗内容
-      const pagePrd = getPagePRD(location.pathname)
-      if (pagePrd) {
-        setPrd({ ...pagePrd, ...mergeTips(pagePrd, tips) })
-      }
-    })
+    message.info('已移至獨立編輯頁面')
   }
 
-  // 恢复默认
+  // 恢复默认（此功能已移至独立页面，保留以兼容旧代码）
   const handleResetDefault = () => {
-    Modal.confirm({
-      title: '確認恢復默認？',
-      content: '將清除所有自定義內容，恢復為系統默認說明',
-      okText: '確認',
-      cancelText: '取消',
-      onOk: () => {
-        deleteCustomTips(location.pathname)
-        setCustomTips(null)
-        message.success('已恢復默認')
-        setShowEditModal(false)
-        const pagePrd = getPagePRD(location.pathname)
-        setPrd(pagePrd)
-      },
-    })
+    message.info('已移至獨立編輯頁面')
   }
 
   // 获取气泡显示内容
@@ -484,262 +451,155 @@ export default function PetMascot() {
       {/* PRD 需求文档弹窗 */}
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 20 }}>🐝</span>
-              <span>界面需求說明 - {prd?.title || '頁面'}</span>
-              {customTips && <Tag color="orange">自定義</Tag>}
-            </div>
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              size="small"
-              onClick={handleOpenEdit}
-            >
-              編輯說明
-            </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>🐝</span>
+            <span>界面需求說明 - {prd?.title || '頁面'}</span>
+            {customTips && <Tag color="orange">自定義</Tag>}
           </div>
         }
         open={showPRD}
         onCancel={() => setShowPRD(false)}
-        footer={null}
-        width={720}
-      >
-        {prd ? (
-          <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}>
-            {/* 模块路径 */}
-            <div style={{ marginBottom: 16, padding: '8px 12px', background: '#FFF7ED', borderRadius: 8, borderLeft: '3px solid #E8720C' }}>
-              <span style={{ color: '#999', fontSize: 12 }}>所屬模塊：</span>
-              <span style={{ color: '#666', fontSize: 13, fontWeight: 500 }}>{prd.module}</span>
-            </div>
-
-            {/* 功能描述 */}
-            <div style={{ marginBottom: 20 }}>
-              <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                功能描述
-              </h4>
-              <p style={{ fontSize: 13, color: '#555', lineHeight: 1.8, margin: 0, paddingLeft: 12 }}>
-                {prd.description}
-              </p>
-            </div>
-
-            {/* 功能要点 */}
-            <div style={{ marginBottom: 20 }}>
-              <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                功能要點
-              </h4>
-              <ul style={{ paddingLeft: 24, margin: 0 }}>
-                {prd.features.map((f, i) => (
-                  <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{f}</li>
-                ))}
-              </ul>
-            </div>
-
-            {/* 字段说明 */}
-            {prd.fields && prd.fields.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                  字段說明
-                </h4>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: '#FAFAFA' }}>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>字段名稱</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {prd.fields.map((field, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
-                        <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{field.label}</td>
-                        <td style={{ padding: '8px 12px', color: '#666' }}>{field.desc}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* 操作说明 */}
-            {prd.actions && prd.actions.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                  操作說明
-                </h4>
-                <ul style={{ paddingLeft: 24, margin: 0 }}>
-                  {prd.actions.map((a, i) => (
-                    <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 注意事项 */}
-            {prd.notes && prd.notes.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                  注意事項
-                </h4>
-                <ul style={{ paddingLeft: 24, margin: 0 }}>
-                  {prd.notes.map((n, i) => (
-                    <li key={i} style={{ fontSize: 13, color: '#E8720C', lineHeight: 2 }}>{n}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 交互说明 */}
-            {prd.interaction && prd.interaction.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 14, color: '#1890ff', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#1890ff', borderRadius: 2 }} />
-                  📱 交互說明
-                </h4>
-                <ul style={{ paddingLeft: 24, margin: 0 }}>
-                  {prd.interaction.map((item, i) => (
-                    <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 公式计算 */}
-            {prd.formulas && prd.formulas.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <h4 style={{ fontSize: 14, color: '#52c41a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#52c41a', borderRadius: 2 }} />
-                  📊 公式計算
-                </h4>
-                <div style={{ padding: '12px 16px', background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
-                  {prd.formulas.map((formula, i) => (
-                    <div key={i} style={{ fontSize: 13, color: '#389e0d', lineHeight: 1.8, fontFamily: 'monospace' }}>
-                      {formula}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 取值规则 */}
-            {prd.rules && prd.rules.length > 0 && (
-              <div style={{ marginBottom: 8 }}>
-                <h4 style={{ fontSize: 14, color: '#722ed1', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 4, height: 14, background: '#722ed1', borderRadius: 2 }} />
-                  📏 取值規則
-                </h4>
-                <ul style={{ paddingLeft: 24, margin: 0 }}>
-                  {prd.rules.map((rule, i) => (
-                    <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{rule}</li>
-                  ))}
-                </ul>
-              </div>
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={() => setShowPRD(false)}>關閉</Button>
+            {hasPermission('edit') && (
+              <Button type="primary" icon={<EditOutlined />} onClick={handleOpenEdit}>
+                編輯說明
+              </Button>
             )}
           </div>
+        }
+        width={720}
+      >
+        {customTips?.prdContent ? (
+          typeof customTips.prdContent === 'string' ? (
+            /* 字符串类型 - 富文本HTML */
+            customTips.prdContent.trim() ? (
+              <div 
+                style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}
+                dangerouslySetInnerHTML={{ __html: customTips.prdContent }} 
+              />
+            ) : null
+          ) : (customTips.prdContent.description || customTips.prdContent.features?.length || customTips.prdContent.searchConditions?.length || customTips.prdContent.fields?.length || customTips.prdContent.actions?.length) ? (
+            /* 对象类型 - 结构化PRD内容 - 只在有内容时展示 */
+            <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}>
+              {/* 模块路径 - 始终展示 */}
+              <div style={{ marginBottom: 16, padding: '8px 12px', background: '#FFF7ED', borderRadius: 8, borderLeft: '3px solid #E8720C' }}>
+                <span style={{ color: '#999', fontSize: 12 }}>所屬模塊：</span>
+                <span style={{ color: '#666', fontSize: 13, fontWeight: 500 }}>{prd?.module}</span>
+              </div>
+
+              {/* 功能描述 - 只在有内容时展示 */}
+              {customTips.prdContent.description && (
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
+                    功能描述
+                  </h4>
+                  <p style={{ fontSize: 13, color: '#555', lineHeight: 1.8, margin: 0, paddingLeft: 12 }}>
+                    {customTips.prdContent.description}
+                  </p>
+                </div>
+              )}
+
+              {/* 功能要点 */}
+              {customTips.prdContent.features && customTips.prdContent.features.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
+                    功能要點
+                  </h4>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#FAFAFA' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>功能名稱</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customTips.prdContent.features.map((feature, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{feature.label}</td>
+                          <td style={{ padding: '8px 12px', color: '#555' }}>{feature.desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* 查询条件 */}
+              {customTips.prdContent.searchConditions && customTips.prdContent.searchConditions.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
+                    查詢條件
+                  </h4>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#FAFAFA' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>查詢條件</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customTips.prdContent.searchConditions.map((condition, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{condition.label}</td>
+                          <td style={{ padding: '8px 12px', color: '#555' }}>{condition.desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* 字段说明 */}
+              {customTips.prdContent.fields && customTips.prdContent.fields.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
+                    字段說明
+                  </h4>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#FAFAFA' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>字段名稱</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customTips.prdContent.fields.map((field, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{field.label}</td>
+                          <td style={{ padding: '8px 12px', color: '#555' }}>{field.desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* 操作说明 */}
+              {customTips.prdContent.actions && customTips.prdContent.actions.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
+                    操作說明
+                  </h4>
+                  <ul style={{ paddingLeft: 24, margin: 0 }}>
+                    {customTips.prdContent.actions.map((action, i) => (
+                      <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null
         ) : (
           <div style={{ textAlign: 'center', padding: '32px 0', color: '#999' }}>
             <p style={{ fontSize: 40, margin: '0 0 12px' }}>🐝</p>
             <p>當前頁面暫無需求說明</p>
-          </div>
-        )}
-      </Modal>
-
-      {/* 编辑说明弹窗 */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <EditOutlined style={{ color: '#1890ff' }} />
-            <span>編輯界面說明 - {defaultPrd?.title || location.pathname}</span>
-          </div>
-        }
-        open={showEditModal}
-        onCancel={() => setShowEditModal(false)}
-        footer={
-          <Space>
-            <Button onClick={() => setShowEditModal(false)}>取消</Button>
-            <Button danger icon={<UndoOutlined />} onClick={handleResetDefault}>
-              恢復默認
-            </Button>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveEdit}>
-              保存
-            </Button>
-          </Space>
-        }
-        width={640}
-      >
-        <Form form={editForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item
-            name="tips"
-            label={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#1890ff' }}>💡</span>
-                <span>氣泡提示（每行一條，會自動輪播）</span>
-              </div>
-            }
-          >
-            <Input.TextArea
-              rows={4}
-              placeholder={defaultPrd?.tips?.join('\n') || '輸入氣泡提示內容，每行一條...'}
-              style={{ fontFamily: 'monospace' }}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="interaction"
-            label={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#1890ff' }}>📱</span>
-                <span>交互說明（每行一條）</span>
-              </div>
-            }
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder={defaultPrd?.interaction?.join('\n') || '輸入交互說明，每行一條...'}
-              style={{ fontFamily: 'monospace' }}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="formulas"
-            label={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#52c41a' }}>📊</span>
-                <span>公式計算（每行一條）</span>
-              </div>
-            }
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder={defaultPrd?.formulas?.join('\n') || '輸入公式計算，每行一條...'}
-              style={{ fontFamily: 'monospace' }}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="rules"
-            label={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#722ed1' }}>📏</span>
-                <span>取值規則（每行一條）</span>
-              </div>
-            }
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder={defaultPrd?.rules?.join('\n') || '輸入取值規則，每行一條...'}
-              style={{ fontFamily: 'monospace' }}
-            />
-          </Form.Item>
-        </Form>
-
-        {customTips?.lastEdited && (
-          <div style={{ textAlign: 'right', fontSize: 12, color: '#999', marginTop: 8 }}>
-            上次編輯：{customTips.lastEdited}
           </div>
         )}
       </Modal>

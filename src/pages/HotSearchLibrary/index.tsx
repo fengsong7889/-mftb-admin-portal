@@ -392,7 +392,7 @@ export default function HotSearchLibrary() {
           rowSelection={{}}
           pagination={{
             total: filteredData.length,
-            pageSize: 20,
+            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],

@@ -318,7 +318,7 @@ export default function Login() {
                   <label>登錄賬號</label>
                   <Input
                     size="large"
-                    placeholder="請輸入賬號或工號"
+                    placeholder="請輸入賬號 (admin 或 guest)"
                     prefix={<UserOutlined style={{ color: '#5a5080' }} />}
                     value={username}
                     onChange={e => { setUsername(e.target.value); setUsernameError('') }}

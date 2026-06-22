@@ -9,6 +9,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import RechargeModal from './RechargeModal'
 
 /** 品牌选项 */
@@ -67,6 +68,7 @@ const formatAmount = (val: number) => {
 
 export default function AccountBalance() {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [rechargeOpen, setRechargeOpen] = useState(false)
   const [rechargeRecord, setRechargeRecord] = useState<AccountRecord | null>(null)
@@ -80,10 +82,14 @@ export default function AccountBalance() {
   /** 操作按钮 - 正常状态 */
   const NormalActions = ({ record }: { record: AccountRecord }) => (
     <Space size={0} split={<span className="action-split">|</span>}>
-      <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
-      <Button type="link" size="small" onClick={() => message.info(`轉賬：${record.groupName}`)}>轉賬</Button>
-      <Button type="link" size="small" onClick={() => message.info(`扣款：${record.groupName}`)}>扣款</Button>
-      <Button type="link" size="small" danger onClick={() => message.info(`凍結：${record.groupName}`)}>凍結</Button>
+      {hasPermission('edit') && (
+        <>
+          <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
+          <Button type="link" size="small" onClick={() => message.info(`轉賬：${record.groupName}`)}>轉賬</Button>
+          <Button type="link" size="small" onClick={() => message.info(`扣款：${record.groupName}`)}>扣款</Button>
+          <Button type="link" size="small" danger onClick={() => message.info(`凍結：${record.groupName}`)}>凍結</Button>
+        </>
+      )}
       <Button type="link" size="small" onClick={() => navigate('/detail-query')}>明細</Button>
       <Button type="link" size="small" onClick={() => navigate('/batch-query')}>批次查詢</Button>
     </Space>
@@ -92,10 +98,14 @@ export default function AccountBalance() {
   /** 操作按钮 - 冻结状态 */
   const FrozenActions = ({ record }: { record: AccountRecord }) => (
     <Space size={0} split={<span className="action-split">|</span>}>
-      <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
-      <Button type="link" size="small" onClick={() => message.info(`轉賬：${record.groupName}`)}>轉賬</Button>
-      <Button type="link" size="small" onClick={() => message.info(`扣款：${record.groupName}`)}>扣款</Button>
-      <Button type="link" size="small" onClick={() => message.info(`解凍：${record.groupName}`)}>解凍</Button>
+      {hasPermission('edit') && (
+        <>
+          <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
+          <Button type="link" size="small" onClick={() => message.info(`轉賬：${record.groupName}`)}>轉賬</Button>
+          <Button type="link" size="small" onClick={() => message.info(`扣款：${record.groupName}`)}>扣款</Button>
+          <Button type="link" size="small" onClick={() => message.info(`解凍：${record.groupName}`)}>解凍</Button>
+        </>
+      )}
       <Button type="link" size="small" onClick={() => navigate('/detail-query')}>明細</Button>
       <Button type="link" size="small" onClick={() => navigate('/batch-query')}>批次查詢</Button>
     </Space>
@@ -230,9 +240,11 @@ export default function AccountBalance() {
       {/* 功能区域 */}
       <div className="action-section">
         <Space>
-          <Button icon={<MergeCellsOutlined />}>
-            商戶合併
-          </Button>
+          {hasPermission('edit') && (
+            <Button icon={<MergeCellsOutlined />}>
+              商戶合併
+            </Button>
+          )}
           <Button icon={<ExportOutlined />}>
             數據導出
           </Button>

@@ -30,12 +30,32 @@ interface ActivityRecord {
   description?: string
   updatedBy: string; updatedAt: string
 }
+/** 加分梯队配置 */
+interface BoostTier {
+  minAmount: number  // 消费金额下限
+  maxAmount?: number // 消费金额上限（可选，为空表示无上限）
+  boostType: 'amount_match' | 'fixed_boost' // 加分类型
+  boostValue: number // 加分值（amount_match时为倍数，fixed_boost时为固定分数）
+}
+
+/** 减分梯队配置 */
+interface DemoteTier {
+  days: number         // 未购买广告天数
+  deductionType: 'fixed_deduction' | 'percent_deduction' // 扣分类型
+  deductionValue: number // 扣分值（fixed_deduction时为固定分数，percent_deduction时为百分比）
+}
+
 interface AdRecord {
   key: string; adType: string; adName: string
   appChannel: AppChannelType
   boostValue: number; status: boolean
   description?: string
   updatedBy: string; updatedAt: string
+  // 梯队配置字段
+  boostTiers?: BoostTier[]
+  demoteTiers?: DemoteTier[]
+  // 是否可删除
+  deletable?: boolean
 }
 interface UserFactorRow {
   key: string; label: string; fields: { key: string; label: string; value: number; suffix?: string; max?: number; min?: number; step?: number }[]
@@ -124,7 +144,29 @@ function createDefaultBizConfig(): BizConfig {
       { key: '10', activityType: 'buy_one_get_one', activityName: '買一送一', appChannel: 'mFood', boostValue: 45, boostMethod: 'fixed', status: true, description: '購買指定商品買一送一', updatedBy: '吳美玲(E10089)', updatedAt: '2026-06-07 17:40' },
     ],
     ads: [
-      { key: '1', adType: 'keyword_ad', adName: '關鍵詞競價', appChannel: 'all', boostValue: 50, status: true, description: '商家購買關鍵詞獲得搜索排名加分', updatedBy: '王美玲(E10089)', updatedAt: '2026-06-15 11:00' },
+      { 
+        key: 'ad_consumption', 
+        adType: 'ad_consumption', 
+        adName: '廣告消費', 
+        appChannel: 'all', 
+        boostValue: 0, 
+        status: true, 
+        description: '商家x天不消費廣告，將會扣分，商家消費廣告則按消費金額得分', 
+        updatedBy: '系統', 
+        updatedAt: '2026-06-22 00:00',
+        deletable: false, // 不可删除
+        boostTiers: [
+          { minAmount: 0, maxAmount: 100, boostType: 'amount_match', boostValue: 1 },
+          { minAmount: 100, maxAmount: 500, boostType: 'amount_match', boostValue: 1.5 },
+          { minAmount: 500, boostType: 'amount_match', boostValue: 2 },
+        ],
+        demoteTiers: [
+          { days: 3, deductionType: 'percent_deduction', deductionValue: 10 },
+          { days: 7, deductionType: 'percent_deduction', deductionValue: 20 },
+          { days: 15, deductionType: 'percent_deduction', deductionValue: 50 },
+        ],
+      },
+      { key: '1', adType: 'keyword_ad', adName: '關鍵詞競價', appChannel: 'all', boostValue: 50, status: true, description: '商家購買關鍵詞獲得搜索排名加分', updatedBy: '王美玲(E10089)', updatedAt: '2026-06-15 11:00', deletable: true },
     ],
   }
 }
@@ -259,16 +301,31 @@ export default function DimensionStrategy() {
   const [adModalOpen, setAdModalOpen] = useState(false)
   const [editingAd, setEditingAd] = useState<AdRecord | null>(null)
   const [adForm] = Form.useForm()
+  const [adCategory, setAdCategory] = useState<'boost' | 'demote'>('boost') // 加分/减分类目
+  const [adBoostTiers, setAdBoostTiers] = useState<BoostTier[]>([])
+  const [adDemoteTiers, setAdDemoteTiers] = useState<DemoteTier[]>([])
 
   const handleAdAdd = () => {
     setEditingAd(null); adForm.resetFields()
-    adForm.setFieldsValue({ status: true }); setAdModalOpen(true)
+    adForm.setFieldsValue({ status: true })
+    setAdCategory('boost')
+    setAdBoostTiers([{ minAmount: 0, maxAmount: undefined, boostType: 'amount_match', boostValue: 1 }])
+    setAdDemoteTiers([])
+    setAdModalOpen(true)
   }
   const handleAdEdit = (r: AdRecord) => {
-    setEditingAd(r); setAdModalOpen(true)
+    setEditingAd(r)
+    setAdCategory(r.boostTiers && r.boostTiers.length > 0 ? 'boost' : 'demote')
+    setAdBoostTiers(r.boostTiers && r.boostTiers.length > 0 ? r.boostTiers : [{ minAmount: 0, maxAmount: undefined, boostType: 'amount_match', boostValue: 1 }])
+    setAdDemoteTiers(r.demoteTiers && r.demoteTiers.length > 0 ? r.demoteTiers : [{ days: 3, deductionType: 'percent_deduction', deductionValue: 10 }])
+    setAdModalOpen(true)
     setTimeout(() => adForm.setFieldsValue({ ...r, appChannel: r.appChannel || 'all' }), 0)
   }
   const handleAdDelete = (r: AdRecord) => {
+    if (r.deletable === false) {
+      message.warning('此數據不可删除')
+      return
+    }
     Modal.confirm({ title: '確認刪除', content: `確定刪除「${r.adName}」？`, okText: '確定', cancelText: '取消',
       onOk: () => { updateBiz(p => ({ ...p, ads: p.ads.filter(a => a.key !== r.key) })); message.success('刪除成功') } })
   }
@@ -276,7 +333,14 @@ export default function DimensionStrategy() {
     adForm.validateFields().then(values => {
       const adName = adTypeMap[values.adType] || values.adName
       const now = new Date().toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\//g, '-')
-      const base = { ...values, adName, updatedBy: '當前用戶', updatedAt: now }
+      const base = { 
+        ...values, 
+        adName, 
+        updatedBy: '當前用戶', 
+        updatedAt: now,
+        boostTiers: adCategory === 'boost' ? adBoostTiers : undefined,
+        demoteTiers: adCategory === 'demote' ? adDemoteTiers : undefined,
+      }
       if (editingAd) {
         updateBiz(p => ({ ...p, ads: p.ads.map(a => a.key === editingAd.key ? { ...a, ...base } : a) }))
         message.success('編輯成功')
@@ -286,6 +350,38 @@ export default function DimensionStrategy() {
       }
       setAdModalOpen(false)
     })
+  }
+
+  /* ---- 廣告加分梯队操作 ---- */
+  const handleAddAdBoostTier = () => {
+    setAdBoostTiers([...adBoostTiers, { minAmount: 0, maxAmount: undefined, boostType: 'amount_match', boostValue: 1 }])
+  }
+  const handleRemoveAdBoostTier = (index: number) => {
+    if (adBoostTiers.length <= 1) return
+    const newTiers = [...adBoostTiers]
+    newTiers.splice(index, 1)
+    setAdBoostTiers(newTiers)
+  }
+  const handleUpdateAdBoostTier = (index: number, field: keyof BoostTier, value: unknown) => {
+    const newTiers = [...adBoostTiers]
+    newTiers[index] = { ...newTiers[index], [field]: value }
+    setAdBoostTiers(newTiers)
+  }
+
+  /* ---- 廣告減分梯队操作 ---- */
+  const handleAddAdDemoteTier = () => {
+    setAdDemoteTiers([...adDemoteTiers, { days: 3, deductionType: 'percent_deduction', deductionValue: 10 }])
+  }
+  const handleRemoveAdDemoteTier = (index: number) => {
+    if (adDemoteTiers.length <= 1) return
+    const newTiers = [...adDemoteTiers]
+    newTiers.splice(index, 1)
+    setAdDemoteTiers(newTiers)
+  }
+  const handleUpdateAdDemoteTier = (index: number, field: keyof DemoteTier, value: unknown) => {
+    const newTiers = [...adDemoteTiers]
+    newTiers[index] = { ...newTiers[index], [field]: value }
+    setAdDemoteTiers(newTiers)
   }
 
   /* ---- 店鋪 CRUD ---- */
@@ -388,7 +484,6 @@ export default function DimensionStrategy() {
     const adCols: TableColumnsType<AdRecord> = [
       { title: '廣告類型', dataIndex: 'adType', key: 'adType', width: 120, render: (v: string) => <Tag color="orange">{adTypeMap[v] || v}</Tag> },
       { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> },
-      { title: '加分值', dataIndex: 'boostValue', key: 'boostValue', width: 80 },
       { title: '狀態', dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? '啟用' : '停用'}</Tag> },
       { title: '說明', dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
       { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
@@ -399,7 +494,9 @@ export default function DimensionStrategy() {
           <Button type="link" size="small" danger={r.status} onClick={e => { e.preventDefault(); updateBiz(p => ({ ...p, ads: p.ads.map(a => a.key === r.key ? { ...a, status: !a.status } : a) })) }}>
             {r.status ? '停用' : '啟用'}
           </Button>
-          <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleAdDelete(r) }}>刪除</Button>
+          {r.deletable !== false && (
+            <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleAdDelete(r) }}>刪除</Button>
+          )}
         </Space>
       )},
     ]
@@ -615,15 +712,207 @@ export default function DimensionStrategy() {
       </Modal>
 
       {/* ---- 廣告 Modal ---- */}
-      <Modal title={editingAd ? '編輯廣告' : '新增廣告'} open={adModalOpen} onOk={handleAdSave}
-        onCancel={() => setAdModalOpen(false)} width={500} destroyOnClose>
+      <Modal 
+        title={editingAd ? '編輯廣告' : '新增廣告'} 
+        open={adModalOpen} 
+        onOk={handleAdSave}
+        onCancel={() => setAdModalOpen(false)} 
+        width={800} 
+        destroyOnClose
+      >
         <Form form={adForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="廣告類型" name="adType" rules={[{ required: true, message: '請選擇廣告類型' }]}>
-            <Select options={adTypeOptions} placeholder="選擇廣告類型" />
+          {/* 新增模式下显示广告类型选择 */}
+          {!editingAd && (
+            <Form.Item label="廣告類型" name="adType" rules={[{ required: true, message: '請選擇廣告類型' }]}>
+              <Select options={adTypeOptions} placeholder="選擇廣告類型" />
+            </Form.Item>
+          )}
+          
+          {/* 干预防类目选择 */}
+          <Form.Item label="干預類目" name="interventionCategory">
+            <Select
+              placeholder="請選擇干預防类目"
+              value={adCategory}
+              onChange={(val: 'boost' | 'demote') => setAdCategory(val)}
+              options={[
+                { label: '加分类目', value: 'boost' },
+                { label: '减分类目', value: 'demote' },
+              ]}
+            />
           </Form.Item>
-          <Form.Item label="加分值" name="boostValue" rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%' }} min={0} max={9999} />
-          </Form.Item>
+
+          {/* 加分梯队配置 */}
+          {adCategory === 'boost' && (
+            <Form.Item label="加分規則配置">
+              <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
+                配置階梯式加分規則，支持多個梯队
+              </div>
+              {adBoostTiers.map((tier, index) => (
+                <div key={index} style={{ 
+                  border: '1px solid #d9d9d9', 
+                  borderRadius: 4, 
+                  padding: 12, 
+                  marginBottom: 8,
+                  background: '#fafafa'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 'bold' }}>梯队 {index + 1}</span>
+                    <Button 
+                      type="link" 
+                      danger 
+                      size="small"
+                      onClick={() => handleRemoveAdBoostTier(index)}
+                      disabled={adBoostTiers.length <= 1}
+                    >
+                      删除
+                    </Button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div>
+                      <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>消費金額下限</div>
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        value={tier.minAmount}
+                        onChange={(val) => handleUpdateAdBoostTier(index, 'minAmount', val || 0)}
+                        min={0}
+                        addonAfter="元"
+                      />
+                    </div>
+                    <div>
+                      <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>消費金額上限（可選）</div>
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        value={tier.maxAmount}
+                        onChange={(val) => handleUpdateAdBoostTier(index, 'maxAmount', val || undefined)}
+                        min={tier.minAmount}
+                        addonAfter="元"
+                        placeholder="無上限"
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>加分方式</div>
+                    <Radio.Group 
+                      value={tier.boostType}
+                      onChange={(e) => handleUpdateAdBoostTier(index, 'boostType', e.target.value)}
+                    >
+                      <Radio value="amount_match">按消費金額加分</Radio>
+                      <Radio value="fixed_boost">固定加分</Radio>
+                    </Radio.Group>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>
+                      {tier.boostType === 'amount_match' ? '消費金額倍數' : '加分值'}
+                    </div>
+                    <InputNumber
+                      style={{ width: '100%' }}
+                      value={tier.boostValue}
+                      onChange={(val) => handleUpdateAdBoostTier(index, 'boostValue', val || 0)}
+                      min={0}
+                      max={9999}
+                      step={tier.boostType === 'amount_match' ? 0.1 : 1}
+                      addonAfter={tier.boostType === 'amount_match' ? '倍' : '分'}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button 
+                type="dashed" 
+                icon={<PlusOutlined />} 
+                onClick={handleAddAdBoostTier}
+                style={{ width: '100%' }}
+              >
+                新增梯队
+              </Button>
+            </Form.Item>
+          )}
+
+          {/* 减分梯队配置 */}
+          {adCategory === 'demote' && (
+            <Form.Item label="減分規則配置">
+              <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
+                配置階梯式減分規則，支持多個梯队
+              </div>
+              {adDemoteTiers.map((tier, index) => (
+                <div key={index} style={{ 
+                  border: '1px solid #d9d9d9', 
+                  borderRadius: 4, 
+                  padding: 12, 
+                  marginBottom: 8,
+                  background: '#fff2f0'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 'bold' }}>梯队 {index + 1}</span>
+                    <Button 
+                      type="link" 
+                      danger 
+                      size="small"
+                      onClick={() => handleRemoveAdDemoteTier(index)}
+                      disabled={adDemoteTiers.length <= 1}
+                    >
+                      删除
+                    </Button>
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>x天未消費</div>
+                    <InputNumber
+                      style={{ width: '100%' }}
+                      value={tier.days}
+                      onChange={(val) => handleUpdateAdDemoteTier(index, 'days', val || 0)}
+                      min={0}
+                      max={365}
+                      addonAfter="天"
+                    />
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>扣分方式</div>
+                    <Radio.Group 
+                      value={tier.deductionType}
+                      onChange={(e) => handleUpdateAdDemoteTier(index, 'deductionType', e.target.value)}
+                    >
+                      <Radio value="fixed_deduction">固定扣分</Radio>
+                      <Radio value="percent_deduction">按比例扣分</Radio>
+                    </Radio.Group>
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>
+                      {tier.deductionType === 'fixed_deduction' ? '扣分值' : '扣分比例'}
+                    </div>
+                    <InputNumber
+                      style={{ width: '100%' }}
+                      value={tier.deductionValue}
+                      onChange={(val) => handleUpdateAdDemoteTier(index, 'deductionValue', val || 0)}
+                      min={0}
+                      max={tier.deductionType === 'percent_deduction' ? 100 : 9999}
+                      addonAfter={tier.deductionType === 'percent_deduction' ? '%' : '分'}
+                    />
+                    {tier.deductionType === 'percent_deduction' && (
+                      <div style={{ 
+                        marginTop: 8, 
+                        padding: 8, 
+                        background: '#e6f7ff', 
+                        borderRadius: 4,
+                        fontSize: 12,
+                        color: '#0050b3',
+                        lineHeight: 1.6
+                      }}>
+                        <strong>按比例扣分說明：</strong>按比例扣分是根據商戶當前總分進行比例扣減。用戶搜索時，系統會執行：<code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>最終得分 = 商戶總分 × (1 - 扣分比例)</code>。例如：商戶總分100分，輸入20%則扣20分，最終得分80分；輸入100%則全部扣除，最終得分0分。
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <Button 
+                type="dashed" 
+                icon={<PlusOutlined />} 
+                onClick={handleAddAdDemoteTier}
+                style={{ width: '100%' }}
+              >
+                新增梯队
+              </Button>
+            </Form.Item>
+          )}
+
           <Form.Item label="狀態" name="status" valuePropName="checked">
             <Switch checkedChildren="啟用" unCheckedChildren="停用" />
           </Form.Item>
