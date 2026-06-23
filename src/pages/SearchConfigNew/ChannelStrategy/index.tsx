@@ -315,7 +315,9 @@ export default function DimensionStrategy() {
   }
   const handleAdEdit = (r: AdRecord) => {
     setEditingAd(r)
-    setAdCategory(r.boostTiers && r.boostTiers.length > 0 ? 'boost' : 'demote')
+    // 根据编辑的记录判断当前是加分还是扣分
+    const isBoost = r.boostTiers && r.boostTiers.length > 0
+    setAdCategory(isBoost ? 'boost' : 'demote')
     setAdBoostTiers(r.boostTiers && r.boostTiers.length > 0 ? r.boostTiers : [{ minAmount: 0, maxAmount: undefined, boostType: 'amount_match', boostValue: 1 }])
     setAdDemoteTiers(r.demoteTiers && r.demoteTiers.length > 0 ? r.demoteTiers : [{ days: 3, deductionType: 'percent_deduction', deductionValue: 10 }])
     setAdModalOpen(true)
@@ -727,22 +729,25 @@ export default function DimensionStrategy() {
               <Select options={adTypeOptions} placeholder="選擇廣告類型" />
             </Form.Item>
           )}
-          
-          {/* 干预防类目选择 */}
-          <Form.Item label="干預類目" name="interventionCategory">
-            <Select
-              placeholder="請選擇干預防类目"
-              value={adCategory}
-              onChange={(val: 'boost' | 'demote') => setAdCategory(val)}
-              options={[
-                { label: '加分类目', value: 'boost' },
-                { label: '减分类目', value: 'demote' },
-              ]}
-            />
-          </Form.Item>
 
-          {/* 加分梯队配置 */}
-          {adCategory === 'boost' && (
+          {/* 非广告消费的广告才显示加分/扣分Tab切换 */}
+          {editingAd && editingAd.key !== 'ad_consumption' && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>配置類型</div>
+              <Tabs
+                activeKey={adCategory}
+                onChange={(key) => setAdCategory(key as 'boost' | 'demote')}
+                items={[
+                  { key: 'boost', label: '➕ 加分' },
+                  { key: 'demote', label: '➖ 扣分' },
+                ]}
+                size="small"
+              />
+            </div>
+          )}
+
+          {/* 加分梯队配置 - 广告消费同时显示加分和扣分,其他广告只显示当前Tab类型 */}
+          {(adCategory === 'boost' || (editingAd && editingAd.key === 'ad_consumption')) && (
             <Form.Item label="加分規則配置">
               <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
                 配置階梯式加分規則，支持多個梯队
@@ -827,8 +832,8 @@ export default function DimensionStrategy() {
             </Form.Item>
           )}
 
-          {/* 减分梯队配置 */}
-          {adCategory === 'demote' && (
+          {/* 减分梯队配置 - 广告消费同时显示加分和扣分,其他广告只显示当前Tab类型 */}
+          {(adCategory === 'demote' || (editingAd && editingAd.key === 'ad_consumption')) && (
             <Form.Item label="減分規則配置">
               <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
                 配置階梯式減分規則，支持多個梯队

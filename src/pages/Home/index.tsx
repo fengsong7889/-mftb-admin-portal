@@ -1,82 +1,76 @@
 import { useState, useEffect, useRef } from 'react'
-import { Input, Button, Tag, Empty } from 'antd'
+import { Input, Button, Tag, Empty, Card, Tabs } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { Line, Column, Area } from '@ant-design/charts'
 import {
   SearchOutlined,
   PlusOutlined,
   DeleteOutlined,
   AccountBookOutlined,
-  SearchOutlined as SearchIcon,
   FileSearchOutlined,
   SwapOutlined,
   AuditOutlined,
-  FundOutlined,
   WalletOutlined,
   DatabaseOutlined,
-  BarChartOutlined,
   FireOutlined,
   ClockCircleOutlined,
-  BellOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   FontSizeOutlined,
   LineChartOutlined,
-  AimOutlined,
-  ReadOutlined,
+  ShoppingOutlined,
+  UserAddOutlined,
+  RiseOutlined,
+  NotificationOutlined,
+  BulbOutlined,
 } from '@ant-design/icons'
+import './index.css'
+
+const { TabPane } = Tabs
 
 /** 励志语句库 */
 const motivationalQuotes = [
-  '每一天都是新的开始，加油！💪',
-  '努力工作，快乐生活！✨',
-  '保持热爱，奔赴山海！🌊',
-  '你的努力，终将成就更好的自己！🌟',
-  '不忘初心，方得始终！💫',
-  '越努力，越幸运！🍀',
-  '今天流下的汗水，是明天成功的基石！🏆',
-  '脚踏实地，仰望星空！🌠',
-  '坚持不懈，梦想终会实现！🎯',
-  '用心做好每一件事，成功自然水到渠成！💎',
+  '每一天都是新的开始,加油!💪',
+  '努力工作,快乐生活!✨',
+  '保持热爱,奔赴山海!🌊',
+  '你的努力,终将成就更好的自己!🌟',
+  '不忘初心,方得始终!💫',
+  '越努力,越幸运!🍀',
+  '今天流下的汗水,是明天成功的基石!🏆',
+  '脚踏实地,仰望星空!🌠',
+  '坚持不懈,梦想终会实现!🎯',
+  '用心做好每一件事,成功自然水到渠成!💎',
 ]
 
 /** 所有可用菜单 */
 const allMenus = [
-  // 财务管理 - 推广金管理
   { key: 'account-balance', label: '賬戶餘額', icon: <AccountBookOutlined />, path: '/account-balance', group: '推廣金管理' },
   { key: 'batch-query', label: '批次查詢', icon: <SearchOutlined />, path: '/batch-query', group: '推廣金管理' },
   { key: 'detail-query', label: '明細查詢', icon: <FileSearchOutlined />, path: '/detail-query', group: '推廣金管理' },
-  // 财务管理 - 商户通对账
   { key: 'writeoff-reconcile', label: '充消對賬', icon: <AuditOutlined />, path: '/writeoff-reconcile', group: '商戶通對賬' },
   { key: 'debt-reconcile', label: '欠款對賬', icon: <CheckCircleOutlined />, path: '/debt-reconcile', group: '商戶通對賬' },
-  // 财务管理 - 审批管理
   { key: 'approval-center', label: '審批中心', icon: <AuditOutlined />, path: '/approval-center', group: '審批管理' },
-  // 搜索管理 - 搜索配置
   { key: 'search-config', label: '搜索配置', icon: <SearchOutlined />, path: '/search-config', group: '搜索配置' },
-  // 搜索管理 - 搜索引导
   { key: 'hint-config', label: '底紋配置', icon: <FontSizeOutlined />, path: '/hint-config', group: '搜索引导' },
   { key: 'hot-search-config', label: '熱搜配置', icon: <FireOutlined />, path: '/hot-search-config', group: '搜索引导' },
-  // 搜索管理 - 搜索词库
   { key: 'word-segmentation', label: '分詞管理', icon: <DatabaseOutlined />, path: '/word-segmentation', group: '搜索词库' },
   { key: 'synonym-config', label: '同義詞配置', icon: <SwapOutlined />, path: '/synonym-config', group: '搜索词库' },
   { key: 'hot-search-library', label: '熱搜詞庫', icon: <FireOutlined />, path: '/hot-search-library', group: '搜索词库' },
-  // 搜索管理 - 报表统计
   { key: 'hint-report', label: '底紋報表', icon: <LineChartOutlined />, path: '/hint-report', group: '報表統計' },
   { key: 'hot-search-report', label: '熱搜報表', icon: <LineChartOutlined />, path: '/hot-search-report', group: '報表統計' },
 ]
 
-/** 默认常用菜单（2排，每排5个，第二排最后一个是添加按钮） */
+/** 默认常用菜单 */
 const defaultFavorites = [
-  // 第一排：推广金管理
-  'account-balance',    // 账户余额
-  'batch-query',        // 批次查询
-  'detail-query',       // 明细查询
-  'approval-center',    // 审批中心
-  'hint-config',        // 底纹配置
-  // 第二排：其他常用功能
-  'hot-search-config',  // 热搜配置
-  'word-segmentation',  // 分词管理
-  'hint-report',        // 底纹报表
-  'hot-search-report',  // 热搜报表
+  'account-balance',
+  'batch-query',
+  'detail-query',
+  'approval-center',
+  'hint-config',
+  'hot-search-config',
+  'word-segmentation',
+  'hint-report',
+  'hot-search-report',
 ]
 
 /** 待办事项 */
@@ -93,26 +87,58 @@ const notifications = [
   { id: 3, title: '數據導出優化', desc: '大數據量導出性能提升50%', time: '1天前', read: true },
 ]
 
+/** 系统公告 */
+const announcements = [
+  { id: 1, title: '平台升級公告', desc: '為提升用戶體驗,平台將於本週末進行升級維護', time: '2天前', read: false },
+  { id: 2, title: '新功能培訓通知', desc: '下週一舉行新功能使用培訓,請各部門準時參加', time: '3天前', read: true },
+]
+
+/** 订单趋势数据 */
+const orderTrendData = [
+  { date: '06-17', delivery: 120, groupBuy: 45, supermarket: 38 },
+  { date: '06-18', delivery: 132, groupBuy: 52, supermarket: 42 },
+  { date: '06-19', delivery: 101, groupBuy: 48, supermarket: 35 },
+  { date: '06-20', delivery: 134, groupBuy: 58, supermarket: 45 },
+  { date: '06-21', delivery: 90, groupBuy: 40, supermarket: 32 },
+  { date: '06-22', delivery: 150, groupBuy: 62, supermarket: 50 },
+  { date: '06-23', delivery: 165, groupBuy: 68, supermarket: 55 },
+]
+
+/** 充值趋势数据 */
+const rechargeTrendData = [
+  { date: '06-17', amount: 12000 },
+  { date: '06-18', amount: 15000 },
+  { date: '06-19', amount: 8000 },
+  { date: '06-20', amount: 22000 },
+  { date: '06-21', amount: 18000 },
+  { date: '06-22', amount: 25000 },
+  { date: '06-23', amount: 28000 },
+]
+
+/** 用户增长数据 */
+const userGrowthData = [
+  { date: '06-17', users: 85 },
+  { date: '06-18', users: 92 },
+  { date: '06-19', users: 78 },
+  { date: '06-20', users: 105 },
+  { date: '06-21', users: 95 },
+  { date: '06-22', users: 118 },
+  { date: '06-23', users: 135 },
+]
+
 export default function Home() {
   const navigate = useNavigate()
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
   const [showAddMenu, setShowAddMenu] = useState(false)
-  
-  /** 励志语句 */
   const [quote, setQuote] = useState('')
-  
-  /** 动态时间 */
   const [currentTime, setCurrentTime] = useState(new Date())
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  /** 初始化励志语句和定时器 */
   useEffect(() => {
-    // 随机选择一条励志语句
     const randomIndex = Math.floor(Math.random() * motivationalQuotes.length)
     setQuote(motivationalQuotes[randomIndex])
 
-    // 每秒更新时间
     timerRef.current = setInterval(() => {
       setCurrentTime(new Date())
     }, 1000)
@@ -124,7 +150,6 @@ export default function Home() {
     }
   }, [])
 
-  /** 格式化时间 */
   const formatDate = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -135,18 +160,15 @@ export default function Home() {
     return `${year}年${month}月${day}日 ${hours}:${minutes}:${seconds}`
   }
 
-  /** 获取星期 */
   const getWeekday = (date: Date) => {
     const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
     return weekdays[date.getDay()]
   }
 
-  /** 搜索过滤菜单 */
   const filteredMenus = searchText
     ? allMenus.filter((m) => m.label.includes(searchText) || m.group.includes(searchText))
     : []
 
-  /** 添加常用菜单 */
   const addFavorite = (key: string) => {
     if (!favorites.includes(key)) {
       setFavorites([...favorites, key])
@@ -155,20 +177,80 @@ export default function Home() {
     setSearchText('')
   }
 
-  /** 移除常用菜单 */
   const removeFavorite = (key: string) => {
     setFavorites(favorites.filter((k) => k !== key))
   }
 
-  /** 获取菜单信息 */
   const getMenuInfo = (key: string) => allMenus.find((m) => m.key === key)
+
+  const getLineData = () => {
+    const result: any[] = []
+    orderTrendData.forEach(item => {
+      result.push({ date: item.date, value: item.delivery, type: '外賣訂單' })
+      result.push({ date: item.date, value: item.groupBuy, type: '團購訂單' })
+      result.push({ date: item.date, value: item.supermarket, type: '超市訂單' })
+    })
+    return result
+  }
+
+  const lineConfig = {
+    data: getLineData(),
+    xField: 'date',
+    yField: 'value',
+    seriesField: 'type',
+    smooth: true,
+    animation: {
+      appear: {
+        animation: 'path-in',
+        duration: 1000,
+      },
+    },
+    legend: {
+      position: 'top' as const,
+    },
+  }
+
+  const columnConfig = {
+    data: rechargeTrendData,
+    xField: 'date',
+    yField: 'amount',
+    label: {
+      position: 'middle' as const,
+      style: {
+        fill: '#FFFFFF',
+        opacity: 0.6,
+      },
+    },
+    xAxis: {
+      label: {
+        autoHide: true,
+        autoRotate: false,
+      },
+    },
+  }
+
+  const areaConfig = {
+    data: userGrowthData,
+    xField: 'date',
+    yField: 'users',
+    smooth: true,
+    areaStyle: {
+      fill: 'l(270) 0:#001529 0.5:#1890ff 1:#1890ff',
+    },
+    line: {
+      style: {
+        stroke: '#1890ff',
+        lineWidth: 2,
+      },
+    },
+  }
 
   return (
     <div className="home-page">
       {/* 欢迎横幅 */}
       <div className="home-welcome home-welcome--orange">
         <div className="home-welcome-left">
-          <h2>歡迎回來，小蜜蜂</h2>
+          <h2>歡迎回來,小蜜蜂</h2>
           <p className="home-welcome-quote">{quote}</p>
         </div>
         <div className="home-welcome-right">
@@ -177,81 +259,81 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 个人工作台 - 独占一行 + 搜索框 */}
-      <div className="home-section home-section--fullwidth">
-        <div className="home-section-header">
-          <h3>📋 個人工作台</h3>
-        </div>
-        {/* 搜索框并入个人工作台 */}
-        <div className="home-workspace-search">
-          <Input
-            prefix={<SearchOutlined style={{ color: '#999', fontSize: 14 }} />}
-            placeholder="搜索系統菜單..."
-            size="middle"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onFocus={() => setShowAddMenu(true)}
-            allowClear
-            className="home-search-input home-search-input--compact"
-          />
-          {showAddMenu && searchText && filteredMenus.length > 0 && (
-            <div className="home-search-dropdown">
-              {filteredMenus.map((menu) => (
-                <div
-                  key={menu.key}
-                  className={`home-search-item ${favorites.includes(menu.key) ? 'is-added' : ''}`}
-                  onClick={() => !favorites.includes(menu.key) && addFavorite(menu.key)}
-                >
-                  <span className="home-search-item-icon">{menu.icon}</span>
-                  <span className="home-search-item-label">{menu.label}</span>
-                  <Tag>{menu.group}</Tag>
-                  {favorites.includes(menu.key) ? (
-                    <span className="home-search-item-added">已添加</span>
-                  ) : (
-                    <PlusOutlined className="home-search-item-add" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="home-favorites home-favorites--compact">
-          {favorites.length === 0 ? (
-            <Empty description="暫無常用菜單，請通過搜索添加" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-          ) : (
-            favorites.map((key) => {
-              const menu = getMenuInfo(key)
-              if (!menu) return null
-              return (
-                <div
-                  key={key}
-                  className="home-fav-card home-fav-card--compact"
-                  onClick={() => navigate(menu.path)}
-                >
-                  <div className="home-fav-icon">{menu.icon}</div>
-                  <span className="home-fav-label">{menu.label}</span>
-                  <button
-                    className="home-fav-remove"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeFavorite(key)
-                    }}
+      {/* 个人工作台和待办事项 */}
+      <div className="home-workspace-todo-grid">
+        {/* 个人工作台 */}
+        <div className="home-section">
+          <div className="home-section-header">
+            <h3>📋 個人工作台</h3>
+          </div>
+          <div className="home-workspace-search">
+            <Input
+              prefix={<SearchOutlined style={{ color: '#999', fontSize: 14 }} />}
+              placeholder="搜索系統菜單..."
+              size="middle"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onFocus={() => setShowAddMenu(true)}
+              allowClear
+              className="home-search-input home-search-input--compact"
+            />
+            {showAddMenu && searchText && filteredMenus.length > 0 && (
+              <div className="home-search-dropdown">
+                {filteredMenus.map((menu) => (
+                  <div
+                    key={menu.key}
+                    className={`home-search-item ${favorites.includes(menu.key) ? 'is-added' : ''}`}
+                    onClick={() => !favorites.includes(menu.key) && addFavorite(menu.key)}
                   >
-                    <DeleteOutlined />
-                  </button>
-                </div>
-              )
-            })
-          )}
-          <div className="home-fav-add home-fav-add--compact" onClick={() => setShowAddMenu(true)}>
-            <PlusOutlined style={{ fontSize: 20, color: '#B0B0B0' }} />
-            <span>添加菜單</span>
+                    <span className="home-search-item-icon">{menu.icon}</span>
+                    <span className="home-search-item-label">{menu.label}</span>
+                    <Tag>{menu.group}</Tag>
+                    {favorites.includes(menu.key) ? (
+                      <span className="home-search-item-added">已添加</span>
+                    ) : (
+                      <PlusOutlined className="home-search-item-add" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="home-favorites home-favorites--compact">
+            {favorites.length === 0 ? (
+              <Empty description="暫無常用菜單,請通過搜索添加" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            ) : (
+              favorites.map((key) => {
+                const menu = getMenuInfo(key)
+                if (!menu) return null
+                return (
+                  <div
+                    key={key}
+                    className="home-fav-card home-fav-card--compact"
+                    onClick={() => navigate(menu.path)}
+                  >
+                    <div className="home-fav-icon">{menu.icon}</div>
+                    <span className="home-fav-label">{menu.label}</span>
+                    <button
+                      className="home-fav-remove"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeFavorite(key)
+                      }}
+                    >
+                      <DeleteOutlined />
+                    </button>
+                  </div>
+                )
+              })
+            )}
+            <div className="home-fav-add home-fav-add--compact" onClick={() => setShowAddMenu(true)}>
+              <PlusOutlined style={{ fontSize: 20, color: '#B0B0B0' }} />
+              <span>添加菜單</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="home-grid">
-        {/* 待办事项 - 移到今日概览位置 */}
+        {/* 待办事项 */}
         <div className="home-section">
           <div className="home-section-header">
             <h3>📌 待辦事項</h3>
@@ -273,26 +355,122 @@ export default function Home() {
             ))}
           </div>
         </div>
+      </div>
 
-        {/* 系统通知 */}
-        <div className="home-section">
-          <div className="home-section-header">
-            <h3>🔔 系統通知</h3>
-            <Tag>{notifications.filter((n) => !n.read).length} 條未讀</Tag>
-          </div>
-          <div className="home-notification-list">
-            {notifications.map((n) => (
-              <div key={n.id} className={`home-notification-item ${n.read ? '' : 'unread'}`}>
-                <div className="home-notification-title">
-                  {!n.read && <span className="home-notification-dot" />}
-                  {n.title}
+      {/* 数据统计卡片和通知区域 */}
+      <div className="home-stats-grid">
+        {/* 左侧：三个统计卡片 */}
+        <div className="home-stats-cards">
+          {/* 订单数据卡片 - 横向布局 */}
+          <Card className="home-stat-card" hoverable>
+            <div className="home-stat-header">
+              <ShoppingOutlined className="home-stat-icon" style={{ color: '#1890ff' }} />
+              <span className="home-stat-title">今日訂單</span>
+            </div>
+            <div className="home-stat-content home-stat-content--horizontal">
+              <div className="home-stat-item">
+                <div className="home-stat-label">外賣訂單</div>
+                <div className="home-stat-value" style={{ color: '#1890ff' }}>165</div>
+                <div className="home-stat-trend">
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +12%
                 </div>
-                <div className="home-notification-desc">{n.desc}</div>
-                <div className="home-notification-time">{n.time}</div>
               </div>
-            ))}
-          </div>
+              <div className="home-stat-divider" />
+              <div className="home-stat-item">
+                <div className="home-stat-label">團購訂單</div>
+                <div className="home-stat-value" style={{ color: '#722ed1' }}>68</div>
+                <div className="home-stat-trend">
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +8%
+                </div>
+              </div>
+              <div className="home-stat-divider" />
+              <div className="home-stat-item">
+                <div className="home-stat-label">超市訂單</div>
+                <div className="home-stat-value" style={{ color: '#fa8c16' }}>55</div>
+                <div className="home-stat-trend">
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +15%
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* 新用户统计卡片 */}
+          <Card className="home-stat-card" hoverable>
+            <div className="home-stat-header">
+              <UserAddOutlined className="home-stat-icon" style={{ color: '#52c41a' }} />
+              <span className="home-stat-title">今日新用戶</span>
+            </div>
+            <div className="home-stat-content home-stat-content--single">
+              <div className="home-stat-item">
+                <div className="home-stat-label">新增用戶</div>
+                <div className="home-stat-value" style={{ color: '#52c41a', fontSize: 26 }}>135</div>
+                <div className="home-stat-trend">
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +18% 較昨日
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* 推广金统计卡片 */}
+          <Card className="home-stat-card" hoverable>
+            <div className="home-stat-header">
+              <WalletOutlined className="home-stat-icon" style={{ color: '#faad14' }} />
+              <span className="home-stat-title">推廣金充值</span>
+            </div>
+            <div className="home-stat-content home-stat-content--single">
+              <div className="home-stat-item">
+                <div className="home-stat-label">今日充值</div>
+                <div className="home-stat-value" style={{ color: '#faad14', fontSize: 24 }}>MOP 28,000</div>
+                <div className="home-stat-trend">
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +22% 較昨日
+                </div>
+                <div className="home-stat-extra">充值筆數:12 筆</div>
+              </div>
+            </div>
+          </Card>
         </div>
+
+        {/* 右侧：系统通知和公告 */}
+        <Card className="home-notification-card-compact">
+          <Tabs defaultActiveKey="1" size="small">
+            <TabPane tab={<span><NotificationOutlined />通知</span>} key="1">
+              <div className="home-notification-list-compact">
+                {notifications.slice(0, 3).map((n) => (
+                  <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
+                    <div className="home-notification-title-compact">
+                      {!n.read && <span className="home-notification-dot" />}
+                      {n.title}
+                    </div>
+                    <div className="home-notification-time-compact">{n.time}</div>
+                  </div>
+                ))}
+              </div>
+            </TabPane>
+            <TabPane tab={<span><BulbOutlined />公告</span>} key="2">
+              <div className="home-notification-list-compact">
+                {announcements.slice(0, 3).map((n) => (
+                  <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
+                    <div className="home-notification-title-compact">
+                      {!n.read && <span className="home-notification-dot" />}
+                      {n.title}
+                    </div>
+                    <div className="home-notification-time-compact">{n.time}</div>
+                  </div>
+                ))}
+              </div>
+            </TabPane>
+          </Tabs>
+        </Card>
+      </div>
+
+      {/* 数据图表区域 - 并排展示 */}
+      <div className="home-charts-grid">
+        <Card title="訂單趨勢(近7天)" className="home-chart-card">
+          <Line {...lineConfig} height={300} />
+        </Card>
+        <Card title="充值趨勢(近7天)" className="home-chart-card">
+          <Column {...columnConfig} height={300} />
+        </Card>
       </div>
     </div>
   )
