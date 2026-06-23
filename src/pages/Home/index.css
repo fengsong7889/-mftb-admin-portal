@@ -10,8 +10,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 32px;
-  margin-bottom: 24px;
+  padding: 16px 32px;
+  margin-bottom: 5px;
   border-radius: 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -54,14 +54,14 @@
 .home-stats-grid {
   display: grid;
   grid-template-columns: 7fr 3fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
 .home-stats-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: 5px;
 }
 
 .home-stats-right {
@@ -249,16 +249,16 @@
 .home-workspace-todo-grid {
   display: grid;
   grid-template-columns: 7fr 3fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
 /* 数据图表网格 */
 .home-charts-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 5px;
+  margin-bottom: 0;
 }
 
 /* 系统通知区域 */
@@ -341,7 +341,7 @@
 .home-section {
   background: white;
   border-radius: 8px;
-  padding: 20px;
+  padding: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -353,8 +353,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
   border-bottom: 2px solid #f0f0f0;
 }
 
