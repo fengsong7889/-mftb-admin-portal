@@ -36,6 +36,7 @@ import {
   ExperimentOutlined,
   BlockOutlined,
   GiftOutlined,
+  TagOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -90,6 +91,42 @@ const keyToPath: Record<string, string> = {
   'recommend-calendar': '/recommend-calendar',
   'recommend-effect-report': '/recommend-effect-report',
   'recommend-revenue-report': '/recommend-revenue-report',
+  // 權限管理
+  'function-permission': '/function-permission',
+  'data-permission': '/data-permission',
+  // 系統設置
+  'menu-management': '/menu-management',
+  'system-template': '/system-template',
+  'layout-settings': '/layout-settings',
+  'basic-settings': '/basic-settings',
+  // 用戶管理
+  'user-feedback': '/user-feedback',
+  'user-list': '/user-list',
+  'user-avatar': '/user-avatar',
+  'user-frozen': '/user-frozen',
+  'device-frozen': '/device-frozen',
+  'user-location-special': '/user-location-special',
+  'user-location-blacklist': '/user-location-blacklist',
+  'whitelist': '/whitelist',
+  // 運營投放管理
+  'delivery-list': '/delivery-list',
+  // 商戶集團管理
+  'merchant-onboarding': '/merchant-onboarding',
+  'merchant-feedback': '/merchant-feedback',
+  'group-list': '/group-list',
+  'group-permission': '/group-permission',
+  'store-basic-info': '/store-basic-info',
+  'contract-management': '/contract-management',
+  'group-brand-library': '/group-brand-library',
+  // 到家業務(外賣)
+  'product-tags': '/product-tags',
+  'product-params': '/product-params',
+  'store-management': '/store-management',
+  'store-categories': '/store-categories',
+  'product-platform-categories': '/product-platform-categories',
+  // 到店業務(團購)
+  'group-buy-store': '/group-buy-store',
+  'group-buy-product': '/group-buy-product',
 }
 
 /** 路由路径 → 菜单 key 映射（用于高亮） */
@@ -103,6 +140,188 @@ const menuItems: MenuItem[] = [
     key: 'home',
     icon: <HomeOutlined />,
     label: '首頁',
+  },
+  {
+    key: 'system',
+    icon: <SettingOutlined />,
+    label: '系統設置',
+    children: [
+      {
+        key: 'menu-management',
+        icon: <AppstoreOutlined />,
+        label: '菜單管理',
+      },
+      {
+        key: 'system-template',
+        icon: <ReadOutlined />,
+        label: '系統模板',
+      },
+      {
+        key: 'layout-settings',
+        icon: <ColumnHeightOutlined />,
+        label: '布局設置',
+      },
+      {
+        key: 'basic-settings',
+        icon: <SettingOutlined />,
+        label: '基礎設置',
+      },
+    ],
+  },
+  {
+    key: 'user-management',
+    icon: <AuditOutlined />,
+    label: '用戶管理',
+    children: [
+      {
+        key: 'user-feedback',
+        icon: <FileSearchOutlined />,
+        label: '用戶意見反饋',
+      },
+      {
+        key: 'user-list',
+        icon: <OrderedListOutlined />,
+        label: '用戶列表',
+      },
+      {
+        key: 'user-avatar',
+        icon: <EyeOutlined />,
+        label: '用戶頭像管理',
+      },
+      {
+        key: 'user-frozen',
+        icon: <StopOutlined />,
+        label: '用戶凍結列表',
+      },
+      {
+        key: 'device-frozen',
+        icon: <BlockOutlined />,
+        label: '設備號凍結列表',
+      },
+      {
+        key: 'user-location-special',
+        icon: <AimOutlined />,
+        label: '用戶收貨地圖特殊收錄',
+      },
+      {
+        key: 'user-location-blacklist',
+        icon: <StopOutlined />,
+        label: '用戶收貨地圖黑名單',
+      },
+      {
+        key: 'whitelist',
+        icon: <SafetyCertificateOutlined />,
+        label: '白名單(內外測試人員)',
+      },
+    ],
+  },
+  {
+    key: 'operation-platform',
+    icon: <RocketOutlined />,
+    label: '運營平台工具',
+  },
+  {
+    key: 'operation-delivery',
+    icon: <FundOutlined />,
+    label: '運營投放管理',
+    children: [
+      {
+        key: 'delivery-list',
+        icon: <OrderedListOutlined />,
+        label: '投放列表',
+      },
+    ],
+  },
+  {
+    key: 'merchant-group',
+    icon: <AppstoreOutlined />,
+    label: '商戶集團管理',
+    children: [
+      {
+        key: 'merchant-onboarding',
+        icon: <PlusOutlined />,
+        label: '商家入駐',
+      },
+      {
+        key: 'merchant-feedback',
+        icon: <FileSearchOutlined />,
+        label: '商家意見',
+      },
+      {
+        key: 'group-list',
+        icon: <OrderedListOutlined />,
+        label: '集團列表',
+      },
+      {
+        key: 'group-permission',
+        icon: <SafetyCertificateOutlined />,
+        label: '集團權限(運營主管)',
+      },
+      {
+        key: 'store-basic-info',
+        icon: <DatabaseOutlined />,
+        label: '門店基礎信息管理',
+      },
+      {
+        key: 'contract-management',
+        icon: <ReadOutlined />,
+        label: '合同管理',
+      },
+      {
+        key: 'group-brand-library',
+        icon: <AppstoreOutlined />,
+        label: '集團門店品牌庫管理',
+      },
+    ],
+  },
+  {
+    key: 'delivery-business',
+    icon: <RocketOutlined />,
+    label: '到家業務(外賣)',
+    children: [
+      {
+        key: 'product-tags',
+        icon: <TagOutlined />,
+        label: '商品標簽',
+      },
+      {
+        key: 'product-params',
+        icon: <SettingOutlined />,
+        label: '商品參數',
+      },
+      {
+        key: 'store-management',
+        icon: <AppstoreOutlined />,
+        label: '門店管理',
+      },
+      {
+        key: 'store-categories',
+        icon: <OrderedListOutlined />,
+        label: '門店營業品類',
+      },
+      {
+        key: 'product-platform-categories',
+        icon: <GlobalOutlined />,
+        label: '商品平台分類',
+      },
+    ],
+  },
+  {
+    key: 'group-buy-business',
+    icon: <GiftOutlined />,
+    label: '到店業務(團購)',
+    children: [
+      {
+        key: 'group-buy-store',
+        icon: <AppstoreOutlined />,
+        label: '團購門店管理',
+      },
+      {
+        key: 'group-buy-product',
+        icon: <DatabaseOutlined />,
+        label: '商品管理',
+      },
+    ],
   },
   {
     key: 'recommend',
@@ -292,7 +511,7 @@ const menuItems: MenuItem[] = [
       {
         key: 'promotion',
         icon: <WalletOutlined />,
-        label: '商戶推廣工具',
+        label: '推廣金管理',
         children: [
           {
             key: 'account-balance',
@@ -339,6 +558,23 @@ const menuItems: MenuItem[] = [
             label: '審批中心',
           },
         ],
+      },
+    ],
+  },
+  {
+    key: 'permission',
+    icon: <SafetyCertificateOutlined />,
+    label: '權限管理',
+    children: [
+      {
+        key: 'function-permission',
+        icon: <AppstoreOutlined />,
+        label: '功能權限',
+      },
+      {
+        key: 'data-permission',
+        icon: <DatabaseOutlined />,
+        label: '數據權限',
       },
     ],
   },
@@ -389,7 +625,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         items={menuItems}
         onClick={handleMenuClick}
         selectedKeys={[selectedKey]}
-        defaultOpenKeys={['recommend', 'recommend-slot-group', 'search', 'search-guide', 'search-config-new', 'search-verify-group', 'finance', 'promotion']}
+        defaultOpenKeys={[]}
         className="sidebar-menu"
       />
     </Sider>

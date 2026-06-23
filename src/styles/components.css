@@ -138,6 +138,11 @@
   font-weight: 600;
   color: #2D3436;
 }
+.header-user-department {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
 .header-user-id {
   font-size: 11px;
   color: #999;

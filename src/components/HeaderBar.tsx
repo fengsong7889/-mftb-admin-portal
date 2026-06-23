@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Layout, Dropdown, Badge, Popover, List, Avatar, Modal, Input, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { Layout, Dropdown, Badge, Popover, List, Avatar, Modal, Input, message, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   MenuFoldOutlined,
@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
   KeyOutlined,
   CameraOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -50,6 +51,44 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   const [oldPwd, setOldPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
+  const [selectedCountry, setSelectedCountry] = useState<string>('china') // 默认中国
+
+  // 国家选项（带国旗图标）
+  const countryOptions = [
+    { value: 'china', label: '中国', flag: '🇨🇳' },
+    { value: 'hongkong', label: '香港', flag: '🇭🇰' },
+    { value: 'macau', label: '澳门', flag: '🇲🇴' },
+    { value: 'taiwan', label: '台湾', flag: '🇹🇼' },
+    { value: 'japan', label: '日本', flag: '🇯🇵' },
+    { value: 'south_korea', label: '韩国', flag: '🇰🇷' },
+    { value: 'singapore', label: '新加坡', flag: '🇸🇬' },
+    { value: 'malaysia', label: '马来西亚', flag: '🇲🇾' },
+    { value: 'thailand', label: '泰国', flag: '🇹🇭' },
+    { value: 'vietnam', label: '越南', flag: '🇻🇳' },
+    { value: 'philippines', label: '菲律宾', flag: '🇵🇭' },
+    { value: 'indonesia', label: '印度尼西亚', flag: '🇮🇩' },
+    { value: 'usa', label: '美国', flag: '🇺🇸' },
+    { value: 'uk', label: '英国', flag: '🇬🇧' },
+    { value: 'australia', label: '澳大利亚', flag: '🇦🇺' },
+  ]
+
+  // 从 localStorage 读取国家选择
+  useEffect(() => {
+    const savedCountry = localStorage.getItem('selected_country')
+    if (savedCountry) {
+      setSelectedCountry(savedCountry)
+    }
+  }, [])
+
+  // 处理国家选择变化
+  const handleCountryChange = (country: string) => {
+    setSelectedCountry(country)
+    localStorage.setItem('selected_country', country)
+    const selected = countryOptions.find(c => c.value === country)
+    message.success(`已切换到${selected?.flag} ${selected?.label}`)
+    // 触发全局事件，其他组件可以监听
+    window.dispatchEvent(new CustomEvent('countryChange', { detail: country }))
+  }
 
   /** 退出登录 */
   const handleLogout = () => {
@@ -135,6 +174,17 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
           </span>
         </div>
         <div className="header-right">
+          {/* 国家选择器 */}
+          <Select
+            value={selectedCountry}
+            onChange={handleCountryChange}
+            style={{ width: 140, marginRight: 16 }}
+            options={countryOptions.map(option => ({
+              value: option.value,
+              label: `${option.flag} ${option.label}`,
+            }))}
+          />
+
           {/* 通知铃铛 */}
           <Popover
             content={notificationContent}
@@ -167,7 +217,12 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
               )}
               <div className="header-user-text">
                 <span className="header-user-name">{user?.name}</span>
-                <span className="header-user-id">{user?.empId}</span>
+                {user?.department && user?.position && (
+                  <span className="header-user-department">
+                    {user.department} - {user.position}
+                  </span>
+                )}
+                <span className="header-user-id">ID: {user?.empId}</span>
               </div>
             </div>
           </Dropdown>

@@ -48,6 +48,9 @@ const RecommendOrder = lazy(() => import('./pages/Recommend/Order'))
 const RecommendCalendar = lazy(() => import('./pages/Recommend/Calendar'))
 const RecommendEffectReport = lazy(() => import('./pages/Recommend/EffectReport'))
 const RecommendRevenueReport = lazy(() => import('./pages/Recommend/RevenueReport'))
+// 權限管理
+const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
+const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
 
 const { Content } = Layout
 
@@ -115,6 +118,9 @@ function AuthenticatedLayout() {
               <Route path="/recommend-calendar" element={<RecommendCalendar />} />
               <Route path="/recommend-effect-report" element={<RecommendEffectReport />} />
               <Route path="/recommend-revenue-report" element={<RecommendRevenueReport />} />
+              {/* 權限管理 */}
+              <Route path="/function-permission" element={<FunctionPermission />} />
+              <Route path="/data-permission" element={<DataPermission />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* 默认回首页 */}
