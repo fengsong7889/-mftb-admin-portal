@@ -87,3 +87,74 @@ export const SERVICE_STATUS_OPTIONS = [
   { label: '啟用', value: ServiceStatus.ENABLED },
   { label: '停用', value: ServiceStatus.DISABLED },
 ]
+
+/** 召回维度 */
+export enum RecallDimension {
+  MERCHANT = 1,    // 商家维度
+  ITEM = 2,        // 商品维度
+  COMMERCIAL = 3,  // 商业维度
+  USER = 4,        // 用户维度
+  PLATFORM = 5,    // 平台维度
+}
+
+export const RECALL_DIMENSION_OPTIONS = [
+  { label: '商家維度', value: RecallDimension.MERCHANT },
+  { label: '商品維度', value: RecallDimension.ITEM },
+  { label: '商業維度', value: RecallDimension.COMMERCIAL },
+  { label: '用戶維度', value: RecallDimension.USER },
+  { label: '平台維度', value: RecallDimension.PLATFORM },
+]
+
+/** 召回维度颜色 */
+export const RECALL_DIMENSION_COLOR: Record<RecallDimension, string> = {
+  [RecallDimension.MERCHANT]: 'blue',
+  [RecallDimension.ITEM]: 'green',
+  [RecallDimension.COMMERCIAL]: 'gold',
+  [RecallDimension.USER]: 'purple',
+  [RecallDimension.PLATFORM]: 'cyan',
+}
+
+/** 排序阶段 */
+export enum RankingStage {
+  COARSE = 1,   // 粗排
+  FINE = 2,     // 精排
+  RERANK = 3,   // 重排
+}
+
+export const RANKING_STAGE_OPTIONS = [
+  { label: '粗排', value: RankingStage.COARSE },
+  { label: '精排', value: RankingStage.FINE },
+  { label: '重排', value: RankingStage.RERANK },
+]
+
+/** 出价模式 */
+export enum BidMode {
+  CPC = 1,   // 按点击付费
+  CPM = 2,   // 按展示付费
+  OCPC = 3,  // 优化点击付费
+}
+
+export const BID_MODE_OPTIONS = [
+  { label: 'CPC (按點擊付費)', value: BidMode.CPC },
+  { label: 'CPM (按展示付費)', value: BidMode.CPM },
+  { label: 'oCPC (優化點擊付費)', value: BidMode.OCPC },
+]
+
+/** 时段类型 */
+export enum TimeSlot {
+  ALL_DAY = 1,       // 全天
+  BREAKFAST = 2,     // 早餐
+  LUNCH = 3,         // 午餐
+  AFTERNOON = 4,     // 下午茶
+  DINNER = 5,        // 晚餐
+  NIGHT_SNACK = 6,   // 夜宵
+}
+
+export const TIME_SLOT_OPTIONS = [
+  { label: '全天', value: TimeSlot.ALL_DAY },
+  { label: '早餐 (06:00-09:00)', value: TimeSlot.BREAKFAST },
+  { label: '午餐 (11:00-14:00)', value: TimeSlot.LUNCH },
+  { label: '下午茶 (14:00-17:00)', value: TimeSlot.AFTERNOON },
+  { label: '晚餐 (17:00-20:00)', value: TimeSlot.DINNER },
+  { label: '夜宵 (20:00-02:00)', value: TimeSlot.NIGHT_SNACK },
+]

@@ -75,22 +75,25 @@ const defaultFavorites = [
 
 /** 待办事项 */
 const todoItems = [
-  { id: 1, title: '審批流程待處理', count: 3, type: 'warning' as const },
-  { id: 2, title: '充值申請待審批', count: 5, type: 'info' as const },
-  { id: 3, title: '欠款賬單待結清', count: 12, type: 'error' as const },
+  { id: 1, title: '推廣金充值申請審批', count: 3, type: 'warning' as const },
+  { id: 2, title: '推廣金扣款申請審批', count: 5, type: 'info' as const },
+  { id: 3, title: '推廣金轉賬申請審批', count: 2, type: 'info' as const },
+  { id: 4, title: '商戶合併申請審批', count: 1, type: 'error' as const },
 ]
 
 /** 系统通知 */
 const notifications = [
-  { id: 1, title: '系統維護通知', desc: '2026-06-10 凌晨 2:00-4:00 進行系統升級', time: '1小時前', read: false },
-  { id: 2, title: '新功能上線', desc: '推廣金充值功能已支持批量操作', time: '3小時前', read: false },
-  { id: 3, title: '數據導出優化', desc: '大數據量導出性能提升50%', time: '1天前', read: true },
+  { id: 1, title: '用戶管理菜單新增日志查看通知', desc: '用戶管理功能增強,支持操作日志查看', time: '1小時前', read: false },
+  { id: 2, title: '權限管理支持授權多個國家數據權限通知', desc: '權限管理模塊升級,支持多國家數據權限配置', time: '3小時前', read: false },
+  { id: 3, title: '運營培訓會議事項', desc: '本週五下午3點運營培訓會議,請準時參加', time: '1天前', read: true },
+  { id: 4, title: '新增廣告無敵星星上線通知', desc: '新廣告形式無敵星星已上線,歡迎體驗', time: '2天前', read: true },
 ]
 
 /** 系统公告 */
 const announcements = [
-  { id: 1, title: '平台升級公告', desc: '為提升用戶體驗,平台將於本週末進行升級維護', time: '2天前', read: false },
-  { id: 2, title: '新功能培訓通知', desc: '下週一舉行新功能使用培訓,請各部門準時參加', time: '3天前', read: true },
+  { id: 1, title: '12月績效數據公佈告知', desc: '12月績效考核數據已公佈,請查看', time: '2天前', read: false },
+  { id: 2, title: '團購策略調整公佈', desc: '團購業務策略調整方案已發佈,請相關人員查收', time: '3天前', read: true },
+  { id: 3, title: '電信新用戶推廣策略公佈', desc: '電信渠道新用戶推廣策略已更新', time: '5天前', read: true },
 ]
 
 /** 订单趋势数据 */
@@ -341,7 +344,12 @@ export default function Home() {
           </div>
           <div className="home-todo-list">
             {todoItems.map((item) => (
-              <div key={item.id} className="home-todo-item">
+              <div 
+                key={item.id} 
+                className="home-todo-item"
+                onClick={() => navigate('/approval-center')}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="home-todo-left">
                   {item.type === 'error' && <ExclamationCircleOutlined style={{ color: '#E53935' }} />}
                   {item.type === 'warning' && <ClockCircleOutlined style={{ color: '#E8720C' }} />}

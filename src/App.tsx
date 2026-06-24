@@ -48,9 +48,28 @@ const RecommendOrder = lazy(() => import('./pages/Recommend/Order'))
 const RecommendCalendar = lazy(() => import('./pages/Recommend/Calendar'))
 const RecommendEffectReport = lazy(() => import('./pages/Recommend/EffectReport'))
 const RecommendRevenueReport = lazy(() => import('./pages/Recommend/RevenueReport'))
+// 推荐管理 - 新增模块
+const RecommendRecallStrategy = lazy(() => import('./pages/Recommend/RecallStrategy'))
+const RecommendRecallSource = lazy(() => import('./pages/Recommend/RecallSource'))
+const RecommendRecallAnalysis = lazy(() => import('./pages/Recommend/RecallAnalysis'))
+const RecommendRankingCoarse = lazy(() => import('./pages/Recommend/RankingCoarse'))
+const RecommendRankingFine = lazy(() => import('./pages/Recommend/RankingFine'))
+const RecommendRankingRerank = lazy(() => import('./pages/Recommend/RankingRerank'))
+const RecommendStrategyAdType = lazy(() => import('./pages/Recommend/StrategyAdType'))
+const RecommendStrategyOrchestration = lazy(() => import('./pages/Recommend/StrategyOrchestration'))
+const RecommendStrategyTimeslot = lazy(() => import('./pages/Recommend/StrategyTimeslot'))
+const RecommendABTest = lazy(() => import('./pages/Recommend/ABTest'))
+const RecommendWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
+const RecommendMerchantRule = lazy(() => import('./pages/Recommend/MerchantRule'))
+const RecommendUserProfile = lazy(() => import('./pages/Recommend/UserProfile'))
 // 權限管理
 const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
 const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
+// 商家推广工具
+const PromotionDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
+const PromotionAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
+const PromotionAlgorithmAdd = lazy(() => import('./pages/Recommend/AlgorithmAdd'))
+const PromotionWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
 
 const { Content } = Layout
 
@@ -118,9 +137,28 @@ function AuthenticatedLayout() {
               <Route path="/recommend-calendar" element={<RecommendCalendar />} />
               <Route path="/recommend-effect-report" element={<RecommendEffectReport />} />
               <Route path="/recommend-revenue-report" element={<RecommendRevenueReport />} />
+              {/* 推荐管理 - 新增路由 */}
+              <Route path="/recommend-recall-strategy" element={<RecommendRecallStrategy />} />
+              <Route path="/recommend-recall-source" element={<RecommendRecallSource />} />
+              <Route path="/recommend-recall-analysis" element={<RecommendRecallAnalysis />} />
+              <Route path="/recommend-ranking-coarse" element={<RecommendRankingCoarse />} />
+              <Route path="/recommend-ranking-fine" element={<RecommendRankingFine />} />
+              <Route path="/recommend-ranking-rerank" element={<RecommendRankingRerank />} />
+              <Route path="/recommend-strategy-adtype" element={<RecommendStrategyAdType />} />
+              <Route path="/recommend-strategy-orchestration" element={<RecommendStrategyOrchestration />} />
+              <Route path="/recommend-strategy-timeslot" element={<RecommendStrategyTimeslot />} />
+              <Route path="/recommend-ab-test" element={<RecommendABTest />} />
+              <Route path="/recommend-waterfall" element={<RecommendWaterfall />} />
+              <Route path="/recommend-merchant-rule" element={<RecommendMerchantRule />} />
+              <Route path="/recommend-user-profile" element={<RecommendUserProfile />} />
               {/* 權限管理 */}
               <Route path="/function-permission" element={<FunctionPermission />} />
               <Route path="/data-permission" element={<DataPermission />} />
+              {/* 商家推广工具 */}
+              <Route path="/promotion-dashboard" element={<PromotionDashboard />} />
+              <Route path="/promotion-algorithm" element={<PromotionAlgorithm />} />
+              <Route path="/promotion-algorithm-add" element={<PromotionAlgorithmAdd />} />
+              <Route path="/promotion-waterfall" element={<PromotionWaterfall />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* 默认回首页 */}

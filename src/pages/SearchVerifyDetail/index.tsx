@@ -605,26 +605,26 @@ export default function SearchVerifyDetail() {
       <div style={{
         background: '#fff', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Button
-            type="primary"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/search-verify')}
-            style={{ fontSize: 14 }}
-          >
-            返回
-          </Button>
-          <Divider type="vertical" style={{ height: 24 }} />
-          <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-              商家得分明細
-            </h2>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-              {merchant.merchantName}（{merchant.merchantId}）· {merchant.category}
-            </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+            商家得分明細
+          </h2>
+          <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+            {merchant.merchantName}（{merchant.merchantId}）· {merchant.category}
           </div>
         </div>
+        <Button
+          type="primary"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/search-verify')}
+          style={{ fontSize: 14 }}
+        >
+          返回
+        </Button>
       </div>
 
       {/* 總分概要卡片 */}

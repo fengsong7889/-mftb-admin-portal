@@ -75,7 +75,7 @@ interface BoostTier {
 interface DemoteTier {
   days: number         // 未购买广告天数
   deductionType: DemoteRuleType
-  deductionValue: number // 扣分值（fixed_deduction时为固定分数，percent_deduction时为百分比）
+  deductionValue: number // 扣分值（fixed_deduction时为固定分数，percent_deduction时为折扣比例）
 }
 
 interface InterventionRecord {
@@ -1043,7 +1043,7 @@ export default function SearchWeightConfig() {
                           onChange={(val) => handleUpdateDemoteTier(index, 'deductionType', val)}
                           options={[
                             { label: '固定分數扣', value: 'fixed_deduction' },
-                            { label: '按比例扣', value: 'percent_deduction' },
+                            { label: '按商戶總得分折扣', value: 'percent_deduction' },
                           ]}
                         />
                       </Form.Item>
@@ -1055,7 +1055,7 @@ export default function SearchWeightConfig() {
                           min={0}
                           max={tier.deductionType === 'percent_deduction' ? 100 : undefined}
                           addonAfter={tier.deductionType === 'percent_deduction' ? '%' : '分'}
-                          placeholder={tier.deductionType === 'percent_deduction' ? '輸入百分比，如20表示扣20%' : '輸入固定扣分'}
+                          placeholder={tier.deductionType === 'percent_deduction' ? '輸入折扣比例，如20表示8折' : '輸入固定扣分'}
                         />
                       </Form.Item>
                       {/* 按比例扣时的提醒说明 */}
@@ -1071,9 +1071,9 @@ export default function SearchWeightConfig() {
                           lineHeight: 1.6
                         }}>
                           <strong>💡 計算說明：</strong>
-                          按比例扣分是根據商戶當前總分進行比例扣減。用戶搜索時，系統會執行：
-                          <code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>最終得分 = 商戶總分 × (1 - 扣分比例)</code>
-                          。例如：商戶總分100分，輸入20%則扣20分，最終得分80分；輸入100%則全部扣除，最終得分0分。
+                          按商戶總得分折扣是根據商戶當前總分進行比例扣減。用戶搜索時，系統會執行：
+                          <code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>最終得分 = 商戶總分 × (1 - 折扣比例)</code>
+                          。例如：商戶總分100分，輸入20%則最終得分80分；輸入100%則全部扣除，最終得分0分。
                         </div>
                       )}
                     </div>
