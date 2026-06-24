@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Row, Col, Timeline, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, GitBranchOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, BranchesOutlined } from '@ant-design/icons'
 import { 
   AppType, 
   RecommendChannel, 
@@ -305,7 +305,7 @@ export default function StrategyOrchestration() {
         description="策略編排引擎用於配置完整的推薦鏈路,從召回到展示的多個階段。每個鏈路包含多個執行步驟,按順序依次執行。"
         type="info"
         showIcon
-        icon={<GitBranchOutlined />}
+        icon={<BranchesOutlined />}
         style={{ marginBottom: 16 }}
       />
 

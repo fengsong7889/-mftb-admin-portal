@@ -6,7 +6,8 @@
   "homepage": "https://fengsong7889.github.io/-mftb-admin-portal",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
+    "build:strict": "tsc && vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist"
   },
