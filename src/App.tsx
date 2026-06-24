@@ -70,6 +70,8 @@ const PromotionDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
 const PromotionAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
 const PromotionAlgorithmAdd = lazy(() => import('./pages/Recommend/AlgorithmAdd'))
 const PromotionWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
+const PromotionSlotConfig = lazy(() => import('./pages/PromotionSlotConfig'))
+const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
 
 const { Content } = Layout
 
@@ -158,7 +160,9 @@ function AuthenticatedLayout() {
               <Route path="/promotion-dashboard" element={<PromotionDashboard />} />
               <Route path="/promotion-algorithm" element={<PromotionAlgorithm />} />
               <Route path="/promotion-algorithm-add" element={<PromotionAlgorithmAdd />} />
+              <Route path="/promotion-slot-config" element={<PromotionSlotConfig />} />
               <Route path="/promotion-waterfall" element={<PromotionWaterfall />} />
+              <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* 默认回首页 */}

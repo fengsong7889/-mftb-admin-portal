@@ -146,8 +146,10 @@ const keyToPath: Record<string, string> = {
   // 商家推广工具
   'promotion-dashboard': '/promotion-dashboard',
   'promotion-algorithm': '/promotion-algorithm',
+  'promotion-slot-config': '/promotion-slot-config',
   'promotion-waterfall': '/promotion-waterfall',
   'promotion-waterfall-preview': '/promotion-waterfall-preview',
+  'promotion-sales-config': '/promotion-sales-config',
   // 推广通
   'promotion-tool': '/promotion-tool',
 }
@@ -357,19 +359,36 @@ const menuItems: MenuItem[] = [
         label: '數據看板',
       },
       {
-        key: 'promotion-algorithm',
+        key: 'promotion-algorithm-group',
         icon: <AppstoreOutlined />,
-        label: '算法配置',
+        label: '算法管理',
+        children: [
+          {
+            key: 'promotion-algorithm',
+            icon: <AppstoreOutlined />,
+            label: '算法庫',
+          },
+          {
+            key: 'promotion-slot-config',
+            icon: <ColumnHeightOutlined />,
+            label: '瀑布流規劃',
+          },
+        ],
       },
       {
         key: 'promotion-waterfall',
         icon: <ColumnHeightOutlined />,
-        label: '瀑布流配置',
+        label: '定價銷售配置',
       },
       {
         key: 'promotion-waterfall-preview',
         icon: <EyeOutlined />,
-        label: '瀑布流預覽',
+        label: '展示位預覽',
+      },
+      {
+        key: 'promotion-sales-config',
+        icon: <DollarOutlined />,
+        label: '廣告購買',
       },
     ],
   },

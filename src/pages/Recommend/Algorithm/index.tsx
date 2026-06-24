@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, ServiceStatus, SERVICE_STATUS_OPTIONS } from '../constants'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const { Search } = Input
 
@@ -97,7 +98,7 @@ export default function Algorithm() {
       result = result.filter(item => item.type === values.type)
     }
     
-    // 应用频道筛选
+    // 业务频道筛选
     if (values.channel !== undefined && values.channel !== null) {
       result = result.filter(item => item.channel === values.channel)
     }
@@ -121,6 +122,20 @@ export default function Algorithm() {
     navigate('/promotion-algorithm-add')
   }
 
+  /** 列配置元数据 */
+  const columnMeta = useMemo(() => [
+    { key: 'code', title: '算法ID' },
+    { key: 'name', title: '算法名稱' },
+    { key: 'type', title: '算法類型' },
+    { key: 'channel', title: '業務頻道' },
+    { key: 'status', title: '狀態' },
+    { key: 'action', title: '操作' },
+  ], [])
+
+  const { configComponent, applyConfig } = useColumnConfig('algorithm', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
+
   const columns: ColumnsType<AlgorithmRecord> = [
     { title: '算法ID', dataIndex: 'code', key: 'code', width: 180, render: (v) => <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{v}</code> },
     { title: '算法名稱', dataIndex: 'name', key: 'name', width: 200 },
@@ -129,7 +144,7 @@ export default function Algorithm() {
       render: (v: AlgorithmType) => <Tag color={TYPE_COLOR[v]}>{TYPE_LABEL[v]}</Tag>,
     },
     {
-      title: '應用頻道', dataIndex: 'channel', key: 'channel', width: 150,
+      title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 150,
       render: (v: RecommendChannel) => CHANNEL_LABEL[v],
     },
     {
@@ -181,7 +196,7 @@ export default function Algorithm() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="應用頻道" name="channel">
+          <Form.Item label="業務頻道" name="channel">
             <Select 
               placeholder="全部" 
               options={[
@@ -210,13 +225,14 @@ export default function Algorithm() {
         <Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleGoToAdd}>新增算法</Button>
         </Space>
+        {configComponent}
       </div>
 
       {/* 列表区域 */}
       <div className="table-section">
         <Table<AlgorithmRecord>
           rowKey="id"
-          columns={columns}
+          columns={applyConfig(columns)}
           dataSource={filteredData}
           pagination={{
             pageSize: 10,

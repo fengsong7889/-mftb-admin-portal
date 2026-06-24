@@ -4,10 +4,30 @@ import TableColumnConfig, { type ColumnConfig, applyColumnConfig } from '../comp
 /**
  * 表格列配置 hook - 简化 TableColumnConfig 集成
  * 
- * @param pageKey - 页面唯一标识
+ * @param pageKey - 页面唯一标识（用于localStorage存储）
  * @param allColumns - 原始 columns 定义 (含 key + title)
  * @param defaultConfig - 默认配置（可选）
- * @returns { configuredColumns, configComponent }
+ * @returns { config, configComponent, applyConfig, columns }
+ * 
+ * @example
+ * // 最简用法
+ * const { columns, configComponent } = useColumnConfig('page-key', [
+ *   { key: 'id', title: 'ID' },
+ *   { key: 'name', title: '名称' },
+ *   { key: 'action', title: '操作' },
+ * ])
+ * 
+ * // 带锁定字段
+ * const { columns, configComponent } = useColumnConfig('page-key', columns, [
+ *   { key: 'action', visible: true, locked: 'tail' },
+ * ])
+ * 
+ * // 在 JSX 中使用
+ * <div>
+ *   <Button>新增</Button>
+ *   {configComponent}
+ *   <Table columns={columns} ... />
+ * </div>
  */
 export function useColumnConfig(
   pageKey: string,
@@ -16,7 +36,7 @@ export function useColumnConfig(
 ) {
   // 初始配置
   const initialConfig = useMemo<ColumnConfig[]>(() => {
-    return allColumns.map((col, idx) => {
+    return allColumns.map((col) => {
       const override = defaultConfig?.find(d => d.key === col.key)
       return {
         key: col.key,
@@ -42,7 +62,25 @@ export function useColumnConfig(
     />
   )
 
-  return { config, configComponent, applyConfig: (tableColumns: any[]) => applyColumnConfig(tableColumns, config) }
+  // 应用配置到表格列
+  const columns = useMemo(() => {
+    return allColumns.map(col => ({ 
+      key: col.key,
+      title: col.title,
+      dataIndex: col.key 
+    }))
+  }, [allColumns])
+
+  const configuredColumns = useMemo(() => {
+    return applyColumnConfig(columns, config)
+  }, [columns, config])
+
+  return { 
+    config, 
+    configComponent, 
+    columns: configuredColumns,
+    applyConfig: (tableColumns: any[]) => applyColumnConfig(tableColumns, config) 
+  }
 }
 
 export type { ColumnConfig }

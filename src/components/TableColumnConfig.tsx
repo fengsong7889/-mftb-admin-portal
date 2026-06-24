@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Modal, Checkbox, Button } from 'antd'
+import { Drawer, Checkbox, Button, Space } from 'antd'
 import {
   SettingOutlined,
   ReloadOutlined,
@@ -157,21 +157,24 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
         title="表格字段設置"
       />
 
-      {/* 配置弹窗 */}
-      <Modal
+      {/* 配置抽屉 */}
+      <Drawer
         title={
           <div className="tcc-modal-title">
             <span>表格字段排列</span>
           </div>
         }
         open={open}
-        onCancel={() => setOpen(false)}
+        onClose={() => setOpen(false)}
         width={480}
-        className="table-column-config-modal"
+        placement="right"
+        className="table-column-config-drawer"
         footer={
           <div className="tcc-footer">
-            <Button onClick={() => setOpen(false)}>取消</Button>
-            <Button type="primary" onClick={handleConfirm}>確認</Button>
+            <Space>
+              <Button onClick={() => setOpen(false)}>取消</Button>
+              <Button type="primary" onClick={handleConfirm}>確認</Button>
+            </Space>
           </div>
         }
         destroyOnClose={false}
@@ -283,7 +286,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
             )}
           </div>
         </div>
-      </Modal>
+      </Drawer>
     </>
   )
 }

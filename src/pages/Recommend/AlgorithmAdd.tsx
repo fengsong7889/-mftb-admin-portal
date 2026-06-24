@@ -7,6 +7,7 @@ import { AlgorithmType, RecommendChannel } from './constants'
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
+  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null) // 当前选择的算法类型
   const [presaleMode, setPresaleMode] = useState(true) // false: 固定, true: 滚动
   const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
   const [merchantLimit, setMerchantLimit] = useState(false) // false: 不限制, true: 限制
@@ -244,19 +245,26 @@ export default function AlgorithmAdd() {
                   { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
                   { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
                 ]}
+                onChange={(value) => {
+                  setSelectedAlgorithmType(value)
+                  // 切换算法类型时重置参数区域的状态
+                  if (value !== AlgorithmType.INVINCIBLE_STAR) {
+                    setIsEditing(false)
+                  }
+                }}
               />
             </Form.Item>
 
             <Form.Item
-              label="應用頻道"
+              label="業務頻道"
               name="channel"
-              rules={[{ required: true, message: '請選擇應用頻道' }]}
+              rules={[{ required: true, message: '請選擇業務頻道' }]}
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 6 }}
               wrapperCol={{ span: 18 }}
             >
               <Select
-                placeholder="請選擇應用頻道"
+                placeholder="請選擇業務頻道"
                 options={[
                   { label: '大首頁瀑布流', value: RecommendChannel.HOME },
                   { label: '外賣頻道瀑布流', value: RecommendChannel.DELIVERY },
@@ -270,50 +278,51 @@ export default function AlgorithmAdd() {
       </Card>
 
       {/* 算法参数区域 */}
-      <Card 
-        title={
-          <Space>
-            <SettingOutlined style={{ fontSize: 18, color: '#52c41a' }} />
-            <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: 0.5 }}>算法參數</span>
-          </Space>
-        }
-        extra={
-          <Space>
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-              配置算法運行參數
-            </span>
-            {!isEditing && (
-              <Button 
-                type="primary" 
-                size="small"
-                onClick={handleEdit}
-                style={{ 
-                  borderRadius: 4,
-                  height: 28
-                }}
-              >
-                編輯
-              </Button>
-            )}
-          </Space>
-        }
-        style={{ 
-          marginTop: 16,
-          backgroundColor: '#ffffff',
-          border: '1px solid #e8eaed',
-          borderRadius: 12,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-        }}
-        headStyle={{
-          backgroundColor: 'linear-gradient(135deg, #f6ffed 0%, #e6f7e6 100%)',
-          borderBottom: '2px solid #b7eb8f',
-          borderRadius: '12px 12px 0 0',
-          padding: '16px 24px'
-        }}
-        bodyStyle={{
-          padding: '24px'
-        }}
-      >
+      {selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? (
+        <Card 
+          title={
+            <Space>
+              <SettingOutlined style={{ fontSize: 18, color: '#52c41a' }} />
+              <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: 0.5 }}>算法參數</span>
+            </Space>
+          }
+          extra={
+            <Space>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                配置算法運行參數
+              </span>
+              {!isEditing && (
+                <Button 
+                  type="primary" 
+                  size="small"
+                  onClick={handleEdit}
+                  style={{ 
+                    borderRadius: 4,
+                    height: 28
+                  }}
+                >
+                  編輯
+                </Button>
+              )}
+            </Space>
+          }
+          style={{ 
+            marginTop: 16,
+            backgroundColor: '#ffffff',
+            border: '1px solid #e8eaed',
+            borderRadius: 12,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+          }}
+          headStyle={{
+            backgroundColor: 'linear-gradient(135deg, #f6ffed 0%, #e6f7e6 100%)',
+            borderBottom: '2px solid #b7eb8f',
+            borderRadius: '12px 12px 0 0',
+            padding: '16px 24px'
+          }}
+          bodyStyle={{
+            padding: '24px'
+          }}
+        >
         <Form
           form={form}
           layout="horizontal"
@@ -726,7 +735,56 @@ export default function AlgorithmAdd() {
             <div style={{ flex: 1 }} />
           </div>
         </Form>
-      </Card>
+        </Card>
+      ) : selectedAlgorithmType ? (
+        /* 其它算法类型：显示提示 */
+        <Card 
+          style={{ 
+            marginTop: 16,
+            backgroundColor: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '60px 20px',
+            color: '#8c8c8c'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>⚙️</div>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
+              暫無參數配置
+            </div>
+            <div style={{ fontSize: 14 }}>
+              當前算法類型暫未開放參數配置，請聯繫管理員
+            </div>
+          </div>
+        </Card>
+      ) : (
+        /* 未选择算法类型：显示提示 */
+        <Card 
+          style={{ 
+            marginTop: 16,
+            backgroundColor: '#f0f5ff',
+            border: '1px solid #d6e4ff',
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '60px 20px',
+            color: '#595959'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>👆</div>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, color: '#1890ff' }}>
+              請先選擇算法類型
+            </div>
+            <div style={{ fontSize: 14 }}>
+              選擇算法類型後，將顯示對應的參數配置項
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* 底部保存按钮（仅编辑模式下显示） */}
       {isEditing && (

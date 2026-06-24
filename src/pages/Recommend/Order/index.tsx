@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button, Space, Table, Tag, Input, Select, Form, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
@@ -6,6 +6,7 @@ import {
   AppType, OrderStatus, RecommendChannel, AlgorithmType,
   APP_OPTIONS, ORDER_STATUS_OPTIONS,
 } from '../constants'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 interface OrderRecord {
   id: number
@@ -112,6 +113,24 @@ export default function Order() {
     setFilteredData(mockData)
   }
 
+  /** 列配置元数据 */
+  const columnMeta = useMemo(() => [
+    { key: 'app', title: '所屬品牌' },
+    { key: 'orderNo', title: '訂單號' },
+    { key: 'merchantName', title: '商家名稱' },
+    { key: 'algorithmType', title: '算法類型' },
+    { key: 'channel', title: '業務頻道' },
+    { key: 'slot', title: '坑位' },
+    { key: 'region', title: '區域' },
+    { key: 'timePeriod', title: '時段' },
+    { key: 'startDate', title: '開始日期' },
+    { key: 'endDate', title: '結束日期' },
+    { key: 'amount', title: '金額' },
+    { key: 'status', title: '訂單狀態' },
+  ], [])
+
+  const { configComponent, applyConfig } = useColumnConfig('order', columnMeta)
+
   const columns: ColumnsType<OrderRecord> = [
     { 
       title: '所屬品牌', 
@@ -202,13 +221,14 @@ export default function Order() {
         <Space>
           <Button type="primary" icon={<PlusOutlined />}>新增訂單</Button>
         </Space>
+        {configComponent}
       </div>
 
       {/* 列表区域 */}
       <div className="table-section">
         <Table<OrderRecord>
           rowKey="id"
-          columns={columns}
+          columns={applyConfig(columns)}
           dataSource={filteredData}
           scroll={{ x: 1400 }}
           pagination={{ 

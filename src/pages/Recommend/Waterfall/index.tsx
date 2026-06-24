@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, LayoutOutlined } from '@ant-design/icons'
@@ -15,6 +15,7 @@ import {
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
 import { mockAlgorithmData } from '../Algorithm'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
   [RecommendChannel.HOME]: '大首頁瀑布流',
@@ -45,94 +46,84 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
 }
 
-// Mock数据 - 瀑布流坑位配置
-const mockData: WaterfallSlotConfig[] = [
-  {
-    id: 1,
-    app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
-    slotPosition: 1,
-    algorithmId: 1,
-    algorithmName: '無敵星星-首頁版',
-    algorithmType: AlgorithmType.INVINCIBLE_STAR,
-    purchaseLimit: { days: 7, quantity: 3 },
-    merchantLimit: 'unlimited',
-    regionLimit: 'limited',
-    regionIds: [1, 2],
-    status: ServiceStatus.ENABLED,
-    updatedBy: 'admin',
-    updatedAt: '2024-01-20 14:20:00',
-    createdAt: '2024-01-15 10:30:00',
-  },
-  {
-    id: 2,
-    app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
-    slotPosition: 3,
-    algorithmId: 6,
-    algorithmName: '猜你喜歡-主力版',
-    algorithmType: AlgorithmType.GUESS_YOU_LIKE,
-    purchaseInterval: 2,
-    merchantLimit: 'limited',
-    merchantIds: [101, 102],
-    regionLimit: 'unlimited',
-    status: ServiceStatus.ENABLED,
-    updatedBy: 'admin',
-    updatedAt: '2024-01-21 10:30:00',
-    createdAt: '2024-01-16 09:15:00',
-  },
-  {
-    id: 3,
-    app: AppType.MFOOD,
-    channel: RecommendChannel.DELIVERY,
-    slotPosition: 2,
-    algorithmId: 2,
-    algorithmName: '新店廣告-外賣版',
-    algorithmType: AlgorithmType.NEW_STORE_AD,
-    purchaseLimit: { days: 14, quantity: 5 },
-    merchantLimit: 'unlimited',
-    regionLimit: 'limited',
-    regionIds: [1],
-    status: ServiceStatus.ENABLED,
-    updatedBy: 'operator',
-    updatedAt: '2024-01-22 16:45:00',
-    createdAt: '2024-01-17 11:20:00',
-  },
-  {
-    id: 4,
-    app: AppType.SHANFENG,
-    channel: RecommendChannel.GROUP_BUY,
-    slotPosition: 1,
-    algorithmId: 3,
-    algorithmName: '盤活廣告-團購版',
-    algorithmType: AlgorithmType.HOT_REVIVE_AD,
-    purchaseInterval: 3,
-    merchantLimit: 'limited',
-    merchantIds: [201],
-    regionLimit: 'unlimited',
-    status: ServiceStatus.DISABLED,
-    updatedBy: 'admin',
-    updatedAt: '2024-01-23 09:15:00',
-    createdAt: '2024-01-18 14:00:00',
-  },
-  {
-    id: 5,
-    app: AppType.MFOOD,
-    channel: RecommendChannel.SUPERMARKET,
-    slotPosition: 5,
-    algorithmId: 4,
-    algorithmName: '獨家商家-超市版',
-    algorithmType: AlgorithmType.EXCLUSIVE_MERCHANT,
-    purchaseLimit: { days: 30, quantity: 10 },
-    merchantLimit: 'unlimited',
-    regionLimit: 'limited',
-    regionIds: [1, 2, 3],
-    status: ServiceStatus.ENABLED,
-    updatedBy: 'admin',
-    updatedAt: '2024-01-24 15:00:00',
-    createdAt: '2024-01-19 08:30:00',
-  },
-]
+// Mock数据 - 瀑布流坑位配置（15天虚拟数据）
+const generateMockData = (): WaterfallSlotConfig[] => {
+  const data: WaterfallSlotConfig[] = []
+  const channels = [
+    RecommendChannel.HOME,
+    RecommendChannel.DELIVERY,
+    RecommendChannel.GROUP_BUY,
+    RecommendChannel.SUPERMARKET,
+  ]
+  const apps = [AppType.SHANFENG, AppType.MFOOD]
+  const algorithms = [
+    { id: 1, name: '無敵星星-首頁版', type: AlgorithmType.INVINCIBLE_STAR },
+    { id: 2, name: '新店廣告-外賣版', type: AlgorithmType.NEW_STORE_AD },
+    { id: 3, name: '盤活廣告-團購版', type: AlgorithmType.HOT_REVIVE_AD },
+    { id: 4, name: '獨家商家-超市版', type: AlgorithmType.EXCLUSIVE_MERCHANT },
+    { id: 5, name: '流量廣告-全渠道', type: AlgorithmType.TRAFFIC_AD },
+    { id: 6, name: '猜你喜歡-主力版', type: AlgorithmType.GUESS_YOU_LIKE },
+    { id: 7, name: '自然流量-默認', type: AlgorithmType.ORGANIC_TRAFFIC },
+    { id: 8, name: '搜索算法-綜合版', type: AlgorithmType.SEARCH_ALGORITHM },
+  ]
+  const users = ['admin', 'operator', 'user001', 'user002']
+
+  let id = 1
+  
+  // 使用固定种子生成可预期的数据（避免每次刷新数据不同）
+  const pseudoRandom = (seed: number) => {
+    const x = Math.sin(seed) * 10000
+    return x - Math.floor(x)
+  }
+  
+  // 生成15天的数据
+  for (let day = 0; day < 15; day++) {
+    const date = new Date()
+    date.setDate(date.getDate() - day)
+    const dateStr = date.toISOString().split('T')[0]
+    
+    // 每天生成3-5条记录（使用固定算法）
+    const recordsPerDay = 3 + Math.floor(pseudoRandom(day * 100) * 3)
+    
+    for (let i = 0; i < recordsPerDay; i++) {
+      const seed = day * 1000 + i * 100
+      const app = apps[Math.floor(pseudoRandom(seed + 1) * apps.length)]
+      const channel = channels[Math.floor(pseudoRandom(seed + 2) * channels.length)]
+      const slotPosition = 1 + Math.floor(pseudoRandom(seed + 3) * 10) // 1-10号位
+      const algorithm = algorithms[Math.floor(pseudoRandom(seed + 4) * algorithms.length)]
+      const status = day < 3 ? ServiceStatus.ENABLED : (pseudoRandom(seed + 5) > 0.3 ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)
+      const user = users[Math.floor(pseudoRandom(seed + 6) * users.length)]
+      
+      const hour = 8 + Math.floor(pseudoRandom(seed + 7) * 12)
+      const minute = Math.floor(pseudoRandom(seed + 8) * 60)
+      
+      data.push({
+        id: id++,
+        app,
+        channel,
+        slotPosition,
+        algorithmId: algorithm.id,
+        algorithmName: algorithm.name,
+        algorithmType: algorithm.type,
+        purchaseLimit: pseudoRandom(seed + 9) > 0.5 ? { days: 7 + day * 2, quantity: 3 + Math.floor(pseudoRandom(seed + 10) * 5) } : undefined,
+        purchaseInterval: pseudoRandom(seed + 11) > 0.5 ? 1 + Math.floor(pseudoRandom(seed + 12) * 5) : undefined,
+        merchantLimit: pseudoRandom(seed + 13) > 0.5 ? 'limited' : 'unlimited',
+        merchantIds: pseudoRandom(seed + 14) > 0.5 ? [100 + Math.floor(pseudoRandom(seed + 15) * 50), 100 + Math.floor(pseudoRandom(seed + 16) * 50)] : undefined,
+        regionLimit: pseudoRandom(seed + 17) > 0.5 ? 'limited' : 'unlimited',
+        regionIds: pseudoRandom(seed + 18) > 0.5 ? [1, 2, 3].slice(0, 1 + Math.floor(pseudoRandom(seed + 19) * 3)) : undefined,
+        status,
+        updatedBy: user,
+        updatedAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+        createdAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+      })
+    }
+  }
+
+  // 按更新时间倒序排列（最新的在前面）
+  return data.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+const mockData: WaterfallSlotConfig[] = generateMockData()
 
 export default function Waterfall() {
   const [searchForm] = Form.useForm()
@@ -240,15 +231,30 @@ export default function Waterfall() {
     })
   }
 
+  /** 列配置元数据 */
+  const columnMeta = useMemo(() => [
+    { key: 'channel', title: '業務頻道' },
+    { key: 'app', title: '所屬品牌' },
+    { key: 'slotPosition', title: '展示位置' },
+    { key: 'algorithmId', title: '算法ID' },
+    { key: 'algorithmName', title: '關聯算法' },
+    { key: 'updatedBy', title: '最後更新人' },
+    { key: 'updatedAt', title: '最後更新時間' },
+    { key: 'action', title: '操作' },
+  ], [])
+
+  const { configComponent, applyConfig } = useColumnConfig('waterfall', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
+
+  // 完整列定义（带自定义渲染）
   const columns: ColumnsType<WaterfallSlotConfig> = [
-    {
-      title: '展示位置',
-      dataIndex: 'slotPosition',
-      key: 'slotPosition',
-      width: 100,
-      render: (v: number) => (
-        <Badge count={`位置${v}`} style={{ backgroundColor: '#1890ff' }} />
-      ),
+    { 
+      title: '業務頻道', 
+      dataIndex: 'channel', 
+      key: 'channel', 
+      width: 140,
+      render: (v: RecommendChannel) => CHANNEL_LABEL[v],
     },
     { 
       title: '所屬品牌', 
@@ -269,12 +275,14 @@ export default function Waterfall() {
         </Tag>
       ),
     },
-    { 
-      title: '業務頻道', 
-      dataIndex: 'channel', 
-      key: 'channel', 
-      width: 140,
-      render: (v: RecommendChannel) => CHANNEL_LABEL[v],
+    {
+      title: '展示位置',
+      dataIndex: 'slotPosition',
+      key: 'slotPosition',
+      width: 100,
+      render: (v: number) => (
+        <Badge count={`${v}號位`} style={{ backgroundColor: '#1890ff' }} />
+      ),
     },
     {
       title: '算法ID',
@@ -283,7 +291,7 @@ export default function Waterfall() {
       width: 120,
       render: (id: number) => (
         <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
-          {id}
+          {String(id).padStart(6, '0')}
         </code>
       ),
     },
@@ -374,9 +382,6 @@ export default function Waterfall() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="所屬品牌" name="app">
-            <Select placeholder="全部" options={APP_OPTIONS} allowClear style={{ width: 120 }} />
-          </Form.Item>
           <Form.Item label="業務頻道" name="channel">
             <Select 
               placeholder="全部" 
@@ -384,6 +389,9 @@ export default function Waterfall() {
               allowClear 
               style={{ width: 160 }}
             />
+          </Form.Item>
+          <Form.Item label="所屬品牌" name="app">
+            <Select placeholder="全部" options={APP_OPTIONS} allowClear style={{ width: 120 }} />
           </Form.Item>
           <Form.Item label="展示位置" name="slotPosition">
             <InputNumber placeholder="坑位序號" min={1} style={{ width: 120 }} />
@@ -424,13 +432,14 @@ export default function Waterfall() {
             新增坑位配置
           </Button>
         </Space>
+        {configComponent}
       </div>
 
       {/* 列表区域 */}
       <div className="table-section">
         <Table<WaterfallSlotConfig>
           rowKey="id"
-          columns={columns}
+          columns={applyConfig(columns)}
           dataSource={filteredData}
           scroll={{ x: 1300 }}
           pagination={{
@@ -690,7 +699,7 @@ export default function Waterfall() {
                 {CHANNEL_LABEL[viewingRecord.channel]}
               </Descriptions.Item>
               <Descriptions.Item label="展示位置">
-                <Badge count={`位置${viewingRecord.slotPosition}`} style={{ backgroundColor: '#1890ff' }} />
+                <Badge count={`${viewingRecord.slotPosition}號位`} style={{ backgroundColor: '#1890ff' }} />
               </Descriptions.Item>
               <Descriptions.Item label="算法名稱" span={2}>
                 <strong>{viewingRecord.algorithmName}</strong>
@@ -702,7 +711,7 @@ export default function Waterfall() {
               </Descriptions.Item>
               <Descriptions.Item label="算法ID">
                 <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
-                  {viewingRecord.algorithmId}
+                  {String(viewingRecord.algorithmId).padStart(6, '0')}
                 </code>
               </Descriptions.Item>
               <Descriptions.Item label="狀態" span={2}>

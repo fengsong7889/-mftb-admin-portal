@@ -14,10 +14,19 @@
   color: #1890ff;
 }
 
-/* 弹窗 */
-.table-column-config-modal .ant-modal-header {
+/* 抽屉 */
+.table-column-config-drawer .ant-drawer-header {
   border-bottom: 1px solid #f0f0f0;
   padding: 16px 24px 12px;
+}
+
+.table-column-config-drawer .ant-drawer-body {
+  padding: 16px 24px;
+}
+
+.table-column-config-drawer .ant-drawer-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .tcc-modal-title {
