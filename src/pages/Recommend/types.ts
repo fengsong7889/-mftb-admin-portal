@@ -105,12 +105,18 @@ export interface ABTest {
 /** 瀑布流坑位配置 */
 export interface WaterfallSlotConfig {
   id: number
+  promotionName?: string                // 推广名称
   app: AppType                        // 所属品牌
   channel: RecommendChannel           // 业务频道
   slotPosition: number                // 展示位置(坑位序号)
+  region?: Region                     // 展示区域
   algorithmId: number                 // 关联算法ID
   algorithmName: string               // 关联算法名称(冗余字段,便于展示)
   algorithmType: AlgorithmType        // 算法类型(冗余字段,便于筛选)
+  
+  // 销售日期范围
+  salesStartDate?: string             // 销售日期起
+  salesEndDate?: string               // 销售日期止
   
   // 坑位级别覆盖的关键参数
   purchaseLimit?: {                   // 购买上限(仅当算法支持连续购买时有效)

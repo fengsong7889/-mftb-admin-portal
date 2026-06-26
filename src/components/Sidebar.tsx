@@ -57,10 +57,8 @@ const keyToPath: Record<string, string> = {
   // 财务管理 - 商户通对账
   'writeoff-reconcile': '/writeoff-reconcile',
   'debt-reconcile': '/debt-reconcile',
-  'debt-detail': '/debt-detail',
   // 财务管理 - 审批管理
   'approval-center': '/approval-center',
-  'approval-detail': '/approval-detail',
   // 搜索管理 - 搜索引导
   'hint-config': '/hint-config',
   'hint-preview': '/hint-preview',
@@ -96,7 +94,6 @@ const keyToPath: Record<string, string> = {
   'recommend-strategy-timeslot': '/recommend-strategy-timeslot',
   'recommend-ab-test': '/recommend-ab-test',
   'recommend-slot': '/recommend-slot',
-  'recommend-waterfall': '/recommend-waterfall',
   'recommend-pricing': '/recommend-pricing',
   'recommend-merchant-rule': '/recommend-merchant-rule',
   'recommend-package': '/recommend-package',
@@ -111,10 +108,11 @@ const keyToPath: Record<string, string> = {
   'function-permission': '/function-permission',
   'data-permission': '/data-permission',
   // 系統設置
-  'menu-management': '/menu-management',
-  'system-template': '/system-template',
-  'layout-settings': '/layout-settings',
-  'basic-settings': '/basic-settings',
+  // 注意:以下菜单项暂未实现对应页面
+  // 'menu-management': '/menu-management',
+  // 'system-template': '/system-template',
+  // 'layout-settings': '/layout-settings',
+  // 'basic-settings': '/basic-settings',
   // 用戶管理
   'user-feedback': '/user-feedback',
   'user-list': '/user-list',
@@ -148,10 +146,9 @@ const keyToPath: Record<string, string> = {
   'promotion-algorithm': '/promotion-algorithm',
   'promotion-slot-config': '/promotion-slot-config',
   'promotion-waterfall': '/promotion-waterfall',
-  'promotion-waterfall-preview': '/promotion-waterfall-preview',
   'promotion-sales-config': '/promotion-sales-config',
-  // 推广通
-  'promotion-tool': '/promotion-tool',
+  // 推广通(父菜单,无需映射)
+  // 'promotion-tool': '/promotion-tool',
 }
 
 /** 路由路径 → 菜单 key 映射（用于高亮） */
@@ -371,7 +368,7 @@ const menuItems: MenuItem[] = [
           {
             key: 'promotion-slot-config',
             icon: <ColumnHeightOutlined />,
-            label: '瀑布流規劃',
+            label: '瀑布流策略',
           },
         ],
       },
@@ -380,22 +377,19 @@ const menuItems: MenuItem[] = [
         icon: <ColumnHeightOutlined />,
         label: '定價銷售配置',
       },
-      {
-        key: 'promotion-waterfall-preview',
-        icon: <EyeOutlined />,
-        label: '展示位預覽',
-      },
-      {
-        key: 'promotion-sales-config',
-        icon: <DollarOutlined />,
-        label: '廣告購買',
-      },
     ],
   },
   {
     key: 'promotion-tool',
     icon: <ThunderboltOutlined />,
     label: '推广通',
+    children: [
+      {
+        key: 'promotion-sales-config',
+        icon: <DollarOutlined />,
+        label: '廣告購買',
+      },
+    ],
   },
   {
     key: 'search',
@@ -669,11 +663,6 @@ const menuItems: MenuItem[] = [
             key: 'recommend-slot',
             icon: <OrderedListOutlined />,
             label: '坑位管理',
-          },
-          {
-            key: 'recommend-waterfall',
-            icon: <ColumnHeightOutlined />,
-            label: '瀑布流配置',
           },
           {
             key: 'recommend-pricing',

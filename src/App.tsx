@@ -59,7 +59,6 @@ const RecommendStrategyAdType = lazy(() => import('./pages/Recommend/StrategyAdT
 const RecommendStrategyOrchestration = lazy(() => import('./pages/Recommend/StrategyOrchestration'))
 const RecommendStrategyTimeslot = lazy(() => import('./pages/Recommend/StrategyTimeslot'))
 const RecommendABTest = lazy(() => import('./pages/Recommend/ABTest'))
-const RecommendWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
 const RecommendMerchantRule = lazy(() => import('./pages/Recommend/MerchantRule'))
 const RecommendUserProfile = lazy(() => import('./pages/Recommend/UserProfile'))
 // 權限管理
@@ -70,7 +69,9 @@ const PromotionDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
 const PromotionAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
 const PromotionAlgorithmAdd = lazy(() => import('./pages/Recommend/AlgorithmAdd'))
 const PromotionWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
+const PromotionWaterfallAdd = lazy(() => import('./pages/Recommend/WaterfallAdd'))
 const PromotionSlotConfig = lazy(() => import('./pages/PromotionSlotConfig'))
+const PromotionSlotConfigAdd = lazy(() => import('./pages/PromotionSlotConfigAdd'))
 const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
 
 const { Content } = Layout
@@ -150,7 +151,6 @@ function AuthenticatedLayout() {
               <Route path="/recommend-strategy-orchestration" element={<RecommendStrategyOrchestration />} />
               <Route path="/recommend-strategy-timeslot" element={<RecommendStrategyTimeslot />} />
               <Route path="/recommend-ab-test" element={<RecommendABTest />} />
-              <Route path="/recommend-waterfall" element={<RecommendWaterfall />} />
               <Route path="/recommend-merchant-rule" element={<RecommendMerchantRule />} />
               <Route path="/recommend-user-profile" element={<RecommendUserProfile />} />
               {/* 權限管理 */}
@@ -161,7 +161,9 @@ function AuthenticatedLayout() {
               <Route path="/promotion-algorithm" element={<PromotionAlgorithm />} />
               <Route path="/promotion-algorithm-add" element={<PromotionAlgorithmAdd />} />
               <Route path="/promotion-slot-config" element={<PromotionSlotConfig />} />
+              <Route path="/promotion-slot-config-add" element={<PromotionSlotConfigAdd />} />
               <Route path="/promotion-waterfall" element={<PromotionWaterfall />} />
+              <Route path="/promotion-waterfall-add" element={<PromotionWaterfallAdd />} />
               <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />

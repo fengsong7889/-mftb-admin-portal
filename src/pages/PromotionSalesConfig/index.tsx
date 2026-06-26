@@ -1,486 +1,250 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Table, Tag, Input, Select, Form, Modal, message, InputNumber } from 'antd'
+import { Card, Table, Tag, Button, Space, Empty, Badge, message } from 'antd'
+import {
+  ThunderboltOutlined,
+  ArrowLeftOutlined,
+} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-
-const { Search } = Input
-
-/** 销售配置记录 */
-interface SalesConfigRecord {
-  id: number
-  name: string
-  type: string
-  channel: string
-  region: string
-  minAmount: number
-  maxAmount: number
-  discount: number
-  status: 'active' | 'inactive'
-  updatedBy: string
-  updatedAt: string
-}
-
-/** 渠道标签 */
-const CHANNEL_LABEL: Record<string, string> = {
-  home: '大首頁',
-  delivery: '外賣',
-  groupBuy: '團購',
-  supermarket: '超市',
-}
-
-/** 类型标签 */
-const TYPE_LABEL: Record<string, string> = {
-  fullReduce: '滿減',
-  discount: '折扣',
-  coupon: '優惠券',
-  flashSale: '秒殺',
-}
-
-/** 类型颜色 */
-const TYPE_COLOR: Record<string, string> = {
-  fullReduce: 'blue',
-  discount: 'green',
-  coupon: 'orange',
-  flashSale: 'red',
-}
-
-/** Mock数据 */
-const mockData: SalesConfigRecord[] = [
-  {
-    id: 1,
-    name: '首頁滿減活動',
-    type: 'fullReduce',
-    channel: 'home',
-    region: '澳門',
-    minAmount: 100,
-    maxAmount: 500,
-    discount: 20,
-    status: 'active',
-    updatedBy: 'admin',
-    updatedAt: '2024-01-20 14:20:00',
-  },
-  {
-    id: 2,
-    name: '外賣折扣活動',
-    type: 'discount',
-    channel: 'delivery',
-    region: '氹仔',
-    minAmount: 50,
-    maxAmount: 300,
-    discount: 15,
-    status: 'active',
-    updatedBy: 'operator',
-    updatedAt: '2024-01-21 10:30:00',
-  },
-  {
-    id: 3,
-    name: '團購優惠券',
-    type: 'coupon',
-    channel: 'groupBuy',
-    region: '珠海',
-    minAmount: 200,
-    maxAmount: 1000,
-    discount: 50,
-    status: 'inactive',
-    updatedBy: 'admin',
-    updatedAt: '2024-01-22 16:45:00',
-  },
-  {
-    id: 4,
-    name: '超市秒殺活動',
-    type: 'flashSale',
-    channel: 'supermarket',
-    region: '澳門',
-    minAmount: 30,
-    maxAmount: 200,
-    discount: 30,
-    status: 'active',
-    updatedBy: 'user001',
-    updatedAt: '2024-01-23 09:15:00',
-  },
-  {
-    id: 5,
-    name: '外賣滿減促銷',
-    type: 'fullReduce',
-    channel: 'delivery',
-    region: '澳門',
-    minAmount: 80,
-    maxAmount: 400,
-    discount: 25,
-    status: 'active',
-    updatedBy: 'admin',
-    updatedAt: '2024-01-24 15:00:00',
-  },
-]
+import { AlgorithmType, Region, RecommendChannel } from '../Recommend/constants'
+import DateTimeGrid from './DateTimeGrid'
+import {
+  type InventoryItem,
+  type RecommendTypeConfig,
+  RECOMMEND_TYPE_CONFIGS,
+  CHANNEL_LABEL,
+  generateMockInventory,
+} from './types'
 
 export default function PromotionSalesConfig() {
-  const [searchForm] = Form.useForm()
-  const [filteredData, setFilteredData] = useState<SalesConfigRecord[]>(mockData)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editingRecord, setEditingRecord] = useState<SalesConfigRecord | null>(null)
-  const [form] = Form.useForm()
+  const [currentStep, setCurrentStep] = useState(0)
+  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null)
+  const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(null)
 
-  // 搜索处理
-  const handleSearch = (values: any) => {
-    let result = [...mockData]
-    
-    if (values.name) {
-      result = result.filter(item => item.name.includes(values.name))
-    }
-    
-    if (values.type) {
-      result = result.filter(item => item.type === values.type)
-    }
-    
-    if (values.channel) {
-      result = result.filter(item => item.channel === values.channel)
-    }
-    
-    if (values.status) {
-      result = result.filter(item => item.status === values.status)
-    }
-    
-    setFilteredData(result)
-  }
-
-  // 重置搜索
-  const handleReset = () => {
-    searchForm.resetFields()
-    setFilteredData(mockData)
-  }
-
-  // 新增/编辑
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields()
-      console.log('表单数据:', values)
-      message.success(editingRecord ? '編輯成功' : '新增成功')
-      setModalVisible(false)
-      form.resetFields()
-      setEditingRecord(null)
-    } catch (error) {
-      console.error('表单验证失败:', error)
-    }
-  }
-
-  // 删除
-  const handleDelete = (record: SalesConfigRecord) => {
-    Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除「${record.name}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
-      onOk: () => {
-        message.success('刪除成功')
-      },
+  // 根据推荐类型生成库存数据（不需要商圈）
+  const inventoryData = useMemo<InventoryItem[]>(() => {
+    if (!selectedAlgorithmType) return []
+    // 生成所有商圈的库存数据
+    const allData: InventoryItem[] = []
+    Object.values(Region).forEach(region => {
+      if (typeof region === 'number') {
+        allData.push(...generateMockInventory(region, selectedAlgorithmType))
+      }
     })
+    return allData
+  }, [selectedAlgorithmType])
+
+  // 推荐类型选择 - 直接进入库存数据界面
+  const handleSelectType = (config: RecommendTypeConfig) => {
+    if (!config.enabled) {
+      message.info('該類型暫未開放，敬請期待')
+      return
+    }
+    setSelectedAlgorithmType(config.type)
+    setCurrentStep(1) // 跳过商圈选择，直接进入库存数据界面
   }
 
-  /** 列配置元数据 */
-  const columnMeta = useMemo(() => [
-    { key: 'name', title: '活動名稱' },
-    { key: 'type', title: '活動類型' },
-    { key: 'channel', title: '業務頻道' },
-    { key: 'region', title: '區域' },
-    { key: 'minAmount', title: '最低金額' },
-    { key: 'maxAmount', title: '最高金額' },
-    { key: 'discount', title: '優惠力度' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '更新人' },
-    { key: 'updatedAt', title: '更新時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+  // 库存选择
+  const handleSelectInventory = (record: InventoryItem) => {
+    setSelectedInventory(record)
+    setCurrentStep(2)
+  }
 
-  const { configComponent, applyConfig } = useColumnConfig('promotion-sales-config', columnMeta, [
-    { key: 'action', visible: true, locked: 'tail' as const },
-  ])
+  // 返回上一步
+  const handleGoBack = () => {
+    if (currentStep === 1) {
+      setSelectedAlgorithmType(null)
+    } else if (currentStep === 2) {
+      setSelectedInventory(null)
+    }
+    setCurrentStep(prev => Math.max(0, prev - 1))
+  }
 
-  const columns: ColumnsType<SalesConfigRecord> = [
-    { 
-      title: '活動名稱', 
-      dataIndex: 'name', 
-      key: 'name', 
-      width: 180,
-      ellipsis: true,
-    },
+  // 库存表格列配置
+  const inventoryColumns: ColumnsType<InventoryItem> = [
     {
-      title: '活動類型',
-      dataIndex: 'type',
-      key: 'type',
-      width: 100,
-      render: (v: string) => <Tag color={TYPE_COLOR[v]}>{TYPE_LABEL[v]}</Tag>,
+      title: '活動名稱',
+      dataIndex: 'promotionName',
+      key: 'promotionName',
+      width: 200,
+      render: (text: string) => <strong>{text}</strong>,
     },
     {
       title: '業務頻道',
       dataIndex: 'channel',
       key: 'channel',
-      width: 120,
-      render: (v: string) => CHANNEL_LABEL[v],
+      width: 150,
+      render: (v: RecommendChannel) => CHANNEL_LABEL[v],
     },
     {
-      title: '區域',
-      dataIndex: 'region',
-      key: 'region',
+      title: '展示位置',
+      dataIndex: 'slotPosition',
+      key: 'slotPosition',
       width: 100,
+      render: (v: number) => <Badge count={`${v}號位`} style={{ backgroundColor: '#1890ff' }} />,
     },
     {
-      title: '最低金額',
-      dataIndex: 'minAmount',
-      key: 'minAmount',
-      width: 100,
-      render: (v: number) => `MOP ${v}`,
-    },
-    {
-      title: '最高金額',
-      dataIndex: 'maxAmount',
-      key: 'maxAmount',
-      width: 100,
-      render: (v: number) => `MOP ${v}`,
-    },
-    {
-      title: '優惠力度',
-      dataIndex: 'discount',
-      key: 'discount',
-      width: 100,
-      render: (v: number) => `${v}%`,
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 80,
-      render: (v: string) => (
-        <Tag color={v === 'active' ? 'green' : 'default'}>
-          {v === 'active' ? '啟用' : '停用'}
-        </Tag>
+      title: '可購買日期',
+      key: 'dateRange',
+      width: 220,
+      render: (_, record) => (
+        <span style={{ color: '#595959' }}>
+          {record.availableStartDate} ~ {record.availableEndDate}
+        </span>
       ),
     },
     {
-      title: '更新人',
-      dataIndex: 'updatedBy',
-      key: 'updatedBy',
-      width: 100,
-    },
-    {
-      title: '更新時間',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 160,
+      title: '庫存狀態',
+      key: 'stock',
+      width: 140,
+      render: (_, record) => {
+        const remaining = record.totalSlots - record.soldSlots
+        const percent = Math.round((remaining / record.totalSlots) * 100)
+        const color = percent > 50 ? 'green' : percent > 20 ? 'orange' : 'red'
+        return (
+          <Space direction="vertical" size={0}>
+            <Tag color={color}>{remaining} 個時段可選</Tag>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>剩餘 {percent}%</span>
+          </Space>
+        )
+      },
     },
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 120,
       fixed: 'right' as const,
       render: (_, record) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button 
-            type="link" 
-            size="small" 
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingRecord(record)
-              form.setFieldsValue(record)
-              setModalVisible(true)
-            }}
-          >
-            編輯
-          </Button>
-          <Button 
-            type="link" 
-            size="small" 
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            刪除
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => handleSelectInventory(record)}
+        >
+          前往購買
+        </Button>
       ),
     },
   ]
 
   return (
     <div className="content-area">
-      {/* 查询区域 */}
-      <div className="search-section">
-        <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="活動名稱" name="name">
-            <Input placeholder="請輸入活動名稱" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item label="活動類型" name="type">
-            <Select 
-              placeholder="全部" 
-              allowClear 
-              style={{ width: 120 }}
-              options={[
-                { label: '滿減', value: 'fullReduce' },
-                { label: '折扣', value: 'discount' },
-                { label: '優惠券', value: 'coupon' },
-                { label: '秒殺', value: 'flashSale' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item label="業務頻道" name="channel">
-            <Select 
-              placeholder="全部" 
-              allowClear 
-              style={{ width: 120 }}
-              options={[
-                { label: '大首頁', value: 'home' },
-                { label: '外賣', value: 'delivery' },
-                { label: '團購', value: 'groupBuy' },
-                { label: '超市', value: 'supermarket' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select 
-              placeholder="全部" 
-              allowClear 
-              style={{ width: 100 }}
-              options={[
-                { label: '啟用', value: 'active' },
-                { label: '停用', value: 'inactive' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item>
-            <div className="search-actions">
-              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>查詢</Button>
-              <Button onClick={handleReset} icon={<ReloadOutlined />}>重置</Button>
+      {/* 页面标题 */}
+      <Card style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 20 }}>
+          <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
+          廣告購買
+        </h2>
+        <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
+          可根據需求選擇推薦類型，為您的店鋪購買廣告曝光位，獲取流量
+        </p>
+      </Card>
+
+      {/* Step 1: 选择推荐类型 */}
+      {currentStep === 0 && (
+        <Card title="選擇推薦類型" style={{ marginBottom: 16 }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 16,
+          }}>
+            {RECOMMEND_TYPE_CONFIGS.map(config => (
+              <Card
+                key={config.type}
+                hoverable={config.enabled}
+                onClick={() => handleSelectType(config)}
+                style={{
+                  cursor: config.enabled ? 'pointer' : 'not-allowed',
+                  opacity: config.enabled ? 1 : 0.5,
+                  border: selectedAlgorithmType === config.type ? '2px solid #1890ff' : undefined,
+                }}
+                bodyStyle={{ padding: 20 }}
+              >
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>{config.icon}</div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{config.name}</h3>
+                  <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
+                    {config.description}
+                  </p>
+                  {!config.enabled && (
+                    <Tag color="default" style={{ marginTop: 12 }}>即將開放</Tag>
+                  )}
+                  {config.enabled && (
+                    <Tag color="green" style={{ marginTop: 12 }}>可購買</Tag>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Step 2: 选择库存数据 */}
+      {currentStep === 1 && (
+        <Card
+          title={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 16 }}>選擇展示位</span>
+              <Button
+                type="primary"
+                icon={<ArrowLeftOutlined />}
+                onClick={handleGoBack}
+                style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
+              >
+                返回上一步
+              </Button>
             </div>
-          </Form.Item>
-        </Form>
-      </div>
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <Table<InventoryItem>
+            rowKey="id"
+            columns={inventoryColumns}
+            dataSource={inventoryData}
+            pagination={false}
+            scroll={{ x: 1030 }}
+            locale={{ emptyText: <Empty description="該商圈暫無可購買庫存" /> }}
+            rowClassName={(record) => selectedInventory?.id === record.id ? 'ant-table-row-selected' : ''}
+          />
+        </Card>
+      )}
 
-      {/* 功能区域 */}
-      <div className="action-section">
-        <Space>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingRecord(null)
-              form.resetFields()
-              setModalVisible(true)
-            }}
+      {/* Step 3: 选择时段并加购 */}
+      {currentStep === 2 && selectedInventory && (
+        <>
+          <Card
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Space size={24}>
+                  <Space size={8}>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前所選活動：</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}>{selectedInventory.promotionName}</span>
+                  </Space>
+                  <Space size={8}>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>業務頻道：</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#1890ff' }}>{CHANNEL_LABEL[selectedInventory.channel]}</span>
+                  </Space>
+                  <Space size={8}>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>展示位置：</span>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{selectedInventory.slotPosition}號位</span>
+                  </Space>
+                </Space>
+                <Button
+                  type="primary"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={handleGoBack}
+                  style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
+                >
+                  返回上一步
+                </Button>
+              </div>
+            }
+            style={{ marginBottom: 16 }}
           >
-            新增銷售配置
-          </Button>
-        </Space>
-        {configComponent}
-      </div>
-
-      {/* 列表区域 */}
-      <div className="table-section">
-        <Table<SalesConfigRecord>
-          rowKey="id"
-          columns={applyConfig(columns)}
-          dataSource={filteredData}
-          scroll={{ x: 1300 }}
-          pagination={{
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50'],
-            showQuickJumper: true,
-          }}
-        />
-      </div>
-
-      {/* 新增/编辑弹窗 */}
-      <Modal
-        title={editingRecord ? '編輯銷售配置' : '新增銷售配置'}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => {
-          setModalVisible(false)
-          form.resetFields()
-          setEditingRecord(null)
-        }}
-        width={600}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item 
-            label="活動名稱" 
-            name="name"
-            rules={[{ required: true, message: '請輸入活動名稱' }]}
-          >
-            <Input placeholder="請輸入活動名稱" />
-          </Form.Item>
-          
-          <Form.Item 
-            label="活動類型" 
-            name="type"
-            rules={[{ required: true, message: '請選擇活動類型' }]}
-          >
-            <Select placeholder="請選擇活動類型">
-              <Select.Option value="fullReduce">滿減</Select.Option>
-              <Select.Option value="discount">折扣</Select.Option>
-              <Select.Option value="coupon">優惠券</Select.Option>
-              <Select.Option value="flashSale">秒殺</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item 
-            label="業務頻道" 
-            name="channel"
-            rules={[{ required: true, message: '請選擇業務頻道' }]}
-          >
-            <Select placeholder="請選擇業務頻道">
-              <Select.Option value="home">大首頁</Select.Option>
-              <Select.Option value="delivery">外賣</Select.Option>
-              <Select.Option value="groupBuy">團購</Select.Option>
-              <Select.Option value="supermarket">超市</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item 
-            label="區域" 
-            name="region"
-            rules={[{ required: true, message: '請輸入區域' }]}
-          >
-            <Input placeholder="請輸入區域" />
-          </Form.Item>
-
-          <Form.Item 
-            label="最低金額" 
-            name="minAmount"
-            rules={[{ required: true, message: '請輸入最低金額' }]}
-          >
-            <InputNumber placeholder="請輸入最低金額" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item 
-            label="最高金額" 
-            name="maxAmount"
-            rules={[{ required: true, message: '請輸入最高金額' }]}
-          >
-            <InputNumber placeholder="請輸入最高金額" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item 
-            label="優惠力度(%)" 
-            name="discount"
-            rules={[{ required: true, message: '請輸入優惠力度' }]}
-          >
-            <InputNumber placeholder="請輸入優惠力度" suffix="%" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item 
-            label="狀態" 
-            name="status"
-            rules={[{ required: true, message: '請選擇狀態' }]}
-          >
-            <Select placeholder="請選擇狀態">
-              <Select.Option value="active">啟用</Select.Option>
-              <Select.Option value="inactive">停用</Select.Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+            <DateTimeGrid
+              inventoryItem={selectedInventory}
+            />
+          </Card>
+        </>
+      )}
     </div>
   )
 }

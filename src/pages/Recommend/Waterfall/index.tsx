@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert } from 'antd'
+import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker } from 'antd'
+const { RangePicker } = DatePicker
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, LayoutOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { 
   AppType, 
   RecommendChannel, 
   AlgorithmType,
-  ServiceStatus, 
+  ServiceStatus,
+  Region,
   APP_OPTIONS,
   SERVICE_STATUS_OPTIONS,
   RECOMMEND_CHANNEL_OPTIONS,
@@ -68,6 +71,26 @@ const generateMockData = (): WaterfallSlotConfig[] => {
   ]
   const users = ['admin', 'operator', 'user001', 'user002']
 
+  // 推广名称虚拟数据
+  const promotionNames = [
+    '无敌星星国庆推广',
+    '新店广告中秋特惠',
+    '盘活广告双十一狂欢',
+    '独家商家周年庆',
+    '流量广告圣诞特卖',
+    '猜你喜欢新年推荐',
+    '自然流量春季大促',
+    '搜索算法开学季',
+    '无敌星星情人节专场',
+    '新店广告夏季清凉',
+    '盘活广告秋季美食',
+    '独家商家冬季暖锅',
+    '流量广告周末特惠',
+    '猜你喜欢月末冲刺',
+    '自然流量节日庆典',
+    '搜索算法品牌周',
+  ]
+
   let id = 1
   
   // 使用固定种子生成可预期的数据（避免每次刷新数据不同）
@@ -76,47 +99,47 @@ const generateMockData = (): WaterfallSlotConfig[] => {
     return x - Math.floor(x)
   }
   
-  // 生成15天的数据
-  for (let day = 0; day < 15; day++) {
+  // 生成15条数据
+  for (let i = 0; i < 15; i++) {
+    const seed = i * 100
     const date = new Date()
-    date.setDate(date.getDate() - day)
+    date.setDate(date.getDate() - Math.floor(i / 2))
     const dateStr = date.toISOString().split('T')[0]
     
-    // 每天生成3-5条记录（使用固定算法）
-    const recordsPerDay = 3 + Math.floor(pseudoRandom(day * 100) * 3)
+    const app = apps[Math.floor(pseudoRandom(seed + 1) * apps.length)]
+    const channel = channels[Math.floor(pseudoRandom(seed + 2) * channels.length)]
+    const slotPosition = 1 + Math.floor(pseudoRandom(seed + 3) * 10) // 1-10号位
+    const algorithm = algorithms[Math.floor(pseudoRandom(seed + 4) * algorithms.length)]
+    const status = i < 10 ? ServiceStatus.ENABLED : ServiceStatus.DISABLED // 前10条启用,后5条停用
+    const user = users[Math.floor(pseudoRandom(seed + 6) * users.length)]
+    const promotionName = promotionNames[i % promotionNames.length] // 循环使用推广名称
     
-    for (let i = 0; i < recordsPerDay; i++) {
-      const seed = day * 1000 + i * 100
-      const app = apps[Math.floor(pseudoRandom(seed + 1) * apps.length)]
-      const channel = channels[Math.floor(pseudoRandom(seed + 2) * channels.length)]
-      const slotPosition = 1 + Math.floor(pseudoRandom(seed + 3) * 10) // 1-10号位
-      const algorithm = algorithms[Math.floor(pseudoRandom(seed + 4) * algorithms.length)]
-      const status = day < 3 ? ServiceStatus.ENABLED : (pseudoRandom(seed + 5) > 0.3 ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)
-      const user = users[Math.floor(pseudoRandom(seed + 6) * users.length)]
-      
-      const hour = 8 + Math.floor(pseudoRandom(seed + 7) * 12)
-      const minute = Math.floor(pseudoRandom(seed + 8) * 60)
-      
-      data.push({
-        id: id++,
-        app,
-        channel,
-        slotPosition,
-        algorithmId: algorithm.id,
-        algorithmName: algorithm.name,
-        algorithmType: algorithm.type,
-        purchaseLimit: pseudoRandom(seed + 9) > 0.5 ? { days: 7 + day * 2, quantity: 3 + Math.floor(pseudoRandom(seed + 10) * 5) } : undefined,
-        purchaseInterval: pseudoRandom(seed + 11) > 0.5 ? 1 + Math.floor(pseudoRandom(seed + 12) * 5) : undefined,
-        merchantLimit: pseudoRandom(seed + 13) > 0.5 ? 'limited' : 'unlimited',
-        merchantIds: pseudoRandom(seed + 14) > 0.5 ? [100 + Math.floor(pseudoRandom(seed + 15) * 50), 100 + Math.floor(pseudoRandom(seed + 16) * 50)] : undefined,
-        regionLimit: pseudoRandom(seed + 17) > 0.5 ? 'limited' : 'unlimited',
-        regionIds: pseudoRandom(seed + 18) > 0.5 ? [1, 2, 3].slice(0, 1 + Math.floor(pseudoRandom(seed + 19) * 3)) : undefined,
-        status,
-        updatedBy: user,
-        updatedAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
-        createdAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
-      })
-    }
+    const hour = 8 + Math.floor(pseudoRandom(seed + 7) * 12)
+    const minute = Math.floor(pseudoRandom(seed + 8) * 60)
+    
+    data.push({
+      id: id++,
+      promotionName,
+      app,
+      channel,
+      slotPosition,
+      region: pseudoRandom(seed + 8) > 0.5 ? Region.MACAU : (pseudoRandom(seed + 9) > 0.5 ? Region.TAIPA : Region.ZHUHAI),
+      algorithmId: algorithm.id,
+      algorithmName: algorithm.name,
+      algorithmType: algorithm.type,
+      salesStartDate: `2024-01-${String(1 + Math.floor(pseudoRandom(seed + 10) * 15)).padStart(2, '0')}`,
+      salesEndDate: `2024-01-${String(16 + Math.floor(pseudoRandom(seed + 11) * 15)).padStart(2, '0')}`,
+      purchaseLimit: pseudoRandom(seed + 12) > 0.5 ? { days: 7, quantity: 3 + Math.floor(pseudoRandom(seed + 13) * 5) } : undefined,
+      purchaseInterval: pseudoRandom(seed + 14) > 0.5 ? 1 + Math.floor(pseudoRandom(seed + 15) * 5) : undefined,
+      merchantLimit: pseudoRandom(seed + 16) > 0.5 ? 'limited' : 'unlimited',
+      merchantIds: pseudoRandom(seed + 17) > 0.5 ? [100 + Math.floor(pseudoRandom(seed + 18) * 50), 100 + Math.floor(pseudoRandom(seed + 19) * 50)] : undefined,
+      regionLimit: pseudoRandom(seed + 20) > 0.5 ? 'limited' : 'unlimited',
+      regionIds: pseudoRandom(seed + 21) > 0.5 ? [1, 2, 3].slice(0, 1 + Math.floor(pseudoRandom(seed + 22) * 3)) : undefined,
+      status,
+      updatedBy: user,
+      updatedAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+      createdAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+    })
   }
 
   // 按更新时间倒序排列（最新的在前面）
@@ -126,6 +149,7 @@ const generateMockData = (): WaterfallSlotConfig[] => {
 const mockData: WaterfallSlotConfig[] = generateMockData()
 
 export default function Waterfall() {
+  const navigate = useNavigate()
   const [searchForm] = Form.useForm()
   const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>(mockData)
   const [modalVisible, setModalVisible] = useState(false)
@@ -168,6 +192,29 @@ export default function Waterfall() {
     
     if (values.status !== undefined && values.status !== null) {
       result = result.filter(item => item.status === values.status)
+    }
+    
+    if (values.updatedBy) {
+      result = result.filter(item => 
+        item.updatedBy && item.updatedBy.includes(values.updatedBy)
+      )
+    }
+    
+    if (values.updatedAt) {
+      const searchDate = values.updatedAt.format('YYYY-MM-DD')
+      result = result.filter(item => 
+        item.updatedAt && item.updatedAt.startsWith(searchDate)
+      )
+    }
+    
+    if (values.salesDateRange && values.salesDateRange.length === 2) {
+      const startDate = values.salesDateRange[0].format('YYYY-MM-DD')
+      const endDate = values.salesDateRange[1].format('YYYY-MM-DD')
+      result = result.filter(item => 
+        item.salesStartDate && item.salesEndDate &&
+        item.salesStartDate <= endDate &&
+        item.salesEndDate >= startDate
+      )
     }
     
     setFilteredData(result)
@@ -231,13 +278,34 @@ export default function Waterfall() {
     })
   }
 
+  // 切换状态（启用/停用）
+  const handleToggleStatus = (record: WaterfallSlotConfig) => {
+    const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
+    const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
+    
+    Modal.confirm({
+      title: `確認${actionText}`,
+      content: `確定要${actionText}位置${record.slotPosition}的配置嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        message.success(`${actionText}成功`)
+      },
+    })
+  }
+
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
+    { key: 'promotionName', title: '活動名稱' },
     { key: 'channel', title: '業務頻道' },
     { key: 'app', title: '所屬品牌' },
     { key: 'slotPosition', title: '展示位置' },
-    { key: 'algorithmId', title: '算法ID' },
-    { key: 'algorithmName', title: '關聯算法' },
+    { key: 'algorithmType', title: '推薦類型' },
+    { key: 'algorithmId', title: '關聯算法ID' },
+    { key: 'algorithmName', title: '關聯算法名稱' },
+    { key: 'salesStartDate', title: '銷售日期起' },
+    { key: 'salesEndDate', title: '銷售日期止' },
+    { key: 'status', title: '狀態' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updatedAt', title: '最後更新時間' },
     { key: 'action', title: '操作' },
@@ -249,6 +317,13 @@ export default function Waterfall() {
 
   // 完整列定义（带自定义渲染）
   const columns: ColumnsType<WaterfallSlotConfig> = [
+    { 
+      title: '活動名稱',
+      dataIndex: 'promotionName',
+      key: 'promotionName',
+      width: 120,
+      ellipsis: true,
+    },
     { 
       title: '業務頻道', 
       dataIndex: 'channel', 
@@ -285,7 +360,18 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '算法ID',
+      title: '推薦類型',
+      dataIndex: 'algorithmType',
+      key: 'algorithmType',
+      width: 120,
+      render: (v: AlgorithmType) => (
+        <Tag color={ALGORITHM_TYPE_COLOR[v]}>
+          {ALGORITHM_TYPE_LABEL[v]}
+        </Tag>
+      ),
+    },
+    {
+      title: '關聯算法ID',
       dataIndex: 'algorithmId',
       key: 'algorithmId',
       width: 120,
@@ -296,28 +382,59 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '關聯算法',
+      title: '關聯算法名稱',
       dataIndex: 'algorithmName',
       key: 'algorithmName',
       width: 200,
       render: (text: string) => <strong>{text}</strong>,
     },
     {
+      title: '銷售日期起',
+      dataIndex: 'salesStartDate',
+      key: 'salesStartDate',
+      width: 120,
+      render: (v: string | undefined) => v || '-',
+    },
+    {
+      title: '銷售日期止',
+      dataIndex: 'salesEndDate',
+      key: 'salesEndDate',
+      width: 120,
+      render: (v: string | undefined) => v || '-',
+    },
+    {
+      title: '狀態',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (v: ServiceStatus) => (
+        <Tag color={v === ServiceStatus.ENABLED ? 'green' : 'default'}>
+          {v === ServiceStatus.ENABLED ? '啟用' : '停用'}
+        </Tag>
+      ),
+    },
+    {
       title: '最後更新人',
       dataIndex: 'updatedBy',
       key: 'updatedBy',
-      width: 100,
+      width: 120,
+      render: (v: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{v}</span>
+      ),
     },
     {
       title: '最後更新時間',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 160,
+      width: 180,
+      render: (v: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{v}</span>
+      ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       fixed: 'right' as const,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
@@ -366,6 +483,14 @@ export default function Waterfall() {
           <Button 
             type="link" 
             size="small" 
+            danger={record.status === ServiceStatus.ENABLED}
+            onClick={() => handleToggleStatus(record)}
+          >
+            {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
+          </Button>
+          <Button 
+            type="link" 
+            size="small" 
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
@@ -386,21 +511,29 @@ export default function Waterfall() {
             <Select 
               placeholder="全部" 
               options={RECOMMEND_CHANNEL_OPTIONS} 
-              allowClear 
-              style={{ width: 160 }}
+              allowClear
             />
           </Form.Item>
           <Form.Item label="所屬品牌" name="app">
-            <Select placeholder="全部" options={APP_OPTIONS} allowClear style={{ width: 120 }} />
+            <Select placeholder="全部" options={APP_OPTIONS} allowClear />
           </Form.Item>
           <Form.Item label="展示位置" name="slotPosition">
-            <InputNumber placeholder="坑位序號" min={1} style={{ width: 120 }} />
+            <InputNumber placeholder="坑位序號" min={1} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="關聯算法" name="algorithm">
-            <Input placeholder="算法名稱/ID" allowClear style={{ width: 160 }} />
+          <Form.Item label="關聯算法名稱" name="algorithm">
+            <Input placeholder="算法名稱/ID" allowClear />
           </Form.Item>
           <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" options={SERVICE_STATUS_OPTIONS} allowClear style={{ width: 100 }} />
+            <Select placeholder="全部" options={SERVICE_STATUS_OPTIONS} allowClear />
+          </Form.Item>
+          <Form.Item label="銷售日期" name="salesDateRange">
+            <RangePicker placeholder={['開始日期', '結束日期']} allowClear />
+          </Form.Item>
+          <Form.Item label="最後更新人" name="updatedBy">
+            <Input placeholder="請輸入更新人" allowClear />
+          </Form.Item>
+          <Form.Item label="最後更新時間" name="updatedAt">
+            <DatePicker placeholder="選擇日期" allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -417,19 +550,9 @@ export default function Waterfall() {
           <Button 
             type="primary" 
             icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingRecord(null)
-              form.resetFields()
-              setAlgorithmType(undefined)
-              setAlgorithmOptions([])
-              setContinuousPurchase('notSupport')
-              setMerchantLimit('unlimited')
-              setSelectedMerchants([])
-              setRegionLimit('unlimited')
-              setModalVisible(true)
-            }}
+            onClick={() => navigate('/promotion-waterfall-add')}
           >
-            新增坑位配置
+            新增
           </Button>
         </Space>
         {configComponent}
@@ -451,6 +574,48 @@ export default function Waterfall() {
           }}
         />
       </div>
+
+      {/* 空数据时展示手机模型 */}
+      {filteredData.length === 0 && (
+        <Card 
+          title="瀑布流預覽" 
+          style={{ marginTop: 16 }}
+          extra={<Tag color="blue">自然流量展示</Tag>}
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+            <div style={{ width: 375, background: '#1a1a1a', borderRadius: 40, padding: '12px 8px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+              <div style={{ background: '#f5f5f5', borderRadius: 32, overflow: 'hidden', minHeight: 667 }}>
+                <div style={{ background: '#fff', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 600 }}>
+                  <span>9:41</span>
+                  <Space size={4}><span>📶</span><span>🔋</span></Space>
+                </div>
+                <div style={{ background: '#fff', padding: '16px', borderBottom: '1px solid #e8e8e8' }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6, color: '#262626' }}>瀑布流展示</div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: 1.5 }}>(只展示啟用的坑位)</div>
+                </div>
+                <div style={{ padding: '12px', minHeight: 550 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    {[{ position: 1, name: '自然流量-默认推荐' }, { position: 2, name: '自然流量-热门商家' }, { position: 3, name: '自然流量-附近推荐' }, { position: 4, name: '自然流量-新品上市' }, { position: 5, name: '自然流量-优质评价' }, { position: 6, name: '自然流量-销量排行' }].map((item) => (
+                      <div key={item.position} style={{ background: '#fff', borderRadius: 8, padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                        <Badge count={`位置${item.position}`} style={{ backgroundColor: '#8c8c8c', marginBottom: 8, display: 'block' }} />
+                        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6, color: '#595959', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                        <Tag color="default" style={{ fontSize: 11, padding: '0 6px', margin: 0 }}>自然流量</Tag>
+                        <div style={{ marginTop: 12, height: 60, background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8c8c8c', fontSize: 24 }}>🌊</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ background: '#fff', borderTop: '1px solid #e8e8e8', padding: '12px 0', display: 'flex', justifyContent: 'space-around' }}>
+                  <span style={{ fontSize: 20 }}>🏠</span>
+                  <span style={{ fontSize: 20 }}>🔍</span>
+                  <span style={{ fontSize: 20 }}>📋</span>
+                  <span style={{ fontSize: 20 }}>👤</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* 新增/编辑弹窗 */}
       <Modal
@@ -517,6 +682,26 @@ export default function Waterfall() {
                 options={algorithmOptions.map(alg => ({ label: alg.name, value: alg.id }))}
                 onChange={handleAlgorithmChange}
                 disabled={!algorithmType}
+              />
+            </Form.Item>
+
+            <Form.Item 
+              label="推薦類型" 
+              name="algorithmType"
+            >
+              <Input 
+                placeholder="選擇算法後自動顯示" 
+                disabled 
+                suffix={
+                  (() => {
+                    const algorithmType = form.getFieldValue('algorithmType') as AlgorithmType | undefined
+                    return algorithmType ? (
+                      <Tag color={ALGORITHM_TYPE_COLOR[algorithmType]}>
+                        {ALGORITHM_TYPE_LABEL[algorithmType]}
+                      </Tag>
+                    ) : null
+                  })()
+                }
               />
             </Form.Item>
           </Card>

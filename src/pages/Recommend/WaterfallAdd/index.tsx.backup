@@ -1,0 +1,626 @@
+import { useState, Fragment } from 'react'
+import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch } from 'antd'
+import { ArrowLeftOutlined, SaveOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import { 
+  AppType, 
+  RecommendChannel, 
+  AlgorithmType,
+  ServiceStatus,
+  Region,
+  APP_OPTIONS,
+  RECOMMEND_CHANNEL_OPTIONS,
+  ALGORITHM_TYPE_OPTIONS,
+  REGION_OPTIONS,
+} from '../constants'
+import dayjs from 'dayjs'
+
+// Mock数据 - 从瀑布流策略读取启用的广告位
+const mockEnabledPositions = [1, 5, 8, 9, 12, 15, 18]
+
+// Mock数据 - 已配置的定价销售(不可选的原因)
+const mockConfiguredSales = [
+  { position: 5, salesId: 'WS001', salesName: '無敵星星-澳門-1月', regions: [Region.MACAU] },
+  { position: 12, salesId: 'WS002', salesName: '無敵星星-氹仔-2月', regions: [Region.TAIPA] },
+]
+
+// Mock数据 - 广告位关联的算法
+const mockPositionAlgorithm = [
+  { position: 1, algorithmId: 1001, algorithmName: '無敵星星-首頁版' },
+  { position: 5, algorithmId: 1002, algorithmName: '無敵星星-外賣版' },
+  { position: 8, algorithmId: 1003, algorithmName: '無敵星星-團購版' },
+  { position: 9, algorithmId: 1004, algorithmName: '無敵星星-超市版' },
+  { position: 12, algorithmId: 1005, algorithmName: '無敵星星-零售版' },
+  { position: 15, algorithmId: 1006, algorithmName: '無敵星星-美食版' },
+  { position: 18, algorithmId: 1007, algorithmName: '無敵星星-閃購版' },
+]
+
+// 时段枚举
+const TIME_SLOTS = [
+  { key: 'fullDay', label: '全時段' },
+  { key: 'breakfast', label: '早餐' },
+  { key: 'lunch', label: '午餐' },
+  { key: 'afternoon', label: '下午茶' },
+  { key: 'dinner', label: '晚餐' },
+  { key: 'night', label: '宵夜' },
+]
+
+export default function WaterfallAdd() {
+  const navigate = useNavigate()
+  const [form] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+
+  // 基础信息
+  const [selectedApp, setSelectedApp] = useState<AppType | undefined>(undefined)
+  const [selectedChannel, setSelectedChannel] = useState<RecommendChannel | undefined>(undefined)
+  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
+  const [selectedRegions, setSelectedRegions] = useState<Region[]>([])
+  const [salesDateRange, setSalesDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | undefined>(undefined)
+  
+  // 广告位选择
+  const [selectedPosition, setSelectedPosition] = useState<number | undefined>(undefined)
+  const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
+  const [conflictInfo, setConflictInfo] = useState<{ salesId: string; salesName: string; regions: Region[] } | null>(null)
+
+  // 区域组合折扣
+  const [regionDiscount, setRegionDiscount] = useState<number | undefined>(undefined)
+  
+  // 时段个数折扣
+  const [timeSlotCountDiscount, setTimeSlotCountDiscount] = useState<{ count: number; discount: number } | undefined>(undefined)
+  
+  // 折扣配置显示控制
+  const [showTimeSlotDiscount, setShowTimeSlotDiscount] = useState(false)
+  const [showTimeSlotCountDiscount, setShowTimeSlotCountDiscount] = useState(false)
+
+  // 所有基础信息都填写后才显示广告位
+  const canShowPositions = selectedApp && selectedChannel && selectedAlgorithmType && selectedRegions.length > 0 && salesDateRange
+
+  // 检查位置是否可选
+  const isPositionAvailable = (position: number) => {
+    if (!mockEnabledPositions.includes(position)) {
+      return false
+    }
+    const conflict = mockConfiguredSales.find(s => s.position === position)
+    return !conflict
+  }
+
+  // 获取冲突信息
+  const getConflictInfo = (position: number) => {
+    return mockConfiguredSales.find(s => s.position === position)
+  }
+
+  // 获取广告位关联的算法
+  const getAlgorithmInfo = (position: number) => {
+    return mockPositionAlgorithm.find(p => p.position === position)
+  }
+
+  // 返回列表
+  const handleBack = () => {
+    navigate('/promotion-waterfall')
+  }
+
+  // 位置选择
+  const handlePositionSelect = (position: number) => {
+    const algorithmInfo = getAlgorithmInfo(position)
+    const conflict = getConflictInfo(position)
+    
+    // 始终显示算法信息
+    if (algorithmInfo) {
+      setSelectedAlgorithmInfo({ id: algorithmInfo.algorithmId, name: algorithmInfo.algorithmName })
+    } else {
+      setSelectedAlgorithmInfo(null)
+    }
+    
+    if (conflict) {
+      setConflictInfo({
+        salesId: conflict.salesId,
+        salesName: conflict.salesName,
+        regions: conflict.regions,
+      })
+      setSelectedPosition(undefined)
+    } else {
+      setSelectedPosition(position)
+      setConflictInfo(null)
+      form.setFieldsValue({
+        algorithmId: algorithmInfo?.algorithmId,
+        algorithmName: algorithmInfo?.algorithmName,
+        slotPosition: position,
+      })
+    }
+  }
+
+  // 提交表单
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
+      setLoading(true)
+      
+      const submitData = {
+        app: selectedApp,
+        channel: selectedChannel,
+        algorithmType: selectedAlgorithmType,
+        slotPosition: selectedPosition,
+        algorithmId: selectedAlgorithmInfo?.id,
+        algorithmName: selectedAlgorithmInfo?.name,
+        regions: selectedRegions,
+        pricing: {
+          fullDay: values.fullDayPrice,
+          breakfast: values.breakfastPrice,
+          lunch: values.lunchPrice,
+          afternoon: values.afternoonPrice,
+          dinner: values.dinnerPrice,
+          night: values.nightPrice,
+        },
+        discount: {
+          fullDay: values.fullDayDiscount,
+          breakfast: values.breakfastDiscount,
+          lunch: values.lunchDiscount,
+          afternoon: values.afternoonDiscount,
+          dinner: values.dinnerDiscount,
+          night: values.nightDiscount,
+        },
+        regionDiscount: selectedRegions.length > 1 ? {
+          regions: selectedRegions,
+          discount: regionDiscount,
+        } : undefined,
+        timeSlotCountDiscount: timeSlotCountDiscount,
+        salesStartDate: values.salesDateRange?.[0],
+        salesEndDate: values.salesDateRange?.[1],
+        status: ServiceStatus.ENABLED,
+      }
+      
+      console.log('提交数据:', submitData)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      message.success('新增成功')
+      navigate('/promotion-waterfall')
+    } catch (error) {
+      console.error('表单验证失败:', error)
+      message.error('請檢查表單填寫是否完整')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 检查是否可以显示售价配置
+  const canShowPricing = selectedPosition && selectedAlgorithmInfo
+
+  return (
+    <div className="content-area" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+      {/* 顶部标题栏 */}
+      <div style={{
+        background: '#fff', padding: '12px 20px', marginBottom: 16,
+        borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+            新增定價銷售配置
+          </h2>
+        </div>
+        <Button
+          type="primary"
+          icon={<ArrowLeftOutlined />}
+          onClick={handleBack}
+          style={{ fontSize: 14 }}
+        >
+          返回
+        </Button>
+      </div>
+
+      {/* 表单区域 - 可滚动 */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px' }}>
+        <Form form={form} layout="vertical">
+          {/* 基础信息选择 */}
+          <Card 
+            title="基礎信息選擇" 
+            size="small"
+            style={{ marginBottom: 16 }}
+            extra={<Tag color="blue">必填</Tag>}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <Form.Item
+                label="所屬品牌"
+                name="app"
+                rules={[{ required: true, message: '請選擇所屬品牌' }]}
+              >
+                <Select
+                  placeholder="請選擇所屬品牌"
+                  options={APP_OPTIONS}
+                  onChange={(value) => setSelectedApp(value)}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="業務頻道"
+                name="channel"
+                rules={[{ required: true, message: '請選擇業務頻道' }]}
+              >
+                <Select
+                  placeholder="請選擇業務頻道"
+                  options={RECOMMEND_CHANNEL_OPTIONS}
+                  onChange={(value) => setSelectedChannel(value)}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="推薦類型"
+                name="algorithmType"
+                rules={[{ required: true, message: '請選擇推薦類型' }]}
+              >
+                <Select
+                  placeholder="請選擇推薦類型"
+                  options={ALGORITHM_TYPE_OPTIONS}
+                  onChange={(value) => setSelectedAlgorithmType(value)}
+                />
+              </Form.Item>
+            </div>
+
+            <Divider style={{ margin: '12px 0' }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <Form.Item
+                label="銷售區域"
+                name="regions"
+                rules={[{ required: true, message: '請選擇銷售區域' }]}
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="請選擇銷售區域"
+                  options={REGION_OPTIONS}
+                  onChange={(value) => setSelectedRegions(value)}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="銷售日期"
+                name="salesDateRange"
+                rules={[{ required: true, message: '請選擇銷售日期' }]}
+              >
+                <DatePicker.RangePicker
+                  style={{ width: '100%' }}
+                  placeholder={['開始日期', '結束日期']}
+                  onChange={(dates) => setSalesDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | undefined)}
+                />
+              </Form.Item>
+            </div>
+          </Card>
+
+          {/* 选择展示位置 */}
+          {canShowPositions && (
+            <Card 
+              title="選擇展示位置" 
+              size="small"
+              style={{ marginBottom: 16 }}
+              extra={<Tag color="blue">必填</Tag>}
+            >
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '30% 30% 40%', 
+                gap: 16,
+                minHeight: 200
+              }}>
+                {/* 左侧: 广告位网格 30% */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+                    廣告位
+                  </div>
+                  <div style={{ background: '#fafafa', borderRadius: 6, padding: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 50px)', gap: 8, justifyContent: 'start' }}>
+                      {mockPositionAlgorithm.map((item) => {
+                        const position = item.position
+                        const isSelected = selectedPosition === position
+                        const isConflict = !!getConflictInfo(position)
+                        
+                        return (
+                          <div
+                            key={position}
+                            onClick={() => handlePositionSelect(position)}
+                            style={{
+                              width: 50,
+                              height: 50,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: isSelected ? '#52c41a' : (isConflict ? '#ffccc7' : '#fff'),
+                              border: isSelected ? '2px solid #52c41a' : (isConflict ? '2px solid #ff4d4f' : '2px solid #d9d9d9'),
+                              color: isSelected ? '#fff' : (isConflict ? '#cf1322' : '#595959'),
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 14,
+                              fontWeight: 600,
+                              transition: 'all 0.2s',
+                              boxShadow: isSelected ? '0 2px 8px rgba(82, 196, 26, 0.3)' : 'none',
+                              opacity: isConflict ? 0.85 : 1,
+                              position: 'relative',
+                            }}
+                          >
+                            {isSelected && (
+                              <span style={{ 
+                                position: 'absolute',
+                                fontSize: 20,
+                                fontWeight: 'bold',
+                              }}>
+                                ✓
+                              </span>
+                            )}
+                            {!isSelected && position}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* 图例 */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12, fontSize: 11, color: '#8c8c8c' }}>
+                    <Space size={4}>
+                      <div style={{ width: 14, height: 14, background: '#fff', border: '2px solid #d9d9d9', borderRadius: 2 }} />
+                      <span>可選</span>
+                    </Space>
+                    <Space size={4}>
+                      <div style={{ width: 14, height: 14, background: '#52c41a', border: '2px solid #52c41a', borderRadius: 2, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>
+                        ✓
+                      </div>
+                      <span>已選中</span>
+                    </Space>
+                    <Space size={4}>
+                      <div style={{ width: 14, height: 14, background: '#fff1f0', border: '2px solid #ffa39e', borderRadius: 2, opacity: 0.6 }} />
+                      <span>已有配置</span>
+                    </Space>
+                  </div>
+                </div>
+
+                {/* 中间: 算法信息 30% */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+                    關聯算法信息
+                  </div>
+                  {selectedAlgorithmInfo ? (
+                    <div style={{ background: conflictInfo ? '#fff7e6' : '#f6ffed', border: conflictInfo ? '1px solid #ffd591' : '1px solid #b7eb8f', borderRadius: 6, padding: 16 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: conflictInfo ? '#fa8c16' : '#52c41a', marginBottom: 12 }}>
+                        {conflictInfo ? '⚠ 已有配置' : `✓ 已選擇: 第 ${selectedPosition} 號位`}
+                      </div>
+                      <Space direction="vertical" size={8}>
+                        <div style={{ fontSize: 12, color: '#595959' }}>
+                          <span style={{ color: '#8c8c8c' }}>算法ID: </span>
+                          <code style={{ background: '#fff', padding: '2px 8px', borderRadius: 4, marginLeft: 4, fontSize: 12 }}>
+                            {String(selectedAlgorithmInfo.id).padStart(6, '0')}
+                          </code>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#595959' }}>
+                          <span style={{ color: '#8c8c8c' }}>算法名稱: </span>
+                          <strong style={{ color: '#262626', marginLeft: 4 }}>
+                            {selectedAlgorithmInfo.name}
+                          </strong>
+                        </div>
+                      </Space>
+                    </div>
+                  ) : (
+                    <div style={{ background: '#fafafa', border: '1px dashed #d9d9d9', borderRadius: 6, padding: 24, textAlign: 'center', color: '#8c8c8c', fontSize: 12 }}>
+                      請點擊左側可選廣告位
+                    </div>
+                  )}
+                </div>
+
+                {/* 右侧: 提示信息 40% */}
+                <div style={{ maxWidth: '100%', overflow: 'hidden' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+                    提示信息
+                  </div>
+                  {conflictInfo ? (
+                    <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6, padding: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#fa8c16', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <InfoCircleOutlined />
+                        該廣告位已有配置
+                      </div>
+                      <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                        <div style={{ fontSize: 12, color: '#595959', wordBreak: 'break-all' }}>
+                          <span style={{ color: '#8c8c8c' }}>定價銷售ID: </span>
+                          <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4, marginLeft: 4, fontSize: 11 }}>
+                            {conflictInfo.salesId}
+                          </code>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#595959', wordBreak: 'break-all' }}>
+                          <span style={{ color: '#8c8c8c' }}>定價銷售名稱: </span>
+                          <strong style={{ color: '#262626', marginLeft: 4, fontSize: 11 }}>
+                            {conflictInfo.salesName}
+                          </strong>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#595959' }}>
+                          <span style={{ color: '#8c8c8c' }}>已配置區域: </span>
+                          <span style={{ color: '#262626', marginLeft: 4 }}>
+                            {conflictInfo.regions.map(r => REGION_OPTIONS.find(opt => opt.value === r)?.label).join(', ')}
+                          </span>
+                        </div>
+                      </Space>
+                    </div>
+                  ) : selectedPosition ? (
+                    <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, padding: 16, textAlign: 'center', color: '#52c41a', fontSize: 12 }}>
+                      ✓ 該廣告位可配置,請繼續下方售價配置
+                    </div>
+                  ) : (
+                    <div style={{ background: '#fafafa', border: '1px dashed #d9d9d9', borderRadius: 6, padding: 24, textAlign: 'center', color: '#8c8c8c', fontSize: 12 }}>
+                      點擊已有配置的廣告位查看詳情
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 隐藏字段 */}
+              <Form.Item name="algorithmId" hidden><Input /></Form.Item>
+              <Form.Item name="algorithmName" hidden><Input /></Form.Item>
+              <Form.Item name="slotPosition" hidden><Input /></Form.Item>
+            </Card>
+          )}
+
+          {/* 售价配置 (仅无敌星星) */}
+          {canShowPricing && selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR && (
+            <Fragment>
+              <Card 
+                title="時段售價配置" 
+                size="small"
+                style={{ marginBottom: 16 }}
+                extra={<Tag color="orange">必填</Tag>}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  {TIME_SLOTS.map(slot => (
+                    <Form.Item
+                      key={slot.key}
+                      label={`${slot.label}售價`}
+                      name={`${slot.key}Price`}
+                      rules={[{ required: true, message: `請輸入${slot.label}售價` }]}
+                    >
+                      <InputNumber
+                        min={0}
+                        precision={2}
+                        placeholder={`請輸入${slot.label}售價`}
+                        style={{ width: '100%' }}
+                        addonAfter="MOP"
+                      />
+                    </Form.Item>
+                  ))}
+                </div>
+              </Card>
+
+              <Card 
+                title={
+                  <Space>
+                    時段折扣配置
+                    <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
+                      單獨購買時段可享受的折扣
+                    </span>
+                  </Space>
+                }
+                size="small"
+                style={{ marginBottom: 16 }}
+                extra={
+                  <Space>
+                    <span style={{ fontSize: 13, color: '#595959' }}>开启配置</span>
+                    <Switch 
+                      checked={showTimeSlotDiscount} 
+                      onChange={setShowTimeSlotDiscount}
+                      size="small"
+                    />
+                  </Space>
+                }
+              >
+                {showTimeSlotDiscount && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    {TIME_SLOTS.map(slot => (
+                      <Form.Item
+                        key={slot.key}
+                        label={`${slot.label}折扣`}
+                        name={`${slot.key}Discount`}
+                        tooltip={`輸入${slot.label}時段的折扣,例如80表示8折`}
+                      >
+                        <InputNumber
+                          min={1}
+                          max={100}
+                          placeholder={`請輸入${slot.label}折扣`}
+                          style={{ width: '100%' }}
+                          addonAfter="折"
+                        />
+                      </Form.Item>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card 
+                title={
+                  <Space>
+                    時段個數折扣配置
+                    <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
+                      購買多個時段時匹配以下折扣
+                    </span>
+                  </Space>
+                }
+                size="small"
+                style={{ marginBottom: 16 }}
+                extra={
+                  <Space>
+                    <span style={{ fontSize: 13, color: '#595959' }}>开启配置</span>
+                    <Switch 
+                      checked={showTimeSlotCountDiscount} 
+                      onChange={setShowTimeSlotCountDiscount}
+                      size="small"
+                    />
+                  </Space>
+                }
+              >
+                {showTimeSlotCountDiscount && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <Form.Item
+                      label="購買時段個數"
+                      name="timeSlotCount"
+                      tooltip="商戶購買達到此時段數量時可享受折扣"
+                    >
+                      <InputNumber
+                        min={1}
+                        max={6}
+                        placeholder="請輸入時段個數(例如5)"
+                        style={{ width: '100%' }}
+                        addonAfter="個時段"
+                        onChange={(value) => {
+                          if (value && timeSlotCountDiscount) {
+                            setTimeSlotCountDiscount({ ...timeSlotCountDiscount, count: value })
+                          }
+                        }}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="對應折扣"
+                      name="timeSlotDiscount"
+                      tooltip="達到上述時段數量時的折扣"
+                    >
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        placeholder="請輸入折扣(例如80表示8折)"
+                        style={{ width: '100%' }}
+                        addonAfter="折"
+                        onChange={(value) => {
+                          if (value && timeSlotCountDiscount) {
+                            setTimeSlotCountDiscount({ ...timeSlotCountDiscount, discount: value })
+                          } else if (value) {
+                            setTimeSlotCountDiscount({ count: form.getFieldValue('timeSlotCount') || 0, discount: value })
+                          }
+                        }}
+                      />
+                    </Form.Item>
+                  </div>
+                )}
+              </Card>
+            </Fragment>
+          )}
+        </Form>
+      </div>
+
+      {/* 底部操作按钮 - 固定 */}
+      <div style={{ 
+        padding: '16px 24px',
+        background: '#fff',
+        borderTop: '1px solid #f0f0f0',
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: 12,
+      }}>
+        <Button onClick={handleBack} style={{ fontSize: 14 }}>
+          取消
+        </Button>
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={handleSubmit}
+          loading={loading}
+          style={{ fontSize: 14 }}
+        >
+          提交
+        </Button>
+      </div>
+    </div>
+  )
+}

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined } from '@ant-design/icons'
-import { AlgorithmType, RecommendChannel } from './constants'
+import { AlgorithmType, RecommendChannel, TimeSlot, TIME_SLOT_OPTIONS } from './constants'
 
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
@@ -319,9 +319,6 @@ export default function AlgorithmAdd() {
             borderRadius: '12px 12px 0 0',
             padding: '16px 24px'
           }}
-          bodyStyle={{
-            padding: '24px'
-          }}
         >
         <Form
           form={form}
@@ -342,8 +339,8 @@ export default function AlgorithmAdd() {
               name="regionLimit"
               rules={[{ required: true, message: '請選擇区域限制' }]}
               style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
               valuePropName="checked"
               getValueFromEvent={(checked) => !checked ? 'limited' : 'unlimited'}
               getValueProps={(value) => ({ checked: value === 'unlimited' })}
@@ -371,8 +368,8 @@ export default function AlgorithmAdd() {
                 name="regions"
                 rules={[{ required: regionLimit, message: '請選擇限制区域' }]}
                 style={{ flex: 1, marginBottom: 0 }}
-                labelCol={{ span: 6 }}
-                wrapperCol={{ span: 18 }}
+                labelCol={{ span: 4 }}
+                wrapperCol={{ span: 20 }}
               >
                 <Checkbox.Group 
                   value={selectedRegions}
@@ -400,8 +397,8 @@ export default function AlgorithmAdd() {
               name="presaleMode"
               rules={[{ required: true, message: '請選擇預售模式' }]}
               style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
               valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 'rolling' : 'fixed'}
               getValueProps={(value) => ({ checked: value === 'rolling' })}
@@ -424,8 +421,8 @@ export default function AlgorithmAdd() {
               name="presaleCycle"
               rules={[{ required: true, message: '請輸入預售周期' }]}
               style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
             >
               <InputNumber 
                 min={1} 
@@ -456,8 +453,8 @@ export default function AlgorithmAdd() {
               name="continuousPurchase"
               rules={[{ required: true, message: '請選擇是否支持連續購買' }]}
               style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
               valuePropName="checked"
               getValueFromEvent={(checked) => !checked ? 'support' : 'notSupport'}
               getValueProps={(value) => ({ checked: value === 'notSupport' })}
@@ -477,46 +474,78 @@ export default function AlgorithmAdd() {
 
             {/* 购买上限（仅在支持连续购买时显示） */}
             {continuousPurchase && (
-              <Form.Item
-                label="購買上限"
-                name="purchaseLimit"
-                rules={[{ required: true, message: '請配置購買上限' }]}
-                style={{ flex: 1, marginBottom: 0 }}
-                labelCol={{ span: 6 }}
-                wrapperCol={{ span: 18 }}
-              >
-                <div style={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8
-                }}>
-                  <span style={{ color: '#595959', fontWeight: 500, fontSize: 14 }}>近</span>
-                  <InputNumber 
-                    min={1} 
-                    max={365} 
-                    placeholder="天數"
-                    style={{ 
-                      width: 100,
-                      height: 36,
-                      borderRadius: 6
-                    }}
-                    size="middle"
-                  />
-                  <span style={{ color: '#595959', fontWeight: 500, fontSize: 14 }}>天內，最多可購買</span>
-                  <InputNumber 
-                    min={1} 
-                    max={100} 
-                    placeholder="數量"
-                    style={{ 
-                      width: 100,
-                      height: 36,
-                      borderRadius: 6
-                    }}
-                    size="middle"
-                  />
-                  <span style={{ color: '#595959', fontWeight: 500, fontSize: 14 }}>個時段</span>
-                </div>
-              </Form.Item>
+              <>
+                <Form.Item
+                  label="購買上限"
+                  style={{ flex: 1, marginBottom: 0 }}
+                  labelCol={{ span: 4 }}
+                  wrapperCol={{ span: 20 }}
+                >
+                  <div style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap'
+                  }}>
+                    <span style={{ color: '#595959', fontWeight: 500, fontSize: 14 }}>近</span>
+                    <Form.Item
+                      name="purchaseLimitDays"
+                      style={{ marginBottom: 0 }}
+                      rules={[{ required: true, message: '請配置天數' }]}
+                    >
+                      <InputNumber 
+                        min={1} 
+                        max={365} 
+                        placeholder="天數"
+                        style={{ 
+                          width: 100,
+                          height: 36,
+                          borderRadius: 6
+                        }}
+                        size="middle"
+                      />
+                    </Form.Item>
+                    <span style={{ color: '#595959', fontWeight: 500, fontSize: 14 }}>天內，最多可購買</span>
+                    <Form.Item
+                      name="purchaseLimitCount"
+                      style={{ marginBottom: 0 }}
+                      rules={[{ required: true, message: '請配置數量' }]}
+                    >
+                      <InputNumber 
+                        min={1} 
+                        max={100} 
+                        placeholder="數量"
+                        style={{ 
+                          width: 100,
+                          height: 36,
+                          borderRadius: 6
+                        }}
+                        size="middle"
+                      />
+                    </Form.Item>
+                    <span style={{ color: '#595959', fontWeight: 500, fontSize: 14 }}>個時段，只統計</span>
+                    <Form.Item
+                      name="purchaseLimitTimeSlots"
+                      style={{ marginBottom: 0, minWidth: 120 }}
+                    >
+                      <Select
+                        mode="multiple"
+                        placeholder="請選擇時段"
+                        options={[
+                          { label: '全部', value: 'all' },
+                          { label: '早餐', value: TimeSlot.BREAKFAST },
+                          { label: '午餐', value: TimeSlot.LUNCH },
+                          { label: '下午茶', value: TimeSlot.AFTERNOON },
+                          { label: '晚餐', value: TimeSlot.DINNER },
+                          { label: '夜宵', value: TimeSlot.NIGHT_SNACK },
+                        ]}
+                        maxTagCount={5}
+                        style={{ width: 100 }}
+                      />
+                    </Form.Item>
+                  </div>
+                </Form.Item>
+              </>
             )}
 
             {/* 间隔天数（仅在不支持连续购买时显示） */}
@@ -526,8 +555,8 @@ export default function AlgorithmAdd() {
                 name="purchaseInterval"
                 rules={[{ required: true, message: '請配置間隔天數' }]}
                 style={{ flex: 1, marginBottom: 0 }}
-                labelCol={{ span: 6 }}
-                wrapperCol={{ span: 18 }}
+                labelCol={{ span: 4 }}
+                wrapperCol={{ span: 20 }}
               >
                 <div style={{ 
                   display: 'flex',
@@ -559,8 +588,8 @@ export default function AlgorithmAdd() {
               name="merchantLimit"
               rules={[{ required: true, message: '請選擇商家限制' }]}
               style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
               valuePropName="checked"
               getValueFromEvent={(checked) => !checked ? 'limited' : 'unlimited'}
               getValueProps={(value) => ({ checked: value === 'unlimited' })}
@@ -588,8 +617,8 @@ export default function AlgorithmAdd() {
                 name="merchants"
                 rules={[{ required: merchantLimit, message: '請選擇商家' }]}
                 style={{ flex: 1, marginBottom: 0 }}
-                labelCol={{ span: 6 }}
-                wrapperCol={{ span: 18 }}
+                labelCol={{ span: 4 }}
+                wrapperCol={{ span: 20 }}
               >
                 <Button 
                   onClick={handleOpenMerchantModal}
@@ -610,36 +639,15 @@ export default function AlgorithmAdd() {
             {!merchantLimit && <div style={{ flex: 1 }} />}
           </div>
 
-          {/* 业务频道 */}
-          <Form.Item
-            label="業務頻道"
-            name="channel"
-            rules={[{ required: true, message: '請選擇業務頻道' }]}
-            style={{ marginBottom: 16 }}
-            labelCol={{ span: 3 }}
-            wrapperCol={{ span: 21 }}
-          >
-            <Select 
-              placeholder="請選擇業務頻道" 
-              style={{ width: '30%' }}
-              options={[
-                { label: '大首頁瀑布流', value: RecommendChannel.HOME },
-                { label: '外賣頻道瀑布流', value: RecommendChannel.DELIVERY },
-                { label: '團購頻道瀑布流', value: RecommendChannel.GROUP_BUY },
-                { label: '超市頻道瀑布流', value: RecommendChannel.SUPERMARKET },
-              ]}
-            />
-          </Form.Item>
-
-          {/* 可购买时段 */}
+          {/* 开放时段 */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             <Form.Item
-              label="可購買時段"
+              label="開放時段"
               name="availableTimeSlots"
-              rules={[{ required: true, message: '請選擇可購買時段' }]}
+              rules={[{ required: true, message: '請選擇開放時段' }]}
               style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
             >
               <Checkbox.Group>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 12px' }}>
