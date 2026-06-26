@@ -332,12 +332,12 @@ export default function AlgorithmAdd() {
             regionLimit: 'limited',
           }}
         >
-          {/* 区域限制 */}
+          {/* 销售区域 */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             <Form.Item
-              label="区域限制"
+              label="销售区域"
               name="regionLimit"
-              rules={[{ required: true, message: '請選擇区域限制' }]}
+              rules={[{ required: true, message: '請選擇销售区域' }]}
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 4 }}
               wrapperCol={{ span: 20 }}
@@ -364,9 +364,9 @@ export default function AlgorithmAdd() {
 
             {regionLimit && (
               <Form.Item
-                label="限制区域"
+                label="区域配置"
                 name="regions"
-                rules={[{ required: regionLimit, message: '請選擇限制区域' }]}
+                rules={[{ required: regionLimit, message: '請選擇区域配置' }]}
                 style={{ flex: 1, marginBottom: 0 }}
                 labelCol={{ span: 4 }}
                 wrapperCol={{ span: 20 }}
@@ -389,6 +389,32 @@ export default function AlgorithmAdd() {
 
             {!regionLimit && <div style={{ flex: 1 }} />}
           </div>
+
+          {/* 备注说明 */}
+          {regionLimit && (
+            <div style={{ 
+              marginBottom: 16, 
+              padding: '12px 16px', 
+              background: '#f6ffed', 
+              border: '1px solid #b7eb8f', 
+              borderRadius: 4,
+              fontSize: 13,
+              lineHeight: 1.8
+            }}>
+              <div style={{ fontWeight: 500, marginBottom: 8, color: '#52c41a' }}>
+                💡 銷售區域配置說明：
+              </div>
+              <div style={{ color: '#666' }}>
+                銷售區域配置，即本規則所涵蓋之地理範圍。當銷售範圍同時包括澳門島與氹仔時，適用以下限制：
+              </div>
+              <div style={{ color: '#666', marginLeft: 20 }}>
+                · 澳門島之商家，僅能購買澳門島區域之廣告；
+              </div>
+              <div style={{ color: '#666', marginLeft: 20 }}>
+                · 氹仔之商家，僅能購買氹仔區域之廣告。
+              </div>
+            </div>
+          )}
 
           {/* 预售模式和预售周期并排 */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>

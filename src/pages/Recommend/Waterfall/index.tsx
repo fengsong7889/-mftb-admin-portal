@@ -772,9 +772,9 @@ export default function Waterfall() {
               </div>
             </Form.Item>
 
-            {/* 区域限制 */}
+            {/* 销售区域 */}
             <Form.Item 
-              label="區域限制" 
+              label="销售区域" 
               name="regionLimit"
               valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 'unlimited' : 'limited'}
@@ -930,7 +930,7 @@ export default function Waterfall() {
                     </div>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="區域限制">
+                <Descriptions.Item label="销售区域">
                   <Tag color={viewingRecord.regionLimit === 'limited' ? 'red' : 'green'}>
                     {viewingRecord.regionLimit === 'limited' ? `限制(${viewingRecord.regionIds?.length || 0}個區域)` : '不限制'}
                   </Tag>

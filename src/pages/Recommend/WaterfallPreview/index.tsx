@@ -278,7 +278,7 @@ export default function WaterfallPreview() {
                       <strong>商家限制:</strong> {slot.merchantLimit === 'limited' ? '限制' : '不限制'}
                     </div>
                     <div>
-                      <strong>區域限制:</strong> {slot.regionLimit === 'limited' ? '限制' : '不限制'}
+                      <strong>销售区域:</strong> {slot.regionLimit === 'limited' ? '限制' : '不限制'}
                     </div>
                   </div>
                 </Card>
