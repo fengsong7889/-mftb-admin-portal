@@ -367,7 +367,7 @@ export default function HintConfig() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>搜尋</Button>
+              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
               <Button icon={<ReloadOutlined />}>重置</Button>
             </div>
           </Form.Item>

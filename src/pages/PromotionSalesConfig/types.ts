@@ -1,4 +1,4 @@
-import { AlgorithmType, Region, RecommendChannel } from '../Recommend/constants'
+import { AlgorithmType, Region, RecommendChannel, AppType } from '../Recommend/constants'
 
 /** 时段状态枚举 */
 export enum TimeSlotStatus {
@@ -31,6 +31,7 @@ export const TIME_SLOT_LABELS: Record<TimeSlotStatus, string> = {
 export interface InventoryItem {
   id: number
   promotionName: string           // 推广名称
+  app: AppType                    // 所属品牌
   channel: RecommendChannel       // 业务频道
   slotPosition: number            // 展示位置
   dailyPrice: number              // 单日单价 (MOP)
@@ -148,7 +149,7 @@ function pseudoRandom(seed: number): number {
 }
 
 /** 生成 Mock 库存数据 */
-export function generateMockInventory(region: Region, algorithmType?: AlgorithmType): InventoryItem[] {
+export function generateMockInventory(region: Region, algorithmType?: AlgorithmType, app?: AppType): InventoryItem[] {
   const channels = [
     RecommendChannel.HOME,
     RecommendChannel.DELIVERY,
@@ -177,35 +178,41 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
   const items: InventoryItem[] = []
   const baseId = region * 1000 + (algorithmType || 0) * 100
   const targetTypes = algorithmType ? [algorithmType] : Object.values(AlgorithmType).filter(v => typeof v === 'number') as AlgorithmType[]
+  
+  // 如果未指定品牌，生成两种品牌的数据
+  const appsToGenerate = app ? [app] : [AppType.SHANFENG, AppType.MFOOD]
 
   let idCounter = 1
   for (const type of targetTypes) {
     const prefix = typePrefixes[type] || '廣告'
     
-    for (let i = 0; i < 4; i++) {
-      const seed = baseId + idCounter * 37
-      const channel = channels[Math.floor(pseudoRandom(seed + 1) * channels.length)]
-      const slotPosition = 1 + Math.floor(pseudoRandom(seed + 2) * 5)
-      const dailyPrice = 800 + Math.floor(pseudoRandom(seed + 3) * 2200)
-      const totalSlots = 20 + Math.floor(pseudoRandom(seed + 4) * 30)
-      const soldSlots = Math.floor(pseudoRandom(seed + 5) * totalSlots * 0.7)
-      const startDay = 1 + Math.floor(pseudoRandom(seed + 6) * 10)
-      const endDay = startDay + 14 + Math.floor(pseudoRandom(seed + 7) * 16)
+    for (const currentApp of appsToGenerate) {
+      for (let i = 0; i < 4; i++) {
+        const seed = baseId + idCounter * 37
+        const channel = channels[Math.floor(pseudoRandom(seed + 1) * channels.length)]
+        const slotPosition = 1 + Math.floor(pseudoRandom(seed + 2) * 5)
+        const dailyPrice = 800 + Math.floor(pseudoRandom(seed + 3) * 2200)
+        const totalSlots = 20 + Math.floor(pseudoRandom(seed + 4) * 30)
+        const soldSlots = Math.floor(pseudoRandom(seed + 5) * totalSlots * 0.7)
+        const startDay = 1 + Math.floor(pseudoRandom(seed + 6) * 10)
+        const endDay = startDay + 14 + Math.floor(pseudoRandom(seed + 7) * 16)
 
-      items.push({
-        id: baseId + idCounter,
-        promotionName: `${prefix}${promotionSuffixes[idCounter % promotionSuffixes.length]}`,
-        channel,
-        slotPosition,
-        dailyPrice,
-        availableStartDate: '2025-07-05',
-        availableEndDate: '2025-07-31',
-        totalSlots,
-        soldSlots,
-        algorithmType: type,
-        region,
-      })
-      idCounter++
+        items.push({
+          id: baseId + idCounter,
+          promotionName: `${prefix}${promotionSuffixes[idCounter % promotionSuffixes.length]}`,
+          app: currentApp,
+          channel,
+          slotPosition,
+          dailyPrice,
+          availableStartDate: '2025-07-05',
+          availableEndDate: '2025-07-18',
+          totalSlots,
+          soldSlots,
+          algorithmType: type,
+          region,
+        })
+        idCounter++
+      }
     }
   }
   return items
@@ -232,10 +239,25 @@ export function generateTimeSlotStatuses(inventoryId: number, date: string): Tim
   const currentDay = parseInt(date.split('-')[2], 10)
   const rowIndex = currentDay - startDay // 第几行（0-based）
 
+  // 根据日期配置特定的不可售时段
+  const unavailableConfig: Record<number, number[]> = {
+    3: [14, 15, 16, 17, 18, 19, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47], // 第 4 行（07-08）：早餐+晚餐+夜宵
+    6: [14, 15, 16, 17, 18, 19, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47], // 第 7 行（07-11）：早餐+晚餐+夜宵
+  }
+
+  // 应用特定日期的不可售配置
+  const unavailableSlots = unavailableConfig[rowIndex] || []
+  unavailableSlots.forEach(slotIndex => {
+    if (slotIndex < statuses.length) {
+      statuses[slotIndex] = TimeSlotStatus.UNAVAILABLE
+    }
+  })
+
   // 按行配置售罄时段
   const soldOutConfig: Record<number, number[]> = {
+    0: [22, 23, 24, 25, 26, 27], // 第 1 行（07-05）：午餐
     2: [14, 15, 16, 17, 18, 19], // 第 3 行（07-07）：早餐
-    6: [22, 23, 24, 25, 26, 27], // 第 7 行（07-11）：午餐
+    4: [34, 35, 36, 37, 38, 39, 40, 41], // 第 5 行（07-09）：晚餐
     8: [28, 29, 30, 31, 32, 33], // 第 9 行（07-13）：下午茶
     10: [34, 35, 36, 37, 38, 39, 40, 41], // 第 11 行（07-15）：晚餐
     11: [42, 43, 44, 45, 46, 47], // 第 12 行（07-16）：夜宵
@@ -251,6 +273,58 @@ export function generateTimeSlotStatuses(inventoryId: number, date: string): Tim
       statuses[slotIndex] = TimeSlotStatus.SOLD_OUT
     }
   })
+
+  // 按餐时段随机设置20%为不可售，确保每个餐时段都有分布
+  const mealSlots = [
+    { start: 12, end: 13 },  // 06:00-07:00
+    { start: 14, end: 19 },  // 早餐 07:00-10:00
+    { start: 20, end: 21 },  // 10:00-11:00
+    { start: 22, end: 27 },  // 午餐 11:00-14:00
+    { start: 28, end: 33 },  // 下午茶 14:00-17:00
+    { start: 34, end: 41 },  // 晚餐 17:00-21:00
+    { start: 42, end: 47 },  // 夜宵 21:00-00:00
+  ]
+  
+  // 对每个餐时段分别随机设置20%为不可售
+  mealSlots.forEach((meal, mealIndex) => {
+    const availableInMeal: number[] = []
+    for (let i = meal.start; i <= meal.end; i++) {
+      if (statuses[i] === TimeSlotStatus.AVAILABLE) {
+        availableInMeal.push(i)
+      }
+    }
+    
+    if (availableInMeal.length > 0) {
+      // 每个餐时段至少设置1个不可售（如果有可售时段）
+      const unavailableCount = Math.max(1, Math.floor(availableInMeal.length * 0.2))
+      
+      // 使用不同的种子确保每个餐时段的随机性不同
+      const mealSeed = inventoryId * 1000 + dateSeed * 100 + mealIndex * 10
+      
+      // Fisher-Yates 洗牌算法
+      const shuffled = [...availableInMeal]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(pseudoRandom(mealSeed + i) * (i + 1))
+        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      
+      const selectedSlots = shuffled.slice(0, unavailableCount)
+      
+      console.log(`餐时段 ${mealIndex}: 可售=${availableInMeal.length}, 设置不可售=${unavailableCount}, 选择=${selectedSlots}`)
+      
+      selectedSlots.forEach(slotIndex => {
+        statuses[slotIndex] = TimeSlotStatus.UNAVAILABLE
+      })
+    }
+  })
+  
+  // 统计最终状态
+  const stats = {
+    available: statuses.filter(s => s === TimeSlotStatus.AVAILABLE).length,
+    soldOut: statuses.filter(s => s === TimeSlotStatus.SOLD_OUT).length,
+    unavailable: statuses.filter(s => s === TimeSlotStatus.UNAVAILABLE).length,
+  }
+  console.log(`日期 ${date} 状态统计:`, stats)
 
   return statuses
 }

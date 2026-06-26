@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select } from 'antd'
+import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal } from 'antd'
 import { CalendarOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -15,11 +15,37 @@ import { Region, REGION_OPTIONS } from '../Recommend/constants'
 interface CartItem {
   key: string
   date: string
+  region: Region           // 商圈
+  regionName: string       // 商圈名称
   mealSlot: string
   timeSlots: number[]
   originalPrice: number  // 原价
   salePrice: number      // 售价
 }
+
+/** 组合商圈接口 */
+interface RegionCombination {
+  id: number
+  name: string
+  regions: Region[]
+  hasDiscount: boolean  // 是否有折扣
+}
+
+/** Mock数据 - 组合商圈 */
+const MOCK_REGION_COMBINATIONS: RegionCombination[] = [
+  {
+    id: 1,
+    name: '澳門+氹仔組合',
+    regions: [Region.MACAU, Region.TAIPA],
+    hasDiscount: true,
+  },
+  {
+    id: 2,
+    name: '全區域組合',
+    regions: [Region.MACAU, Region.TAIPA, Region.ZHUHAI],
+    hasDiscount: false,
+  },
+]
 
 interface DateTimeGridProps {
   inventoryItem: InventoryItem
@@ -40,7 +66,49 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRegion, setSelectedRegion] = useState<Region | undefined>(undefined)
+  const [selectedCombination, setSelectedCombination] = useState<number | undefined>(undefined)
+  const [regionMode, setRegionMode] = useState<'single' | 'combination'>('single')
   const pageSize = 7
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
+  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
+  
+  // Mock数据 - 商家推广金余额
+  const [merchantBalance, setMerchantBalance] = useState(15800)
+
+  // 点击订单支付
+  const handlePayment = () => {
+    setIsPaymentModalVisible(true)
+  }
+
+  // 确认支付
+  const handleConfirmPayment = () => {
+    const totalAmount = cartItems.reduce((sum, item) => sum + item.salePrice, 0)
+    
+    // 扣除推广金余额
+    setMerchantBalance(prev => prev - totalAmount)
+    
+    // 关闭支付弹窗
+    setIsPaymentModalVisible(false)
+    
+    // 清空购物车
+    setCartItems([])
+    
+    // 显示成功弹窗
+    setIsSuccessModalVisible(true)
+  }
+
+  // 查看订单
+  const handleViewOrder = () => {
+    setIsSuccessModalVisible(false)
+    message.info('跳转至訂單界面（功能待实现）')
+    // TODO: 路由跳转至订单页面
+  }
+
+  // 继续购买
+  const handleContinuePurchase = () => {
+    setIsSuccessModalVisible(false)
+    message.success('繼續購買')
+  }
 
   // 生成所有日期列表
   const allDates = useMemo(() => {
@@ -64,18 +132,12 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
   const totalPages = Math.ceil(allDates.length / pageSize)
 
-  // 计算可选时段数
-  const availableCount = useMemo(() => {
-    if (!selectedDate) return 0
-    const dateStr = selectedDate.format('YYYY-MM-DD')
-    const statuses = generateTimeSlotStatuses(inventoryItem.id, dateStr)
-    return statuses.filter(s => s === TimeSlotStatus.AVAILABLE).length
-  }, [inventoryItem.id, selectedDate])
-
-  // 单个时段价格
+  // 单个时段价格（使用固定总时段数48，不随选择变化）
   const slotPrice = useMemo(() => {
-    return calcSlotPrice(inventoryItem.dailyPrice, availableCount || 1)
-  }, [inventoryItem.dailyPrice, availableCount])
+    // 固定使用48个时段作为基准（去除凌晨0-6点的12个不可售时段，实际36个）
+    const totalAvailableSlots = 36
+    return calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
+  }, [inventoryItem.dailyPrice])
 
   // 检查某个日期的某个时段是否已被加购到购物车
   const isMealSlotLocked = (date: Dayjs, mealSlot: typeof MEAL_TIME_SLOTS[0]) => {
@@ -139,7 +201,9 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
   // 计算时段总价
   const getMealSlotPrice = (mealSlot: typeof MEAL_TIME_SLOTS[0], availableSlots: number) => {
-    const pricePerSlot = calcSlotPrice(inventoryItem.dailyPrice, availableCount || 1)
+    // 使用固定总时段数36计算单价
+    const totalAvailableSlots = 36
+    const pricePerSlot = calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
     return pricePerSlot * availableSlots
   }
 
@@ -182,14 +246,56 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 style={{ width: 160 }}
               />
               <span>商圈：</span>
-              <Select
-                placeholder="全部"
-                value={selectedRegion}
-                onChange={(value) => setSelectedRegion(value)}
-                allowClear
-                style={{ width: 120 }}
-                options={REGION_OPTIONS}
-              />
+              <Radio.Group 
+                value={regionMode} 
+                onChange={(e) => {
+                  setRegionMode(e.target.value)
+                  setSelectedRegion(undefined)
+                  setSelectedCombination(undefined)
+                }}
+                size="small"
+                style={{ marginRight: 8 }}
+              >
+                <Radio.Button value="single">獨立商圈</Radio.Button>
+                <Radio.Button value="combination">
+                  <Space size={4}>
+                    <span>組合商圈</span>
+                    <span style={{ 
+                      fontSize: 11, 
+                      color: '#fff',
+                      background: '#ff4d4f',
+                      borderRadius: 2,
+                      padding: '0 3px',
+                      lineHeight: '16px',
+                      fontWeight: 600,
+                    }}>
+                      折
+                    </span>
+                  </Space>
+                </Radio.Button>
+              </Radio.Group>
+              {regionMode === 'single' ? (
+                <Select
+                  placeholder="全部"
+                  value={selectedRegion}
+                  onChange={(value) => setSelectedRegion(value)}
+                  allowClear
+                  style={{ width: 120 }}
+                  options={REGION_OPTIONS}
+                />
+              ) : (
+                <Select
+                  placeholder="全部"
+                  value={selectedCombination}
+                  onChange={(value) => setSelectedCombination(value)}
+                  allowClear
+                  style={{ width: 160 }}
+                  options={MOCK_REGION_COMBINATIONS.map(c => ({
+                    label: c.name,
+                    value: c.id,
+                  }))}
+                />
+              )}
             </Space>
             {/* 图例 */}
             <Space size={16}>
@@ -434,6 +540,19 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{selectedDate.format('YYYY-MM-DD')}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>所屬商圈：</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#722ed1' }}>
+                    {(() => {
+                      const regionLabel: Record<Region, string> = {
+                        [Region.MACAU]: '澳門',
+                        [Region.TAIPA]: '氹仔',
+                        [Region.ZHUHAI]: '珠海',
+                      }
+                      return regionLabel[inventoryItem.region] || '-'
+                    })()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>查看時段：</span>
                   <span style={{ fontSize: 14, color: '#52c41a', fontWeight: 600 }}>
                     {MEAL_TIME_SLOTS.find(m => m.key === selectedMealSlot)?.label}
@@ -485,10 +604,19 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   const hasNoDiscount = meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
                   const originalPrice = hasNoDiscount ? salePrice : inventoryItem.dailyPrice
                   
+                  // 获取商圈名称
+                  const regionLabel: Record<Region, string> = {
+                    [Region.MACAU]: '澳門',
+                    [Region.TAIPA]: '氹仔',
+                    [Region.ZHUHAI]: '珠海',
+                  }
+                  
                   // 添加到购物车
                   const newItem: CartItem = {
                     key: `${dateStr}-${selectedMealSlot}-${Date.now()}`,
                     date: dateStr,
+                    region: inventoryItem.region,
+                    regionName: regionLabel[inventoryItem.region] || '-',
                     mealSlot: meal.label,
                     timeSlots: availableSlots,
                     originalPrice,
@@ -518,10 +646,10 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           )}
         </Card>
 
-        {/* 已选时段 */}
+        {/* 已选商圈，时段 */}
         <Card 
           size="small" 
-          title="已選時段"
+          title="已選商圈，時段"
         >
           <div style={{ 
             fontSize: 11, 
@@ -544,6 +672,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 width: 110,
                 render: (text: string) => (
                   <span style={{ fontSize: 12 }}>{text}</span>
+                ),
+              },
+              {
+                title: '商圈',
+                dataIndex: 'regionName',
+                key: 'regionName',
+                width: 70,
+                render: (text: string) => (
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{text}</span>
                 ),
               },
               {
@@ -595,6 +732,28 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           size="small" 
           title="費用結算"
         >
+          {/* 推广金余额 */}
+          <div style={{ 
+            padding: '12px 16px', 
+            marginBottom: 12, 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: 6,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>
+              推廣金餘額
+            </span>
+            <span style={{ 
+              fontSize: 22, 
+              fontWeight: 700, 
+              color: '#fff',
+            }}>
+              ${merchantBalance.toLocaleString()}
+            </span>
+          </div>
+
           <table style={{ width: '100%', fontSize: 12, marginBottom: 12 }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
@@ -634,6 +793,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             block 
             size="large"
             disabled={cartItems.length === 0}
+            onClick={handlePayment}
             style={{ 
               background: cartItems.length > 0 ? '#ff4d4f' : '#d9d9d9', 
               borderColor: cartItems.length > 0 ? '#ff4d4f' : '#d9d9d9',
@@ -646,6 +806,88 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           </Button>
         </Card>
       </div>
+
+      {/* 支付确认弹窗 */}
+      <Modal
+        title="確認訂單"
+        open={isPaymentModalVisible}
+        onOk={handleConfirmPayment}
+        onCancel={() => setIsPaymentModalVisible(false)}
+        okText="確定支付"
+        cancelText="取消"
+        okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>購買明細：</h4>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#fafafa' }}>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>日期</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>商圈</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>時段</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right' }}>售價</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cartItems.map(item => (
+                <tr key={item.key}>
+                  <td style={{ padding: '8px', border: '1px solid #e8e8e8' }}>{item.date}</td>
+                  <td style={{ padding: '8px', border: '1px solid #e8e8e8' }}>{item.regionName}</td>
+                  <td style={{ padding: '8px', border: '1px solid #e8e8e8' }}>{item.mealSlot}</td>
+                  <td style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right', color: '#ff4d4f', fontWeight: 600 }}>
+                    ${item.salePrice}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ background: '#fafafa', padding: 16, borderRadius: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ color: '#595959' }}>訂單金額（原價）：</span>
+            <span style={{ fontWeight: 600 }}>${cartItems.reduce((sum, item) => sum + item.originalPrice, 0)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+            <span>訂單優惠：</span>
+            <span style={{ fontWeight: 600 }}>-${cartItems.reduce((sum, item) => sum + (item.originalPrice - item.salePrice), 0)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+            <span style={{ fontWeight: 600 }}>實付金額：</span>
+            <span style={{ fontWeight: 700 }}>${cartItems.reduce((sum, item) => sum + item.salePrice, 0)}</span>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 支付成功弹窗 */}
+      <Modal
+        title="購買成功"
+        open={isSuccessModalVisible}
+        onCancel={() => setIsSuccessModalVisible(false)}
+        footer={[
+          <Button key="view" type="primary" onClick={handleViewOrder}>
+            查看訂單
+          </Button>,
+          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>
+            繼續購買
+          </Button>,
+        ]}
+        width={400}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <p style={{ fontSize: 16, color: '#595959', marginBottom: 8 }}>
+            恭喜！購買成功
+          </p>
+          <p style={{ fontSize: 14, color: '#8c8c8c' }}>
+            已扣除推廣金 ${cartItems.reduce((sum, item) => sum + item.salePrice, 0)}
+          </p>
+          <p style={{ fontSize: 14, color: '#8c8c8c' }}>
+            剩餘餘額：${merchantBalance}
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react'
-import { Card, Table, Tag, Button, Space, Empty, Badge, message } from 'antd'
+import { Card, Table, Tag, Button, Space, Empty, Badge, message, Select } from 'antd'
 import {
   ThunderboltOutlined,
   ArrowLeftOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { AlgorithmType, Region, RecommendChannel } from '../Recommend/constants'
+import { AlgorithmType, Region, RecommendChannel, AppType, APP_OPTIONS, REGION_OPTIONS } from '../Recommend/constants'
 import DateTimeGrid from './DateTimeGrid'
 import {
   type InventoryItem,
@@ -19,19 +19,26 @@ export default function PromotionSalesConfig() {
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null)
   const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(null)
+  const [selectedApp, setSelectedApp] = useState<AppType | null | undefined>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-  // 根据推荐类型生成库存数据（不需要商圈）
+  // 根据推荐类型和品牌生成库存数据
   const inventoryData = useMemo<InventoryItem[]>(() => {
     if (!selectedAlgorithmType) return []
     // 生成所有商圈的库存数据
     const allData: InventoryItem[] = []
     Object.values(Region).forEach(region => {
       if (typeof region === 'number') {
-        allData.push(...generateMockInventory(region, selectedAlgorithmType))
+        allData.push(...generateMockInventory(region, selectedAlgorithmType, selectedApp || undefined))
       }
     })
+    // 如果选择了品牌（非null），过滤数据
+    if (selectedApp !== null && selectedApp !== undefined) {
+      return allData.filter(item => item.app === selectedApp)
+    }
     return allData
-  }, [selectedAlgorithmType])
+  }, [selectedAlgorithmType, selectedApp])
 
   // 推荐类型选择 - 直接进入库存数据界面
   const handleSelectType = (config: RecommendTypeConfig) => {
@@ -41,6 +48,7 @@ export default function PromotionSalesConfig() {
     }
     setSelectedAlgorithmType(config.type)
     setCurrentStep(1) // 跳过商圈选择，直接进入库存数据界面
+    setCurrentPage(1) // 重置分页
   }
 
   // 库存选择
@@ -53,6 +61,7 @@ export default function PromotionSalesConfig() {
   const handleGoBack = () => {
     if (currentStep === 1) {
       setSelectedAlgorithmType(null)
+      setCurrentPage(1) // 重置分页
     } else if (currentStep === 2) {
       setSelectedInventory(null)
     }
@@ -67,6 +76,20 @@ export default function PromotionSalesConfig() {
       key: 'promotionName',
       width: 200,
       render: (text: string) => <strong>{text}</strong>,
+    },
+    {
+      title: '所屬品牌',
+      dataIndex: 'app',
+      key: 'app',
+      width: 100,
+      render: (v: AppType) => {
+        const appConfig: Record<AppType, { color: string; label: string }> = {
+          [AppType.SHANFENG]: { color: 'orange', label: '閃峰' },
+          [AppType.MFOOD]: { color: 'green', label: 'mFood' },
+        }
+        const config = appConfig[v]
+        return config ? <Tag color={config.color}>{config.label}</Tag> : '-'
+      },
     },
     {
       title: '業務頻道',
@@ -128,7 +151,7 @@ export default function PromotionSalesConfig() {
   return (
     <div className="content-area">
       {/* 页面标题 */}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
         <h2 style={{ margin: 0, fontSize: 20 }}>
           <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
           廣告購買
@@ -140,7 +163,7 @@ export default function PromotionSalesConfig() {
 
       {/* Step 1: 选择推荐类型 */}
       {currentStep === 0 && (
-        <Card title="選擇推薦類型" style={{ marginBottom: 16 }}>
+        <Card title="選擇推薦類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -182,7 +205,20 @@ export default function PromotionSalesConfig() {
         <Card
           title={
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 16 }}>選擇展示位</span>
+              <Space size={16}>
+                <span style={{ fontSize: 16 }}>選擇展示位</span>
+                <Select
+                  placeholder="全部"
+                  value={selectedApp}
+                  onChange={(value) => setSelectedApp(value)}
+                  allowClear
+                  style={{ width: 140 }}
+                  options={[
+                    { label: '全部', value: null },
+                    ...APP_OPTIONS,
+                  ]}
+                />
+              </Space>
               <Button
                 type="primary"
                 icon={<ArrowLeftOutlined />}
@@ -194,12 +230,25 @@ export default function PromotionSalesConfig() {
             </div>
           }
           style={{ marginBottom: 16 }}
+          bodyStyle={{ padding: '5px 24px' }}
         >
           <Table<InventoryItem>
             rowKey="id"
             columns={inventoryColumns}
             dataSource={inventoryData}
-            pagination={false}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: inventoryData.length,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: (total) => `共 ${total} 條`,
+              onChange: (page, size) => {
+                setCurrentPage(page)
+                setPageSize(size)
+              },
+            }}
             scroll={{ x: 1030 }}
             locale={{ emptyText: <Empty description="該商圈暫無可購買庫存" /> }}
             rowClassName={(record) => selectedInventory?.id === record.id ? 'ant-table-row-selected' : ''}
@@ -238,6 +287,7 @@ export default function PromotionSalesConfig() {
               </div>
             }
             style={{ marginBottom: 16 }}
+            bodyStyle={{ padding: '5px 24px' }}
           >
             <DateTimeGrid
               inventoryItem={selectedInventory}

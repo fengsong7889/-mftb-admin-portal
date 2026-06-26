@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload, Card } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
@@ -315,8 +315,9 @@ export default function HotSearchLibrary() {
   return (
     <div className="content-area">
       {/* 查询区域 */}
-      <div className="search-section">
-        <Form layout="inline">
+      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <div className="search-section">
+          <Form layout="inline">
           <Form.Item label="熱搜詞">
             <Input
               placeholder="輸入關鍵詞"
@@ -372,8 +373,9 @@ export default function HotSearchLibrary() {
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
-        </Form>
-      </div>
+          </Form>
+        </div>
+      </Card>
 
       {/* 操作区域 */}
       <div className="action-section">

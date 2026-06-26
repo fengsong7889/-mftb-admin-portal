@@ -527,8 +527,6 @@
 .search-section {
   display: block;
   margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #F0F0F0;
 }
 .search-section .ant-form-inline {
   display: grid;
@@ -574,11 +572,11 @@
 .search-section .ant-select-selector {
   width: 100% !important;
 }
-/* 操作按钮区域 - 占满最后一行 */
+/* 操作按钮区域 - 紧跟最后一个查询条件，与输入框对齐 */
 .search-section .ant-form-item:last-child {
-  grid-column: 1 / -1;
+  grid-column: auto;
   justify-self: start;
-  padding-top: 8px;
+  padding-top: 26px; /* 与输入框对齐，跳过标题高度 */
 }
 .search-actions {
   display: flex;

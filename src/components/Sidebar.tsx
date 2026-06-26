@@ -147,6 +147,11 @@ const keyToPath: Record<string, string> = {
   'promotion-slot-config': '/promotion-slot-config',
   'promotion-waterfall': '/promotion-waterfall',
   'promotion-sales-config': '/promotion-sales-config',
+  'promotion-order-manage': '/promotion-order-manage',
+  // 推广通 - 報表分析
+  'promotion-report-overview': '/promotion-report-overview',
+  'promotion-report-order': '/promotion-report-order',
+  'promotion-report-compare': '/promotion-report-compare',
   // 推广通(父菜单,无需映射)
   // 'promotion-tool': '/promotion-tool',
 }
@@ -388,6 +393,33 @@ const menuItems: MenuItem[] = [
         key: 'promotion-sales-config',
         icon: <DollarOutlined />,
         label: '廣告購買',
+      },
+      {
+        key: 'promotion-order-manage',
+        icon: <OrderedListOutlined />,
+        label: '訂單管理',
+      },
+      {
+        key: 'promotion-report-group',
+        icon: <BarChartOutlined />,
+        label: '報表分析',
+        children: [
+          {
+            key: 'promotion-report-overview',
+            icon: <DashboardOutlined />,
+            label: '數據概覽',
+          },
+          {
+            key: 'promotion-report-order',
+            icon: <LineChartOutlined />,
+            label: '訂單效果報表',
+          },
+          {
+            key: 'promotion-report-compare',
+            icon: <PieChartOutlined />,
+            label: '推薦類型對比',
+          },
+        ],
       },
     ],
   },
