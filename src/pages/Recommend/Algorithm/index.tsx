@@ -140,7 +140,7 @@ export default function Algorithm() {
     { key: 'name', title: '算法名稱' },
     { key: 'type', title: '算法類型' },
     { key: 'channel', title: '業務頻道' },
-    { key: 'placementInterface', title: '投放界面' },
+    { key: 'placementInterface', title: '算法落地頁' },
     { key: 'status', title: '狀態' },
     { key: 'action', title: '操作' },
   ], [])
@@ -161,7 +161,7 @@ export default function Algorithm() {
       render: (v: RecommendChannel) => CHANNEL_LABEL[v],
     },
     {
-      title: '投放界面', dataIndex: 'placementInterface', key: 'placementInterface', width: 120,
+      title: '算法落地頁', dataIndex: 'placementInterface', key: 'placementInterface', width: 120,
       render: (v: PlacementInterface) => v ? PLACEMENT_LABEL[v] : '-',
     },
     {
@@ -224,7 +224,7 @@ export default function Algorithm() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="投放界面" name="placementInterface">
+          <Form.Item label="算法落地頁" name="placementInterface">
             <Select 
               placeholder="全部" 
               options={[

@@ -78,6 +78,8 @@ const PromotionOrderManage = lazy(() => import('./pages/PromotionOrderManage'))
 const PromotionReportOverview = lazy(() => import('./pages/PromotionReport/Overview'))
 const PromotionReportOrder = lazy(() => import('./pages/PromotionReport/OrderReport'))
 const PromotionReportCompare = lazy(() => import('./pages/PromotionReport/Compare'))
+// 地圖規劃
+const MapPlanning = lazy(() => import('./pages/MapPlanning'))
 
 const { Content } = Layout
 
@@ -175,6 +177,8 @@ function AuthenticatedLayout() {
               <Route path="/promotion-report-overview" element={<PromotionReportOverview />} />
               <Route path="/promotion-report-order" element={<PromotionReportOrder />} />
               <Route path="/promotion-report-compare" element={<PromotionReportCompare />} />
+              {/* 地圖規劃 */}
+              <Route path="/map-planning" element={<MapPlanning />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* 默认回首页 */}

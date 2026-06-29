@@ -152,6 +152,8 @@ const keyToPath: Record<string, string> = {
   'promotion-report-overview': '/promotion-report-overview',
   'promotion-report-order': '/promotion-report-order',
   'promotion-report-compare': '/promotion-report-compare',
+  // 地圖規劃
+  'map-planning': '/map-planning',
   // 推广通(父菜单,无需映射)
   // 'promotion-tool': '/promotion-tool',
 }
@@ -359,6 +361,11 @@ const menuItems: MenuItem[] = [
         key: 'promotion-dashboard',
         icon: <PieChartOutlined />,
         label: '數據看板',
+      },
+      {
+        key: 'map-planning',
+        icon: <AimOutlined />,
+        label: '地圖規劃',
       },
       {
         key: 'promotion-algorithm-group',
