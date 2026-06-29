@@ -3,7 +3,7 @@ import { Button, Space, Table, Tag, Badge, Input, Select, Form } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { AlgorithmType, RecommendChannel, ServiceStatus, SERVICE_STATUS_OPTIONS } from '../constants'
+import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS } from '../constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const { Search } = Input
@@ -14,6 +14,7 @@ interface AlgorithmRecord {
   code: string
   type: AlgorithmType
   channel: RecommendChannel
+  placementInterface?: PlacementInterface  // 投放界面
   status: ServiceStatus
   slotCount: number
 }
@@ -41,10 +42,16 @@ const TYPE_COLOR: Record<AlgorithmType, string> = {
 } as Record<AlgorithmType, string>
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '大首頁瀑布流',
-  [RecommendChannel.DELIVERY]: '外賣頻道瀑布流',
-  [RecommendChannel.GROUP_BUY]: '團購頻道瀑布流',
-  [RecommendChannel.SUPERMARKET]: '超市頻道瀑布流',
+  [RecommendChannel.FOOD_DELIVERY]: '美食外賣',
+  [RecommendChannel.SUPERMARKET]: '超市百貨',
+  [RecommendChannel.GROUP_BUY]: '團購到店',
+}
+
+const PLACEMENT_LABEL: Record<PlacementInterface, string> = {
+  [PlacementInterface.HOME]: '大首頁-Feed',
+  [PlacementInterface.DELIVERY]: '外賣頻道-Feed',
+  [PlacementInterface.SUPERMARKET]: '超市頻道-Feed',
+  [PlacementInterface.GROUP_BUY]: '團購頻道-Feed',
 }
 
 const TIME_SLOT_LABEL: Record<string, string> = {
@@ -57,21 +64,21 @@ const TIME_SLOT_LABEL: Record<string, string> = {
 }
 
 export const mockAlgorithmData: AlgorithmRecord[] = [
-  { id: 1, name: '無敵星星-首頁版', code: 'ALG_STAR_HOME', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 2, name: '新店廣告-外賣版', code: 'ALG_NEWSTORE_DELIVERY', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.DELIVERY, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 3, name: '盤活廣告-團購版', code: 'ALG_REVIVE_GROUPBUY', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 4, name: '獨家商家-超市版', code: 'ALG_EXCLUSIVE_SUPER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 5, name: '流量廣告-全渠道', code: 'ALG_TRAFFIC_ALL', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.HOME, status: ServiceStatus.ENABLED, slotCount: 4 },
-  { id: 6, name: '猜你喜歡-主力版', code: 'ALG_GUESS_MAIN', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.HOME, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 7, name: '自然流量-默認', code: 'ALG_ORGANIC_DEFAULT', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.HOME, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 8, name: '搜索算法-綜合版', code: 'ALG_SEARCH_COMPOSITE', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.HOME, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 9, name: '無敵星星-夜間版', code: 'ALG_STAR_NIGHT', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 10, name: '新店廣告-早餐版', code: 'ALG_NEWSTORE_BREAKFAST', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 11, name: '盤活廣告-午市版', code: 'ALG_REVIVE_LUNCH', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 12, name: '獨家商家-晚市版', code: 'ALG_EXCLUSIVE_DINNER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.GROUP_BUY, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 13, name: '流量廣告-下午茶', code: 'ALG_TRAFFIC_AFTERNOON', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.DELIVERY, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 14, name: '猜你喜歡-週末版', code: 'ALG_GUESS_WEEKEND', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.GROUP_BUY, status: ServiceStatus.ENABLED, slotCount: 4 },
-  { id: 15, name: '搜索算法-深夜版', code: 'ALG_SEARCH_NIGHT', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.SUPERMARKET, status: ServiceStatus.ENABLED, slotCount: 1 },
+  { id: 1, name: '無敵星星-首頁版', code: 'ALG_STAR_HOME', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 2, name: '新店廣告-外賣版', code: 'ALG_NEWSTORE_DELIVERY', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.DELIVERY, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 3, name: '盤活廣告-團購版', code: 'ALG_REVIVE_GROUPBUY', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 4, name: '獨家商家-超市版', code: 'ALG_EXCLUSIVE_SUPER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, status: ServiceStatus.ENABLED, slotCount: 1 },
+  { id: 5, name: '流量廣告-全渠道', code: 'ALG_TRAFFIC_ALL', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, status: ServiceStatus.ENABLED, slotCount: 4 },
+  { id: 6, name: '猜你喜歡-主力版', code: 'ALG_GUESS_MAIN', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 7, name: '自然流量-默認', code: 'ALG_ORGANIC_DEFAULT', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 8, name: '搜索算法-綜合版', code: 'ALG_SEARCH_COMPOSITE', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 9, name: '無敵星星-夜間版', code: 'ALG_STAR_NIGHT', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.DELIVERY, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 10, name: '新店廣告-早餐版', code: 'ALG_NEWSTORE_BREAKFAST', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, status: ServiceStatus.ENABLED, slotCount: 1 },
+  { id: 11, name: '盤活廣告-午市版', code: 'ALG_REVIVE_LUNCH', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 12, name: '獨家商家-晚市版', code: 'ALG_EXCLUSIVE_DINNER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 13, name: '流量廣告-下午茶', code: 'ALG_TRAFFIC_AFTERNOON', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.DELIVERY, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 14, name: '猜你喜歡-週末版', code: 'ALG_GUESS_WEEKEND', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, status: ServiceStatus.ENABLED, slotCount: 4 },
+  { id: 15, name: '搜索算法-深夜版', code: 'ALG_SEARCH_NIGHT', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, status: ServiceStatus.ENABLED, slotCount: 1 },
 ]
 
 export default function Algorithm() {
@@ -103,6 +110,11 @@ export default function Algorithm() {
       result = result.filter(item => item.channel === values.channel)
     }
     
+    // 投放界面筛选
+    if (values.placementInterface !== undefined && values.placementInterface !== null) {
+      result = result.filter(item => item.placementInterface === values.placementInterface)
+    }
+    
     // 状态筛选
     if (values.status !== undefined && values.status !== null) {
       result = result.filter(item => item.status === values.status)
@@ -128,6 +140,7 @@ export default function Algorithm() {
     { key: 'name', title: '算法名稱' },
     { key: 'type', title: '算法類型' },
     { key: 'channel', title: '業務頻道' },
+    { key: 'placementInterface', title: '投放界面' },
     { key: 'status', title: '狀態' },
     { key: 'action', title: '操作' },
   ], [])
@@ -137,7 +150,7 @@ export default function Algorithm() {
   ])
 
   const columns: ColumnsType<AlgorithmRecord> = [
-    { title: '算法ID', dataIndex: 'code', key: 'code', width: 180, render: (v) => <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{v}</code> },
+    { title: '算法ID', dataIndex: 'code', key: 'code', width: 120, render: (v) => <Tag color="blue">{v}</Tag> },
     { title: '算法名稱', dataIndex: 'name', key: 'name', width: 200 },
     {
       title: '算法類型', dataIndex: 'type', key: 'type', width: 120,
@@ -146,6 +159,10 @@ export default function Algorithm() {
     {
       title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 150,
       render: (v: RecommendChannel) => CHANNEL_LABEL[v],
+    },
+    {
+      title: '投放界面', dataIndex: 'placementInterface', key: 'placementInterface', width: 120,
+      render: (v: PlacementInterface) => v ? PLACEMENT_LABEL[v] : '-',
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
@@ -200,10 +217,21 @@ export default function Algorithm() {
             <Select 
               placeholder="全部" 
               options={[
-                { label: '大首頁瀑布流', value: RecommendChannel.HOME },
-                { label: '外賣頻道瀑布流', value: RecommendChannel.DELIVERY },
-                { label: '團購頻道瀑布流', value: RecommendChannel.GROUP_BUY },
-                { label: '超市頻道瀑布流', value: RecommendChannel.SUPERMARKET },
+                { label: '美食外賣', value: RecommendChannel.FOOD_DELIVERY },
+                { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+                { label: '團購到店', value: RecommendChannel.GROUP_BUY },
+              ]}
+              allowClear
+            />
+          </Form.Item>
+          <Form.Item label="投放界面" name="placementInterface">
+            <Select 
+              placeholder="全部" 
+              options={[
+                { label: '大首頁-Feed', value: PlacementInterface.HOME },
+                { label: '外賣頻道-Feed', value: PlacementInterface.DELIVERY },
+                { label: '超市頻道-Feed', value: PlacementInterface.SUPERMARKET },
+                { label: '團購頻道-Feed', value: PlacementInterface.GROUP_BUY },
               ]}
               allowClear
             />

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal } from 'antd'
 import { CalendarOutlined, DeleteOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import {
@@ -61,6 +62,7 @@ const MEAL_TIME_SLOTS = [
 ]
 
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
+  const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null)
   const [selectedMealSlot, setSelectedMealSlot] = useState<string | null>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
@@ -100,8 +102,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 查看订单
   const handleViewOrder = () => {
     setIsSuccessModalVisible(false)
-    message.info('跳转至訂單界面（功能待实现）')
-    // TODO: 路由跳转至订单页面
+    navigate('/promotion-order-manage')
   }
 
   // 继续购买
@@ -877,15 +878,28 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       >
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 8 }}>
+          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>
             恭喜！購買成功
           </p>
-          <p style={{ fontSize: 14, color: '#8c8c8c' }}>
-            已扣除推廣金 ${cartItems.reduce((sum, item) => sum + item.salePrice, 0)}
-          </p>
-          <p style={{ fontSize: 14, color: '#8c8c8c' }}>
-            剩餘餘額：${merchantBalance}
-          </p>
+          <div style={{ 
+            background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)',
+            padding: '20px 16px',
+            borderRadius: 8,
+            marginBottom: 16,
+          }}>
+            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>
+              已扣除推廣金
+            </p>
+            <p style={{ 
+              fontSize: 36, 
+              fontWeight: 700, 
+              color: '#fa541c',
+              margin: 0,
+              lineHeight: 1.2,
+            }}>
+              $1985.89
+            </p>
+          </div>
         </div>
       </Modal>
     </div>

@@ -21,10 +21,9 @@ import { mockAlgorithmData } from '../Algorithm'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '大首頁瀑布流',
-  [RecommendChannel.DELIVERY]: '外賣頻道瀑布流',
-  [RecommendChannel.GROUP_BUY]: '團購頻道瀑布流',
-  [RecommendChannel.SUPERMARKET]: '超市頻道瀑布流',
+  [RecommendChannel.FOOD_DELIVERY]: '美食外賣',
+  [RecommendChannel.SUPERMARKET]: '超市百貨',
+  [RecommendChannel.GROUP_BUY]: '團購到店',
 }
 
 const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
@@ -53,8 +52,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
 const generateMockData = (): WaterfallSlotConfig[] => {
   const data: WaterfallSlotConfig[] = []
   const channels = [
-    RecommendChannel.HOME,
-    RecommendChannel.DELIVERY,
+    RecommendChannel.FOOD_DELIVERY,
     RecommendChannel.GROUP_BUY,
     RecommendChannel.SUPERMARKET,
   ]
@@ -119,6 +117,7 @@ const generateMockData = (): WaterfallSlotConfig[] => {
     
     data.push({
       id: id++,
+      adId: `AD${String(id).padStart(6, '0')}`,
       promotionName,
       app,
       channel,
@@ -296,7 +295,8 @@ export default function Waterfall() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'promotionName', title: '活動名稱' },
+    { key: 'adId', title: '廣告ID' },
+    { key: 'promotionName', title: '廣告名稱' },
     { key: 'channel', title: '業務頻道' },
     { key: 'app', title: '所屬品牌' },
     { key: 'slotPosition', title: '展示位置' },
@@ -318,10 +318,17 @@ export default function Waterfall() {
   // 完整列定义（带自定义渲染）
   const columns: ColumnsType<WaterfallSlotConfig> = [
     { 
-      title: '活動名稱',
+      title: '廣告ID',
+      dataIndex: 'adId',
+      key: 'adId',
+      width: 120,
+      render: (text: string) => <Tag color="blue">{text}</Tag>,
+    },
+    { 
+      title: '廣告名稱',
       dataIndex: 'promotionName',
       key: 'promotionName',
-      width: 120,
+      width: 140,
       ellipsis: true,
     },
     { 

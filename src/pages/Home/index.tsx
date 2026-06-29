@@ -58,6 +58,17 @@ const allMenus = [
   { key: 'hot-search-library', label: '熱搜詞庫', icon: <FireOutlined />, path: '/hot-search-library', group: '搜索词库' },
   { key: 'hint-report', label: '底紋報表', icon: <LineChartOutlined />, path: '/hint-report', group: '報表統計' },
   { key: 'hot-search-report', label: '熱搜報表', icon: <LineChartOutlined />, path: '/hot-search-report', group: '報表統計' },
+  // 商家推广工具
+  { key: 'promotion-dashboard', label: '數據看板', icon: <LineChartOutlined />, path: '/promotion-dashboard', group: '商家推广工具' },
+  { key: 'promotion-algorithm', label: '算法庫', icon: <DatabaseOutlined />, path: '/promotion-algorithm', group: '商家推广工具' },
+  { key: 'promotion-slot-config', label: '瀑布流策略', icon: <SwapOutlined />, path: '/promotion-slot-config', group: '商家推广工具' },
+  { key: 'promotion-waterfall', label: '定價銷售配置', icon: <WalletOutlined />, path: '/promotion-waterfall', group: '商家推广工具' },
+  // 推广通
+  { key: 'promotion-sales-config', label: '廣告購買', icon: <ShoppingOutlined />, path: '/promotion-sales-config', group: '推广通' },
+  { key: 'promotion-order-manage', label: '訂單管理', icon: <FileSearchOutlined />, path: '/promotion-order-manage', group: '推广通' },
+  { key: 'promotion-report-overview', label: '數據概覽', icon: <LineChartOutlined />, path: '/promotion-report-overview', group: '推广通' },
+  { key: 'promotion-report-order', label: '訂單效果報表', icon: <LineChartOutlined />, path: '/promotion-report-order', group: '推广通' },
+  { key: 'promotion-report-compare', label: '推薦類型對比', icon: <LineChartOutlined />, path: '/promotion-report-compare', group: '推广通' },
 ]
 
 /** 默认常用菜单 */

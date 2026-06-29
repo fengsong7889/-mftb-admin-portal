@@ -105,7 +105,8 @@ export interface ABTest {
 /** 瀑布流坑位配置 */
 export interface WaterfallSlotConfig {
   id: number
-  promotionName?: string                // 推广名称
+  adId?: string                         // 广告ID
+  promotionName?: string                // 广告名称
   app: AppType                        // 所属品牌
   channel: RecommendChannel           // 业务频道
   slotPosition: number                // 展示位置(坑位序号)

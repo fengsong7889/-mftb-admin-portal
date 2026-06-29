@@ -31,10 +31,18 @@ const CHANNEL_FULL_LABEL: Record<string, string> = {
 
 /** 渠道标签 */
 const CHANNEL_LABEL: Record<string, string> = {
-  home: '大首頁',
-  delivery: '外賣',
-  groupBuy: '團購',
-  supermarket: '超市',
+  home: '美食外賣',
+  delivery: '外賣頻道',
+  groupBuy: '團購到店',
+  supermarket: '超市百貨',
+}
+
+/** 投放界面标签 */
+const PLACEMENT_LABEL: Record<string, string> = {
+  home: '大首頁-Feed',
+  delivery: '外賣頻道-Feed',
+  groupBuy: '團購頻道-Feed',
+  supermarket: '超市頻道-Feed',
 }
 
 /** 品牌标签 */
@@ -274,6 +282,11 @@ export default function PromotionSlotConfig() {
     const values = searchForm.getFieldsValue()
     let result = [...mockData]
     
+    // 配置ID
+    if (values.id) {
+      result = result.filter(item => String(item.id).includes(String(values.id)))
+    }
+    
     // 业务频道
     if (values.channel) {
       result = result.filter(item => item.channel === values.channel)
@@ -341,6 +354,16 @@ export default function PromotionSlotConfig() {
 
   const columns: ColumnsType<WaterfallSlotConfig> = [
     {
+      title: '配置ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 100,
+      align: 'center',
+      render: (v: number) => (
+        <Tag color="blue">{String(v).padStart(6, '0')}</Tag>
+      ),
+    },
+    {
       title: '業務頻道',
       dataIndex: 'channel',
       key: 'channel',
@@ -357,6 +380,13 @@ export default function PromotionSlotConfig() {
           {APP_LABEL[v]}
         </Tag>
       ),
+    },
+    {
+      title: '投放界面',
+      dataIndex: 'channel',
+      key: 'placementInterface',
+      width: 140,
+      render: (v: string) => PLACEMENT_LABEL[v] || '-',
     },
     {
       title: '展示位置',
@@ -476,14 +506,19 @@ export default function PromotionSlotConfig() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
+          <Form.Item label="配置ID" name="id">
+            <Input 
+              placeholder="請輸入配置ID" 
+              allowClear
+            />
+          </Form.Item>
           <Form.Item label="業務頻道" name="channel" initialValue="home">
             <Select 
               placeholder="全部"
               options={[
-                { label: '大首頁', value: 'home' },
-                { label: '外賣', value: 'delivery' },
-                { label: '團購', value: 'groupBuy' },
-                { label: '超市', value: 'supermarket' },
+                { label: '美食外賣', value: 'home' },
+                { label: '超市百貨', value: 'supermarket' },
+                { label: '團購到店', value: 'groupBuy' },
               ]}
               allowClear
             />
@@ -494,6 +529,18 @@ export default function PromotionSlotConfig() {
               options={[
                 { label: '閃峰', value: 'shanfeng' },
                 { label: 'mFood', value: 'mfood' },
+              ]}
+              allowClear
+            />
+          </Form.Item>
+          <Form.Item label="投放界面" name="placementInterface">
+            <Select 
+              placeholder="全部"
+              options={[
+                { label: '大首頁-Feed', value: 'home' },
+                { label: '外賣頻道-Feed', value: 'delivery' },
+                { label: '超市頻道-Feed', value: 'supermarket' },
+                { label: '團購頻道-Feed', value: 'groupBuy' },
               ]}
               allowClear
             />
@@ -514,7 +561,7 @@ export default function PromotionSlotConfig() {
             <Select 
               placeholder="請選擇"
               allowClear
-              options={Array.from({ length: parseInt(localStorage.getItem('waterfall_max_slot_count') || '20') }, (_, i) => ({
+              options={Array.from({ length: 20 }, (_, i) => ({
                 label: `${i + 1}號位`,
                 value: i + 1,
               }))}

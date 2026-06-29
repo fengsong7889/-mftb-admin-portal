@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined } from '@ant-design/icons'
-import { AlgorithmType, RecommendChannel, TimeSlot, TIME_SLOT_OPTIONS } from './constants'
+import { AlgorithmType, RecommendChannel, PlacementInterface, TimeSlot, TIME_SLOT_OPTIONS } from './constants'
 
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
@@ -15,6 +15,8 @@ export default function AlgorithmAdd() {
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
+  const [placementInterfaceMode, setPlacementInterfaceMode] = useState(false) // false: 全部, true: 指定
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>([])
   const [isEditing, setIsEditing] = useState(false) // 编辑模式
 
   // 自定义美化 Switch：
@@ -266,10 +268,9 @@ export default function AlgorithmAdd() {
               <Select
                 placeholder="請選擇業務頻道"
                 options={[
-                  { label: '大首頁瀑布流', value: RecommendChannel.HOME },
-                  { label: '外賣頻道瀑布流', value: RecommendChannel.DELIVERY },
-                  { label: '團購頻道瀑布流', value: RecommendChannel.GROUP_BUY },
-                  { label: '超市頻道瀑布流', value: RecommendChannel.SUPERMARKET },
+                  { label: '美食外賣', value: RecommendChannel.FOOD_DELIVERY },
+                  { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+                  { label: '團購到店', value: RecommendChannel.GROUP_BUY },
                 ]}
               />
             </Form.Item>
@@ -332,6 +333,66 @@ export default function AlgorithmAdd() {
             regionLimit: 'limited',
           }}
         >
+          {/* 投放界面 */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <Form.Item
+              label="投放界面"
+              name="placementInterfaceMode"
+              rules={[{ required: true, message: '請選擇投放界面' }]}
+              style={{ flex: 1, marginBottom: 0 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
+              valuePropName="checked"
+              getValueFromEvent={(checked) => checked ? 'specified' : 'all'}
+              getValueProps={(value) => ({ checked: value === 'specified' })}
+            >
+              <CustomSwitch
+                checked={placementInterfaceMode}
+                onChange={(checked) => {
+                  setPlacementInterfaceMode(checked)
+                  form.setFieldsValue({ placementInterfaceMode: checked ? 'specified' : 'all' })
+                  if (!checked) {
+                    setSelectedPlacements([])
+                    form.setFieldsValue({ placementInterfaces: [] })
+                  }
+                }}
+                leftText="全部"
+                rightText="指定"
+                leftColor="#52c41a"
+                rightColor="#ff4d4f"
+              />
+            </Form.Item>
+
+            {/* 投放界面选择 - 条件渲染,但保持占位 */}
+            {placementInterfaceMode ? (
+              <Form.Item
+                label="选择界面"
+                name="placementInterfaces"
+                rules={[{ required: placementInterfaceMode, message: '請選擇投放界面' }]}
+                style={{ flex: 1, marginBottom: 0 }}
+                labelCol={{ span: 4 }}
+                wrapperCol={{ span: 20 }}
+              >
+                <Checkbox.Group 
+                  value={selectedPlacements}
+                  onChange={(values) => {
+                    setSelectedPlacements(values as string[])
+                    form.setFieldsValue({ placementInterfaces: values })
+                  }}
+                >
+                  <Space size={12}>
+                    <Checkbox value="home">大首頁-Feed</Checkbox>
+                    <Checkbox value="delivery">外賣頻道-Feed</Checkbox>
+                    <Checkbox value="supermarket">超市頻道-Feed</Checkbox>
+                    <Checkbox value="groupbuy">團購頻道-Feed</Checkbox>
+                  </Space>
+                </Checkbox.Group>
+              </Form.Item>
+            ) : (
+              <div style={{ flex: 1 }} />
+            )}
+          </div>
+
           {/* 销售区域 */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             <Form.Item

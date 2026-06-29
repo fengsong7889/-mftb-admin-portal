@@ -11,17 +11,30 @@ export const APP_OPTIONS = [
 
 /** 业务频道（推荐瀑布流） */
 export enum RecommendChannel {
-  HOME = 1,       // 大首页瀑布流
-  DELIVERY = 2,   // 外卖频道瀑布流
-  GROUP_BUY = 3,  // 团购频道瀑布流
-  SUPERMARKET = 4,// 超市频道瀑布流
+  FOOD_DELIVERY = 1,   // 美食外卖
+  SUPERMARKET = 2,     // 超市百货
+  GROUP_BUY = 3,       // 团购到店
 }
 
 export const RECOMMEND_CHANNEL_OPTIONS = [
-  { label: '大首頁瀑布流', value: RecommendChannel.HOME },
-  { label: '外賣頻道瀑布流', value: RecommendChannel.DELIVERY },
-  { label: '團購頻道瀑布流', value: RecommendChannel.GROUP_BUY },
-  { label: '超市頻道瀑布流', value: RecommendChannel.SUPERMARKET },
+  { label: '美食外賣', value: RecommendChannel.FOOD_DELIVERY },
+  { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+  { label: '團購到店', value: RecommendChannel.GROUP_BUY },
+]
+
+/** 投放界面 */
+export enum PlacementInterface {
+  HOME = 1,           // 大首页
+  DELIVERY = 2,       // 外卖频道
+  SUPERMARKET = 3,    // 超市频道
+  GROUP_BUY = 4,      // 团购频道
+}
+
+export const PLACEMENT_INTERFACE_OPTIONS = [
+  { label: '大首頁-Feed', value: PlacementInterface.HOME },
+  { label: '外賣頻道-Feed', value: PlacementInterface.DELIVERY },
+  { label: '超市頻道-Feed', value: PlacementInterface.SUPERMARKET },
+  { label: '團購頻道-Feed', value: PlacementInterface.GROUP_BUY },
 ]
 
 /** 算法类型 */

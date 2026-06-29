@@ -30,7 +30,8 @@ export const TIME_SLOT_LABELS: Record<TimeSlotStatus, string> = {
 /** 库存数据记录 */
 export interface InventoryItem {
   id: number
-  promotionName: string           // 推广名称
+  adId: string                      // 广告ID
+  promotionName: string           // 广告名称
   app: AppType                    // 所属品牌
   channel: RecommendChannel       // 业务频道
   slotPosition: number            // 展示位置
@@ -199,6 +200,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
 
         items.push({
           id: baseId + idCounter,
+          adId: `AD${String(baseId + idCounter).padStart(6, '0')}`,
           promotionName: `${prefix}${promotionSuffixes[idCounter % promotionSuffixes.length]}`,
           app: currentApp,
           channel,

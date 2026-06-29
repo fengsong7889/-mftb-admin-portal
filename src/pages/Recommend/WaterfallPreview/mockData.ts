@@ -12,7 +12,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 1,
     app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 1,
     algorithmId: 1,
     algorithmName: '無敵星星-首頁版',
@@ -29,7 +29,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 2,
     app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 3,
     algorithmId: 6,
     algorithmName: '猜你喜歡-主力版',
@@ -46,7 +46,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 3,
     app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 5,
     algorithmId: 2,
     algorithmName: '新店廣告-外賣版',
@@ -63,7 +63,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 4,
     app: AppType.SHANFENG,
-    channel: RecommendChannel.DELIVERY,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 1,
     algorithmId: 2,
     algorithmName: '新店廣告-外賣版',
@@ -79,7 +79,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 5,
     app: AppType.SHANFENG,
-    channel: RecommendChannel.DELIVERY,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 2,
     algorithmId: 6,
     algorithmName: '猜你喜歡-主力版',
@@ -97,7 +97,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 6,
     app: AppType.MFOOD,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 1,
     algorithmId: 1,
     algorithmName: '無敵星星-首頁版',
@@ -114,7 +114,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 7,
     app: AppType.MFOOD,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 2,
     algorithmId: 5,
     algorithmName: '流量廣告-全渠道',
@@ -131,7 +131,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
   {
     id: 8,
     app: AppType.MFOOD,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.FOOD_DELIVERY,
     slotPosition: 4,
     algorithmId: 6,
     algorithmName: '猜你喜歡-主力版',

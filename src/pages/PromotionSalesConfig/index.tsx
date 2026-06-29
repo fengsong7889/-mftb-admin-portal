@@ -71,7 +71,14 @@ export default function PromotionSalesConfig() {
   // 库存表格列配置
   const inventoryColumns: ColumnsType<InventoryItem> = [
     {
-      title: '活動名稱',
+      title: '廣告ID',
+      dataIndex: 'adId',
+      key: 'adId',
+      width: 120,
+      render: (text: string) => <Tag color="blue">{text}</Tag>,
+    },
+    {
+      title: '廣告名稱',
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 200,
@@ -264,7 +271,7 @@ export default function PromotionSalesConfig() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space size={24}>
                   <Space size={8}>
-                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前所選活動：</span>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前所選廣告：</span>
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}>{selectedInventory.promotionName}</span>
                   </Space>
                   <Space size={8}>
