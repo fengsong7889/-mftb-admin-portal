@@ -18,6 +18,9 @@ export default function AlgorithmAdd() {
   const [placementInterfaceMode, setPlacementInterfaceMode] = useState(false) // false: 全部, true: 指定
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([])
   const [isEditing, setIsEditing] = useState(false) // 编辑模式
+  const [regionMerchantCustom, setRegionMerchantCustom] = useState(false) // false: 限制1個, true: 自定義
+  const [singleUserExposureLimit, setSingleUserExposureLimit] = useState(true) // false: 不限, true: 限制
+  const [dailyExposureLimit, setDailyExposureLimit] = useState(false) // false: 不限, true: 限制
 
   // 自定义美化 Switch：
   // 支持自定义左右側的轨道颜色
@@ -29,6 +32,7 @@ export default function AlgorithmAdd() {
     rightText,
     leftColor = '#ff4d4f',
     rightColor = '#1890ff',
+    disabled = false,
   }: {
     checked?: boolean
     onChange?: (checked: boolean) => void
@@ -36,10 +40,11 @@ export default function AlgorithmAdd() {
     rightText: string
     leftColor?: string
     rightColor?: string
+    disabled?: boolean
   }) => {
     const isChecked = checked ?? false
     return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: disabled ? 0.5 : 1 }}>
       <span
         style={{
           fontSize: 14,
@@ -60,12 +65,12 @@ export default function AlgorithmAdd() {
           height: 28,
           borderRadius: 999,
           background: isChecked ? rightColor : leftColor,
-          cursor: 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           userSelect: 'none',
           transition: 'background 0.3s ease',
           boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.12)',
         }}
-        onClick={() => onChange && onChange(!isChecked)}
+        onClick={() => !disabled && onChange && onChange(!isChecked)}
       >
         <div
           style={{
@@ -267,6 +272,10 @@ export default function AlgorithmAdd() {
                   if (value !== AlgorithmType.INVINCIBLE_STAR && value !== AlgorithmType.HOT_REVIVE_AD) {
                     setIsEditing(false)
                   }
+                  // 無敵星星時：區域商家展示限制默認限制1個並禁用
+                  if (value === AlgorithmType.INVINCIBLE_STAR) {
+                    setRegionMerchantCustom(false)
+                  }
                 }}
               />
             </Form.Item>
@@ -398,49 +407,263 @@ export default function AlgorithmAdd() {
             </Form.Item>
           </div>
 
-          {/* 區域商家展示限制 和 算法落地頁 並排展示 */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <Form.Item
-              label="區域商家展示限制"
-              name="regionMerchantDisplayLimit"
-              rules={[{ required: true, message: '請輸入區域商家展示限制数量' }]}
-              style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 4 }}
-              wrapperCol={{ span: 20 }}
-            >
-              <InputNumber
-                min={1}
-                max={10000}
-                placeholder="請輸入商家数量"
-                style={{
-                  width: '100%',
-                  height: 44,
-                  borderRadius: 8,
-                  fontSize: 14
-                }}
-                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>個數</span>}
-                size="large"
-              />
-            </Form.Item>
+          {/* 區域商家展示限制 + 算法落地頁 */}
+          {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? (
+            /* 盤活復蘇：區域商家展示限制單獨一行，算法落地頁下一排左對齊 */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 16 }}>
+              {/* 區域商家展示限制 和 輪循商家數限制 同一排 */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 0 }}>
+                <Form.Item
+                  label="區域商家展示限制"
+                  style={{ flex: 1, marginBottom: 0 }}
+                  labelCol={{ span: 4 }}
+                  wrapperCol={{ span: 20 }}
+                >
+                  <CustomSwitch
+                    checked={regionMerchantCustom}
+                    onChange={(checked) => setRegionMerchantCustom(checked)}
+                    leftText="限制1個"
+                    rightText="自定義"
+                    disabled={!isEditing}
+                  />
+                </Form.Item>
 
-            <Form.Item
-              label="算法落地頁"
-              name="algorithmLandingPage"
-              rules={[{ required: true, message: '請選擇算法落地頁' }]}
-              style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 4 }}
-              wrapperCol={{ span: 20 }}
-            >
-              <Checkbox.Group
-                options={[
-                  { label: '大首頁-Feed', value: 'home' },
-                  { label: '外賣頻道-Feed', value: 'delivery' },
-                  { label: '超市頻道-Feed', value: 'supermarket' },
-                  { label: '團購頻道-Feed', value: 'groupBuy' },
-                ]}
-              />
-            </Form.Item>
-          </div>
+                {/* 算法落地頁：與區域商家展示限制同排 */}
+                <Form.Item
+                  label="算法落地頁"
+                  name="algorithmLandingPage"
+                  rules={[{ required: true, message: '請選擇算法落地頁' }]}
+                  style={{ flex: 1, marginBottom: 0 }}
+                  labelCol={{ span: 4 }}
+                  wrapperCol={{ span: 20 }}
+                >
+                  <Checkbox.Group
+                    options={[
+                      { label: '大首頁-Feed', value: 'home' },
+                      { label: '外賣頻道-Feed', value: 'delivery' },
+                      { label: '超市頻道-Feed', value: 'supermarket' },
+                      { label: '團購頻道-Feed', value: 'groupBuy' },
+                    ]}
+                  />
+                </Form.Item>
+              </div>
+
+              {/* 自定義時：算法策略小包围區域 */}
+              {regionMerchantCustom && (
+                <div style={{
+                  border: '1px solid #d6e4ff',
+                  borderRadius: 8,
+                  background: '#f0f5ff',
+                  overflow: 'hidden',
+                }}>
+                  {/* 標題欄 */}
+                  <div style={{
+                    fontSize: 14, fontWeight: 600, color: '#1890ff',
+                    padding: '10px 20px',
+                    borderBottom: '1px solid #d6e4ff',
+                    background: '#e6f4ff',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <SettingOutlined />
+                    算法策略
+                  </div>
+
+                  <div style={{ padding: '16px 20px' }}>
+                    {/* 條件區域 */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: '#1677ff',
+                        marginBottom: 10, paddingLeft: 8,
+                        borderLeft: '3px solid #1677ff',
+                      }}>條件</div>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <Form.Item
+                          label="輪循商家數限制"
+                          name="regionMerchantDisplayLimit"
+                          rules={[{ required: true, message: '請輸入展示個數' }]}
+                          style={{ flex: 1, marginBottom: 0 }}
+                          labelCol={{ span: 4 }}
+                          wrapperCol={{ span: 20 }}
+                        >
+                          <InputNumber
+                            min={1}
+                            max={10000}
+                            placeholder="請輸入商家数量"
+                            style={{ width: '100%', height: 36, borderRadius: 6, fontSize: 14 }}
+                            addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>個數</span>}
+                          />
+                        </Form.Item>
+                        <div style={{ flex: 1 }} />
+                      </div>
+                    </div>
+
+                    {/* 策略區域 */}
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1px solid #e8eaed',
+                      borderRadius: 6,
+                      padding: '14px 16px',
+                    }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: '#52c41a',
+                        marginBottom: 10, paddingLeft: 8,
+                        borderLeft: '3px solid #52c41a',
+                      }}>策略</div>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        {/* 單用戶曝光數 */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>單用戶曝光數</span>
+                            <CustomSwitch
+                              checked={singleUserExposureLimit}
+                              onChange={(checked) => setSingleUserExposureLimit(checked)}
+                              leftText="不限"
+                              rightText="限制"
+                              leftColor="#d9d9d9"
+                              rightColor="#52c41a"
+                              disabled={!isEditing}
+                            />
+                            {singleUserExposureLimit && (
+                              <Form.Item
+                                name="singleUserExposure"
+                                style={{ flex: 1, marginBottom: 0 }}
+                                wrapperCol={{ span: 24 }}
+                              >
+                                <InputNumber
+                                  min={1}
+                                  max={9999}
+                                  placeholder="請輸入"
+                                  style={{ width: '100%', height: 36, borderRadius: 6, fontSize: 14 }}
+                                  addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>次</span>}
+                                />
+                              </Form.Item>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 商家單日曝光上限 */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家單日曝光上限</span>
+                            <CustomSwitch
+                              checked={dailyExposureLimit}
+                              onChange={(checked) => setDailyExposureLimit(checked)}
+                              leftText="不限"
+                              rightText="限制"
+                              leftColor="#d9d9d9"
+                              rightColor="#52c41a"
+                              disabled={!isEditing}
+                            />
+                            {dailyExposureLimit && (
+                              <Form.Item
+                                name="dailyMaxExposure"
+                                style={{ flex: 1, marginBottom: 0 }}
+                                wrapperCol={{ span: 24 }}
+                              >
+                                <InputNumber
+                                  min={1}
+                                  max={999999}
+                                  placeholder="請輸入"
+                                  style={{ width: '100%', height: 36, borderRadius: 6, fontSize: 14 }}
+                                  addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>次/日</span>}
+                                />
+                              </Form.Item>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 商家曝光策略：策略欄内新起一行，左對齊 */}
+                      <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                            <Form.Item
+                              name="merchantExposureStrategy"
+                              style={{ flex: 1, marginBottom: 0 }}
+                              wrapperCol={{ span: 24 }}
+                            >
+                              <Select
+                                placeholder="請選擇"
+                                style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                                options={[
+                                  { label: '按商家維度', value: 'merchant' },
+                                  { label: '按隨機維度', value: 'random' },
+                                ]}
+                              />
+                            </Form.Item>
+                          </div>
+                        </div>
+                        <div style={{ flex: 1 }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* 無敵星星：區域商家展示限制 和 算法落地頁 並排展示 */
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              <Form.Item
+                label="區域商家展示限制"
+                style={{ flex: 1, marginBottom: 0 }}
+                labelCol={{ span: 4 }}
+                wrapperCol={{ span: 20 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <CustomSwitch
+                    checked={regionMerchantCustom}
+                    onChange={(checked) => setRegionMerchantCustom(checked)}
+                    leftText="限制1個"
+                    rightText="自定義"
+                    disabled={true}
+                  />
+                  {regionMerchantCustom && (
+                    <Form.Item
+                      name="regionMerchantDisplayLimit"
+                      rules={[{ required: true, message: '請輸入展示個數' }]}
+                      style={{ marginBottom: 0 }}
+                      label="輪循商家數限制"
+                      labelCol={{ span: 8 }}
+                      wrapperCol={{ span: 16 }}
+                    >
+                      <InputNumber
+                        min={1}
+                        max={10000}
+                        placeholder="請輸入商家数量"
+                        style={{
+                          width: 160,
+                          height: 44,
+                          borderRadius: 8,
+                          fontSize: 14
+                        }}
+                        addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>個數</span>}
+                        size="large"
+                      />
+                    </Form.Item>
+                  )}
+                </div>
+              </Form.Item>
+
+              <Form.Item
+                label="算法落地頁"
+                name="algorithmLandingPage"
+                rules={[{ required: true, message: '請選擇算法落地頁' }]}
+                style={{ flex: 1, marginBottom: 0 }}
+                labelCol={{ span: 4 }}
+                wrapperCol={{ span: 20 }}
+              >
+                <Checkbox.Group
+                  options={[
+                    { label: '大首頁-Feed', value: 'home' },
+                    { label: '外賣頻道-Feed', value: 'delivery' },
+                    { label: '超市頻道-Feed', value: 'supermarket' },
+                    { label: '團購頻道-Feed', value: 'groupBuy' },
+                  ]}
+                />
+              </Form.Item>
+            </div>
+          )}
         </Form>
         </Card>
       ) : selectedAlgorithmType ? (

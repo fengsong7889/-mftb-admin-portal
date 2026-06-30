@@ -99,17 +99,17 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     enabled: true,
   },
   {
-    type: AlgorithmType.NEW_STORE_AD,
-    name: '新店廣告',
-    icon: '🏪',
-    description: '新店專屬推廣位，快速獲取首批顧客',
-    enabled: false,
-  },
-  {
     type: AlgorithmType.HOT_REVIVE_AD,
     name: '盤活復蘇',
     icon: '🔥',
     description: '盤活熱門商家流量，提升店鋪曝光',
+    enabled: true,
+  },
+  {
+    type: AlgorithmType.NEW_STORE_AD,
+    name: '新店廣告',
+    icon: '🏪',
+    description: '新店專屬推廣位，快速獲取首批顧客',
     enabled: false,
   },
   {

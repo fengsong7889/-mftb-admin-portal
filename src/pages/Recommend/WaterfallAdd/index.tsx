@@ -31,6 +31,17 @@ const mockPositionAlgorithm = [
   { position: 18, algorithmId: 1007, algorithmName: '無敵星星-閃購版' },
 ]
 
+// Mock数据 - 盤活復蘇广告位关联的算法
+const mockRevivePositionAlgorithm = [
+  { position: 1, algorithmId: 2001, algorithmName: '盤活復蘇-首頁版' },
+  { position: 5, algorithmId: 2002, algorithmName: '盤活復蘇-外賣版' },
+  { position: 8, algorithmId: 2003, algorithmName: '盤活復蘇-團購版' },
+  { position: 9, algorithmId: 2004, algorithmName: '盤活復蘇-超市版' },
+  { position: 12, algorithmId: 2005, algorithmName: '盤活復蘇-零售版' },
+  { position: 15, algorithmId: 2006, algorithmName: '盤活復蘇-美食版' },
+  { position: 18, algorithmId: 2007, algorithmName: '盤活復蘇-閃購版' },
+]
+
 // 时段枚举
 const TIME_SLOTS = [
   { key: 'fullDay', label: '全時段' },
@@ -101,8 +112,15 @@ export default function WaterfallAdd() {
   const [regionCombinations, setRegionCombinations] = useState<RegionCombinationDiscount[]>([])
   const [regionCombinationEnabled, setRegionCombinationEnabled] = useState(false) // 区域组合折扣开关
   
-  // 显示广告位的条件
-  const canShowPositions = selectedApp && selectedChannel && selectedAlgorithmType
+  // 显示广告位的条件：仅無敵星星和盤活復蘇
+  const canShowPositions = selectedApp && selectedChannel && selectedAlgorithmType &&
+    (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD)
+  
+  // 推荐类型为其它条件时显示暂未开通提示
+  const showNotAvailable = selectedAlgorithmType && !canShowPositions
+  
+  // 是否为盤活復蘇算法类型
+  const isReviveAlgorithm = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
 
   // 自定义美化 Switch
   const CustomSwitch = ({
@@ -188,7 +206,11 @@ export default function WaterfallAdd() {
   const handlePositionSelect = (position: number) => {
     setSelectedPosition(position)
     
-    const algorithm = mockPositionAlgorithm.find(p => p.position === position)
+    // 根据推荐类型选择不同的算法数据
+    const algorithmData = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD 
+      ? mockRevivePositionAlgorithm 
+      : mockPositionAlgorithm
+    const algorithm = algorithmData.find(p => p.position === position)
     if (algorithm) {
       setSelectedAlgorithmInfo({
         id: algorithm.algorithmId,
@@ -582,6 +604,24 @@ export default function WaterfallAdd() {
             </Card>
           )}
 
+          {/* 暂未开通提示 */}
+          {showNotAvailable && (
+            <Card 
+              size="small"
+              style={{ marginBottom: 12, borderRadius: 8 }}
+            >
+              <div style={{ textAlign: 'center', padding: '32px 0', color: '#8c8c8c' }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#595959', marginBottom: 6 }}>
+                  暫未開通
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  當前推薦類型暫不支持廣告位選擇，僅「無敵星星」和「盤活復蘇」類型可用
+                </div>
+              </div>
+            </Card>
+          )}
+
 
           {/* 区域计价配置 */}
           {selectedPosition && (
@@ -640,28 +680,49 @@ export default function WaterfallAdd() {
                     )}
                   </div>
 
-                  {/* 时段售价 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-                    {TIME_SLOTS.map(slot => (
-                      <Form.Item
-                        key={slot.key}
-                        label={`${slot.label}售價`}
-                        style={{ marginBottom: 0 }}
-                      >
-                        <InputNumber
-                          min={0}
-                          precision={2}
-                          placeholder={`請輸入${slot.label}售價`}
-                          style={{ width: '100%' }}
-                          addonAfter="MOP"
-                          value={config.pricing[slot.key]}
-                          onChange={(value) => handleUpdateRegionPricing(config.region, slot.key, value)}
-                        />
-                      </Form.Item>
-                    ))}
-                  </div>
+                  {/* 时段售价 / 按天售价 */}
+                  {isReviveAlgorithm ? (
+                    // 盤活復蘇：按天计价
+                    <Form.Item
+                      label="每天售價"
+                      style={{ marginBottom: 0 }}
+                    >
+                      <InputNumber
+                        min={0}
+                        precision={2}
+                        placeholder="請輸入每天售價"
+                        style={{ width: '100%' }}
+                        addonAfter="MOP/天"
+                        value={config.pricing['fullDay']}
+                        onChange={(value) => handleUpdateRegionPricing(config.region, 'fullDay', value)}
+                      />
+                    </Form.Item>
+                  ) : (
+                    // 無敵星星：按时段计价
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+                      {TIME_SLOTS.map(slot => (
+                        <Form.Item
+                          key={slot.key}
+                          label={`${slot.label}售價`}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            min={0}
+                            precision={2}
+                            placeholder={`請輸入${slot.label}售價`}
+                            style={{ width: '100%' }}
+                            addonAfter="MOP"
+                            value={config.pricing[slot.key]}
+                            onChange={(value) => handleUpdateRegionPricing(config.region, slot.key, value)}
+                          />
+                        </Form.Item>
+                      ))}
+                    </div>
+                  )}
 
-                  {/* 时段折扣开关 */}
+                  {/* 时段折扣开关 - 仅無敵星星显示 */}
+                  {!isReviveAlgorithm && (
+                    <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: config.discountEnabled ? 12 : 0 }}>
                     <span style={{ fontSize: 13, color: '#595959' }}>时段折扣配置:</span>
                     <Switch 
@@ -726,6 +787,8 @@ export default function WaterfallAdd() {
                     </div>
                     </>
                   )}
+                    </>
+                  )}
                 </div>
               ))}
               </>
@@ -733,12 +796,12 @@ export default function WaterfallAdd() {
             </Card>
           )}
 
-          {/* 时段个数折扣 - 梯度配置 */}
+          {/* 购买多天折扣配置（梯度）/ 时段个数折扣配置 */}
           {selectedRegions.length > 0 && (
             <Card 
               title={
                 <Space>
-                  時段個數折扣配置（梯度）
+                  {isReviveAlgorithm ? '購買多天折扣配置（梯度）' : '時段個數折扣配置（梯度）'}
                   <Switch 
                     checked={gradientEnabled}
                     onChange={(checked) => {
@@ -752,7 +815,7 @@ export default function WaterfallAdd() {
                     style={{ marginLeft: 8 }}
                   />
                   <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
-                    購買多個時段時匹配以下折扣
+                    {isReviveAlgorithm ? '購買多天時匹配以下折扣' : '購買多個時段時匹配以下折扣'}
                   </span>
                 </Space>
               }
@@ -781,16 +844,16 @@ export default function WaterfallAdd() {
                   {gradients.map((gradient, index) => (
                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
                       <Tag color="blue">梯度 {index + 1}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>時段個數≥</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{isReviveAlgorithm ? '購買天數≥' : '時段個數≥'}</span>
                       <InputNumber
                         min={1}
-                        max={6}
-                        placeholder="時段個數"
+                        max={isReviveAlgorithm ? 30 : 6}
+                        placeholder={isReviveAlgorithm ? '天數' : '時段個數'}
                         style={{ width: 80 }}
                         value={gradient.count}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
-                      <span style={{ fontSize: 13, color: '#595959' }}>個時段，對應折扣：</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{isReviveAlgorithm ? '天，對應折扣：' : '個時段，對應折扣：'}</span>
                       <InputNumber
                         min={1}
                         max={100}
@@ -814,8 +877,8 @@ export default function WaterfallAdd() {
             </Card>
           )}
 
-          {/* 多区域组合折扣 */}
-          {selectedRegions.length > 0 && (
+          {/* 多区域组合折扣 - 仅無敵星星显示 */}
+          {!isReviveAlgorithm && selectedRegions.length > 0 && (
             <Card 
               title={
                 <Space>

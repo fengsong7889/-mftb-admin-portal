@@ -7,6 +7,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { AlgorithmType, Region, RecommendChannel, AppType, APP_OPTIONS, REGION_OPTIONS } from '../Recommend/constants'
 import DateTimeGrid from './DateTimeGrid'
+import DayPicker from './DayPicker'
 import {
   type InventoryItem,
   type RecommendTypeConfig,
@@ -263,8 +264,8 @@ export default function PromotionSalesConfig() {
         </Card>
       )}
 
-      {/* Step 3: 选择时段并加购 */}
-      {currentStep === 2 && selectedInventory && (
+      {/* Step 3: 选择时段并加购 - 無敵星星 */}
+      {currentStep === 2 && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <>
           <Card
             title={
@@ -297,6 +298,47 @@ export default function PromotionSalesConfig() {
             bodyStyle={{ padding: '5px 24px' }}
           >
             <DateTimeGrid
+              inventoryItem={selectedInventory}
+            />
+          </Card>
+        </>
+      )}
+
+      {/* Step 3: 选择日期并加购 - 盤活復蘇 */}
+      {currentStep === 2 && selectedInventory && selectedInventory.algorithmType === AlgorithmType.HOT_REVIVE_AD && (
+        <>
+          <Card
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Space size={24}>
+                  <Space size={8}>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前所選廣告：</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}>{selectedInventory.promotionName}</span>
+                  </Space>
+                  <Space size={8}>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>業務頻道：</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#1890ff' }}>{CHANNEL_LABEL[selectedInventory.channel]}</span>
+                  </Space>
+                  <Space size={8}>
+                    <span style={{ fontSize: 13, color: '#8c8c8c' }}>展示位置：</span>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{selectedInventory.slotPosition}號位</span>
+                  </Space>
+                  <Tag color="volcano">盤活復蘇</Tag>
+                </Space>
+                <Button
+                  type="primary"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={handleGoBack}
+                  style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
+                >
+                  返回上一步
+                </Button>
+              </div>
+            }
+            style={{ marginBottom: 16 }}
+            bodyStyle={{ padding: '16px 24px' }}
+          >
+            <DayPicker
               inventoryItem={selectedInventory}
             />
           </Card>
