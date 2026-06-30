@@ -21,7 +21,8 @@ import { mockAlgorithmData } from '../Algorithm'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.FOOD_DELIVERY]: '美食外賣',
+  [RecommendChannel.HOME]: '大首頁',
+  [RecommendChannel.DELIVERY]: '外賣頻道',
   [RecommendChannel.SUPERMARKET]: '超市百貨',
   [RecommendChannel.GROUP_BUY]: '團購到店',
 }
@@ -52,7 +53,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
 const generateMockData = (): WaterfallSlotConfig[] => {
   const data: WaterfallSlotConfig[] = []
   const channels = [
-    RecommendChannel.FOOD_DELIVERY,
+    RecommendChannel.DELIVERY,
     RecommendChannel.GROUP_BUY,
     RecommendChannel.SUPERMARKET,
   ]

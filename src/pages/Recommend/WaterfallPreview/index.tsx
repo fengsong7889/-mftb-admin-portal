@@ -11,14 +11,15 @@ import type { WaterfallSlotConfig } from '../types'
 import { mockWaterfallData } from './mockData'
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.FOOD_DELIVERY]: '美食外賣',
+  [RecommendChannel.HOME]: '大首頁',
+  [RecommendChannel.DELIVERY]: '外賣頻道',
   [RecommendChannel.SUPERMARKET]: '超市百貨',
   [RecommendChannel.GROUP_BUY]: '團購到店',
 }
 
 export default function WaterfallPreview() {
   const [selectedApp, setSelectedApp] = useState<AppType>(AppType.SHANFENG)
-  const [selectedChannel, setSelectedChannel] = useState<RecommendChannel>(RecommendChannel.FOOD_DELIVERY)
+  const [selectedChannel, setSelectedChannel] = useState<RecommendChannel>(RecommendChannel.DELIVERY)
 
   // 过滤启用的坑位配置
   const enabledSlots = useMemo(() => {

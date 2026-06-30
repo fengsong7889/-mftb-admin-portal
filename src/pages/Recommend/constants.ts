@@ -11,13 +11,15 @@ export const APP_OPTIONS = [
 
 /** 业务频道（推荐瀑布流） */
 export enum RecommendChannel {
-  FOOD_DELIVERY = 1,   // 美食外卖
-  SUPERMARKET = 2,     // 超市百货
-  GROUP_BUY = 3,       // 团购到店
+  HOME = 1,           // 大首页
+  DELIVERY = 2,       // 外卖频道
+  SUPERMARKET = 3,    // 超市百货
+  GROUP_BUY = 4,      // 团购到店
 }
 
 export const RECOMMEND_CHANNEL_OPTIONS = [
-  { label: '美食外賣', value: RecommendChannel.FOOD_DELIVERY },
+  { label: '大首頁', value: RecommendChannel.HOME },
+  { label: '外賣頻道', value: RecommendChannel.DELIVERY },
   { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
   { label: '團購到店', value: RecommendChannel.GROUP_BUY },
 ]

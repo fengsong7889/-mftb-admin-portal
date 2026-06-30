@@ -112,6 +112,18 @@ export default function WaterfallAdd() {
   const [regionCombinations, setRegionCombinations] = useState<RegionCombinationDiscount[]>([])
   const [regionCombinationEnabled, setRegionCombinationEnabled] = useState(false) // 区域组合折扣开关
   
+  // 销售策略（仅无敌星星）
+  const [presaleMode, setPresaleMode] = useState<'fixed' | 'rolling'>('fixed') // 预售模式：固定/滚动
+  const [presaleDays, setPresaleDays] = useState<number>(7) // 预售天数
+  const [continuousPurchase, setContinuousPurchase] = useState(false) // 连续购买
+  const [purchaseLimitDays, setPurchaseLimitDays] = useState<number>(30) // 购买上限：X天内
+  const [purchaseLimitSlots, setPurchaseLimitSlots] = useState<number>(3) // 最多可购买X个时段
+  const [purchaseLimitMeals, setPurchaseLimitMeals] = useState<string[]>([]) // 统计时段（多选）
+  const [continuousInterval, setContinuousInterval] = useState<number>(7) // 连续购买=不支持时间隔天数
+  const [merchantLimit, setMerchantLimit] = useState(false) // 商家限制
+  const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]) // 选择的商家
+  const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
+  
   // 显示广告位的条件：仅無敵星星和盤活復蘇
   const canShowPositions = selectedApp && selectedChannel && selectedAlgorithmType &&
     (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD)
@@ -601,6 +613,162 @@ export default function WaterfallAdd() {
                   </Space>
                 </div>
               )}
+            </Card>
+          )}
+
+          {/* 销售策略（仅无敌星星） */}
+          {selectedPosition && !isReviveAlgorithm && (
+            <Card 
+              title="銷售策略" 
+              size="small"
+              style={{ marginBottom: 12, borderRadius: 8 }}
+            >
+              {/* 预售模式 + 预售天数 并排 */}
+              <div style={{ display: 'flex', gap: 32, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售模式：</span>
+                  <Switch 
+                    checked={presaleMode === 'rolling'}
+                    onChange={(checked) => setPresaleMode(checked ? 'rolling' : 'fixed')}
+                    checkedChildren="滾動"
+                    unCheckedChildren="固定"
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數：</span>
+                  <InputNumber
+                    min={1}
+                    max={90}
+                    value={presaleDays}
+                    onChange={(value) => setPresaleDays(value || 7)}
+                    addonAfter="天"
+                    style={{ width: 160 }}
+                  />
+                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                    {presaleMode === 'fixed' 
+                      ? `系統僅銷售 ${presaleDays} 天內的廣告，每過一天減少一天，售完即止`
+                      : `系統持續銷售 ${presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售`}
+                  </span>
+                </div>
+              </div>
+
+              {/* 连续购买：Switch + 右侧参数 */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>連續購買：</span>
+                  <Switch 
+                    checked={continuousPurchase}
+                    onChange={(checked) => setContinuousPurchase(checked)}
+                    checkedChildren="支持"
+                    unCheckedChildren="不支持"
+                  />
+                </div>
+                {/* 右侧参数区 */}
+                {continuousPurchase ? (
+                  <div style={{ flex: 1, padding: 12, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: '#595959' }}>購買上限：</span>
+                      <InputNumber min={1} max={365} value={purchaseLimitDays} onChange={(value) => setPurchaseLimitDays(value || 30)} style={{ width: 80 }} size="small" />
+                      <span style={{ fontSize: 12, color: '#595959' }}>天內，最多可購買</span>
+                      <InputNumber min={1} max={20} value={purchaseLimitSlots} onChange={(value) => setPurchaseLimitSlots(value || 3)} style={{ width: 70 }} size="small" />
+                      <span style={{ fontSize: 12, color: '#595959' }}>個時段，只統計</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {TIME_SLOTS.filter(t => t.key !== 'fullDay').map(slot => (
+                        <Checkbox
+                          key={slot.key}
+                          checked={purchaseLimitMeals.includes(slot.key)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setPurchaseLimitMeals([...purchaseLimitMeals, slot.key])
+                            } else {
+                              setPurchaseLimitMeals(purchaseLimitMeals.filter(k => k !== slot.key))
+                            }
+                          }}
+                        >
+                          {slot.label}
+                        </Checkbox>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, padding: 12, background: '#fff7e6', borderRadius: 6, border: '1px solid #ffd591' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: '#595959' }}>間隔</span>
+                      <InputNumber min={1} max={365} value={continuousInterval} onChange={(value) => setContinuousInterval(value || 7)} style={{ width: 80 }} size="small" />
+                      <span style={{ fontSize: 12, color: '#595959' }}>天，可再次購買</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 商家限制：Switch + 右侧按钮 */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>商家限制：</span>
+                  <Switch 
+                    checked={merchantLimit}
+                    onChange={(checked) => setMerchantLimit(checked)}
+                    checkedChildren="限制"
+                    unCheckedChildren="不限制"
+                  />
+                </div>
+                {merchantLimit && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Button icon={<PlusOutlined />} onClick={() => message.info('打開商家選擇界面')}>
+                      選擇商家
+                    </Button>
+                    {selectedMerchants.length > 0 && (
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>已選 {selectedMerchants.length} 個商家</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 可售时段（复选） */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>可售時段：</span>
+                <Checkbox
+                  checked={onlySellTimeSlots.includes('fullDay')}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      // 勾选全部时，取消其它5个时段
+                      setOnlySellTimeSlots(['fullDay'])
+                    } else {
+                      setOnlySellTimeSlots([])
+                    }
+                  }}
+                >
+                  全部
+                </Checkbox>
+                {TIME_SLOTS.filter(t => t.key !== 'fullDay').map(slot => {
+                  const isAllSelected = onlySellTimeSlots.includes('fullDay')
+                  const isChecked = !isAllSelected && onlySellTimeSlots.includes(slot.key)
+                  return (
+                    <Checkbox
+                      key={slot.key}
+                      checked={isChecked}
+                      onChange={(e) => {
+                        let next: string[]
+                        if (e.target.checked) {
+                          // 勾选单个时段时，取消全部
+                          next = [...onlySellTimeSlots.filter(k => k !== 'fullDay'), slot.key]
+                        } else {
+                          next = onlySellTimeSlots.filter(k => k !== slot.key && k !== 'fullDay')
+                        }
+                        // 当5个时段都勾选时，自动变为全选
+                        const allSlots = ['breakfast', 'lunch', 'afternoon', 'dinner', 'night']
+                        if (allSlots.every(s => next.includes(s))) {
+                          next = ['fullDay']
+                        }
+                        setOnlySellTimeSlots(next)
+                      }}
+                    >
+                      <span style={{ color: isAllSelected ? '#bfbfbf' : '#595959' }}>{slot.label}</span>
+                    </Checkbox>
+                  )
+                })}
+              </div>
             </Card>
           )}
 

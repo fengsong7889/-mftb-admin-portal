@@ -43,7 +43,8 @@ const TYPE_COLOR: Record<AlgorithmType, string> = {
 } as Record<AlgorithmType, string>
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.FOOD_DELIVERY]: '美食外賣',
+  [RecommendChannel.HOME]: '大首頁',
+  [RecommendChannel.DELIVERY]: '外賣頻道',
   [RecommendChannel.SUPERMARKET]: '超市百貨',
   [RecommendChannel.GROUP_BUY]: '團購到店',
 }
@@ -75,19 +76,19 @@ const BRAND_COLOR: Record<AppType, string> = {
 }
 
 export const mockAlgorithmData: AlgorithmRecord[] = [
-  { id: 1, name: '無敵星星-首頁版', code: 'ALG_STAR_HOME', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 2, name: '新店廣告-外賣版', code: 'ALG_NEWSTORE_DELIVERY', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 1, name: '無敵星星-首頁版', code: 'ALG_STAR_HOME', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 2, name: '新店廣告-外賣版', code: 'ALG_NEWSTORE_DELIVERY', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 3, name: '盤活復蘇-團購版', code: 'ALG_REVIVE_GROUPBUY', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 4, name: '獨家商家-超市版', code: 'ALG_EXCLUSIVE_SUPER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 5, name: '流量廣告-全渠道', code: 'ALG_TRAFFIC_ALL', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 4 },
-  { id: 6, name: '猜你喜歡-主力版', code: 'ALG_GUESS_MAIN', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 7, name: '自然流量-默認', code: 'ALG_ORGANIC_DEFAULT', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 8, name: '搜索算法-綜合版', code: 'ALG_SEARCH_COMPOSITE', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 9, name: '無敵星星-夜間版', code: 'ALG_STAR_NIGHT', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 5, name: '流量廣告-全渠道', code: 'ALG_TRAFFIC_ALL', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 4 },
+  { id: 6, name: '猜你喜歡-主力版', code: 'ALG_GUESS_MAIN', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 7, name: '自然流量-默認', code: 'ALG_ORGANIC_DEFAULT', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 8, name: '搜索算法-綜合版', code: 'ALG_SEARCH_COMPOSITE', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 9, name: '無敵星星-夜間版', code: 'ALG_STAR_NIGHT', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 10, name: '新店廣告-早餐版', code: 'ALG_NEWSTORE_BREAKFAST', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 11, name: '盤活復蘇-午市版', code: 'ALG_REVIVE_LUNCH', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 11, name: '盤活復蘇-午市版', code: 'ALG_REVIVE_LUNCH', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
   { id: 12, name: '獨家商家-晚市版', code: 'ALG_EXCLUSIVE_DINNER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 13, name: '流量廣告-下午茶', code: 'ALG_TRAFFIC_AFTERNOON', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.FOOD_DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 13, name: '流量廣告-下午茶', code: 'ALG_TRAFFIC_AFTERNOON', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 14, name: '猜你喜歡-週末版', code: 'ALG_GUESS_WEEKEND', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 4 },
   { id: 15, name: '搜索算法-深夜版', code: 'ALG_SEARCH_NIGHT', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 1 },
 ]
@@ -238,7 +239,7 @@ export default function Algorithm() {
             <Select 
               placeholder="全部" 
               options={[
-                { label: '美食外賣', value: RecommendChannel.FOOD_DELIVERY },
+                { label: '美食外賣', value: RecommendChannel.DELIVERY },
                 { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
                 { label: '團購到店', value: RecommendChannel.GROUP_BUY },
               ]}

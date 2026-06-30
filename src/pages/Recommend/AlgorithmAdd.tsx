@@ -293,7 +293,7 @@ export default function AlgorithmAdd() {
               <Select
                 placeholder="請選擇業務頻道"
                 options={[
-                  { label: '美食外賣', value: RecommendChannel.FOOD_DELIVERY },
+                  { label: '美食外賣', value: RecommendChannel.DELIVERY },
                   { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
                   { label: '團購到店', value: RecommendChannel.GROUP_BUY },
                 ]}
