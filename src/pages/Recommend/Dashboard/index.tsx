@@ -36,7 +36,7 @@ const RUNNING_ADS: RunningAd[] = [
   { id: 1, name: '無敵星星-首頁推廣', type: '無敵星星', channel: '大首頁', region: '澳門', budget: 50000, spent: 32000, impressions: 1250000, clicks: 58750, ctr: 4.7, status: 'running', startDate: '2026-06-01', endDate: '2026-06-30' },
   { id: 2, name: '猜你喜歡-外賣推廣', type: '猜你喜歡', channel: '外賣', region: '澳門', budget: 30000, spent: 18500, impressions: 850000, clicks: 38250, ctr: 4.5, status: 'running', startDate: '2026-06-10', endDate: '2026-07-10' },
   { id: 3, name: '流量廣告-團購推廣', type: '流量廣告', channel: '團購', region: '氹仔', budget: 25000, spent: 15200, impressions: 620000, clicks: 24800, ctr: 4.0, status: 'running', startDate: '2026-06-15', endDate: '2026-07-15' },
-  { id: 4, name: '熱門盤活-超市推廣', type: '熱門盤活', channel: '超市', region: '珠海', budget: 20000, spent: 12800, impressions: 480000, clicks: 19200, ctr: 4.0, status: 'running', startDate: '2026-06-05', endDate: '2026-06-25' },
+  { id: 4, name: '盤活復蘇-超市推廣', type: '盤活復蘇', channel: '超市', region: '珠海', budget: 20000, spent: 12800, impressions: 480000, clicks: 19200, ctr: 4.0, status: 'running', startDate: '2026-06-05', endDate: '2026-06-25' },
   { id: 5, name: '新店推送-外賣推廣', type: '新店推送', channel: '外賣', region: '澳門', budget: 15000, spent: 8900, impressions: 320000, clicks: 12800, ctr: 4.0, status: 'running', startDate: '2026-06-20', endDate: '2026-07-20' },
   { id: 6, name: '獨家商店-首頁推廣', type: '獨家商店', channel: '大首頁', region: '氹仔', budget: 40000, spent: 28000, impressions: 950000, clicks: 47500, ctr: 5.0, status: 'running', startDate: '2026-06-01', endDate: '2026-06-30' },
 ]
@@ -70,7 +70,7 @@ const AD_TYPE_COLORS: Record<string, string> = {
   '猜你喜歡': 'blue',
   '無敵星星': 'purple',
   '新店推送': 'green',
-  '熱門盤活': 'orange',
+  '盤活復蘇': 'orange',
   '獨家商店': 'red',
   '流量廣告': 'gold',
 }
@@ -302,7 +302,7 @@ export default function Dashboard() {
               <Option value="猜你喜歡">猜你喜歡</Option>
               <Option value="無敵星星">無敵星星</Option>
               <Option value="新店推送">新店推送</Option>
-              <Option value="熱門盤活">熱門盤活</Option>
+              <Option value="盤活復蘇">盤活復蘇</Option>
               <Option value="獨家商店">獨家商店</Option>
               <Option value="流量廣告">流量廣告</Option>
             </Select>

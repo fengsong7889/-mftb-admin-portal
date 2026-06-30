@@ -20,7 +20,7 @@ const { TextArea } = Input
 const ALGORITHM_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活廣告',
+  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
@@ -79,14 +79,14 @@ const mockData = [
   {
     id: 2,
     algorithmType: AlgorithmType.HOT_REVIVE_AD,
-    name: '盤活廣告策略-團購',
+    name: '盤活復蘇策略-團購',
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
     timeSlot: TimeSlot.ALL_DAY,
     config: {
       inactiveDays: 30,
       maxDisplayFrequency: 2,
-      recallStrategy: '熱門盤活召回',
+      recallStrategy: '盤活復蘇召回',
       frequencyControl: '每用戶每天最多展示2次',
     },
     status: ServiceStatus.ENABLED,

@@ -72,7 +72,7 @@ enum RecommendType {
 
 const RECOMMEND_TYPE_LABEL: Record<RecommendType, string> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [RecommendType.REVITALIZATION_AD]: '盤活廣告',
+  [RecommendType.REVITALIZATION_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
   [RecommendType.TRAFFIC_AD]: '流量廣告',
 }
@@ -145,7 +145,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '3',
     orderNo: 'ORD20250707003',
-    promotionName: '熱門盤活·外賣熱推',
+    promotionName: '盤活復蘇·外賣熱推',
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.ZHUHAI,
@@ -233,7 +233,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '8',
     orderNo: 'ORD20250629008',
-    promotionName: '熱門盤活·團購到店',
+    promotionName: '盤活復蘇·團購到店',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.TAIPA,
@@ -304,7 +304,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '12',
     orderNo: 'ORD20250625012',
-    promotionName: '熱門盤活·氹仔熱推',
+    promotionName: '盤活復蘇·氹仔熱推',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.TAIPA,

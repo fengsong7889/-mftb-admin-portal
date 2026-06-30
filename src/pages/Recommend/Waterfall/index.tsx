@@ -29,7 +29,7 @@ const CHANNEL_LABEL: Record<RecommendChannel, string> = {
 const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活廣告',
+  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
@@ -60,7 +60,7 @@ const generateMockData = (): WaterfallSlotConfig[] => {
   const algorithms = [
     { id: 1, name: '無敵星星-首頁版', type: AlgorithmType.INVINCIBLE_STAR },
     { id: 2, name: '新店廣告-外賣版', type: AlgorithmType.NEW_STORE_AD },
-    { id: 3, name: '盤活廣告-團購版', type: AlgorithmType.HOT_REVIVE_AD },
+    { id: 3, name: '盤活復蘇-團購版', type: AlgorithmType.HOT_REVIVE_AD },
     { id: 4, name: '獨家商家-超市版', type: AlgorithmType.EXCLUSIVE_MERCHANT },
     { id: 5, name: '流量廣告-全渠道', type: AlgorithmType.TRAFFIC_AD },
     { id: 6, name: '猜你喜歡-主力版', type: AlgorithmType.GUESS_YOU_LIKE },

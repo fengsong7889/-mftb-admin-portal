@@ -3,14 +3,14 @@
 /** 推荐类型枚举 */
 export enum ReportRecommendType {
   INVINCIBLE_STAR = 1,      // 無敵星星
-  REVITALIZATION_AD = 2,    // 盤活廣告
+  REVITALIZATION_AD = 2,    // 盤活復蘇
   NEW_STORE_AD = 3,         // 新店廣告
   TRAFFIC_AD = 4,           // 流量廣告
 }
 
 export const REPORT_RECOMMEND_TYPE_LABEL: Record<ReportRecommendType, string> = {
   [ReportRecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [ReportRecommendType.REVITALIZATION_AD]: '盤活廣告',
+  [ReportRecommendType.REVITALIZATION_AD]: '盤活復蘇',
   [ReportRecommendType.NEW_STORE_AD]: '新店廣告',
   [ReportRecommendType.TRAFFIC_AD]: '流量廣告',
 }

@@ -259,7 +259,7 @@ export default function PromotionSlotConfigAdd() {
                   { label: '無敵星星', value: 'invincibleStar' },
                   { label: '猜你喜歡', value: 'youLike' },
                   { label: '新店廣告', value: 'newShopAd' },
-                  { label: '盤活廣告', value: 'activateAd' },
+                  { label: '盤活復蘇', value: 'activateAd' },
                   { label: '獨家商家', value: 'exclusiveShop' },
                 ]}
                 onChange={(value) => {

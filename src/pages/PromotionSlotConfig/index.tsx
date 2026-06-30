@@ -55,7 +55,7 @@ const APP_LABEL: Record<string, string> = {
 const ALGORITHM_TYPE_LABEL: Record<string, string> = {
   invincibleStar: '無敵星星',
   newShopAd: '新店廣告',
-  activateAd: '盤活廣告',
+  activateAd: '盤活復蘇',
   exclusiveShop: '獨家商家',
   youLike: '猜你喜歡',
 }
@@ -90,7 +90,7 @@ const mockData: WaterfallSlotConfig[] = (() => {
     invincibleStar: ['無敵星星-首頁版', '無敵星星-外賣版', '無敵星星-團購版'],
     youLike: ['猜你喜歡-主力版', '猜你喜歡-週末版', '猜你喜歡-夜間版'],
     newShopAd: ['新店廣告-首頁版', '新店廣告-早餐版', '新店廣告-午市版'],
-    activateAd: ['盤活廣告-首頁版', '盤活廣告-午市版', '盤活廣告-晚市版'],
+    activateAd: ['盤活復蘇-首頁版', '盤活復蘇-午市版', '盤活復蘇-晚市版'],
     exclusiveShop: ['獨家商家-首頁版', '獨家商家-超市版', '獨家商家-晚市版'],
   }
   const users = ['admin', 'operator', 'user001', 'user002']
@@ -169,7 +169,7 @@ export default function PromotionSlotConfig() {
         invincibleStar: ['無敵星星-首頁版', '無敵星星-外賣版', '無敵星星-團購版'],
         youLike: ['猜你喜歡-主力版', '猜你喜歡-週末版', '猜你喜歡-夜間版'],
         newShopAd: ['新店廣告-首頁版', '新店廣告-早餐版', '新店廣告-午市版'],
-        activateAd: ['盤活廣告-首頁版', '盤活廣告-午市版', '盤活廣告-晚市版'],
+        activateAd: ['盤活復蘇-首頁版', '盤活復蘇-午市版', '盤活復蘇-晚市版'],
         exclusiveShop: ['獨家商家-首頁版', '獨家商家-超市版', '獨家商家-晚市版'],
       }
       
@@ -575,7 +575,7 @@ export default function PromotionSlotConfig() {
                 { label: '無敵星星', value: 'invincibleStar' },
                 { label: '猜你喜歡', value: 'youLike' },
                 { label: '新店廣告', value: 'newShopAd' },
-                { label: '盤活廣告', value: 'activateAd' },
+                { label: '盤活復蘇', value: 'activateAd' },
                 { label: '獨家商家', value: 'exclusiveShop' },
               ]}
             />
@@ -943,7 +943,7 @@ export default function PromotionSlotConfig() {
                 { label: '無敵星星', value: 'invincibleStar' },
                 { label: '猜你喜歡', value: 'youLike' },
                 { label: '新店廣告', value: 'newShopAd' },
-                { label: '盤活廣告', value: 'activateAd' },
+                { label: '盤活復蘇', value: 'activateAd' },
                 { label: '獨家商家', value: 'exclusiveShop' },
               ]}
             />

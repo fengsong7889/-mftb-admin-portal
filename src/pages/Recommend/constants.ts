@@ -41,7 +41,7 @@ export const PLACEMENT_INTERFACE_OPTIONS = [
 export enum AlgorithmType {
   INVINCIBLE_STAR = 1,    // 无敌星星
   NEW_STORE_AD = 2,       // 新店广告
-  HOT_REVIVE_AD = 3,      // 盘活广告
+  HOT_REVIVE_AD = 3,      // 盘活复苏
   EXCLUSIVE_MERCHANT = 4, // 独家商家
   TRAFFIC_AD = 5,         // 流量广告
   GUESS_YOU_LIKE = 6,     // 猜你喜欢
@@ -52,7 +52,7 @@ export enum AlgorithmType {
 export const ALGORITHM_TYPE_OPTIONS = [
   { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
   { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-  { label: '盤活廣告', value: AlgorithmType.HOT_REVIVE_AD },
+  { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
   { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
   { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
   { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },

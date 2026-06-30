@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined } from '@ant-design/icons'
-import { AlgorithmType, RecommendChannel, PlacementInterface, TimeSlot, TIME_SLOT_OPTIONS } from './constants'
+import { AlgorithmType, RecommendChannel, PlacementInterface, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
 
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
@@ -228,6 +228,20 @@ export default function AlgorithmAdd() {
             </Form.Item>
 
             <Form.Item
+              label="所屬品牌"
+              name="brand"
+              rules={[{ required: true, message: '請選擇所屬品牌' }]}
+              style={{ flex: 1, marginBottom: 0 }}
+              labelCol={{ span: 6 }}
+              wrapperCol={{ span: 18 }}
+            >
+              <Select
+                placeholder="請選擇所屬品牌"
+                options={APP_OPTIONS}
+              />
+            </Form.Item>
+
+            <Form.Item
               label="算法類型"
               name="type"
               rules={[{ required: true, message: '請選擇算法類型' }]}
@@ -240,7 +254,7 @@ export default function AlgorithmAdd() {
                 options={[
                   { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
                   { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-                  { label: '盤活廣告', value: AlgorithmType.HOT_REVIVE_AD },
+                  { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
                   { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
                   { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
                   { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
@@ -250,18 +264,20 @@ export default function AlgorithmAdd() {
                 onChange={(value) => {
                   setSelectedAlgorithmType(value)
                   // 切换算法类型时重置参数区域的状态
-                  if (value !== AlgorithmType.INVINCIBLE_STAR) {
+                  if (value !== AlgorithmType.INVINCIBLE_STAR && value !== AlgorithmType.HOT_REVIVE_AD) {
                     setIsEditing(false)
                   }
                 }}
               />
             </Form.Item>
+          </div>
 
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 16 }}>
             <Form.Item
               label="業務頻道"
               name="channel"
               rules={[{ required: true, message: '請選擇業務頻道' }]}
-              style={{ flex: 1, marginBottom: 0 }}
+              style={{ flex: '0 0 calc((100% - 32px) / 3)', marginBottom: 0 }}
               labelCol={{ span: 6 }}
               wrapperCol={{ span: 18 }}
             >
@@ -279,7 +295,7 @@ export default function AlgorithmAdd() {
       </Card>
 
       {/* 算法参数区域 */}
-      {selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? (
+      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD) ? (
         <Card 
           title={
             <Space>
@@ -336,9 +352,9 @@ export default function AlgorithmAdd() {
           {/* 配送地圖同步頻率和執行時段前每 */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             <Form.Item
-              label="配送地圖同步頻率"
+              label="配送範圍同步"
               name="deliveryMapFetchFrequency"
-              rules={[{ required: true, message: '請輸入配送地圖同步頻率' }]}
+              rules={[{ required: true, message: '請輸入配送範圍同步的分鐘數' }]}
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 4 }}
               wrapperCol={{ span: 20 }}
@@ -353,15 +369,15 @@ export default function AlgorithmAdd() {
                   borderRadius: 8,
                   fontSize: 14
                 }}
-                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>分鐘計算</span>}
+                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>分鐘/次</span>}
                 size="large"
               />
             </Form.Item>
 
             <Form.Item
-              label="執行時段前每"
+              label="區域數據提前"
               name="regionPurchaseCalcFrequency"
-              rules={[{ required: true, message: '請輸入執行時段前每分鐘數' }]}
+              rules={[{ required: true, message: '請輸入區域數據提前的分鐘數' }]}
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 4 }}
               wrapperCol={{ span: 20 }}
@@ -376,60 +392,55 @@ export default function AlgorithmAdd() {
                   borderRadius: 8,
                   fontSize: 14
                 }}
-                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>分鐘計算</span>}
+                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>分鐘計算存儲</span>}
                 size="large"
               />
             </Form.Item>
           </div>
 
-          {/* 區域商家展示限制 */}
-          <Form.Item
-            label="區域商家展示限制"
-            name="regionMerchantDisplayLimit"
-            rules={[{ required: true, message: '請輸入區域商家展示限制数量' }]}
-            labelCol={{ span: 4 }}
-            wrapperCol={{ span: 20 }}
-          >
-            <InputNumber
-              min={1}
-              max={10000}
-              placeholder="請輸入商家数量"
-              style={{
-                width: '100%',
-                height: 44,
-                borderRadius: 8,
-                fontSize: 14
-              }}
-              addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>個數</span>}
-              size="large"
-            />
-          </Form.Item>
+          {/* 區域商家展示限制 和 算法落地頁 並排展示 */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <Form.Item
+              label="區域商家展示限制"
+              name="regionMerchantDisplayLimit"
+              rules={[{ required: true, message: '請輸入區域商家展示限制数量' }]}
+              style={{ flex: 1, marginBottom: 0 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
+            >
+              <InputNumber
+                min={1}
+                max={10000}
+                placeholder="請輸入商家数量"
+                style={{
+                  width: '100%',
+                  height: 44,
+                  borderRadius: 8,
+                  fontSize: 14
+                }}
+                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>個數</span>}
+                size="large"
+              />
+            </Form.Item>
 
-          {/* 算法落地頁 */}
-          <Form.Item
-            label="算法落地頁"
-            name="algorithmLandingPage"
-            rules={[{ required: true, message: '請選擇算法落地頁' }]}
-            labelCol={{ span: 4 }}
-            wrapperCol={{ span: 20 }}
-          >
-            <Select
-              placeholder="請選擇算法落地頁"
-              allowClear
-              style={{
-                height: 44,
-                borderRadius: 8,
-                fontSize: 14
-              }}
-              size="large"
-              options={[
-                { label: '大首頁-Feed', value: 'home' },
-                { label: '外賣頻道-Feed', value: 'delivery' },
-                { label: '超市頻道-Feed', value: 'supermarket' },
-                { label: '團購頻道-Feed', value: 'groupBuy' },
-              ]}
-            />
-          </Form.Item>
+            <Form.Item
+              label="算法落地頁"
+              name="algorithmLandingPage"
+              rules={[{ required: true, message: '請選擇算法落地頁' }]}
+              style={{ flex: 1, marginBottom: 0 }}
+              labelCol={{ span: 4 }}
+              wrapperCol={{ span: 20 }}
+            >
+              <Checkbox.Group
+                options={[
+                  { label: '大首頁-Feed', value: 'home' },
+                  { label: '外賣頻道-Feed', value: 'delivery' },
+                  { label: '超市頻道-Feed', value: 'supermarket' },
+                  { label: '團購頻道-Feed', value: 'groupBuy' },
+                ]}
+              />
+            </Form.Item>
+          </div>
         </Form>
         </Card>
       ) : selectedAlgorithmType ? (

@@ -158,7 +158,19 @@ const MapPlanning: React.FC = () => {
       key: String(node.id),
       title: (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingRight: 8 }}>
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.title}</span>
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {node.level === 1 ? (
+              <>
+                <span style={{ color: '#1890ff', fontWeight: 600 }}>【區域】</span>
+                <span>{node.title}</span>
+              </>
+            ) : (
+              <>
+                <span style={{ color: '#52c41a', fontWeight: 500 }}>【商圈】</span>
+                <span>{node.title}</span>
+              </>
+            )}
+          </span>
           {node.level === 1 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 140, justifyContent: 'flex-end', paddingLeft: 16 }}>
               <Switch

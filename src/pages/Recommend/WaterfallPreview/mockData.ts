@@ -151,7 +151,7 @@ export const mockWaterfallData: WaterfallSlotConfig[] = [
     channel: RecommendChannel.GROUP_BUY,
     slotPosition: 1,
     algorithmId: 3,
-    algorithmName: '盤活廣告-團購版',
+    algorithmName: '盤活復蘇-團購版',
     algorithmType: AlgorithmType.HOT_REVIVE_AD,
     purchaseLimit: { days: 14, quantity: 5 },
     merchantLimit: 'unlimited',

@@ -33,7 +33,7 @@ const CHANNEL_LABEL: Record<RecommendChannel, string> = {
 const ALG_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活廣告',
+  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
@@ -169,7 +169,7 @@ export default function EffectReport() {
               options={[
                 { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
                 { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-                { label: '盤活廣告', value: AlgorithmType.HOT_REVIVE_AD },
+                { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
                 { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
                 { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
                 { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },

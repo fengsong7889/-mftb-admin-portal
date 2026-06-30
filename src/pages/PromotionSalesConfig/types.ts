@@ -107,7 +107,7 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
   },
   {
     type: AlgorithmType.HOT_REVIVE_AD,
-    name: '熱門盤活',
+    name: '盤活復蘇',
     icon: '🔥',
     description: '盤活熱門商家流量，提升店鋪曝光',
     enabled: false,
@@ -162,7 +162,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
   const typePrefixes: Record<AlgorithmType, string> = {
     [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
     [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-    [AlgorithmType.HOT_REVIVE_AD]: '熱門盤活',
+    [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
     [AlgorithmType.TRAFFIC_AD]: '流量廣告',
     [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
     [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',

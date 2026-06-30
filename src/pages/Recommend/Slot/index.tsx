@@ -19,7 +19,7 @@ interface SlotRecord {
 const ALG_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活廣告',
+  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',

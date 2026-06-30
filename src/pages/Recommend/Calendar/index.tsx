@@ -23,7 +23,7 @@ const ALG_COLOR: Record<string, string> = {
   '猜你喜歡': 'blue',
   '無敵星星': 'purple',
   '新店推送': 'green',
-  '熱門盤活': 'orange',
+  '盤活復蘇': 'orange',
   '獨家商店': 'red',
   '流量廣告': 'gold',
 }
@@ -40,7 +40,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
   ],
   '2026-06-03': [
     { alg: '新店推送', slot: '團購首選坑位', channel: '團購' },
-    { alg: '熱門盤活', slot: '超市熱賣坑位', channel: '超市' },
+    { alg: '盤活復蘇', slot: '超市熱賣坑位', channel: '超市' },
   ],
   '2026-06-04': [
     { alg: '猜你喜歡', slot: '外賣推薦坑位2', channel: '外賣' },
@@ -54,7 +54,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
     { alg: '猜你喜歡', slot: '外賣熱門坑位', channel: '外賣' },
   ],
   '2026-06-09': [
-    { alg: '熱門盤活', slot: '超市推薦坑位1', channel: '超市' },
+    { alg: '盤活復蘇', slot: '超市推薦坑位1', channel: '超市' },
   ],
   '2026-06-10': [
     { alg: '新店推送', slot: '首頁第二坑', channel: '大首頁' },
@@ -66,7 +66,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
   ],
   '2026-06-12': [
     { alg: '無敵星星', slot: '外賣推薦坑位2', channel: '外賣' },
-    { alg: '熱門盤活', slot: '超市熱賣坑位', channel: '超市' },
+    { alg: '盤活復蘇', slot: '超市熱賣坑位', channel: '超市' },
   ],
   '2026-06-15': [
     { alg: '猜你喜歡', slot: '首頁第一坑', channel: '大首頁' },
@@ -80,7 +80,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
     { alg: '獨家商店', slot: '超市推薦坑位1', channel: '超市' },
   ],
   '2026-06-18': [
-    { alg: '熱門盤活', slot: '首頁第三坑', channel: '大首頁' },
+    { alg: '盤活復蘇', slot: '首頁第三坑', channel: '大首頁' },
     { alg: '猜你喜歡', slot: '外賣推薦坑位1', channel: '外賣' },
   ],
   '2026-06-19': [
@@ -95,7 +95,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
     { alg: '獨家商店', slot: '首頁第二坑', channel: '大首頁' },
   ],
   '2026-06-24': [
-    { alg: '熱門盤活', slot: '團購推薦坑位1', channel: '團購' },
+    { alg: '盤活復蘇', slot: '團購推薦坑位1', channel: '團購' },
     { alg: '流量廣告', slot: '首頁第三坑', channel: '大首頁' },
   ],
   '2026-06-25': [
@@ -111,7 +111,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
   ],
   '2026-06-30': [
     { alg: '猜你喜歡', slot: '首頁第二坑', channel: '大首頁' },
-    { alg: '熱門盤活', slot: '超市熱賣坑位', channel: '超市' },
+    { alg: '盤活復蘇', slot: '超市熱賣坑位', channel: '超市' },
   ],
   // 2026年7月
   '2026-07-01': [
@@ -126,7 +126,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
     { alg: '獨家商店', slot: '超市推薦坑位1', channel: '超市' },
   ],
   '2026-07-06': [
-    { alg: '熱門盤活', slot: '外賣熱門坑位', channel: '外賣' },
+    { alg: '盤活復蘇', slot: '外賣熱門坑位', channel: '外賣' },
     { alg: '無敵星星', slot: '首頁第二坑', channel: '大首頁' },
   ],
   '2026-07-07': [
@@ -141,7 +141,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
   ],
   '2026-07-10': [
     { alg: '猜你喜歡', slot: '首頁第二坑', channel: '大首頁' },
-    { alg: '熱門盤活', slot: '團購推薦坑位1', channel: '團購' },
+    { alg: '盤活復蘇', slot: '團購推薦坑位1', channel: '團購' },
   ],
   '2026-07-13': [
     { alg: '無敵星星', slot: '首頁第三坑', channel: '大首頁' },
@@ -153,7 +153,7 @@ const MOCK_SCHEDULE: Record<string, Array<{ alg: string; slot: string; channel: 
   '2026-07-15': [
     { alg: '猜你喜歡', slot: '首頁第一坑', channel: '大首頁' },
     { alg: '獨家商店', slot: '團購首選坑位', channel: '團購' },
-    { alg: '熱門盤活', slot: '外賣熱門坑位', channel: '外賣' },
+    { alg: '盤活復蘇', slot: '外賣熱門坑位', channel: '外賣' },
   ],
   '2026-07-16': [
     { alg: '無敵星星', slot: '超市熱賣坑位', channel: '超市' },

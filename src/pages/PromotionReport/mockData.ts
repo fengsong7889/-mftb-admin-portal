@@ -41,7 +41,7 @@ export const mockOrderReports: OrderReportItem[] = [
   {
     id: '2',
     orderNo: 'ORD20250704002',
-    promotionName: '盤活廣告·特惠推廣',
+    promotionName: '盤活復蘇·特惠推廣',
     recommendType: ReportRecommendType.REVITALIZATION_AD,
     app: ReportApp.MFOOD,
     channel: ReportChannel.RETAIL,
@@ -137,7 +137,7 @@ export const mockOrderReports: OrderReportItem[] = [
   {
     id: '6',
     orderNo: 'ORD20250630006',
-    promotionName: '盤活廣告·午市特惠',
+    promotionName: '盤活復蘇·午市特惠',
     recommendType: ReportRecommendType.REVITALIZATION_AD,
     app: ReportApp.MFOOD,
     channel: ReportChannel.FOOD_DELIVERY,
@@ -233,7 +233,7 @@ export const mockOrderReports: OrderReportItem[] = [
   {
     id: '10',
     orderNo: 'ORD20250626010',
-    promotionName: '盤活廣告·團購特惠',
+    promotionName: '盤活復蘇·團購特惠',
     recommendType: ReportRecommendType.REVITALIZATION_AD,
     app: ReportApp.MFOOD,
     channel: ReportChannel.GROUP_BUY,
@@ -329,7 +329,7 @@ export const mockOrderReports: OrderReportItem[] = [
   {
     id: '14',
     orderNo: 'ORD20250622014',
-    promotionName: '盤活廣告·早餐時段',
+    promotionName: '盤活復蘇·早餐時段',
     recommendType: ReportRecommendType.REVITALIZATION_AD,
     app: ReportApp.MFOOD,
     channel: ReportChannel.FOOD_DELIVERY,
@@ -425,7 +425,7 @@ export const mockOrderReports: OrderReportItem[] = [
   {
     id: '18',
     orderNo: 'ORD20250618018',
-    promotionName: '盤活廣告·珠海專區',
+    promotionName: '盤活復蘇·珠海專區',
     recommendType: ReportRecommendType.REVITALIZATION_AD,
     app: ReportApp.MFOOD,
     channel: ReportChannel.GROUP_BUY,
@@ -576,7 +576,7 @@ export const mockRecommendTypeCompare: RecommendTypeCompare[] = [
   },
   {
     recommendType: ReportRecommendType.REVITALIZATION_AD,
-    recommendTypeLabel: '盤活廣告',
+    recommendTypeLabel: '盤活復蘇',
     totalImpressions: 397000,
     totalClicks: 39700,
     avgCtr: 10.0,
