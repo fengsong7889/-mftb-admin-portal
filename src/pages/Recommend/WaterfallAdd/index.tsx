@@ -1,7 +1,9 @@
 import { useState, Fragment } from 'react'
-import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined } from '@ant-design/icons'
+import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree } from 'antd'
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, TileLayer } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import { 
   AppType, 
   RecommendChannel, 
@@ -52,9 +54,45 @@ const TIME_SLOTS = [
   { key: 'night', label: '宵夜' },
 ]
 
+// 商圈选择树形数据
+const regionTreeData = [
+  {
+    key: '1',
+    title: '澳門區域',
+    children: [
+      { key: '1-1', title: '黑沙環區' },
+      { key: '1-2', title: '高士德區' },
+      { key: '1-3', title: '新馬路區' },
+      { key: '1-4', title: '新皇朝區' },
+      { key: '1-5', title: '港珠澳區' },
+    ],
+  },
+  {
+    key: '2',
+    title: '氹仔區域',
+    children: [
+      { key: '2-1', title: '花城市區' },
+      { key: '2-2', title: '北安機場' },
+      { key: '2-3', title: '左酒店區' },
+      { key: '2-4', title: '右酒店區' },
+      { key: '2-5', title: '澳大專區' },
+      { key: '2-6', title: '黑沙灘區' },
+    ],
+  },
+  {
+    key: '3',
+    title: '珠海區域',
+    children: [
+      { key: '3-1', title: '拱北區域' },
+      { key: '3-2', title: '橫琴區域' },
+    ],
+  },
+]
+
 // 区域计价配置接口
 interface RegionPricingConfig {
   region: Region
+  regionLabel: string // 显示名称（区域或商圈名称）
   pricing: Record<string, number | undefined>
   discountEnabled: boolean
   discounts: Record<string, number | undefined>
@@ -94,6 +132,10 @@ export default function WaterfallAdd() {
   const [selectedRegions, setSelectedRegions] = useState<Region[]>([])
   const [regionPricingConfigs, setRegionPricingConfigs] = useState<RegionPricingConfig[]>([])
   const [newRegionSelect, setNewRegionSelect] = useState<Region | undefined>(undefined) // 新增区域选择器
+  
+  // 商圈选择弹窗
+  const [regionSelectModalVisible, setRegionSelectModalVisible] = useState(false)
+  const [selectedRegionNode, setSelectedRegionNode] = useState<{ key: string; title: string; level: number } | null>(null)
   
   // 销售日期
   const [salesDateRange, setSalesDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | undefined>(undefined)
@@ -232,7 +274,7 @@ export default function WaterfallAdd() {
   }
 
   // 添加区域计价配置
-  const handleAddRegionConfig = (region: Region) => {
+  const handleAddRegionConfig = (region: Region, label: string) => {
     if (regionPricingConfigs.find(c => c.region === region)) {
       message.warning('該區域已添加計價配置')
       return
@@ -240,6 +282,7 @@ export default function WaterfallAdd() {
     
     const newConfig: RegionPricingConfig = {
       region,
+      regionLabel: label,
       pricing: {},
       discountEnabled: false,
       discounts: {},
@@ -624,9 +667,9 @@ export default function WaterfallAdd() {
               style={{ marginBottom: 12, borderRadius: 8 }}
             >
               {/* 预售模式 + 预售天数 并排 */}
-              <div style={{ display: 'flex', gap: 32, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售模式：</span>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售模式:</span>
                   <Switch 
                     checked={presaleMode === 'rolling'}
                     onChange={(checked) => setPresaleMode(checked ? 'rolling' : 'fixed')}
@@ -634,8 +677,8 @@ export default function WaterfallAdd() {
                     unCheckedChildren="固定"
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數：</span>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數:</span>
                   <InputNumber
                     min={1}
                     max={90}
@@ -654,8 +697,8 @@ export default function WaterfallAdd() {
 
               {/* 连续购买：Switch + 右侧参数 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>連續購買：</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>連續購買:</span>
                   <Switch 
                     checked={continuousPurchase}
                     onChange={(checked) => setContinuousPurchase(checked)}
@@ -704,8 +747,8 @@ export default function WaterfallAdd() {
 
               {/* 商家限制：Switch + 右侧按钮 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>商家限制：</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>商家限制:</span>
                   <Switch 
                     checked={merchantLimit}
                     onChange={(checked) => setMerchantLimit(checked)}
@@ -725,49 +768,47 @@ export default function WaterfallAdd() {
                 )}
               </div>
 
-              {/* 可售时段（复选） */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>可售時段：</span>
-                <Checkbox
-                  checked={onlySellTimeSlots.includes('fullDay')}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      // 勾选全部时，取消其它5个时段
-                      setOnlySellTimeSlots(['fullDay'])
-                    } else {
-                      setOnlySellTimeSlots([])
-                    }
-                  }}
-                >
-                  全部
-                </Checkbox>
-                {TIME_SLOTS.filter(t => t.key !== 'fullDay').map(slot => {
-                  const isAllSelected = onlySellTimeSlots.includes('fullDay')
-                  const isChecked = !isAllSelected && onlySellTimeSlots.includes(slot.key)
-                  return (
-                    <Checkbox
-                      key={slot.key}
-                      checked={isChecked}
-                      onChange={(e) => {
-                        let next: string[]
-                        if (e.target.checked) {
-                          // 勾选单个时段时，取消全部
-                          next = [...onlySellTimeSlots.filter(k => k !== 'fullDay'), slot.key]
-                        } else {
-                          next = onlySellTimeSlots.filter(k => k !== slot.key && k !== 'fullDay')
-                        }
-                        // 当5个时段都勾选时，自动变为全选
-                        const allSlots = ['breakfast', 'lunch', 'afternoon', 'dinner', 'night']
-                        if (allSlots.every(s => next.includes(s))) {
-                          next = ['fullDay']
-                        }
-                        setOnlySellTimeSlots(next)
-                      }}
-                    >
-                      <span style={{ color: isAllSelected ? '#bfbfbf' : '#595959' }}>{slot.label}</span>
-                    </Checkbox>
-                  )
-                })}
+              {/* 可售时段 */}
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>可售時段:</span>
+                  <Switch 
+                    checked={!onlySellTimeSlots.includes('fullDay')}
+                    onChange={(checked) => {
+                      if (checked) {
+                        // 指定：清空选择，让用户自己勾选
+                        setOnlySellTimeSlots([])
+                      } else {
+                        // 全部
+                        setOnlySellTimeSlots(['fullDay'])
+                      }
+                    }}
+                    checkedChildren="指定"
+                    unCheckedChildren="全部"
+                  />
+                </div>
+                {/* 指定时显示5个时段勾选 */}
+                {!onlySellTimeSlots.includes('fullDay') && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: 12, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+                    {TIME_SLOTS.filter(t => t.key !== 'fullDay').map(slot => (
+                      <Checkbox
+                        key={slot.key}
+                        checked={onlySellTimeSlots.includes(slot.key)}
+                        onChange={(e) => {
+                          let next: string[]
+                          if (e.target.checked) {
+                            next = [...onlySellTimeSlots, slot.key]
+                          } else {
+                            next = onlySellTimeSlots.filter(k => k !== slot.key)
+                          }
+                          setOnlySellTimeSlots(next)
+                        }}
+                      >
+                        {slot.label}
+                      </Checkbox>
+                    ))}
+                  </div>
+                )}
               </div>
             </Card>
           )}
@@ -798,31 +839,17 @@ export default function WaterfallAdd() {
               size="small"
               style={{ marginBottom: 12, borderRadius: 8 }}
               extra={
-                <Space>
-                  <Select
-                    placeholder="選擇商圈"
-                    style={{ width: 150 }}
-                    size="small"
-                    options={REGION_OPTIONS.filter(opt => !selectedRegions.includes(opt.value))}
-                    value={newRegionSelect}
-                    onChange={(value) => setNewRegionSelect(value)}
-                  />
-                  <Button 
-                    type="primary" 
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={() => {
-                      if (!newRegionSelect) {
-                        message.warning('請先選擇商圈')
-                        return
-                      }
-                      handleAddRegionConfig(newRegionSelect)
-                      setNewRegionSelect(undefined)
-                    }}
-                  >
-                    新增
-                  </Button>
-                </Space>
+                <Button 
+                  type="primary" 
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setSelectedRegionNode(null)
+                    setRegionSelectModalVisible(true)
+                  }}
+                >
+                  選擇商圈
+                </Button>
               }
             >
               {regionPricingConfigs.length === 0 ? (
@@ -836,7 +863,7 @@ export default function WaterfallAdd() {
                 <div key={config.region} style={{ marginBottom: index < regionPricingConfigs.length - 1 ? 24 : 0, padding: 16, background: '#fafafa', borderRadius: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <Tag color="cyan" style={{ fontSize: 14, padding: '4px 12px' }}>
-                      {REGION_OPTIONS.find((opt) => opt.value === config.region)?.label}
+                      {config.regionLabel}
                     </Tag>
                     {regionPricingConfigs.length > 1 && (
                       <Button 
@@ -1044,6 +1071,80 @@ export default function WaterfallAdd() {
               ) : null}
             </Card>
           )}
+
+          {/* 商圈选择弹窗 */}
+          <Modal
+            title="選擇商圈"
+            open={regionSelectModalVisible}
+            onCancel={() => setRegionSelectModalVisible(false)}
+            onOk={() => {
+              if (!selectedRegionNode) {
+                message.warning('請選擇一個區域或商圈')
+                return
+              }
+              // 根据树节点映射到Region
+              const nodeKey = selectedRegionNode.key
+              let regionValue: Region
+              if (nodeKey.startsWith('1')) regionValue = Region.MACAU
+              else if (nodeKey.startsWith('2')) regionValue = Region.TAIPA
+              else regionValue = Region.ZHUHAI
+              
+              if (regionPricingConfigs.find(c => c.region === regionValue)) {
+                message.warning('該區域已添加計價配置')
+                return
+              }
+              handleAddRegionConfig(regionValue, selectedRegionNode.title)
+              setRegionSelectModalVisible(false)
+            }}
+            okText="確認"
+            cancelText="取消"
+            width={800}
+          >
+            <div style={{ display: 'flex', gap: 16, padding: '8px 0' }}>
+              {/* 左侧树形结构 */}
+              <div style={{ width: 240, flexShrink: 0 }}>
+                <div style={{ marginBottom: 8, fontSize: 13, color: '#8c8c8c' }}>
+                  請選擇區域或商圈：
+                </div>
+                <Tree
+                  treeData={regionTreeData}
+                  defaultExpandAll
+                  showIcon={false}
+                  switcherIcon={<DownOutlined />}
+                  selectedKeys={selectedRegionNode ? [selectedRegionNode.key] : []}
+                  onSelect={(keys, info) => {
+                    setSelectedRegionNode({
+                      key: keys[0] as string,
+                      title: info.node.title as string,
+                      level: info.node.children ? 1 : 2,
+                    })
+                  }}
+                  style={{ padding: 12, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', minHeight: 300 }}
+                />
+                {selectedRegionNode && (
+                  <div style={{ marginTop: 8, padding: '8px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                    <span style={{ fontSize: 12, color: '#595959' }}>已選擇：</span>
+                    <Tag color="green">{selectedRegionNode.title}</Tag>
+                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>({selectedRegionNode.level === 1 ? '區域' : '商圈'})</span>
+                  </div>
+                )}
+              </div>
+              {/* 右侧地图区域 */}
+              <div style={{ flex: 1, borderRadius: 6, overflow: 'hidden', border: '1px solid #f0f0f0', minHeight: 350 }}>
+                <MapContainer
+                  center={[22.1987, 113.5439]}
+                  zoom={13}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.amap.com/">高德地图</a>'
+                    url="https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"
+                    subdomains="1234"
+                  />
+                </MapContainer>
+              </div>
+            </div>
+          </Modal>
 
           {/* 多区域组合折扣 - 仅無敵星星显示 */}
           {!isReviveAlgorithm && selectedRegions.length > 0 && (

@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table } from 'antd'
+import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Switch } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import { AlgorithmType, RecommendChannel, PlacementInterface, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
 
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
+  const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听商家曝光策略选择
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null) // 当前选择的算法类型
   const [presaleMode, setPresaleMode] = useState(true) // false: 固定, true: 滚动
   const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
@@ -22,87 +23,19 @@ export default function AlgorithmAdd() {
   const [singleUserExposureLimit, setSingleUserExposureLimit] = useState(true) // false: 不限, true: 限制
   const [dailyExposureLimit, setDailyExposureLimit] = useState(false) // false: 不限, true: 限制
 
-  // 自定义美化 Switch：
-  // 支持自定义左右側的轨道颜色
-  // 選中側外部文字變為藍色，未選中側為灰色
-  const CustomSwitch = ({
-    checked,
-    onChange,
-    leftText,
-    rightText,
-    leftColor = '#ff4d4f',
-    rightColor = '#1890ff',
-    disabled = false,
-  }: {
-    checked?: boolean
-    onChange?: (checked: boolean) => void
-    leftText: string
-    rightText: string
-    leftColor?: string
-    rightColor?: string
-    disabled?: boolean
-  }) => {
-    const isChecked = checked ?? false
-    return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: disabled ? 0.5 : 1 }}>
-      <span
-        style={{
-          fontSize: 14,
-          fontWeight: isChecked ? 400 : 600,
-          color: isChecked ? '#8c8c8c' : '#1890ff',
-          transition: 'all 0.3s ease',
-          minWidth: 36,
-          textAlign: 'right',
-        }}
-      >
-        {leftText}
-      </span>
-
-      <div
-        style={{
-          position: 'relative',
-          width: 72,
-          height: 28,
-          borderRadius: 999,
-          background: isChecked ? rightColor : leftColor,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          userSelect: 'none',
-          transition: 'background 0.3s ease',
-          boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.12)',
-        }}
-        onClick={() => !disabled && onChange && onChange(!isChecked)}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: 3,
-            left: 3,
-            width: 22,
-            height: 22,
-            background: '#ffffff',
-            borderRadius: '50%',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
-            transform: isChecked ? 'translateX(44px)' : 'translateX(0)',
-            transition: 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-        />
-      </div>
-
-      <span
-        style={{
-          fontSize: 14,
-          fontWeight: isChecked ? 600 : 400,
-          color: isChecked ? '#1890ff' : '#8c8c8c',
-          transition: 'all 0.3s ease',
-          minWidth: 36,
-          textAlign: 'left',
-        }}
-      >
-        {rightText}
-      </span>
-    </div>
-  )
-}
+  // 商家维度配置（按商家维度曝光策略）
+  interface DimensionItem {
+    id: string
+    type: string
+    weight: number | undefined
+  }
+  const DIMENSION_OPTIONS = [
+    { value: 'qualityScore', label: '商家質量分', desc: '滿分5分，歸一化至0-100' },
+    { value: 'orderCompletion', label: '訂單完成率', desc: '近30天訂單完成比例，0-100%' },
+    { value: 'newMerchant', label: '新商家扶持', desc: '首投7天內漸變：第1天=100，第7天=14，第8天=0' },
+  ]
+  const [dimensionItems, setDimensionItems] = useState<DimensionItem[]>([])
+  const [selectedDimension, setSelectedDimension] = useState<string | undefined>(undefined)
 
   // 返回上一页
   const handleBack = () => {
@@ -361,9 +294,9 @@ export default function AlgorithmAdd() {
           {/* 配送地圖同步頻率和執行時段前每 */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             <Form.Item
-              label="配送範圍同步"
+              label="配送地圖同步計算"
               name="deliveryMapFetchFrequency"
-              rules={[{ required: true, message: '請輸入配送範圍同步的分鐘數' }]}
+              rules={[{ required: true, message: '請輸入配送地圖同步計算的分鐘數' }]}
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 4 }}
               wrapperCol={{ span: 20 }}
@@ -384,26 +317,84 @@ export default function AlgorithmAdd() {
             </Form.Item>
 
             <Form.Item
-              label="區域數據提前"
-              name="regionPurchaseCalcFrequency"
-              rules={[{ required: true, message: '請輸入區域數據提前的分鐘數' }]}
+              label="區域商家數據每日"
+              style={{ flex: 1, marginBottom: 0 }}
+              labelCol={{ span: 6 }}
+              wrapperCol={{ span: 18 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Form.Item name="regionPurchaseCalcTime" noStyle rules={[{ required: true, message: '請選擇計算時間' }]}>
+                  <TimePicker
+                    format="HH:mm"
+                    placeholder="選擇時間"
+                    style={{ flex: 1 }}
+                    size="large"
+                  />
+                </Form.Item>
+                <span style={{ color: '#595959', fontWeight: 500, fontSize: 13, whiteSpace: 'nowrap' }}>點計算次日數據並緩存</span>
+              </div>
+            </Form.Item>
+          </div>
+
+          {/* 定时器校验 + 监听机制 */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <Form.Item
+              label="定時器校驗"
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 4 }}
               wrapperCol={{ span: 20 }}
             >
-              <InputNumber
-                min={1}
-                max={1440}
-                placeholder="請輸入分钟数"
-                style={{
-                  width: '100%',
-                  height: 44,
-                  borderRadius: 8,
-                  fontSize: 14
-                }}
-                addonAfter={<span style={{ color: '#595959', fontWeight: 500, fontSize: 13 }}>分鐘計算存儲</span>}
-                size="large"
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>每</span>
+                <Form.Item name="consistencyCheckInterval" noStyle rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber
+                    min={1}
+                    max={1440}
+                    placeholder="分鐘"
+                    style={{ width: 60, borderRadius: 8, fontSize: 14 }}
+                  />
+                </Form.Item>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>分鐘校驗數據一致性，時段開始</span>
+                <span style={{ fontSize: 14, color: '#1890ff', fontWeight: 600, whiteSpace: 'nowrap' }}>前</span>
+                <Form.Item name="preSlotCheckMinutes" noStyle rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber
+                    min={1}
+                    max={600}
+                    placeholder="分鐘"
+                    style={{ width: 60, borderRadius: 8, fontSize: 14 }}
+                  />
+                </Form.Item>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>分鐘校驗，時段開始</span>
+                <span style={{ fontSize: 14, color: '#1890ff', fontWeight: 600, whiteSpace: 'nowrap' }}>時</span>
+                <Form.Item name="forceCheckOnSlotStart" noStyle valuePropName="checked">
+                  <Checkbox>強制</Checkbox>
+                </Form.Item>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>校驗</span>
+              </div>
+            </Form.Item>
+
+            <Form.Item
+              label="監聽機制"
+              style={{ flex: 1, marginBottom: 0 }}
+              labelCol={{ span: 6 }}
+              wrapperCol={{ span: 18 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>訂單監聽:</span>
+                <Form.Item name="orderListenCancelled" noStyle valuePropName="checked" initialValue={true}>
+                  <Checkbox disabled>已取消</Checkbox>
+                </Form.Item>
+                <Form.Item name="orderListenRefunded" noStyle valuePropName="checked" initialValue={true}>
+                  <Checkbox disabled>已退款</Checkbox>
+                </Form.Item>
+                <span style={{ fontSize: 14, color: '#1890ff', fontWeight: 600 }}>剔除候選集</span>
+                <span style={{ fontSize: 14, color: '#595959' }}>|</span>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>商家監聽:</span>
+                <Form.Item name="merchantListenClosed" noStyle valuePropName="checked">
+                  <Checkbox>已打烊</Checkbox>
+                </Form.Item>
+                <span style={{ fontSize: 14, color: '#1890ff', fontWeight: 600 }}>剔除候選集</span>
+              </div>
             </Form.Item>
           </div>
 
@@ -419,13 +410,16 @@ export default function AlgorithmAdd() {
                   labelCol={{ span: 4 }}
                   wrapperCol={{ span: 20 }}
                 >
-                  <CustomSwitch
-                    checked={regionMerchantCustom}
-                    onChange={(checked) => setRegionMerchantCustom(checked)}
-                    leftText="限制1個"
-                    rightText="自定義"
-                    disabled={!isEditing}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: regionMerchantCustom ? '#8c8c8c' : '#1890ff', fontWeight: regionMerchantCustom ? 400 : 600 }}>限制1個</span>
+                    <Switch
+                      checked={regionMerchantCustom}
+                      onChange={(checked) => setRegionMerchantCustom(checked)}
+                      disabled={!isEditing}
+                      size="small"
+                    />
+                    <span style={{ fontSize: 13, color: regionMerchantCustom ? '#1890ff' : '#8c8c8c', fontWeight: regionMerchantCustom ? 600 : 400 }}>自定義</span>
+                  </div>
                 </Form.Item>
 
                 {/* 算法落地頁：與區域商家展示限制同排 */}
@@ -434,8 +428,8 @@ export default function AlgorithmAdd() {
                   name="algorithmLandingPage"
                   rules={[{ required: true, message: '請選擇算法落地頁' }]}
                   style={{ flex: 1, marginBottom: 0 }}
-                  labelCol={{ span: 4 }}
-                  wrapperCol={{ span: 20 }}
+                  labelCol={{ span: 6 }}
+                  wrapperCol={{ span: 18 }}
                 >
                   <Checkbox.Group
                     options={[
@@ -514,15 +508,14 @@ export default function AlgorithmAdd() {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>單用戶曝光數</span>
-                            <CustomSwitch
+                            <span style={{ fontSize: 13, color: singleUserExposureLimit ? '#8c8c8c' : '#1890ff', fontWeight: singleUserExposureLimit ? 400 : 600 }}>不限</span>
+                            <Switch
                               checked={singleUserExposureLimit}
                               onChange={(checked) => setSingleUserExposureLimit(checked)}
-                              leftText="不限"
-                              rightText="限制"
-                              leftColor="#d9d9d9"
-                              rightColor="#52c41a"
                               disabled={!isEditing}
+                              size="small"
                             />
+                            <span style={{ fontSize: 13, color: singleUserExposureLimit ? '#1890ff' : '#8c8c8c', fontWeight: singleUserExposureLimit ? 600 : 400 }}>限制</span>
                             {singleUserExposureLimit && (
                               <Form.Item
                                 name="singleUserExposure"
@@ -544,16 +537,15 @@ export default function AlgorithmAdd() {
                         {/* 商家單日曝光上限 */}
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家單日曝光上限</span>
-                            <CustomSwitch
+                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap', marginLeft: '65px' }}>商家單日曝光</span>
+                            <span style={{ fontSize: 13, color: dailyExposureLimit ? '#8c8c8c' : '#1890ff', fontWeight: dailyExposureLimit ? 400 : 600 }}>不限</span>
+                            <Switch
                               checked={dailyExposureLimit}
                               onChange={(checked) => setDailyExposureLimit(checked)}
-                              leftText="不限"
-                              rightText="限制"
-                              leftColor="#d9d9d9"
-                              rightColor="#52c41a"
                               disabled={!isEditing}
+                              size="small"
                             />
+                            <span style={{ fontSize: 13, color: dailyExposureLimit ? '#1890ff' : '#8c8c8c', fontWeight: dailyExposureLimit ? 600 : 400 }}>限制</span>
                             {dailyExposureLimit && (
                               <Form.Item
                                 name="dailyMaxExposure"
@@ -572,6 +564,14 @@ export default function AlgorithmAdd() {
                           </div>
                         </div>
                       </div>
+
+                      {/* 曝光限制备注 */}
+                      {(singleUserExposureLimit || dailyExposureLimit) && (
+                        <div style={{ marginTop: 8, padding: '8px 12px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12, color: '#8c8c8c', lineHeight: '20px' }}>
+                          <span style={{ color: '#faad14', fontWeight: 600 }}>備註：</span>
+                          計算結果會考慮曝光策略，曝光上限會剔除候選集，剩餘商家繼續輪候，當所有商家曝光滿足，則該展示位將顯示權重分排序商家。
+                        </div>
+                      )}
 
                       {/* 商家曝光策略：策略欄内新起一行，左對齊 */}
                       <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
@@ -596,6 +596,107 @@ export default function AlgorithmAdd() {
                         </div>
                         <div style={{ flex: 1 }} />
                       </div>
+
+                      {/* 按随机维度配置 */}
+                      {merchantExposureStrategy === 'random' && (
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <Form.Item name="shuffleRandom" noStyle valuePropName="checked" initialValue={true}>
+                              <Checkbox disabled>洗牌隨機</Checkbox>
+                            </Form.Item>
+                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                              維護廣告商家ID列表，亂序排列後逐個取出，取完一輪再重新洗牌開始下一輪，絕對均勻，用戶短時間內不會看到重複廣告。
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 按商家维度配置 */}
+                      {merchantExposureStrategy === 'merchant' && (
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0f5ff', border: '1px solid #adc6ff', borderRadius: 6 }}>
+                          <div style={{ fontSize: 13, color: '#595959', marginBottom: 12 }}>
+                            <span style={{ color: '#1890ff', fontWeight: 600 }}>*</span> 選擇維度（至少一項，多項可設置權重，權重高的優先曝光）:
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {dimensionItems.map((item, index) => {
+                              const opt = DIMENSION_OPTIONS.find(o => o.value === item.type)
+                              return (
+                                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <span style={{ fontSize: 13, color: '#595959', fontWeight: 500, minWidth: 80 }}>{opt?.label}</span>
+                                  <span style={{ fontSize: 13, color: '#8c8c8c' }}>（{opt?.desc}）</span>
+                                  <span style={{ fontSize: 13, color: '#595959' }}>權重:</span>
+                                  <InputNumber
+                                    min={1}
+                                    max={100}
+                                    placeholder="1-100"
+                                    style={{ width: 100 }}
+                                    size="small"
+                                    value={item.weight}
+                                    onChange={(val) => {
+                                      const newItems = [...dimensionItems]
+                                      newItems[index].weight = val ?? undefined
+                                      setDimensionItems(newItems)
+                                    }}
+                                  />
+                                  <DeleteOutlined
+                                    style={{ color: '#ff4d4f', fontSize: 16, cursor: 'pointer' }}
+                                    onClick={() => setDimensionItems(dimensionItems.filter((_, i) => i !== index))}
+                                  />
+                                </div>
+                              )
+                            })}
+                            {/* 新增维度 */}
+                            {dimensionItems.length < DIMENSION_OPTIONS.length && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Select
+                                  placeholder="選擇維度"
+                                  style={{ width: 160, height: 32 }}
+                                  size="small"
+                                  value={selectedDimension}
+                                  onChange={(val) => setSelectedDimension(val)}
+                                  options={DIMENSION_OPTIONS.filter(o => !dimensionItems.find(d => d.type === o.value))}
+                                />
+                                <Button
+                                  type="dashed"
+                                  size="small"
+                                  icon={<PlusOutlined />}
+                                  disabled={!selectedDimension}
+                                  onClick={() => {
+                                    if (selectedDimension) {
+                                      setDimensionItems([...dimensionItems, { id: Date.now().toString(), type: selectedDimension, weight: undefined }])
+                                      setSelectedDimension(undefined)
+                                    }
+                                  }}
+                                >
+                                  新增
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          {/* 计算公式 */}
+                          <div style={{ marginTop: 16, padding: '10px 12px', background: '#ffffff', border: '1px solid #d9d9d9', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px', display: 'flex', gap: 24 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4, color: '#1890ff' }}>計算公式：</div>
+                              <div>最終得分 = (質量分/5×100 × W₁) + (訂單完成率 × W₂) + (扶持分 × W₃)</div>
+                              <div style={{ marginTop: 4, color: '#8c8c8c' }}>扶持分 = max(0, (8-首投天數)/7 × 100)</div>
+                            </div>
+                            <div style={{ flex: 1, borderLeft: '1px solid #e8e8e8', paddingLeft: 16 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4, color: '#52c41a' }}>示例：</div>
+                              <div style={{ marginBottom: 8 }}>假設權重：W₁=60, W₂=30, W₃=10</div>
+                              <div style={{ display: 'flex', gap: 16 }}>
+                                <div style={{ flex: 1 }}>
+                                  <div>商家A：質量4分 + 完成率90% + 首投15天</div>
+                                  <div style={{ color: '#8c8c8c' }}>得分 = 80×60 + 90×30 + 0×10 = <span style={{ color: '#1890ff', fontWeight: 600 }}>7500</span></div>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <div>商家B：質量3分 + 完成率70% + 首投2天</div>
+                                  <div style={{ color: '#8c8c8c' }}>得分 = 60×60 + 70×30 + 85.7×10 = <span style={{ color: '#1890ff', fontWeight: 600 }}>6557</span></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -611,13 +712,16 @@ export default function AlgorithmAdd() {
                 wrapperCol={{ span: 20 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <CustomSwitch
-                    checked={regionMerchantCustom}
-                    onChange={(checked) => setRegionMerchantCustom(checked)}
-                    leftText="限制1個"
-                    rightText="自定義"
-                    disabled={true}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: regionMerchantCustom ? '#8c8c8c' : '#1890ff', fontWeight: regionMerchantCustom ? 400 : 600 }}>限制1個</span>
+                    <Switch
+                      checked={regionMerchantCustom}
+                      onChange={(checked) => setRegionMerchantCustom(checked)}
+                      disabled={true}
+                      size="small"
+                    />
+                    <span style={{ fontSize: 13, color: regionMerchantCustom ? '#1890ff' : '#8c8c8c', fontWeight: regionMerchantCustom ? 600 : 400 }}>自定義</span>
+                  </div>
                   {regionMerchantCustom && (
                     <Form.Item
                       name="regionMerchantDisplayLimit"
@@ -650,8 +754,8 @@ export default function AlgorithmAdd() {
                 name="algorithmLandingPage"
                 rules={[{ required: true, message: '請選擇算法落地頁' }]}
                 style={{ flex: 1, marginBottom: 0 }}
-                labelCol={{ span: 4 }}
-                wrapperCol={{ span: 20 }}
+                labelCol={{ span: 6 }}
+                wrapperCol={{ span: 18 }}
               >
                 <Checkbox.Group
                   options={[
