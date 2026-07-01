@@ -30,9 +30,9 @@ export default function AlgorithmAdd() {
     weight: number | undefined
   }
   const DIMENSION_OPTIONS = [
-    { value: 'qualityScore', label: '商家質量分', desc: '滿分5分，歸一化至0-100' },
-    { value: 'orderCompletion', label: '訂單完成率', desc: '近30天訂單完成比例，0-100%' },
-    { value: 'newMerchant', label: '新商家扶持', desc: '首投7天內漸變：第1天=100，第7天=14，第8天=0' },
+    { value: 'qualityScore', label: '商家質量分', desc: '滿分5分，歸一化至0-1' },
+    { value: 'orderCompletion', label: '訂單完成率', desc: '近30天訂單完成比例，歸一化至0-1' },
+    { value: 'newMerchant', label: '新商家扶持', desc: '首投7天內漸變：第1天=1，第7天=0.14，第8天=0' },
   ]
   const [dimensionItems, setDimensionItems] = useState<DimensionItem[]>([])
   const [selectedDimension, setSelectedDimension] = useState<string | undefined>(undefined)
@@ -677,8 +677,8 @@ export default function AlgorithmAdd() {
                           <div style={{ marginTop: 16, padding: '10px 12px', background: '#ffffff', border: '1px solid #d9d9d9', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px', display: 'flex', gap: 24 }}>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 600, marginBottom: 4, color: '#1890ff' }}>計算公式：</div>
-                              <div>最終得分 = (質量分/5×100 × W₁) + (訂單完成率 × W₂) + (扶持分 × W₃)</div>
-                              <div style={{ marginTop: 4, color: '#8c8c8c' }}>扶持分 = max(0, (8-首投天數)/7 × 100)</div>
+                              <div>最終得分 = (質量分/5 × W₁) + (訂單完成率 × W₂) + (扶持分 × W₃)</div>
+                              <div style={{ marginTop: 4, color: '#8c8c8c' }}>扶持分 = max(0, (8-首投天數)/7)</div>
                             </div>
                             <div style={{ flex: 1, borderLeft: '1px solid #e8e8e8', paddingLeft: 16 }}>
                               <div style={{ fontWeight: 600, marginBottom: 4, color: '#52c41a' }}>示例：</div>
@@ -686,11 +686,11 @@ export default function AlgorithmAdd() {
                               <div style={{ display: 'flex', gap: 16 }}>
                                 <div style={{ flex: 1 }}>
                                   <div>商家A：質量4分 + 完成率90% + 首投15天</div>
-                                  <div style={{ color: '#8c8c8c' }}>得分 = 80×60 + 90×30 + 0×10 = <span style={{ color: '#1890ff', fontWeight: 600 }}>7500</span></div>
+                                  <div style={{ color: '#8c8c8c' }}>得分 = 0.8×60 + 0.9×30 + 0×10 = <span style={{ color: '#1890ff', fontWeight: 600 }}>75</span></div>
                                 </div>
                                 <div style={{ flex: 1 }}>
                                   <div>商家B：質量3分 + 完成率70% + 首投2天</div>
-                                  <div style={{ color: '#8c8c8c' }}>得分 = 60×60 + 70×30 + 85.7×10 = <span style={{ color: '#1890ff', fontWeight: 600 }}>6557</span></div>
+                                  <div style={{ color: '#8c8c8c' }}>得分 = 0.6×60 + 0.7×30 + 0.857×10 = <span style={{ color: '#1890ff', fontWeight: 600 }}>65.57</span></div>
                                 </div>
                               </div>
                             </div>

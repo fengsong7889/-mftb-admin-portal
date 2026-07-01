@@ -301,24 +301,24 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             {/* 图例 */}
             <Space size={16}>
               <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#52c41a', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>可售</span>
+                <div style={{ width: 16, height: 16, background: '#f6ffed', border: '2px solid #52c41a', borderRadius: 3 }} />
+                <span style={{ fontSize: 12, color: '#595959' }}>已選中</span>
               </Space>
               <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#ff4d4f', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>售罄</span>
+                <div style={{ width: 16, height: 16, background: '#fff', border: '1px solid #e8e8e8', borderRadius: 3 }} />
+                <span style={{ fontSize: 12, color: '#595959' }}>可購買</span>
               </Space>
               <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#d9d9d9', borderRadius: 3 }} />
+                <div style={{ width: 16, height: 16, background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 3 }} />
+                <span style={{ fontSize: 12, color: '#595959' }}>已售罄</span>
+              </Space>
+              <Space size={4}>
+                <div style={{ width: 16, height: 16, background: '#f5f5f5', borderRadius: 3 }} />
                 <span style={{ fontSize: 12, color: '#595959' }}>不可售</span>
               </Space>
               <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#e6f7ff', border: '1px solid #1890ff', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>已选中</span>
-              </Space>
-              <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#f9f0ff', border: '1px solid #722ed1', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>已锁定</span>
+                <div style={{ width: 16, height: 16, background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 3 }} />
+                <span style={{ fontSize: 12, color: '#595959' }}>已鎖定</span>
               </Space>
             </Space>
           </div>
@@ -375,10 +375,10 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                       onClick={() => handleDateClick(date)}
                       style={{ 
                         padding: '10px 6px', 
-                        border: '1px solid #e8e8e8',
+                        border: isDateSelected ? '2px solid #52c41a' : '1px solid #e8e8e8',
                         textAlign: 'center',
                         cursor: 'pointer',
-                        background: isDateSelected ? '#e6f7ff' : '#fff',
+                        background: isDateSelected ? '#f6ffed' : '#fff',
                         fontWeight: isDateSelected ? 600 : 400,
                         transition: 'all 0.2s',
                       }}
@@ -413,22 +413,23 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                             padding: '8px 6px', 
                             textAlign: 'center',
                             cursor: isAvailable ? 'pointer' : 'not-allowed',
-                            background: isSelected ? '#e6f7ff' : 
+                            background: isSelected ? '#f6ffed' : 
                                        isLocked ? '#f9f0ff' :
-                                       isSoldOut ? '#ffccc7' : 
+                                       isSoldOut ? '#fff2f0' : 
                                        !isAvailable ? '#f5f5f5' : '#fff',
-                            border: isSelected ? '2px solid #1890ff' : 
-                                    isLocked ? '2px solid #722ed1' : 
+                            border: isSelected ? '2px solid #52c41a' : 
+                                    isLocked ? '1px solid #d3adf7' : 
+                                    isSoldOut ? '1px solid #ffccc7' :
                                     '1px solid #e8e8e8',
                             transition: 'all 0.2s',
-                            opacity: !isAvailable && !isLocked ? 0.6 : 1,
+                            opacity: !isAvailable && !isLocked && !isSoldOut ? 0.6 : 1,
                           }}
                         >
                           {/* 1. 状态标签 */}
                           <div style={{ marginBottom: 4 }}>
                             {status.status === 'available' && (
                               <Tag color="success" style={{ fontSize: 10, padding: '1px 4px' }}>
-                                可售
+                                可購買
                               </Tag>
                             )}
                             {status.status === 'locked' && (
@@ -438,7 +439,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                             )}
                             {status.status === 'soldOut' && (
                               <Tag color="error" style={{ fontSize: 10, padding: '1px 4px' }}>
-                                售罄
+                                已售罄
                               </Tag>
                             )}
                             {status.status === 'unavailable' && (

@@ -94,8 +94,9 @@ interface OrderItem {
   region: Region
   recommendType: RecommendType
   slotPosition: number
+  mealSlots: string[]       // 無敵星星：購買時段
+  purchaseDays?: string[]    // 盤活復蘇：購買日期列表
   purchaseDate: string
-  mealSlots: string[]
   originalPrice: number
   discountPrice: number
   actualPrice: number
@@ -152,7 +153,8 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 2,
     purchaseDate: '2025-07-08',
-    mealSlots: ['午餐 11:00-14:00', '下午茶 14:00-17:00'],
+    mealSlots: [],
+    purchaseDays: ['2025-07-08', '2025-07-09', '2025-07-10'],
     originalPrice: 3000,
     discountPrice: 2700,
     actualPrice: 2700,
@@ -240,7 +242,8 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 4,
     purchaseDate: '2025-06-29',
-    mealSlots: ['晚餐 17:00-21:00', '夜宵 21:00-02:00'],
+    mealSlots: [],
+    purchaseDays: ['2025-06-29', '2025-06-30', '2025-07-01', '2025-07-02'],
     originalPrice: 2800,
     discountPrice: 2520,
     actualPrice: 2520,
@@ -311,7 +314,8 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 3,
     purchaseDate: '2025-06-25',
-    mealSlots: ['下午茶 14:00-17:00'],
+    mealSlots: [],
+    purchaseDays: ['2025-06-25', '2025-06-26'],
     originalPrice: 1400,
     discountPrice: 1260,
     actualPrice: 1260,
@@ -414,7 +418,7 @@ export default function PromotionOrderManage() {
     { key: 'region', title: '所屬商圈' },
     { key: 'recommendType', title: '推薦類型' },
     { key: 'slotPosition', title: '展示位置' },
-    { key: 'mealSlots', title: '購買時段' },
+    { key: 'purchaseContent', title: '購買內容' },
     { key: 'originalPrice', title: '訂單金額' },
     { key: 'discount', title: '優惠金額' },
     { key: 'actualPrice', title: '實付金額' },
@@ -487,19 +491,38 @@ export default function PromotionOrderManage() {
       render: (position: number) => `${position}號位`,
     },
     {
-      title: '購買時段',
-      dataIndex: 'mealSlots',
-      key: 'mealSlots',
-      width: 200,
-      render: (slots: string[]) => (
-        <Space direction="vertical" size={2}>
-          {slots.map((slot, index) => (
-            <Tag key={index} color="blue" style={{ margin: 0 }}>
-              {slot}
-            </Tag>
-          ))}
-        </Space>
-      ),
+      title: '購買內容',
+      key: 'purchaseContent',
+      width: 220,
+      render: (_, record) => {
+        if (record.recommendType === RecommendType.REVITALIZATION_AD && record.purchaseDays && record.purchaseDays.length > 0) {
+          // 盤活復蘇：按天購買，顯示日期範圍 + 天數
+          const first = record.purchaseDays[0]
+          const last = record.purchaseDays[record.purchaseDays.length - 1]
+          const days = record.purchaseDays.length
+          return (
+            <Space direction="vertical" size={2}>
+              <Tag color="green" style={{ margin: 0 }}>{days}天</Tag>
+              <span style={{ fontSize: 12, color: '#595959' }}>
+                {first.slice(5)} ~ {last.slice(5)}
+              </span>
+            </Space>
+          )
+        }
+        // 無敵星星：按時段購買
+        if (record.mealSlots && record.mealSlots.length > 0) {
+          return (
+            <Space direction="vertical" size={2}>
+              {record.mealSlots.map((slot, index) => (
+                <Tag key={index} color="blue" style={{ margin: 0 }}>
+                  {slot}
+                </Tag>
+              ))}
+            </Space>
+          )
+        }
+        return <span style={{ color: '#bfbfbf' }}>-</span>
+      },
     },
     {
       title: '訂單金額',

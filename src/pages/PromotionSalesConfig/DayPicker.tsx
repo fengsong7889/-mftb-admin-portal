@@ -309,7 +309,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             </Space>
             <Space size={4}>
               <div style={{ width: 14, height: 14, background: '#f5f5f5', borderRadius: 2 }} />
-              <span style={{ color: '#595959' }}>不可購買</span>
+              <span style={{ color: '#595959' }}>不可售</span>
             </Space>
             <Space size={4}>
               <div style={{ width: 14, height: 14, background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 2 }} />
@@ -403,11 +403,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                           <CheckCircleFilled style={{ fontSize: 14, marginTop: 4 }} />
                         )}
                         {isDateSoldOut(date) && (
-                          <span style={{ fontSize: 10, marginTop: 2 }}>售罄</span>
+                          <span style={{ fontSize: 10, marginTop: 2 }}>已售罄</span>
                         )}
                         {isDateAvailable(date) && !isDateSoldOut(date) && !isSelected && (
                           <span style={{ fontSize: 10, color: inCart ? '#722ed1' : '#52c41a', marginTop: 2 }}>
-                            {inCart ? '鎖定' : '可售'}
+                            {inCart ? '已鎖定' : '可購買'}
                           </span>
                         )}
                       </>
