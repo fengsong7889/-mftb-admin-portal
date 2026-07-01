@@ -156,7 +156,7 @@ export default function Algorithm() {
     { key: 'code', title: '算法ID' },
     { key: 'name', title: '算法名稱' },
     { key: 'brand', title: '所屬品牌' },
-    { key: 'type', title: '算法類型' },
+    { key: 'type', title: '廣告類型' },
     { key: 'channel', title: '業務頻道' },
     { key: 'placementInterface', title: '算法落地頁' },
     { key: 'status', title: '狀態' },
@@ -175,7 +175,7 @@ export default function Algorithm() {
       render: (v: AppType) => v ? <Tag color={BRAND_COLOR[v]}>{BRAND_LABEL[v]}</Tag> : '-',
     },
     {
-      title: '算法類型', dataIndex: 'type', key: 'type', width: 120,
+      title: '廣告類型', dataIndex: 'type', key: 'type', width: 120,
       render: (v: AlgorithmType) => <Tag color={TYPE_COLOR[v]}>{TYPE_LABEL[v]}</Tag>,
     },
     {
@@ -219,7 +219,7 @@ export default function Algorithm() {
           <Form.Item label="算法名稱" name="name">
             <Input placeholder="請輸入算法名稱" allowClear />
           </Form.Item>
-          <Form.Item label="算法類型" name="type">
+          <Form.Item label="廣告類型" name="type">
             <Select 
               placeholder="全部" 
               options={[

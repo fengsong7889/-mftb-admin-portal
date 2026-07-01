@@ -163,7 +163,7 @@ export default function EffectReport() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="算法類型" name="algorithm">
+          <Form.Item label="廣告類型" name="algorithm">
             <Select 
               placeholder="全部" 
               options={[

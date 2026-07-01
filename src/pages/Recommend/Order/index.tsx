@@ -118,7 +118,7 @@ export default function Order() {
     { key: 'app', title: '所屬品牌' },
     { key: 'orderNo', title: '訂單號' },
     { key: 'merchantName', title: '商家名稱' },
-    { key: 'algorithmType', title: '算法類型' },
+    { key: 'algorithmType', title: '廣告類型' },
     { key: 'channel', title: '業務頻道' },
     { key: 'slot', title: '坑位' },
     { key: 'region', title: '區域' },
@@ -154,7 +154,7 @@ export default function Order() {
     { title: '訂單號', dataIndex: 'orderNo', key: 'orderNo', width: 160 },
     { title: '商家名稱', dataIndex: 'merchantName', key: 'merchantName', width: 140 },
     { 
-      title: '算法類型', 
+      title: '廣告類型', 
       dataIndex: 'algorithmType', 
       key: 'algorithmType',
       width: 120,

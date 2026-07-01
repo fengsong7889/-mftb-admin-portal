@@ -141,7 +141,7 @@ export default function Pricing() {
       width: 100,
     },
     { 
-      title: '算法類型', 
+      title: '廣告類型', 
       dataIndex: 'algorithmType', 
       key: 'algorithmType',
       width: 120,
@@ -217,7 +217,7 @@ export default function Pricing() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="算法類型" name="algorithmType">
+          <Form.Item label="廣告類型" name="algorithmType">
             <Select 
               placeholder="全部" 
               options={[

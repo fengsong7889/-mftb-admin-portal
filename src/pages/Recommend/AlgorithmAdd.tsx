@@ -180,15 +180,35 @@ export default function AlgorithmAdd() {
             </Form.Item>
 
             <Form.Item
-              label="算法類型"
-              name="type"
-              rules={[{ required: true, message: '請選擇算法類型' }]}
+              label="業務頻道"
+              name="channel"
+              rules={[{ required: true, message: '請選擇業務頻道' }]}
               style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 6 }}
               wrapperCol={{ span: 18 }}
             >
               <Select
-                placeholder="請選擇算法類型"
+                placeholder="請選擇業務頻道"
+                options={[
+                  { label: '美食外賣', value: RecommendChannel.DELIVERY },
+                  { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+                  { label: '團購到店', value: RecommendChannel.GROUP_BUY },
+                ]}
+              />
+            </Form.Item>
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 16 }}>
+            <Form.Item
+              label="廣告類型"
+              name="type"
+              rules={[{ required: true, message: '請選擇廣告類型' }]}
+              style={{ flex: '0 0 calc((100% - 32px) / 3)', marginBottom: 0 }}
+              labelCol={{ span: 6 }}
+              wrapperCol={{ span: 18 }}
+            >
+              <Select
+                placeholder="請選擇廣告類型"
                 options={[
                   { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
                   { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
@@ -210,26 +230,6 @@ export default function AlgorithmAdd() {
                     setRegionMerchantCustom(false)
                   }
                 }}
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 16 }}>
-            <Form.Item
-              label="業務頻道"
-              name="channel"
-              rules={[{ required: true, message: '請選擇業務頻道' }]}
-              style={{ flex: '0 0 calc((100% - 32px) / 3)', marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
-            >
-              <Select
-                placeholder="請選擇業務頻道"
-                options={[
-                  { label: '美食外賣', value: RecommendChannel.DELIVERY },
-                  { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
-                  { label: '團購到店', value: RecommendChannel.GROUP_BUY },
-                ]}
               />
             </Form.Item>
           </div>
@@ -790,7 +790,7 @@ export default function AlgorithmAdd() {
               暫無參數配置
             </div>
             <div style={{ fontSize: 14 }}>
-              當前算法類型暫未開放參數配置，請聯繫管理員
+              當前廣告類型暫未開放參數配置，請聯繫管理員
             </div>
           </div>
         </Card>
@@ -811,10 +811,10 @@ export default function AlgorithmAdd() {
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>👆</div>
             <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, color: '#1890ff' }}>
-              請先選擇算法類型
+              請先選擇廣告類型
             </div>
             <div style={{ fontSize: 14 }}>
-              選擇算法類型後，將顯示對應的參數配置項
+              選擇廣告類型後，將顯示對應的參數配置項
             </div>
           </div>
         </Card>

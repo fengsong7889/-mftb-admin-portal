@@ -51,7 +51,7 @@ export default function AlgorithmMonitor() {
             onChange={setSelectedChannel}
           />
           <Select
-            placeholder="選擇算法類型"
+            placeholder="選擇廣告類型"
             allowClear
             style={{ width: 160 }}
             options={ALGORITHM_TYPE_OPTIONS}

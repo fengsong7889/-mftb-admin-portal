@@ -52,7 +52,7 @@ export default function RevenueReport() {
   const columns: ColumnsType<RevenueRecord> = [
     { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
     { title: '頻道', dataIndex: 'channel', key: 'channel', render: (v: RecommendChannel) => CHANNEL_LABEL[v] },
-    { title: '算法類型', dataIndex: 'algorithmType', key: 'algorithmType', render: (v: AlgorithmType) => ALG_LABEL[v] },
+    { title: '廣告類型', dataIndex: 'algorithmType', key: 'algorithmType', render: (v: AlgorithmType) => ALG_LABEL[v] },
     { title: '營收金額 (MOP)', dataIndex: 'revenue', key: 'revenue', render: (v: number) => v.toLocaleString() },
     { title: '佔比', dataIndex: 'proportion', key: 'proportion' },
   ]
@@ -80,7 +80,7 @@ export default function RevenueReport() {
             onChange={setSelectedPeriod}
           />
           <Select
-            placeholder="選擇算法類型"
+            placeholder="選擇廣告類型"
             allowClear
             style={{ width: 160 }}
             options={ALGORITHM_TYPE_OPTIONS}

@@ -12,8 +12,6 @@ import {
   TimeSlot,
   ServiceStatus,
   APP_OPTIONS,
-  RECOMMEND_CHANNEL_OPTIONS,
-  ALGORITHM_TYPE_OPTIONS,
   REGION_OPTIONS,
   SERVICE_STATUS_OPTIONS,
 } from '../constants'
@@ -566,7 +564,11 @@ export default function WaterfallAdd() {
               >
                 <Select 
                   placeholder="請選擇業務頻道" 
-                  options={RECOMMEND_CHANNEL_OPTIONS}
+                  options={[
+                    { label: '美食外賣', value: RecommendChannel.DELIVERY },
+                    { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+                    { label: '團購到店', value: RecommendChannel.GROUP_BUY },
+                  ]}
                   onChange={(value) => setSelectedChannel(value)}
                 />
               </Form.Item>
@@ -574,14 +576,39 @@ export default function WaterfallAdd() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <Form.Item 
-                label="推薦類型" 
+                label="廣告類型" 
                 name="algorithmType" 
-                rules={[{ required: true, message: '請選擇推薦類型' }]}
+                rules={[{ required: true, message: '請選擇廣告類型' }]}
               >
                 <Select 
-                  placeholder="請選擇推薦類型" 
-                  options={ALGORITHM_TYPE_OPTIONS}
+                  placeholder="請選擇廣告類型" 
+                  options={[
+                    { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
+                    { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
+                    { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
+                    { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
+                    { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
+                    { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
+                    { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
+                    { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
+                  ]}
                   onChange={(value) => setSelectedAlgorithmType(value)}
+                />
+              </Form.Item>
+
+              <Form.Item 
+                label="算法落地頁" 
+                name="algorithmLandingPage" 
+                rules={[{ required: true, message: '請選擇算法落地頁' }]}
+              >
+                <Select
+                  placeholder="請選擇算法落地頁"
+                  options={[
+                    { label: '大首頁-Feed', value: 'home' },
+                    { label: '外賣頻道-Feed', value: 'delivery' },
+                    { label: '超市頻道-Feed', value: 'supermarket' },
+                    { label: '團購頻道-Feed', value: 'groupBuy' },
+                  ]}
                 />
               </Form.Item>
             </div>

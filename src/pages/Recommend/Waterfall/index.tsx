@@ -669,11 +669,11 @@ export default function Waterfall() {
             </Form.Item>
 
             <Form.Item 
-              label="算法類型" 
-              rules={[{ required: true, message: '請選擇算法類型' }]}
+              label="廣告類型" 
+              rules={[{ required: true, message: '請選擇廣告類型' }]}
             >
               <Select 
-                placeholder="請選擇算法類型" 
+                placeholder="請選擇廣告類型" 
                 options={ALGORITHM_TYPE_OPTIONS}
                 onChange={handleAlgorithmTypeChange}
                 value={algorithmType}
@@ -686,7 +686,7 @@ export default function Waterfall() {
               rules={[{ required: true, message: '請選擇關聯算法' }]}
             >
               <Select 
-                placeholder="請先選擇算法類型" 
+                placeholder="請先選擇廣告類型" 
                 options={algorithmOptions.map(alg => ({ label: alg.name, value: alg.id }))}
                 onChange={handleAlgorithmChange}
                 disabled={!algorithmType}
@@ -897,7 +897,7 @@ export default function Waterfall() {
               <Descriptions.Item label="算法名稱" span={2}>
                 <strong>{viewingRecord.algorithmName}</strong>
               </Descriptions.Item>
-              <Descriptions.Item label="算法類型">
+              <Descriptions.Item label="廣告類型">
                 <Tag color={ALGORITHM_TYPE_COLOR[viewingRecord.algorithmType]}>
                   {ALGORITHM_TYPE_LABEL[viewingRecord.algorithmType]}
                 </Tag>

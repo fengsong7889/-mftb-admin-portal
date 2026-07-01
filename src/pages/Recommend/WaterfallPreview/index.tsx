@@ -259,7 +259,7 @@ export default function WaterfallPreview() {
                 >
                   <div style={{ fontSize: 12, color: '#595959', lineHeight: 1.8 }}>
                     <div>
-                      <strong>算法類型:</strong> {slot.algorithmType}
+                      <strong>廣告類型:</strong> {slot.algorithmType}
                     </div>
                     <div>
                       <strong>算法ID:</strong> {slot.algorithmId}

@@ -37,7 +37,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   supermarket: '超市百貨',
 }
 
-/** 投放界面标签 */
+/** 算法落地頁标签 */
 const PLACEMENT_LABEL: Record<string, string> = {
   home: '大首頁-Feed',
   delivery: '外賣頻道-Feed',
@@ -382,7 +382,7 @@ export default function PromotionSlotConfig() {
       ),
     },
     {
-      title: '投放界面',
+      title: '算法落地頁',
       dataIndex: 'channel',
       key: 'placementInterface',
       width: 140,
@@ -399,7 +399,7 @@ export default function PromotionSlotConfig() {
       ),
     },
     {
-      title: '推薦類型',
+      title: '廣告類型',
       dataIndex: 'algorithmType',
       key: 'algorithmType',
       width: 120,
@@ -533,7 +533,7 @@ export default function PromotionSlotConfig() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="投放界面" name="placementInterface">
+          <Form.Item label="算法落地頁" name="placementInterface">
             <Select 
               placeholder="全部"
               options={[
@@ -543,6 +543,16 @@ export default function PromotionSlotConfig() {
                 { label: '團購頻道-Feed', value: 'groupBuy' },
               ]}
               allowClear
+            />
+          </Form.Item>
+          <Form.Item label="展示位置" name="position">
+            <Select 
+              placeholder="請選擇"
+              allowClear
+              options={Array.from({ length: 20 }, (_, i) => ({
+                label: `${i + 1}號位`,
+                value: i + 1,
+              }))}
             />
           </Form.Item>
           <Form.Item label="算法ID" name="algorithmId">
@@ -557,17 +567,7 @@ export default function PromotionSlotConfig() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="展示位置" name="position">
-            <Select 
-              placeholder="請選擇"
-              allowClear
-              options={Array.from({ length: 20 }, (_, i) => ({
-                label: `${i + 1}號位`,
-                value: i + 1,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item label="推薦類型" name="algorithmType">
+          <Form.Item label="廣告類型" name="algorithmType">
             <Select 
               placeholder="全部"
               allowClear
@@ -934,9 +934,9 @@ export default function PromotionSlotConfig() {
           </Form.Item>
 
           <Form.Item
-            label="算法類型"
+            label="廣告類型"
             name="algorithmType"
-            rules={[{ required: true, message: '請選擇算法類型' }]}
+            rules={[{ required: true, message: '請選擇廣告類型' }]}
           >
             <Select
               options={[
