@@ -298,7 +298,7 @@ function FlowEditor() {
   const { screenToFlowPosition } = useReactFlow()
   const [messageApi, contextHolder] = message.useMessage()
 
-  // 从 localStorage 加载已保存的位置
+  // 从 localStorage 加載已保存的位置
   const loadSavedPositions = useCallback((): Record<string, { x: number; y: number }> | null => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -327,8 +327,9 @@ function FlowEditor() {
   const [editingNode, setEditingNode] = useState<{ id: string; label: string; desc: string } | null>(null)
 
   // 节点选择变化
-  const handleSelectionChange = useCallback(({ selectedNodes }: { selectedNodes: Node[] }) => {
-    setSelectedIds(selectedNodes.map(n => n.id))
+  const handleSelectionChange = useCallback((params: any) => {
+    const nodes = params.nodes || []
+    setSelectedIds(nodes.map((n: Node) => n.id))
   }, [])
 
   // 节点拖动后标记变更
