@@ -12,7 +12,6 @@ import {
   Position,
   MarkerType,
   type Node,
-  type Edge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -63,83 +62,97 @@ const createNode = (
   targetPosition: Position.Top,
 })
 
-/** 初始节点 - 算法推荐业务流程（待讨论完善） */
+/** 初始节点 - 实际业务流程 */
 const initialNodes: Node[] = [
-  // 第一行：入口
-  createNode('1', '用戶發起請求', 'start', { x: 300, y: 0 }, 'APP/小程序/H5'),
+  // ===== 阶段1：算法库 =====
+  createNode('s1', '① 算法庫 - 配置廣告算法', 'start', { x: 250, y: 0 }, '運營人員操作'),
+  createNode('1a', '創建算法', 'data', { x: 100, y: 110 }, '如：無敵星星'),
+  createNode('1b', '配置算法參數', 'data', { x: 300, y: 110 }, '召回/排序/策略規則'),
+  createNode('1c', '啟用算法', 'decision', { x: 500, y: 110 }, '狀態設為可用'),
 
-  // 第二行：召回层
-  createNode('2', '召回層', 'process', { x: 300, y: 100 }, '多路召回合并'),
-  createNode('2a', '無敵星星召回', 'data', { x: 50, y: 210 }, '黃金坑位引流'),
-  createNode('2b', '盤活復蘇召回', 'data', { x: 200, y: 210 }, '熱門商家激活'),
-  createNode('2c', '新店廣告召回', 'data', { x: 350, y: 210 }, '新店專屬推廣'),
-  createNode('2d', '猜你喜歡召回', 'data', { x: 500, y: 210 }, '個性化推薦'),
+  // ===== 阶段2：瀑布流策略 =====
+  createNode('s2', '② 瀑布流策略 - 引用算法+分配位置', 'process', { x: 250, y: 230 }, '運營人員操作'),
+  createNode('2a', '引用算法', 'data', { x: 100, y: 340 }, '選擇已創建的算法'),
+  createNode('2b', '選擇瀑布流', 'data', { x: 300, y: 340 }, '如：大首頁瀑布流'),
+  createNode('2c', '分配展示位', 'decision', { x: 500, y: 340 }, '如：第2位或第5位'),
 
-  // 第三行：排序层
-  createNode('3', '排序層', 'process', { x: 300, y: 320 }, '粗排 → 精排 → 重排'),
-  createNode('3a', '粗排配置', 'decision', { x: 120, y: 430 }, '快速篩選候選集'),
-  createNode('3b', '精排配置', 'decision', { x: 300, y: 430 }, '精細化打分排序'),
-  createNode('3c', '重排策略', 'decision', { x: 480, y: 430 }, '業務規則調整'),
+  // ===== 阶段3：销售定价 =====
+  createNode('s3', '③ 銷售定價 - 創建活動+配置價格', 'system', { x: 250, y: 460 }, '運營人員操作'),
+  createNode('3a', '新增廣告售賣', 'data', { x: 0, y: 570 }, '如：無敵星星類型'),
+  createNode('3b', '選擇展示位', 'data', { x: 170, y: 570 }, '如：2號位'),
+  createNode('3c', '選擇區域', 'data', { x: 340, y: 570 }, '威尼斯人/皇朝/黑馬仕等'),
+  createNode('3d', '配置區域價格', 'decision', { x: 510, y: 570 }, '每個區域單獨定價'),
 
-  // 第四行：策略层
-  createNode('4', '策略層', 'system', { x: 300, y: 540 }, '廣告策略編排'),
-  createNode('4a', '時段策略', 'data', { x: 120, y: 650 }, '分時段投放規則'),
-  createNode('4b', '廣告類型策略', 'data', { x: 300, y: 650 }, '類型匹配規則'),
-  createNode('4c', 'A/B測試', 'data', { x: 480, y: 650 }, '實驗分流對比'),
+  // ===== 阶段4：广告购买 =====
+  createNode('s4', '④ 廣告購買 - 商家下單', 'start', { x: 250, y: 690 }, '商家操作'),
+  createNode('4a', '選擇廣告類型', 'data', { x: 0, y: 800 }, '如：無敵星星'),
+  createNode('4b', '選擇可購買活動', 'data', { x: 170, y: 800 }, '已上架的活動'),
+  createNode('4c', '選擇投放區域', 'data', { x: 340, y: 800 }, '商家所在區域'),
+  createNode('4d', '選擇日期時段', 'data', { x: 510, y: 800 }, '某天某個時段'),
+  createNode('4e', '提交並支付', 'decision', { x: 250, y: 910 }, '訂單支付'),
 
-  // 第五行：投放层
-  createNode('5', '投放層', 'process', { x: 300, y: 760 }, '坑位分配與定價'),
-  createNode('5a', '坑位管理', 'data', { x: 180, y: 870 }, '瀑布流策略配置'),
-  createNode('5b', '定價策略', 'data', { x: 420, y: 870 }, '銷售定價規則'),
+  // ===== 阶段5：订单管理 =====
+  createNode('s5', '⑤ 訂單管理 - 推送狀態', 'process', { x: 250, y: 1020 }, '系統自動 + 商家查看'),
+  createNode('5a', '訂單提交', 'data', { x: 130, y: 1130 }, '支付完成'),
+  createNode('5b', '系統推送', 'system', { x: 370, y: 1130 }, '系統處理推送'),
+  createNode('5c', '推送完成', 'end', { x: 250, y: 1240 }, '廣告上線'),
 
-  // 第六行：结果
-  createNode('6', '返回推薦結果', 'end', { x: 300, y: 980 }, '展示給用戶'),
+  // ===== 阶段6：报表分析 =====
+  createNode('s6', '⑥ 報表分析 - 推廣效果', 'end', { x: 250, y: 1350 }, '商家查看'),
+  createNode('6a', '數據概覽', 'data', { x: 100, y: 1460 }, '整體推廣數據'),
+  createNode('6b', '訂單效果報表', 'data', { x: 300, y: 1460 }, '訂單級別效果'),
+  createNode('6c', '類型對比', 'data', { x: 500, y: 1460 }, '不同廣告類型對比'),
 ]
 
 /** 初始边 */
-const initialEdges: Edge[] = [
-  // 入口 → 召回
-  { id: 'e1-2', source: '1', target: '2', animated: true, stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
+const initialEdges = [
+  // 阶段1：算法库内部
+  { id: 'es1-1a', source: 's1', target: '1a', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'es1-1b', source: 's1', target: '1b', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'es1-1c', source: 's1', target: '1c', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
 
-  // 召回 → 各召回源
-  { id: 'e2-2a', source: '2', target: '2a', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e2-2b', source: '2', target: '2b', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e2-2c', source: '2', target: '2c', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e2-2d', source: '2', target: '2d', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段1 → 阶段2
+  { id: 'e1c-s2', source: '1c', target: 's2', animated: true, style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '算法啟用後' },
 
-  // 召回源 → 排序
-  { id: 'e2a-3', source: '2a', target: '3', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e2b-3', source: '2b', target: '3', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e2c-3', source: '2c', target: '3', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e2d-3', source: '2d', target: '3', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段2：瀑布流策略内部
+  { id: 'es2-2a', source: 's2', target: '2a', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'es2-2b', source: 's2', target: '2b', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'es2-2c', source: 's2', target: '2c', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
 
-  // 排序 → 各排序阶段
-  { id: 'e3-3a', source: '3', target: '3a', stroke: '#FAAD14', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3-3b', source: '3', target: '3b', stroke: '#FAAD14', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3-3c', source: '3', target: '3c', stroke: '#FAAD14', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段2 → 阶段3
+  { id: 'e2c-s3', source: '2c', target: 's3', animated: true, style: { stroke: '#722ED1' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '位置分配完成' },
 
-  // 排序 → 策略
-  { id: 'e3a-4', source: '3a', target: '4', stroke: '#EB2F96', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3b-4', source: '3b', target: '4', stroke: '#EB2F96', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3c-4', source: '3c', target: '4', stroke: '#EB2F96', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段3：销售定价内部
+  { id: 'es3-3a', source: 's3', target: '3a', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e3a-3b', source: '3a', target: '3b', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e3b-3c', source: '3b', target: '3c', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e3c-3d', source: '3c', target: '3d', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
 
-  // 策略 → 各策略
-  { id: 'e4-4a', source: '4', target: '4a', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4-4b', source: '4', target: '4b', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4-4c', source: '4', target: '4c', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段3 → 阶段4
+  { id: 'e3d-s4', source: '3d', target: 's4', animated: true, style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '活動上架' },
 
-  // 策略 → 投放
-  { id: 'e4a-5', source: '4a', target: '5', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4b-5', source: '4b', target: '5', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4c-5', source: '4c', target: '5', stroke: '#1890FF', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段4：广告购买内部
+  { id: 'es4-4a', source: 's4', target: '4a', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e4a-4b', source: '4a', target: '4b', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e4b-4c', source: '4b', target: '4c', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e4c-4d', source: '4c', target: '4d', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e4d-4e', source: '4d', target: '4e', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
 
-  // 投放 → 子模块
-  { id: 'e5-5a', source: '5', target: '5a', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e5-5b', source: '5', target: '5b', stroke: '#722ED1', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段4 → 阶段5
+  { id: 'e4e-s5', source: '4e', target: 's5', animated: true, style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '支付完成' },
 
-  // 投放 → 结果
-  { id: 'e5a-6', source: '5a', target: '6', animated: true, stroke: '#FA541C', markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e5b-6', source: '5b', target: '6', animated: true, stroke: '#FA541C', markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段5：订单管理内部
+  { id: 'es5-5a', source: 's5', target: '5a', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e5a-5b', source: '5a', target: '5b', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'e5b-5c', source: '5b', target: '5c', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+
+  // 阶段5 → 阶段6
+  { id: 'e5c-s6', source: '5c', target: 's6', animated: true, style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '推送完成後' },
+
+  // 阶段6：报表分析内部
+  { id: 'es6-6a', source: 's6', target: '6a', style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'es6-6b', source: 's6', target: '6b', style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  { id: 'es6-6c', source: 's6', target: '6c', style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed } },
 ]
 
 export default function AlgorithmFlow() {
@@ -233,15 +246,12 @@ export default function AlgorithmFlow() {
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.3}
           maxZoom={2}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
         >
           <Background color="#e8e8e8" gap={20} size={1} />
           <Controls showInteractive={false} />
           <MiniMap
-            nodeColor={(node) => {
-              const type = node.data?.label?.props?.children?.[0]?.props?.style?.border?.split(' ')[2] || '#D9D9D9'
-              return type
-            }}
+            nodeColor={() => '#E8720C'}
             style={{ borderRadius: 8, border: '1px solid #f0f0f0' }}
           />
         </ReactFlow>
