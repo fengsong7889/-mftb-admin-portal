@@ -1,14 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Switch } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import { AlgorithmType, RecommendChannel, PlacementInterface, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
+import { mockAlgorithmData } from './Algorithm/index'
+
+/** 广告类型标签映射 */
+const TYPE_LABEL: Record<number, string> = {
+  [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
+  [AlgorithmType.NEW_STORE_AD]: '新店廣告',
+  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
+  [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
+  [AlgorithmType.TRAFFIC_AD]: '流量廣告',
+  [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
+  [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
+  [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
+}
+
+const TYPE_ICON: Record<number, string> = {
+  [AlgorithmType.INVINCIBLE_STAR]: '⭐',
+  [AlgorithmType.NEW_STORE_AD]: '🏪',
+  [AlgorithmType.HOT_REVIVE_AD]: '🔥',
+  [AlgorithmType.EXCLUSIVE_MERCHANT]: '👑',
+  [AlgorithmType.TRAFFIC_AD]: '📊',
+  [AlgorithmType.GUESS_YOU_LIKE]: '💡',
+  [AlgorithmType.ORGANIC_TRAFFIC]: '🌿',
+  [AlgorithmType.SEARCH_ALGORITHM]: '🔍',
+}
 
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const algorithmTypeParam = searchParams.get('type') || ''
+  const algorithmIdParam = searchParams.get('id') || ''
+  const initialType = algorithmTypeParam ? Number(algorithmTypeParam) as AlgorithmType : null
+  const isEditMode = !!algorithmIdParam // 有 id 参数则为编辑模式
   const [form] = Form.useForm()
   const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听商家曝光策略选择
-  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null) // 当前选择的算法类型
+  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(initialType) // 从 URL 参数初始化
   const [presaleMode, setPresaleMode] = useState(true) // false: 固定, true: 滚动
   const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
   const [merchantLimit, setMerchantLimit] = useState(false) // false: 不限制, true: 限制
@@ -18,7 +47,7 @@ export default function AlgorithmAdd() {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
   const [placementInterfaceMode, setPlacementInterfaceMode] = useState(false) // false: 全部, true: 指定
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([])
-  const [isEditing, setIsEditing] = useState(false) // 编辑模式
+  const [isEditing, setIsEditing] = useState(isEditMode) // 编辑模式
   const [regionMerchantCustom, setRegionMerchantCustom] = useState(false) // false: 限制1個, true: 自定義
   const [singleUserExposureLimit, setSingleUserExposureLimit] = useState(true) // false: 不限, true: 限制
   const [dailyExposureLimit, setDailyExposureLimit] = useState(false) // false: 不限, true: 限制
@@ -37,9 +66,23 @@ export default function AlgorithmAdd() {
   const [dimensionItems, setDimensionItems] = useState<DimensionItem[]>([])
   const [selectedDimension, setSelectedDimension] = useState<string | undefined>(undefined)
 
-  // 返回上一页
+  // 编辑模式下加载默认数据
+  useEffect(() => {
+    if (isEditMode && algorithmIdParam) {
+      const record = mockAlgorithmData.find(item => item.id === Number(algorithmIdParam))
+      if (record) {
+        form.setFieldsValue({
+          name: record.name,
+          brand: record.brand,
+          channel: record.channel,
+        })
+      }
+    }
+  }, [isEditMode, algorithmIdParam, form])
+
+  // 返回算法列表页
   const handleBack = () => {
-    navigate('/promotion-algorithm')
+    navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)
   }
 
   // 进入编辑模式
@@ -97,7 +140,7 @@ export default function AlgorithmAdd() {
       console.log('新增算法数据:', values)
       message.success('算法新增成功')
       setIsEditing(false)
-      navigate('/promotion-algorithm')
+      navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)
     } catch (error) {
       console.error('验证失败:', error)
     }
@@ -115,8 +158,13 @@ export default function AlgorithmAdd() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            新增算法
+            {isEditMode ? '編輯算法' : '新增算法'}
           </h2>
+          {selectedAlgorithmType && (
+            <span style={{ fontSize: 14, color: '#595959' }}>
+              {TYPE_ICON[selectedAlgorithmType]} {TYPE_LABEL[selectedAlgorithmType]}
+            </span>
+          )}
         </div>
         <Button
           type="primary"
@@ -176,6 +224,7 @@ export default function AlgorithmAdd() {
               <Select
                 placeholder="請選擇所屬品牌"
                 options={APP_OPTIONS}
+                disabled={isEditMode}
               />
             </Form.Item>
 
@@ -190,46 +239,11 @@ export default function AlgorithmAdd() {
               <Select
                 placeholder="請選擇業務頻道"
                 options={[
-                  { label: '美食外賣', value: RecommendChannel.DELIVERY },
+                  { label: '美食外賣', value: RecommendChannel.HOME },
                   { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
                   { label: '團購到店', value: RecommendChannel.GROUP_BUY },
                 ]}
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 16 }}>
-            <Form.Item
-              label="廣告類型"
-              name="type"
-              rules={[{ required: true, message: '請選擇廣告類型' }]}
-              style={{ flex: '0 0 calc((100% - 32px) / 3)', marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
-            >
-              <Select
-                placeholder="請選擇廣告類型"
-                options={[
-                  { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
-                  { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-                  { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
-                  { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
-                  { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
-                  { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
-                  { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
-                  { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
-                ]}
-                onChange={(value) => {
-                  setSelectedAlgorithmType(value)
-                  // 切换算法类型时重置参数区域的状态
-                  if (value !== AlgorithmType.INVINCIBLE_STAR && value !== AlgorithmType.HOT_REVIVE_AD) {
-                    setIsEditing(false)
-                  }
-                  // 無敵星星時：區域商家展示限制默認限制1個並禁用
-                  if (value === AlgorithmType.INVINCIBLE_STAR) {
-                    setRegionMerchantCustom(false)
-                  }
-                }}
+                disabled={isEditMode}
               />
             </Form.Item>
           </div>
@@ -246,24 +260,9 @@ export default function AlgorithmAdd() {
             </Space>
           }
           extra={
-            <Space>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                配置算法運行參數
-              </span>
-              {!isEditing && (
-                <Button 
-                  type="primary" 
-                  size="small"
-                  onClick={handleEdit}
-                  style={{ 
-                    borderRadius: 4,
-                    height: 28
-                  }}
-                >
-                  編輯
-                </Button>
-              )}
-            </Space>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              配置算法運行參數
+            </span>
           }
           style={{ 
             marginTop: 16,
@@ -283,7 +282,7 @@ export default function AlgorithmAdd() {
           form={form}
           layout="horizontal"
           colon={false}
-          disabled={!isEditing}
+          disabled={false}
           initialValues={{
             presaleMode: 'rolling',
             continuousPurchase: 'notSupport',
@@ -415,7 +414,7 @@ export default function AlgorithmAdd() {
                     <Switch
                       checked={regionMerchantCustom}
                       onChange={(checked) => setRegionMerchantCustom(checked)}
-                      disabled={!isEditing}
+                      disabled={false}
                       size="small"
                     />
                     <span style={{ fontSize: 13, color: regionMerchantCustom ? '#1890ff' : '#8c8c8c', fontWeight: regionMerchantCustom ? 600 : 400 }}>自定義</span>
@@ -512,7 +511,7 @@ export default function AlgorithmAdd() {
                             <Switch
                               checked={singleUserExposureLimit}
                               onChange={(checked) => setSingleUserExposureLimit(checked)}
-                              disabled={!isEditing}
+                              disabled={false}
                               size="small"
                             />
                             <span style={{ fontSize: 13, color: singleUserExposureLimit ? '#1890ff' : '#8c8c8c', fontWeight: singleUserExposureLimit ? 600 : 400 }}>限制</span>
@@ -542,7 +541,7 @@ export default function AlgorithmAdd() {
                             <Switch
                               checked={dailyExposureLimit}
                               onChange={(checked) => setDailyExposureLimit(checked)}
-                              disabled={!isEditing}
+                              disabled={false}
                               size="small"
                             />
                             <span style={{ fontSize: 13, color: dailyExposureLimit ? '#1890ff' : '#8c8c8c', fontWeight: dailyExposureLimit ? 600 : 400 }}>限制</span>
@@ -820,8 +819,8 @@ export default function AlgorithmAdd() {
         </Card>
       )}
 
-      {/* 底部保存按钮（仅编辑模式下显示） */}
-      {isEditing && (
+      {/* 底部保存按钮 */}
+      {selectedAlgorithmType && (
         <div style={{ 
           marginTop: 24, 
           padding: '20px 24px',
@@ -834,7 +833,7 @@ export default function AlgorithmAdd() {
           <Space size={12}>
             <Button 
               size="large"
-              onClick={handleCancelEdit}
+              onClick={handleBack}
               style={{ 
                 borderRadius: 6,
                 padding: '4px 24px',

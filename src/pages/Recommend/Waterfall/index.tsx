@@ -301,7 +301,7 @@ export default function Waterfall() {
     { key: 'channel', title: '業務頻道' },
     { key: 'app', title: '所屬品牌' },
     { key: 'slotPosition', title: '展示位置' },
-    { key: 'algorithmType', title: '推薦類型' },
+    { key: 'algorithmType', title: '廣告類型' },
     { key: 'algorithmId', title: '關聯算法ID' },
     { key: 'algorithmName', title: '關聯算法名稱' },
     { key: 'salesStartDate', title: '銷售日期起' },
@@ -368,7 +368,7 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '推薦類型',
+      title: '廣告類型',
       dataIndex: 'algorithmType',
       key: 'algorithmType',
       width: 120,
@@ -694,7 +694,7 @@ export default function Waterfall() {
             </Form.Item>
 
             <Form.Item 
-              label="推薦類型" 
+              label="廣告類型"
               name="algorithmType"
             >
               <Input 

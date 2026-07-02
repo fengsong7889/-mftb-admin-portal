@@ -13,8 +13,8 @@ const { RangePicker } = DatePicker
 /** 品牌选项 */
 const brandOptions = [
   { label: '全部', value: 'all' },
-  { label: '1mFood', value: '1mFood' },
-  { label: '2閃蜂', value: 'flashBee' },
+  { label: 'mFood', value: 'mFood' },
+  { label: '閃蜂', value: 'flashBee' },
 ]
 
 /** 批次类型选项 */
@@ -54,8 +54,8 @@ interface BatchRecord {
 
 /** 品牌显示映射 */
 const brandMap: Record<string, string> = {
-  '1mFood': '1mFood',
-  flashBee: '2閃蜂',
+  mFood: 'mFood',
+  flashBee: '閃蜂',
 }
 
 /** 批次类型显示映射 */
@@ -66,10 +66,10 @@ const batchTypeMap: Record<string, string> = {
 }
 
 /** 模拟数据 */
-const groupNames = ['廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕', '廣州酒駕']
+const groupNames = ['廣州酒家', '海底撈', '星巴克', '麥當勞', '肯德基', '必勝客', '喜茶', '奈雪的茶', '真功夫', '大吉鴨', '太二酸菜魚', '瑞幸咖啡']
 const batchTypes = ['recharge', 'recharge', 'transfer', 'recharge', 'merge', 'recharge', 'transfer', 'recharge', 'merge', 'recharge', 'recharge', 'transfer']
 const actualFlags = ['是', '是', '否', '是', '--', '--', '--', '--', '--', '是', '是', '--']
-const remarks = ['新店首充，獎勵多', '新店首充，獎勵多', '不綁定BD', '新店首充，獎勵多', '--', '--', '新店首充，獎勵多', '--', '不綁定BD', '新店首充，獎勵多', '--', '--']
+const remarks = ['新店首充，獎勵多', '月度充值獎勵', '不綁定BD', '節日活動充值', '--', '--', '跨店轉賬充值', '--', '不綁定BD', '日常充值', '促銷充值活動', '--']
 const virtualAmounts = [28000, 26000, 24000, 22000, 20000, 28000, 26000, 24000, 22000, 20000, 28000, 26000]
 const actualAmounts = [20000, 22000, 16000, 18000, 14000, 20000, 22000, 16000, 18000, 14000, 20000, 22000]
 
@@ -78,7 +78,7 @@ const mockData: BatchRecord[] = Array.from({ length: 12 }, (_, i) => ({
   index: i + 1,
   groupId: i % 2 === 0 ? '100001' : '100002',
   groupName: groupNames[i],
-  brand: i % 3 === 0 ? 'flashBee' : '1mFood',
+  brand: i % 3 === 0 ? 'flashBee' : 'mFood',
   batchType: batchTypes[i],
   batchNo: 'PC202612281',
   flowNo: '202601',

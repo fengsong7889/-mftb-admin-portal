@@ -168,7 +168,7 @@ export default function WaterfallAdd() {
   const canShowPositions = selectedApp && selectedChannel && selectedAlgorithmType &&
     (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD)
   
-  // 推荐类型为其它条件时显示暂未开通提示
+  // 廣告類型爲其它條件時顯示暫未開通提示
   const showNotAvailable = selectedAlgorithmType && !canShowPositions
   
   // 是否为盤活復蘇算法类型
@@ -258,7 +258,7 @@ export default function WaterfallAdd() {
   const handlePositionSelect = (position: number) => {
     setSelectedPosition(position)
     
-    // 根据推荐类型选择不同的算法数据
+    // 根据广告类型选择不同的算法数据
     const algorithmData = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD 
       ? mockRevivePositionAlgorithm 
       : mockPositionAlgorithm
@@ -852,7 +852,7 @@ export default function WaterfallAdd() {
                   暫未開通
                 </div>
                 <div style={{ fontSize: 13 }}>
-                  當前推薦類型暫不支持廣告位選擇，僅「無敵星星」和「盤活復蘇」類型可用
+                  當前廣告類型暫不支持廣告位選擇，僅「無敵星星」和「盤活復蘇」類型可用
                 </div>
               </div>
             </Card>

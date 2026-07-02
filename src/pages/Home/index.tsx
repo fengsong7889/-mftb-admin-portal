@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Input, Button, Tag, Empty, Card, Tabs } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { Line, Column, Area } from '@ant-design/charts'
@@ -26,20 +26,18 @@ import {
 } from '@ant-design/icons'
 import './index.css'
 
-const { TabPane } = Tabs
-
 /** 励志语句库 */
 const motivationalQuotes = [
-  '每一天都是新的开始,加油!💪',
-  '努力工作,快乐生活!✨',
-  '保持热爱,奔赴山海!🌊',
-  '你的努力,终将成就更好的自己!🌟',
-  '不忘初心,方得始终!💫',
-  '越努力,越幸运!🍀',
-  '今天流下的汗水,是明天成功的基石!🏆',
-  '脚踏实地,仰望星空!🌠',
-  '坚持不懈,梦想终会实现!🎯',
-  '用心做好每一件事,成功自然水到渠成!💎',
+  '每一天都是新的开始,加油!',
+  '努力工作,快乐生活!',
+  '保持热爱,奔赴山海!',
+  '你的努力,终将成就更好的自己!',
+  '不忘初心,方得始终!',
+  '越努力,越幸运!',
+  '今天流下的汗水,是明天成功的基石!',
+  '脚踏实地,仰望星空!',
+  '坚持不懈,梦想终会实现!',
+  '用心做好每一件事,成功自然水到渠成!',
 ]
 
 /** 所有可用菜单 */
@@ -62,7 +60,7 @@ const allMenus = [
   { key: 'promotion-dashboard', label: '數據看板', icon: <LineChartOutlined />, path: '/promotion-dashboard', group: '商家推广工具' },
   { key: 'promotion-algorithm', label: '算法庫', icon: <DatabaseOutlined />, path: '/promotion-algorithm', group: '商家推广工具' },
   { key: 'promotion-slot-config', label: '瀑布流策略', icon: <SwapOutlined />, path: '/promotion-slot-config', group: '商家推广工具' },
-  { key: 'promotion-waterfall', label: '定價銷售配置', icon: <WalletOutlined />, path: '/promotion-waterfall', group: '商家推广工具' },
+  { key: 'promotion-waterfall', label: '銷售定價', icon: <WalletOutlined />, path: '/promotion-waterfall', group: '商家推广工具' },
   // 推广通
   { key: 'promotion-sales-config', label: '廣告購買', icon: <ShoppingOutlined />, path: '/promotion-sales-config', group: '推广通' },
   { key: 'promotion-order-manage', label: '訂單管理', icon: <FileSearchOutlined />, path: '/promotion-order-manage', group: '推广通' },
@@ -140,6 +138,29 @@ const userGrowthData = [
   { date: '06-23', users: 135 },
 ]
 
+/** 数字动画 Hook */
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+  useEffect(() => {
+    const start = performance.now()
+    const from = 0
+    const animate = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      // easeOutExpo
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
+      setValue(Math.round(from + (target - from) * eased))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate)
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+  return value
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [searchText, setSearchText] = useState('')
@@ -148,6 +169,13 @@ export default function Home() {
   const [quote, setQuote] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 数字动画
+  const orderDelivery = useCountUp(165)
+  const orderGroupBuy = useCountUp(68)
+  const orderSupermarket = useCountUp(55)
+  const newUsers = useCountUp(135)
+  const rechargeAmount = useCountUp(28000)
 
   useEffect(() => {
     const randomIndex = Math.floor(Math.random() * motivationalQuotes.length)
@@ -262,9 +290,9 @@ export default function Home() {
   return (
     <div className="home-page">
       {/* 欢迎横幅 */}
-      <div className="home-welcome home-welcome--orange">
+      <div className="home-welcome home-welcome--animated">
         <div className="home-welcome-left">
-          <h2>歡迎回來,小蜜蜂</h2>
+          <h2>歡迎回來,小蜜蜂 <span className="home-welcome-emoji">🐝</span></h2>
           <p className="home-welcome-quote">{quote}</p>
         </div>
         <div className="home-welcome-right">
@@ -381,15 +409,18 @@ export default function Home() {
         {/* 左侧：三个统计卡片 */}
         <div className="home-stats-cards">
           {/* 订单数据卡片 - 横向布局 */}
-          <Card className="home-stat-card" hoverable>
+          <Card className="home-stat-card home-stat-card--gradient-blue" hoverable>
             <div className="home-stat-header">
-              <ShoppingOutlined className="home-stat-icon" style={{ color: '#1890ff' }} />
+              <div className="home-stat-icon-badge" style={{ background: 'rgba(24,144,255,0.1)' }}>
+                <ShoppingOutlined style={{ color: '#1890ff', fontSize: 18 }} />
+              </div>
               <span className="home-stat-title">今日訂單</span>
+              <Tag color="blue" className="home-stat-live-tag">LIVE</Tag>
             </div>
             <div className="home-stat-content home-stat-content--horizontal">
               <div className="home-stat-item">
                 <div className="home-stat-label">外賣訂單</div>
-                <div className="home-stat-value" style={{ color: '#1890ff' }}>165</div>
+                <div className="home-stat-value home-stat-value--animated" style={{ color: '#1890ff' }}>{orderDelivery}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +12%
                 </div>
@@ -397,7 +428,7 @@ export default function Home() {
               <div className="home-stat-divider" />
               <div className="home-stat-item">
                 <div className="home-stat-label">團購訂單</div>
-                <div className="home-stat-value" style={{ color: '#722ed1' }}>68</div>
+                <div className="home-stat-value home-stat-value--animated" style={{ color: '#722ed1' }}>{orderGroupBuy}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +8%
                 </div>
@@ -405,7 +436,7 @@ export default function Home() {
               <div className="home-stat-divider" />
               <div className="home-stat-item">
                 <div className="home-stat-label">超市訂單</div>
-                <div className="home-stat-value" style={{ color: '#fa8c16' }}>55</div>
+                <div className="home-stat-value home-stat-value--animated" style={{ color: '#fa8c16' }}>{orderSupermarket}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +15%
                 </div>
@@ -414,15 +445,17 @@ export default function Home() {
           </Card>
 
           {/* 新用户统计卡片 */}
-          <Card className="home-stat-card" hoverable>
+          <Card className="home-stat-card home-stat-card--gradient-green" hoverable>
             <div className="home-stat-header">
-              <UserAddOutlined className="home-stat-icon" style={{ color: '#52c41a' }} />
+              <div className="home-stat-icon-badge" style={{ background: 'rgba(82,196,26,0.1)' }}>
+                <UserAddOutlined style={{ color: '#52c41a', fontSize: 18 }} />
+              </div>
               <span className="home-stat-title">今日新用戶</span>
             </div>
             <div className="home-stat-content home-stat-content--single">
               <div className="home-stat-item">
                 <div className="home-stat-label">新增用戶</div>
-                <div className="home-stat-value" style={{ color: '#52c41a', fontSize: 26 }}>135</div>
+                <div className="home-stat-value home-stat-value--animated" style={{ color: '#52c41a', fontSize: 26 }}>{newUsers}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +18% 較昨日
                 </div>
@@ -431,15 +464,19 @@ export default function Home() {
           </Card>
 
           {/* 推广金统计卡片 */}
-          <Card className="home-stat-card" hoverable>
+          <Card className="home-stat-card home-stat-card--gradient-gold" hoverable>
             <div className="home-stat-header">
-              <WalletOutlined className="home-stat-icon" style={{ color: '#faad14' }} />
+              <div className="home-stat-icon-badge" style={{ background: 'rgba(250,173,20,0.1)' }}>
+                <WalletOutlined style={{ color: '#faad14', fontSize: 18 }} />
+              </div>
               <span className="home-stat-title">推廣金充值</span>
             </div>
             <div className="home-stat-content home-stat-content--single">
               <div className="home-stat-item">
                 <div className="home-stat-label">今日充值</div>
-                <div className="home-stat-value" style={{ color: '#faad14', fontSize: 24 }}>MOP 28,000</div>
+                <div className="home-stat-value home-stat-value--animated" style={{ color: '#faad14', fontSize: 24 }}>
+                  MOP {rechargeAmount.toLocaleString()}
+                </div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +22% 較昨日
                 </div>
@@ -451,34 +488,46 @@ export default function Home() {
 
         {/* 右侧：系统通知和公告 */}
         <Card className="home-notification-card-compact">
-          <Tabs defaultActiveKey="1" size="small">
-            <TabPane tab={<span><NotificationOutlined />通知</span>} key="1">
-              <div className="home-notification-list-compact">
-                {notifications.slice(0, 3).map((n) => (
-                  <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
-                    <div className="home-notification-title-compact">
-                      {!n.read && <span className="home-notification-dot" />}
-                      {n.title}
-                    </div>
-                    <div className="home-notification-time-compact">{n.time}</div>
+          <Tabs
+            defaultActiveKey="1"
+            size="small"
+            items={[
+              {
+                key: '1',
+                label: <span><NotificationOutlined /> 通知</span>,
+                children: (
+                  <div className="home-notification-list-compact">
+                    {notifications.slice(0, 3).map((n) => (
+                      <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
+                        <div className="home-notification-title-compact">
+                          {!n.read && <span className="home-notification-dot" />}
+                          {n.title}
+                        </div>
+                        <div className="home-notification-time-compact">{n.time}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </TabPane>
-            <TabPane tab={<span><BulbOutlined />公告</span>} key="2">
-              <div className="home-notification-list-compact">
-                {announcements.slice(0, 3).map((n) => (
-                  <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
-                    <div className="home-notification-title-compact">
-                      {!n.read && <span className="home-notification-dot" />}
-                      {n.title}
-                    </div>
-                    <div className="home-notification-time-compact">{n.time}</div>
+                ),
+              },
+              {
+                key: '2',
+                label: <span><BulbOutlined /> 公告</span>,
+                children: (
+                  <div className="home-notification-list-compact">
+                    {announcements.slice(0, 3).map((n) => (
+                      <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
+                        <div className="home-notification-title-compact">
+                          {!n.read && <span className="home-notification-dot" />}
+                          {n.title}
+                        </div>
+                        <div className="home-notification-time-compact">{n.time}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </TabPane>
-          </Tabs>
+                ),
+              },
+            ]}
+          />
         </Card>
       </div>
 

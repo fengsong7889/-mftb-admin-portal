@@ -9,7 +9,6 @@ import {
   LogoutOutlined,
   KeyOutlined,
   CameraOutlined,
-  GlobalOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'

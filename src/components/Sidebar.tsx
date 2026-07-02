@@ -1,4 +1,4 @@
-import { Layout, Menu } from 'antd'
+import { Layout, Menu, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -40,6 +40,21 @@ import {
   ClockCircleOutlined,
   UserOutlined,
   DashboardOutlined,
+  TeamOutlined,
+  ShopOutlined,
+  ToolOutlined,
+  MoneyCollectOutlined,
+  SoundOutlined,
+  CrownOutlined,
+  CarOutlined,
+  BulbOutlined,
+  LockOutlined,
+  SendOutlined,
+  FileTextOutlined,
+  StarOutlined,
+  ProfileOutlined,
+  BranchesOutlined,
+  ShoppingFilled,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -172,7 +187,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'system',
-    icon: <SettingOutlined />,
+    icon: <ToolOutlined />,
     label: '系統設置',
     children: [
       {
@@ -182,7 +197,7 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'system-template',
-        icon: <ReadOutlined />,
+        icon: <FileTextOutlined />,
         label: '系統模板',
       },
       {
@@ -199,22 +214,22 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'user-management',
-    icon: <AuditOutlined />,
+    icon: <TeamOutlined />,
     label: '用戶管理',
     children: [
       {
         key: 'user-feedback',
-        icon: <FileSearchOutlined />,
+        icon: <SoundOutlined />,
         label: '用戶意見反饋',
       },
       {
         key: 'user-list',
-        icon: <OrderedListOutlined />,
+        icon: <ProfileOutlined />,
         label: '用戶列表',
       },
       {
         key: 'user-avatar',
-        icon: <EyeOutlined />,
+        icon: <StarOutlined />,
         label: '用戶頭像管理',
       },
       {
@@ -246,12 +261,12 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'operation-platform',
-    icon: <RocketOutlined />,
+    icon: <BulbOutlined />,
     label: '運營平台工具',
   },
   {
     key: 'operation-delivery',
-    icon: <FundOutlined />,
+    icon: <SoundOutlined />,
     label: '運營投放管理',
     children: [
       {
@@ -263,7 +278,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'merchant-group',
-    icon: <AppstoreOutlined />,
+    icon: <ShopOutlined />,
     label: '商戶集團管理',
     children: [
       {
@@ -273,7 +288,7 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'merchant-feedback',
-        icon: <FileSearchOutlined />,
+        icon: <SoundOutlined />,
         label: '商家意見',
       },
       {
@@ -283,7 +298,7 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'group-permission',
-        icon: <SafetyCertificateOutlined />,
+        icon: <LockOutlined />,
         label: '集團權限(運營主管)',
       },
       {
@@ -293,7 +308,7 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'contract-management',
-        icon: <ReadOutlined />,
+        icon: <FileTextOutlined />,
         label: '合同管理',
       },
       {
@@ -305,7 +320,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'delivery-business',
-    icon: <RocketOutlined />,
+    icon: <CarOutlined />,
     label: '到家業務(外賣)',
     children: [
       {
@@ -337,7 +352,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'group-buy-business',
-    icon: <GiftOutlined />,
+    icon: <ShopOutlined />,
     label: '到店業務(團購)',
     children: [
       {
@@ -353,8 +368,8 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    key: 'merchant-promotion',
-    icon: <RocketOutlined />,
+    key: 'merchant_promotion',
+    icon: <CrownOutlined />,
     label: '商家推广工具',
     children: [
       {
@@ -387,7 +402,7 @@ const menuItems: MenuItem[] = [
       {
         key: 'promotion-waterfall',
         icon: <ColumnHeightOutlined />,
-        label: '定價銷售配置',
+        label: '銷售定價',
       },
     ],
   },
@@ -398,12 +413,12 @@ const menuItems: MenuItem[] = [
     children: [
       {
         key: 'promotion-sales-config',
-        icon: <DollarOutlined />,
+        icon: <ShoppingFilled />,
         label: '廣告購買',
       },
       {
         key: 'promotion-order-manage',
-        icon: <OrderedListOutlined />,
+        icon: <FileSearchOutlined />,
         label: '訂單管理',
       },
       {
@@ -432,7 +447,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'search',
-    icon: <DatabaseOutlined />,
+    icon: <SearchOutlined />,
     label: '搜索管理',
     children: [
       {
@@ -544,7 +559,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'finance',
-    icon: <FundOutlined />,
+    icon: <MoneyCollectOutlined />,
     label: '財務管理',
     children: [
       {
@@ -571,7 +586,7 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'merchant-reconcile',
-        icon: <SwapOutlined />,
+        icon: <AuditOutlined />,
         label: '商戶通對賬',
         children: [
           {
@@ -602,7 +617,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'permission',
-    icon: <SafetyCertificateOutlined />,
+    icon: <LockOutlined />,
     label: '權限管理',
     children: [
       {
@@ -619,7 +634,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'recommend',
-    icon: <RocketOutlined />,
+    icon: <SendOutlined />,
     label: '推薦管理',
     children: [
       {
@@ -784,6 +799,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     const path = keyToPath[key]
     if (path) {
       navigate(path)
+    } else {
+      message.info('該功能模塊開發中，敬請期待')
     }
   }
 

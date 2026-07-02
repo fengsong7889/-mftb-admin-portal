@@ -1,12 +1,24 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form } from 'antd'
+import { Button, Space, Table, Tag, Badge, Input, Select, Form, Card } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS } from '../constants'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS } from '../constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const { Search } = Input
+
+/** 广告类型卡片配置 */
+const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
+  { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: '超級曝光位，首頁頂部黃金坑位，強勢引流' },
+  { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: '盤活熱門商家流量，提升店鋪曝光' },
+  { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: '新店專屬推廣位，快速獲取首批顧客' },
+  { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: '獨家商家專屬展示位，彰顯品牌實力' },
+  { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: '精準流量投放，覆蓋目標用戶群體' },
+  { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: '智能推薦，個性化匹配用戶偏好' },
+  { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: '自然流量曝光，提升店鋪基礎流量' },
+  { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: '搜索算法優化，提升搜索轉化率' },
+]
 
 interface AlgorithmRecord {
   id: number
@@ -43,8 +55,8 @@ const TYPE_COLOR: Record<AlgorithmType, string> = {
 } as Record<AlgorithmType, string>
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '大首頁',
-  [RecommendChannel.DELIVERY]: '外賣頻道',
+  [RecommendChannel.HOME]: '美食外賣',
+  [RecommendChannel.DELIVERY]: '美食外賣',
   [RecommendChannel.SUPERMARKET]: '超市百貨',
   [RecommendChannel.GROUP_BUY]: '團購到店',
 }
@@ -76,63 +88,81 @@ const BRAND_COLOR: Record<AppType, string> = {
 }
 
 export const mockAlgorithmData: AlgorithmRecord[] = [
-  { id: 1, name: '無敵星星-首頁版', code: 'ALG_STAR_HOME', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 2, name: '新店廣告-外賣版', code: 'ALG_NEWSTORE_DELIVERY', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 3, name: '盤活復蘇-團購版', code: 'ALG_REVIVE_GROUPBUY', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 4, name: '獨家商家-超市版', code: 'ALG_EXCLUSIVE_SUPER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 5, name: '流量廣告-全渠道', code: 'ALG_TRAFFIC_ALL', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 4 },
-  { id: 6, name: '猜你喜歡-主力版', code: 'ALG_GUESS_MAIN', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 7, name: '自然流量-默認', code: 'ALG_ORGANIC_DEFAULT', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 8, name: '搜索算法-綜合版', code: 'ALG_SEARCH_COMPOSITE', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 9, name: '無敵星星-夜間版', code: 'ALG_STAR_NIGHT', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 10, name: '新店廣告-早餐版', code: 'ALG_NEWSTORE_BREAKFAST', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 11, name: '盤活復蘇-午市版', code: 'ALG_REVIVE_LUNCH', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 12, name: '獨家商家-晚市版', code: 'ALG_EXCLUSIVE_DINNER', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 13, name: '流量廣告-下午茶', code: 'ALG_TRAFFIC_AFTERNOON', type: AlgorithmType.TRAFFIC_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 14, name: '猜你喜歡-週末版', code: 'ALG_GUESS_WEEKEND', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 4 },
-  { id: 15, name: '搜索算法-深夜版', code: 'ALG_SEARCH_NIGHT', type: AlgorithmType.SEARCH_ALGORITHM, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 1 },
+  // 無敵星星 - 8条
+  { id: 1, name: '無敵星星-美食外賣閃峰版', code: 'ALG_STAR_001', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 2, name: '無敵星星-美食外賣閃峰版B', code: 'ALG_STAR_002', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 3, name: '無敵星星-超市百貨閃峰版', code: 'ALG_STAR_003', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 4, name: '無敵星星-團購到店閃峰版', code: 'ALG_STAR_004', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 5, name: '無敵星星-美食外賣mFood版', code: 'ALG_STAR_005', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 6, name: '無敵星星-美食外賣mFood版B', code: 'ALG_STAR_006', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 7, name: '無敵星星-超市百貨mFood版', code: 'ALG_STAR_007', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 8, name: '無敵星星-團購到店mFood版', code: 'ALG_STAR_008', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  // 盤活復蘇 - 7条
+  { id: 9, name: '盤活復蘇-美食外賣閃峰版', code: 'ALG_REV_001', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 10, name: '盤活復蘇-美食外賣閃峰版B', code: 'ALG_REV_002', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 11, name: '盤活復蘇-超市百貨閃峰版', code: 'ALG_REV_003', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 12, name: '盤活復蘇-團購到店閃峰版', code: 'ALG_REV_004', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 13, name: '盤活復蘇-美食外賣mFood版', code: 'ALG_REV_005', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 14, name: '盤活復蘇-美食外賣mFood版B', code: 'ALG_REV_006', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 15, name: '盤活復蘇-超市百貨mFood版', code: 'ALG_REV_007', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
 ]
 
 export default function Algorithm() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [searchForm] = Form.useForm()
-  const [filteredData, setFilteredData] = useState<AlgorithmRecord[]>(mockAlgorithmData)
+
+  // 从 URL 参数恢复列表状态（从新增页返回时）
+  const typeParam = searchParams.get('type')
+  const initialType = typeParam ? Number(typeParam) as AlgorithmType : null
+  const [selectedType, setSelectedType] = useState<AlgorithmType | null>(initialType)
+  const [filteredData, setFilteredData] = useState<AlgorithmRecord[]>(
+    initialType ? mockAlgorithmData.filter(item => item.type === initialType) : mockAlgorithmData
+  )
+
+  // 统计每种广告类型的算法数量
+  const typeCountMap = useMemo(() => {
+    const map: Record<number, number> = {}
+    mockAlgorithmData.forEach(item => {
+      map[item.type] = (map[item.type] || 0) + 1
+    })
+    return map
+  }, [])
+
+  // 点击卡片 → 进入列表
+  const handleSelectType = (type: AlgorithmType) => {
+    setSelectedType(type)
+    const data = mockAlgorithmData.filter(item => item.type === type)
+    setFilteredData(data)
+    searchForm.resetFields()
+  }
+
+  // 返回卡片选择页
+  const handleBackToCards = () => {
+    setSelectedType(null)
+    setFilteredData(mockAlgorithmData)
+    searchForm.resetFields()
+  }
 
   // 搜索处理
   const handleSearch = (values: any) => {
-    let result = [...mockAlgorithmData]
+    let result = mockAlgorithmData.filter(item => item.type === selectedType)
     
-    // 算法名称筛选
     if (values.name) {
       result = result.filter(item => item.name.includes(values.name))
     }
-    
-    // 算法ID筛选
     if (values.code) {
       result = result.filter(item => item.code.includes(values.code))
     }
-    
-    // 算法类型筛选
-    if (values.type !== undefined && values.type !== null) {
-      result = result.filter(item => item.type === values.type)
-    }
-    
-    // 业务频道筛选
     if (values.channel !== undefined && values.channel !== null) {
       result = result.filter(item => item.channel === values.channel)
     }
-    
-    // 投放界面筛选
     if (values.placementInterface !== undefined && values.placementInterface !== null) {
       result = result.filter(item => item.placementInterface === values.placementInterface)
     }
-    
-    // 所属品牌筛选
     if (values.brand !== undefined && values.brand !== null) {
       result = result.filter(item => item.brand === values.brand)
     }
-    
-    // 状态筛选
     if (values.status !== undefined && values.status !== null) {
       result = result.filter(item => item.status === values.status)
     }
@@ -143,20 +173,22 @@ export default function Algorithm() {
   // 重置搜索
   const handleReset = () => {
     searchForm.resetFields()
-    setFilteredData(mockAlgorithmData)
+    setFilteredData(mockAlgorithmData.filter(item => item.type === selectedType))
   }
 
-  // 跳转到新增页面
+  // 跳转到新增页面（携带当前算法类型）
   const handleGoToAdd = () => {
-    navigate('/promotion-algorithm-add')
+    navigate(`/promotion-algorithm-add?type=${selectedType}`)
   }
+
+  // 当前选中的类型信息
+  const selectedTypeCard = ALGORITHM_TYPE_CARDS.find(c => c.type === selectedType)
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'code', title: '算法ID' },
     { key: 'name', title: '算法名稱' },
     { key: 'brand', title: '所屬品牌' },
-    { key: 'type', title: '廣告類型' },
     { key: 'channel', title: '業務頻道' },
     { key: 'placementInterface', title: '算法落地頁' },
     { key: 'status', title: '狀態' },
@@ -173,10 +205,6 @@ export default function Algorithm() {
     {
       title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: AppType) => v ? <Tag color={BRAND_COLOR[v]}>{BRAND_LABEL[v]}</Tag> : '-',
-    },
-    {
-      title: '廣告類型', dataIndex: 'type', key: 'type', width: 120,
-      render: (v: AlgorithmType) => <Tag color={TYPE_COLOR[v]}>{TYPE_LABEL[v]}</Tag>,
     },
     {
       title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 150,
@@ -199,7 +227,7 @@ export default function Algorithm() {
       title: '操作', key: 'action', width: 180,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small">編輯</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}`)}>編輯</Button>
           <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED}>
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
           </Button>
@@ -208,8 +236,84 @@ export default function Algorithm() {
     },
   ]
 
+  // ===== Step 1: 卡片选择页 =====
+  if (selectedType === null) {
+    return (
+      <div className="content-area">
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+          <h2 style={{ margin: 0, fontSize: 20 }}>
+            <AppstoreOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+            算法庫
+          </h2>
+          <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
+            管理各廣告類型的算法策略配置，選擇類型查看詳情
+          </p>
+        </Card>
+
+        <Card title="請選擇算法類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 16,
+          }}>
+            {ALGORITHM_TYPE_CARDS.map(card => {
+              const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD
+              return (
+                <Card
+                  key={card.type}
+                  hoverable={enabled}
+                  onClick={() => enabled && handleSelectType(card.type)}
+                  style={{
+                    cursor: enabled ? 'pointer' : 'not-allowed',
+                    opacity: enabled ? 1 : 0.5,
+                  }}
+                  bodyStyle={{ padding: 20 }}
+                >
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>{card.icon}</div>
+                    <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{TYPE_LABEL[card.type]}</h3>
+                    <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
+                      {card.description}
+                    </p>
+                    {enabled ? (
+                      <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 個算法</Tag>
+                    ) : (
+                      <Tag color="default" style={{ marginTop: 12 }}>敬請期待</Tag>
+                    )}
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // ===== Step 2: 列表页 =====
   return (
     <div className="content-area">
+      {/* 页面头部 */}
+      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Space size={16}>
+            <h2 style={{ margin: 0, fontSize: 20 }}>
+              <span style={{ marginRight: 8 }}>{selectedTypeCard?.icon}</span>
+              {TYPE_LABEL[selectedType]} - 算法列表
+            </h2>
+            <Tag color="blue">{filteredData.length} 個算法</Tag>
+          </Space>
+          <Button
+            type="primary"
+            icon={<ArrowLeftOutlined />}
+            onClick={handleBackToCards}
+            style={{ fontSize: 14 }}
+          >
+            返回
+          </Button>
+        </div>
+      </Card>
+
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
@@ -219,27 +323,11 @@ export default function Algorithm() {
           <Form.Item label="算法名稱" name="name">
             <Input placeholder="請輸入算法名稱" allowClear />
           </Form.Item>
-          <Form.Item label="廣告類型" name="type">
-            <Select 
-              placeholder="全部" 
-              options={[
-                { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
-                { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-                { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
-                { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
-                { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
-                { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
-                { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
-                { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
-              ]}
-              allowClear
-            />
-          </Form.Item>
           <Form.Item label="業務頻道" name="channel">
             <Select 
               placeholder="全部" 
               options={[
-                { label: '美食外賣', value: RecommendChannel.DELIVERY },
+                { label: '美食外賣', value: RecommendChannel.HOME },
                 { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
                 { label: '團購到店', value: RecommendChannel.GROUP_BUY },
               ]}
