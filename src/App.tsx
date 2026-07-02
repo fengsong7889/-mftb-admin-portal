@@ -68,6 +68,7 @@ const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
 const PromotionDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
 const PromotionAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
 const PromotionAlgorithmAdd = lazy(() => import('./pages/Recommend/AlgorithmAdd'))
+const PromotionAlgorithmFlow = lazy(() => import('./pages/Recommend/AlgorithmFlow'))
 const PromotionWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
 const PromotionWaterfallAdd = lazy(() => import('./pages/Recommend/WaterfallAdd'))
 const PromotionSlotConfig = lazy(() => import('./pages/PromotionSlotConfig'))
@@ -167,6 +168,7 @@ function AuthenticatedLayout() {
               <Route path="/promotion-dashboard" element={<PromotionDashboard />} />
               <Route path="/promotion-algorithm" element={<PromotionAlgorithm />} />
               <Route path="/promotion-algorithm-add" element={<PromotionAlgorithmAdd />} />
+              <Route path="/promotion-algorithm-flow" element={<PromotionAlgorithmFlow />} />
               <Route path="/promotion-slot-config" element={<PromotionSlotConfig />} />
               <Route path="/promotion-slot-config-add" element={<PromotionSlotConfigAdd />} />
               <Route path="/promotion-waterfall" element={<PromotionWaterfall />} />

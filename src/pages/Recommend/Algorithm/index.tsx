@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Card } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS } from '../constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -303,14 +303,23 @@ export default function Algorithm() {
             </h2>
             <Tag color="blue">{filteredData.length} 個算法</Tag>
           </Space>
-          <Button
-            type="primary"
-            icon={<ArrowLeftOutlined />}
-            onClick={handleBackToCards}
-            style={{ fontSize: 14 }}
-          >
-            返回
-          </Button>
+          <Space>
+            <Button
+              icon={<ApartmentOutlined />}
+              onClick={() => navigate('/promotion-algorithm-flow')}
+              style={{ fontSize: 14 }}
+            >
+              業務流程
+            </Button>
+            <Button
+              type="primary"
+              icon={<ArrowLeftOutlined />}
+              onClick={handleBackToCards}
+              style={{ fontSize: 14 }}
+            >
+              返回
+            </Button>
+          </Space>
         </div>
       </Card>
 
