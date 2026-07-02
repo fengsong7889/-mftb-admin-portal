@@ -1,1 +1,0 @@
-import{j as s}from"./index-tcChmz21.js";import{d as a,A as e}from"./constants-BMbiHJIH.js";import{T as i}from"./index-4SPJj80z.js";function A({value:m=e.SHANFENG,onChange:t}){return s.jsx(i,{activeKey:String(m),onChange:r=>t==null?void 0:t(Number(r)),items:a.map(r=>({key:String(r.value),label:r.label})),style:{marginBottom:16}})}export{A};
