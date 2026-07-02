@@ -1300,17 +1300,8 @@ export default function WaterfallAdd() {
       </div>
 
       {/* 底部操作按钮 - 固定 */}
-      <div style={{ 
-        padding: '12px 20px',
-        background: '#fff',
-        borderTop: '1px solid #f0f0f0',
-        borderRadius: 8,
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        gap: 12,
-      }}>
-        <Button onClick={handleBack} style={{ fontSize: 14 }}>
+      <div className="form-footer">
+        <Button onClick={handleBack}>
           取消
         </Button>
         <Button
@@ -1318,7 +1309,6 @@ export default function WaterfallAdd() {
           icon={<SaveOutlined />}
           onClick={handleSubmit}
           loading={loading}
-          style={{ fontSize: 14 }}
         >
           提交
         </Button>

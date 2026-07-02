@@ -821,44 +821,17 @@ export default function AlgorithmAdd() {
 
       {/* 底部保存按钮 */}
       {selectedAlgorithmType && (
-        <div style={{ 
-          marginTop: 24, 
-          padding: '20px 24px',
-          backgroundColor: '#fff',
-          borderRadius: 8,
-          border: '1px solid #e8eaed',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-          textAlign: 'right'
-        }}>
-          <Space size={12}>
-            <Button 
-              size="large"
-              onClick={handleBack}
-              style={{ 
-                borderRadius: 6,
-                padding: '4px 24px',
-                height: 40
-              }}
-            >
-              取消
-            </Button>
-            <Button 
-              type="primary" 
-              size="large"
-              icon={<SaveOutlined />} 
-              onClick={handleSubmit}
-              style={{ 
-                borderRadius: 6,
-                padding: '4px 24px',
-                height: 40,
-                background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-                border: 'none',
-                boxShadow: '0 2px 6px rgba(24,144,255,0.35)'
-              }}
-            >
-              保存
-            </Button>
-          </Space>
+        <div className="form-footer">
+          <Button onClick={handleBack}>
+            取消
+          </Button>
+          <Button 
+            type="primary" 
+            icon={<SaveOutlined />} 
+            onClick={handleSubmit}
+          >
+            保存
+          </Button>
         </div>
       )}
 
