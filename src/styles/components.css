@@ -833,26 +833,129 @@
 }
 
 /* --- 弹窗/表单底部按钮（确认/取消/返回） --- */
+.ant-modal-footer {
+  padding: 12px 24px;
+  border-top: 1px solid #f0f0f0;
+}
 .ant-modal-footer .ant-btn {
-  font-size: 13px;
-  height: 32px;
-  padding: 0 20px;
-  border-radius: 6px;
+  font-size: 14px;
+  height: 36px;
+  padding: 0 24px;
+  border-radius: 8px;
   font-weight: 500;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 88px;
 }
 .ant-modal-footer .ant-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
 }
+.ant-modal-footer .ant-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+/* 弹窗确认按钮 - 主色实心 */
 .ant-modal-footer .ant-btn-primary {
   background: #E8720C;
   border-color: #E8720C;
+  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
 }
 .ant-modal-footer .ant-btn-primary:hover {
   background: #F59432;
   border-color: #F59432;
+  box-shadow: 0 4px 12px rgba(232, 114, 12, 0.4);
 }
+/* 弹窗取消按钮 - 描边柔和 */
+.ant-modal-footer .ant-btn-default {
+  border-color: #D9D9D9;
+  color: #595959;
+}
+.ant-modal-footer .ant-btn-default:hover {
+  border-color: #E8720C;
+  color: #E8720C;
+}
+/* 弹窗危险按钮 */
+.ant-modal-footer .ant-btn-dangerous {
+  border-radius: 8px;
+}
+
+/* --- 页面级底部操作栏（保存/取消/返回/通过/驳回） --- */
+.form-footer,
+.approval-detail-footer,
+.recharge-footer,
+.debt-detail-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+}
+.form-footer .ant-btn,
+.approval-detail-footer .ant-btn,
+.recharge-footer .ant-btn,
+.debt-detail-footer .ant-btn {
+  font-size: 14px;
+  height: 38px;
+  padding: 0 28px;
+  border-radius: 8px;
+  font-weight: 500;
+  min-width: 96px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.form-footer .ant-btn:hover,
+.approval-detail-footer .ant-btn:hover,
+.recharge-footer .ant-btn:hover,
+.debt-detail-footer .ant-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.form-footer .ant-btn:active,
+.approval-detail-footer .ant-btn:active,
+.recharge-footer .ant-btn:active,
+.debt-detail-footer .ant-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+/* 页面底部 - 保存/确认/通过按钮 */
+.form-footer .ant-btn-primary,
+.approval-detail-footer .ant-btn-primary,
+.recharge-footer .ant-btn-primary {
+  background: #E8720C;
+  border-color: #E8720C;
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.3);
+}
+.form-footer .ant-btn-primary:hover,
+.approval-detail-footer .ant-btn-primary:hover,
+.recharge-footer .ant-btn-primary:hover {
+  background: #F59432;
+  border-color: #F59432;
+  box-shadow: 0 4px 14px rgba(232, 114, 12, 0.4);
+}
+/* 页面底部 - 取消/返回按钮 */
+.form-footer .ant-btn-default,
+.approval-detail-footer .ant-btn-default,
+.recharge-footer .ant-btn-default,
+.debt-detail-footer .ant-btn-default {
+  border-color: #D9D9D9;
+  color: #595959;
+  background: #fff;
+}
+.form-footer .ant-btn-default:hover,
+.approval-detail-footer .ant-btn-default:hover,
+.recharge-footer .ant-btn-default:hover,
+.debt-detail-footer .ant-btn-default:hover {
+  border-color: #E8720C;
+  color: #E8720C;
+}
+/* 页面底部 - 驳回/删除等危险按钮 */
+.form-footer .ant-btn-dangerous,
+.approval-detail-footer .ant-btn-dangerous {
+  min-width: 96px;
+}
+
 /* 返回按钮 - 页面顶部 */
 .ant-btn[style*="arrow-left"],
 .ant-btn > .anticon-arrow-left + span,
