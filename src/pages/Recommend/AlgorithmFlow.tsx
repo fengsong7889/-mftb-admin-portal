@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from 'react'
-import { Button, Space, Tag, Tooltip } from 'antd'
-import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, ExpandOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Space, Tag, Tooltip, message } from 'antd'
+import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, ExpandOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
   ReactFlow,
@@ -267,11 +267,79 @@ const initialEdges = [
   { id: 'e-end', source: 'n6b', target: 'end', animated: true, style: edgeStyle('#FF4D4F'), markerEnd: arrowEnd('#FF4D4F') },
 ]
 
+/* ===== localStorage 键名 ===== */
+const STORAGE_KEY = 'algorithm-flow-node-positions'
+
 /* ===== 主组件 ===== */
 export default function AlgorithmFlow() {
   const navigate = useNavigate()
-  const [nodes, , onNodesChange] = useNodesState(initialNodes)
+
+  // 从 localStorage 加载已保存的位置
+  const loadSavedPositions = useCallback((): Record<string, { x: number; y: number }> | null => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  }, [])
+
+  // 初始化节点：合并已保存的位置
+  const getInitialNodes = useCallback(() => {
+    const saved = loadSavedPositions()
+    if (!saved) return initialNodes
+    return initialNodes.map(node => ({
+      ...node,
+      position: saved[node.id] || node.position,
+    }))
+  }, [loadSavedPositions])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(getInitialNodes())
   const [edges, , onEdgesChange] = useEdgesState(initialEdges)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  // 节点拖动后保存位置
+  const handleNodesChange = useCallback((changes: any) => {
+    onNodesChange(changes)
+    const dragChanges = changes.filter((c: any) => c.type === 'position' && c.dragging === false)
+    if (dragChanges.length > 0) {
+      setHasChanges(true)
+    }
+  }, [onNodesChange])
+
+  // 保存位置到 localStorage
+  const handleSave = useCallback(() => {
+    const positions: Record<string, { x: number; y: number }> = {}
+    nodes.forEach(node => {
+      positions[node.id] = node.position
+    })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
+    setHasChanges(false)
+    message.success('位置已保存')
+  }, [nodes])
+
+  // 重置位置
+  const handleReset = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY)
+    setNodes(initialNodes)
+    setHasChanges(false)
+    message.info('已重置为默认位置')
+  }, [setNodes])
+
+  // 页面卸载前自动保存未保存的更改
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (hasChanges) {
+        const positions: Record<string, { x: number; y: number }> = {}
+        nodes.forEach(node => {
+          positions[node.id] = node.position
+        })
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasChanges, nodes])
 
   const proOptions = useMemo(() => ({ hideAttribution: true }), [])
 
@@ -307,6 +375,12 @@ export default function AlgorithmFlow() {
           </Tooltip>
           <Tooltip title="適應屏幕">
             <Button icon={<ExpandOutlined />} onClick={() => {}} />
+          </Tooltip>
+          <Tooltip title="保存位置">
+            <Button icon={<SaveOutlined />} onClick={handleSave} />
+          </Tooltip>
+          <Tooltip title="重置位置">
+            <Button icon={<UndoOutlined />} onClick={handleReset} />
           </Tooltip>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}>
             返回算法庫
@@ -353,7 +427,7 @@ export default function AlgorithmFlow() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
           proOptions={proOptions}
