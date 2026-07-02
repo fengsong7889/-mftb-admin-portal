@@ -316,13 +316,6 @@ export default function Algorithm() {
           </Space>
           <Space>
             <Button
-              icon={<ApartmentOutlined />}
-              onClick={() => navigate('/promotion-algorithm-flow')}
-              style={{ fontSize: 14 }}
-            >
-              業務流程
-            </Button>
-            <Button
               type="primary"
               icon={<ArrowLeftOutlined />}
               onClick={handleBackToCards}
