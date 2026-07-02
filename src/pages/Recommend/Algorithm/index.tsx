@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form, Card } from 'antd'
+import { Button, Space, Table, Tag, Badge, Input, Select, Form, Card, Tabs } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -7,6 +7,24 @@ import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SER
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const { Search } = Input
+
+/** 各业务类型对应的算法类型列表 */
+const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
+  delivery: [
+    AlgorithmType.INVINCIBLE_STAR,
+    AlgorithmType.HOT_REVIVE_AD,
+    AlgorithmType.NEW_STORE_AD,
+    AlgorithmType.EXCLUSIVE_MERCHANT,
+    AlgorithmType.TRAFFIC_AD,
+    AlgorithmType.GUESS_YOU_LIKE,
+    AlgorithmType.ORGANIC_TRAFFIC,
+    AlgorithmType.SEARCH_ALGORITHM,
+  ],
+  groupBuy: [
+    AlgorithmType.INVINCIBLE_STAR,
+    AlgorithmType.HOT_REVIVE_AD,
+  ],
+}
 
 /** 广告类型卡片配置 */
 const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
@@ -105,6 +123,12 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 13, name: '盤活復蘇-美食外賣mFood版', code: 'ALG_REV_005', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
   { id: 14, name: '盤活復蘇-美食外賣mFood版B', code: 'ALG_REV_006', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 15, name: '盤活復蘇-超市百貨mFood版', code: 'ALG_REV_007', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
+  // 團購到店 - 無敵星星
+  { id: 16, name: '無敵星星-團購到店閃峰版', code: 'ALG_STAR_009', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 17, name: '無敵星星-團購到店mFood版', code: 'ALG_STAR_010', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
+  // 團購到店 - 盤活復蘇
+  { id: 18, name: '盤活復蘇-團購到店閃峰版', code: 'ALG_REV_008', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 19, name: '盤活復蘇-團購到店mFood版', code: 'ALG_REV_009', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
 ]
 
 export default function Algorithm() {
@@ -262,40 +286,91 @@ export default function Algorithm() {
         </Card>
 
         <Card title="請選擇算法類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: 16,
-          }}>
-            {ALGORITHM_TYPE_CARDS.map(card => {
-              const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD
-              return (
-                <Card
-                  key={card.type}
-                  hoverable={enabled}
-                  onClick={() => enabled && handleSelectType(card.type)}
-                  style={{
-                    cursor: enabled ? 'pointer' : 'not-allowed',
-                    opacity: enabled ? 1 : 0.5,
-                  }}
-                  bodyStyle={{ padding: 20 }}
-                >
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>{card.icon}</div>
-                    <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{TYPE_LABEL[card.type]}</h3>
-                    <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
-                      {card.description}
-                    </p>
-                    {enabled ? (
-                      <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 個算法</Tag>
-                    ) : (
-                      <Tag color="default" style={{ marginTop: 12 }}>敬請期待</Tag>
-                    )}
+          <Tabs
+            defaultActiveKey="delivery"
+            items={[
+              {
+                key: 'delivery',
+                label: '外賣到家',
+                children: (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 16,
+                  }}>
+                    {ALGORITHM_TYPE_CARDS
+                      .filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type))
+                      .map(card => {
+                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD
+                        return (
+                          <Card
+                            key={card.type}
+                            hoverable={enabled}
+                            onClick={() => enabled && handleSelectType(card.type)}
+                            style={{
+                              cursor: enabled ? 'pointer' : 'not-allowed',
+                              opacity: enabled ? 1 : 0.5,
+                            }}
+                            bodyStyle={{ padding: 20 }}
+                          >
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 48, marginBottom: 12 }}>{card.icon}</div>
+                              <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{TYPE_LABEL[card.type]}</h3>
+                              <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
+                                {card.description}
+                              </p>
+                              {enabled ? (
+                                <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 個算法</Tag>
+                              ) : (
+                                <Tag color="default" style={{ marginTop: 12 }}>敬請期待</Tag>
+                              )}
+                            </div>
+                          </Card>
+                        )
+                      })}
                   </div>
-                </Card>
-              )
-            })}
-          </div>
+                ),
+              },
+              {
+                key: 'groupBuy',
+                label: '團購到店',
+                children: (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 16,
+                  }}>
+                    {ALGORITHM_TYPE_CARDS
+                      .filter(card => TAB_ALGORITHM_MAP.groupBuy.includes(card.type))
+                      .map(card => {
+                        const enabled = true
+                        return (
+                          <Card
+                            key={card.type}
+                            hoverable={enabled}
+                            onClick={() => enabled && handleSelectType(card.type)}
+                            style={{
+                              cursor: enabled ? 'pointer' : 'not-allowed',
+                              opacity: enabled ? 1 : 0.5,
+                            }}
+                            bodyStyle={{ padding: 20 }}
+                          >
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 48, marginBottom: 12 }}>{card.icon}</div>
+                              <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{TYPE_LABEL[card.type]}</h3>
+                              <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
+                                {card.description}
+                              </p>
+                              <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 個算法</Tag>
+                            </div>
+                          </Card>
+                        )
+                      })}
+                  </div>
+                ),
+              },
+            ]}
+          />
         </Card>
       </div>
     )

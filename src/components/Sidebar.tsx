@@ -383,26 +383,14 @@ const menuItems: MenuItem[] = [
         label: '地圖規劃',
       },
       {
-        key: 'promotion-algorithm-group',
+        key: 'promotion-algorithm',
         icon: <AppstoreOutlined />,
-        label: '算法管理',
-        children: [
-          {
-            key: 'promotion-algorithm',
-            icon: <AppstoreOutlined />,
-            label: '算法庫',
-          },
-          {
-            key: 'promotion-slot-config',
-            icon: <ColumnHeightOutlined />,
-            label: '瀑布流策略',
-          },
-        ],
+        label: '算法库',
       },
       {
-        key: 'promotion-waterfall',
+        key: 'promotion-slot-config',
         icon: <ColumnHeightOutlined />,
-        label: '銷售定價',
+        label: '瀑布流策略',
       },
     ],
   },
