@@ -241,13 +241,24 @@ export default function Algorithm() {
     return (
       <div className="content-area">
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-          <h2 style={{ margin: 0, fontSize: 20 }}>
-            <AppstoreOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-            算法庫
-          </h2>
-          <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
-            管理各廣告類型的算法策略配置，選擇類型查看詳情
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20 }}>
+                <AppstoreOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                算法庫
+              </h2>
+              <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
+                管理各廣告類型的算法策略配置，選擇類型查看詳情
+              </p>
+            </div>
+            <Button
+              icon={<ApartmentOutlined />}
+              onClick={() => navigate('/promotion-algorithm-flow')}
+              style={{ fontSize: 14 }}
+            >
+              業務流程
+            </Button>
+          </div>
         </Card>
 
         <Card title="請選擇算法類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
