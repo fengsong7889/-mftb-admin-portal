@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Space, Tag, Tooltip, message } from 'antd'
-import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, ExpandOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, Space, Tag, Tooltip, message, Modal, Input, Select, Popconfirm } from 'antd'
+import {
+  ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, ExpandOutlined,
+  SaveOutlined, UndoOutlined, EditOutlined, EyeOutlined, PlusOutlined,
+  DeleteOutlined, DragOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
   ReactFlow,
@@ -9,6 +13,8 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   Position,
   MarkerType,
   Handle,
@@ -269,10 +275,28 @@ const initialEdges = [
 
 /* ===== localStorage 键名 ===== */
 const STORAGE_KEY = 'algorithm-flow-node-positions'
+const CUSTOM_NODES_KEY = 'algorithm-flow-custom-nodes'
+const CUSTOM_EDGES_KEY = 'algorithm-flow-custom-edges'
 
-/* ===== 主组件 ===== */
-export default function AlgorithmFlow() {
+/* ===== 节点面板配置 ===== */
+const NODE_PALETTE = [
+  { type: 'terminal', label: '開始/結束', icon: '🟢', color: '#52C41A', desc: '流程起止點' },
+  { type: 'stage', label: '階段標題', icon: '📋', color: '#1890FF', desc: '階段分組標題' },
+  { type: 'process', label: '流程步驟', icon: '📝', color: '#1890FF', desc: '具體操作步驟' },
+  { type: 'decision', label: '決策/判斷', icon: '⚖️', color: '#FAAD14', desc: '判斷條件節點' },
+  { type: 'system', label: '系統處理', icon: '⚙️', color: '#722ED1', desc: '系統自動處理' },
+]
+
+/* ===== 生成新節點 ID ===== */
+let nodeIdCounter = 100
+const genNodeId = () => `custom_${++nodeIdCounter}`
+
+/* ===== 内部组件（使用 useReactFlow） ===== */
+function FlowEditor() {
   const navigate = useNavigate()
+  const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const { screenToFlowPosition } = useReactFlow()
+  const [messageApi, contextHolder] = message.useMessage()
 
   // 从 localStorage 加载已保存的位置
   const loadSavedPositions = useCallback((): Record<string, { x: number; y: number }> | null => {
@@ -295,17 +319,108 @@ export default function AlgorithmFlow() {
   }, [loadSavedPositions])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(getInitialNodes())
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [hasChanges, setHasChanges] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingNode, setEditingNode] = useState<{ id: string; label: string; desc: string } | null>(null)
 
-  // 节点拖动后保存位置
+  // 节点选择变化
+  const handleSelectionChange = useCallback(({ selectedNodes }: { selectedNodes: Node[] }) => {
+    setSelectedIds(selectedNodes.map(n => n.id))
+  }, [])
+
+  // 节点拖动后标记变更
   const handleNodesChange = useCallback((changes: any) => {
     onNodesChange(changes)
     const dragChanges = changes.filter((c: any) => c.type === 'position' && c.dragging === false)
-    if (dragChanges.length > 0) {
-      setHasChanges(true)
-    }
+    if (dragChanges.length > 0) setHasChanges(true)
   }, [onNodesChange])
+
+  // 删除选中节点
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedIds.length === 0) return
+    setNodes(nds => nds.filter(n => !selectedIds.includes(n.id)))
+    setEdges(eds => eds.filter(e => !selectedIds.includes(e.source) && !selectedIds.includes(e.target)))
+    setSelectedIds([])
+    setHasChanges(true)
+    messageApi.success(`已刪除 ${selectedIds.length} 個節點`)
+  }, [selectedIds, setNodes, setEdges, messageApi])
+
+  // 双击节点编辑
+  const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setEditingNode({
+      id: node.id,
+      label: (node.data.label as string) || '',
+      desc: (node.data.desc as string) || '',
+    })
+    setEditModalOpen(true)
+  }, [])
+
+  // 保存编辑
+  const handleEditSave = useCallback(() => {
+    if (!editingNode) return
+    setNodes(nds => nds.map(n =>
+      n.id === editingNode.id
+        ? { ...n, data: { ...n.data, label: editingNode.label, desc: editingNode.desc || undefined } }
+        : n
+    ))
+    setEditModalOpen(false)
+    setEditingNode(null)
+    setHasChanges(true)
+    messageApi.success('節點已更新')
+  }, [editingNode, setNodes, messageApi])
+
+  // 拖拽添加节点
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const type = e.dataTransfer.getData('application/reactflow-type')
+    const label = e.dataTransfer.getData('application/reactflow-label')
+    if (!type || !reactFlowWrapper.current) return
+
+    const position = screenToFlowPosition({
+      x: e.clientX - reactFlowWrapper.current.getBoundingClientRect().left,
+      y: e.clientY - reactFlowWrapper.current.getBoundingClientRect().top,
+    })
+
+    const paletteItem = NODE_PALETTE.find(p => p.type === type)
+    const newNode: Node = {
+      id: genNodeId(),
+      type,
+      position,
+      data: {
+        label,
+        desc: paletteItem?.desc || '',
+        color: paletteItem?.color || '#1890FF',
+        icon: paletteItem?.icon || '',
+      },
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
+    }
+    setNodes(nds => [...nds, newNode])
+    setHasChanges(true)
+    messageApi.success(`已添加「${label}」節點`)
+  }, [screenToFlowPosition, setNodes, messageApi])
+
+  // 键盘 Delete 删除
+  useEffect(() => {
+    if (!editMode) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedIds.length > 0 && !editModalOpen) {
+          handleDeleteSelected()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [editMode, selectedIds, editModalOpen, handleDeleteSelected])
 
   // 保存位置到 localStorage
   const handleSave = useCallback(() => {
@@ -315,16 +430,16 @@ export default function AlgorithmFlow() {
     })
     localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
     setHasChanges(false)
-    message.success('位置已保存')
-  }, [nodes])
+    messageApi.success('位置已保存')
+  }, [nodes, messageApi])
 
   // 重置位置
   const handleReset = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
     setNodes(initialNodes)
     setHasChanges(false)
-    message.info('已重置为默认位置')
-  }, [setNodes])
+    messageApi.info('已重置为默认位置')
+  }, [setNodes, messageApi])
 
   // 页面卸载前自动保存未保存的更改
   useEffect(() => {
@@ -364,9 +479,23 @@ export default function AlgorithmFlow() {
             <span style={{ marginRight: 8 }}>🔀</span>
             算法推薦業務流程
           </h2>
-          <Tag color="processing">交互式流程圖</Tag>
+          <Tag color={editMode ? 'warning' : 'processing'}>{editMode ? '編輯模式' : '交互式流程圖'}</Tag>
         </Space>
         <Space>
+          <Tooltip title={editMode ? '退出編輯' : '進入編輯'}>
+            <Button
+              type={editMode ? 'primary' : 'default'}
+              icon={editMode ? <EyeOutlined /> : <EditOutlined />}
+              onClick={() => { setEditMode(!editMode); setSelectedIds([]) }}
+            />
+          </Tooltip>
+          {editMode && (
+            <Popconfirm title="確定刪除選中節點？" onConfirm={handleDeleteSelected} disabled={selectedIds.length === 0}>
+              <Tooltip title={`刪除選中 (${selectedIds.length})`}>
+                <Button icon={<DeleteOutlined />} danger disabled={selectedIds.length === 0} />
+              </Tooltip>
+            </Popconfirm>
+          )}
           <Tooltip title="縮小">
             <Button icon={<ZoomOutOutlined />} onClick={() => {}} />
           </Tooltip>
@@ -418,33 +547,155 @@ export default function AlgorithmFlow() {
           </Space>
         ))}
         <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
-          提示：可拖拽畫布、滾輪縮放、拖動節點調整位置
+          {editMode ? '編輯模式：從左側面板拖拽節點到畫布添加，雙擊節點編輯內容，選中後按 Delete 或點擊刪除按鈕移除' : '提示：可拖拽畫布、滾輪縮放、拖動節點調整位置'}
         </span>
       </div>
 
-      {/* React Flow 画布 */}
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          proOptions={proOptions}
-          fitView
-          fitViewOptions={{ padding: 0.15 }}
-          minZoom={0.2}
-          maxZoom={2}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.4 }}
+      {/* 主体区域：节点面板 + 画布 */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        {/* 节点面板（编辑模式显示） */}
+        {editMode && (
+          <div style={{
+            width: 180,
+            background: '#FAFAFA',
+            borderRight: '1px solid #f0f0f0',
+            padding: '12px 10px',
+            overflowY: 'auto',
+            flexShrink: 0,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <DragOutlined /> 節點面板
+            </div>
+            <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 10 }}>
+              拖拽到右側畫布添加節點
+            </div>
+            {NODE_PALETTE.map(item => (
+              <div
+                key={item.type}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow-type', item.type)
+                  e.dataTransfer.setData('application/reactflow-label', item.label)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                style={{
+                  padding: '10px 12px',
+                  marginBottom: 8,
+                  borderRadius: 6,
+                  background: '#fff',
+                  border: `1.5px solid ${item.color}`,
+                  cursor: 'grab',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 2px 8px ${item.color}30`; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; e.currentTarget.style.transform = 'none' }}
+              >
+                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{item.label}</div>
+                  <div style={{ fontSize: 10, color: '#8C8C8C' }}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{
+              marginTop: 16,
+              padding: '8px 10px',
+              background: '#FFF7E6',
+              borderRadius: 6,
+              border: '1px solid #FFD591',
+              fontSize: 11,
+              color: '#D46B08',
+              lineHeight: 1.6,
+            }}>
+              💡 提示：雙擊已有節點可編輯標題和描述
+            </div>
+          </div>
+        )}
+
+        {/* React Flow 画布 */}
+        <div
+          ref={reactFlowWrapper}
+          style={{ flex: 1, minHeight: 0 }}
+          onDragOver={editMode ? handleDragOver : undefined}
+          onDrop={editMode ? handleDrop : undefined}
         >
-          <Background color="#e8e8e8" gap={20} size={1} />
-          <Controls showInteractive={false} />
-          <MiniMap
-            nodeColor={() => '#E8720C'}
-            style={{ borderRadius: 8, border: '1px solid #f0f0f0' }}
-          />
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeDoubleClick={handleNodeDoubleClick}
+            onSelectionChange={handleSelectionChange}
+            nodeTypes={nodeTypes}
+            proOptions={proOptions}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            minZoom={0.2}
+            maxZoom={2}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.4 }}
+            nodesDraggable
+            nodesConnectable={editMode}
+          >
+            <Background color="#e8e8e8" gap={20} size={1} />
+            <Controls showInteractive={false} />
+            <MiniMap
+              nodeColor={() => '#E8720C'}
+              style={{ borderRadius: 8, border: '1px solid #f0f0f0' }}
+            />
+          </ReactFlow>
+        </div>
       </div>
+
+      {/* 编辑节点弹窗 */}
+      <Modal
+        title="編輯節點"
+        open={editModalOpen}
+        onOk={handleEditSave}
+        onCancel={() => { setEditModalOpen(false); setEditingNode(null) }}
+        okText="保存"
+        cancelText="取消"
+        width={400}
+      >
+        {editingNode && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>節點標題</div>
+              <Input
+                value={editingNode.label}
+                onChange={(e) => setEditingNode({ ...editingNode, label: e.target.value })}
+                placeholder="請輸入節點標題"
+                maxLength={30}
+                showCount
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>描述信息</div>
+              <Input.TextArea
+                value={editingNode.desc}
+                onChange={(e) => setEditingNode({ ...editingNode, desc: e.target.value })}
+                placeholder="請輸入描述信息（可選）"
+                rows={2}
+                maxLength={50}
+                showCount
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
+      {contextHolder}
     </div>
+  )
+}
+
+/* ===== 导出组件（包裹 ReactFlowProvider） ===== */
+export default function AlgorithmFlow() {
+  return (
+    <ReactFlowProvider>
+      <FlowEditor />
+    </ReactFlowProvider>
   )
 }
