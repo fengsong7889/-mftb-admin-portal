@@ -11,150 +11,263 @@ import {
   useEdgesState,
   Position,
   MarkerType,
+  Handle,
+  type NodeProps,
   type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-/** 节点样式类型 */
-const nodeStyleMap: Record<string, { bg: string; border: string; color: string }> = {
-  start: { bg: '#F6FFED', border: '#52C41A', color: '#389E0D' },
-  end: { bg: '#FFF2E8', border: '#FA541C', color: '#CF1322' },
-  process: { bg: '#E6F7FF', border: '#1890FF', color: '#096DD9' },
-  decision: { bg: '#FFF7E6', border: '#FAAD14', color: '#D48806' },
-  data: { bg: '#F9F0FF', border: '#722ED1', color: '#531DAB' },
-  system: { bg: '#FFF0F6', border: '#EB2F96', color: '#C41D7F' },
+/* ===== 专业流程图节点类型 ===== */
+
+/** 开始/结束节点 - 椭圆胶囊形 */
+function TerminalNode({ data }: NodeProps) {
+  const isEnd = data.isEnd as boolean
+  const desc = data.desc as string | undefined
+  return (
+    <div style={{
+      padding: '10px 28px',
+      borderRadius: 24,
+      background: isEnd ? 'linear-gradient(135deg, #FFF1F0, #FFCCC7)' : 'linear-gradient(135deg, #F6FFED, #D9F7BE)',
+      border: `2px solid ${isEnd ? '#FF4D4F' : '#52C41A'}`,
+      textAlign: 'center',
+      minWidth: 120,
+      boxShadow: isEnd ? '0 2px 8px rgba(255,77,79,0.15)' : '0 2px 8px rgba(82,196,26,0.15)',
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: isEnd ? '#CF1322' : '#389E0D', letterSpacing: 2 }}>
+        {data.label as string}
+      </div>
+      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{desc}</div> : null}
+      <Handle type="source" position={Position.Bottom} style={{ background: isEnd ? '#FF4D4F' : '#52C41A' }} />
+      <Handle type="target" position={Position.Top} style={{ background: isEnd ? '#FF4D4F' : '#52C41A' }} />
+    </div>
+  )
 }
 
-/** 通用节点工厂 */
-const createNode = (
-  id: string,
-  label: string,
-  type: string,
-  position: { x: number; y: number },
-  description?: string
-): Node => ({
-  id,
-  type: 'default',
-  position,
-  data: {
-    label: (
-      <div style={{
-        padding: '10px 16px',
-        borderRadius: 8,
-        border: `2px solid ${nodeStyleMap[type]?.border || '#D9D9D9'}`,
-        background: nodeStyleMap[type]?.bg || '#fff',
-        minWidth: 140,
-        textAlign: 'center',
-        fontSize: 13,
-        fontWeight: 500,
-        color: nodeStyleMap[type]?.color || '#333',
-      }}>
-        <div>{label}</div>
-        {description && (
-          <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4, fontWeight: 400 }}>
-            {description}
-          </div>
-        )}
+/** 阶段标题节点 - 横向色带 */
+function StageNode({ data }: NodeProps) {
+  const color = data.color as string
+  const desc = data.desc as string | undefined
+  return (
+    <div style={{
+      padding: '8px 24px',
+      borderRadius: 6,
+      background: `linear-gradient(90deg, ${color}12, ${color}08)`,
+      border: `2px solid ${color}`,
+      borderLeft: `6px solid ${color}`,
+      textAlign: 'left',
+      minWidth: 200,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color }}>{data.label as string}</div>
+      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{desc}</div> : null}
+      <Handle type="source" position={Position.Bottom} style={{ background: color }} />
+      <Handle type="target" position={Position.Top} style={{ background: color }} />
+    </div>
+  )
+}
+
+/** 流程步骤节点 - 标准矩形 */
+function ProcessNode({ data }: NodeProps) {
+  const color = data.color as string || '#1890FF'
+  const icon = data.icon as string
+  const desc = data.desc as string | undefined
+  return (
+    <div style={{
+      padding: '10px 18px',
+      borderRadius: 6,
+      background: '#fff',
+      border: `1.5px solid ${color}`,
+      textAlign: 'center',
+      minWidth: 130,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+        {icon && <span style={{ marginRight: 4 }}>{icon}</span>}
+        {data.label as string}
       </div>
-    ),
-  },
-  sourcePosition: Position.Bottom,
-  targetPosition: Position.Top,
-})
+      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 3 }}>{desc}</div> : null}
+      <Handle type="source" position={Position.Bottom} style={{ background: color }} />
+      <Handle type="target" position={Position.Top} style={{ background: color }} />
+      <Handle type="source" position={Position.Right} style={{ background: color }} />
+      <Handle type="target" position={Position.Left} style={{ background: color }} />
+    </div>
+  )
+}
 
-/** 初始节点 - 实际业务流程 */
+/** 决策/判断节点 - 菱形效果 */
+function DecisionNode({ data }: NodeProps) {
+  const color = data.color as string || '#FAAD14'
+  const desc = data.desc as string | undefined
+  return (
+    <div style={{
+      padding: '10px 18px',
+      borderRadius: 6,
+      background: `linear-gradient(135deg, ${color}15, ${color}08)`,
+      border: `2px solid ${color}`,
+      textAlign: 'center',
+      minWidth: 130,
+      position: 'relative',
+      boxShadow: `0 2px 6px ${color}25`,
+    }}>
+      <div style={{
+        position: 'absolute', top: -1, right: -1,
+        background: color, color: '#fff', fontSize: 10, padding: '1px 6px',
+        borderRadius: '0 4px 0 4px', fontWeight: 600,
+      }}>判斷</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+        {data.label as string}
+      </div>
+      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 3 }}>{desc}</div> : null}
+      <Handle type="source" position={Position.Bottom} style={{ background: color }} />
+      <Handle type="target" position={Position.Top} style={{ background: color }} />
+      <Handle type="source" position={Position.Right} style={{ background: color }} />
+      <Handle type="target" position={Position.Left} style={{ background: color }} />
+    </div>
+  )
+}
+
+/** 系统自动处理节点 - 虚线边框 */
+function SystemNode({ data }: NodeProps) {
+  const desc = data.desc as string | undefined
+  return (
+    <div style={{
+      padding: '10px 18px',
+      borderRadius: 6,
+      background: '#F9F0FF',
+      border: '2px dashed #722ED1',
+      textAlign: 'center',
+      minWidth: 130,
+      boxShadow: '0 1px 4px rgba(114,46,209,0.08)',
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#531DAB' }}>
+        ⚙️ {data.label as string}
+      </div>
+      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 3 }}>{desc}</div> : null}
+      <Handle type="source" position={Position.Bottom} style={{ background: '#722ED1' }} />
+      <Handle type="target" position={Position.Top} style={{ background: '#722ED1' }} />
+      <Handle type="source" position={Position.Right} style={{ background: '#722ED1' }} />
+      <Handle type="target" position={Position.Left} style={{ background: '#722ED1' }} />
+    </div>
+  )
+}
+
+/** 自定义节点类型映射 */
+const nodeTypes = {
+  terminal: TerminalNode,
+  stage: StageNode,
+  process: ProcessNode,
+  decision: DecisionNode,
+  system: SystemNode,
+}
+
+/* ===== 构建节点 ===== */
 const initialNodes: Node[] = [
-  // ===== 阶段1：算法库 =====
-  createNode('s1', '① 算法庫 - 配置廣告算法', 'start', { x: 250, y: 0 }, '運營人員操作'),
-  createNode('1a', '創建算法', 'data', { x: 100, y: 110 }, '如：無敵星星'),
-  createNode('1b', '配置算法參數', 'data', { x: 300, y: 110 }, '召回/排序/策略規則'),
-  createNode('1c', '啟用算法', 'decision', { x: 500, y: 110 }, '狀態設為可用'),
+  // ── 开始 ──
+  { id: 'start', type: 'terminal', position: { x: 300, y: 0 }, data: { label: '開 始', desc: '運營人員登錄系統' }, sourcePosition: Position.Bottom },
 
-  // ===== 阶段2：瀑布流策略 =====
-  createNode('s2', '② 瀑布流策略 - 引用算法+分配位置', 'process', { x: 250, y: 230 }, '運營人員操作'),
-  createNode('2a', '引用算法', 'data', { x: 100, y: 340 }, '選擇已創建的算法'),
-  createNode('2b', '選擇瀑布流', 'data', { x: 300, y: 340 }, '如：大首頁瀑布流'),
-  createNode('2c', '分配展示位', 'decision', { x: 500, y: 340 }, '如：第2位或第5位'),
+  // ── 阶段1：算法库 ──
+  { id: 'stg1', type: 'stage', position: { x: 220, y: 100 }, data: { label: '階段一：算法庫配置', desc: '運營人員操作', color: '#52C41A' } },
+  { id: 'n1a', type: 'process', position: { x: 80, y: 210 }, data: { label: '創建算法', desc: '如：無敵星星', color: '#52C41A', icon: '📝' } },
+  { id: 'n1b', type: 'process', position: { x: 280, y: 210 }, data: { label: '配置算法參數', desc: '召回/排序/策略規則', color: '#52C41A', icon: '⚙️' } },
+  { id: 'n1c', type: 'decision', position: { x: 480, y: 210 }, data: { label: '啟用算法', desc: '狀態設為可用', color: '#52C41A' } },
 
-  // ===== 阶段3：销售定价 =====
-  createNode('s3', '③ 銷售定價 - 創建活動+配置價格', 'system', { x: 250, y: 460 }, '運營人員操作'),
-  createNode('3a', '新增廣告售賣', 'data', { x: 0, y: 570 }, '如：無敵星星類型'),
-  createNode('3b', '選擇展示位', 'data', { x: 170, y: 570 }, '如：2號位'),
-  createNode('3c', '選擇區域', 'data', { x: 340, y: 570 }, '威尼斯人/皇朝/黑馬仕等'),
-  createNode('3d', '配置區域價格', 'decision', { x: 510, y: 570 }, '每個區域單獨定價'),
+  // ── 阶段2：瀑布流策略 ──
+  { id: 'stg2', type: 'stage', position: { x: 220, y: 330 }, data: { label: '階段二：瀑布流策略配置', desc: '運營人員操作', color: '#1890FF' } },
+  { id: 'n2a', type: 'process', position: { x: 80, y: 440 }, data: { label: '引用算法', desc: '選擇已創建的算法', color: '#1890FF', icon: '🔗' } },
+  { id: 'n2b', type: 'process', position: { x: 280, y: 440 }, data: { label: '選擇瀑布流', desc: '如：大首頁瀑布流', color: '#1890FF', icon: '📋' } },
+  { id: 'n2c', type: 'decision', position: { x: 480, y: 440 }, data: { label: '分配展示位', desc: '如：第2位或第5位', color: '#1890FF' } },
 
-  // ===== 阶段4：广告购买 =====
-  createNode('s4', '④ 廣告購買 - 商家下單', 'start', { x: 250, y: 690 }, '商家操作'),
-  createNode('4a', '選擇廣告類型', 'data', { x: 0, y: 800 }, '如：無敵星星'),
-  createNode('4b', '選擇可購買活動', 'data', { x: 170, y: 800 }, '已上架的活動'),
-  createNode('4c', '選擇投放區域', 'data', { x: 340, y: 800 }, '商家所在區域'),
-  createNode('4d', '選擇日期時段', 'data', { x: 510, y: 800 }, '某天某個時段'),
-  createNode('4e', '提交並支付', 'decision', { x: 250, y: 910 }, '訂單支付'),
+  // ── 阶段3：销售定价 ──
+  { id: 'stg3', type: 'stage', position: { x: 220, y: 560 }, data: { label: '階段三：銷售定價配置', desc: '運營人員操作', color: '#EB2F96' } },
+  { id: 'n3a', type: 'process', position: { x: 30, y: 670 }, data: { label: '新增廣告售賣', desc: '如：無敵星星類型', color: '#EB2F96', icon: '📦' } },
+  { id: 'n3b', type: 'process', position: { x: 200, y: 670 }, data: { label: '選擇展示位', desc: '如：2號位', color: '#EB2F96', icon: '📍' } },
+  { id: 'n3c', type: 'process', position: { x: 370, y: 670 }, data: { label: '選擇區域', desc: '威尼斯人/皇朝等', color: '#EB2F96', icon: '🗺️' } },
+  { id: 'n3d', type: 'decision', position: { x: 540, y: 670 }, data: { label: '配置區域價格', desc: '每個區域單獨定價', color: '#EB2F96' } },
 
-  // ===== 阶段5：订单管理 =====
-  createNode('s5', '⑤ 訂單管理 - 推送狀態', 'process', { x: 250, y: 1020 }, '系統自動 + 商家查看'),
-  createNode('5a', '訂單提交', 'data', { x: 130, y: 1130 }, '支付完成'),
-  createNode('5b', '系統推送', 'system', { x: 370, y: 1130 }, '系統處理推送'),
-  createNode('5c', '推送完成', 'end', { x: 250, y: 1240 }, '廣告上線'),
+  // ── 阶段4：广告购买 ──
+  { id: 'stg4', type: 'stage', position: { x: 220, y: 790 }, data: { label: '階段四：廣告購買（商家操作）', desc: '商家端操作', color: '#FA8C16' } },
+  { id: 'n4a', type: 'process', position: { x: 30, y: 900 }, data: { label: '選擇廣告類型', desc: '如：無敵星星', color: '#FA8C16', icon: '🏷️' } },
+  { id: 'n4b', type: 'process', position: { x: 180, y: 900 }, data: { label: '選擇可購買活動', desc: '已上架的活動', color: '#FA8C16', icon: '🎯' } },
+  { id: 'n4c', type: 'process', position: { x: 340, y: 900 }, data: { label: '選擇投放區域', desc: '商家所在區域', color: '#FA8C16', icon: '📍' } },
+  { id: 'n4d', type: 'process', position: { x: 500, y: 900 }, data: { label: '選擇日期時段', desc: '某天某個時段', color: '#FA8C16', icon: '📅' } },
+  { id: 'n4e', type: 'decision', position: { x: 300, y: 1010 }, data: { label: '提交並支付', desc: '訂單支付', color: '#FA8C16' } },
 
-  // ===== 阶段6：报表分析 =====
-  createNode('s6', '⑥ 報表分析 - 推廣效果', 'end', { x: 250, y: 1350 }, '商家查看'),
-  createNode('6a', '數據概覽', 'data', { x: 100, y: 1460 }, '整體推廣數據'),
-  createNode('6b', '訂單效果報表', 'data', { x: 300, y: 1460 }, '訂單級別效果'),
-  createNode('6c', '類型對比', 'data', { x: 500, y: 1460 }, '不同廣告類型對比'),
+  // ── 阶段5：订单管理 ──
+  { id: 'stg5', type: 'stage', position: { x: 220, y: 1120 }, data: { label: '階段五：訂單管理', desc: '系統自動 + 商家查看', color: '#722ED1' } },
+  { id: 'n5a', type: 'process', position: { x: 150, y: 1230 }, data: { label: '訂單提交', desc: '支付完成', color: '#722ED1', icon: '📄' } },
+  { id: 'n5b', type: 'system', position: { x: 380, y: 1230 }, data: { label: '系統推送', desc: '系統處理推送' } },
+  { id: 'n5c', type: 'decision', position: { x: 260, y: 1340 }, data: { label: '推送完成', desc: '廣告上線', color: '#722ED1' } },
+
+  // ── 阶段6：报表分析 ──
+  { id: 'stg6', type: 'stage', position: { x: 220, y: 1450 }, data: { label: '階段六：報表分析', desc: '商家查看推廣效果', color: '#13C2C2' } },
+  { id: 'n6a', type: 'process', position: { x: 80, y: 1560 }, data: { label: '數據概覽', desc: '整體推廣數據', color: '#13C2C2', icon: '📊' } },
+  { id: 'n6b', type: 'process', position: { x: 280, y: 1560 }, data: { label: '訂單效果報表', desc: '訂單級別效果', color: '#13C2C2', icon: '📈' } },
+  { id: 'n6c', type: 'process', position: { x: 480, y: 1560 }, data: { label: '類型對比', desc: '不同廣告類型對比', color: '#13C2C2', icon: '📉' } },
+
+  // ── 结束 ──
+  { id: 'end', type: 'terminal', position: { x: 300, y: 1680 }, data: { label: '結 束', desc: '流程完成', isEnd: true }, targetPosition: Position.Top },
 ]
 
-/** 初始边 */
+/* ===== 构建边 ===== */
+const edgeStyle = (color: string) => ({ stroke: color, strokeWidth: 2 })
+const arrowEnd = (color: string) => ({ type: MarkerType.ArrowClosed, color, width: 16, height: 16 })
+
 const initialEdges = [
-  // 阶段1：算法库内部
-  { id: 'es1-1a', source: 's1', target: '1a', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'es1-1b', source: 's1', target: '1b', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'es1-1c', source: 's1', target: '1c', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  // 开始 → 阶段1
+  { id: 'e-start', source: 'start', target: 'stg1', style: edgeStyle('#52C41A'), markerEnd: arrowEnd('#52C41A') },
+
+  // 阶段1内部
+  { id: 'e1a', source: 'stg1', target: 'n1a', style: edgeStyle('#52C41A'), markerEnd: arrowEnd('#52C41A') },
+  { id: 'e1b', source: 'stg1', target: 'n1b', style: edgeStyle('#52C41A'), markerEnd: arrowEnd('#52C41A') },
+  { id: 'e1c', source: 'stg1', target: 'n1c', style: edgeStyle('#52C41A'), markerEnd: arrowEnd('#52C41A') },
 
   // 阶段1 → 阶段2
-  { id: 'e1c-s2', source: '1c', target: 's2', animated: true, style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '算法啟用後' },
+  { id: 'e12', source: 'n1c', target: 'stg2', animated: true, style: edgeStyle('#1890FF'), markerEnd: arrowEnd('#1890FF'), label: '算法啟用後' },
 
-  // 阶段2：瀑布流策略内部
-  { id: 'es2-2a', source: 's2', target: '2a', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'es2-2b', source: 's2', target: '2b', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'es2-2c', source: 's2', target: '2c', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段2内部
+  { id: 'e2a', source: 'stg2', target: 'n2a', style: edgeStyle('#1890FF'), markerEnd: arrowEnd('#1890FF') },
+  { id: 'e2b', source: 'stg2', target: 'n2b', style: edgeStyle('#1890FF'), markerEnd: arrowEnd('#1890FF') },
+  { id: 'e2c', source: 'stg2', target: 'n2c', style: edgeStyle('#1890FF'), markerEnd: arrowEnd('#1890FF') },
 
   // 阶段2 → 阶段3
-  { id: 'e2c-s3', source: '2c', target: 's3', animated: true, style: { stroke: '#722ED1' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '位置分配完成' },
+  { id: 'e23', source: 'n2c', target: 'stg3', animated: true, style: edgeStyle('#EB2F96'), markerEnd: arrowEnd('#EB2F96'), label: '位置分配完成' },
 
-  // 阶段3：销售定价内部
-  { id: 'es3-3a', source: 's3', target: '3a', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3a-3b', source: '3a', target: '3b', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3b-3c', source: '3b', target: '3c', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e3c-3d', source: '3c', target: '3d', style: { stroke: '#EB2F96' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段3内部 - 链式流程
+  { id: 'e3a', source: 'stg3', target: 'n3a', style: edgeStyle('#EB2F96'), markerEnd: arrowEnd('#EB2F96') },
+  { id: 'e3ab', source: 'n3a', target: 'n3b', style: edgeStyle('#EB2F96'), markerEnd: arrowEnd('#EB2F96') },
+  { id: 'e3bc', source: 'n3b', target: 'n3c', style: edgeStyle('#EB2F96'), markerEnd: arrowEnd('#EB2F96') },
+  { id: 'e3cd', source: 'n3c', target: 'n3d', style: edgeStyle('#EB2F96'), markerEnd: arrowEnd('#EB2F96') },
 
   // 阶段3 → 阶段4
-  { id: 'e3d-s4', source: '3d', target: 's4', animated: true, style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '活動上架' },
+  { id: 'e34', source: 'n3d', target: 'stg4', animated: true, style: edgeStyle('#FA8C16'), markerEnd: arrowEnd('#FA8C16'), label: '活動上架' },
 
-  // 阶段4：广告购买内部
-  { id: 'es4-4a', source: 's4', target: '4a', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4a-4b', source: '4a', target: '4b', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4b-4c', source: '4b', target: '4c', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4c-4d', source: '4c', target: '4d', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e4d-4e', source: '4d', target: '4e', style: { stroke: '#52C41A' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段4内部 - 链式流程
+  { id: 'e4a', source: 'stg4', target: 'n4a', style: edgeStyle('#FA8C16'), markerEnd: arrowEnd('#FA8C16') },
+  { id: 'e4ab', source: 'n4a', target: 'n4b', style: edgeStyle('#FA8C16'), markerEnd: arrowEnd('#FA8C16') },
+  { id: 'e4bc', source: 'n4b', target: 'n4c', style: edgeStyle('#FA8C16'), markerEnd: arrowEnd('#FA8C16') },
+  { id: 'e4cd', source: 'n4c', target: 'n4d', style: edgeStyle('#FA8C16'), markerEnd: arrowEnd('#FA8C16') },
+  { id: 'e4de', source: 'n4d', target: 'n4e', style: edgeStyle('#FA8C16'), markerEnd: arrowEnd('#FA8C16') },
 
   // 阶段4 → 阶段5
-  { id: 'e4e-s5', source: '4e', target: 's5', animated: true, style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '支付完成' },
+  { id: 'e45', source: 'n4e', target: 'stg5', animated: true, style: edgeStyle('#722ED1'), markerEnd: arrowEnd('#722ED1'), label: '支付完成' },
 
-  // 阶段5：订单管理内部
-  { id: 'es5-5a', source: 's5', target: '5a', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e5a-5b', source: '5a', target: '5b', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'e5b-5c', source: '5b', target: '5c', style: { stroke: '#1890FF' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段5内部
+  { id: 'e5a', source: 'stg5', target: 'n5a', style: edgeStyle('#722ED1'), markerEnd: arrowEnd('#722ED1') },
+  { id: 'e5ab', source: 'n5a', target: 'n5b', style: edgeStyle('#722ED1'), markerEnd: arrowEnd('#722ED1') },
+  { id: 'e5bc', source: 'n5b', target: 'n5c', style: edgeStyle('#722ED1'), markerEnd: arrowEnd('#722ED1') },
 
   // 阶段5 → 阶段6
-  { id: 'e5c-s6', source: '5c', target: 's6', animated: true, style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed }, label: '推送完成後' },
+  { id: 'e56', source: 'n5c', target: 'stg6', animated: true, style: edgeStyle('#13C2C2'), markerEnd: arrowEnd('#13C2C2'), label: '推送完成後' },
 
-  // 阶段6：报表分析内部
-  { id: 'es6-6a', source: 's6', target: '6a', style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'es6-6b', source: 's6', target: '6b', style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed } },
-  { id: 'es6-6c', source: 's6', target: '6c', style: { stroke: '#FA541C' }, markerEnd: { type: MarkerType.ArrowClosed } },
+  // 阶段6内部
+  { id: 'e6a', source: 'stg6', target: 'n6a', style: edgeStyle('#13C2C2'), markerEnd: arrowEnd('#13C2C2') },
+  { id: 'e6b', source: 'stg6', target: 'n6b', style: edgeStyle('#13C2C2'), markerEnd: arrowEnd('#13C2C2') },
+  { id: 'e6c', source: 'stg6', target: 'n6c', style: edgeStyle('#13C2C2'), markerEnd: arrowEnd('#13C2C2') },
+
+  // 阶段6 → 结束
+  { id: 'e-end', source: 'n6b', target: 'end', animated: true, style: edgeStyle('#FF4D4F'), markerEnd: arrowEnd('#FF4D4F') },
 ]
 
+/* ===== 主组件 ===== */
 export default function AlgorithmFlow() {
   const navigate = useNavigate()
   const [nodes, , onNodesChange] = useNodesState(initialNodes)
@@ -204,27 +317,28 @@ export default function AlgorithmFlow() {
       {/* 图例 */}
       <div style={{
         display: 'flex',
-        gap: 16,
+        gap: 20,
         padding: '8px 24px',
         background: '#FAFAFA',
         borderBottom: '1px solid #f0f0f0',
         flexShrink: 0,
         flexWrap: 'wrap',
+        alignItems: 'center',
       }}>
         {[
-          { label: '起始/結束', type: 'start' },
-          { label: '處理流程', type: 'process' },
-          { label: '配置/數據', type: 'data' },
-          { label: '決策/判斷', type: 'decision' },
-          { label: '系統模塊', type: 'system' },
+          { label: '開始/結束', shape: 'ellipse', bg: '#F6FFED', border: '#52C41A' },
+          { label: '階段標題', shape: 'rect', bg: '#F0F5FF', border: '#1890FF' },
+          { label: '流程步驟', shape: 'rect', bg: '#FFFFFF', border: '#1890FF' },
+          { label: '決策/判斷', shape: 'rect', bg: '#FFFBE6', border: '#FAAD14' },
+          { label: '系統處理', shape: 'rect', bg: '#F9F0FF', border: '#722ED1', dashed: true },
         ].map(item => (
-          <Space key={item.type} size={4}>
+          <Space key={item.label} size={4}>
             <div style={{
-              width: 14,
-              height: 14,
-              borderRadius: 3,
-              background: nodeStyleMap[item.type].bg,
-              border: `2px solid ${nodeStyleMap[item.type].border}`,
+              width: 16,
+              height: 16,
+              borderRadius: item.shape === 'ellipse' ? 8 : 3,
+              background: item.bg,
+              border: `2px ${item.dashed ? 'dashed' : 'solid'} ${item.border}`,
             }} />
             <span style={{ fontSize: 12, color: '#595959' }}>{item.label}</span>
           </Space>
@@ -241,12 +355,13 @@ export default function AlgorithmFlow() {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
           proOptions={proOptions}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.3}
+          fitViewOptions={{ padding: 0.15 }}
+          minZoom={0.2}
           maxZoom={2}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.4 }}
         >
           <Background color="#e8e8e8" gap={20} size={1} />
           <Controls showInteractive={false} />
