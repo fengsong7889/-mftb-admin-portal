@@ -138,10 +138,21 @@ export default function Algorithm() {
 
   // 从 URL 参数恢复列表状态（从新增页返回时）
   const typeParam = searchParams.get('type')
+  const tabParam = searchParams.get('tab') as 'delivery' | 'groupBuy' | null
   const initialType = typeParam ? Number(typeParam) as AlgorithmType : null
   const [selectedType, setSelectedType] = useState<AlgorithmType | null>(initialType)
+  const [businessType, setBusinessType] = useState<'delivery' | 'groupBuy'>(tabParam || 'delivery')
+
+  /** 根据业务类型过滤数据 */
+  const filterByBusinessType = (data: AlgorithmRecord[]) => {
+    if (businessType === 'groupBuy') {
+      return data.filter(item => item.channel === RecommendChannel.GROUP_BUY)
+    }
+    return data.filter(item => item.channel !== RecommendChannel.GROUP_BUY)
+  }
+
   const [filteredData, setFilteredData] = useState<AlgorithmRecord[]>(
-    initialType ? mockAlgorithmData.filter(item => item.type === initialType) : mockAlgorithmData
+    initialType ? filterByBusinessType(mockAlgorithmData.filter(item => item.type === initialType)) : mockAlgorithmData
   )
 
   // 统计每种广告类型的算法数量
@@ -154,9 +165,10 @@ export default function Algorithm() {
   }, [])
 
   // 点击卡片 → 进入列表
-  const handleSelectType = (type: AlgorithmType) => {
+  const handleSelectType = (type: AlgorithmType, tab: 'delivery' | 'groupBuy') => {
     setSelectedType(type)
-    const data = mockAlgorithmData.filter(item => item.type === type)
+    setBusinessType(tab)
+    const data = filterByBusinessType(mockAlgorithmData.filter(item => item.type === type))
     setFilteredData(data)
     searchForm.resetFields()
   }
@@ -165,24 +177,19 @@ export default function Algorithm() {
   const handleBackToCards = () => {
     setSelectedType(null)
     setFilteredData(mockAlgorithmData)
+    setBusinessType('delivery')
     searchForm.resetFields()
   }
 
   // 搜索处理
   const handleSearch = (values: any) => {
-    let result = mockAlgorithmData.filter(item => item.type === selectedType)
+    let result = filterByBusinessType(mockAlgorithmData.filter(item => item.type === selectedType))
     
     if (values.name) {
       result = result.filter(item => item.name.includes(values.name))
     }
     if (values.code) {
       result = result.filter(item => item.code.includes(values.code))
-    }
-    if (values.channel !== undefined && values.channel !== null) {
-      result = result.filter(item => item.channel === values.channel)
-    }
-    if (values.placementInterface !== undefined && values.placementInterface !== null) {
-      result = result.filter(item => item.placementInterface === values.placementInterface)
     }
     if (values.brand !== undefined && values.brand !== null) {
       result = result.filter(item => item.brand === values.brand)
@@ -197,12 +204,12 @@ export default function Algorithm() {
   // 重置搜索
   const handleReset = () => {
     searchForm.resetFields()
-    setFilteredData(mockAlgorithmData.filter(item => item.type === selectedType))
+    setFilteredData(filterByBusinessType(mockAlgorithmData.filter(item => item.type === selectedType)))
   }
 
-  // 跳转到新增页面（携带当前算法类型）
+  // 跳转到新增页面（携带当前算法类型和业务类型）
   const handleGoToAdd = () => {
-    navigate(`/promotion-algorithm-add?type=${selectedType}`)
+    navigate(`/promotion-algorithm-add?type=${selectedType}&tab=${businessType}`)
   }
 
   // 当前选中的类型信息
@@ -213,8 +220,6 @@ export default function Algorithm() {
     { key: 'code', title: '算法ID' },
     { key: 'name', title: '算法名稱' },
     { key: 'brand', title: '所屬品牌' },
-    { key: 'channel', title: '業務頻道' },
-    { key: 'placementInterface', title: '算法落地頁' },
     { key: 'status', title: '狀態' },
     { key: 'action', title: '操作' },
   ], [])
@@ -231,14 +236,6 @@ export default function Algorithm() {
       render: (v: AppType) => v ? <Tag color={BRAND_COLOR[v]}>{BRAND_LABEL[v]}</Tag> : '-',
     },
     {
-      title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 150,
-      render: (v: RecommendChannel) => CHANNEL_LABEL[v],
-    },
-    {
-      title: '算法落地頁', dataIndex: 'placementInterface', key: 'placementInterface', width: 120,
-      render: (v: PlacementInterface) => v ? PLACEMENT_LABEL[v] : '-',
-    },
-    {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
       render: (v: ServiceStatus) => (
         <Badge
@@ -251,7 +248,7 @@ export default function Algorithm() {
       title: '操作', key: 'action', width: 180,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}`)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>編輯</Button>
           <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED}>
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
           </Button>
@@ -306,7 +303,7 @@ export default function Algorithm() {
                           <Card
                             key={card.type}
                             hoverable={enabled}
-                            onClick={() => enabled && handleSelectType(card.type)}
+                            onClick={() => enabled && handleSelectType(card.type, 'delivery')}
                             style={{
                               cursor: enabled ? 'pointer' : 'not-allowed',
                               opacity: enabled ? 1 : 0.5,
@@ -348,7 +345,7 @@ export default function Algorithm() {
                           <Card
                             key={card.type}
                             hoverable={enabled}
-                            onClick={() => enabled && handleSelectType(card.type)}
+                            onClick={() => enabled && handleSelectType(card.type, 'groupBuy')}
                             style={{
                               cursor: enabled ? 'pointer' : 'not-allowed',
                               opacity: enabled ? 1 : 0.5,
@@ -410,29 +407,6 @@ export default function Algorithm() {
           </Form.Item>
           <Form.Item label="算法名稱" name="name">
             <Input placeholder="請輸入算法名稱" allowClear />
-          </Form.Item>
-          <Form.Item label="業務頻道" name="channel">
-            <Select 
-              placeholder="全部" 
-              options={[
-                { label: '美食外賣', value: RecommendChannel.HOME },
-                { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
-                { label: '團購到店', value: RecommendChannel.GROUP_BUY },
-              ]}
-              allowClear
-            />
-          </Form.Item>
-          <Form.Item label="算法落地頁" name="placementInterface">
-            <Select 
-              placeholder="全部" 
-              options={[
-                { label: '大首頁-Feed', value: PlacementInterface.HOME },
-                { label: '外賣頻道-Feed', value: PlacementInterface.DELIVERY },
-                { label: '超市頻道-Feed', value: PlacementInterface.SUPERMARKET },
-                { label: '團購頻道-Feed', value: PlacementInterface.GROUP_BUY },
-              ]}
-              allowClear
-            />
           </Form.Item>
           <Form.Item label="所屬品牌" name="brand">
             <Select placeholder="全部" options={APP_OPTIONS} allowClear />

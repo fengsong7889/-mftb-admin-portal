@@ -1,0 +1,189 @@
+/* Weight Slider - 蓝紫渐变主题 */
+
+@keyframes ws-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.ws-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+/* 气泡 - 绝对定位在滑块上方 */
+.ws-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  transition: left 0.25s ease-out;
+  z-index: 3;
+}
+
+.ws-tooltip-box {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  animation: ws-bounce 2s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+.ws-tooltip-arrow {
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 3px solid #7c3aed;
+  margin: 0 auto;
+}
+
+/* 滑块区域 */
+.ws-slider-box {
+  position: relative;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  padding-top: 0;
+}
+
+/* 轨道背景 */
+.ws-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ws-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.25s ease-out;
+}
+
+/* 原生 input range */
+.ws-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+}
+
+/* Webkit 轨道 - 透明，高度等于手柄 */
+.ws-input::-webkit-slider-runnable-track {
+  height: 18px;
+  background: transparent;
+}
+
+/* Webkit 手柄：居中在轨道表面 */
+.ws-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #2563eb;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
+  margin-top: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ws-input:hover::-webkit-slider-thumb {
+  border-color: #7c3aed;
+  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.35);
+  transform: scale(1.2);
+}
+
+.ws-input:active::-webkit-slider-thumb {
+  border-color: #6d28d9;
+  box-shadow: 0 2px 10px rgba(109, 40, 217, 0.4);
+  transform: scale(1.1);
+}
+
+/* Firefox 轨道 */
+.ws-input::-moz-range-track {
+  height: 18px;
+  background: transparent;
+  border: none;
+}
+
+/* Firefox 手柄 */
+.ws-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #2563eb;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ws-input:hover::-moz-range-thumb {
+  border-color: #7c3aed;
+  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.35);
+  transform: scale(1.2);
+}
+
+/* 刻度 */
+.ws-ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0 0;
+}
+
+.ws-tick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.ws-tick-bar {
+  width: 1.5px;
+  height: 5px;
+  border-radius: 1px;
+  background: #d1d5db;
+  transition: background 0.25s ease;
+}
+
+.ws-tick-bar.on {
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+}
+
+.ws-tick-num {
+  font-size: 9px;
+  color: #9ca3af;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.ws-tick-num.on {
+  color: #7c3aed;
+  font-weight: 700;
+  transform: scale(1.15);
+}
+
+

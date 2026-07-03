@@ -275,6 +275,7 @@ const initialEdges = [
 
 /* ===== localStorage 键名 ===== */
 const STORAGE_KEY = 'algorithm-flow-node-positions'
+const NODE_DATA_KEY = 'algorithm-flow-node-data'
 const CUSTOM_NODES_KEY = 'algorithm-flow-custom-nodes'
 const CUSTOM_EDGES_KEY = 'algorithm-flow-custom-edges'
 
@@ -298,25 +299,35 @@ function FlowEditor() {
   const { screenToFlowPosition } = useReactFlow()
   const [messageApi, contextHolder] = message.useMessage()
 
-  // 从 localStorage 加載已保存的位置
-  const loadSavedPositions = useCallback((): Record<string, { x: number; y: number }> | null => {
+  // 从 localStorage 加载已保存的位置和节点数据
+  const loadSavedData = useCallback(() => {
+    let positions: Record<string, { x: number; y: number }> | null = null
+    let nodeDataMap: Record<string, { label?: string; desc?: string }> | null = null
     try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      return saved ? JSON.parse(saved) : null
-    } catch {
-      return null
-    }
+      const savedPos = localStorage.getItem(STORAGE_KEY)
+      positions = savedPos ? JSON.parse(savedPos) : null
+    } catch { /* ignore */ }
+    try {
+      const savedData = localStorage.getItem(NODE_DATA_KEY)
+      nodeDataMap = savedData ? JSON.parse(savedData) : null
+    } catch { /* ignore */ }
+    return { positions, nodeDataMap }
   }, [])
 
-  // 初始化节点：合并已保存的位置
+  // 初始化节点：合并已保存的位置和文字内容
   const getInitialNodes = useCallback(() => {
-    const saved = loadSavedPositions()
-    if (!saved) return initialNodes
-    return initialNodes.map(node => ({
-      ...node,
-      position: saved[node.id] || node.position,
-    }))
-  }, [loadSavedPositions])
+    const { positions, nodeDataMap } = loadSavedData()
+    if (!positions && !nodeDataMap) return initialNodes
+    return initialNodes.map(node => {
+      const savedPos = positions?.[node.id]
+      const savedData = nodeDataMap?.[node.id]
+      return {
+        ...node,
+        position: savedPos || node.position,
+        data: savedData ? { ...node.data, ...savedData } : node.data,
+      }
+    })
+  }, [loadSavedData])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(getInitialNodes())
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -423,20 +434,27 @@ function FlowEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [editMode, selectedIds, editModalOpen, handleDeleteSelected])
 
-  // 保存位置到 localStorage
+  // 保存位置和节点数据到 localStorage
   const handleSave = useCallback(() => {
     const positions: Record<string, { x: number; y: number }> = {}
+    const nodeDataMap: Record<string, { label?: string; desc?: string }> = {}
     nodes.forEach(node => {
       positions[node.id] = node.position
+      nodeDataMap[node.id] = {
+        label: node.data.label as string | undefined,
+        desc: node.data.desc as string | undefined,
+      }
     })
     localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
+    localStorage.setItem(NODE_DATA_KEY, JSON.stringify(nodeDataMap))
     setHasChanges(false)
-    messageApi.success('位置已保存')
+    messageApi.success('已保存')
   }, [nodes, messageApi])
 
-  // 重置位置
+  // 重置位置和数据
   const handleReset = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(NODE_DATA_KEY)
     setNodes(initialNodes)
     setHasChanges(false)
     messageApi.info('已重置为默认位置')
@@ -447,10 +465,16 @@ function FlowEditor() {
     const handleBeforeUnload = () => {
       if (hasChanges) {
         const positions: Record<string, { x: number; y: number }> = {}
+        const nodeDataMap: Record<string, { label?: string; desc?: string }> = {}
         nodes.forEach(node => {
           positions[node.id] = node.position
+          nodeDataMap[node.id] = {
+            label: node.data.label as string | undefined,
+            desc: node.data.desc as string | undefined,
+          }
         })
         localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
+        localStorage.setItem(NODE_DATA_KEY, JSON.stringify(nodeDataMap))
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
