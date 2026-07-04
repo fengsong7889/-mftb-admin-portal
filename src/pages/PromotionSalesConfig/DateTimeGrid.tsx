@@ -483,7 +483,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                               )}
                             </>
                           )}
-                          {!isAvailable && !isSoldOut && (
+                          {!isAvailable && !isSoldOut && !isLocked && (
                             <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>
                               --
                             </div>
