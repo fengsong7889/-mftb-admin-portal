@@ -1,7 +1,7 @@
-import { useState, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { 
@@ -41,6 +41,22 @@ const mockRevivePositionAlgorithm = [
   { position: 15, algorithmId: 2006, algorithmName: '盤活復蘇-美食版' },
   { position: 18, algorithmId: 2007, algorithmName: '盤活復蘇-閃購版' },
 ]
+
+// 业务频道 → 展示页面选项映射
+const CHANNEL_PAGE_OPTIONS: Record<number, { label: string; value: string }[]> = {
+  [RecommendChannel.DELIVERY]: [
+    { label: '大首頁-Feed', value: 'home' },
+    { label: '外賣頻道-Feed', value: 'delivery' },
+  ],
+  [RecommendChannel.SUPERMARKET]: [
+    { label: '大首頁-Feed', value: 'home' },
+    { label: '超市頻道-Feed', value: 'supermarket' },
+  ],
+  [RecommendChannel.GROUP_BUY]: [
+    { label: '大首頁-Feed', value: 'home' },
+    { label: '團購頻道-Feed', value: 'groupBuy' },
+  ],
+}
 
 // 时段枚举
 const TIME_SLOTS = [
@@ -113,6 +129,8 @@ interface RegionCombinationDiscount {
 
 export default function WaterfallAdd() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const urlAlgorithmType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
@@ -120,10 +138,9 @@ export default function WaterfallAdd() {
   const [promotionName, setPromotionName] = useState('')
   const [selectedApp, setSelectedApp] = useState<AppType | undefined>(undefined)
   const [selectedChannel, setSelectedChannel] = useState<RecommendChannel | undefined>(undefined)
-  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
+  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | undefined>(urlAlgorithmType ?? undefined)
   
-  // 广告位选择
-  const [selectedPosition, setSelectedPosition] = useState<number | undefined>(undefined)
+  // 广告位选择（已移除展示位置）
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
   
   // 区域计价配置
@@ -164,15 +181,21 @@ export default function WaterfallAdd() {
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]) // 选择的商家
   const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
   
-  // 显示广告位的条件：仅無敵星星和盤活復蘇
-  const canShowPositions = selectedApp && selectedChannel && selectedAlgorithmType &&
-    (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD)
+  // 显示广告位的条件（已移除廣告位選擇）
+  const canShowPositions = false
   
   // 廣告類型爲其它條件時顯示暫未開通提示
-  const showNotAvailable = selectedAlgorithmType && !canShowPositions
+  const showNotAvailable = false
   
   // 是否为盤活復蘇算法类型
   const isReviveAlgorithm = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
+
+  // 从 URL 参数初始化表单
+  useEffect(() => {
+    if (urlAlgorithmType) {
+      form.setFieldsValue({ algorithmType: urlAlgorithmType })
+    }
+  }, [urlAlgorithmType, form])
 
   // 自定义美化 Switch
   const CustomSwitch = ({
@@ -254,21 +277,9 @@ export default function WaterfallAdd() {
 
 
 
-  // 选择广告位
-  const handlePositionSelect = (position: number) => {
-    setSelectedPosition(position)
-    
-    // 根据广告类型选择不同的算法数据
-    const algorithmData = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD 
-      ? mockRevivePositionAlgorithm 
-      : mockPositionAlgorithm
-    const algorithm = algorithmData.find(p => p.position === position)
-    if (algorithm) {
-      setSelectedAlgorithmInfo({
-        id: algorithm.algorithmId,
-        name: algorithm.algorithmName,
-      })
-    }
+  // 选择广告位（已移除）
+  const handlePositionSelect = (_position: number) => {
+    // 广告位选择已移除
   }
 
   // 添加区域计价配置
@@ -463,7 +474,11 @@ export default function WaterfallAdd() {
 
   // 返回列表
   const handleBack = () => {
-    navigate('/promotion-waterfall')
+    if (urlAlgorithmType) {
+      navigate(`/promotion-waterfall?type=${urlAlgorithmType}`)
+    } else {
+      navigate('/promotion-waterfall')
+    }
   }
 
   // 提交表单
@@ -477,7 +492,7 @@ export default function WaterfallAdd() {
         app: selectedApp,
         channel: selectedChannel,
         algorithmType: selectedAlgorithmType,
-        slotPosition: selectedPosition,
+        slotPosition: undefined,
         algorithmId: selectedAlgorithmInfo?.id,
         algorithmName: selectedAlgorithmInfo?.name,
         regions: regionPricingConfigs.map(c => ({
@@ -569,46 +584,23 @@ export default function WaterfallAdd() {
                     { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
                     { label: '團購到店', value: RecommendChannel.GROUP_BUY },
                   ]}
-                  onChange={(value) => setSelectedChannel(value)}
-                />
-              </Form.Item>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              <Form.Item 
-                label="廣告類型" 
-                name="algorithmType" 
-                rules={[{ required: true, message: '請選擇廣告類型' }]}
-              >
-                <Select 
-                  placeholder="請選擇廣告類型" 
-                  options={[
-                    { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
-                    { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-                    { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
-                    { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
-                    { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
-                    { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
-                    { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
-                    { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
-                  ]}
-                  onChange={(value) => setSelectedAlgorithmType(value)}
+                  onChange={(value) => {
+                    setSelectedChannel(value)
+                    // 切换频道时重置展示页面
+                    form.setFieldsValue({ algorithmLandingPage: undefined })
+                  }}
                 />
               </Form.Item>
 
               <Form.Item 
-                label="算法落地頁" 
+                label="展示頁面" 
                 name="algorithmLandingPage" 
-                rules={[{ required: true, message: '請選擇算法落地頁' }]}
+                rules={[{ required: true, message: '請選擇展示頁面' }]}
               >
                 <Select
-                  placeholder="請選擇算法落地頁"
-                  options={[
-                    { label: '大首頁-Feed', value: 'home' },
-                    { label: '外賣頻道-Feed', value: 'delivery' },
-                    { label: '超市頻道-Feed', value: 'supermarket' },
-                    { label: '團購頻道-Feed', value: 'groupBuy' },
-                  ]}
+                  placeholder="請先選擇業務頻道"
+                  disabled={!selectedChannel}
+                  options={selectedChannel ? CHANNEL_PAGE_OPTIONS[selectedChannel] : []}
                 />
               </Form.Item>
             </div>
@@ -626,7 +618,7 @@ export default function WaterfallAdd() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 40px)', gap: 8, justifyContent: 'start' }}>
                   {mockPositionAlgorithm.map((item) => {
                     const position = item.position
-                    const isSelected = selectedPosition === position
+                    const isSelected = undefined === position
                     
                     return (
                       <div
@@ -687,7 +679,7 @@ export default function WaterfallAdd() {
           )}
 
           {/* 销售策略（仅无敌星星） */}
-          {selectedPosition && !isReviveAlgorithm && (
+          {!isReviveAlgorithm && selectedApp && selectedChannel && selectedAlgorithmType && (
             <Card 
               title="銷售策略" 
               size="small"
@@ -860,7 +852,7 @@ export default function WaterfallAdd() {
 
 
           {/* 区域计价配置 */}
-          {selectedPosition && (
+          {selectedApp && selectedChannel && selectedAlgorithmType && (
             <Card 
               title="商圈計價配置" 
               size="small"
@@ -1109,12 +1101,26 @@ export default function WaterfallAdd() {
                 message.warning('請選擇一個區域或商圈')
                 return
               }
-              // 根据树节点映射到Region
-              const nodeKey = selectedRegionNode.key
+              // 根据树节点ID映射到Region（与地圖規劃商圈数据一致）
+              const nodeId = Number(selectedRegionNode.key)
+              const nodeToRegionMap: Record<number, Region> = {
+                2: Region.KOKSAA,    // 黑沙環區
+                3: Region.COSTA,     // 高士德區
+                4: Region.SANMA,     // 新馬路區
+                5: Region.SANWONG,   // 新皇朝區
+                6: Region.HKM,       // 港珠澳區
+                8: Region.FAHUA,     // 花城市區
+                9: Region.AIRPORT,   // 北安機場
+                10: Region.LHOTEL,   // 左酒店區
+                11: Region.RHOTEL,   // 右酒店區
+                12: Region.UM,       // 澳大專區
+                13: Region.HACS,     // 黑沙灘區
+              }
+              // 如果选择的是父节点（区域），默认取第一个子商圈
               let regionValue: Region
-              if (nodeKey.startsWith('1')) regionValue = Region.MACAU
-              else if (nodeKey.startsWith('2')) regionValue = Region.TAIPA
-              else regionValue = Region.ZHUHAI
+              if (nodeId === 1) regionValue = Region.KOKSAA
+              else if (nodeId === 7) regionValue = Region.FAHUA
+              else regionValue = nodeToRegionMap[nodeId] || Region.KOKSAA
               
               if (regionPricingConfigs.find(c => c.region === regionValue)) {
                 message.warning('該區域已添加計價配置')

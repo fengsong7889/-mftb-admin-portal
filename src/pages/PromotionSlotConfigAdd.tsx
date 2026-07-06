@@ -97,7 +97,7 @@ export default function PromotionSlotConfigAdd() {
           form={form}
           layout="horizontal"
         >
-          {/* 第一行：所属品牌、业务频道、算法类型 */}
+          {/* 所屬品牌、廣告類型、展示位置 */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
             <Form.Item
               label="所屬品牌"
@@ -112,24 +112,6 @@ export default function PromotionSlotConfigAdd() {
                 options={[
                   { label: '閃峰', value: 'shanfeng' },
                   { label: 'mFood', value: 'mfood' },
-                ]}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="業務頻道"
-              name="channel"
-              rules={[{ required: true, message: '請選擇業務頻道' }]}
-              style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
-            >
-              <Select
-                placeholder="請選擇業務頻道"
-                options={[
-                  { label: '美食外賣', value: RecommendChannel.DELIVERY },
-                  { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
-                  { label: '團購到店', value: RecommendChannel.GROUP_BUY },
                 ]}
               />
             </Form.Item>
@@ -159,34 +141,12 @@ export default function PromotionSlotConfigAdd() {
                 }}
               />
             </Form.Item>
-          </div>
-
-          {/* 算法落地頁、展示位置 */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 16 }}>
-            <Form.Item
-              label="算法落地頁"
-              name="algorithmLandingPage"
-              rules={[{ required: true, message: '請選擇算法落地頁' }]}
-              style={{ flex: '0 0 calc((100% - 32px) / 3)', marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
-            >
-              <Select
-                placeholder="請選擇算法落地頁"
-                options={[
-                  { label: '大首頁-Feed', value: 'home' },
-                  { label: '外賣頻道-Feed', value: 'delivery' },
-                  { label: '超市頻道-Feed', value: 'supermarket' },
-                  { label: '團購頻道-Feed', value: 'groupBuy' },
-                ]}
-              />
-            </Form.Item>
 
             <Form.Item
               label="展示位置"
               name="position"
               rules={[{ required: true, message: '請選擇展示位置' }]}
-              style={{ flex: '0 0 calc((100% - 32px) / 3)', marginBottom: 0 }}
+              style={{ flex: 1, marginBottom: 0 }}
               labelCol={{ span: 6 }}
               wrapperCol={{ span: 18 }}
             >

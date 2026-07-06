@@ -49,17 +49,33 @@ const CHANNEL_LABEL: Record<RecommendChannel, string> = {
   [RecommendChannel.SUPERMARKET]: '大首頁',
 }
 
-// 商圈枚举
+// 商圈枚举（与地圖規劃商圈数据一致）
 enum Region {
-  MACAU = 1,
-  TAIPA = 2,
-  ZHUHAI = 3,
+  KOKSAA = 1,         // 黑沙環區
+  COSTA = 2,          // 高士德區
+  SANMA = 3,          // 新馬路區
+  SANWONG = 4,        // 新皇朝區
+  HKM = 5,            // 港珠澳區
+  FAHUA = 6,          // 花城市區
+  AIRPORT = 7,        // 北安機場
+  LHOTEL = 8,         // 左酒店區
+  RHOTEL = 9,         // 右酒店區
+  UM = 10,            // 澳大專區
+  HACS = 11,          // 黑沙灘區
 }
 
-const REGION_LABEL: Record<Region, string> = {
-  [Region.MACAU]: '澳門',
-  [Region.TAIPA]: '氹仔',
-  [Region.ZHUHAI]: '珠海',
+const REGION_LABEL: Record<number, string> = {
+  [Region.KOKSAA]: '黑沙環區',
+  [Region.COSTA]: '高士德區',
+  [Region.SANMA]: '新馬路區',
+  [Region.SANWONG]: '新皇朝區',
+  [Region.HKM]: '港珠澳區',
+  [Region.FAHUA]: '花城市區',
+  [Region.AIRPORT]: '北安機場',
+  [Region.LHOTEL]: '左酒店區',
+  [Region.RHOTEL]: '右酒店區',
+  [Region.UM]: '澳大專區',
+  [Region.HACS]: '黑沙灘區',
 }
 
 // 推荐类型枚举
@@ -113,7 +129,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·黃金展位',
     app: AppType.SHANFENG,
     channel: RecommendChannel.HOME,
-    region: Region.MACAU,
+    region: Region.KOKSAA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 3,
     purchaseDate: '2025-07-05',
@@ -131,7 +147,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '新店廣告·首頁推薦',
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
-    region: Region.TAIPA,
+    region: Region.FAHUA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 5,
     purchaseDate: '2025-07-06',
@@ -149,7 +165,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '盤活復蘇·外賣熱推',
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
-    region: Region.ZHUHAI,
+    region: Region.SANMA,
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 2,
     purchaseDate: '2025-07-08',
@@ -167,7 +183,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '流量廣告·團購精選',
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
-    region: Region.MACAU,
+    region: Region.KOKSAA,
     recommendType: RecommendType.TRAFFIC_AD,
     slotPosition: 4,
     purchaseDate: '2025-07-03',
@@ -185,7 +201,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·週末專場',
     app: AppType.SHANFENG,
     channel: RecommendChannel.HOME,
-    region: Region.TAIPA,
+    region: Region.FAHUA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
     purchaseDate: '2025-07-02',
@@ -202,7 +218,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·早鳥優惠',
     app: AppType.MFOOD,
     channel: RecommendChannel.HOME,
-    region: Region.MACAU,
+    region: Region.KOKSAA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 2,
     purchaseDate: '2025-07-01',
@@ -220,7 +236,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '新店廣告·零售閃購',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
-    region: Region.ZHUHAI,
+    region: Region.SANMA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 3,
     purchaseDate: '2025-06-30',
@@ -238,7 +254,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '盤活復蘇·團購到店',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
-    region: Region.TAIPA,
+    region: Region.FAHUA,
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 4,
     purchaseDate: '2025-06-29',
@@ -256,7 +272,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '流量廣告·大首頁推薦',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
-    region: Region.MACAU,
+    region: Region.KOKSAA,
     recommendType: RecommendType.TRAFFIC_AD,
     slotPosition: 1,
     purchaseDate: '2025-06-28',
@@ -274,7 +290,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·夜宵專場',
     app: AppType.MFOOD,
     channel: RecommendChannel.HOME,
-    region: Region.ZHUHAI,
+    region: Region.SANMA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 5,
     purchaseDate: '2025-06-27',
@@ -292,7 +308,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '新店廣告·澳門專區',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
-    region: Region.MACAU,
+    region: Region.KOKSAA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 2,
     purchaseDate: '2025-06-26',
@@ -310,7 +326,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '盤活復蘇·氹仔熱推',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
-    region: Region.TAIPA,
+    region: Region.FAHUA,
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 3,
     purchaseDate: '2025-06-25',
@@ -328,7 +344,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '流量廣告·珠海精選',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
-    region: Region.ZHUHAI,
+    region: Region.SANMA,
     recommendType: RecommendType.TRAFFIC_AD,
     slotPosition: 4,
     purchaseDate: '2025-06-24',
@@ -345,7 +361,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·全時段推廣',
     app: AppType.MFOOD,
     channel: RecommendChannel.HOME,
-    region: Region.MACAU,
+    region: Region.KOKSAA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
     purchaseDate: '2025-06-23',
@@ -363,7 +379,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '新店廣告·閃購特惠',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
-    region: Region.TAIPA,
+    region: Region.FAHUA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 5,
     purchaseDate: '2025-06-22',
@@ -417,7 +433,6 @@ export default function PromotionOrderManage() {
     { key: 'channel', title: '業務頻道' },
     { key: 'region', title: '所屬商圈' },
     { key: 'recommendType', title: '推薦類型' },
-    { key: 'slotPosition', title: '展示位置' },
     { key: 'purchaseContent', title: '購買內容' },
     { key: 'originalPrice', title: '訂單金額' },
     { key: 'discount', title: '優惠金額' },
@@ -482,13 +497,6 @@ export default function PromotionOrderManage() {
           {RECOMMEND_TYPE_LABEL[type]}
         </Tag>
       ),
-    },
-    {
-      title: '展示位置',
-      dataIndex: 'slotPosition',
-      key: 'slotPosition',
-      width: 100,
-      render: (position: number) => `${position}號位`,
     },
     {
       title: '購買內容',

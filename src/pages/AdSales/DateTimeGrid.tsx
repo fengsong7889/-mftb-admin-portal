@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal, TreeSelect } from 'antd'
-import { CalendarOutlined, DeleteOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DeleteOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -22,6 +22,8 @@ interface CartItem {
   timeSlots: number[]
   originalPrice: number  // 原价
   salePrice: number      // 售价
+  storeId: string        // 店铺ID
+  storeName: string      // 店铺名称
 }
 
 /** 组合商圈接口 */
@@ -58,6 +60,15 @@ interface DateTimeGridProps {
   inventoryItem: InventoryItem
 }
 
+/** Mock数据 - 店铺列表 */
+const MOCK_STORES = [
+  { id: 'store-001', name: '威尼斯人酒店' },
+  { id: 'store-002', name: '皇朝廣場店' },
+  { id: 'store-003', name: '黑馬仕美食街' },
+  { id: 'store-004', name: '新葡京旗艦店' },
+  { id: 'store-005', name: '官也街老店' },
+]
+
 // 时段定义（早餐/午餐/下午茶/晚餐/夜宵）
 const MEAL_TIME_SLOTS = [
   { key: 'breakfast', label: '早餐', timeRange: '07:00-10:00', slots: [14, 15, 16, 17, 18, 19] },
@@ -79,6 +90,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const pageSize = 7
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
+  const [selectedStore, setSelectedStore] = useState<string | undefined>(undefined)
   
   // Mock数据 - 商家推广金余额
   const [merchantBalance, setMerchantBalance] = useState(15800)
@@ -594,6 +606,35 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 </div>
               </Space>
 
+              {/* 选择店铺 */}
+              <div style={{ 
+                padding: '10px 12px', 
+                background: '#fafafa', 
+                borderRadius: 6, 
+                border: '1px solid #f0f0f0',
+                marginTop: 12,
+              }}>
+                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>
+                  <ShopOutlined style={{ marginRight: 4 }} />
+                  選擇店鋪 <span style={{ color: '#ff4d4f' }}>*</span>
+                </div>
+                <Select
+                  showSearch
+                  placeholder="請輸入店鋪名稱或ID搜索"
+                  value={selectedStore}
+                  onChange={(value) => setSelectedStore(value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  filterOption={(input, option) => {
+                    const keyword = input.toLowerCase()
+                    const label = (option?.label ?? '').toString().toLowerCase()
+                    const value = (option?.value ?? '').toString().toLowerCase()
+                    return label.includes(keyword) || value.includes(keyword)
+                  }}
+                  options={MOCK_STORES.map(s => ({ label: `${s.name} (${s.id.replace('store-', '')})`, value: s.id }))}
+                />
+              </div>
+
               {/* 底部加购按钮 */}
               <Button 
                 type="primary" 
@@ -602,6 +643,10 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 onClick={() => {
                   if (!selectedDate || !selectedMealSlot) {
                     message.warning('請先選擇日期和時段')
+                    return
+                  }
+                  if (!selectedStore) {
+                    message.warning('請先選擇店鋪')
                     return
                   }
                   
@@ -638,6 +683,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                     [Region.HACS]: '黑沙灘區',
                   }
                   
+                  // 获取店铺名称
+                  const storeInfo = MOCK_STORES.find(s => s.id === selectedStore)
                   
                   // 添加到购物车
                   const newItem: CartItem = {
@@ -649,6 +696,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                     timeSlots: availableSlots,
                     originalPrice,
                     salePrice,
+                    storeId: selectedStore!,
+                    storeName: storeInfo?.name || '-',
                   }
                   
                   setCartItems(prev => [...prev, newItem])
@@ -709,6 +758,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 width: 70,
                 render: (text: string) => (
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{text}</span>
+                ),
+              },
+              {
+                title: '店鋪',
+                dataIndex: 'storeName',
+                key: 'storeName',
+                width: 90,
+                render: (text: string) => (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#722ed1' }}>{text}</span>
                 ),
               },
               {

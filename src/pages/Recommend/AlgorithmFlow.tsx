@@ -189,8 +189,8 @@ const initialNodes: Node[] = [
   { id: 'n3c', type: 'process', position: { x: 370, y: 670 }, data: { label: '選擇區域', desc: '威尼斯人/皇朝等', color: '#EB2F96', icon: '🗺️' } },
   { id: 'n3d', type: 'decision', position: { x: 540, y: 670 }, data: { label: '配置區域價格', desc: '每個區域單獨定價', color: '#EB2F96' } },
 
-  // ── 阶段4：广告购买 ──
-  { id: 'stg4', type: 'stage', position: { x: 220, y: 790 }, data: { label: '階段四：廣告購買（商家操作）', desc: '商家端操作', color: '#FA8C16' } },
+  // ── 阶段4：店铺推广 ──
+  { id: 'stg4', type: 'stage', position: { x: 220, y: 790 }, data: { label: '階段四：店鋪推廣（商家操作）', desc: '商家端操作', color: '#FA8C16' } },
   { id: 'n4a', type: 'process', position: { x: 30, y: 900 }, data: { label: '選擇廣告類型', desc: '如：無敵星星', color: '#FA8C16', icon: '🏷️' } },
   { id: 'n4b', type: 'process', position: { x: 180, y: 900 }, data: { label: '選擇可購買活動', desc: '已上架的活動', color: '#FA8C16', icon: '🎯' } },
   { id: 'n4c', type: 'process', position: { x: 340, y: 900 }, data: { label: '選擇投放區域', desc: '商家所在區域', color: '#FA8C16', icon: '📍' } },

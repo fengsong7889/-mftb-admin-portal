@@ -163,12 +163,12 @@ const keyToPath: Record<string, string> = {
   'promotion-waterfall': '/promotion-waterfall',
   'promotion-sales-config': '/promotion-sales-config',
   'promotion-order-manage': '/promotion-order-manage',
+  // 广告销售（商家推广工具下，复用店铺推广页面）
+  'ad-sales': '/ad-sales',
   // 推广通 - 報表分析
   'promotion-report-overview': '/promotion-report-overview',
   'promotion-report-order': '/promotion-report-order',
   'promotion-report-compare': '/promotion-report-compare',
-  // 地圖規劃
-  'map-planning': '/map-planning',
   // 推广通(父菜单,无需映射)
   // 'promotion-tool': '/promotion-tool',
 }
@@ -378,11 +378,6 @@ const menuItems: MenuItem[] = [
         label: '數據看板',
       },
       {
-        key: 'map-planning',
-        icon: <AimOutlined />,
-        label: '地圖規劃',
-      },
-      {
         key: 'promotion-algorithm',
         icon: <AppstoreOutlined />,
         label: '算法库',
@@ -391,6 +386,16 @@ const menuItems: MenuItem[] = [
         key: 'promotion-slot-config',
         icon: <ColumnHeightOutlined />,
         label: '瀑布流策略',
+      },
+      {
+        key: 'promotion-waterfall',
+        icon: <WalletOutlined />,
+        label: '銷售定價',
+      },
+      {
+        key: 'ad-sales',
+        icon: <ShoppingFilled />,
+        label: '广告销售',
       },
     ],
   },
@@ -402,7 +407,7 @@ const menuItems: MenuItem[] = [
       {
         key: 'promotion-sales-config',
         icon: <ShoppingFilled />,
-        label: '廣告購買',
+        label: '店鋪推廣',
       },
       {
         key: 'promotion-order-manage',

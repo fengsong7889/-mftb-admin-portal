@@ -11,6 +11,7 @@ interface WaterfallSlotConfig {
   slotIndex: number
   businessChannel: string  // 业务频道: food / supermarket / groupBuy
   pageLocation: string     // 页面位置: home / delivery / supermarket / groupBuy
+  timeSlot: string         // 时段: allDay / breakfast / lunch / afternoonTea / dinner / midnightSnack
   app: string
   position: number
   algorithmId: number
@@ -45,12 +46,12 @@ const BUSINESS_CHANNEL_LABEL: Record<string, string> = {
   groupBuy: '團購到店',
 }
 
-/** 算法落地頁标签 */
+/** 展示頁面标签 */
 const PLACEMENT_LABEL: Record<string, string> = {
   home: '大首頁-Feed',
-  delivery: '外賣頻道-Feed',
-  groupBuy: '團購頻道-Feed',
-  supermarket: '超市頻道-Feed',
+  delivery: '外賣頻道-瀑布流',
+  groupBuy: '團購頻道-瀑布流',
+  supermarket: '超市頻道-瀑布流',
 }
 
 /** 品牌标签 */
@@ -61,6 +62,13 @@ const APP_LABEL: Record<string, string> = {
 
 /** Tab配置：业务频道 → 有效页面位置 + 算法来源 */
 const TAB_CONFIG: Record<string, { label: string; pageLocations: string[]; pageLocationOptions: { label: string; value: string }[] }> = {
+  home: {
+    label: '大首頁',
+    pageLocations: ['home'],
+    pageLocationOptions: [
+      { label: '大首頁', value: 'home' },
+    ],
+  },
   food: {
     label: '美食外賣',
     pageLocations: ['home', 'delivery'],
@@ -86,6 +94,19 @@ const TAB_CONFIG: Record<string, { label: string; pageLocations: string[]; pageL
     ],
   },
 }
+
+/** 时段配置 */
+const TIME_SLOT_CONFIG: { key: string; label: string; timeRange: string }[] = [
+  { key: 'breakfast', label: '早餐', timeRange: '06:00-10:00' },
+  { key: 'lunch', label: '午餐', timeRange: '10:00-14:00' },
+  { key: 'afternoonTea', label: '下午茶', timeRange: '14:00-17:00' },
+  { key: 'dinner', label: '晚餐', timeRange: '17:00-21:00' },
+  { key: 'midnightSnack', label: '夜宵', timeRange: '21:00-06:00' },
+]
+
+/** 时段标签映射 */
+const TIME_SLOT_LABEL: Record<string, string> = {}
+TIME_SLOT_CONFIG.forEach(ts => { TIME_SLOT_LABEL[ts.key] = ts.label })
 
 /** 算法类型标签 */
 const ALGORITHM_TYPE_LABEL: Record<string, string> = {
@@ -117,7 +138,7 @@ const pseudoRandom = (seed: number) => {
   return x - Math.floor(x)
 }
 
-/** Mock数据 - 覆盖所有业务频道+页面位置组合 */
+/** Mock数据 - 覆盖所有业务频道+页面位置+时段组合 */
 const mockData: WaterfallSlotConfig[] = (() => {
   // 业务频道 × 页面位置的有效组合
   const combos: { businessChannel: string; pageLocation: string }[] = [
@@ -128,6 +149,7 @@ const mockData: WaterfallSlotConfig[] = (() => {
     { businessChannel: 'groupBuy', pageLocation: 'home' },
     { businessChannel: 'groupBuy', pageLocation: 'groupBuy' },
   ]
+  const timeSlots = ['breakfast', 'lunch', 'afternoonTea', 'dinner', 'midnightSnack']
   const algorithmTypes = ['invincibleStar', 'youLike', 'newShopAd', 'activateAd', 'exclusiveShop']
   const algorithmNames: Record<string, string[]> = {
     invincibleStar: ['無敵星星-首頁版', '無敵星星-外賣版', '無敵星星-團購版'],
@@ -141,31 +163,34 @@ const mockData: WaterfallSlotConfig[] = (() => {
   const data: WaterfallSlotConfig[] = []
   let id = 1
   
-  // 每个组合生成 3-4 条数据
+  // 每个组合 × 每个时段生成 2-3 条数据
   for (const combo of combos) {
-    const count = 3 + Math.floor(pseudoRandom(id * 77) * 2)
-    for (let j = 0; j < count; j++) {
-      const seed = id * 100
-      const algorithmType = algorithmTypes[Math.floor(pseudoRandom(seed + 1) * algorithmTypes.length)]
-      const names = algorithmNames[algorithmType]
-      const algorithmName = names[Math.floor(pseudoRandom(seed + 2) * names.length)]
-      
-      data.push({
-        id,
-        slotIndex: j + 1,
-        businessChannel: combo.businessChannel,
-        pageLocation: combo.pageLocation,
-        app: 'shanfeng',
-        position: j + 1,
-        algorithmId: Math.floor(pseudoRandom(seed + 3) * 10) + 1,
-        algorithmName,
-        algorithmType,
-        weight: Math.floor(pseudoRandom(seed + 4) * 50) + 40,
-        status: pseudoRandom(seed + 5) > 0.2 ? 'active' : 'inactive',
-        updatedBy: users[Math.floor(pseudoRandom(seed + 6) * users.length)],
-        updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} ${String(8 + Math.floor(pseudoRandom(seed + 7) * 12)).padStart(2, '0')}:${String(Math.floor(pseudoRandom(seed + 8) * 60)).padStart(2, '0')}:00`,
-      })
-      id++
+    for (const ts of timeSlots) {
+      const count = 2 + Math.floor(pseudoRandom(id * 77) * 2)
+      for (let j = 0; j < count; j++) {
+        const seed = id * 100
+        const algorithmType = algorithmTypes[Math.floor(pseudoRandom(seed + 1) * algorithmTypes.length)]
+        const names = algorithmNames[algorithmType]
+        const algorithmName = names[Math.floor(pseudoRandom(seed + 2) * names.length)]
+        
+        data.push({
+          id,
+          slotIndex: j + 1,
+          businessChannel: combo.businessChannel,
+          pageLocation: combo.pageLocation,
+          timeSlot: ts,
+          app: 'shanfeng',
+          position: j + 1,
+          algorithmId: Math.floor(pseudoRandom(seed + 3) * 10) + 1,
+          algorithmName,
+          algorithmType,
+          weight: Math.floor(pseudoRandom(seed + 4) * 50) + 40,
+          status: pseudoRandom(seed + 5) > 0.2 ? 'active' : 'inactive',
+          updatedBy: users[Math.floor(pseudoRandom(seed + 6) * users.length)],
+          updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} ${String(8 + Math.floor(pseudoRandom(seed + 7) * 12)).padStart(2, '0')}:${String(Math.floor(pseudoRandom(seed + 8) * 60)).padStart(2, '0')}:00`,
+        })
+        id++
+      }
     }
   }
   
@@ -185,15 +210,27 @@ export default function PromotionSlotConfig() {
   const [boothControlForm] = Form.useForm()
   const [maxSlotCount, setMaxSlotCount] = useState(15)
 
-  // 当前Tab：从URL读取，默认 food
-  const activeTab = searchParams.get('tab') || 'food'
+  // 当前Tab：从URL读取，默认 home
+  const activeTab = searchParams.get('tab') || 'home'
+  // 当前时段Tab，默认 breakfast
+  const [activeTimeSlot, setActiveTimeSlot] = useState('breakfast')
 
   // 当前Tab配置
-  const tabConfig = TAB_CONFIG[activeTab] || TAB_CONFIG.food
+  const tabConfig = TAB_CONFIG[activeTab] || TAB_CONFIG.home
 
   // 切换Tab时重置搜索并更新URL
   const handleTabChange = (key: string) => {
     setSearchParams({ tab: key })
+    setActiveTimeSlot('breakfast')
+    searchForm.resetFields()
+    searchForm.setFieldsValue({ app: 'shanfeng' })
+    setFilteredData([])
+    setSearched(false)
+  }
+
+  // 切换时段Tab时重置搜索
+  const handleTimeSlotChange = (key: string) => {
+    setActiveTimeSlot(key)
     searchForm.resetFields()
     searchForm.setFieldsValue({ app: 'shanfeng' })
     setFilteredData([])
@@ -202,9 +239,16 @@ export default function PromotionSlotConfig() {
 
   // 初始化时按默认Tab查询
   useEffect(() => {
-    const defaultData = mockData.filter(
-      item => item.businessChannel === activeTab && item.app === 'shanfeng'
-    )
+    let defaultData: WaterfallSlotConfig[]
+    if (activeTab === 'home') {
+      defaultData = mockData.filter(
+        item => item.pageLocation === 'home' && item.app === 'shanfeng'
+      )
+    } else {
+      defaultData = mockData.filter(
+        item => item.businessChannel === activeTab && item.app === 'shanfeng'
+      )
+    }
     setFilteredData(defaultData)
     setSearched(true)
   }, [])
@@ -215,12 +259,12 @@ export default function PromotionSlotConfig() {
   
   // 手机模型标题
   const phoneTitle = currentPageLocation
-    ? `${PAGE_LOCATION_FULL_LABEL[currentPageLocation]}-${BUSINESS_CHANNEL_LABEL[activeTab]}-${APP_LABEL[currentApp]}`
-    : `${BUSINESS_CHANNEL_LABEL[activeTab]}-${APP_LABEL[currentApp]}`
+    ? `${PAGE_LOCATION_FULL_LABEL[currentPageLocation]}-${activeTab === 'home' ? '全部頻道' : BUSINESS_CHANNEL_LABEL[activeTab]}-${APP_LABEL[currentApp]}`
+    : `${activeTab === 'home' ? '大首頁' : BUSINESS_CHANNEL_LABEL[activeTab]}-${APP_LABEL[currentApp]}`
 
-  // 新增 - 跳转到新页面
+    // 新增 - 打开弹窗
   const handleAdd = () => {
-    navigate('/promotion-slot-config-add')
+    setAddModalVisible(true)
   }
 
   // 提交新增
@@ -229,34 +273,36 @@ export default function PromotionSlotConfig() {
       const values = await addForm.validateFields()
       
       const maxId = filteredData.length > 0 ? Math.max(...filteredData.map(d => d.id)) : 0
-      const maxPosition = filteredData.length > 0 ? Math.max(...filteredData.map(d => d.position)) : 0
       
-      const algorithmTypeNames: Record<string, string[]> = {
-        invincibleStar: ['無敵星星-首頁版', '無敵星星-外賣版', '無敵星星-團購版'],
-        youLike: ['猜你喜歡-主力版', '猜你喜歡-週末版', '猜你喜歡-夜間版'],
-        newShopAd: ['新店廣告-首頁版', '新店廣告-早餐版', '新店廣告-午市版'],
-        activateAd: ['盤活復蘇-首頁版', '盤活復蘇-午市版', '盤活復蘇-晚市版'],
-        exclusiveShop: ['獨家商家-首頁版', '獨家商家-超市版', '獨家商家-晚市版'],
+      const algorithmTypeNames: Record<string, string> = {
+        invincibleStar: '無敵星星',
+        youLike: '猜你喜歡',
+        newShopAd: '新店廣告',
+        activateAd: '盤活復蘇',
+        exclusiveShop: '獨家商家',
+        trafficAd: '流量廣告',
+        organicTraffic: '自然流量',
+        searchAlgorithm: '搜索算法',
       }
       
-      const algorithmNames = algorithmTypeNames[values.algorithmType]
-      const algorithmName = algorithmNames[0]
+      const algorithmName = algorithmTypeNames[values.algorithmType] || values.algorithmType
       
       const now = new Date()
       const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
       
       const newRecord: WaterfallSlotConfig = {
         id: maxId + 1,
-        slotIndex: maxPosition + 1,
-        businessChannel: activeTab,
-        pageLocation: values.pageLocation || tabConfig.pageLocations[0],
+        slotIndex: values.position,
+        businessChannel: activeTab === 'home' ? 'food' : activeTab,
+        pageLocation: tabConfig.pageLocations[0],
+        timeSlot: activeTimeSlot,
         app: values.app,
-        position: values.position || (maxPosition + 1),
-        algorithmId: values.algorithmId,
+        position: values.position,
+        algorithmId: maxId + 1,
         algorithmName,
         algorithmType: values.algorithmType,
-        weight: values.weight,
-        status: values.status,
+        weight: 50,
+        status: 'active',
         updatedBy: 'admin',
         updatedAt: timeStr,
       }
@@ -265,6 +311,7 @@ export default function PromotionSlotConfig() {
       setFilteredData(newData)
       setSearched(true)
       setAddModalVisible(false)
+      addForm.resetFields()
       message.success('新增成功')
     } catch (error) {
       console.error('新增失败:', error)
@@ -296,7 +343,7 @@ export default function PromotionSlotConfig() {
       : 0
     
     boothControlForm.setFieldsValue({
-      businessChannel: BUSINESS_CHANNEL_LABEL[activeTab] || activeTab,
+      businessChannel: activeTab === 'home' ? '大首頁(全部)' : (BUSINESS_CHANNEL_LABEL[activeTab] || activeTab),
       app: APP_LABEL[currentAppVal] || currentAppVal,
       maxSlotCount: currentMaxPosition,
     })
@@ -344,8 +391,13 @@ export default function PromotionSlotConfig() {
   }
   const handleSearch = () => {
     const values = searchForm.getFieldsValue()
-    // 先按当前Tab过滤业务频道
-    let result = mockData.filter(item => item.businessChannel === activeTab)
+    // 先按当前Tab过滤：大首頁按pageLocation，其他按businessChannel
+    let result = activeTab === 'home'
+      ? mockData.filter(item => item.pageLocation === 'home')
+      : mockData.filter(item => item.businessChannel === activeTab)
+    
+    // 时段过滤
+    result = result.filter(item => item.timeSlot === activeTimeSlot)
     
     // 页面位置
     if (values.pageLocation) {
@@ -470,13 +522,6 @@ export default function PromotionSlotConfig() {
       ),
     },
     {
-      title: '算法落地頁',
-      dataIndex: 'pageLocation',
-      key: 'placementInterface',
-      width: 140,
-      render: (v: string) => PLACEMENT_LABEL[v] || '-',
-    },
-    {
       title: '展示位置',
       dataIndex: 'position',
       key: 'position',
@@ -561,11 +606,12 @@ export default function PromotionSlotConfig() {
   return (
     <div className="content-area">
       {/* 业务频道 Tab */}
-      <div style={{ marginBottom: 16, borderBottom: '1px solid #f0f0f0' }}>
+      <div style={{ marginBottom: 0, borderBottom: '1px solid #f0f0f0' }}>
         <Tabs
           activeKey={activeTab}
           onChange={handleTabChange}
           items={[
+            { key: 'home', label: '大首頁' },
             { key: 'food', label: '美食外賣' },
             { key: 'supermarket', label: '超市百貨' },
             { key: 'groupBuy', label: '團購到店' },
@@ -573,30 +619,57 @@ export default function PromotionSlotConfig() {
         />
       </div>
 
+      {/* 时段子 Tab */}
+      <div style={{ marginBottom: 16, paddingLeft: 8 }}>
+        <Tabs
+          activeKey={activeTimeSlot}
+          onChange={handleTimeSlotChange}
+          size="small"
+          items={TIME_SLOT_CONFIG.map(ts => ({
+            key: ts.key,
+            label: (
+              <span style={{ fontSize: 13, color: activeTimeSlot === ts.key ? '#E8720C' : '#8C8C8C' }}>
+                {ts.label} <span style={{ fontSize: 11, color: '#BFBFBF' }}>{ts.timeRange}</span>
+              </span>
+            ),
+          }))}
+        />
+      </div>
+
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="页面位置" name="pageLocation">
+          {/* 所屬品牌 - 突出显示 */}
+          <Form.Item 
+            label={
+              <span style={{ 
+                fontWeight: 600, 
+                color: '#E8720C',
+                fontSize: 14
+              }}>
+                所屬品牌
+              </span>
+            }
+            name="app" 
+            initialValue="shanfeng"
+            style={{
+              background: 'linear-gradient(135deg, #FFF7E6 0%, #FFE7BA 100%)',
+              padding: '4px 12px',
+              borderRadius: 6,
+              border: '1px solid #FFD591',
+              marginRight: 16
+            }}
+          >
             <Select 
-              placeholder="全部"
-              allowClear
-              options={tabConfig.pageLocationOptions}
-            />
-          </Form.Item>
-          <Form.Item label="配置ID" name="id">
-            <Input 
-              placeholder="請輸入配置ID" 
-              allowClear
-            />
-          </Form.Item>
-          <Form.Item label="所屬品牌" name="app" initialValue="shanfeng">
-            <Select 
-              placeholder="全部"
+              placeholder="請選擇品牌"
+              style={{ 
+                minWidth: 120,
+                fontWeight: 500
+              }}
               options={[
                 { label: '閃峰', value: 'shanfeng' },
                 { label: 'mFood', value: 'mfood' },
               ]}
-              allowClear
             />
           </Form.Item>
           <Form.Item label="展示位置" name="position">
@@ -607,6 +680,19 @@ export default function PromotionSlotConfig() {
                 label: `${i + 1}號位`,
                 value: i + 1,
               }))}
+            />
+          </Form.Item>
+          <Form.Item label="廣告類型" name="algorithmType">
+            <Select 
+              placeholder="全部"
+              allowClear
+              options={[
+                { label: '無敵星星', value: 'invincibleStar' },
+                { label: '猜你喜歡', value: 'youLike' },
+                { label: '新店廣告', value: 'newShopAd' },
+                { label: '盤活復蘇', value: 'activateAd' },
+                { label: '獨家商家', value: 'exclusiveShop' },
+              ]}
             />
           </Form.Item>
           <Form.Item label="算法ID" name="algorithmId">
@@ -621,17 +707,10 @@ export default function PromotionSlotConfig() {
               allowClear
             />
           </Form.Item>
-          <Form.Item label="廣告類型" name="algorithmType">
-            <Select 
-              placeholder="全部"
+          <Form.Item label="配置ID" name="id">
+            <Input 
+              placeholder="請輸入配置ID" 
               allowClear
-              options={[
-                { label: '無敵星星', value: 'invincibleStar' },
-                { label: '猜你喜歡', value: 'youLike' },
-                { label: '新店廣告', value: 'newShopAd' },
-                { label: '盤活復蘇', value: 'activateAd' },
-                { label: '獨家商家', value: 'exclusiveShop' },
-              ]}
             />
           </Form.Item>
           <Form.Item label="狀態" name="status">
@@ -761,12 +840,6 @@ export default function PromotionSlotConfig() {
                 <Space>
                   <Button type="primary" onClick={handleAdd}>
                     <PlusOutlined /> 新增
-                  </Button>
-                  <Button onClick={handleBatchEdit}>
-                    <EditOutlined /> 批量修改
-                  </Button>
-                  <Button onClick={handleBoothControl}>
-                    <ControlOutlined /> 展位管控
                   </Button>
                 </Space>
               }
@@ -905,12 +978,6 @@ export default function PromotionSlotConfig() {
                   <Button type="primary" onClick={handleAdd}>
                     <PlusOutlined /> 新增
                   </Button>
-                  <Button onClick={handleBatchEdit}>
-                    <EditOutlined /> 批量修改
-                  </Button>
-                  <Button onClick={handleBoothControl}>
-                    <ControlOutlined /> 展位管控
-                  </Button>
                 </Space>
               }
               style={{ borderRadius: 8 }}
@@ -947,39 +1014,16 @@ export default function PromotionSlotConfig() {
           style={{ marginTop: 24 }}
         >
           <Form.Item
-            label="页面位置"
-            name="pageLocation"
-            initialValue={tabConfig.pageLocations[0]}
-            rules={[{ required: true, message: '請選擇頁面位置' }]}
-          >
-            <Select
-              options={tabConfig.pageLocationOptions}
-            />
-          </Form.Item>
-
-          <Form.Item
             label="所屬品牌"
             name="app"
             rules={[{ required: true, message: '請選擇所屬品牌' }]}
           >
             <Select
+              placeholder="請選擇所屬品牌"
               options={[
                 { label: '閃峰', value: 'shanfeng' },
                 { label: 'mFood', value: 'mfood' },
               ]}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="展示位置"
-            name="position"
-            rules={[{ required: true, message: '請輸入展示位置' }]}
-          >
-            <InputNumber
-              min={1}
-              max={100}
-              style={{ width: '100%' }}
-              placeholder="請輸入位置序號(如: 1, 2, 3...)"
             />
           </Form.Item>
 
@@ -989,52 +1033,31 @@ export default function PromotionSlotConfig() {
             rules={[{ required: true, message: '請選擇廣告類型' }]}
           >
             <Select
+              placeholder="請選擇廣告類型"
               options={[
                 { label: '無敵星星', value: 'invincibleStar' },
-                { label: '猜你喜歡', value: 'youLike' },
                 { label: '新店廣告', value: 'newShopAd' },
                 { label: '盤活復蘇', value: 'activateAd' },
                 { label: '獨家商家', value: 'exclusiveShop' },
+                { label: '流量廣告', value: 'trafficAd' },
+                { label: '猜你喜歡', value: 'youLike' },
+                { label: '自然流量', value: 'organicTraffic' },
+                { label: '搜索算法', value: 'searchAlgorithm' },
               ]}
             />
           </Form.Item>
 
           <Form.Item
-            label="算法ID"
-            name="algorithmId"
-            rules={[{ required: true, message: '請輸入算法ID' }]}
-          >
-            <InputNumber
-              min={1}
-              max={1000}
-              style={{ width: '100%' }}
-              placeholder="請輸入算法ID"
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="權重分"
-            name="weight"
-            rules={[{ required: true, message: '請輸入權重分' }]}
-          >
-            <InputNumber
-              min={0}
-              max={100}
-              style={{ width: '100%' }}
-              placeholder="請輸入權重分(0-100)"
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="狀態"
-            name="status"
-            rules={[{ required: true, message: '請選擇狀態' }]}
+            label="展示位置"
+            name="position"
+            rules={[{ required: true, message: '請選擇展示位置' }]}
           >
             <Select
-              options={[
-                { label: '啟用', value: 'active' },
-                { label: '停用', value: 'inactive' },
-              ]}
+              placeholder="請選擇展示位置"
+              options={Array.from({ length: parseInt(localStorage.getItem('waterfall_max_slot_count') || '20') }, (_, i) => ({
+                label: `${i + 1}號位`,
+                value: i + 1,
+              }))}
             />
           </Form.Item>
         </Form>

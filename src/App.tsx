@@ -74,6 +74,8 @@ const PromotionWaterfallAdd = lazy(() => import('./pages/Recommend/WaterfallAdd'
 const PromotionSlotConfig = lazy(() => import('./pages/PromotionSlotConfig'))
 const PromotionSlotConfigAdd = lazy(() => import('./pages/PromotionSlotConfigAdd'))
 const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
+// 广告销售（独立页面，不复用店铺推广组件）
+const AdSales = lazy(() => import('./pages/AdSales'))
 const PromotionOrderManage = lazy(() => import('./pages/PromotionOrderManage'))
 // 推广通 - 報表分析
 const PromotionReportOverview = lazy(() => import('./pages/PromotionReport/Overview'))
@@ -172,8 +174,10 @@ function AuthenticatedLayout() {
               <Route path="/promotion-slot-config" element={<PromotionSlotConfig />} />
               <Route path="/promotion-slot-config-add" element={<PromotionSlotConfigAdd />} />
               <Route path="/promotion-waterfall" element={<PromotionWaterfall />} />
+              <Route path="/promotion-waterfall1" element={<PromotionWaterfall />} />
               <Route path="/promotion-waterfall-add" element={<PromotionWaterfallAdd />} />
               <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
+              <Route path="/ad-sales" element={<AdSales />} />
               <Route path="/promotion-order-manage" element={<PromotionOrderManage />} />
               {/* 推广通 - 報表分析 */}
               <Route path="/promotion-report-overview" element={<PromotionReportOverview />} />

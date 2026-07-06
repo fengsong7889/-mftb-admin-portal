@@ -18,7 +18,7 @@ import {
   generateMockInventory,
 } from './types'
 
-export default function PromotionSalesConfig() {
+export default function AdSales() {
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null)
   const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(null)
@@ -209,7 +209,7 @@ export default function PromotionSalesConfig() {
           <div>
             <h2 style={{ margin: 0, fontSize: 20 }}>
               <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
-              店鋪推廣
+              广告销售
             </h2>
             <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
               可根據需求選擇推薦類型，為您的店鋪購買廣告曝光位，獲取流量

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import { Tag, Button, Space, Divider, message, Alert, DatePicker, Table, Empty, Modal } from 'antd'
-import { ShoppingCartOutlined, CheckCircleFilled, CalendarOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Tag, Button, Space, Divider, message, Alert, DatePicker, Table, Empty, Modal, Select } from 'antd'
+import { ShoppingCartOutlined, CheckCircleFilled, CalendarOutlined, DeleteOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
 import dayjs from 'dayjs'
@@ -31,6 +31,8 @@ interface CartItem {
   originalPrice: number  // 原价
   discount: number       // 折扣
   salePrice: number      // 售价
+  storeId: string        // 店铺ID
+  storeName: string      // 店铺名称
 }
 
 /** 购物车展平行 */
@@ -45,6 +47,15 @@ interface DayPickerProps {
   inventoryItem: InventoryItem
 }
 
+/** Mock数据 - 店铺列表 */
+const MOCK_STORES = [
+  { id: 'store-001', name: '威尼斯人酒店' },
+  { id: 'store-002', name: '皇朝廣場店' },
+  { id: 'store-003', name: '黑馬仕美食街' },
+  { id: 'store-004', name: '新葡京旗艦店' },
+  { id: 'store-005', name: '官也街老店' },
+]
+
 export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const navigate = useNavigate()
   const [selectedDates, setSelectedDates] = useState<string[]>([])
@@ -53,6 +64,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [merchantBalance, setMerchantBalance] = useState(15800)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
+  const [selectedStore, setSelectedStore] = useState<string | undefined>(undefined)
 
   // 获取可售日期范围
   const startDate = dayjs(inventoryItem.availableStartDate)
@@ -165,10 +177,16 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       message.warning('請先選擇購買日期')
       return
     }
+    if (!selectedStore) {
+      message.warning('請先選擇店鋪')
+      return
+    }
     const days = selectedDates.length
     const basePrice = inventoryItem.dailyPrice * days
     const discount = currentDiscount?.discount ?? 100
     const salePrice = Math.round(basePrice * discount / 100)
+
+    const storeInfo = MOCK_STORES.find(s => s.id === selectedStore)
 
     const newItem: CartItem = {
       key: `cart-${Date.now()}`,
@@ -177,6 +195,8 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       originalPrice: basePrice,
       discount,
       salePrice,
+      storeId: selectedStore,
+      storeName: storeInfo?.name || '-',
     }
     setCartItems(prev => [...prev, newItem])
     message.success(`已加購 ${days} 天`)
@@ -469,6 +489,35 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
               <span style={{ color: '#fa541c' }}>MOP {pendingPrice}</span>
             </div>
           )}
+
+          {/* 选择店铺 */}
+          <div style={{ 
+            padding: '10px 12px', 
+            background: '#fff', 
+            borderRadius: 6, 
+            border: '1px solid #b7eb8f',
+            marginTop: 12,
+          }}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>
+              <ShopOutlined style={{ marginRight: 4 }} />
+              選擇店鋪 <span style={{ color: '#ff4d4f' }}>*</span>
+            </div>
+            <Select
+              showSearch
+              placeholder="請輸入店鋪名稱或ID搜索"
+              value={selectedStore}
+              onChange={(value) => setSelectedStore(value)}
+              allowClear
+              style={{ width: '100%' }}
+              filterOption={(input, option) => {
+                const keyword = input.toLowerCase()
+                const label = (option?.label ?? '').toString().toLowerCase()
+                const value = (option?.value ?? '').toString().toLowerCase()
+                return label.includes(keyword) || value.includes(keyword)
+              }}
+              options={MOCK_STORES.map(s => ({ label: `${s.name} (${s.id.replace('store-', '')})`, value: s.id }))}
+            />
+          </div>
 
           <Button
             type="primary"

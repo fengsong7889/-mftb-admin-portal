@@ -62,17 +62,76 @@ export const ALGORITHM_TYPE_OPTIONS = [
   { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
 ]
 
-/** 区域 */
+/** 区域（与地圖規劃商圈数据一致） */
 export enum Region {
-  MACAU = 1,
-  TAIPA = 2,
-  ZHUHAI = 3,
+  // 澳門區域
+  KOKSAA = 1,         // 黑沙環區
+  COSTA = 2,          // 高士德區
+  SANMA = 3,          // 新馬路區
+  SANWONG = 4,        // 新皇朝區
+  HKM = 5,            // 港珠澳區
+  // 氹仔區域
+  FAHUA = 6,          // 花城市區
+  AIRPORT = 7,        // 北安機場
+  LHOTEL = 8,         // 左酒店區
+  RHOTEL = 9,         // 右酒店區
+  UM = 10,            // 澳大專區
+  HACS = 11,          // 黑沙灘區
 }
 
 export const REGION_OPTIONS = [
-  { label: '澳門', value: Region.MACAU },
-  { label: '氹仔', value: Region.TAIPA },
-  { label: '珠海', value: Region.ZHUHAI },
+  { label: '黑沙環區', value: Region.KOKSAA },
+  { label: '高士德區', value: Region.COSTA },
+  { label: '新馬路區', value: Region.SANMA },
+  { label: '新皇朝區', value: Region.SANWONG },
+  { label: '港珠澳區', value: Region.HKM },
+  { label: '花城市區', value: Region.FAHUA },
+  { label: '北安機場', value: Region.AIRPORT },
+  { label: '左酒店區', value: Region.LHOTEL },
+  { label: '右酒店區', value: Region.RHOTEL },
+  { label: '澳大專區', value: Region.UM },
+  { label: '黑沙灘區', value: Region.HACS },
+]
+
+/** 区域父节点值（用于TreeSelect二级选择） */
+export const AREA_PARENT_VALUES = {
+  MACAU_AREA: 'macau_area',
+  TAIPA_AREA: 'taipa_area',
+} as const
+
+/** 区域 → 商圈映射（用于选择区域时过滤） */
+export const AREA_TO_REGIONS: Record<string, Region[]> = {
+  [AREA_PARENT_VALUES.MACAU_AREA]: [Region.KOKSAA, Region.COSTA, Region.SANMA, Region.SANWONG, Region.HKM],
+  [AREA_PARENT_VALUES.TAIPA_AREA]: [Region.FAHUA, Region.AIRPORT, Region.LHOTEL, Region.RHOTEL, Region.UM, Region.HACS],
+}
+
+/** 商圈树形数据（与地圖規劃一致，支持二级选择） */
+export const REGION_TREE_DATA = [
+  {
+    value: AREA_PARENT_VALUES.MACAU_AREA,
+    title: '澳門區域',
+    selectable: true,
+    children: [
+      { value: Region.KOKSAA, title: '黑沙環區' },
+      { value: Region.COSTA, title: '高士德區' },
+      { value: Region.SANMA, title: '新馬路區' },
+      { value: Region.SANWONG, title: '新皇朝區' },
+      { value: Region.HKM, title: '港珠澳區' },
+    ],
+  },
+  {
+    value: AREA_PARENT_VALUES.TAIPA_AREA,
+    title: '氹仔區域',
+    selectable: true,
+    children: [
+      { value: Region.FAHUA, title: '花城市區' },
+      { value: Region.AIRPORT, title: '北安機場' },
+      { value: Region.LHOTEL, title: '左酒店區' },
+      { value: Region.RHOTEL, title: '右酒店區' },
+      { value: Region.UM, title: '澳大專區' },
+      { value: Region.HACS, title: '黑沙灘區' },
+    ],
+  },
 ]
 
 /** 订单状态 */
