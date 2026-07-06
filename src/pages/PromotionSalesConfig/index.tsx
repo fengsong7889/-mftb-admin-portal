@@ -18,6 +18,18 @@ import {
   generateMockInventory,
 } from './types'
 
+/** 業務頻道標籤與選項 */
+const BIZ_CHANNEL_LABEL: Record<string, string> = {
+  food: '美食外賣',
+  supermarket: '超市百貨',
+  groupBuy: '團購到店',
+}
+const BIZ_CHANNEL_OPTIONS = [
+  { label: '美食外賣', value: 'food' },
+  { label: '超市百貨', value: 'supermarket' },
+  { label: '團購到店', value: 'groupBuy' },
+]
+
 export default function PromotionSalesConfig() {
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(null)
@@ -28,6 +40,7 @@ export default function PromotionSalesConfig() {
   const [searchAdId, setSearchAdId] = useState<string>('')
   const [searchAdName, setSearchAdName] = useState<string>('')
   const [searchChannel, setSearchChannel] = useState<RecommendChannel | null | undefined>(null)
+  const [searchBizChannel, setSearchBizChannel] = useState<string | null | undefined>(null)
   const [searchDateRange, setSearchDateRange] = useState<[any, any] | null>(null)
   const [searchInventoryStatus, setSearchInventoryStatus] = useState<'has' | 'none' | null | undefined>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -78,6 +91,10 @@ export default function PromotionSalesConfig() {
     if (searchChannel !== null && searchChannel !== undefined) {
       data = data.filter(item => item.channel === searchChannel)
     }
+    // 業務頻道篩選
+    if (searchBizChannel !== null && searchBizChannel !== undefined) {
+      data = data.filter(item => item.bizChannel === searchBizChannel)
+    }
     // 可购买日期筛选
     if (searchDateRange && searchDateRange[0] && searchDateRange[1]) {
       const start = searchDateRange[0].format('YYYY-MM-DD')
@@ -91,7 +108,7 @@ export default function PromotionSalesConfig() {
       data = data.filter(item => item.soldSlots >= item.totalSlots)
     }
     return data
-  }, [inventoryData, selectedSlotPosition, searchAdId, searchAdName, searchChannel, searchDateRange, searchInventoryStatus])
+  }, [inventoryData, selectedSlotPosition, searchAdId, searchAdName, searchChannel, searchBizChannel, searchDateRange, searchInventoryStatus])
 
   // 推荐类型选择 - 直接进入库存数据界面
   const handleSelectType = (config: RecommendTypeConfig) => {
@@ -157,6 +174,16 @@ export default function PromotionSalesConfig() {
       key: 'channel',
       width: 150,
       render: (v: RecommendChannel) => CHANNEL_LABEL[v],
+    },
+    {
+      title: '業務頻道',
+      key: 'bizChannel',
+      width: 110,
+      align: 'center',
+      render: (_: unknown, record: InventoryItem) => {
+        const biz = record.bizChannel || ''
+        return biz ? <Tag color="blue">{BIZ_CHANNEL_LABEL[biz]}</Tag> : '-'
+      },
     },
     {
       title: '可購買日期',
@@ -386,6 +413,15 @@ export default function PromotionSalesConfig() {
                   }
                 />
               </Form.Item>
+              <Form.Item label="業務頻道">
+                <Select
+                  placeholder="全部"
+                  value={searchBizChannel}
+                  onChange={(value) => setSearchBizChannel(value)}
+                  allowClear
+                  options={BIZ_CHANNEL_OPTIONS}
+                />
+              </Form.Item>
               <Form.Item label="可購買日期">
                 <DatePicker.RangePicker
                   value={searchDateRange as any}
@@ -413,6 +449,7 @@ export default function PromotionSalesConfig() {
                     setSearchAdId('')
                     setSearchAdName('')
                     setSearchChannel(null)
+                    setSearchBizChannel(null)
                     setSearchDateRange(null)
                     setSearchInventoryStatus(null)
                   }}>重置</Button>

@@ -109,6 +109,7 @@ export interface WaterfallSlotConfig {
   promotionName?: string                // 广告名称
   app: AppType                        // 所属品牌
   channel: RecommendChannel           // 业务频道
+  bizChannel?: string                 // 業務頻道（food/supermarket/groupBuy）
   slotPosition: number                // 展示位置(坑位序号)
   region?: Region                     // 展示区域
   algorithmId: number                 // 关联算法ID

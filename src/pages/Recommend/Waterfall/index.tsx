@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker } from 'antd'
+import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker, Tabs } from 'antd'
 const { RangePicker } = DatePicker
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, LayoutOutlined, ArrowLeftOutlined, AppstoreOutlined, WalletOutlined } from '@ant-design/icons'
@@ -33,11 +33,37 @@ const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: st
 ]
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '大首頁',
-  [RecommendChannel.DELIVERY]: '外賣頻道',
-  [RecommendChannel.SUPERMARKET]: '超市百貨',
-  [RecommendChannel.GROUP_BUY]: '團購到店',
+  [RecommendChannel.HOME]: '大首頁-Feed',
+  [RecommendChannel.DELIVERY]: '外賣頻道-Feed',
+  [RecommendChannel.SUPERMARKET]: '超市頻道-Feed',
+  [RecommendChannel.GROUP_BUY]: '團購頻道-Feed',
 }
+
+/** 展示頁面選項（與廣告銷售一致） */
+const CHANNEL_OPTIONS = [
+  { label: '大首頁-Feed', value: RecommendChannel.HOME },
+  { label: '外賣頻道-Feed', value: RecommendChannel.DELIVERY },
+  { label: '超市頻道-Feed', value: RecommendChannel.SUPERMARKET },
+  { label: '團購頻道-Feed', value: RecommendChannel.GROUP_BUY },
+]
+
+/** 業務頻道映射（由展示頁面推导） */
+const CHANNEL_TO_BIZ: Record<number, string> = {
+  [RecommendChannel.DELIVERY]: 'food',
+  [RecommendChannel.SUPERMARKET]: 'supermarket',
+  [RecommendChannel.GROUP_BUY]: 'groupBuy',
+}
+const BIZ_CHANNEL_POOL = ['food', 'supermarket', 'groupBuy']
+const BIZ_CHANNEL_LABEL: Record<string, string> = {
+  food: '美食外賣',
+  supermarket: '超市百貨',
+  groupBuy: '團購到店',
+}
+const BIZ_CHANNEL_OPTIONS = [
+  { label: '美食外賣', value: 'food' },
+  { label: '超市百貨', value: 'supermarket' },
+  { label: '團購到店', value: 'groupBuy' },
+]
 
 const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
@@ -65,6 +91,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
 const generateMockData = (): WaterfallSlotConfig[] => {
   const data: WaterfallSlotConfig[] = []
   const channels = [
+    RecommendChannel.HOME,
     RecommendChannel.DELIVERY,
     RecommendChannel.GROUP_BUY,
     RecommendChannel.SUPERMARKET,
@@ -126,6 +153,10 @@ const generateMockData = (): WaterfallSlotConfig[] => {
       
       const app = apps[Math.floor(pseudoRandom(seed + 1) * apps.length)]
       const channel = channels[Math.floor(pseudoRandom(seed + 2) * channels.length)]
+      // 大首頁隨機分配業務頻道，其他頻道直接映射
+      const bizChannel = channel === RecommendChannel.HOME
+        ? BIZ_CHANNEL_POOL[Math.floor(pseudoRandom(seed + 30) * BIZ_CHANNEL_POOL.length)]
+        : CHANNEL_TO_BIZ[channel]
       const slotPosition = 1 + Math.floor(pseudoRandom(seed + 3) * 10)
       const algorithm = cfg.algorithm
       const status = j < 10 ? ServiceStatus.ENABLED : ServiceStatus.DISABLED
@@ -141,6 +172,7 @@ const generateMockData = (): WaterfallSlotConfig[] => {
         promotionName,
         app,
         channel,
+        bizChannel,
         slotPosition,
         region: [Region.KOKSAA, Region.COSTA, Region.SANMA, Region.FAHUA, Region.AIRPORT][Math.floor(pseudoRandom(seed + 8) * 5)],
         algorithmId: algorithm.id,
@@ -175,6 +207,7 @@ export default function Waterfall() {
   const urlType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
   const [searchForm] = Form.useForm()
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(urlType) // null = 卡片选择页
+  const [bizTypeTab, setBizTypeTab] = useState<string>('delivery') // 外賣到家 / 團購到店
   const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>(mockData)
   const [modalVisible, setModalVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -232,6 +265,10 @@ export default function Waterfall() {
     
     if (values.channel !== undefined && values.channel !== null) {
       result = result.filter(item => item.channel === values.channel)
+    }
+
+    if (values.bizChannel !== undefined && values.bizChannel !== null) {
+      result = result.filter(item => item.bizChannel === values.bizChannel)
     }
 
     if (values.slotPosition !== undefined && values.slotPosition !== null) {
@@ -355,6 +392,7 @@ export default function Waterfall() {
     { key: 'promotionName', title: '廣告名稱' },
     { key: 'app', title: '所屬品牌' },
     { key: 'channel', title: '展示頁面' },
+    { key: 'bizChannel', title: '業務頻道' },
     { key: 'algorithmId', title: '關聯算法ID' },
     { key: 'algorithmName', title: '關聯算法名稱' },
     { key: 'salesStartDate', title: '銷售日期起' },
@@ -410,6 +448,16 @@ export default function Waterfall() {
       key: 'channel', 
       width: 140,
       render: (v: RecommendChannel) => CHANNEL_LABEL[v],
+    },
+    {
+      title: '業務頻道',
+      key: 'bizChannel',
+      width: 110,
+      align: 'center',
+      render: (_: unknown, record: WaterfallSlotConfig) => {
+        const biz = record.bizChannel || ''
+        return biz ? <Tag color="blue">{BIZ_CHANNEL_LABEL[biz]}</Tag> : '-'
+      },
     },
     {
       title: '關聯算法ID',
@@ -560,6 +608,15 @@ export default function Waterfall() {
         </Card>
 
         <Card title="請選擇廣告類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+          <Tabs
+            activeKey={bizTypeTab}
+            onChange={setBizTypeTab}
+            items={[
+              { key: 'delivery', label: '外賣到家' },
+              { key: 'groupBuy', label: '團購到店' },
+            ]}
+            style={{ marginBottom: 8 }}
+          />
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -637,9 +694,12 @@ export default function Waterfall() {
           <Form.Item label="展示頁面" name="channel">
             <Select 
               placeholder="全部" 
-              options={RECOMMEND_CHANNEL_OPTIONS} 
+              options={CHANNEL_OPTIONS} 
               allowClear
             />
+          </Form.Item>
+          <Form.Item label="業務頻道" name="bizChannel">
+            <Select placeholder="全部" options={BIZ_CHANNEL_OPTIONS} allowClear />
           </Form.Item>
           <Form.Item label="關聯算法名稱" name="algorithm">
             <Input placeholder="算法名稱/ID" allowClear />
@@ -769,7 +829,7 @@ export default function Waterfall() {
               name="channel" 
               rules={[{ required: true, message: '請選擇展示頁面' }]}
             >
-              <Select placeholder="請選擇" options={RECOMMEND_CHANNEL_OPTIONS} />
+              <Select placeholder="請選擇" options={CHANNEL_OPTIONS} />
             </Form.Item>
 
             <Form.Item 

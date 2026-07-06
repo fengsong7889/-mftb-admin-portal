@@ -34,6 +34,7 @@ export interface InventoryItem {
   promotionName: string           // 广告名称
   app: AppType                    // 所属品牌
   channel: RecommendChannel       // 业务频道
+  bizChannel?: string             // 業務頻道（food/supermarket/groupBuy）
   slotPosition: number            // 展示位置
   dailyPrice: number              // 单日单价 (MOP)
   availableStartDate: string      // 可购买日期起
@@ -134,6 +135,14 @@ export const CHANNEL_LABEL: Record<RecommendChannel, string> = {
   [RecommendChannel.SUPERMARKET]: '超市頻道-Feed',
 }
 
+/** 展示頁面 → 業務頻道映射 */
+const CHANNEL_TO_BIZ: Record<number, string> = {
+  [RecommendChannel.DELIVERY]: 'food',
+  [RecommendChannel.SUPERMARKET]: 'supermarket',
+  [RecommendChannel.GROUP_BUY]: 'groupBuy',
+}
+const BIZ_CHANNEL_POOL = ['food', 'supermarket', 'groupBuy']
+
 /** 可购买起始日期 */
 const PURCHASE_START_DATE = '2025-07-05'
 const PURCHASE_START_DAY = parseInt(PURCHASE_START_DATE.split('-')[2], 10)
@@ -192,6 +201,10 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
       for (let i = 0; i < 4; i++) {
         const seed = baseId + idCounter * 37
         const channel = channels[Math.floor(pseudoRandom(seed + 1) * channels.length)]
+        // 大首頁隨機分配業務頻道，其他頻道直接映射
+        const bizChannel = channel === RecommendChannel.HOME
+          ? BIZ_CHANNEL_POOL[Math.floor(pseudoRandom(seed + 20) * BIZ_CHANNEL_POOL.length)]
+          : CHANNEL_TO_BIZ[channel]
         const slotPosition = 1 + Math.floor(pseudoRandom(seed + 2) * 5)
         const dailyPrice = 800 + Math.floor(pseudoRandom(seed + 3) * 2200)
         const totalSlots = 20 + Math.floor(pseudoRandom(seed + 4) * 30)
@@ -205,6 +218,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
           promotionName: `${prefix}${promotionSuffixes[idCounter % promotionSuffixes.length]}`,
           app: currentApp,
           channel,
+          bizChannel,
           slotPosition,
           dailyPrice,
           availableStartDate: '2025-07-05',

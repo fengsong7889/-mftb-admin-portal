@@ -179,6 +179,7 @@ function AuthenticatedLayout() {
               <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
               <Route path="/ad-sales" element={<AdSales />} />
               <Route path="/promotion-order-manage" element={<PromotionOrderManage />} />
+              <Route path="/merchant-order-manage" element={<PromotionOrderManage />} />
               {/* 推广通 - 報表分析 */}
               <Route path="/promotion-report-overview" element={<PromotionReportOverview />} />
               <Route path="/promotion-report-order" element={<PromotionReportOrder />} />

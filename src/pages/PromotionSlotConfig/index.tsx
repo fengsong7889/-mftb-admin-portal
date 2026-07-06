@@ -97,6 +97,7 @@ const TAB_CONFIG: Record<string, { label: string; pageLocations: string[]; pageL
 
 /** 时段配置 */
 const TIME_SLOT_CONFIG: { key: string; label: string; timeRange: string }[] = [
+  { key: 'fallback', label: '兜底時段', timeRange: '全天' },
   { key: 'breakfast', label: '早餐', timeRange: '06:00-10:00' },
   { key: 'lunch', label: '午餐', timeRange: '10:00-14:00' },
   { key: 'afternoonTea', label: '下午茶', timeRange: '14:00-17:00' },
@@ -212,8 +213,8 @@ export default function PromotionSlotConfig() {
 
   // 当前Tab：从URL读取，默认 home
   const activeTab = searchParams.get('tab') || 'home'
-  // 当前时段Tab，默认 breakfast
-  const [activeTimeSlot, setActiveTimeSlot] = useState('breakfast')
+  // 当前时段Tab，默认 fallback（兜底時段）
+  const [activeTimeSlot, setActiveTimeSlot] = useState('fallback')
 
   // 当前Tab配置
   const tabConfig = TAB_CONFIG[activeTab] || TAB_CONFIG.home
@@ -264,6 +265,9 @@ export default function PromotionSlotConfig() {
 
     // 新增 - 打开弹窗
   const handleAdd = () => {
+    addForm.setFieldsValue({
+      businessChannel: activeTab === 'home' ? undefined : activeTab,
+    })
     setAddModalVisible(true)
   }
 
@@ -293,7 +297,7 @@ export default function PromotionSlotConfig() {
       const newRecord: WaterfallSlotConfig = {
         id: maxId + 1,
         slotIndex: values.position,
-        businessChannel: activeTab === 'home' ? 'food' : activeTab,
+        businessChannel: activeTab === 'home' ? (values.businessChannel || 'food') : activeTab,
         pageLocation: tabConfig.pageLocations[0],
         timeSlot: activeTimeSlot,
         app: values.app,
@@ -532,6 +536,16 @@ export default function PromotionSlotConfig() {
       ),
     },
     {
+      title: '業務頻道',
+      dataIndex: 'businessChannel',
+      key: 'businessChannel',
+      width: 110,
+      align: 'center',
+      render: (v: string) => (
+        <Tag color="blue">{BUSINESS_CHANNEL_LABEL[v] || v}</Tag>
+      ),
+    },
+    {
       title: '狀態',
       dataIndex: 'status',
       key: 'status',
@@ -611,10 +625,10 @@ export default function PromotionSlotConfig() {
           activeKey={activeTab}
           onChange={handleTabChange}
           items={[
-            { key: 'home', label: '大首頁' },
-            { key: 'food', label: '美食外賣' },
-            { key: 'supermarket', label: '超市百貨' },
-            { key: 'groupBuy', label: '團購到店' },
+            { key: 'home', label: '大首頁-Feed' },
+            { key: 'food', label: '美食外賣-Feed' },
+            { key: 'supermarket', label: '超市百貨-Feed' },
+            { key: 'groupBuy', label: '團購到店-Feed' },
           ]}
         />
       </div>
@@ -625,6 +639,7 @@ export default function PromotionSlotConfig() {
           activeKey={activeTimeSlot}
           onChange={handleTimeSlotChange}
           size="small"
+          style={{ marginBottom: 0 }}
           items={TIME_SLOT_CONFIG.map(ts => ({
             key: ts.key,
             label: (
@@ -633,6 +648,16 @@ export default function PromotionSlotConfig() {
               </span>
             ),
           }))}
+          tabBarExtraContent={
+            <span style={{
+              fontSize: 12,
+              color: '#595959',
+              whiteSpace: 'nowrap',
+              fontWeight: 500,
+            }}>
+              💡 每個時段系統會優先獲取該時段的瀑布流配置，若無任何配置，則自動使用兜底時段的配置
+            </span>
+          }
         />
       </div>
 
@@ -1023,6 +1048,23 @@ export default function PromotionSlotConfig() {
               options={[
                 { label: '閃峰', value: 'shanfeng' },
                 { label: 'mFood', value: 'mfood' },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="業務頻道"
+            name="businessChannel"
+            initialValue={activeTab === 'home' ? undefined : activeTab}
+            rules={[{ required: true, message: '請選擇業務頻道' }]}
+          >
+            <Select
+              placeholder="請選擇業務頻道"
+              disabled={activeTab !== 'home'}
+              options={[
+                { label: '美食外賣', value: 'food' },
+                { label: '超市百貨', value: 'supermarket' },
+                { label: '團購到店', value: 'groupBuy' },
               ]}
             />
           </Form.Item>

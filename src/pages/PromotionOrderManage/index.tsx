@@ -36,17 +36,15 @@ const APP_LABEL: Record<AppType, string> = {
 
 // 业务频道枚举
 enum RecommendChannel {
-  HOME = 1,
   DELIVERY = 2,
   GROUP_BUY = 3,
   SUPERMARKET = 4,
 }
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '美食外賣',
-  [RecommendChannel.DELIVERY]: '零售閃購',
+  [RecommendChannel.DELIVERY]: '美食外賣',
   [RecommendChannel.GROUP_BUY]: '團購到店',
-  [RecommendChannel.SUPERMARKET]: '大首頁',
+  [RecommendChannel.SUPERMARKET]: '超市百貨',
 }
 
 // 商圈枚举（与地圖規劃商圈数据一致）
@@ -110,6 +108,10 @@ interface OrderItem {
   region: Region
   recommendType: RecommendType
   slotPosition: number
+  groupId: string             // 集團ID
+  groupName: string           // 集團名稱
+  storeId: string             // 門店ID
+  storeName: string           // 門店名稱
   mealSlots: string[]       // 無敵星星：購買時段
   purchaseDays?: string[]    // 盤活復蘇：購買日期列表
   purchaseDate: string
@@ -128,10 +130,14 @@ const mockOrders: OrderItem[] = [
     orderNo: 'ORD20250705001',
     promotionName: '無敵星星·黃金展位',
     app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.DELIVERY,
     region: Region.KOKSAA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 3,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20001',
+    storeName: '澳門總店',
     purchaseDate: '2025-07-05',
     mealSlots: ['早餐 07:00-10:00', '午餐 11:00-14:00'],
     originalPrice: 2000,
@@ -150,6 +156,10 @@ const mockOrders: OrderItem[] = [
     region: Region.FAHUA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 5,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20002',
+    storeName: '氹仔分店',
     purchaseDate: '2025-07-06',
     mealSlots: ['晚餐 17:00-21:00'],
     originalPrice: 1500,
@@ -168,6 +178,10 @@ const mockOrders: OrderItem[] = [
     region: Region.SANMA,
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 2,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20003',
+    storeName: '珠海旗艦店',
     purchaseDate: '2025-07-08',
     mealSlots: [],
     purchaseDays: ['2025-07-08', '2025-07-09', '2025-07-10'],
@@ -186,6 +200,10 @@ const mockOrders: OrderItem[] = [
     region: Region.KOKSAA,
     recommendType: RecommendType.TRAFFIC_AD,
     slotPosition: 4,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20004',
+    storeName: '黑沙環店',
     purchaseDate: '2025-07-03',
     mealSlots: ['早餐 07:00-10:00'],
     originalPrice: 1000,
@@ -200,10 +218,14 @@ const mockOrders: OrderItem[] = [
     orderNo: 'ORD20250702005',
     promotionName: '無敵星星·週末專場',
     app: AppType.SHANFENG,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.SUPERMARKET,
     region: Region.FAHUA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20005',
+    storeName: '新馬路店',
     purchaseDate: '2025-07-02',
     mealSlots: ['晚餐 17:00-21:00', '夜宵 21:00-02:00'],
     originalPrice: 2500,
@@ -217,10 +239,14 @@ const mockOrders: OrderItem[] = [
     orderNo: 'ORD20250701006',
     promotionName: '無敵星星·早鳥優惠',
     app: AppType.MFOOD,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.GROUP_BUY,
     region: Region.KOKSAA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 2,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20001',
+    storeName: '澳門總店',
     purchaseDate: '2025-07-01',
     mealSlots: ['早餐 07:00-10:00', '午餐 11:00-14:00'],
     originalPrice: 1800,
@@ -239,6 +265,10 @@ const mockOrders: OrderItem[] = [
     region: Region.SANMA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 3,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20002',
+    storeName: '氹仔分店',
     purchaseDate: '2025-06-30',
     mealSlots: ['午餐 11:00-14:00'],
     originalPrice: 1200,
@@ -257,6 +287,10 @@ const mockOrders: OrderItem[] = [
     region: Region.FAHUA,
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 4,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20003',
+    storeName: '珠海旗艦店',
     purchaseDate: '2025-06-29',
     mealSlots: [],
     purchaseDays: ['2025-06-29', '2025-06-30', '2025-07-01', '2025-07-02'],
@@ -275,6 +309,10 @@ const mockOrders: OrderItem[] = [
     region: Region.KOKSAA,
     recommendType: RecommendType.TRAFFIC_AD,
     slotPosition: 1,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20004',
+    storeName: '黑沙環店',
     purchaseDate: '2025-06-28',
     mealSlots: ['早餐 07:00-10:00', '下午茶 14:00-17:00'],
     originalPrice: 1600,
@@ -289,10 +327,14 @@ const mockOrders: OrderItem[] = [
     orderNo: 'ORD20250627010',
     promotionName: '無敵星星·夜宵專場',
     app: AppType.MFOOD,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.DELIVERY,
     region: Region.SANMA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 5,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20005',
+    storeName: '新馬路店',
     purchaseDate: '2025-06-27',
     mealSlots: ['夜宵 21:00-02:00'],
     originalPrice: 2200,
@@ -311,6 +353,10 @@ const mockOrders: OrderItem[] = [
     region: Region.KOKSAA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 2,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20001',
+    storeName: '澳門總店',
     purchaseDate: '2025-06-26',
     mealSlots: ['午餐 11:00-14:00', '晚餐 17:00-21:00'],
     originalPrice: 1900,
@@ -329,6 +375,10 @@ const mockOrders: OrderItem[] = [
     region: Region.FAHUA,
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 3,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20002',
+    storeName: '氹仔分店',
     purchaseDate: '2025-06-25',
     mealSlots: [],
     purchaseDays: ['2025-06-25', '2025-06-26'],
@@ -347,6 +397,10 @@ const mockOrders: OrderItem[] = [
     region: Region.SANMA,
     recommendType: RecommendType.TRAFFIC_AD,
     slotPosition: 4,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20003',
+    storeName: '珠海旗艦店',
     purchaseDate: '2025-06-24',
     mealSlots: ['早餐 07:00-10:00', '午餐 11:00-14:00'],
     originalPrice: 2100,
@@ -360,10 +414,14 @@ const mockOrders: OrderItem[] = [
     orderNo: 'ORD20250623014',
     promotionName: '無敵星星·全時段推廣',
     app: AppType.MFOOD,
-    channel: RecommendChannel.HOME,
+    channel: RecommendChannel.SUPERMARKET,
     region: Region.KOKSAA,
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20004',
+    storeName: '黑沙環店',
     purchaseDate: '2025-06-23',
     mealSlots: ['早餐 07:00-10:00', '午餐 11:00-14:00', '晚餐 17:00-21:00'],
     originalPrice: 3500,
@@ -382,6 +440,10 @@ const mockOrders: OrderItem[] = [
     region: Region.FAHUA,
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 5,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20005',
+    storeName: '新馬路店',
     purchaseDate: '2025-06-22',
     mealSlots: ['午餐 11:00-14:00', '下午茶 14:00-17:00'],
     originalPrice: 1700,
@@ -400,6 +462,8 @@ export default function PromotionOrderManage() {
     app: undefined as AppType | undefined,
     channel: undefined as RecommendChannel | undefined,
     region: undefined as Region | undefined,
+    groupIdOrName: '',
+    storeIdOrName: '',
     dateRange: undefined as [any, any] | undefined,
   })
 
@@ -421,6 +485,18 @@ export default function PromotionOrderManage() {
       if (filters.region !== undefined && order.region !== filters.region) {
         return false
       }
+      if (filters.groupIdOrName) {
+        const kw = filters.groupIdOrName.toLowerCase()
+        if (!order.groupId.toLowerCase().includes(kw) && !order.groupName.toLowerCase().includes(kw)) {
+          return false
+        }
+      }
+      if (filters.storeIdOrName) {
+        const kw = filters.storeIdOrName.toLowerCase()
+        if (!order.storeId.toLowerCase().includes(kw) && !order.storeName.toLowerCase().includes(kw)) {
+          return false
+        }
+      }
       return true
     })
   }, [filters])
@@ -428,6 +504,8 @@ export default function PromotionOrderManage() {
   // 列配置元数据
   const columnMeta = useMemo(() => [
     { key: 'orderNo', title: '訂單編號' },
+    { key: 'groupInfo', title: '集團ID/集團名稱' },
+    { key: 'storeInfo', title: '門店ID/門店名稱' },
     { key: 'promotionName', title: '推廣名稱' },
     { key: 'app', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
@@ -455,6 +533,28 @@ export default function PromotionOrderManage() {
       key: 'orderNo',
       width: 180,
       fixed: 'left',
+    },
+    {
+      title: '集團ID/集團名稱',
+      key: 'groupInfo',
+      width: 180,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupId}</span>
+          <span>{record.groupName}</span>
+        </Space>
+      ),
+    },
+    {
+      title: '門店ID/門店名稱',
+      key: 'storeInfo',
+      width: 180,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeId}</span>
+          <span>{record.storeName}</span>
+        </Space>
+      ),
     },
     {
       title: '推廣名稱',
@@ -595,6 +695,8 @@ export default function PromotionOrderManage() {
       app: undefined,
       channel: undefined,
       region: undefined,
+      groupIdOrName: '',
+      storeIdOrName: '',
       dateRange: undefined,
     })
   }
@@ -680,6 +782,22 @@ export default function PromotionOrderManage() {
                   }))}
               />
             </Form.Item>
+            <Form.Item label="集團ID/名稱">
+              <Input
+                placeholder="請輸入集團ID或名稱"
+                allowClear
+                value={filters.groupIdOrName}
+                onChange={e => setFilters({ ...filters, groupIdOrName: e.target.value })}
+              />
+            </Form.Item>
+            <Form.Item label="門店ID/名稱">
+              <Input
+                placeholder="請輸入門店ID或名稱"
+                allowClear
+                value={filters.storeIdOrName}
+                onChange={e => setFilters({ ...filters, storeIdOrName: e.target.value })}
+              />
+            </Form.Item>
             <Form.Item label="下單時間">
               <RangePicker style={{ width: '100%' }} />
             </Form.Item>
@@ -715,7 +833,7 @@ export default function PromotionOrderManage() {
               console.log('选中行:', selectedRowKeys, selectedRows)
             },
           }}
-          scroll={{ x: 1800 }}
+          scroll={{ x: 2200 }}
           pagination={{
             total: filteredOrders.length,
             pageSize: 10,

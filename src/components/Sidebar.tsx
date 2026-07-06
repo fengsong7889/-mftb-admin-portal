@@ -163,6 +163,8 @@ const keyToPath: Record<string, string> = {
   'promotion-waterfall': '/promotion-waterfall',
   'promotion-sales-config': '/promotion-sales-config',
   'promotion-order-manage': '/promotion-order-manage',
+  // 商家推广工具 - 訂單管理（独立key，复用同一页面）
+  'merchant-order-manage': '/merchant-order-manage',
   // 广告销售（商家推广工具下，复用店铺推广页面）
   'ad-sales': '/ad-sales',
   // 推广通 - 報表分析
@@ -396,6 +398,11 @@ const menuItems: MenuItem[] = [
         key: 'ad-sales',
         icon: <ShoppingFilled />,
         label: '广告销售',
+      },
+      {
+        key: 'merchant-order-manage',
+        icon: <FileSearchOutlined />,
+        label: '訂單管理',
       },
     ],
   },
