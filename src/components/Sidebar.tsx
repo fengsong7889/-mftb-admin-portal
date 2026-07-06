@@ -1,4 +1,5 @@
-import { Layout, Menu, message } from 'antd'
+import { useState } from 'react'
+import { Layout, Menu, message, Modal, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -173,6 +174,23 @@ const keyToPath: Record<string, string> = {
   // 推广通(父菜单,无需映射)
   // 'promotion-tool': '/promotion-tool',
 }
+
+/** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
+const noPageKeys = new Set([
+  // 用戶管理
+  'user-feedback', 'user-list', 'user-avatar', 'user-frozen', 'device-frozen',
+  'user-location-special', 'user-location-blacklist', 'whitelist',
+  // 運營投放管理
+  'delivery-list',
+  // 商戶集團管理
+  'merchant-onboarding', 'merchant-feedback', 'group-list', 'group-permission',
+  'store-basic-info', 'contract-management', 'group-brand-library',
+  // 到家業務(外賣)
+  'product-tags', 'product-params', 'store-management', 'store-categories',
+  'product-platform-categories',
+  // 到店業務(團購)
+  'group-buy-store', 'group-buy-product',
+])
 
 /** 路由路径 → 菜单 key 映射（用于高亮） */
 const pathToKey: Record<string, string> = {}
@@ -779,18 +797,43 @@ interface SidebarProps {
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [pwdModalOpen, setPwdModalOpen] = useState(false)
+  const [pwdValue, setPwdValue] = useState('')
+  const [pendingKey, setPendingKey] = useState<string>('')
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
     : (pathToKey[location.pathname] || 'home')
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (noPageKeys.has(key)) {
+      setPendingKey(key)
+      setPwdValue('')
+      setPwdModalOpen(true)
+      return
+    }
     const path = keyToPath[key]
     if (path) {
       navigate(path)
     } else {
       message.info('該功能模塊開發中，敬請期待')
     }
+  }
+
+  const handlePwdOk = () => {
+    if (pwdValue === '9510') {
+      message.success('密碼驗證成功')
+      setPwdModalOpen(false)
+      setPwdValue('')
+      // 验证通过后可在此处添加跳转逻辑
+    } else {
+      message.error('密碼錯誤，請重新輸入')
+    }
+  }
+
+  const handlePwdCancel = () => {
+    setPwdModalOpen(false)
+    setPwdValue('')
   }
 
   return (
@@ -822,6 +865,27 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         defaultOpenKeys={[]}
         className="sidebar-menu"
       />
+      <Modal
+        title="機密頁面，請輸入密碼訪問"
+        open={pwdModalOpen}
+        onOk={handlePwdOk}
+        onCancel={handlePwdCancel}
+        okText="確定"
+        cancelText="取消"
+        afterOpenChange={(open) => {
+          if (open) {
+            const input = document.querySelector<HTMLInputElement>('.ant-modal input[type="password"]')
+            input?.focus()
+          }
+        }}
+      >
+        <Input.Password
+          placeholder="請輸入密碼訪問"
+          value={pwdValue}
+          onChange={(e) => setPwdValue(e.target.value)}
+          onPressEnter={handlePwdOk}
+        />
+      </Modal>
     </Sider>
   )
 }
