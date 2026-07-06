@@ -436,7 +436,7 @@ export default function AlgorithmAdd() {
                                           style={{ width: 64 }}
                                           size="small"
                                         />
-                                        天訂單完成比例
+                                        天訂單完成比例（貝葉斯平滑）
                                         <Popover
                                           trigger="click"
                                           placement="right"
