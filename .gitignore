@@ -23,11 +23,11 @@ Thumbs.db
 # Logs
 *.log
 
-# Large media files (>100MB)
-*.mp4
-*.mov
-*.avi
-*.mkv
+# Large media files (>100MB) - use `git lfs track` for large files
+# *.mp4
+# *.mov
+# *.avi
+# *.mkv
 
 # Qoder repowiki
 .qoder/
