@@ -240,7 +240,14 @@ export default function StrategyAdType() {
   // 切换状态
   const handleToggleStatus = (record: any) => {
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
-    message.success(`已${newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'}策略「${record.name}」`)
+    const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
+    Modal.confirm({
+      title: `確認${actionText}`,
+      content: `確定要${actionText}策略「${record.name}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => message.success(`已${actionText}策略「${record.name}」`),
+    })
   }
 
   const columns: ColumnsType<any> = [
@@ -357,6 +364,7 @@ export default function StrategyAdType() {
             type="link" 
             size="small"
             danger={record.status === ServiceStatus.ENABLED}
+            style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}

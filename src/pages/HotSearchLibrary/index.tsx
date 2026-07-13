@@ -303,7 +303,7 @@ export default function HotSearchLibrary() {
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
-          <Button type="link" size="small" danger={record.status === 'active'} onClick={() => handleToggleStatus(record)}>
+          <Button type="link" size="small" danger={record.status === 'active'} style={record.status !== 'active' ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
             {record.status === 'active' ? '停用' : '啟用'}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>

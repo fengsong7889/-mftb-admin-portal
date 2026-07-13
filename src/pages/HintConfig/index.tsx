@@ -321,6 +321,7 @@ export default function HintConfig() {
             type="link"
             size="small"
             danger={record.status === 'active'}
+            style={record.status !== 'active' ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
             {record.status === 'active' ? '失效' : '生效'}

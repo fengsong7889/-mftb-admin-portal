@@ -126,8 +126,34 @@ export default function PromotionSlotConfigAdd() {
 
   // 删除坑位配置
   const handleDeleteSlot = (record: SlotAlgorithm) => {
-    console.log('删除坑位:', record)
-    message.success(`已刪除 ${record.position}號位 配置`)
+    Modal.confirm({
+      title: '確認刪除',
+      content: `確定要刪除${record.position}號位配置嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => message.success(`已刪除 ${record.position}號位 配置`),
+    })
+  }
+
+  // 切换启用/停用状态
+  const handleToggleStatus = (record: SlotAlgorithm) => {
+    const newStatus = record.status === 'active' ? 'inactive' : 'active'
+    const actionText = newStatus === 'active' ? '啟用' : '停用'
+    Modal.confirm({
+      title: `確認${actionText}`,
+      content: `確定要${actionText}「${record.algorithmName}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        setSlotAlgorithms(prev =>
+          prev.map(item =>
+            item.position === record.position ? { ...item, status: newStatus } : item
+          )
+        )
+        message.success(`已${actionText} ${record.algorithmName}`)
+      },
+    })
   }
 
   // 拖拽排序
@@ -229,12 +255,23 @@ export default function PromotionSlotConfigAdd() {
     {
       title: '操作',
       key: 'action',
-      width: 80,
+      width: 140,
       align: 'center',
       render: (_, record) => (
-        <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
-          刪除
-        </Button>
+        <Space size={4}>
+          <Button
+            type="link"
+            size="small"
+            danger={record.status === 'active'}
+            style={record.status === 'inactive' ? { color: '#52c41a' } : undefined}
+            onClick={() => handleToggleStatus(record)}
+          >
+            {record.status === 'active' ? '停用' : '啟用'}
+          </Button>
+          <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
+            刪除
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -348,7 +385,7 @@ export default function PromotionSlotConfigAdd() {
               display: 'flex', flexDirection: 'column', gap: 10,
               overflow: 'auto', flex: 1,
             }}>
-              {slotAlgorithms.map((item, index) => (
+              {slotAlgorithms.filter(item => item.status === 'active').map((item, index) => (
                 <div
                   key={item.position}
                   draggable

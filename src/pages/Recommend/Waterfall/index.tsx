@@ -361,6 +361,7 @@ export default function Waterfall() {
     { key: 'adId', title: '配置ID' },
     { key: 'promotionName', title: '算法名稱' },
     { key: 'app', title: '所屬品牌' },
+    { key: 'bizChannel', title: '業務頻道' },
     { key: 'status', title: '狀態' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updatedAt', title: '最後更新時間' },
@@ -403,6 +404,17 @@ export default function Waterfall() {
           fontWeight: 500
         }}>
           {v === AppType.SHANFENG ? '閃峰' : 'mFood'}
+        </Tag>
+      ),
+    },
+    {
+      title: '業務頻道',
+      dataIndex: 'bizChannel',
+      key: 'bizChannel',
+      width: 120,
+      render: (v: string) => (
+        <Tag color={v === 'food' ? 'orange' : v === 'supermarket' ? 'cyan' : 'purple'}>
+          {BIZ_CHANNEL_LABEL[v] || v}
         </Tag>
       ),
     },
@@ -488,6 +500,7 @@ export default function Waterfall() {
             type="link" 
             size="small" 
             danger={record.status === ServiceStatus.ENABLED}
+            style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}

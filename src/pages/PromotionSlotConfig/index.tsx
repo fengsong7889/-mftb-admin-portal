@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Space, Table, Tag, Select, Form, Input } from 'antd'
+import { Button, Space, Table, Tag, Select, Form, Input, message, Modal } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -116,7 +116,6 @@ export default function PromotionSlotConfig() {
   const navigate = useNavigate()
   const [searchForm] = Form.useForm()
   const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>(mockData)
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 初始化时查询全部数据
   useEffect(() => {
@@ -130,13 +129,37 @@ export default function PromotionSlotConfig() {
 
   // 启用/停用
   const handleToggleStatus = (record: WaterfallSlotConfig) => {
-    console.log('切换状态:', record)
+    const newStatus: 'active' | 'inactive' = record.status === 'active' ? 'inactive' : 'active'
+    const actionText = newStatus === 'active' ? '啟用' : '停用'
+    Modal.confirm({
+      title: `確認${actionText}`,
+      content: `確定要${actionText}「${record.promotionName}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        const updated = filteredData.map(item =>
+          item.id === record.id ? { ...item, status: newStatus } : item
+        )
+        setFilteredData(updated)
+        message.success(`已${actionText}「${record.promotionName}」`)
+      },
+    })
   }
 
 
   // 删除
   const handleDelete = (record: WaterfallSlotConfig) => {
-    console.log('删除:', record)
+    Modal.confirm({
+      title: '確認刪除',
+      content: `確定要刪除瀑布流「${record.promotionName}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setFilteredData(prev => prev.filter(item => item.id !== record.id))
+        message.success('刪除成功')
+      },
+    })
   }
   // 搜索处理
   const handleSearch = () => {
@@ -237,6 +260,8 @@ export default function PromotionSlotConfig() {
           <Button 
             type="link" 
             size="small"
+            danger={record.status === 'active'}
+            style={record.status !== 'active' ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
             {record.status === 'active' ? '停用' : '啟用'}
@@ -321,16 +346,6 @@ export default function PromotionSlotConfig() {
         <Table<WaterfallSlotConfig>
           columns={applyConfig(columns)}
           dataSource={filteredData}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: (selectedKeys) => {
-              setSelectedRowKeys(selectedKeys)
-            },
-            getCheckboxProps: (record) => ({
-              disabled: record.status === 'inactive',
-              name: record.algorithmName,
-            }),
-          }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,

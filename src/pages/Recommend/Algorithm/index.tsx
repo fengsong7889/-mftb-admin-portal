@@ -177,6 +177,23 @@ export default function Algorithm() {
     setBusinessType('delivery')
   }
 
+  // 启用/停用算法
+  const handleToggleStatus = (record: AlgorithmRecord) => {
+    const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
+    const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
+    Modal.confirm({
+      title: `確認${actionText}`,
+      content: `確定要${actionText}算法「${record.name}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+        setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+        message.success(`已${actionText}「${record.name}」`)
+      },
+    })
+  }
+
   // 删除算法
   const handleDelete = (record: AlgorithmRecord) => {
     Modal.confirm({
@@ -235,7 +252,7 @@ export default function Algorithm() {
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>編輯</Button>
-          <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED}>
+          <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED} style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>

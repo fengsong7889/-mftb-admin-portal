@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree, Upload } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined, UploadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined, UploadOutlined, ShopOutlined, PictureOutlined, DollarOutlined, BarChartOutlined, FundOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -20,17 +20,17 @@ import dayjs from 'dayjs'
 
 // Mock数据 - 可选算法列表
 const ALGORITHM_OPTIONS = [
-  { id: 1, name: '無敵星星-首頁版', type: 'invincibleStar' },
-  { id: 2, name: '無敵星星-外賣版', type: 'invincibleStar' },
-  { id: 3, name: '無敵星星-團購版', type: 'invincibleStar' },
-  { id: 4, name: '猜你喜歡-主力版', type: 'youLike' },
-  { id: 5, name: '猜你喜歡-週末版', type: 'youLike' },
-  { id: 6, name: '新店廣告-首頁版', type: 'newShopAd' },
-  { id: 7, name: '新店廣告-早餐版', type: 'newShopAd' },
-  { id: 8, name: '盤活復蘇-首頁版', type: 'activateAd' },
-  { id: 9, name: '盤活復蘇-午市版', type: 'activateAd' },
-  { id: 10, name: '獨家商家-首頁版', type: 'exclusiveShop' },
-  { id: 11, name: '獨家商家-超市版', type: 'exclusiveShop' },
+  { id: 1, name: '無敵星星-首頁版', type: 'invincibleStar', app: AppType.SHANFENG },
+  { id: 2, name: '無敵星星-外賣版', type: 'invincibleStar', app: AppType.SHANFENG },
+  { id: 3, name: '無敵星星-團購版', type: 'invincibleStar', app: AppType.SHANFENG },
+  { id: 4, name: '猜你喜歡-主力版', type: 'youLike', app: AppType.SHANFENG },
+  { id: 5, name: '猜你喜歡-週末版', type: 'youLike', app: AppType.SHANFENG },
+  { id: 6, name: '新店廣告-首頁版', type: 'newShopAd', app: AppType.MFOOD },
+  { id: 7, name: '新店廣告-早餐版', type: 'newShopAd', app: AppType.MFOOD },
+  { id: 8, name: '盤活復蘇-首頁版', type: 'activateAd', app: AppType.MFOOD },
+  { id: 9, name: '盤活復蘇-午市版', type: 'activateAd', app: AppType.MFOOD },
+  { id: 10, name: '獨家商家-首頁版', type: 'exclusiveShop', app: AppType.SHANFENG },
+  { id: 11, name: '獨家商家-超市版', type: 'exclusiveShop', app: AppType.SHANFENG },
 ]
 
 // Mock数据 - 从瀑布流策略读取启用的广告位
@@ -195,6 +195,9 @@ export default function WaterfallAdd() {
   const [merchantLimit, setMerchantLimit] = useState(false) // 商家限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]) // 选择的商家
   const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
+  
+  // 盘活复苏 - 按天定价配置
+  const [dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
   
   // 显示广告位的条件（已移除廣告位選擇）
   const canShowPositions = false
@@ -484,7 +487,14 @@ export default function WaterfallAdd() {
       <div style={{ padding: 0 }}>
         <Form form={form} layout="vertical">
           {/* 基础信息 */}
-          <Card title="基礎信息" size="small" style={{ marginBottom: 12, borderRadius: 8 }}>
+          <div style={{ borderLeft: '4px solid #1890ff', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基礎信息</span>
+              <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <Form.Item 
                 label="算法名稱"
@@ -499,6 +509,14 @@ export default function WaterfallAdd() {
                     label: alg.name,
                     value: alg.id,
                   }))}
+                  onChange={(value) => {
+                    // 根据算法自动带出所属品牌
+                    const selectedAlg = ALGORITHM_OPTIONS.find(alg => alg.id === value)
+                    if (selectedAlg?.app) {
+                      form.setFieldsValue({ app: selectedAlg.app })
+                      setSelectedApp(selectedAlg.app)
+                    }
+                  }}
                 />
               </Form.Item>
 
@@ -530,10 +548,17 @@ export default function WaterfallAdd() {
                 />
               </Form.Item>
             </div>
-          </Card>
+          </div>
 
           {/* 推广图片 */}
-          <Card title="推廣圖片" size="small" style={{ marginBottom: 12, borderRadius: 8 }}>
+          <div style={{ borderLeft: '4px solid #52c41a', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <PictureOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>推廣圖片</span>
+              <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
               <Form.Item label="封面圖">
                 <Upload
@@ -581,16 +606,19 @@ export default function WaterfallAdd() {
                 </Upload>
               </Form.Item>
             </div>
-          </Card>
+          </div>
 
           {/* 广告位选择 */}
           {canShowPositions && (
-            <Card 
-              title="選擇廣告位" 
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-              extra={<Tag color="blue">必填</Tag>}
-            >
+            <div style={{ borderLeft: '4px solid #1890ff', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <SettingOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>選擇廣告位</span>
+                <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>必填</Tag>
+                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+              </div>
               <div style={{ background: '#fafafa', borderRadius: 6, padding: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 40px)', gap: 8, justifyContent: 'start' }}>
                   {mockPositionAlgorithm.map((item) => {
@@ -652,16 +680,20 @@ export default function WaterfallAdd() {
                   </Space>
                 </div>
               )}
-            </Card>
+            </div>
           )}
 
           {/* 销售策略（无敌星星 + 盘活复苏） */}
           {selectedApp && selectedChannel && selectedAlgorithmType && (
-            <Card 
-              title="銷售策略" 
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-            >
+            <div style={{ borderLeft: '4px solid #fa8c16', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>銷售策略</span>
+                <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>策略配置</Tag>
+                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+              </div>
               {/* 预售天数 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -747,15 +779,10 @@ export default function WaterfallAdd() {
                 )}
               </div>
               )}
-            </Card>
+            </div>
           )}
-
-          {/* 暂未开通提示 */}
           {showNotAvailable && (
-            <Card 
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-            >
+            <div style={{ borderLeft: '4px solid #d9d9d9', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ textAlign: 'center', padding: '32px 0', color: '#8c8c8c' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
                 <div style={{ fontSize: 15, fontWeight: 500, color: '#595959', marginBottom: 6 }}>
@@ -765,17 +792,117 @@ export default function WaterfallAdd() {
                   當前廣告類型暫不支持廣告位選擇，僅「無敵星星」和「盤活復蘇」類型可用
                 </div>
               </div>
-            </Card>
+            </div>
           )}
 
 
-          {/* 区域计价配置 */}
-          {selectedApp && selectedChannel && selectedAlgorithmType && (
-            <Card 
-              title="商圈計價配置" 
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-              extra={
+          {/* 盘活复苏 - 按天定价配置 + 梯度折扣 */}
+          {selectedApp && selectedChannel && selectedAlgorithmType && isReviveAlgorithm && (
+            <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FundOutlined style={{ fontSize: 14, color: '#722ed1' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>按天計價配置</span>
+                <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>每日定價</Tag>
+                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+              </div>
+              <div style={{ maxWidth: 400, marginBottom: 24 }}>
+                <Form.Item
+                  label="每天售價"
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber
+                    min={0}
+                    precision={2}
+                    placeholder="請輸入每天售價"
+                    style={{ width: '100%' }}
+                    addonAfter="MOP/天"
+                    value={dailyPrice}
+                    onChange={(value) => setDailyPrice(value ?? undefined)}
+                  />
+                </Form.Item>
+              </div>
+              {/* 购买多天折扣配置（梯度） */}
+              <Divider style={{ margin: '16px 0' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
+                <Switch 
+                  checked={gradientEnabled}
+                  onChange={(checked) => {
+                    setGradientEnabled(checked)
+                    if (checked && gradients.length === 0) {
+                      setGradients([{ count: 0, discount: 0 }])
+                    }
+                  }}
+                  size="small"
+                />
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
+                {gradientEnabled && (
+                  <Button 
+                    type="primary" 
+                    size="small" 
+                    icon={<PlusOutlined />}
+                    onClick={handleAddGradient}
+                    style={{ borderRadius: 6, marginLeft: 'auto' }}
+                  >
+                    添加梯度
+                  </Button>
+                )}
+              </div>
+              {gradientEnabled && (
+                gradients.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
+                    暫無梯度配置，請點擊右上角"添加梯度"
+                  </div>
+                ) : (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  {gradients.map((gradient, index) => (
+                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+                      <Tag color="blue">梯度 {index + 1}</Tag>
+                      <span style={{ fontSize: 13, color: '#595959' }}>購買天數≥</span>
+                      <InputNumber
+                        min={1}
+                        max={30}
+                        placeholder="天數"
+                        style={{ width: 80 }}
+                        value={gradient.count}
+                        onChange={(value) => handleUpdateGradient(index, 'count', value)}
+                      />
+                      <span style={{ fontSize: 13, color: '#595959' }}>天，對應折扣：</span>
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        placeholder="折扣"
+                        style={{ width: 80 }}
+                        addonAfter="折"
+                        value={gradient.discount}
+                        onChange={(value) => handleUpdateGradient(index, 'discount', value)}
+                      />
+                      <Button 
+                        type="text" 
+                        danger 
+                        icon={<DeleteFilled style={{ fontSize: 16 }} />}
+                        onClick={() => handleRemoveGradient(index)}
+                      />
+                    </div>
+                  ))}
+                </Space>
+                )
+              )}
+            </div>
+          )}
+
+          {/* 区域计价配置 - 仅无敌星星显示 */}
+          {selectedApp && selectedChannel && selectedAlgorithmType && !isReviveAlgorithm && (
+            <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FundOutlined style={{ fontSize: 14, color: '#722ed1' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>商圈計價配置</span>
+                <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>分區定價</Tag>
+                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                 <Button 
                   type="primary" 
                   size="small"
@@ -784,11 +911,11 @@ export default function WaterfallAdd() {
                     setSelectedRegionNode(null)
                     setRegionSelectModalVisible(true)
                   }}
+                  style={{ borderRadius: 6 }}
                 >
                   選擇商圈
                 </Button>
-              }
-            >
+              </div>
               {regionPricingConfigs.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
                   請選擇商圈並點擊"新增"按鈕添加計價配置
@@ -925,47 +1052,45 @@ export default function WaterfallAdd() {
               ))}
               </>
               )}
-            </Card>
+            </div>
           )}
 
-          {/* 购买多天折扣配置（梯度）/ 时段个数折扣配置 */}
-          {selectedRegions.length > 0 && (
-            <Card 
-              title={
-                <Space>
-                  {isReviveAlgorithm ? '購買多天折扣配置（梯度）' : '時段個數折扣配置（梯度）'}
-                  <Switch 
-                    checked={gradientEnabled}
-                    onChange={(checked) => {
-                      setGradientEnabled(checked)
-                      // 开启时默认添加一个梯度
-                      if (checked && gradients.length === 0) {
-                        setGradients([{ count: 0, discount: 0 }])
-                      }
-                    }}
-                    size="small"
-                    style={{ marginLeft: 8 }}
-                  />
-                  <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
-                    {isReviveAlgorithm ? '購買多天時匹配以下折扣' : '購買多個時段時匹配以下折扣'}
-                  </span>
-                </Space>
-              }
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-              extra={
-                gradientEnabled && (
+          {/* 时段个数折扣配置 - 仅无敌星星显示 */}
+          {!isReviveAlgorithm && selectedRegions.length > 0 && (
+            <div style={{ borderLeft: '4px solid #13c2c2', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BarChartOutlined style={{ fontSize: 14, color: '#13c2c2' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>
+                  時段個數折扣配置（梯度）
+                </span>
+                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+                <Switch 
+                  checked={gradientEnabled}
+                  onChange={(checked) => {
+                    setGradientEnabled(checked)
+                    if (checked && gradients.length === 0) {
+                      setGradients([{ count: 0, discount: 0 }])
+                    }
+                  }}
+                  size="small"
+                />
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                  購買多個時段時匹配以下折扣
+                </span>
+                {gradientEnabled && (
                   <Button 
                     type="primary" 
                     size="small" 
                     icon={<PlusOutlined />}
                     onClick={handleAddGradient}
+                    style={{ borderRadius: 6 }}
                   >
                     添加梯度
                   </Button>
-                )
-              }
-            >
+                )}
+              </div>
               {gradientEnabled ? (
                 gradients.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
@@ -976,16 +1101,16 @@ export default function WaterfallAdd() {
                   {gradients.map((gradient, index) => (
                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
                       <Tag color="blue">梯度 {index + 1}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>{isReviveAlgorithm ? '購買天數≥' : '時段個數≥'}</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>時段個數≥</span>
                       <InputNumber
                         min={1}
-                        max={isReviveAlgorithm ? 30 : 6}
-                        placeholder={isReviveAlgorithm ? '天數' : '時段個數'}
+                        max={6}
+                        placeholder="時段個數"
                         style={{ width: 80 }}
                         value={gradient.count}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
-                      <span style={{ fontSize: 13, color: '#595959' }}>{isReviveAlgorithm ? '天，對應折扣：' : '個時段，對應折扣：'}</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>個時段，對應折扣：</span>
                       <InputNumber
                         min={1}
                         max={100}
@@ -1006,7 +1131,7 @@ export default function WaterfallAdd() {
                 </Space>
                 )
               ) : null}
-            </Card>
+            </div>
           )}
 
           {/* 商圈选择弹窗 */}
@@ -1102,19 +1227,15 @@ export default function WaterfallAdd() {
       </div>
 
       {/* 取消扣费规则配置 */}
-      <Card
-        title={
-          <Space>
-            <SettingOutlined style={{ color: '#E8720C' }} />
-            <span style={{ fontSize: 15, fontWeight: 600 }}>取消扣費規則</span>
-            <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400, marginLeft: 8 }}>
-              當剩餘天數沒有匹配到規則，取消則不扣費
-            </span>
-          </Space>
-        }
-        style={{ marginBottom: 12, borderRadius: 8 }}
-        headStyle={{ borderBottom: '1px solid #f0f0f0' }}
-      >
+      <div style={{ borderLeft: '4px solid #f5222d', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消扣費規則</span>
+          <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
         <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
             廣告開始推廣，扣費比例
@@ -1200,7 +1321,7 @@ export default function WaterfallAdd() {
             },
           ]}
         />
-      </Card>
+      </div>
 
       {/* 底部操作按钮 - 固定 */}
       <div className="form-footer">
@@ -1213,7 +1334,7 @@ export default function WaterfallAdd() {
           onClick={handleSubmit}
           loading={loading}
         >
-          提交
+          保存
         </Button>
       </div>
 

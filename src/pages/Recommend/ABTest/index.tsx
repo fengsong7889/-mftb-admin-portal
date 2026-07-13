@@ -231,11 +231,20 @@ export default function ABTest() {
 
   // 切换状态
   const handleToggleStatus = (record: any) => {
-    if (record.status === 'running') {
-      message.success('已暫停測試')
-    } else if (record.status === 'paused' || record.status === 'draft') {
-      message.success('已啟動測試')
-    }
+    const actionText = record.status === 'running' ? '暫停' : '啟動'
+    Modal.confirm({
+      title: `確認${actionText}`,
+      content: `確定要${actionText}A/B測試「${record.name}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        if (record.status === 'running') {
+          message.success('已暫停測試')
+        } else if (record.status === 'paused' || record.status === 'draft') {
+          message.success('已啟動測試')
+        }
+      },
+    })
   }
 
   const columns: ColumnsType<any> = [
