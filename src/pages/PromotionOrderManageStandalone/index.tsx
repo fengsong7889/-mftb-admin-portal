@@ -460,6 +460,9 @@ export default function PromotionOrderManage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const orderType = searchParams.get('type') || ''
+  // 来源标识：从「銷售訂單」(ad-sales) 进入则返回销售订单，否则返回「店鋪推廣」
+  const fromSource = searchParams.get('from') || ''
+  const backPath = fromSource === 'ad-sales' ? '/ad-sales' : '/promotion-sales-config'
 
   const [filters, setFilters] = useState({
     orderNo: '',
@@ -722,7 +725,7 @@ export default function PromotionOrderManage() {
           <div>
             <h2 style={{ margin: 0, fontSize: 20 }}>
               <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
-              {orderType ? `${orderType}訂單` : '銷售訂單'}
+              {orderType ? `${orderType}訂單` : '推廣通訂單'}
             </h2>
             <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
               {orderType ? `查看${orderType}的訂單詳情` : '查看廣告訂單詳情'}
@@ -731,14 +734,14 @@ export default function PromotionOrderManage() {
           <Space size={12}>
             <Button
               icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/ad-sales')}
+              onClick={() => navigate(backPath)}
             >
               返回
             </Button>
             <Button
               type="primary"
               icon={<ShoppingCartOutlined />}
-              onClick={() => navigate(`/ad-sales?type=${encodeURIComponent(orderType)}`)}
+              onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
               style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
             >
               購買廣告

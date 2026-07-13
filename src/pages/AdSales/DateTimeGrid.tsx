@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal, TreeSelect } from 'antd'
-import { CalendarOutlined, DeleteOutlined, ShopOutlined } from '@ant-design/icons'
+import { useState, useMemo, useEffect } from 'react'
+import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal, TreeSelect, Input, Form } from 'antd'
+import { CalendarOutlined, DeleteOutlined, ShopOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -24,6 +24,7 @@ interface CartItem {
   salePrice: number      // 售价
   storeId: string        // 店铺ID
   storeName: string      // 店铺名称
+  lockTime: number       // 锁定时间戳（毫秒）
 }
 
 /** 组合商圈接口 */
@@ -62,12 +63,19 @@ interface DateTimeGridProps {
 
 /** Mock数据 - 店铺列表 */
 const MOCK_STORES = [
-  { id: 'store-001', name: '威尼斯人酒店' },
-  { id: 'store-002', name: '皇朝廣場店' },
-  { id: 'store-003', name: '黑馬仕美食街' },
-  { id: 'store-004', name: '新葡京旗艦店' },
-  { id: 'store-005', name: '官也街老店' },
+  { id: '10001', name: '威尼斯人酒店' },
+  { id: '10002', name: '皇朝廣場店' },
+  { id: '10003', name: '黑馬仕美食街' },
+  { id: '10004', name: '新葡京旗艦店' },
+  { id: '10005', name: '官也街老店' },
 ]
+
+/** 店铺下拉选项（展示ID） */
+const STORE_OPTIONS = MOCK_STORES.map(s => ({
+  label: `${s.name}（ID：${s.id}）`,
+  value: s.id,
+  name: s.name,
+}))
 
 // 时段定义（早餐/午餐/下午茶/晚餐/夜宵）
 const MEAL_TIME_SLOTS = [
@@ -78,9 +86,27 @@ const MEAL_TIME_SLOTS = [
   { key: 'supper', label: '夜宵', timeRange: '21:00-02:00', slots: [42, 43, 44, 45, 46, 47, 0, 1, 2, 3] },
 ]
 
+/** 商圈列表（表格行） */
+const REGION_LIST = [
+  { key: Region.KOKSAA, name: '黑沙環區' },
+  { key: Region.COSTA, name: '高士德區' },
+  { key: Region.SANMA, name: '新馬路區' },
+  { key: Region.SANWONG, name: '新皇朝區' },
+  { key: Region.HKM, name: '港珠澳區' },
+  { key: Region.FAHUA, name: '花城市區' },
+  { key: Region.AIRPORT, name: '北安機場' },
+  { key: Region.LHOTEL, name: '左酒店區' },
+  { key: Region.RHOTEL, name: '右酒店區' },
+  { key: Region.UM, name: '澳大專區' },
+  { key: Region.HACS, name: '黑沙灘區' },
+]
+
+const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null)
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null)
   const [selectedMealSlot, setSelectedMealSlot] = useState<string | null>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -91,6 +117,52 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [selectedStore, setSelectedStore] = useState<string | undefined>(undefined)
+  const [currentTime, setCurrentTime] = useState(Date.now())
+
+  // 倒计时：每秒更新当前时间
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // 自动释放过期锁定（60秒后）
+  useEffect(() => {
+    const expiredItems = cartItems.filter(item => currentTime - item.lockTime >= 60000)
+    if (expiredItems.length > 0) {
+      setCartItems(prev => prev.filter(item => currentTime - item.lockTime < 60000))
+      expiredItems.forEach(item => {
+        message.info(`${item.date} ${item.regionName} ${item.mealSlot} 鎖定已到期，自動釋放`)
+      })
+    }
+  }, [currentTime, cartItems])
+
+  // 查询条件状态
+  const [searchBrand, setSearchBrand] = useState<string | null>(null)
+  const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
+  const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
+  const [searchDate, setSearchDate] = useState<Dayjs | null>(null)
+  const [searchBD, setSearchBD] = useState<string | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
+
+  // 查询：必须选择所属品牌、算法名称、门店名称
+  const handleSearch = () => {
+    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
+    if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
+    if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
+    setHasSearched(true)
+  }
+
+  // 重置查询条件
+  const handleReset = () => {
+    setSearchBrand(null)
+    setSearchAlgorithm(null)
+    setSearchStoreName(null)
+    setSearchDate(null)
+    setSearchBD(null)
+    setHasSearched(false)
+  }
   
   // Mock数据 - 商家推广金余额
   const [merchantBalance, setMerchantBalance] = useState(15800)
@@ -120,7 +192,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 查看订单
   const handleViewOrder = () => {
     setIsSuccessModalVisible(false)
-    navigate('/promotion-order-manage')
+    navigate('/promotion-order-manage?from=ad-sales')
   }
 
   // 继续购买
@@ -245,108 +317,149 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 16 }}>
-      {/* 左侧：日期×时段表格 */}
-      <Card 
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <Space>
-              <CalendarOutlined />
-              <span>選擇日期：</span>
-              <DatePicker 
-                value={selectedDate}
-                onChange={(date) => {
-                  if (date) {
-                    setSelectedDate(date)
-                    setSelectedMealSlot(null)
-                  }
-                }}
-                format="YYYY-MM-DD"
-                style={{ width: 160 }}
+    <div>
+      {/* 查询区域 - 始终显示 */}
+      <div className="search-section" style={{ marginBottom: 16 }}>
+          <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+            <Form.Item label="所屬品牌">
+              <Select
+                placeholder="全部"
+                value={searchBrand}
+                onChange={(v) => setSearchBrand(v)}
+                allowClear
+                options={[
+                  { label: '閃峰', value: 'shanfeng' },
+                  { label: 'mFood', value: 'mfood' },
+                ]}
               />
-              <span>商圈：</span>
-              <Radio.Group 
-                value={regionMode} 
-                onChange={(e) => {
-                  setRegionMode(e.target.value)
-                  setSelectedRegion(undefined)
-                  setSelectedCombination(undefined)
+            </Form.Item>
+            <Form.Item label="算法名稱">
+              <Select
+                placeholder="全部"
+                value={searchAlgorithm}
+                onChange={(v) => setSearchAlgorithm(v)}
+                allowClear
+                options={[
+                  { label: '無敵星星', value: 'invincible_star' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="門店名稱">
+              <Select
+                placeholder="支持ID和名稱搜索"
+                value={searchStoreName}
+                onChange={(v) => setSearchStoreName(v)}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={STORE_OPTIONS}
+              />
+            </Form.Item>
+            <Form.Item label="選擇BD">
+              <Select
+                placeholder="全部"
+                value={searchBD}
+                onChange={(v) => setSearchBD(v)}
+                allowClear
+                showSearch
+                filterOption={(input, option) => {
+                  const keyword = input.toLowerCase()
+                  const label = (option?.label ?? '').toString().toLowerCase()
+                  return label.includes(keyword)
                 }}
+                options={[
+                  { label: '張偉', value: 'bd-001' },
+                  { label: '李娜', value: 'bd-002' },
+                  { label: '王強', value: 'bd-003' },
+                  { label: '劉敏', value: 'bd-004' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="選擇日期">
+              <DatePicker
+                value={searchDate}
+                onChange={(date) => setSearchDate(date)}
+                format="YYYY-MM-DD"
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Form.Item>
+              <div className="search-actions">
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </div>
+            </Form.Item>
+          </Form>
+      </div>
+
+      {!hasSearched ? (
+        <Card bodyStyle={{ padding: '48px 24px' }}>
+          <Empty description="請先選擇所屬品牌、算法名稱、門店名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        </Card>
+      ) : (
+      <div style={{ display: 'flex', gap: 16 }}>
+        {/* 左侧：日期×时段表格 */}
+        <div style={{ flex: 1 }}>
+        {/* 日期×时段表格 */}
+        <Card 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            {/* 12306风格日期选择器 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+              <Button
                 size="small"
-                style={{ marginRight: 8 }}
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               >
-                <Radio.Button value="single">獨立商圈</Radio.Button>
-                <Radio.Button value="combination">
-                  <Space size={4}>
-                    <span>組合商圈</span>
-                    <span style={{ 
-                      fontSize: 11, 
-                      color: '#fff',
-                      background: '#ff4d4f',
-                      borderRadius: 2,
-                      padding: '0 3px',
-                      lineHeight: '16px',
-                      fontWeight: 600,
-                    }}>
-                      折
-                    </span>
-                  </Space>
-                </Radio.Button>
-              </Radio.Group>
-              {regionMode === 'single' ? (
-                <TreeSelect
-                  placeholder="全部"
-                  value={selectedRegion}
-                  onChange={(value) => setSelectedRegion(value)}
-                  allowClear
-                  style={{ width: 150 }}
-                  treeData={REGION_TREE_DATA}
-                  treeDefaultExpandAll
-                  showSearch
-                  treeNodeFilterProp="title"
-                />
-              ) : (
-                <Select
-                  placeholder="全部"
-                  value={selectedCombination}
-                  onChange={(value) => setSelectedCombination(value)}
-                  allowClear
-                  style={{ width: 160 }}
-                  options={MOCK_REGION_COMBINATIONS.map(c => ({
-                    label: c.name,
-                    value: c.id,
-                  }))}
-                />
-              )}
-            </Space>
-            {/* 图例 */}
-            <Space size={16}>
-              <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#f6ffed', border: '2px solid #52c41a', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>已選中</span>
-              </Space>
-              <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#fff', border: '1px solid #e8e8e8', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>可購買</span>
-              </Space>
-              <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>已售罄</span>
-              </Space>
-              <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#f5f5f5', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>不可售</span>
-              </Space>
-              <Space size={4}>
-                <div style={{ width: 16, height: 16, background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 3 }} />
-                <span style={{ fontSize: 12, color: '#595959' }}>已鎖定</span>
-              </Space>
-            </Space>
+                ◀
+              </Button>
+              <div style={{ flex: 1, display: 'flex', gap: 4, padding: '4px 0' }}>
+                {dateList.map(date => {
+                  const dateStr = date.format('YYYY-MM-DD')
+                  const isSelected = selectedDate?.format('YYYY-MM-DD') === dateStr
+                  const isToday = dateStr === dayjs().format('YYYY-MM-DD')
+                  const isHovered = hoveredDate === dateStr
+                  return (
+                    <div
+                      key={dateStr}
+                      onClick={() => handleDateClick(date)}
+                      onMouseEnter={() => setHoveredDate(dateStr)}
+                      onMouseLeave={() => setHoveredDate(null)}
+                      style={{
+                        flex: 1,
+                        padding: '6px 4px',
+                        borderRadius: 6,
+                        border: isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
+                        background: isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : isToday ? '#f6ffed' : '#fff',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: isSelected || isHovered ? '#fa8c16' : '#333' }}>
+                        {date.format('MM-DD')}
+                      </span>
+                      <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
+                        {isToday ? '今天' : WEEKDAY_LABELS[date.day()]}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <Button
+                size="small"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              >
+                ▶
+              </Button>
+            </div>
           </div>
         }
         style={{ flex: 1 }}
       >
-
 
         {/* 表格 */}
         <div style={{ overflowX: 'auto' }}>
@@ -363,9 +476,9 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   border: '1px solid #e8e8e8',
                   fontWeight: 600,
                   color: '#333',
-                  width: 100,
+                  width: 120,
                 }}>
-                  日期
+                  商圈
                 </th>
                 {MEAL_TIME_SLOTS.map(meal => (
                   <th 
@@ -385,129 +498,153 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
               </tr>
             </thead>
 
-            {/* 数据行 */}
+            {/* 数据行 - 商圈为行 */}
             <tbody>
-              {dateList.map(date => {
-                const isDateSelected = selectedDate?.format('YYYY-MM-DD') === date.format('YYYY-MM-DD')
+              {REGION_LIST.map(region => {
+                const activeDate = selectedDate || (allDates.length > 0 ? allDates[0] : dayjs())
+                const dateStr = activeDate.format('YYYY-MM-DD')
                 return (
-                  <tr key={date.format('YYYY-MM-DD')}>
-                    {/* 日期列 */}
-                    <td 
-                      onClick={() => handleDateClick(date)}
-                      style={{ 
-                        padding: '10px 6px', 
-                        border: isDateSelected ? '2px solid #52c41a' : '1px solid #e8e8e8',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        background: isDateSelected ? '#f6ffed' : '#fff',
-                        fontWeight: isDateSelected ? 600 : 400,
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <div style={{ fontSize: 13, color: '#333' }}>{date.format('MM-DD')}</div>
-                      <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2 }}>
-                        {['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][date.day()]}
-                      </div>
+                  <tr key={region.key}>
+                    {/* 商圈名称列 */}
+                    <td style={{ 
+                      padding: '10px 8px', 
+                      border: '1px solid #e8e8e8',
+                      textAlign: 'center',
+                      fontWeight: 600,
+                      color: '#333',
+                      background: '#fafafa',
+                    }}>
+                      <div style={{ fontSize: 13 }}>{region.name}</div>
                     </td>
 
                     {/* 时段列 */}
                     {MEAL_TIME_SLOTS.map(meal => {
-                      const status = getMealSlotStatus(date, meal)
-                      // 售罄时也使用总时段数计算价格
-                      const slotsForPrice = status.status === 'soldOut' ? meal.slots.length : status.availableSlots
-                      const price = getMealSlotPrice(meal, slotsForPrice)
-                      const isSelected = isDateSelected && selectedMealSlot === meal.key
-                      const isAvailable = status.status === 'available'
-                      const isSoldOut = status.status === 'soldOut'
-                      const isLocked = status.status === 'locked'
+                      const statuses = generateTimeSlotStatuses(inventoryItem.id + region.key, dateStr)
+                      const slotStates = meal.slots.map(slotIndex => statuses[slotIndex])
+                      const availableCount = slotStates.filter(s => s === TimeSlotStatus.AVAILABLE).length
+                      const soldOutCount = slotStates.filter(s => s === TimeSlotStatus.SOLD_OUT).length
                       
-                      // 检查当前时段是否包含无折扣的半小时
-                      const dateStr = date.format('YYYY-MM-DD')
+                      const isLocked = cartItems.some(item => 
+                        item.date === dateStr && 
+                        item.region === region.key &&
+                        meal.slots.some(slotIndex => item.timeSlots.includes(slotIndex))
+                      )
+                      
+                      // 获取锁定的购物车项以计算倒计时
+                      const lockedCartItem = cartItems.find(item => 
+                        item.date === dateStr && 
+                        item.region === region.key &&
+                        meal.slots.some(slotIndex => item.timeSlots.includes(slotIndex))
+                      )
+                      const remainingSeconds = lockedCartItem 
+                        ? Math.max(0, 60 - Math.floor((currentTime - lockedCartItem.lockTime) / 1000))
+                        : 0
+                      
+                      let status: 'available' | 'soldOut' | 'unavailable' | 'locked'
+                      let availableSlots: number
+                      
+                      if (isLocked) {
+                        status = 'locked'
+                        availableSlots = availableCount
+                      } else if (soldOutCount > 0 && availableCount === 0) {
+                        status = 'soldOut'
+                        availableSlots = 0
+                      } else if (availableCount > 0) {
+                        status = 'available'
+                        availableSlots = availableCount
+                      } else {
+                        status = 'unavailable'
+                        availableSlots = 0
+                      }
+                      
+                      const slotsForPrice = status === 'soldOut' ? meal.slots.length : availableSlots
+                      const totalAvailableSlots = 36
+                      const pricePerSlot = calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
+                      const price = pricePerSlot * slotsForPrice
+                      const isSelected = selectedDate?.format('YYYY-MM-DD') === dateStr && selectedMealSlot === meal.key && selectedRegion === region.key
+                      const isAvailable = status === 'available'
+                      const isSoldOut = status === 'soldOut'
+                      const isLockedStatus = status === 'locked'
+                      
                       const noDiscountSlots = getNoDiscountSlotsByRow(dateStr)
                       const hasNoDiscount = meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
                       
                       return (
                         <td 
                           key={meal.key}
-                          onClick={() => handleMealSlotClick(date, meal)}
+                          onClick={() => {
+                            if (isAvailable) {
+                              setSelectedDate(activeDate)
+                              setSelectedMealSlot(meal.key)
+                              setSelectedRegion(region.key)
+                            } else {
+                              message.info('該時段暫不可購買')
+                            }
+                          }}
                           style={{ 
                             padding: '8px 6px', 
                             textAlign: 'center',
                             cursor: isAvailable ? 'pointer' : 'not-allowed',
                             background: isSelected ? '#f6ffed' : 
-                                       isLocked ? '#f9f0ff' :
+                                       isLockedStatus ? '#f9f0ff' :
                                        isSoldOut ? '#fff2f0' : 
                                        !isAvailable ? '#f5f5f5' : '#fff',
                             border: isSelected ? '2px solid #52c41a' : 
-                                    isLocked ? '1px solid #d3adf7' : 
+                                    isLockedStatus ? '1px solid #d3adf7' : 
                                     isSoldOut ? '1px solid #ffccc7' :
                                     '1px solid #e8e8e8',
                             transition: 'all 0.2s',
-                            opacity: !isAvailable && !isLocked && !isSoldOut ? 0.6 : 1,
+                            opacity: !isAvailable && !isLockedStatus && !isSoldOut ? 0.6 : 1,
                           }}
                         >
-                          {/* 1. 状态标签 */}
-                          <div style={{ marginBottom: 4 }}>
-                            {status.status === 'available' && (
-                              <Tag color="success" style={{ fontSize: 10, padding: '1px 4px' }}>
-                                可購買
-                              </Tag>
+                          {/* 状态标签 */}
+                          <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                            {status === 'available' && (
+                              isSelected
+                                ? <Tag color="#E8720C" style={{ fontSize: 10, padding: '1px 4px' }}>已選擇</Tag>
+                                : <Tag color="success" style={{ fontSize: 10, padding: '1px 4px' }}>可購買</Tag>
                             )}
-                            {status.status === 'locked' && (
-                              <Tag color="#722ed1" style={{ fontSize: 10, padding: '1px 4px' }}>
-                                已鎖定
-                              </Tag>
+                            {status === 'locked' && (
+                              <>
+                                <Tag color="#722ed1" style={{ fontSize: 10, padding: '1px 4px' }}>已鎖定</Tag>
+                                <span>
+                                  <span style={{ fontSize: 16, fontWeight: 700, color: '#ff4d4f' }}>
+                                    {remainingSeconds}
+                                  </span>
+                                  <span style={{ fontSize: 10, color: '#ff7875' }}>秒後釋放</span>
+                                </span>
+                              </>
                             )}
-                            {status.status === 'soldOut' && (
-                              <Tag color="error" style={{ fontSize: 10, padding: '1px 4px' }}>
-                                已售罄
-                              </Tag>
+                            {status === 'soldOut' && (
+                              <Tag color="error" style={{ fontSize: 10, padding: '1px 4px' }}>已售罄</Tag>
                             )}
-                            {status.status === 'unavailable' && (
-                              <Tag color="default" style={{ fontSize: 10, padding: '1px 4px' }}>
-                                不可售
-                              </Tag>
+                            {status === 'unavailable' && (
+                              <Tag color="default" style={{ fontSize: 10, padding: '1px 4px' }}>不可售</Tag>
                             )}
                           </div>
 
-                          {/* 2. 售賣價格（折扣价） */}
-                          {(isAvailable || isSoldOut || isLocked) && (
+                          {/* 价格 */}
+                          {(isAvailable || isSoldOut || isLockedStatus) && (
                             <>
                               <div style={{ 
                                 fontSize: 16, 
                                 fontWeight: 700, 
-                                color: isSoldOut ? '#bfbfbf' : isLocked ? '#722ed1' : '#fa541c',
+                                color: isSoldOut ? '#bfbfbf' : isLockedStatus ? '#722ed1' : '#fa541c',
                                 marginBottom: 2,
                               }}>
                                 ${price}
                               </div>
-                              
-                              {/* 4. 原價展示 / 無折扣提示 */}
                               {hasNoDiscount ? (
-                                <div style={{ 
-                                  fontSize: 10, 
-                                  color: '#fa541c',
-                                  marginBottom: 2,
-                                  fontWeight: 600,
-                                }}>
-                                  無折扣
-                                </div>
+                                <div style={{ fontSize: 10, color: '#fa541c', marginBottom: 2, fontWeight: 600 }}>無折扣</div>
                               ) : (
-                                <div style={{ 
-                                  fontSize: 10, 
-                                  color: '#8c8c8c',
-                                  marginBottom: 2,
-                                  textDecoration: 'line-through',
-                                }}>
+                                <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 2, textDecoration: 'line-through' }}>
                                   原價：${inventoryItem.dailyPrice}
                                 </div>
                               )}
                             </>
                           )}
-                          {!isAvailable && !isSoldOut && !isLocked && (
-                            <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>
-                              --
-                            </div>
+                          {!isAvailable && !isSoldOut && !isLockedStatus && (
+                            <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>--</div>
                           )}
                         </td>
                       )
@@ -517,43 +654,13 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
               })}
             </tbody>
           </table>
-          
-          {/* 分页控件 */}
-          {totalPages > 1 && (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              gap: 8,
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: '1px solid #e8e8e8',
-            }}>
-              <Button
-                size="small"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              >
-                上一頁
-              </Button>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                第 {currentPage} / {totalPages} 頁（共 {allDates.length} 天）
-              </span>
-              <Button
-                size="small"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              >
-                下一頁
-              </Button>
-            </div>
-          )}
         </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* 右侧：当前所选 + 已选时段 + 费用结算 */}
       <div style={{ width: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* 当前所选 */}
+        {/* 当前所选 - 信息展示 */}
         <Card size="small" title={<Space><CalendarOutlined /><span>當前所選</span></Space>}>
           {selectedDate && selectedMealSlot ? (
             <div>
@@ -566,20 +673,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>所屬商圈：</span>
                   <span style={{ fontSize: 14, fontWeight: 600, color: '#722ed1' }}>
                     {(() => {
-                      const regionLabel: Record<number, string> = {
-                        [Region.KOKSAA]: '黑沙環區',
-                        [Region.COSTA]: '高士德區',
-                        [Region.SANMA]: '新馬路區',
-                        [Region.SANWONG]: '新皇朝區',
-                        [Region.HKM]: '港珠澳區',
-                        [Region.FAHUA]: '花城市區',
-                        [Region.AIRPORT]: '北安機場',
-                        [Region.LHOTEL]: '左酒店區',
-                        [Region.RHOTEL]: '右酒店區',
-                        [Region.UM]: '澳大專區',
-                        [Region.HACS]: '黑沙灘區',
-                      }
-                      return regionLabel[inventoryItem.region] || '-'
+                      return REGION_LIST.find(r => r.key === (selectedRegion || inventoryItem.region))?.name || '-'
                     })()}
                   </span>
                 </div>
@@ -606,35 +700,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 </div>
               </Space>
 
-              {/* 选择店铺 */}
-              <div style={{ 
-                padding: '10px 12px', 
-                background: '#fafafa', 
-                borderRadius: 6, 
-                border: '1px solid #f0f0f0',
-                marginTop: 12,
-              }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>
-                  <ShopOutlined style={{ marginRight: 4 }} />
-                  選擇店鋪 <span style={{ color: '#ff4d4f' }}>*</span>
-                </div>
-                <Select
-                  showSearch
-                  placeholder="請輸入店鋪名稱或ID搜索"
-                  value={selectedStore}
-                  onChange={(value) => setSelectedStore(value)}
-                  allowClear
-                  style={{ width: '100%' }}
-                  filterOption={(input, option) => {
-                    const keyword = input.toLowerCase()
-                    const label = (option?.label ?? '').toString().toLowerCase()
-                    const value = (option?.value ?? '').toString().toLowerCase()
-                    return label.includes(keyword) || value.includes(keyword)
-                  }}
-                  options={MOCK_STORES.map(s => ({ label: `${s.name} (${s.id.replace('store-', '')})`, value: s.id }))}
-                />
-              </div>
-
               {/* 底部加购按钮 */}
               <Button 
                 type="primary" 
@@ -643,10 +708,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 onClick={() => {
                   if (!selectedDate || !selectedMealSlot) {
                     message.warning('請先選擇日期和時段')
-                    return
-                  }
-                  if (!selectedStore) {
-                    message.warning('請先選擇店鋪')
                     return
                   }
                   
@@ -669,43 +730,31 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   const originalPrice = hasNoDiscount ? salePrice : inventoryItem.dailyPrice
                   
                   // 获取商圈名称
-                  const regionLabel: Record<number, string> = {
-                    [Region.KOKSAA]: '黑沙環區',
-                    [Region.COSTA]: '高士德區',
-                    [Region.SANMA]: '新馬路區',
-                    [Region.SANWONG]: '新皇朝區',
-                    [Region.HKM]: '港珠澳區',
-                    [Region.FAHUA]: '花城市區',
-                    [Region.AIRPORT]: '北安機場',
-                    [Region.LHOTEL]: '左酒店區',
-                    [Region.RHOTEL]: '右酒店區',
-                    [Region.UM]: '澳大專區',
-                    [Region.HACS]: '黑沙灘區',
-                  }
-                  
-                  // 获取店铺名称
-                  const storeInfo = MOCK_STORES.find(s => s.id === selectedStore)
+                  const activeRegion = selectedRegion || inventoryItem.region
+                  const regionName = REGION_LIST.find(r => r.key === activeRegion)?.name || '-'
                   
                   // 添加到购物车
                   const newItem: CartItem = {
                     key: `${dateStr}-${selectedMealSlot}-${Date.now()}`,
                     date: dateStr,
-                    region: inventoryItem.region,
-                    regionName: regionLabel[inventoryItem.region] || '-',
+                    region: activeRegion as Region,
+                    regionName,
                     mealSlot: meal.label,
                     timeSlots: availableSlots,
                     originalPrice,
                     salePrice,
-                    storeId: selectedStore!,
-                    storeName: storeInfo?.name || '-',
+                    storeId: searchStoreName || '',
+                    storeName: searchStoreName ? STORE_OPTIONS.find(s => s.value === searchStoreName)?.name || '' : '',
+                    lockTime: Date.now(),
                   }
                   
                   setCartItems(prev => [...prev, newItem])
-                  message.success(`已加購 ${dateStr} ${meal.label}`)
+                  message.success(`已加購 ${dateStr} ${regionName} ${meal.label}`)
                   
                   // 重置选择
                   setSelectedDate(null)
                   setSelectedMealSlot(null)
+                  setSelectedRegion(undefined)
                 }}
                 style={{ 
                   marginTop: 16, 
@@ -761,7 +810,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ),
               },
               {
-                title: '店鋪',
+                title: '門店',
                 dataIndex: 'storeName',
                 key: 'storeName',
                 width: 90,
@@ -787,6 +836,22 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 render: (price: number) => (
                   <span style={{ fontSize: 12, color: '#ff4d4f', fontWeight: 600 }}>${price}</span>
                 ),
+              },
+              {
+                title: '鎖定時間',
+                key: 'countdown',
+                width: 100,
+                align: 'center' as const,
+                render: (_, record) => {
+                  const remaining = Math.max(0, 60 - Math.floor((currentTime - record.lockTime) / 1000))
+                  if (remaining <= 0) return <span style={{ fontSize: 11, color: '#bfbfbf' }}>已釋放</span>
+                  return (
+                    <span style={{ fontSize: 12 }}>
+                      <span style={{ fontWeight: 700, color: remaining <= 10 ? '#ff4d4f' : '#fa8c16' }}>{remaining}</span>
+                      <span style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 2 }}>秒</span>
+                    </span>
+                  )
+                },
               },
               {
                 title: '操作',
@@ -892,6 +957,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           </Button>
         </Card>
       </div>
+      </div>
+      )}
 
       {/* 支付确认弹窗 */}
       <Modal

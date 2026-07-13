@@ -1,12 +1,10 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form, Card, Tabs } from 'antd'
+import { Button, Space, Table, Tag, Badge, Card, Tabs, Modal, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
+import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS } from '../constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
-
-const { Search } = Input
 
 /** 各业务类型对应的算法类型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
@@ -134,7 +132,6 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
 export default function Algorithm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [searchForm] = Form.useForm()
 
   // 从 URL 参数恢复列表状态（从新增页返回时）
   const typeParam = searchParams.get('type')
@@ -142,6 +139,7 @@ export default function Algorithm() {
   const initialType = typeParam ? Number(typeParam) as AlgorithmType : null
   const [selectedType, setSelectedType] = useState<AlgorithmType | null>(initialType)
   const [businessType, setBusinessType] = useState<'delivery' | 'groupBuy'>(tabParam || 'delivery')
+  const [dataList, setDataList] = useState<AlgorithmRecord[]>(mockAlgorithmData)
 
   /** 根据业务类型过滤数据 */
   const filterByBusinessType = (data: AlgorithmRecord[]) => {
@@ -152,7 +150,7 @@ export default function Algorithm() {
   }
 
   const [filteredData, setFilteredData] = useState<AlgorithmRecord[]>(
-    initialType ? filterByBusinessType(mockAlgorithmData.filter(item => item.type === initialType)) : mockAlgorithmData
+    initialType ? filterByBusinessType(dataList.filter(item => item.type === initialType)) : dataList
   )
 
   // 统计每种广告类型的算法数量
@@ -168,43 +166,31 @@ export default function Algorithm() {
   const handleSelectType = (type: AlgorithmType, tab: 'delivery' | 'groupBuy') => {
     setSelectedType(type)
     setBusinessType(tab)
-    const data = filterByBusinessType(mockAlgorithmData.filter(item => item.type === type))
+    const data = filterByBusinessType(dataList.filter(item => item.type === type))
     setFilteredData(data)
-    searchForm.resetFields()
   }
 
   // 返回卡片选择页
   const handleBackToCards = () => {
     setSelectedType(null)
-    setFilteredData(mockAlgorithmData)
+    setFilteredData(dataList)
     setBusinessType('delivery')
-    searchForm.resetFields()
   }
 
-  // 搜索处理
-  const handleSearch = (values: any) => {
-    let result = filterByBusinessType(mockAlgorithmData.filter(item => item.type === selectedType))
-    
-    if (values.name) {
-      result = result.filter(item => item.name.includes(values.name))
-    }
-    if (values.code) {
-      result = result.filter(item => item.code.includes(values.code))
-    }
-    if (values.brand !== undefined && values.brand !== null) {
-      result = result.filter(item => item.brand === values.brand)
-    }
-    if (values.status !== undefined && values.status !== null) {
-      result = result.filter(item => item.status === values.status)
-    }
-    
-    setFilteredData(result)
-  }
-
-  // 重置搜索
-  const handleReset = () => {
-    searchForm.resetFields()
-    setFilteredData(filterByBusinessType(mockAlgorithmData.filter(item => item.type === selectedType)))
+  // 删除算法
+  const handleDelete = (record: AlgorithmRecord) => {
+    Modal.confirm({
+      title: '確認刪除',
+      content: `確定要刪除算法「${record.name}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setDataList(prev => prev.filter(item => item.id !== record.id))
+        setFilteredData(prev => prev.filter(item => item.id !== record.id))
+        message.success('刪除成功')
+      },
+    })
   }
 
   // 跳转到新增页面（携带当前算法类型和业务类型）
@@ -245,12 +231,15 @@ export default function Algorithm() {
       ),
     },
     {
-      title: '操作', key: 'action', width: 180,
+      title: '操作', key: 'action', width: 220,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>編輯</Button>
           <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED}>
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
+          </Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
+            刪除
           </Button>
         </Space>
       ),
@@ -398,30 +387,6 @@ export default function Algorithm() {
           </Space>
         </div>
       </Card>
-
-      {/* 查询区域 */}
-      <div className="search-section">
-        <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="算法ID" name="code">
-            <Input placeholder="請輸入算法ID" allowClear />
-          </Form.Item>
-          <Form.Item label="算法名稱" name="name">
-            <Input placeholder="請輸入算法名稱" allowClear />
-          </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="全部" options={APP_OPTIONS} allowClear />
-          </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" options={SERVICE_STATUS_OPTIONS} allowClear />
-          </Form.Item>
-          <Form.Item>
-            <div className="search-actions">
-              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>查詢</Button>
-              <Button onClick={handleReset} icon={<ReloadOutlined />}>重置</Button>
-            </div>
-          </Form.Item>
-        </Form>
-      </div>
 
       {/* 功能区域 */}
       <div className="action-section">

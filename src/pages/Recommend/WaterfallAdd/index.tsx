@@ -1,6 +1,7 @@
-import { useState, useEffect, Fragment } from 'react'
-import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo, Fragment } from 'react'
+import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree, Upload } from 'antd'
+import type { UploadFile } from 'antd/es/upload/interface'
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined, UploadOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -16,6 +17,21 @@ import {
   SERVICE_STATUS_OPTIONS,
 } from '../constants'
 import dayjs from 'dayjs'
+
+// Mock数据 - 可选算法列表
+const ALGORITHM_OPTIONS = [
+  { id: 1, name: '無敵星星-首頁版', type: 'invincibleStar' },
+  { id: 2, name: '無敵星星-外賣版', type: 'invincibleStar' },
+  { id: 3, name: '無敵星星-團購版', type: 'invincibleStar' },
+  { id: 4, name: '猜你喜歡-主力版', type: 'youLike' },
+  { id: 5, name: '猜你喜歡-週末版', type: 'youLike' },
+  { id: 6, name: '新店廣告-首頁版', type: 'newShopAd' },
+  { id: 7, name: '新店廣告-早餐版', type: 'newShopAd' },
+  { id: 8, name: '盤活復蘇-首頁版', type: 'activateAd' },
+  { id: 9, name: '盤活復蘇-午市版', type: 'activateAd' },
+  { id: 10, name: '獨家商家-首頁版', type: 'exclusiveShop' },
+  { id: 11, name: '獨家商家-超市版', type: 'exclusiveShop' },
+]
 
 // Mock数据 - 从瀑布流策略读取启用的广告位
 const mockEnabledPositions = [1, 5, 8, 9, 12, 15, 18]
@@ -120,25 +136,32 @@ interface TimeSlotGradient {
   discount: number
 }
 
-// 区域组合折扣接口
-interface RegionCombinationDiscount {
-  name: string // 组合名称
-  regions: Region[]
-  discount: number
-}
-
 export default function WaterfallAdd() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlAlgorithmType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
+  const urlModule = searchParams.get('module') || 'delivery' // 'delivery' = 外賣到家, 'groupBuy' = 團購到店
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
+  // 根据模块过滤业务频道选项
+  const channelOptions = urlModule === 'groupBuy'
+    ? [{ label: '團購到店', value: RecommendChannel.GROUP_BUY }]
+    : [
+        { label: '美食外賣', value: RecommendChannel.DELIVERY },
+        { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+      ]
+
   // 基础信息
-  const [promotionName, setPromotionName] = useState('')
   const [selectedApp, setSelectedApp] = useState<AppType | undefined>(undefined)
   const [selectedChannel, setSelectedChannel] = useState<RecommendChannel | undefined>(undefined)
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | undefined>(urlAlgorithmType ?? undefined)
+
+  // 取消扣费规则配置
+  const [cancelFeeRules, setCancelFeeRules] = useState<{ id: number; maxDays: number; feePercent: number }[]>([
+    { id: 1, maxDays: 0, feePercent: 100 },
+    { id: 2, maxDays: 3, feePercent: 80 },
+  ])
   
   // 广告位选择（已移除展示位置）
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
@@ -152,11 +175,13 @@ export default function WaterfallAdd() {
   const [regionSelectModalVisible, setRegionSelectModalVisible] = useState(false)
   const [selectedRegionNode, setSelectedRegionNode] = useState<{ key: string; title: string; level: number } | null>(null)
   
-  // 销售日期
-  const [salesDateRange, setSalesDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | undefined>(undefined)
-  
-  // 状态
+
   const [status, setStatus] = useState<ServiceStatus>(ServiceStatus.ENABLED)
+  
+  // 推广图片
+  const [coverFileList, setCoverFileList] = useState<UploadFile[]>([])
+  const [detailFileList, setDetailFileList] = useState<UploadFile[]>([])
+  const [promoFileList, setPromoFileList] = useState<UploadFile[]>([])
   
   // 算法规则弹窗
   const [algorithmRuleModalVisible, setAlgorithmRuleModalVisible] = useState(false)
@@ -165,18 +190,8 @@ export default function WaterfallAdd() {
   const [gradients, setGradients] = useState<TimeSlotGradient[]>([])
   const [gradientEnabled, setGradientEnabled] = useState(false) // 梯度配置开关
   
-  // 多区域组合折扣
-  const [regionCombinations, setRegionCombinations] = useState<RegionCombinationDiscount[]>([])
-  const [regionCombinationEnabled, setRegionCombinationEnabled] = useState(false) // 区域组合折扣开关
-  
   // 销售策略（仅无敌星星）
-  const [presaleMode, setPresaleMode] = useState<'fixed' | 'rolling'>('fixed') // 预售模式：固定/滚动
   const [presaleDays, setPresaleDays] = useState<number>(7) // 预售天数
-  const [continuousPurchase, setContinuousPurchase] = useState(false) // 连续购买
-  const [purchaseLimitDays, setPurchaseLimitDays] = useState<number>(30) // 购买上限：X天内
-  const [purchaseLimitSlots, setPurchaseLimitSlots] = useState<number>(3) // 最多可购买X个时段
-  const [purchaseLimitMeals, setPurchaseLimitMeals] = useState<string[]>([]) // 统计时段（多选）
-  const [continuousInterval, setContinuousInterval] = useState<number>(7) // 连续购买=不支持时间隔天数
   const [merchantLimit, setMerchantLimit] = useState(false) // 商家限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]) // 选择的商家
   const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
@@ -399,79 +414,6 @@ export default function WaterfallAdd() {
     }))
   }
 
-  // 添加区域组合折扣
-  const handleAddRegionCombination = () => {
-    if (selectedRegions.length < 2) {
-      message.warning('至少需要选择2个区域才能组合')
-      return
-    }
-    setRegionCombinations([...regionCombinations, { name: '', regions: [], discount: 0 }])
-  }
-
-  // 删除区域组合折扣
-  const handleRemoveRegionCombination = (index: number) => {
-    setRegionCombinations(regionCombinations.filter((_, i) => i !== index))
-  }
-
-  // 更新组合名称
-  const handleUpdateCombinationName = (index: number, name: string) => {
-    setRegionCombinations(combinations => 
-      combinations.map((c, i) => {
-        if (i === index) {
-          return { ...c, name }
-        }
-        return c
-      })
-    )
-  }
-
-  // 更新区域组合
-  const handleUpdateCombinationRegions = (index: number, regions: Region[]) => {
-    setRegionCombinations(combinations => 
-      combinations.map((c, i) => {
-        if (i === index) {
-          return { ...c, regions }
-        }
-        return c
-      })
-    )
-  }
-
-  // 更新组合折扣
-  const handleUpdateCombinationDiscount = (index: number, discount: number | null) => {
-    setRegionCombinations(combinations => 
-      combinations.map((c, i) => {
-        if (i === index) {
-          return { ...c, discount: discount ?? 0 }
-        }
-        return c
-      })
-    )
-  }
-
-  // 生成区域组合选项(排除已使用的组合)
-  const getRegionCombinationOptions = (currentIndex: number) => {
-    if (selectedRegions.length < 2) return []
-    
-    // 生成所有可能的组合(2个区域到所有区域)
-    const combinations: Region[] = []
-    const regions = selectedRegions
-    
-    // 2个区域的组合
-    for (let i = 0; i < regions.length; i++) {
-      for (let j = i + 1; j < regions.length; j++) {
-        combinations.push(regions[i], regions[j])
-      }
-    }
-    
-    // 3个及以上区域的组合
-    if (regions.length >= 3) {
-      combinations.push(...regions)
-    }
-    
-    return regions
-  }
-
   // 返回列表
   const handleBack = () => {
     if (urlAlgorithmType) {
@@ -488,7 +430,6 @@ export default function WaterfallAdd() {
       setLoading(true)
       
       const submitData = {
-        promotionName,
         app: selectedApp,
         channel: selectedChannel,
         algorithmType: selectedAlgorithmType,
@@ -501,9 +442,7 @@ export default function WaterfallAdd() {
           discountEnabled: c.discountEnabled,
           discounts: c.discountEnabled ? c.discounts : undefined,
         })),
-        salesDateRange,
         gradients,
-        regionCombinations,
       }
       
       console.log('提交數據:', submitData)
@@ -548,15 +487,18 @@ export default function WaterfallAdd() {
           <Card title="基礎信息" size="small" style={{ marginBottom: 12, borderRadius: 8 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <Form.Item 
-                label="活動名稱" 
-                name="promotionName" 
-                rules={[{ required: true, message: '請輸入活動名稱' }]}
+                label="算法名稱"
+                name="algorithmId" 
+                rules={[{ required: true, message: '請選擇算法' }]}
               >
-                <Input 
-                  placeholder="請輸入活動名稱（最多10個字）" 
-                  maxLength={10}
-                  value={promotionName}
-                  onChange={(e) => setPromotionName(e.target.value)}
+                <Select 
+                  placeholder="請選擇算法"
+                  showSearch
+                  optionFilterProp="label"
+                  options={ALGORITHM_OPTIONS.map(alg => ({
+                    label: alg.name,
+                    value: alg.id,
+                  }))}
                 />
               </Form.Item>
 
@@ -579,11 +521,7 @@ export default function WaterfallAdd() {
               >
                 <Select 
                   placeholder="請選擇業務頻道" 
-                  options={[
-                    { label: '美食外賣', value: RecommendChannel.DELIVERY },
-                    { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
-                    { label: '團購到店', value: RecommendChannel.GROUP_BUY },
-                  ]}
+                  options={channelOptions}
                   onChange={(value) => {
                     setSelectedChannel(value)
                     // 切换频道时重置展示页面
@@ -591,17 +529,56 @@ export default function WaterfallAdd() {
                   }}
                 />
               </Form.Item>
+            </div>
+          </Card>
 
-              <Form.Item 
-                label="展示頁面" 
-                name="algorithmLandingPage" 
-                rules={[{ required: true, message: '請選擇展示頁面' }]}
-              >
-                <Select
-                  placeholder="請先選擇業務頻道"
-                  disabled={!selectedChannel}
-                  options={selectedChannel ? CHANNEL_PAGE_OPTIONS[selectedChannel] : []}
-                />
+          {/* 推广图片 */}
+          <Card title="推廣圖片" size="small" style={{ marginBottom: 12, borderRadius: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+              <Form.Item label="封面圖">
+                <Upload
+                  listType="picture-card"
+                  fileList={coverFileList}
+                  onChange={({ fileList }) => setCoverFileList(fileList)}
+                  beforeUpload={() => false}
+                >
+                  {coverFileList.length < 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <PlusOutlined style={{ fontSize: 20 }} />
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳封面圖</span>
+                    </div>
+                  )}
+                </Upload>
+              </Form.Item>
+              <Form.Item label="詳情圖">
+                <Upload
+                  listType="picture-card"
+                  fileList={detailFileList}
+                  onChange={({ fileList }) => setDetailFileList(fileList)}
+                  beforeUpload={() => false}
+                >
+                  {detailFileList.length < 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <PlusOutlined style={{ fontSize: 20 }} />
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
+                    </div>
+                  )}
+                </Upload>
+              </Form.Item>
+              <Form.Item label="宣傳圖">
+                <Upload
+                  listType="picture-card"
+                  fileList={promoFileList}
+                  onChange={({ fileList }) => setPromoFileList(fileList)}
+                  beforeUpload={() => false}
+                >
+                  {promoFileList.length < 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <PlusOutlined style={{ fontSize: 20 }} />
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳宣傳圖</span>
+                    </div>
+                  )}
+                </Upload>
               </Form.Item>
             </div>
           </Card>
@@ -678,25 +655,16 @@ export default function WaterfallAdd() {
             </Card>
           )}
 
-          {/* 销售策略（仅无敌星星） */}
-          {!isReviveAlgorithm && selectedApp && selectedChannel && selectedAlgorithmType && (
+          {/* 销售策略（无敌星星 + 盘活复苏） */}
+          {selectedApp && selectedChannel && selectedAlgorithmType && (
             <Card 
               title="銷售策略" 
               size="small"
               style={{ marginBottom: 12, borderRadius: 8 }}
             >
-              {/* 预售模式 + 预售天数 并排 */}
+              {/* 预售天数 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售模式:</span>
-                  <Switch 
-                    checked={presaleMode === 'rolling'}
-                    onChange={(checked) => setPresaleMode(checked ? 'rolling' : 'fixed')}
-                    checkedChildren="滾動"
-                    unCheckedChildren="固定"
-                  />
-                </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數:</span>
                   <InputNumber
                     min={1}
@@ -706,62 +674,10 @@ export default function WaterfallAdd() {
                     addonAfter="天"
                     style={{ width: 160 }}
                   />
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                    {presaleMode === 'fixed' 
-                      ? `系統僅銷售 ${presaleDays} 天內的廣告，每過一天減少一天，售完即止`
-                      : `系統持續銷售 ${presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售`}
+                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
+                    系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售
                   </span>
                 </div>
-              </div>
-
-              {/* 连续购买：Switch + 右侧参数 */}
-              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>連續購買:</span>
-                  <Switch 
-                    checked={continuousPurchase}
-                    onChange={(checked) => setContinuousPurchase(checked)}
-                    checkedChildren="支持"
-                    unCheckedChildren="不支持"
-                  />
-                </div>
-                {/* 右侧参数区 */}
-                {continuousPurchase ? (
-                  <div style={{ flex: 1, padding: 12, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: '#595959' }}>購買上限：</span>
-                      <InputNumber min={1} max={365} value={purchaseLimitDays} onChange={(value) => setPurchaseLimitDays(value || 30)} style={{ width: 80 }} size="small" />
-                      <span style={{ fontSize: 12, color: '#595959' }}>天內，最多可購買</span>
-                      <InputNumber min={1} max={20} value={purchaseLimitSlots} onChange={(value) => setPurchaseLimitSlots(value || 3)} style={{ width: 70 }} size="small" />
-                      <span style={{ fontSize: 12, color: '#595959' }}>個時段，只統計</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {TIME_SLOTS.filter(t => t.key !== 'fullDay').map(slot => (
-                        <Checkbox
-                          key={slot.key}
-                          checked={purchaseLimitMeals.includes(slot.key)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setPurchaseLimitMeals([...purchaseLimitMeals, slot.key])
-                            } else {
-                              setPurchaseLimitMeals(purchaseLimitMeals.filter(k => k !== slot.key))
-                            }
-                          }}
-                        >
-                          {slot.label}
-                        </Checkbox>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ flex: 1, padding: 12, background: '#fff7e6', borderRadius: 6, border: '1px solid #ffd591' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#595959' }}>間隔</span>
-                      <InputNumber min={1} max={365} value={continuousInterval} onChange={(value) => setContinuousInterval(value || 7)} style={{ width: 80 }} size="small" />
-                      <span style={{ fontSize: 12, color: '#595959' }}>天，可再次購買</span>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* 商家限制：Switch + 右侧按钮 */}
@@ -787,7 +703,8 @@ export default function WaterfallAdd() {
                 )}
               </div>
 
-              {/* 可售时段 */}
+              {/* 可售时段（仅无敌星星） */}
+              {!isReviveAlgorithm && (
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
                   <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>可售時段:</span>
@@ -829,6 +746,7 @@ export default function WaterfallAdd() {
                   </div>
                 )}
               </div>
+              )}
             </Card>
           )}
 
@@ -1179,131 +1097,110 @@ export default function WaterfallAdd() {
             </div>
           </Modal>
 
-          {/* 多区域组合折扣 - 仅無敵星星显示 */}
-          {!isReviveAlgorithm && selectedRegions.length > 0 && (
-            <Card 
-              title={
-                <Space>
-                  商圈組合折扣
-                  <Switch 
-                    checked={regionCombinationEnabled}
-                    onChange={(checked) => {
-                      setRegionCombinationEnabled(checked)
-                      // 开启时默认添加一个组合折扣
-                      if (checked && regionCombinations.length === 0) {
-                        setRegionCombinations([{ name: '', regions: [], discount: 0 }])
-                      }
-                    }}
-                    size="small"
-                    style={{ marginLeft: 8 }}
-                  />
-                  <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
-                    選擇多個區域時可享受的組合折扣
-                  </span>
-                </Space>
-              }
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-              extra={
-                regionCombinationEnabled && (
-                  <Button 
-                    type="primary" 
-                    size="small" 
-                    icon={<PlusOutlined />}
-                    onClick={handleAddRegionCombination}
-                  >
-                    添加組合
-                  </Button>
-                )
-              }
-            >
-              {regionCombinationEnabled ? (
-                regionCombinations.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
-                    暫無區域組合折扣，請點擊右上角"添加組合"
-                  </div>
-                ) : (
-                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  {regionCombinations.map((combination, index) => (
-                    <div key={index} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, background: '#fafafa', borderRadius: 6 }}>
-                      <Tag color="purple">組合 {index + 1}</Tag>
-                      <Form.Item label="組合名稱" style={{ marginBottom: 0, flex: 1.5 }}>
-                        <Input
-                          placeholder="請輸入組合名稱"
-                          value={combination.name}
-                          onChange={(e) => handleUpdateCombinationName(index, e.target.value)}
-                        />
-                      </Form.Item>
-                      <Form.Item label="選擇商圈" style={{ marginBottom: 0, flex: 2 }}>
-                        <Select
-                          mode="multiple"
-                          placeholder="請選擇組合區域"
-                          style={{ width: '100%' }}
-                          options={REGION_OPTIONS.filter((opt) => selectedRegions.includes(opt.value))}
-                          value={combination.regions}
-                          onChange={(value) => handleUpdateCombinationRegions(index, value)}
-                        />
-                      </Form.Item>
-                      <span style={{ color: '#8c8c8c' }}>→</span>
-                      <Form.Item label="組合折扣" style={{ marginBottom: 0, flex: 1 }}>
-                        <InputNumber
-                          min={1}
-                          max={100}
-                          placeholder="折扣"
-                          style={{ width: '100%' }}
-                          addonAfter="折"
-                          value={combination.discount}
-                          onChange={(value) => handleUpdateCombinationDiscount(index, value)}
-                        />
-                      </Form.Item>
-                      <Button 
-                        type="text" 
-                        danger 
-                        icon={<DeleteFilled style={{ fontSize: 16 }} />}
-                        onClick={() => handleRemoveRegionCombination(index)}
-                      />
-                    </div>
-                  ))}
-                </Space>
-                )
-              ) : null}
-            </Card>
-          )}
 
-          {/* 销售日期 */}
-          {selectedRegions.length > 0 && (
-            <Card 
-              title="銷售日期" 
-              size="small"
-              style={{ marginBottom: 12, borderRadius: 8 }}
-              extra={<Tag color="blue">必填</Tag>}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, alignItems: 'center' }}>
-                <Form.Item 
-                  name="salesDateRange" 
-                  rules={[{ required: true, message: '請選擇銷售日期' }]}
-                  style={{ marginBottom: 0 }}
-                >
-                  <DatePicker.RangePicker 
-                    style={{ width: '100%' }} 
-                    placeholder={['開始日期', '結束日期']}
-                    onChange={(dates) => setSalesDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | undefined)}
-                  />
-                </Form.Item>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>狀態:</span>
-                  <Switch 
-                    checked={status === ServiceStatus.ENABLED}
-                    onChange={(checked) => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
-                    checkedChildren="啟用"
-                    unCheckedChildren="停用"
-                  />
-                </div>
-              </div>
-            </Card>
-          )}
         </Form>
       </div>
+
+      {/* 取消扣费规则配置 */}
+      <Card
+        title={
+          <Space>
+            <SettingOutlined style={{ color: '#E8720C' }} />
+            <span style={{ fontSize: 15, fontWeight: 600 }}>取消扣費規則</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400, marginLeft: 8 }}>
+              當剩餘天數沒有匹配到規則，取消則不扣費
+            </span>
+          </Space>
+        }
+        style={{ marginBottom: 12, borderRadius: 8 }}
+        headStyle={{ borderBottom: '1px solid #f0f0f0' }}
+      >
+        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
+            廣告開始推廣，扣費比例
+          </span>
+          <Button
+            size="small"
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              const nextId = cancelFeeRules.length > 0 ? Math.max(...cancelFeeRules.map(r => r.id)) + 1 : 1
+              setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
+            }}
+          >
+            新增梯度
+          </Button>
+        </div>
+
+        <Table
+          rowKey="id"
+          dataSource={cancelFeeRules}
+          pagination={false}
+          bordered
+          size="small"
+          columns={[
+            {
+              title: '廣告推廣',
+              dataIndex: 'maxDays',
+              width: 220,
+              render: (_, record: { id: number; maxDays: number; feePercent: number }) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>剩餘天數 ≤</span>
+                  <InputNumber
+                    min={0}
+                    max={999}
+                    value={record.maxDays === 999 ? undefined : record.maxDays}
+                    onChange={(val) => {
+                      setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, maxDays: val ?? 0 } : r))
+                    }}
+                    addonAfter={record.maxDays === 999 ? '' : '天'}
+                    placeholder={record.maxDays === 999 ? '不限' : ''}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              ),
+            },
+            {
+              title: '比例配置',
+              dataIndex: 'feePercent',
+              width: 160,
+              render: (_, record: { id: number; maxDays: number; feePercent: number }) => (
+                <InputNumber
+                  min={0}
+                  max={100}
+                  value={record.feePercent}
+                  onChange={(val) => {
+                    setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, feePercent: val ?? 0 } : r))
+                  }}
+                  addonAfter="%"
+                  style={{ width: '100%' }}
+                />
+              ),
+            },
+            {
+              title: '操作',
+              width: 80,
+              align: 'center',
+              render: (_: unknown, record: { id: number }) => (
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  onClick={() => {
+                    if (cancelFeeRules.length <= 1) {
+                      message.warning('至少保留一條規則')
+                      return
+                    }
+                    setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
+                  }}
+                >
+                  刪除
+                </Button>
+              ),
+            },
+          ]}
+        />
+      </Card>
 
       {/* 底部操作按钮 - 固定 */}
       <div className="form-footer">

@@ -61,6 +61,7 @@ export default function AlgorithmAdd() {
   const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
   const [merchantLimit, setMerchantLimit] = useState(false) // false: 不限制, true: 限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([])
+  const [deliveryRange, setDeliveryRange] = useState<string[]>([]) // 配送範圍：短程/中程/遠程
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
@@ -268,6 +269,7 @@ export default function AlgorithmAdd() {
             continuousPurchase: 'notSupport',
             merchantLimit: 'unlimited',
             regionLimit: 'limited',
+            merchantExposureStrategy: selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? 'random' : undefined,
           }}
         >
 
@@ -315,27 +317,47 @@ export default function AlgorithmAdd() {
             </div>
           </Form.Item>
 
-          {/* 區域商家展示限制 */}
+          {/* 配送範圍計算（僅盤活復蘇） */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
-            /* 盤活復蘇：區域商家展示限制 */
-            <div style={{
-              border: '1px solid #d6e4ff',
-              borderRadius: 8,
-              background: '#f0f5ff',
-              overflow: 'hidden',
-              marginBottom: 16,
-            }}>
-                  {/* 標題欄 */}
-                  <div style={{
-                    fontSize: 14, fontWeight: 600, color: '#1890ff',
-                    padding: '10px 20px',
-                    borderBottom: '1px solid #d6e4ff',
-                    background: '#e6f4ff',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                    <SettingOutlined />
-                    算法策略
-                  </div>
+            <Form.Item
+              label="配送範圍計算"
+              style={{ marginBottom: 16 }}
+              labelCol={{ flex: '150px' }}
+              wrapperCol={{ flex: 1 }}
+            >
+              <Checkbox.Group
+                options={[
+                  { label: '短程', value: 'short' },
+                  { label: '中程', value: 'medium' },
+                  { label: '遠程', value: 'long' },
+                ]}
+                value={deliveryRange}
+                onChange={(checkedValues) => setDeliveryRange(checkedValues as string[])}
+              />
+            </Form.Item>
+          )}
+
+          {/* 區域商家展示限制 */}
+          {(selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR) && (
+            /* 盤活復蘇/無敵星星：區域商家展示限制 */
+              <div style={{
+                border: '1px solid #d6e4ff',
+                borderRadius: 8,
+                background: '#f0f5ff',
+                overflow: 'hidden',
+                marginBottom: 16,
+              }}>
+                    {/* 標題欄 */}
+                    <div style={{
+                      fontSize: 14, fontWeight: 600, color: '#1890ff',
+                      padding: '10px 20px',
+                      borderBottom: '1px solid #d6e4ff',
+                      background: '#e6f4ff',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <SettingOutlined />
+                      算法策略
+                    </div>
 
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -348,10 +370,13 @@ export default function AlgorithmAdd() {
                         <Select
                           placeholder="請選擇"
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
-                          options={[
+                          options={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? [
+                            { label: '隨機計算', value: 'random' },
+                          ] : [
                             { label: '維度計算', value: 'merchant' },
-                            { label: '輪詢計算', value: 'random' },
+                            { label: '隨機計算', value: 'random' },
                           ]}
+                          disabled={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR}
                         />
                       </Form.Item>
                     </div>
@@ -359,24 +384,9 @@ export default function AlgorithmAdd() {
                       {/* 按轮询维度配置 */}
                       {merchantExposureStrategy === 'random' && (
                         <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>每</span>
-                            <Form.Item
-                              name="pollingInterval"
-                              style={{ flex: 0, marginBottom: 0 }}
-                            >
-                              <InputNumber
-                                min={1}
-                                max={1440}
-                                placeholder="請輸入"
-                                style={{ width: 120, height: 36, borderRadius: 6, fontSize: 14 }}
-                              />
-                            </Form.Item>
-                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘輪詢一次</span>
-                          </div>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後以配置的時間間隔逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。
+                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
                             </span>
                           </div>
                         </div>
@@ -644,6 +654,8 @@ export default function AlgorithmAdd() {
                       )}
                   </div>
             </div>
+
+
           )}
         </Form>
         </Card>

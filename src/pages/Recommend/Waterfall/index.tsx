@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker, Tabs } from 'antd'
 const { RangePicker } = DatePicker
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, LayoutOutlined, ArrowLeftOutlined, AppstoreOutlined, WalletOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, EyeOutlined, LayoutOutlined, ArrowLeftOutlined, AppstoreOutlined, WalletOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   AppType, 
@@ -224,6 +224,14 @@ export default function Waterfall() {
     return map
   }, [])
 
+  // 业务频道选项（根据业务类型过滤）
+  const bizChannelOptions = useMemo(() => {
+    if (bizTypeTab === 'groupBuy') {
+      return BIZ_CHANNEL_OPTIONS.filter(opt => opt.value === 'groupBuy')
+    }
+    return BIZ_CHANNEL_OPTIONS.filter(opt => opt.value !== 'groupBuy')
+  }, [bizTypeTab])
+
   // 点击卡片进入列表
   const handleSelectType = (type: AlgorithmType) => {
     setSelectedAlgorithmType(type)
@@ -246,67 +254,29 @@ export default function Waterfall() {
   const [selectedMerchants, setSelectedMerchants] = useState<number[]>([])
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState<'limited' | 'unlimited'>('unlimited')
-
+  
   // 搜索处理
   const handleSearch = (values: any) => {
     let result = [...mockData]
     
-    // 廣告名稱/ID搜索
-    if (values.promotionName) {
-      result = result.filter(item => 
-        item.promotionName?.includes(values.promotionName) || 
-        item.adId?.includes(values.promotionName)
-      )
+    // 配置ID搜索
+    if (values.adId) {
+      result = result.filter(item => item.adId?.includes(values.adId))
     }
     
+    // 瀑布流名称搜索
+    if (values.promotionName) {
+      result = result.filter(item => item.promotionName?.includes(values.promotionName))
+    }
+    
+    // 所属品牌搜索
     if (values.app !== undefined && values.app !== null) {
       result = result.filter(item => item.app === values.app)
     }
     
-    if (values.channel !== undefined && values.channel !== null) {
-      result = result.filter(item => item.channel === values.channel)
-    }
-
-    if (values.bizChannel !== undefined && values.bizChannel !== null) {
-      result = result.filter(item => item.bizChannel === values.bizChannel)
-    }
-
-    if (values.slotPosition !== undefined && values.slotPosition !== null) {
-      result = result.filter(item => item.slotPosition === values.slotPosition)
-    }
-
-    if (values.algorithm) {
-      result = result.filter(item => 
-        item.algorithmName.includes(values.algorithm) || 
-        String(item.algorithmId).includes(values.algorithm)
-      )
-    }
-    
+    // 状态搜索
     if (values.status !== undefined && values.status !== null) {
       result = result.filter(item => item.status === values.status)
-    }
-    
-    if (values.updatedBy) {
-      result = result.filter(item => 
-        item.updatedBy && item.updatedBy.includes(values.updatedBy)
-      )
-    }
-    
-    if (values.updatedAt) {
-      const searchDate = values.updatedAt.format('YYYY-MM-DD')
-      result = result.filter(item => 
-        item.updatedAt && item.updatedAt.startsWith(searchDate)
-      )
-    }
-    
-    if (values.salesDateRange && values.salesDateRange.length === 2) {
-      const startDate = values.salesDateRange[0].format('YYYY-MM-DD')
-      const endDate = values.salesDateRange[1].format('YYYY-MM-DD')
-      result = result.filter(item => 
-        item.salesStartDate && item.salesEndDate &&
-        item.salesStartDate <= endDate &&
-        item.salesEndDate >= startDate
-      )
     }
     
     setFilteredData(result)
@@ -388,15 +358,9 @@ export default function Waterfall() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'adId', title: '廣告ID' },
-    { key: 'promotionName', title: '廣告名稱' },
+    { key: 'adId', title: '配置ID' },
+    { key: 'promotionName', title: '算法名稱' },
     { key: 'app', title: '所屬品牌' },
-    { key: 'channel', title: '展示頁面' },
-    { key: 'bizChannel', title: '業務頻道' },
-    { key: 'algorithmId', title: '關聯算法ID' },
-    { key: 'algorithmName', title: '關聯算法名稱' },
-    { key: 'salesStartDate', title: '銷售日期起' },
-    { key: 'salesEndDate', title: '銷售日期止' },
     { key: 'status', title: '狀態' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updatedAt', title: '最後更新時間' },
@@ -410,18 +374,18 @@ export default function Waterfall() {
   // 完整列定义（带自定义渲染）
   const columns: ColumnsType<WaterfallSlotConfig> = [
     { 
-      title: '廣告ID',
+      title: '配置ID',
       dataIndex: 'adId',
       key: 'adId',
       width: 120,
       render: (text: string) => <Tag color="blue">{text}</Tag>,
     },
     { 
-      title: '廣告名稱',
+      title: '算法名稱',
       dataIndex: 'promotionName',
       key: 'promotionName',
-      width: 140,
-      ellipsis: true,
+      width: 200,
+      render: (text: string) => <strong>{text}</strong>,
     },
     { 
       title: '所屬品牌', 
@@ -441,55 +405,6 @@ export default function Waterfall() {
           {v === AppType.SHANFENG ? '閃峰' : 'mFood'}
         </Tag>
       ),
-    },
-    { 
-      title: '展示頁面',
-      dataIndex: 'channel', 
-      key: 'channel', 
-      width: 140,
-      render: (v: RecommendChannel) => CHANNEL_LABEL[v],
-    },
-    {
-      title: '業務頻道',
-      key: 'bizChannel',
-      width: 110,
-      align: 'center',
-      render: (_: unknown, record: WaterfallSlotConfig) => {
-        const biz = record.bizChannel || ''
-        return biz ? <Tag color="blue">{BIZ_CHANNEL_LABEL[biz]}</Tag> : '-'
-      },
-    },
-    {
-      title: '關聯算法ID',
-      dataIndex: 'algorithmId',
-      key: 'algorithmId',
-      width: 120,
-      render: (id: number) => (
-        <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
-          {String(id).padStart(6, '0')}
-        </code>
-      ),
-    },
-    {
-      title: '關聯算法名稱',
-      dataIndex: 'algorithmName',
-      key: 'algorithmName',
-      width: 200,
-      render: (text: string) => <strong>{text}</strong>,
-    },
-    {
-      title: '銷售日期起',
-      dataIndex: 'salesStartDate',
-      key: 'salesStartDate',
-      width: 120,
-      render: (v: string | undefined) => v || '-',
-    },
-    {
-      title: '銷售日期止',
-      dataIndex: 'salesEndDate',
-      key: 'salesEndDate',
-      width: 120,
-      render: (v: string | undefined) => v || '-',
     },
     {
       title: '狀態',
@@ -581,7 +496,6 @@ export default function Waterfall() {
             type="link" 
             size="small" 
             danger
-            icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
           >
             刪除
@@ -608,15 +522,6 @@ export default function Waterfall() {
         </Card>
 
         <Card title="請選擇廣告類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-          <Tabs
-            activeKey={bizTypeTab}
-            onChange={setBizTypeTab}
-            items={[
-              { key: 'delivery', label: '外賣到家' },
-              { key: 'groupBuy', label: '團購到店' },
-            ]}
-            style={{ marginBottom: 8 }}
-          />
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -685,36 +590,17 @@ export default function Waterfall() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="廣告名稱" name="promotionName">
-            <Input placeholder="廣告名稱/ID搜索" allowClear />
+          <Form.Item label="配置ID" name="adId">
+            <Input placeholder="請輸入配置ID" allowClear />
+          </Form.Item>
+          <Form.Item label="算法名稱" name="promotionName">
+            <Input placeholder="請輸入算法名稱" allowClear />
           </Form.Item>
           <Form.Item label="所屬品牌" name="app">
             <Select placeholder="全部" options={APP_OPTIONS} allowClear />
           </Form.Item>
-          <Form.Item label="展示頁面" name="channel">
-            <Select 
-              placeholder="全部" 
-              options={CHANNEL_OPTIONS} 
-              allowClear
-            />
-          </Form.Item>
-          <Form.Item label="業務頻道" name="bizChannel">
-            <Select placeholder="全部" options={BIZ_CHANNEL_OPTIONS} allowClear />
-          </Form.Item>
-          <Form.Item label="關聯算法名稱" name="algorithm">
-            <Input placeholder="算法名稱/ID" allowClear />
-          </Form.Item>
           <Form.Item label="狀態" name="status">
             <Select placeholder="全部" options={SERVICE_STATUS_OPTIONS} allowClear />
-          </Form.Item>
-          <Form.Item label="銷售日期" name="salesDateRange">
-            <RangePicker placeholder={['開始日期', '結束日期']} allowClear />
-          </Form.Item>
-          <Form.Item label="最後更新人" name="updatedBy">
-            <Input placeholder="請輸入更新人" allowClear />
-          </Form.Item>
-          <Form.Item label="最後更新時間" name="updatedAt">
-            <DatePicker placeholder="選擇日期" allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -731,7 +617,7 @@ export default function Waterfall() {
           <Button 
             type="primary" 
             icon={<PlusOutlined />}
-            onClick={() => navigate(`/promotion-waterfall-add?type=${selectedAlgorithmType}`)}
+            onClick={() => navigate(`/promotion-waterfall-add?type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
             新增
           </Button>
@@ -755,47 +641,6 @@ export default function Waterfall() {
           }}
         />
       </div>
-
-      {/* 空数据时展示手机模型 */}
-      {filteredData.length === 0 && (
-        <Card 
-          title="瀑布流預覽" 
-          style={{ marginTop: 16 }}
-          extra={<Tag color="blue">自然流量展示</Tag>}
-        >
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
-            <div style={{ width: 110, background: '#1a1a1a', borderRadius: 14, padding: '3px 2px', boxShadow: '0 3px 12px rgba(0,0,0,0.3)' }}>
-              <div style={{ background: '#f5f5f5', borderRadius: 11, overflow: 'hidden', minHeight: 180 }}>
-                <div style={{ background: '#fff', padding: '2px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 6, fontWeight: 600 }}>
-                  <span>9:41</span>
-                  <Space size={1}><span style={{ fontSize: 6 }}>📶</span><span style={{ fontSize: 6 }}>🔋</span></Space>
-                </div>
-                <div style={{ background: '#fff', padding: '3px 4px', borderBottom: '1px solid #e8e8e8' }}>
-                  <div style={{ fontSize: 8, fontWeight: 600, color: '#262626' }}>瀑布流展示</div>
-                  <div style={{ fontSize: 6, color: '#8c8c8c', lineHeight: 1.2 }}>(只展示啟用的坑位)</div>
-                </div>
-                <div style={{ padding: '3px', minHeight: 120 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                    {[{ position: 1, name: '默认推荐' }, { position: 2, name: '热门商家' }, { position: 3, name: '附近推荐' }, { position: 4, name: '新品上市' }, { position: 5, name: '优质评价' }, { position: 6, name: '销量排行' }].map((item) => (
-                      <div key={item.position} style={{ background: '#fff', borderRadius: 2, padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>
-                        <Badge count={`${item.position}`} style={{ backgroundColor: '#8c8c8c', marginBottom: 1, display: 'block', fontSize: 6 }} />
-                        <div style={{ fontSize: 6, fontWeight: 500, color: '#595959', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                        <div style={{ marginTop: 2, height: 14, background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8c8c8c', fontSize: 7 }}>🌊</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ background: '#fff', borderTop: '1px solid #e8e8e8', padding: '2px 0', display: 'flex', justifyContent: 'space-around' }}>
-                  <span style={{ fontSize: 7 }}>🏠</span>
-                  <span style={{ fontSize: 7 }}>🔍</span>
-                  <span style={{ fontSize: 7 }}>📋</span>
-                  <span style={{ fontSize: 7 }}>👤</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {/* 新增/编辑弹窗 */}
       <Modal
@@ -845,9 +690,9 @@ export default function Waterfall() {
             </Form.Item>
 
             <Form.Item 
-              label="關聯算法" 
+              label="算法名稱" 
               name="algorithmId"
-              rules={[{ required: true, message: '請選擇關聯算法' }]}
+              rules={[{ required: true, message: '請選擇算法' }]}
             >
               <Select 
                 placeholder="請先選擇廣告類型" 
@@ -1127,6 +972,7 @@ export default function Waterfall() {
           </>
         )}
       </Modal>
+
     </div>
   )
 }

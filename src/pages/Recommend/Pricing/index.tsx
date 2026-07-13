@@ -141,17 +141,6 @@ export default function Pricing() {
       width: 100,
     },
     { 
-      title: '廣告類型', 
-      dataIndex: 'algorithmType', 
-      key: 'algorithmType',
-      width: 120,
-      render: (v: AlgorithmType) => (
-        <span style={{ color: ALG_COLOR[v] }}>
-          {ALG_LABEL[v]}
-        </span>
-      ),
-    },
-    { 
       title: '區域', 
       dataIndex: 'region', 
       key: 'region',
