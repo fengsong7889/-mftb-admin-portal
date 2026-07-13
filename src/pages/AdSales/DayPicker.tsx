@@ -3,6 +3,7 @@ import { Tag, Button, Space, Divider, message, Table, Empty, Modal, Select, Card
 import { ShoppingCartOutlined, CalendarOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
+import { RECOMMEND_TYPE_CONFIGS } from './types'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 
@@ -269,7 +270,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     setCartItems([])
     setIsSuccessModalVisible(true)
   }
-  const handleViewOrder = () => { setIsSuccessModalVisible(false); navigate('/promotion-order-manage?from=ad-sales') }
+  const handleViewOrder = () => {
+    setIsSuccessModalVisible(false)
+    const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === inventoryItem.algorithmType)?.name || ''
+    navigate(`/promotion-order-manage?type=${encodeURIComponent(typeName)}&from=ad-sales`)
+  }
   const handleContinuePurchase = () => { setIsSuccessModalVisible(false); message.success('繼續購買') }
 
   return (

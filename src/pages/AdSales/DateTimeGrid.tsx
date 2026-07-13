@@ -10,6 +10,7 @@ import {
   calcSlotPrice,
   getNoDiscountSlotsByRow,
   type InventoryItem,
+  RECOMMEND_TYPE_CONFIGS,
 } from './types'
 import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES } from '../Recommend/constants'
 
@@ -192,7 +193,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 查看订单
   const handleViewOrder = () => {
     setIsSuccessModalVisible(false)
-    navigate('/promotion-order-manage?from=ad-sales')
+    const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === inventoryItem.algorithmType)?.name || ''
+    navigate(`/promotion-order-manage?type=${encodeURIComponent(typeName)}&from=ad-sales`)
   }
 
   // 继续购买
