@@ -297,7 +297,9 @@ export default function PromotionSlotConfigAdd() {
       width: 80,
       align: 'center',
       render: (v: string) => (
-        <Badge status={v === 'active' ? 'success' : 'default'} text={v === 'active' ? '啟用' : '停用'} />
+        <Tag color={v === 'active' ? 'green' : 'default'}>
+          {v === 'active' ? '啟用' : '停用'}
+        </Tag>
       ),
     },
     {

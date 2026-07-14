@@ -15,8 +15,21 @@ import {
   APP_OPTIONS,
   REGION_OPTIONS,
   SERVICE_STATUS_OPTIONS,
+  ALGORITHM_TYPE_OPTIONS,
 } from '../constants'
 import dayjs from 'dayjs'
+
+/** 算法类型图标 */
+const TYPE_ICON: Record<number, string> = {
+  [AlgorithmType.INVINCIBLE_STAR]: '⭐',
+  [AlgorithmType.NEW_STORE_AD]: '🏪',
+  [AlgorithmType.HOT_REVIVE_AD]: '🔥',
+  [AlgorithmType.EXCLUSIVE_MERCHANT]: '👑',
+  [AlgorithmType.TRAFFIC_AD]: '📊',
+  [AlgorithmType.GUESS_YOU_LIKE]: '💡',
+  [AlgorithmType.ORGANIC_TRAFFIC]: '🌿',
+  [AlgorithmType.SEARCH_ALGORITHM]: '🔍',
+}
 
 // Mock数据 - 可选算法列表
 const ALGORITHM_OPTIONS = [
@@ -192,6 +205,7 @@ export default function WaterfallAdd() {
   
   // 销售策略（仅无敌星星）
   const [presaleDays, setPresaleDays] = useState<number>(7) // 预售天数
+  const [dailySalesLimit, setDailySalesLimit] = useState<number>(2) // 每天销售个数限制
   const [merchantLimit, setMerchantLimit] = useState(false) // 商家限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]) // 选择的商家
   const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
@@ -481,10 +495,15 @@ export default function WaterfallAdd() {
         >
           返回
         </Button>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            新增定價銷售配置
+            定價配置
           </h2>
+          {urlAlgorithmType != null && (
+            <span style={{ fontSize: 14, color: '#595959' }}>
+              {TYPE_ICON[urlAlgorithmType]} {ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.label || ''}
+            </span>
+          )}
         </div>
       </div>
 
@@ -733,6 +752,27 @@ export default function WaterfallAdd() {
                   />
                   <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
                     系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售
+                  </span>
+                </div>
+              </div>
+
+              {/* 每天销售个数 */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>每天銷售個數:</span>
+                  <InputNumber
+                    min={1}
+                    max={999}
+                    value={dailySalesLimit}
+                    onChange={(value) => setDailySalesLimit(value ?? 2)}
+                    addonAfter="個"
+                    style={{ width: 160 }}
+                  />
+                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
+                    {isReviveAlgorithm
+                      ? `商家所在區域（視算法配置：短程/中程/遠程），每天允許 ${dailySalesLimit} 個商家購買`
+                      : `每個區域，每天允許 ${dailySalesLimit} 個商家購買`
+                    }
                   </span>
                 </div>
               </div>
@@ -1022,14 +1062,14 @@ export default function WaterfallAdd() {
                     <>
                       {/* 限时折扣开关 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: config.limitedTimeDiscount ? 12 : 16 }}>
-                        <span style={{ fontSize: 13, color: '#595959' }}>限时折扣:</span>
+                        <span style={{ fontSize: 13, color: '#595959' }}>長期打折:</span>
                         <Switch 
                           checked={config.limitedTimeDiscount} 
                           onChange={(checked) => handleToggleLimitedTimeDiscount(config.region, checked)}
                           size="small"
                         />
                         <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                          {config.limitedTimeDiscount ? '在指定周期内执行打折' : '一直执行打折'}
+                          {config.limitedTimeDiscount ? '在指定周期内执行打折' : '限時打折'}
                         </span>
                       </div>
 
@@ -1102,7 +1142,7 @@ export default function WaterfallAdd() {
                   size="small"
                 />
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                  購買多個時段時匹配以下折扣
+                  購買多個時段匹配以下折扣。注意：當時段配置了折扣，則優先按時段折扣價計算；示例：早餐原價100，折扣價80，午餐原價200，無折扣，購買2個時段打6折；那麼就是（80+200）*0.6=168
                 </span>
                 {gradientEnabled && (
                   <Button 
@@ -1257,27 +1297,10 @@ export default function WaterfallAdd() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消扣費規則</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消訂單，扣費配置</span>
           <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
-        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
-            廣告開始推廣，扣費比例
-          </span>
-          <Button
-            size="small"
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              const nextId = cancelFeeRules.length > 0 ? Math.max(...cancelFeeRules.map(r => r.id)) + 1 : 1
-              setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
-            }}
-          >
-            新增梯度
-          </Button>
-        </div>
-
         <Table
           rowKey="id"
           dataSource={cancelFeeRules}
@@ -1325,24 +1348,42 @@ export default function WaterfallAdd() {
             },
             {
               title: '操作',
-              width: 80,
+              width: 120,
               align: 'center',
-              render: (_: unknown, record: { id: number; maxDays: number; feePercent: number }) => (
-                <Button
-                  type="link"
-                  size="small"
-                  danger
-                  onClick={() => {
-                    if (cancelFeeRules.length <= 1) {
-                      message.warning('至少保留一條規則')
-                      return
-                    }
-                    setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
-                  }}
-                >
-                  刪除
-                </Button>
-              ),
+              render: (_: unknown, record: { id: number; maxDays: number; feePercent: number }) => {
+                const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
+                return (
+                  <Space size={4}>
+                    {isLastRow && (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          const nextId = cancelFeeRules.length > 0 ? Math.max(...cancelFeeRules.map(r => r.id)) + 1 : 1
+                          setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
+                        }}
+                      >
+                        新增梯度
+                      </Button>
+                    )}
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      onClick={() => {
+                        if (cancelFeeRules.length <= 1) {
+                          message.warning('至少保留一條規則')
+                          return
+                        }
+                        setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
+                      }}
+                    >
+                      刪除
+                    </Button>
+                  </Space>
+                )
+              },
             },
           ]}
         />

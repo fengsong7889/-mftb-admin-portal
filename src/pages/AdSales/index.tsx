@@ -109,18 +109,17 @@ export default function AdSales() {
                 返回
               </Button>
             )}
-            <div>
-              <h2 style={{ margin: 0, fontSize: 20 }}>
-                <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
                 {currentStep >= 1 && selectedAlgorithmType
-                  ? `購買${RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''}`
+                  ? '購買廣告'
                   : '銷售訂單'}
               </h2>
-              <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
-                {currentStep >= 1 && selectedAlgorithmType
-                  ? `為您的店鋪購買${RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''}廣告曝光位`
-                  : '可根據需求選擇推薦類型，為您的店鋪購買廣告曝光位，獲取流量'}
-              </p>
+              {currentStep >= 1 && selectedAlgorithmType && (
+                <span style={{ fontSize: 14, color: '#595959' }}>
+                  {RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.icon} {RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name}
+                </span>
+              )}
             </div>
           </div>
           {currentStep >= 1 && (

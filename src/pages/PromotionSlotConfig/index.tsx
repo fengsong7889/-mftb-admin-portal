@@ -181,6 +181,11 @@ export default function PromotionSlotConfig() {
       result = result.filter(item => item.app === values.app)
     }
     
+    // 算法名称
+    if (values.algorithmName) {
+      result = result.filter(item => item.algorithmName === values.algorithmName)
+    }
+    
     // 状态
     if (values.status) {
       result = result.filter(item => item.status === values.status)
@@ -304,6 +309,31 @@ export default function PromotionSlotConfig() {
               options={[
                 { label: '閃峰', value: 'shanfeng' },
                 { label: 'mFood', value: 'mfood' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="算法名稱" name="algorithmName">
+            <Select 
+              placeholder="請輸入搜索" 
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={[
+                { label: '無敵星星-首頁版', value: '無敵星星-首頁版' },
+                { label: '無敵星星-外賣版', value: '無敵星星-外賣版' },
+                { label: '無敵星星-團購版', value: '無敵星星-團購版' },
+                { label: '猜你喜歡-主力版', value: '猜你喜歡-主力版' },
+                { label: '猜你喜歡-週末版', value: '猜你喜歡-週末版' },
+                { label: '猜你喜歡-夜間版', value: '猜你喜歡-夜間版' },
+                { label: '新店廣告-首頁版', value: '新店廣告-首頁版' },
+                { label: '新店廣告-早餐版', value: '新店廣告-早餐版' },
+                { label: '新店廣告-午市版', value: '新店廣告-午市版' },
+                { label: '盤活復蘇-首頁版', value: '盤活復蘇-首頁版' },
+                { label: '盤活復蘇-午市版', value: '盤活復蘇-午市版' },
+                { label: '盤活復蘇-晚市版', value: '盤活復蘇-晚市版' },
+                { label: '獨家商家-首頁版', value: '獨家商家-首頁版' },
+                { label: '獨家商家-超市版', value: '獨家商家-超市版' },
+                { label: '獨家商家-晚市版', value: '獨家商家-晚市版' },
               ]}
             />
           </Form.Item>

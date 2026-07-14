@@ -560,7 +560,7 @@ export default function Waterfall() {
                       {card.description}
                     </p>
                     {enabled ? (
-                      <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 條定價</Tag>
+                      <Tag color="blue" style={{ marginTop: 12 }}>查看/調整定價</Tag>
                     ) : (
                       <Tag color="default" style={{ marginTop: 12 }}>敬請期待</Tag>
                     )}
@@ -589,10 +589,16 @@ export default function Waterfall() {
             >
               返回
             </Button>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <span style={{ marginRight: 8 }}>{ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon}</span>
-              {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]} - 銷售定價
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+                定價列表
+              </h2>
+              {selectedAlgorithmType != null && (
+                <span style={{ fontSize: 14, color: '#595959' }}>
+                  {ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon} {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]}
+                </span>
+              )}
+            </div>
           </Space>
         </div>
       </Card>
@@ -604,7 +610,22 @@ export default function Waterfall() {
             <Input placeholder="請輸入配置ID" allowClear />
           </Form.Item>
           <Form.Item label="算法名稱" name="promotionName">
-            <Input placeholder="請輸入算法名稱" allowClear />
+            <Select 
+              placeholder="請輸入搜索" 
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={[
+                { label: '無敵星星-首頁版', value: '無敵星星-首頁版' },
+                { label: '新店廣告-外賣版', value: '新店廣告-外賣版' },
+                { label: '盤活復蘇-團購版', value: '盤活復蘇-團購版' },
+                { label: '獨家商家-超市版', value: '獨家商家-超市版' },
+                { label: '流量廣告-全渠道', value: '流量廣告-全渠道' },
+                { label: '猜你喜歡-主力版', value: '猜你喜歡-主力版' },
+                { label: '自然流量-默認', value: '自然流量-默認' },
+                { label: '搜索算法-綜合版', value: '搜索算法-綜合版' },
+              ]}
+            />
           </Form.Item>
           <Form.Item label="所屬品牌" name="app">
             <Select placeholder="全部" options={APP_OPTIONS} allowClear />

@@ -92,6 +92,13 @@ const RECOMMEND_TYPE_LABEL: Record<RecommendType, string> = {
   [RecommendType.TRAFFIC_AD]: '流量廣告',
 }
 
+const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
+  [RecommendType.INVINCIBLE_STAR]: '⭐',
+  [RecommendType.REVITALIZATION_AD]: '🔥',
+  [RecommendType.NEW_STORE_AD]: '🏪',
+  [RecommendType.TRAFFIC_AD]: '📊',
+}
+
 const RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
   [RecommendType.INVINCIBLE_STAR]: 'gold',
   [RecommendType.REVITALIZATION_AD]: 'green',
@@ -515,10 +522,10 @@ export default function PromotionOrderManage() {
     { key: 'orderNo', title: '訂單編號' },
     { key: 'groupInfo', title: '集團ID/集團名稱' },
     { key: 'storeInfo', title: '門店ID/門店名稱' },
-    { key: 'promotionName', title: '推廣名稱' },
+    { key: 'promotionName', title: '算法名稱' },
     { key: 'app', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
-    { key: 'region', title: '所屬商圈' },
+    ...(orderType !== '盤活復蘇' ? [{ key: 'region', title: '所屬商圈' }] : []),
     { key: 'purchaseContent', title: orderType === '無敵星星' ? '購買時段' : orderType === '盤活復蘇' ? '購買天數' : '購買內容' },
     { key: 'originalPrice', title: '訂單金額' },
     { key: 'discount', title: '優惠金額' },
@@ -565,7 +572,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '推廣名稱',
+      title: '算法名稱',
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 180,
@@ -588,13 +595,13 @@ export default function PromotionOrderManage() {
       width: 120,
       render: (channel: RecommendChannel) => CHANNEL_LABEL[channel],
     },
-    {
+    ...(orderType !== '盤活復蘇' ? [{
       title: '所屬商圈',
       dataIndex: 'region',
       key: 'region',
       width: 100,
       render: (region: Region) => REGION_LABEL[region],
-    },
+    }] : []),
     {
       title: orderType === '無敵星星' ? '購買時段' : orderType === '盤活復蘇' ? '購買天數' : '購買內容',
       key: 'purchaseContent',
@@ -728,14 +735,17 @@ export default function PromotionOrderManage() {
             >
               返回
             </Button>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 20 }}>
-                <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
-                {orderType ? `${orderType}訂單` : '銷售訂單'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+                訂單列表
               </h2>
-              <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
-                {orderType ? `查看${orderType}的訂單詳情` : '查看廣告訂單詳情'}
-              </p>
+              {orderType && (
+                <span style={{ fontSize: 14, color: '#595959' }}>
+                  {Object.entries(RECOMMEND_TYPE_LABEL).find(([_, label]) => label === orderType)?.[0] && (
+                    <>{RECOMMEND_TYPE_ICON[Number(Object.entries(RECOMMEND_TYPE_LABEL).find(([_, label]) => label === orderType)?.[0]) as RecommendType]} {orderType}</>
+                  )}
+                </span>
+              )}
             </div>
           </div>
           <Space size={12}>

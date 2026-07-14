@@ -87,6 +87,18 @@ const REGION_LIST = [
 
 const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 
+/** 算法 → 品牌映射（选择算法后自动带出品牌） */
+const ALGORITHM_BRAND_MAP: Record<string, string> = {
+  invincible_star: 'shanfeng',
+  new_store_ad: 'mfood',
+  hot_revive: 'shanfeng',
+  exclusive_merchant: 'mfood',
+  traffic_ad: 'shanfeng',
+  guess_you_like: 'shanfeng',
+  organic_traffic: 'mfood',
+  search_algo: 'shanfeng',
+}
+
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null)
@@ -128,8 +140,51 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [searchDate, setSearchDate] = useState<Dayjs | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   
+  // 冲突弹窗状态
+  const [conflictModalVisible, setConflictModalVisible] = useState(false)
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  
   // Mock数据 - 商家推广金余额
   const [merchantBalance, setMerchantBalance] = useState(15800)
+
+  // 算法切换处理（带冲突检测）
+  const handleAlgorithmChange = (value: string | null) => {
+    const hasCartItems = cartItems.length > 0
+    if (hasCartItems && value !== searchAlgorithm) {
+      setPendingAction(() => {
+        setSearchAlgorithm(value)
+        if (value && ALGORITHM_BRAND_MAP[value]) {
+          setSearchBrand(ALGORITHM_BRAND_MAP[value])
+        } else {
+          setSearchBrand(null)
+        }
+      })
+      setConflictModalVisible(true)
+      return
+    }
+    setSearchAlgorithm(value)
+    if (value && ALGORITHM_BRAND_MAP[value]) {
+      setSearchBrand(ALGORITHM_BRAND_MAP[value])
+    } else {
+      setSearchBrand(null)
+    }
+  }
+
+  // 确认清空购物车
+  const handleConfirmClear = () => {
+    setCartItems([])
+    setConflictModalVisible(false)
+    if (pendingAction) {
+      pendingAction()
+      setPendingAction(null)
+    }
+  }
+
+  // 取消切换
+  const handleCancelSwitch = () => {
+    setConflictModalVisible(false)
+    setPendingAction(null)
+  }
 
   // 点击订单支付
   const handlePayment = () => {
@@ -287,26 +342,35 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         {/* 查询区域 */}
         <div className="search-section" style={{ marginBottom: 16 }}>
           <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+            <Form.Item label="算法名稱">
+              <Select
+                placeholder="請輸入搜索"
+                value={searchAlgorithm}
+                onChange={handleAlgorithmChange}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={[
+                  { label: '無敵星星-首頁版', value: 'invincible_star' },
+                  { label: '新店廣告-外賣版', value: 'new_store_ad' },
+                  { label: '盤活復蘇-團購版', value: 'hot_revive' },
+                  { label: '獨家商家-超市版', value: 'exclusive_merchant' },
+                  { label: '流量廣告-全渠道', value: 'traffic_ad' },
+                  { label: '猜你喜歡-主力版', value: 'guess_you_like' },
+                  { label: '自然流量-默認', value: 'organic_traffic' },
+                  { label: '搜索算法-綜合版', value: 'search_algo' },
+                ]}
+              />
+            </Form.Item>
             <Form.Item label="所屬品牌">
               <Select
-                placeholder="全部"
+                placeholder="選擇算法後自動帶出"
                 value={searchBrand}
                 onChange={(v) => setSearchBrand(v)}
                 allowClear
                 options={[
                   { label: '閃峰', value: 'shanfeng' },
                   { label: 'mFood', value: 'mfood' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item label="算法名稱">
-              <Select
-                placeholder="全部"
-                value={searchAlgorithm}
-                onChange={(v) => setSearchAlgorithm(v)}
-                allowClear
-                options={[
-                  { label: '無敵星星', value: 'invincible_star' },
                 ]}
               />
             </Form.Item>
@@ -1003,6 +1067,30 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             </p>
           </div>
         </div>
+      </Modal>
+
+      {/* 算法切换冲突提醒弹窗 */}
+      <Modal
+        title="提示"
+        open={conflictModalVisible}
+        onOk={handleConfirmClear}
+        onCancel={handleCancelSwitch}
+        okText="確認切換"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <p style={{ margin: '16px 0 8px', fontSize: 14, lineHeight: 1.8 }}>
+          您當前已有加購數據，同一門店同一訂單僅支持選擇相同算法的廣告位。
+        </p>
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: '#595959' }}>
+          切換算法或門店後，已選的商圈、時段將被清空。您可以：
+        </p>
+        <p style={{ margin: '0 0 8px', fontSize: 14, color: '#595959' }}>
+          <strong>確認切換：</strong>清空已選商圈、時段，重新查詢
+        </p>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#595959' }}>
+          <strong>取消：</strong>保留當前選擇，先完成下單後再選擇其他門店或算法
+        </p>
       </Modal>
     </div>
   )

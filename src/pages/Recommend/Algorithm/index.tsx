@@ -241,10 +241,9 @@ export default function Algorithm() {
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
       render: (v: ServiceStatus) => (
-        <Badge
-          status={v === ServiceStatus.ENABLED ? 'success' : 'default'}
-          text={v === ServiceStatus.ENABLED ? '啟用' : '停用'}
-        />
+        <Tag color={v === ServiceStatus.ENABLED ? 'green' : 'default'}>
+          {v === ServiceStatus.ENABLED ? '啟用' : '停用'}
+        </Tag>
       ),
     },
     {
@@ -323,7 +322,7 @@ export default function Algorithm() {
                                 {card.description}
                               </p>
                               {enabled ? (
-                                <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 個算法</Tag>
+                                <Tag color="blue" style={{ marginTop: 12 }}>查看/調整算法</Tag>
                               ) : (
                                 <Tag color="default" style={{ marginTop: 12 }}>敬請期待</Tag>
                               )}
@@ -364,7 +363,7 @@ export default function Algorithm() {
                               <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
                                 {card.description}
                               </p>
-                              <Tag color="blue" style={{ marginTop: 12 }}>{typeCountMap[card.type] || 0} 個算法</Tag>
+                              <Tag color="blue" style={{ marginTop: 12 }}>查看/調整算法</Tag>
                             </div>
                           </Card>
                         )
@@ -394,11 +393,16 @@ export default function Algorithm() {
             >
               返回
             </Button>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <span style={{ marginRight: 8 }}>{selectedTypeCard?.icon}</span>
-              {TYPE_LABEL[selectedType]} - 算法列表
-            </h2>
-            <Tag color="blue">{filteredData.length} 個算法</Tag>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+                算法列表
+              </h2>
+              {selectedType != null && (
+                <span style={{ fontSize: 14, color: '#595959' }}>
+                  {selectedTypeCard?.icon} {TYPE_LABEL[selectedType]}
+                </span>
+              )}
+            </div>
           </Space>
         </div>
       </Card>

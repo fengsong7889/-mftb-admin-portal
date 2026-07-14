@@ -21,13 +21,13 @@ const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 // Mock: 部分日期已售罄
 const SOLD_OUT_DATES = ['2025-07-08', '2025-07-12', '2025-07-15', '2025-07-20', '2025-07-25']
 
-/** Mock数据 - 店铺列表 */
+/** Mock数据 - 店铺列表（含BD信息） */
 const MOCK_STORES = [
-  { id: '10001', name: '威尼斯人酒店' },
-  { id: '10002', name: '皇朝廣場店' },
-  { id: '10003', name: '黑馬仕美食街' },
-  { id: '10004', name: '新葡京旗艦店' },
-  { id: '10005', name: '官也街老店' },
+  { id: '10001', name: '威尼斯人酒店', bd: 'bd-001', bdName: '張偉' },
+  { id: '10002', name: '皇朝廣場店', bd: 'bd-002', bdName: '李娜' },
+  { id: '10003', name: '黑馬仕美食街', bd: 'bd-003', bdName: '王強' },
+  { id: '10004', name: '新葡京旗艦店', bd: 'bd-001', bdName: '張偉' },
+  { id: '10005', name: '官也街老店', bd: 'bd-004', bdName: '劉敏' },
 ]
 
 /** 店铺下拉选项（展示ID） */
@@ -35,6 +35,26 @@ const STORE_OPTIONS = MOCK_STORES.map(s => ({
   label: `${s.name}（ID：${s.id}）`,
   value: s.id,
 }))
+
+/** 算法 → 品牌映射（选择算法后自动带出品牌） */
+const ALGORITHM_BRAND_MAP: Record<string, string> = {
+  hot_revive: 'shanfeng',
+  new_store_ad: 'mfood',
+  invincible_star: 'shanfeng',
+  exclusive_merchant: 'mfood',
+  traffic_ad: 'shanfeng',
+  guess_you_like: 'shanfeng',
+  organic_traffic: 'mfood',
+  search_algo: 'shanfeng',
+}
+
+/** BD选项 */
+const BD_OPTIONS = [
+  { label: '張偉', value: 'bd-001' },
+  { label: '李娜', value: 'bd-002' },
+  { label: '王強', value: 'bd-003' },
+  { label: '劉敏', value: 'bd-004' },
+]
 
 /** 购物车项 */
 interface CartItem {
@@ -77,11 +97,81 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [isConflictModalVisible, setIsConflictModalVisible] = useState(false)
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
 
-  // 查询：必须选择所属品牌、算法名称、门店名称
+  // 检查购物车是否有加购数据
+  const hasCartItems = cartItems.length > 0
+
+  // 算法名称变更处理：自动带出品牌，并检查购物车冲突
+  const handleAlgorithmChange = (value: string | null) => {
+    if (hasCartItems && value !== searchAlgorithm) {
+      setPendingAction(() => {
+        setSearchAlgorithm(value)
+        if (value && ALGORITHM_BRAND_MAP[value]) {
+          setSearchBrand(ALGORITHM_BRAND_MAP[value])
+        } else {
+          setSearchBrand(null)
+        }
+      })
+      setIsConflictModalVisible(true)
+      return
+    }
+    setSearchAlgorithm(value)
+    if (value && ALGORITHM_BRAND_MAP[value]) {
+      setSearchBrand(ALGORITHM_BRAND_MAP[value])
+    } else {
+      setSearchBrand(null)
+    }
+  }
+
+  // 门店名称变更处理：自动带出BD，并检查购物车冲突
+  const handleStoreChange = (value: string | null) => {
+    if (hasCartItems && value !== searchStoreName) {
+      setPendingAction(() => {
+        setSearchStoreName(value)
+        const store = MOCK_STORES.find(s => s.id === value)
+        if (store) {
+          setSearchBD(store.bd)
+        } else {
+          setSearchBD(null)
+        }
+      })
+      setIsConflictModalVisible(true)
+      return
+    }
+    setSearchStoreName(value)
+    const store = MOCK_STORES.find(s => s.id === value)
+    if (store) {
+      setSearchBD(store.bd)
+    } else {
+      setSearchBD(null)
+    }
+  }
+
+  // 确认切换（清空已选）
+  const handleConfirmSwitch = () => {
+    setIsConflictModalVisible(false)
+    if (pendingAction) {
+      pendingAction()
+      setPendingAction(null)
+    }
+    setCartItems([])
+    setSelectedDates([])
+    setHasSearched(false)
+    message.success('已清空已選商圈、時段，請重新查詢')
+  }
+
+  // 取消切换
+  const handleCancelSwitch = () => {
+    setIsConflictModalVisible(false)
+    setPendingAction(null)
+  }
+
+  // 查询：必须选择算法名称、品牌、门店名称
   const handleSearch = () => {
-    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
     if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
+    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
     if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
     setHasSearched(true)
   }
@@ -282,21 +372,30 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
           <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+            <Form.Item label="算法名稱">
+              <Select placeholder="請輸入搜索" value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+                options={[
+                  { label: '盤活復蘇-團購版', value: 'hot_revive' },
+                  { label: '無敵星星-首頁版', value: 'invincible_star' },
+                  { label: '新店廣告-外賣版', value: 'new_store_ad' },
+                  { label: '獨家商家-超市版', value: 'exclusive_merchant' },
+                  { label: '流量廣告-全渠道', value: 'traffic_ad' },
+                  { label: '猜你喜歡-主力版', value: 'guess_you_like' },
+                  { label: '自然流量-默認', value: 'organic_traffic' },
+                  { label: '搜索算法-綜合版', value: 'search_algo' },
+                ]} />
+            </Form.Item>
             <Form.Item label="所屬品牌">
-              <Select placeholder="全部" value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
+              <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
                 options={[{ label: '閃峰', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
             </Form.Item>
-            <Form.Item label="算法名稱">
-              <Select placeholder="全部" value={searchAlgorithm} onChange={(v) => setSearchAlgorithm(v)} allowClear
-                options={[{ label: '盤活復蘇', value: 'hot_revive' }]} />
-            </Form.Item>
             <Form.Item label="門店名稱">
-              <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={(v) => setSearchStoreName(v)} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
+              <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
             </Form.Item>
             <Form.Item label="選擇BD">
-              <Select placeholder="全部" value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
+              <Select placeholder="選擇門店後自動帶出" value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
                 filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
-                options={[{ label: '張偉', value: 'bd-001' }, { label: '李娜', value: 'bd-002' }, { label: '王強', value: 'bd-003' }, { label: '劉敏', value: 'bd-004' }]} />
+                options={BD_OPTIONS} />
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
@@ -306,6 +405,30 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             </Form.Item>
           </Form>
       </div>
+
+      {/* 购物车冲突提醒弹窗 */}
+      <Modal
+        title="提示"
+        open={isConflictModalVisible}
+        onOk={handleConfirmSwitch}
+        onCancel={handleCancelSwitch}
+        okText="確認切換"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <div style={{ padding: '8px 0' }}>
+          <p style={{ marginBottom: 12, fontSize: 14, color: '#262626' }}>
+            您當前已有加購數據，同一門店同一訂單僅支持選擇相同算法的廣告位。
+          </p>
+          <p style={{ marginBottom: 0, fontSize: 13, color: '#595959' }}>
+            切換算法或門店後，已選的商圈、時段將被清空。您可以：
+          </p>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#595959' }}>
+            <li>確認切換：清空已選商圈、時段，重新查詢</li>
+            <li>取消：保留當前選擇，先完成下單後再選擇其他門店或算法</li>
+          </ul>
+        </div>
+      </Modal>
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
