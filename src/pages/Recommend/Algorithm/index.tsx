@@ -210,6 +210,11 @@ export default function Algorithm() {
     })
   }
 
+  // 查看详情（跳转只读详情页）
+  const handleViewDetail = (record: AlgorithmRecord) => {
+    navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}&mode=detail`)
+  }
+
   // 跳转到新增页面（携带当前算法类型和业务类型）
   const handleGoToAdd = () => {
     navigate(`/promotion-algorithm-add?type=${selectedType}&tab=${businessType}`)
@@ -247,9 +252,10 @@ export default function Algorithm() {
       ),
     },
     {
-      title: '操作', key: 'action', width: 220,
+      title: '操作', key: 'action', width: 280,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>詳情</Button>
           <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>編輯</Button>
           <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED} style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
             {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}

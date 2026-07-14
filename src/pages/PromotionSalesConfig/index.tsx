@@ -5,6 +5,7 @@ import {
   ArrowLeftOutlined,
   ShoppingCartOutlined,
   OrderedListOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, Region, RecommendChannel, AppType } from '../Recommend/constants'
@@ -184,7 +185,17 @@ export default function PromotionSalesConfig() {
                             <Tag color="default" style={{ marginTop: 12 }}>即將開放</Tag>
                           )}
                           {config.enabled && (
-                            <div style={{ display: 'flex', gap: 24, marginTop: 16, justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center' }}>
+                              <Button
+                                size="small"
+                                icon={<EyeOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}&mode=detail`)
+                                }}
+                              >
+                                詳情
+                              </Button>
                               <Button
                                 size="small"
                                 icon={<OrderedListOutlined />}
@@ -248,7 +259,17 @@ export default function PromotionSalesConfig() {
                             <Tag color="default" style={{ marginTop: 12 }}>即將開放</Tag>
                           )}
                           {config.enabled && (
-                            <div style={{ display: 'flex', gap: 24, marginTop: 16, justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center' }}>
+                              <Button
+                                size="small"
+                                icon={<EyeOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}&mode=detail`)
+                                }}
+                              >
+                                詳情
+                              </Button>
                               <Button
                                 size="small"
                                 icon={<OrderedListOutlined />}

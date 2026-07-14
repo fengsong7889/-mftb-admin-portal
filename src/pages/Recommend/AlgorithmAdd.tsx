@@ -34,8 +34,10 @@ export default function AlgorithmAdd() {
   const [searchParams] = useSearchParams()
   const algorithmTypeParam = searchParams.get('type') || ''
   const algorithmIdParam = searchParams.get('id') || ''
+  const modeParam = searchParams.get('mode') || ''
+  const isDetailMode = modeParam === 'detail' // 只读详情模式
   const initialType = algorithmTypeParam ? Number(algorithmTypeParam) as AlgorithmType : null
-  const isEditMode = !!algorithmIdParam // 有 id 参数则为编辑模式
+  const isEditMode = !!algorithmIdParam && !isDetailMode // 有 id 参数且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听曝光策略选择
 
@@ -65,11 +67,11 @@ export default function AlgorithmAdd() {
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
-  const [isEditing, setIsEditing] = useState(isEditMode) // 编辑模式
+  const [isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
-  // 编辑模式下加载默认数据
+  // 编辑模式或详情模式下加载默认数据
   useEffect(() => {
-    if (isEditMode && algorithmIdParam) {
+    if (algorithmIdParam) {
       const record = mockAlgorithmData.find(item => item.id === Number(algorithmIdParam))
       if (record) {
         form.setFieldsValue({
@@ -78,7 +80,7 @@ export default function AlgorithmAdd() {
         })
       }
     }
-  }, [isEditMode, algorithmIdParam, form])
+  }, [algorithmIdParam, form])
 
   // 返回算法列表页
   const handleBack = () => {
@@ -166,7 +168,7 @@ export default function AlgorithmAdd() {
         </Button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            {isEditMode ? '編輯算法' : '新增算法'}
+            {isDetailMode ? '算法詳情' : isEditMode ? '編輯算法' : '新增算法'}
           </h2>
           {selectedAlgorithmType && (
             <span style={{ fontSize: 14, color: '#595959' }}>
@@ -200,6 +202,7 @@ export default function AlgorithmAdd() {
         <Form
           form={form}
           layout="horizontal"
+          disabled={isDetailMode}
         >
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
             <Form.Item
@@ -224,7 +227,7 @@ export default function AlgorithmAdd() {
               <Select
                 placeholder="請選擇所屬品牌"
                 options={APP_OPTIONS}
-                disabled={isEditMode}
+                disabled={isEditMode || isDetailMode}
               />
             </Form.Item>
           </div>
@@ -263,13 +266,13 @@ export default function AlgorithmAdd() {
           form={form}
           layout="horizontal"
           colon={false}
-          disabled={false}
+          disabled={isDetailMode}
           initialValues={{
             presaleMode: 'rolling',
             continuousPurchase: 'notSupport',
             merchantLimit: 'unlimited',
             regionLimit: 'limited',
-            merchantExposureStrategy: selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? 'random' : undefined,
+            merchantExposureStrategy: 'random',
           }}
         >
 
@@ -376,7 +379,7 @@ export default function AlgorithmAdd() {
                             { label: '維度計算', value: 'merchant' },
                             { label: '輪詢計算', value: 'random' },
                           ]}
-                          disabled={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR}
+                          disabled={isDetailMode || selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR}
                         />
                       </Form.Item>
                     </div>
@@ -410,12 +413,13 @@ export default function AlgorithmAdd() {
                                   value={selectedDimension}
                                   onChange={(val) => setSelectedDimension(val)}
                                   options={DIMENSION_OPTIONS.filter(o => !dimensionItems.find(d => d.type === o.value))}
+                                  disabled={isDetailMode}
                                 />
                                 <Button
                                   type="dashed"
                                   size="small"
                                   icon={<PlusOutlined />}
-                                  disabled={!selectedDimension}
+                                  disabled={isDetailMode || !selectedDimension}
                                   onClick={() => {
                                     if (selectedDimension) {
                                       setDimensionItems([...dimensionItems, { id: Date.now().toString(), type: selectedDimension, weight: undefined }])
@@ -447,6 +451,7 @@ export default function AlgorithmAdd() {
                                           onChange={(val) => setOrderCompletionDays(val ?? 30)}
                                           style={{ width: 64 }}
                                           size="small"
+                                          disabled={isDetailMode}
                                         />
                                         天訂單完成比例（貝葉斯平滑）
                                         <Popover
@@ -511,10 +516,12 @@ export default function AlgorithmAdd() {
                                     ) : (
                                       <span style={{ fontSize: 13, color: '#8c8c8c' }}>（{opt?.desc}）</span>
                                     )}
-                                    <DeleteOutlined
-                                      style={{ color: '#ff4d4f', fontSize: 16, cursor: 'pointer' }}
-                                      onClick={() => setDimensionItems(dimensionItems.filter((_, i) => i !== index))}
-                                    />
+                                    {!isDetailMode && (
+                                      <DeleteOutlined
+                                        style={{ color: '#ff4d4f', fontSize: 16, cursor: 'pointer' }}
+                                        onClick={() => setDimensionItems(dimensionItems.filter((_, i) => i !== index))}
+                                      />
+                                    )}
                                   </div>
                                   {/* 第二行：权重滑块 */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 0 }}>
@@ -536,6 +543,7 @@ export default function AlgorithmAdd() {
                                           min={1}
                                           max={10}
                                           value={item.weight ?? 1}
+                                          disabled={isDetailMode}
                                           onMouseDown={() => {
                                             if (hideTimerRef.current[item.id]) clearTimeout(hideTimerRef.current[item.id])
                                             setTooltipVisible(prev => ({ ...prev, [item.id]: true }))
@@ -711,8 +719,8 @@ export default function AlgorithmAdd() {
         </Card>
       )}
 
-      {/* 底部保存按钮 */}
-      {selectedAlgorithmType && (
+      {/* 底部保存按钮（详情模式下隐藏） */}
+      {selectedAlgorithmType && !isDetailMode && (
         <div className="form-footer">
           <Button onClick={handleBack}>
             取消

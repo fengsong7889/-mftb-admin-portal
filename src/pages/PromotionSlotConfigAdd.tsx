@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Button, Form, Input, Select, Space, message, Card, Table, Tag, Badge, Switch, Popover, Modal, InputNumber } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined } from '@ant-design/icons'
+import { mockData } from './PromotionSlotConfig/index'
 
 /** 品牌选项 */
 const APP_OPTIONS = [
@@ -71,6 +72,11 @@ const MOCK_SLOT_ALGORITHMS: SlotAlgorithm[] = [
 
 export default function PromotionSlotConfigAdd() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editIdParam = searchParams.get('id') || ''
+  const modeParam = searchParams.get('mode') || ''
+  const isDetailMode = modeParam === 'detail'
+  const isEditMode = !!editIdParam && !isDetailMode
   const [form] = Form.useForm()
   const [filterDislike, setFilterDislike] = useState(false)
   const [slotAlgorithms, setSlotAlgorithms] = useState<SlotAlgorithm[]>(MOCK_SLOT_ALGORITHMS)
@@ -83,6 +89,19 @@ export default function PromotionSlotConfigAdd() {
   const [rangeStart, setRangeStart] = useState<number | null>(null)
   const [rangeEnd, setRangeEnd] = useState<number | null>(null)
   const [totalPositions, setTotalPositions] = useState<number>(100)
+
+  // 编辑模式或详情模式下加载数据
+  useEffect(() => {
+    if (editIdParam) {
+      const record = mockData.find(item => item.id === Number(editIdParam))
+      if (record) {
+        form.setFieldsValue({
+          promotionName: record.promotionName,
+          app: record.app,
+        })
+      }
+    }
+  }, [editIdParam, form])
 
   // 新增坑位配置
   const handleAddSlot = () => {
@@ -302,12 +321,12 @@ export default function PromotionSlotConfigAdd() {
         </Tag>
       ),
     },
-    {
+    ...(!isDetailMode ? [{
       title: '操作',
       key: 'action',
       width: 180,
-      align: 'center',
-      render: (_, record) => (
+      align: 'center' as const,
+      render: (_: any, record: SlotAlgorithm) => (
         <Space size={4}>
           <Button
             type="link"
@@ -326,7 +345,7 @@ export default function PromotionSlotConfigAdd() {
           </Button>
         </Space>
       ),
-    },
+    }] : []),
   ]
 
   return (
@@ -341,7 +360,7 @@ export default function PromotionSlotConfigAdd() {
           返回
         </Button>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-          新增瀑布流配置
+          {isDetailMode ? '瀑布流詳情' : isEditMode ? '編輯瀑布流配置' : '新增瀑布流配置'}
         </h2>
       </div>
 
@@ -363,7 +382,7 @@ export default function PromotionSlotConfigAdd() {
           borderRadius: '8px 8px 0 0',
         }}
       >
-        <Form form={form} layout="horizontal">
+        <Form form={form} layout="horizontal" disabled={isDetailMode}>
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
             <Form.Item
               label="瀑布流名稱"
@@ -441,10 +460,10 @@ export default function PromotionSlotConfigAdd() {
               {slotAlgorithms.filter(item => item.status === 'active').map((item, index) => (
                 <div
                   key={item.position}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={() => handleDrop(index)}
+                  draggable={!isDetailMode}
+                  onDragStart={() => !isDetailMode && handleDragStart(index)}
+                  onDragOver={(e) => !isDetailMode && handleDragOver(e, index)}
+                  onDrop={() => !isDetailMode && handleDrop(index)}
                   onDragEnd={handleDragEnd}
                   style={{
                     background: item.status === 'active' ? '#FAFAFA' : '#f5f5f5',
@@ -454,7 +473,7 @@ export default function PromotionSlotConfigAdd() {
                       ? '2px solid #1890ff'
                       : `1px solid ${item.status === 'active' ? '#F0F0F0' : '#e8e8e8'}`,
                     opacity: dragIndex === index ? 0.4 : (item.status === 'active' ? 1 : 0.6),
-                    cursor: 'grab',
+                    cursor: isDetailMode ? 'default' : 'grab',
                     transition: 'border 0.2s, opacity 0.2s',
                   }}
                 >
@@ -462,7 +481,9 @@ export default function PromotionSlotConfigAdd() {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <HolderOutlined style={{ color: '#bfbfbf', fontSize: 14, cursor: 'grab' }} />
+                      {!isDetailMode && (
+                        <HolderOutlined style={{ color: '#bfbfbf', fontSize: 14, cursor: 'grab' }} />
+                      )}
                       <Badge
                         count={`${item.position}號位`}
                         style={{ backgroundColor: item.status === 'active' ? '#1890ff' : '#d9d9d9' }}
@@ -489,9 +510,11 @@ export default function PromotionSlotConfigAdd() {
             }
             extra={
               <Space size={16}>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleAddSlot} size="small">
-                  新增
-                </Button>
+                {!isDetailMode && (
+                  <Button type="primary" icon={<PlusOutlined />} onClick={handleAddSlot} size="small">
+                    新增
+                  </Button>
+                )}
                 <div style={{ display: 'inline-flex', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>過濾用戶不喜歡</span>
                   <Switch
@@ -502,6 +525,7 @@ export default function PromotionSlotConfigAdd() {
                       message.info(checked ? '已開啟過濾用戶不喜歡' : '已關閉過濾用戶不喜歡')
                     }}
                     style={{ marginLeft: 8 }}
+                    disabled={isDetailMode}
                   />
                   <Popover
                     content={
@@ -685,11 +709,13 @@ export default function PromotionSlotConfigAdd() {
         </Form>
       </Modal>
 
-      {/* 底部操作按钮 */}
-      <div className="form-footer">
-        <Button onClick={handleBack}>取消</Button>
-        <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>保存</Button>
-      </div>
+      {/* 底部操作按钮（详情模式下隐藏） */}
+      {!isDetailMode && (
+        <div className="form-footer">
+          <Button onClick={handleBack}>取消</Button>
+          <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>保存</Button>
+        </div>
+      )}
     </div>
   )
 }

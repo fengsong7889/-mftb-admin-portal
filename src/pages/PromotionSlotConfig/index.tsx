@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 
 /** 瀑布流配置记录 */
-interface WaterfallSlotConfig {
+export interface WaterfallSlotConfig {
   id: number
   promotionName: string
   slotIndex: number
@@ -53,7 +53,7 @@ const PROMOTION_NAMES = [
 ]
 
 /** Mock数据 - 覆盖所有业务频道+页面位置+时段组合 */
-const mockData: WaterfallSlotConfig[] = (() => {
+export const mockData: WaterfallSlotConfig[] = (() => {
   // 业务频道 × 页面位置的有效组合
   const combos: { businessChannel: string; pageLocation: string }[] = [
     { businessChannel: 'food', pageLocation: 'home' },
@@ -124,7 +124,12 @@ export default function PromotionSlotConfig() {
 
   // 编辑
   const handleEdit = (record: WaterfallSlotConfig) => {
-    console.log('编辑:', record)
+    navigate(`/promotion-slot-config-add?id=${record.id}`)
+  }
+
+  // 查看详情
+  const handleViewDetail = (record: WaterfallSlotConfig) => {
+    navigate(`/promotion-slot-config-add?id=${record.id}&mode=detail`)
   }
 
   // 启用/停用
@@ -258,10 +263,17 @@ export default function PromotionSlotConfig() {
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 240,
       fixed: 'right' as const,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+          <Button 
+            type="link" 
+            size="small"
+            onClick={() => handleViewDetail(record)}
+          >
+            詳情
+          </Button>
           <Button 
             type="link" 
             size="small"
@@ -364,7 +376,7 @@ export default function PromotionSlotConfig() {
             icon={<PlusOutlined />}
             onClick={() => navigate('/promotion-slot-config-add')}
           >
-            新增
+            新增策略
           </Button>
 
         </Space>
