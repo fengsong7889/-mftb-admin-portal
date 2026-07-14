@@ -80,12 +80,17 @@ export default function PromotionSlotConfigAdd() {
   const [addForm] = Form.useForm()
   const [selectedAlgoType, setSelectedAlgoType] = useState<string>('')
   const [selectedPositions, setSelectedPositions] = useState<number[]>([])
+  const [rangeStart, setRangeStart] = useState<number | null>(null)
+  const [rangeEnd, setRangeEnd] = useState<number | null>(null)
+  const [totalPositions, setTotalPositions] = useState<number>(100)
 
   // 新增坑位配置
   const handleAddSlot = () => {
     addForm.resetFields()
     setSelectedAlgoType('')
     setSelectedPositions([])
+    setRangeStart(null)
+    setRangeEnd(null)
     setIsAddModalVisible(true)
   }
 
@@ -94,6 +99,39 @@ export default function PromotionSlotConfigAdd() {
     setSelectedPositions(prev =>
       prev.includes(pos) ? prev.filter(p => p !== pos) : [...prev, pos].sort((a, b) => a - b)
     )
+  }
+
+  // 批量添加范围位置
+  const handleAddRange = () => {
+    if (rangeStart === null || rangeEnd === null || rangeStart > rangeEnd) {
+      message.warning('請輸入有效的位置範圍')
+      return
+    }
+    const occupiedPositions = new Set(slotAlgorithms.map(s => s.position))
+    const newPositions: number[] = []
+    for (let i = rangeStart; i <= rangeEnd; i++) {
+      if (!occupiedPositions.has(i) && !selectedPositions.includes(i)) {
+        newPositions.push(i)
+      }
+    }
+    if (newPositions.length === 0) {
+      message.warning('所選範圍內無可用位置')
+      return
+    }
+    setSelectedPositions(prev => [...prev, ...newPositions].sort((a, b) => a - b))
+    setRangeStart(null)
+    setRangeEnd(null)
+    message.success(`已添加 ${newPositions.length} 個位置`)
+  }
+
+  // 移除位置
+  const removePosition = (pos: number) => {
+    setSelectedPositions(prev => prev.filter(p => p !== pos))
+  }
+
+  // 清空所有选择
+  const clearAllPositions = () => {
+    setSelectedPositions([])
   }
 
   const handleConfirmAddSlot = async () => {
@@ -134,6 +172,16 @@ export default function PromotionSlotConfigAdd() {
       okButtonProps: { danger: true },
       onOk: () => message.success(`已刪除 ${record.position}號位 配置`),
     })
+  }
+
+  // 编辑坑位配置
+  const handleEditSlot = (record: SlotAlgorithm) => {
+    addForm.setFieldsValue({
+      algorithmId: record.algorithmId,
+    })
+    setSelectedAlgoType(ALGO_TYPE_LABEL[record.algorithmType] || '')
+    setSelectedPositions([record.position])
+    setIsAddModalVisible(true)
   }
 
   // 切换启用/停用状态
@@ -255,7 +303,7 @@ export default function PromotionSlotConfigAdd() {
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 180,
       align: 'center',
       render: (_, record) => (
         <Space size={4}>
@@ -267,6 +315,9 @@ export default function PromotionSlotConfigAdd() {
             onClick={() => handleToggleStatus(record)}
           >
             {record.status === 'active' ? '停用' : '啟用'}
+          </Button>
+          <Button type="link" size="small" onClick={() => handleEditSlot(record)}>
+            編輯
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
             刪除
@@ -492,7 +543,7 @@ export default function PromotionSlotConfigAdd() {
         okText="確定"
         cancelText="取消"
         okButtonProps={{ style: { background: '#E8720C', borderColor: '#E8720C' } }}
-        width={520}
+        width={900}
       >
         <Form form={addForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
@@ -525,42 +576,108 @@ export default function PromotionSlotConfigAdd() {
               <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400, marginLeft: 8 }}>
                 已選 {selectedPositions.length} 個位置
               </span>
+              <Select
+                value={totalPositions}
+                onChange={(val) => setTotalPositions(val)}
+                size="small"
+                style={{ width: 90, marginLeft: 12, fontSize: 12 }}
+                options={[
+                  { label: '前 100 個', value: 100 },
+                  { label: '前 200 個', value: 200 },
+                  { label: '前 300 個', value: 300 },
+                  { label: '前 500 個', value: 500 },
+                ]}
+              />
             </span>
           } required>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-              {Array.from({ length: Math.max(slotAlgorithms.length + 5, 15) }, (_, i) => i + 1).map(pos => {
-                const existingSlot = slotAlgorithms.find(s => s.position === pos)
-                const isOccupied = !!existingSlot
-                const isSelected = selectedPositions.includes(pos)
-                return (
-                  <div
-                    key={pos}
-                    onClick={() => !isOccupied && togglePosition(pos)}
-                    style={{
-                      padding: '10px 8px',
-                      borderRadius: 6,
-                      border: isSelected ? '2px solid #E8720C' : isOccupied ? '1px solid #e8e8e8' : '1px solid #d9d9d9',
-                      background: isSelected ? '#fff7e6' : isOccupied ? '#f5f5f5' : '#fff',
-                      cursor: isOccupied ? 'not-allowed' : 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.2s',
-                      opacity: isOccupied ? 0.6 : 1,
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400, color: isSelected ? '#E8720C' : isOccupied ? '#bfbfbf' : '#333' }}>
-                      {pos}號位
-                    </div>
-                    {isOccupied && (
-                      <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {existingSlot.algorithmName.slice(0, 4)}...
+            <div style={{ 
+              maxHeight: 450, 
+              overflowY: 'auto', 
+              padding: '12px', 
+              background: '#fafafa', 
+              border: '1px solid #e8e8e8', 
+              borderRadius: 6 
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 8 }}>
+                {Array.from({ length: totalPositions }, (_, i) => i + 1).map(pos => {
+                  const existingSlot = slotAlgorithms.find(s => s.position === pos)
+                  const isOccupied = !!existingSlot
+                  const isSelected = selectedPositions.includes(pos)
+                  return (
+                    <div
+                      key={pos}
+                      onClick={() => !isOccupied && togglePosition(pos)}
+                      style={{
+                        padding: '8px 4px',
+                        borderRadius: 6,
+                        border: isSelected ? '2px solid #E8720C' : isOccupied ? '1px solid #e8e8e8' : '1px solid #d9d9d9',
+                        background: isSelected ? '#fff7e6' : isOccupied ? '#f5f5f5' : '#fff',
+                        cursor: isOccupied ? 'not-allowed' : 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.2s',
+                        opacity: isOccupied ? 0.5 : 1,
+                      }}
+                    >
+                      <div style={{ 
+                        fontSize: 12, 
+                        fontWeight: isSelected ? 600 : 400, 
+                        color: isSelected ? '#E8720C' : isOccupied ? '#bfbfbf' : '#333' 
+                      }}>
+                        {pos}號位
                       </div>
-                    )}
-                    {isSelected && !isOccupied && (
-                      <div style={{ fontSize: 10, color: '#E8720C', marginTop: 4 }}>已選擇</div>
-                    )}
-                  </div>
-                )
-              })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 已选位置统计展示区 */}
+            <div style={{ 
+              marginTop: 12, 
+              padding: '12px 16px', 
+              background: selectedPositions.length > 0 ? '#fff7e6' : '#fafafa', 
+              border: selectedPositions.length > 0 ? '1px solid #ffd591' : '1px solid #e8e8e8', 
+              borderRadius: 6 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>
+                  已選坑位統計（{selectedPositions.length} 個）
+                </span>
+                {selectedPositions.length > 0 && (
+                  <Button 
+                    size="small" 
+                    onClick={clearAllPositions} 
+                    style={{ fontSize: 12, padding: '0 8px', height: 22 }}
+                  >
+                    清空全部
+                  </Button>
+                )}
+              </div>
+              {selectedPositions.length > 0 ? (
+                <div style={{ 
+                  maxHeight: 120, 
+                  overflowY: 'auto', 
+                  display: 'flex', 
+                  flexWrap: 'wrap', 
+                  gap: 6 
+                }}>
+                  {selectedPositions.map(pos => (
+                    <Tag
+                      key={pos}
+                      closable
+                      onClose={() => removePosition(pos)}
+                      color="orange"
+                      style={{ margin: 0, fontSize: 12 }}
+                    >
+                      {pos}號位
+                    </Tag>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '12px 0', color: '#bfbfbf', fontSize: 13 }}>
+                  暫未選擇位置，請在上方網格中點擊選擇
+                </div>
+              )}
             </div>
           </Form.Item>
         </Form>

@@ -374,7 +374,7 @@ export default function AlgorithmAdd() {
                             { label: '隨機計算', value: 'random' },
                           ] : [
                             { label: '維度計算', value: 'merchant' },
-                            { label: '隨機計算', value: 'random' },
+                            { label: '輪詢計算', value: 'random' },
                           ]}
                           disabled={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR}
                         />
@@ -386,7 +386,9 @@ export default function AlgorithmAdd() {
                         <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
+                              {selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR
+                                ? '系統自動統計各區域內購買廣告的商家，生成商家ID列表進行隨機展示。過程中如有新增購買商家，系統會自動納入隨機候選集；如有取消推廣的商家，系統會自動剔除。'
+                                : '系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。'}
                             </span>
                           </div>
                         </div>

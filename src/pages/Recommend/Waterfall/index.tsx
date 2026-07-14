@@ -664,7 +664,7 @@ export default function Waterfall() {
           setAlgorithmType(undefined)
           setAlgorithmOptions([])
         }}
-        width={900}
+        width={1100}
         okText="確定"
         cancelText="取消"
       >
