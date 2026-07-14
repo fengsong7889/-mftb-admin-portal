@@ -29,16 +29,13 @@ export default defineConfig({
           if (id.includes('@xyflow')) return 'flow-vendor'
           // 地图(仅地图规划/瀑布流新增页用到)
           if (id.includes('leaflet')) return 'leaflet-vendor'
-          // antd 组件库及其子依赖
-          if (id.includes('/antd/') || id.includes('@ant-design/icons') || id.includes('/rc-')) return 'antd-vendor'
-          // React 运行时
+          // antd + React 合并同一 chunk，避免 antd 初始化时访问 React.version 的跨 chunk 时序问题
           if (
-            id.includes('/react-router') ||
-            id.includes('/react-dom/') ||
-            id.includes('/react/') ||
-            id.includes('/scheduler/')
-          )
-            return 'react-vendor'
+            id.includes('/antd/') || id.includes('@ant-design/icons') || id.includes('/rc-') ||
+            id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')
+          ) return 'antd-vendor'
+          // React Router 单独拆分
+          if (id.includes('/react-router')) return 'react-vendor'
           return 'vendor'
         },
       },
