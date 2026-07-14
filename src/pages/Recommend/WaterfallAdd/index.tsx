@@ -154,6 +154,10 @@ export default function WaterfallAdd() {
   const [searchParams] = useSearchParams()
   const urlAlgorithmType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
   const urlModule = searchParams.get('module') || 'delivery' // 'delivery' = 外賣到家, 'groupBuy' = 團購到店
+  const urlId = searchParams.get('id') || ''
+  const modeParam = searchParams.get('mode') || ''
+  const isDetailMode = modeParam === 'detail' // 只读详情模式
+  const isEditMode = !!urlId && !isDetailMode // 有 id 且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
@@ -233,6 +237,57 @@ export default function WaterfallAdd() {
       form.setFieldsValue({ algorithmType: urlAlgorithmType })
     }
   }, [urlAlgorithmType, form])
+
+  // 编辑/详情模式下加载数据
+  useEffect(() => {
+    if (urlId) {
+      // Mock: 根据 id 加载数据（从 Waterfall 页面的 mockData 结构映射）
+      const mockRecord = {
+        id: Number(urlId),
+        algorithmId: 1,
+        app: AppType.SHANFENG,
+        channel: RecommendChannel.DELIVERY,
+        algorithmType: urlAlgorithmType || AlgorithmType.INVINCIBLE_STAR,
+        presaleDays: 7,
+        dailySalesLimit: 2,
+        merchantLimit: false,
+        dailyPrice: urlAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? 100 : undefined,
+      }
+      form.setFieldsValue({
+        algorithmId: mockRecord.algorithmId,
+        app: mockRecord.app,
+        channel: mockRecord.channel,
+      })
+      setSelectedApp(mockRecord.app)
+      setSelectedChannel(mockRecord.channel)
+      if (mockRecord.algorithmType) {
+        setSelectedAlgorithmType(mockRecord.algorithmType)
+      }
+      setPresaleDays(mockRecord.presaleDays)
+      setDailySalesLimit(mockRecord.dailySalesLimit)
+      setMerchantLimit(mockRecord.merchantLimit)
+      if (mockRecord.dailyPrice) {
+        setDailyPrice(mockRecord.dailyPrice)
+      }
+      // 填充一条商圈计价配置 mock 数据
+      const isRevive = mockRecord.algorithmType === AlgorithmType.HOT_REVIVE_AD
+      const mockRegionConfig: RegionPricingConfig = {
+        region: Region.KOKSAA,
+        regionLabel: '黑沙環區',
+        pricing: isRevive
+          ? { fullDay: 100 }
+          : { fullDay: 120, breakfast: 80, lunch: 150, afternoon: 90, dinner: 180, night: 60 },
+        discountEnabled: true,
+        discounts: isRevive
+          ? {}
+          : { breakfast: 8, lunch: 9, dinner: 8 },
+        limitedTimeDiscount: false,
+        discountDateRange: undefined,
+      }
+      setSelectedRegions([Region.KOKSAA])
+      setRegionPricingConfigs([mockRegionConfig])
+    }
+  }, [urlId, urlAlgorithmType, form])
 
   // 自定义美化 Switch
   const CustomSwitch = ({
@@ -497,7 +552,7 @@ export default function WaterfallAdd() {
         </Button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            定價配置
+            {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價配置' : '定價配置'}
           </h2>
           {urlAlgorithmType != null && (
             <span style={{ fontSize: 14, color: '#595959' }}>
@@ -509,7 +564,7 @@ export default function WaterfallAdd() {
 
       {/* 表单内容区域 */}
       <div style={{ padding: 0 }}>
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" disabled={isDetailMode}>
           {/* 基础信息 */}
           <div style={{ borderLeft: '4px solid #1890ff', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
@@ -526,6 +581,7 @@ export default function WaterfallAdd() {
                 rules={[{ required: true, message: '請選擇算法' }]}
               >
                 <Select 
+                  disabled={isEditMode || isDetailMode}
                   placeholder="請選擇算法"
                   showSearch
                   optionFilterProp="label"
@@ -550,6 +606,7 @@ export default function WaterfallAdd() {
                 rules={[{ required: true, message: '請選擇所屬品牌' }]}
               >
                 <Select 
+                  disabled={isEditMode || isDetailMode}
                   placeholder="請選擇所屬品牌" 
                   options={APP_OPTIONS}
                   onChange={(value) => setSelectedApp(value)}
@@ -562,6 +619,7 @@ export default function WaterfallAdd() {
                 rules={[{ required: true, message: '請選擇業務頻道' }]}
               >
                 <Select 
+                  disabled={isEditMode || isDetailMode}
                   placeholder="請選擇業務頻道" 
                   options={channelOptions}
                   onChange={(value) => {
@@ -576,6 +634,7 @@ export default function WaterfallAdd() {
             {isSingleImageType && (
               <Form.Item label="封面圖" style={{ marginBottom: 0, marginTop: 16 }}>
                 <Upload
+                  disabled={isDetailMode}
                   listType="picture-card"
                   fileList={coverFileList}
                   onChange={({ fileList }) => setCoverFileList(fileList)}
@@ -1316,6 +1375,7 @@ export default function WaterfallAdd() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>剩餘天數 ≤</span>
                   <InputNumber
+                    disabled={isDetailMode}
                     min={0}
                     max={999}
                     value={record.maxDays === 999 ? undefined : record.maxDays}
@@ -1335,6 +1395,7 @@ export default function WaterfallAdd() {
               width: 160,
               render: (_, record: { id: number; maxDays: number; feePercent: number }) => (
                 <InputNumber
+                  disabled={isDetailMode}
                   min={0}
                   max={100}
                   value={record.feePercent}
@@ -1351,6 +1412,7 @@ export default function WaterfallAdd() {
               width: 120,
               align: 'center',
               render: (_: unknown, record: { id: number; maxDays: number; feePercent: number }) => {
+                if (isDetailMode) return <span style={{ color: '#bfbfbf' }}>—</span>
                 const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
                 return (
                   <Space size={4}>
@@ -1390,6 +1452,7 @@ export default function WaterfallAdd() {
       </div>
 
       {/* 底部操作按钮 - 固定 */}
+      {!isDetailMode && (
       <div className="form-footer">
         <Button onClick={handleBack}>
           取消
@@ -1403,6 +1466,7 @@ export default function WaterfallAdd() {
           保存
         </Button>
       </div>
+      )}
 
       {/* 算法规则弹窗 */}
       <Modal

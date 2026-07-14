@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker, Tabs } from 'antd'
 const { RangePicker } = DatePicker
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, EyeOutlined, LayoutOutlined, ArrowLeftOutlined, AppstoreOutlined, WalletOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, LayoutOutlined, ArrowLeftOutlined, AppstoreOutlined, WalletOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   AppType, 
@@ -457,42 +457,14 @@ export default function Waterfall() {
           <Button 
             type="link" 
             size="small" 
-            icon={<EyeOutlined />}
-            onClick={() => {
-              setViewingRecord(record)
-              setDetailVisible(true)
-            }}
+            onClick={() => navigate(`/promotion-waterfall-add?id=${record.id}&mode=detail&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
-            查看
+            詳情
           </Button>
           <Button 
             type="link" 
             size="small" 
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingRecord(record)
-              form.setFieldsValue({
-                app: record.app,
-                channel: record.channel,
-                slotPosition: record.slotPosition,
-                algorithmType: record.algorithmType,
-                algorithmId: record.algorithmId,
-                algorithmName: record.algorithmName,
-                purchaseLimit: record.purchaseLimit,
-                purchaseInterval: record.purchaseInterval,
-                merchantLimit: record.merchantLimit,
-                merchantIds: record.merchantIds,
-                regionLimit: record.regionLimit,
-                regionIds: record.regionIds,
-                status: record.status,
-              })
-              setAlgorithmType(record.algorithmType)
-              setContinuousPurchase(record.purchaseLimit ? 'support' : 'notSupport')
-              setMerchantLimit(record.merchantLimit)
-              setSelectedMerchants(record.merchantIds || [])
-              setRegionLimit(record.regionLimit)
-              setModalVisible(true)
-            }}
+            onClick={() => navigate(`/promotion-waterfall-add?id=${record.id}&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
             編輯
           </Button>

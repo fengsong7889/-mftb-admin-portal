@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Button, Space, Table, Tag, Input, Select, Form } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
   APP_OPTIONS, SERVICE_STATUS_OPTIONS,
@@ -71,6 +72,7 @@ const mockData: PricingRecord[] = [
 ]
 
 export default function Pricing() {
+  const navigate = useNavigate()
   const [searchForm] = Form.useForm()
   const [filteredData, setFilteredData] = useState<PricingRecord[]>(mockData)
 
@@ -179,9 +181,25 @@ export default function Pricing() {
     {
       title: '操作', 
       key: 'action',
-      width: 100,
-      render: () => (
-        <Button type="link" size="small">編輯</Button>
+      width: 140,
+      render: (_, record) => (
+        <Space size={4}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => navigate(`/recommend-pricing-add?id=${record.id}&mode=detail`)}
+          >
+            詳情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => navigate(`/recommend-pricing-add?id=${record.id}`)}
+          >
+            編輯
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -237,7 +255,7 @@ export default function Pricing() {
       {/* 功能区域 */}
       <div className="action-section">
         <Space>
-          <Button type="primary" icon={<PlusOutlined />}>新增價格</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/recommend-pricing-add')}>新增價格</Button>
         </Space>
       </div>
 

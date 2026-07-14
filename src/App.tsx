@@ -43,6 +43,7 @@ const RecommendAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
 const RecommendAlgorithmMonitor = lazy(() => import('./pages/Recommend/AlgorithmMonitor'))
 const RecommendSlot = lazy(() => import('./pages/Recommend/Slot'))
 const RecommendPricing = lazy(() => import('./pages/Recommend/Pricing'))
+const RecommendPricingAdd = lazy(() => import('./pages/Recommend/PricingAdd'))
 const RecommendPackage = lazy(() => import('./pages/Recommend/Package'))
 const RecommendOrder = lazy(() => import('./pages/Recommend/Order'))
 const RecommendCalendar = lazy(() => import('./pages/Recommend/Calendar'))
@@ -145,6 +146,7 @@ function AuthenticatedLayout() {
               <Route path="/recommend-algorithm-monitor" element={<RecommendAlgorithmMonitor />} />
               <Route path="/recommend-slot" element={<RecommendSlot />} />
               <Route path="/recommend-pricing" element={<RecommendPricing />} />
+              <Route path="/recommend-pricing-add" element={<RecommendPricingAdd />} />
               <Route path="/recommend-package" element={<RecommendPackage />} />
               <Route path="/recommend-order" element={<RecommendOrder />} />
               <Route path="/recommend-calendar" element={<RecommendCalendar />} />
