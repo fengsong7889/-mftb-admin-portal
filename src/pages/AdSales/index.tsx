@@ -101,8 +101,10 @@ export default function AdSales() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {currentStep >= 1 && (
               <Button
+                type="primary"
                 icon={<ArrowLeftOutlined />}
                 onClick={handleGoBack}
+                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
               >
                 返回
               </Button>

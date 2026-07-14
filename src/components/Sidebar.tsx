@@ -412,6 +412,11 @@ const menuItems: MenuItem[] = [
         label: '銷售定價',
       },
       {
+        key: 'promotion-sales-config',
+        icon: <ShoppingFilled />,
+        label: '店鋪推廣',
+      },
+      {
         key: 'ad-sales',
         icon: <ShoppingFilled />,
         label: '銷售訂單',
@@ -423,11 +428,6 @@ const menuItems: MenuItem[] = [
     icon: <ThunderboltOutlined />,
     label: '推广通',
     children: [
-      {
-        key: 'promotion-sales-config',
-        icon: <ShoppingFilled />,
-        label: '店鋪推廣',
-      },
       {
         key: 'promotion-report-group',
         icon: <BarChartOutlined />,

@@ -724,8 +724,10 @@ export default function PromotionOrderManage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Button
+              type="primary"
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate(backPath)}
+              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
             >
               返回
             </Button>
