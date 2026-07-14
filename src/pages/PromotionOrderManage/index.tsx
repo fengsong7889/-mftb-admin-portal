@@ -719,22 +719,24 @@ export default function PromotionOrderManage() {
       {/* 页面标题 */}
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
-              {orderType ? `${orderType}訂單` : '銷售訂單'}
-            </h2>
-            <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
-              {orderType ? `查看${orderType}的訂單詳情` : '查看廣告訂單詳情'}
-            </p>
-          </div>
-          <Space size={12}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Button
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate('/ad-sales')}
             >
               返回
             </Button>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20 }}>
+                <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
+                {orderType ? `${orderType}訂單` : '銷售訂單'}
+              </h2>
+              <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
+                {orderType ? `查看${orderType}的訂單詳情` : '查看廣告訂單詳情'}
+              </p>
+            </div>
+          </div>
+          <Space size={12}>
             <Button
               type="primary"
               icon={<ShoppingCartOutlined />}

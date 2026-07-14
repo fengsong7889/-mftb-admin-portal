@@ -386,13 +386,6 @@ export default function Algorithm() {
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space size={16}>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <span style={{ marginRight: 8 }}>{selectedTypeCard?.icon}</span>
-              {TYPE_LABEL[selectedType]} - 算法列表
-            </h2>
-            <Tag color="blue">{filteredData.length} 個算法</Tag>
-          </Space>
-          <Space>
             <Button
               type="primary"
               icon={<ArrowLeftOutlined />}
@@ -401,6 +394,11 @@ export default function Algorithm() {
             >
               返回
             </Button>
+            <h2 style={{ margin: 0, fontSize: 20 }}>
+              <span style={{ marginRight: 8 }}>{selectedTypeCard?.icon}</span>
+              {TYPE_LABEL[selectedType]} - 算法列表
+            </h2>
+            <Tag color="blue">{filteredData.length} 個算法</Tag>
           </Space>
         </div>
       </Card>

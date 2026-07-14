@@ -282,14 +282,14 @@ export default function PromotionSlotConfigAdd() {
       <div style={{
         background: '#fff', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-          新增瀑布流配置
-        </h2>
         <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack} style={{ fontSize: 14 }}>
           返回
         </Button>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+          新增瀑布流配置
+        </h2>
       </div>
 
       {/* 表单区域 */}

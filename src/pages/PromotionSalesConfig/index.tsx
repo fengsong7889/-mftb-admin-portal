@@ -98,27 +98,31 @@ export default function PromotionSalesConfig() {
       {/* 页面标题 */}
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
-              {currentStep >= 1 && selectedAlgorithmType
-                ? `購買${RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''}`
-                : '店鋪推廣'}
-            </h2>
-            <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
-              {currentStep >= 1 && selectedAlgorithmType
-                ? `為您的店鋪購買${RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''}廣告曝光位`
-                : '可根據需求選擇推薦類型，為您的店鋪購買廣告曝光位，獲取流量'}
-            </p>
-          </div>
-          {currentStep >= 1 && (
-            <Space size={12}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {currentStep >= 1 && (
               <Button
                 icon={<ArrowLeftOutlined />}
                 onClick={handleGoBack}
               >
                 返回
               </Button>
+            )}
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20 }}>
+                <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
+                {currentStep >= 1 && selectedAlgorithmType
+                  ? `購買${RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''}`
+                  : '店鋪推廣'}
+              </h2>
+              <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
+                {currentStep >= 1 && selectedAlgorithmType
+                  ? `為您的店鋪購買${RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''}廣告曝光位`
+                  : '可根據需求選擇推薦類型，為您的店鋪購買廣告曝光位，獲取流量'}
+              </p>
+            </div>
+          </div>
+          {currentStep >= 1 && (
+            <Space size={12}>
               <Button
                 type="primary"
                 icon={<OrderedListOutlined />}

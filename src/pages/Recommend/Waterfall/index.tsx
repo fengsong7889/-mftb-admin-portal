@@ -581,13 +581,6 @@ export default function Waterfall() {
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space size={16}>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <span style={{ marginRight: 8 }}>{ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon}</span>
-              {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]} - 銷售定價
-            </h2>
-            <Tag color="blue">{filteredData.length} 條定價</Tag>
-          </Space>
-          <Space>
             <Button
               type="primary"
               icon={<ArrowLeftOutlined />}
@@ -596,6 +589,10 @@ export default function Waterfall() {
             >
               返回
             </Button>
+            <h2 style={{ margin: 0, fontSize: 20 }}>
+              <span style={{ marginRight: 8 }}>{ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon}</span>
+              {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]} - 銷售定價
+            </h2>
           </Space>
         </div>
       </Card>

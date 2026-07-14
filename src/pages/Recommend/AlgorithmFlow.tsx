@@ -500,6 +500,9 @@ function FlowEditor() {
         flexShrink: 0,
       }}>
         <Space size={16}>
+          <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}>
+            返回算法庫
+          </Button>
           <h2 style={{ margin: 0, fontSize: 20 }}>
             <span style={{ marginRight: 8 }}>🔀</span>
             算法推薦業務流程
@@ -536,9 +539,6 @@ function FlowEditor() {
           <Tooltip title="重置位置">
             <Button icon={<UndoOutlined />} onClick={handleReset} />
           </Tooltip>
-          <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}>
-            返回算法庫
-          </Button>
         </Space>
       </div>
 

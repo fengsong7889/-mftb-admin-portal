@@ -606,17 +606,9 @@ export default function SearchVerifyDetail() {
         background: '#fff', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        gap: 12,
       }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            商家得分明細
-          </h2>
-          <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-            {merchant.merchantName}（{merchant.merchantId}）· {merchant.category}
-          </div>
-        </div>
         <Button
           type="primary"
           icon={<ArrowLeftOutlined />}
@@ -625,6 +617,14 @@ export default function SearchVerifyDetail() {
         >
           返回
         </Button>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+            商家得分明細
+          </h2>
+          <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+            {merchant.merchantName}（{merchant.merchantId}）· {merchant.category}
+          </div>
+        </div>
       </div>
 
       {/* 總分概要卡片 */}

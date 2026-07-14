@@ -153,9 +153,17 @@ export default function AlgorithmAdd() {
         background: '#fff', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        gap: 12,
       }}>
+        <Button
+          type="primary"
+          icon={<ArrowLeftOutlined />}
+          onClick={handleBack}
+          style={{ fontSize: 14 }}
+        >
+          返回
+        </Button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
             {isEditMode ? '編輯算法' : '新增算法'}
@@ -166,14 +174,6 @@ export default function AlgorithmAdd() {
             </span>
           )}
         </div>
-        <Button
-          type="primary"
-          icon={<ArrowLeftOutlined />}
-          onClick={handleBack}
-          style={{ fontSize: 14 }}
-        >
-          返回
-        </Button>
       </div>
 
       {/* 算法选择区域 */}

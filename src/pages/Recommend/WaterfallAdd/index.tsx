@@ -208,6 +208,11 @@ export default function WaterfallAdd() {
   // 是否为盤活復蘇算法类型
   const isReviveAlgorithm = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
 
+  // 是否为單圖類型（無敵星星/盤活復蘇只有封面圖，合併進基礎信息卡片）
+  const isSingleImageType =
+    selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ||
+    selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
+
   // 从 URL 参数初始化表单
   useEffect(() => {
     if (urlAlgorithmType) {
@@ -465,14 +470,9 @@ export default function WaterfallAdd() {
         background: '#fff', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        gap: 12,
       }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            新增定價銷售配置
-          </h2>
-        </div>
         <Button
           type="primary"
           icon={<ArrowLeftOutlined />}
@@ -481,6 +481,11 @@ export default function WaterfallAdd() {
         >
           返回
         </Button>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
+            新增定價銷售配置
+          </h2>
+        </div>
       </div>
 
       {/* 表单内容区域 */}
@@ -542,15 +547,34 @@ export default function WaterfallAdd() {
                   options={channelOptions}
                   onChange={(value) => {
                     setSelectedChannel(value)
-                    // 切换频道时重置展示页面
+                    // 切换頻道时重置展示页面
                     form.setFieldsValue({ algorithmLandingPage: undefined })
                   }}
                 />
               </Form.Item>
             </div>
+            {/* 單圖類型：封面圖置於第二行，與算法名稱左對齊 */}
+            {isSingleImageType && (
+              <Form.Item label="封面圖" style={{ marginBottom: 0, marginTop: 16 }}>
+                <Upload
+                  listType="picture-card"
+                  fileList={coverFileList}
+                  onChange={({ fileList }) => setCoverFileList(fileList)}
+                  beforeUpload={() => false}
+                >
+                  {coverFileList.length < 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <PlusOutlined style={{ fontSize: 20 }} />
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳封面圖</span>
+                    </div>
+                  )}
+                </Upload>
+              </Form.Item>
+            )}
           </div>
 
-          {/* 推广图片 */}
+          {/* 推广图片（多圖類型：封面/詳情/宣傳；單圖類型已合併至基礎信息卡片） */}
+          {!isSingleImageType && (
           <div style={{ borderLeft: '4px solid #52c41a', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -607,6 +631,7 @@ export default function WaterfallAdd() {
               </Form.Item>
             </div>
           </div>
+          )}
 
           {/* 广告位选择 */}
           {canShowPositions && (
@@ -684,7 +709,7 @@ export default function WaterfallAdd() {
           )}
 
           {/* 销售策略（无敌星星 + 盘活复苏） */}
-          {selectedApp && selectedChannel && selectedAlgorithmType && (
+          {(
             <div style={{ borderLeft: '4px solid #fa8c16', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -797,7 +822,7 @@ export default function WaterfallAdd() {
 
 
           {/* 盘活复苏 - 按天定价配置 + 梯度折扣 */}
-          {selectedApp && selectedChannel && selectedAlgorithmType && isReviveAlgorithm && (
+          {isReviveAlgorithm && (
             <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -894,7 +919,7 @@ export default function WaterfallAdd() {
           )}
 
           {/* 区域计价配置 - 仅无敌星星显示 */}
-          {selectedApp && selectedChannel && selectedAlgorithmType && !isReviveAlgorithm && (
+          {!isReviveAlgorithm && (
             <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1302,7 +1327,7 @@ export default function WaterfallAdd() {
               title: '操作',
               width: 80,
               align: 'center',
-              render: (_: unknown, record: { id: number }) => (
+              render: (_: unknown, record: { id: number; maxDays: number; feePercent: number }) => (
                 <Button
                   type="link"
                   size="small"

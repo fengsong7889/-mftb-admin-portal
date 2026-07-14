@@ -722,7 +722,9 @@
   margin-bottom: 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* 新增/操作按钮统一右对齐 */
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* ========================================================================
@@ -2086,7 +2088,7 @@
 .debt-detail-title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
 }
 

@@ -106,10 +106,10 @@ export default function DebtDetail() {
       {/* 还款信息头部 */}
       <div className="debt-detail-header">
         <div className="debt-detail-title-row">
-          <h3 className="debt-detail-title">還款信息</h3>
           <Button type="link" onClick={() => navigate('/debt-reconcile')} className="debt-detail-back-link">
             <ArrowLeftOutlined /> 返回
           </Button>
+          <h3 className="debt-detail-title">還款信息</h3>
         </div>
 
         {/* 进度条区域 */}
