@@ -17,25 +17,6 @@ export default defineConfig({
     open: true,
   },
   build: {
-    chunkSizeWarningLimit: 800,
-    rollupOptions: {
-      output: {
-        // 拆分第三方库为独立 chunk，配合页面懒加载按需加载
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          // antd + React 合并同一 chunk，避免 antd 初始化时访问 React.version 的跨 chunk 时序问题
-          if (
-            id.includes('/antd/') || id.includes('@ant-design/icons') || id.includes('/rc-') ||
-            id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')
-          ) return 'antd-vendor'
-          // 流程图(仅算法流程页用到)
-          if (id.includes('@xyflow')) return 'flow-vendor'
-          // 地图(仅地图规划/瀑布流新增页用到)
-          if (id.includes('leaflet')) return 'leaflet-vendor'
-          // 其余第三方库（含 @antv/charts）统一打包，避免跨 chunk 初始化依赖问题
-          return 'vendor'
-        },
-      },
-    },
+    chunkSizeWarningLimit: 2000,
   },
 })
