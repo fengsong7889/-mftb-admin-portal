@@ -19,7 +19,7 @@ enum OrderStatus {
 const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
   [OrderStatus.PENDING_PROMOTION]: { label: '待推廣', color: 'blue' },
   [OrderStatus.PROMOTING]: { label: '推廣中', color: 'green' },
-  [OrderStatus.PROMOTED]: { label: '已推廣', color: 'purple' },
+  [OrderStatus.PROMOTED]: { label: '已完成', color: 'purple' },
   [OrderStatus.REFUNDED]: { label: '已退款', color: 'orange' },
   [OrderStatus.CANCELLED]: { label: '已取消', color: 'red' },
 }
