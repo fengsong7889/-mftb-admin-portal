@@ -1072,78 +1072,6 @@ export default function WaterfallAdd() {
           )}
 
 
-          {/* 盘活复苏 - 梯度折扣配置 */}
-          {isReviveAlgorithm && (
-            <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              {/* 购买多天折扣配置（梯度） */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
-                <Switch 
-                  checked={gradientEnabled}
-                  onChange={(checked) => {
-                    setGradientEnabled(checked)
-                    if (checked && gradients.length === 0) {
-                      setGradients([{ count: 0, discount: 0 }])
-                    }
-                  }}
-                  size="small"
-                />
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
-                {gradientEnabled && (
-                  <Button 
-                    type="primary" 
-                    size="small" 
-                    icon={<PlusOutlined />}
-                    onClick={handleAddGradient}
-                    style={{ borderRadius: 6, marginLeft: 'auto' }}
-                  >
-                    添加梯度
-                  </Button>
-                )}
-              </div>
-              {gradientEnabled && (
-                gradients.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
-                    暫無梯度配置，請點擊右上角"添加梯度"
-                  </div>
-                ) : (
-                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  {gradients.map((gradient, index) => (
-                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
-                      <Tag color="blue">梯度 {index + 1}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>購買天數≥</span>
-                      <InputNumber
-                        min={1}
-                        max={30}
-                        placeholder="天數"
-                        style={{ width: 80 }}
-                        value={gradient.count}
-                        onChange={(value) => handleUpdateGradient(index, 'count', value)}
-                      />
-                      <span style={{ fontSize: 13, color: '#595959' }}>天，對應折扣：</span>
-                      <InputNumber
-                        min={1}
-                        max={100}
-                        placeholder="折扣"
-                        style={{ width: 80 }}
-                        addonAfter="折"
-                        value={gradient.discount}
-                        onChange={(value) => handleUpdateGradient(index, 'discount', value)}
-                      />
-                      <Button 
-                        type="text" 
-                        danger 
-                        icon={<DeleteFilled style={{ fontSize: 16 }} />}
-                        onClick={() => handleRemoveGradient(index)}
-                      />
-                    </div>
-                  ))}
-                </Space>
-                )
-              )}
-            </div>
-          )}
-
           {/* 区域计价配置 - 无敌星星和盘活复苏都显示 */}
             <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
@@ -1332,6 +1260,78 @@ export default function WaterfallAdd() {
               </>
               )}
             </div>
+
+          {/* 盘活复苏 - 梯度折扣配置（选择商圈后才展示） */}
+          {isReviveAlgorithm && regionPricingConfigs.length > 0 && (
+            <div style={{ borderLeft: '4px solid #13c2c2', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              {/* 购买多天折扣配置（梯度） */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
+                <Switch 
+                  checked={gradientEnabled}
+                  onChange={(checked) => {
+                    setGradientEnabled(checked)
+                    if (checked && gradients.length === 0) {
+                      setGradients([{ count: 0, discount: 0 }])
+                    }
+                  }}
+                  size="small"
+                />
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
+                {gradientEnabled && (
+                  <Button 
+                    type="primary" 
+                    size="small" 
+                    icon={<PlusOutlined />}
+                    onClick={handleAddGradient}
+                    style={{ borderRadius: 6, marginLeft: 'auto' }}
+                  >
+                    添加梯度
+                  </Button>
+                )}
+              </div>
+              {gradientEnabled && (
+                gradients.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
+                    暫無梯度配置，請點擊右上角"添加梯度"
+                  </div>
+                ) : (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  {gradients.map((gradient, index) => (
+                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+                      <Tag color="blue">梯度 {index + 1}</Tag>
+                      <span style={{ fontSize: 13, color: '#595959' }}>購買天數≥</span>
+                      <InputNumber
+                        min={1}
+                        max={30}
+                        placeholder="天數"
+                        style={{ width: 80 }}
+                        value={gradient.count}
+                        onChange={(value) => handleUpdateGradient(index, 'count', value)}
+                      />
+                      <span style={{ fontSize: 13, color: '#595959' }}>天，對應折扣：</span>
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        placeholder="折扣"
+                        style={{ width: 80 }}
+                        addonAfter="折"
+                        value={gradient.discount}
+                        onChange={(value) => handleUpdateGradient(index, 'discount', value)}
+                      />
+                      <Button 
+                        type="text" 
+                        danger 
+                        icon={<DeleteFilled style={{ fontSize: 16 }} />}
+                        onClick={() => handleRemoveGradient(index)}
+                      />
+                    </div>
+                  ))}
+                </Space>
+                )
+              )}
+            </div>
+          )}
 
           {/* 时段个数折扣配置 - 仅无敌星星显示 */}
           {!isReviveAlgorithm && selectedRegions.length > 0 && (
