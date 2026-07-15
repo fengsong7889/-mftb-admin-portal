@@ -88,80 +88,94 @@ interface OrderItem {
 }
 
 /* ---- Mock ---- */
+const slotDefs = [
+  { slot: '早餐', originalPrice: 80 },
+  { slot: '午餐', originalPrice: 150 },
+  { slot: '下午茶', originalPrice: 90 },
+  { slot: '晚餐', originalPrice: 180 },
+  { slot: '宵夜', originalPrice: 60 },
+] as const
+
+const dates = ['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20']
+const pastDates = ['2025-06-20', '2025-06-21', '2025-06-22', '2025-06-23', '2025-06-24']
+
+function genOrder(
+  id: string, orderNo: string, algoId: string, promoName: string,
+  app: AppType, channel: RecommendChannel, region: number,
+  recType: RecommendType, slotPos: number, gid: string, gname: string,
+  sid: string, sname: string, pdate: string, orig: number, disc: number,
+  actual: number, status: OrderStatus, otime: string, ptime: string | undefined,
+  slotPattern: number[], dateIdx: number, gradDisc: { count: number; discount: number } | null,
+  refundAmt?: number,
+): OrderItem {
+  const isRevive = recType === RecommendType.REVITALIZATION_AD
+  const isPast = status !== OrderStatus.PENDING_PROMOTION && status !== OrderStatus.PROMOTING
+  const baseDates = isPast ? pastDates : dates
+  const slotPrices: SlotPriceItem[] = []
+  if (isRevive) {
+    slotPattern.forEach((di, i) => {
+      const p = 1000 + (i * 100)
+      const d = [10, 9, 8][i % 3]
+      slotPrices.push({ slot: `Day${i + 1}`, date: baseDates[di % 5], originalPrice: p, discount: d, actualPrice: Math.round(p * d / 10) })
+    })
+  } else {
+    slotPattern.forEach((si, i) => {
+      const dateIdx = Math.floor(i / 5)
+      const date = baseDates[dateIdx % 5]
+      const def = slotDefs[si % 5]
+      const d = [10, 9, 8, 8][i % 4]
+      slotPrices.push({ slot: def.slot, date, originalPrice: def.originalPrice, discount: d, actualPrice: Math.round(def.originalPrice * d / 10) })
+    })
+  }
+  const cancelFeeRules = [
+    { maxDays: 0, feePercent: 100 },
+    { maxDays: 3, feePercent: 80 },
+    { maxDays: 7, feePercent: 50 },
+  ]
+  return {
+    id, orderNo, algorithmId: algoId, promotionName: promoName, app, channel, region,
+    recommendType: recType, slotPosition: slotPos, groupId: gid, groupName: gname,
+    storeId: sid, storeName: sname, purchaseDate: pdate, originalPrice: orig,
+    discountPrice: disc, actualPrice: actual, status, orderTime: otime, payTime: ptime,
+    promoStartDate: isPast ? '2025-06-15' : '2026-07-16',
+    slotPrices, gradientDiscount: gradDisc, cancelFeeRules,
+    ...(refundAmt !== undefined ? { refundAmount: refundAmt } : {}),
+  }
+}
+
 const mockOrders: OrderItem[] = [
-  {
-    id: '1',
-    orderNo: 'ORD20250705001',
-    algorithmId: 'ALG001',
-    promotionName: '無敵星星·黃金展位',
-    app: AppType.SHANFENG,
-    channel: RecommendChannel.DELIVERY,
-    region: 1,
-    recommendType: RecommendType.INVINCIBLE_STAR,
-    slotPosition: 3,
-    groupId: 'G10001',
-    groupName: '澳門美食集團',
-    storeId: 'S20001',
-    storeName: '澳門總店',
-    purchaseDate: '2025-07-05',
-    originalPrice: 2000,
-    discountPrice: 1800,
-    actualPrice: 1440,
-    status: OrderStatus.PROMOTING,
-    orderTime: '2025-07-05 10:30:00',
-    payTime: '2025-07-05 10:35:00',
-    promoStartDate: '2026-07-16',
-    slotPrices: [
-      { slot: '早餐', date: '2026-07-16', originalPrice: 80, discount: 8, actualPrice: 64 },
-      { slot: '午餐', date: '2026-07-16', originalPrice: 150, discount: 9, actualPrice: 135 },
-      { slot: '下午茶', date: '2026-07-16', originalPrice: 90, discount: 8, actualPrice: 72 },
-      { slot: '晚餐', date: '2026-07-16', originalPrice: 180, discount: 8, actualPrice: 144 },
-      { slot: '宵夜', date: '2026-07-16', originalPrice: 60, discount: 10, actualPrice: 60 },
-      { slot: '早餐', date: '2026-07-17', originalPrice: 80, discount: 8, actualPrice: 64 },
-      { slot: '午餐', date: '2026-07-17', originalPrice: 150, discount: 9, actualPrice: 135 },
-      { slot: '下午茶', date: '2026-07-17', originalPrice: 90, discount: 8, actualPrice: 72 },
-      { slot: '晚餐', date: '2026-07-17', originalPrice: 180, discount: 8, actualPrice: 144 },
-      { slot: '宵夜', date: '2026-07-17', originalPrice: 60, discount: 10, actualPrice: 60 },
-    ],
-    gradientDiscount: { count: 10, discount: 8 },
-    cancelFeeRules: [
-      { maxDays: 0, feePercent: 100 },
-      { maxDays: 3, feePercent: 80 },
-      { maxDays: 7, feePercent: 50 },
-    ],
-  },
-  {
-    id: '2',
-    orderNo: 'ORD20250706002',
-    algorithmId: 'ALG002',
-    promotionName: '無敵星星·首頁推薦',
-    app: AppType.MFOOD,
-    channel: RecommendChannel.DELIVERY,
-    region: 6,
-    recommendType: RecommendType.INVINCIBLE_STAR,
-    slotPosition: 5,
-    groupId: 'G10002',
-    groupName: '閃峰餐飲連鎖',
-    storeId: 'S20002',
-    storeName: '氹仔分店',
-    purchaseDate: '2025-07-06',
-    originalPrice: 1500,
-    discountPrice: 1350,
-    actualPrice: 1350,
-    status: OrderStatus.PENDING_PROMOTION,
-    orderTime: '2025-07-06 14:20:00',
-    payTime: '2025-07-06 14:25:00',
-    promoStartDate: '2026-07-16',
-    slotPrices: [
-      { slot: '晚餐', date: '2026-07-16', originalPrice: 1500, discount: 9, actualPrice: 1350 },
-    ],
-    gradientDiscount: null,
-    cancelFeeRules: [
-      { maxDays: 0, feePercent: 100 },
-      { maxDays: 3, feePercent: 80 },
-      { maxDays: 7, feePercent: 50 },
-    ],
-  },
+  // 無敵星星訂單 (id: 1-15)
+  genOrder('1','ORD20250705001','ALG001','無敵星星·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.INVINCIBLE_STAR,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-05',2000,1800,1440,OrderStatus.PROMOTING,'2025-07-05 10:30:00','2025-07-05 10:35:00',[0,1,2,3,4,0,1,2,3,4],0,{count:10,discount:8}),
+  genOrder('2','ORD20250706002','ALG002','無敵星星·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10002','閃峰餐飲連鎖','S20002','氹仔分店','2025-07-06',1500,1350,1350,OrderStatus.PENDING_PROMOTION,'2025-07-06 14:20:00','2025-07-06 14:25:00',[3],0,null),
+  genOrder('3','ORD20250707003','ALG003','盤活復蘇·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.INVINCIBLE_STAR,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-08',3000,2700,2700,OrderStatus.PROMOTED,'2025-07-07 09:15:00',undefined,[0,1,2,3,4],0,null),
+  genOrder('4','ORD20250703004','ALG004','流量廣告·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-03',1000,900,900,OrderStatus.REFUNDED,'2025-07-03 16:40:00','2025-07-03 16:45:00',[0],0,null,900),
+  genOrder('5','ORD20250702005','ALG001','無敵星星·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.INVINCIBLE_STAR,1,'G10002','閃峰餐飲連鎖','S20005','新馬路店','2025-07-02',2500,2250,2250,OrderStatus.REFUNDED,'2025-07-02 11:20:00',undefined,[3,4],0,null,2250),
+  genOrder('6','ORD20250701006','ALG001','無敵星星·早鳥優惠',AppType.MFOOD,RecommendChannel.GROUP_BUY,1,RecommendType.INVINCIBLE_STAR,2,'G10003','大灣區餐飲集團','S20001','澳門總店','2025-07-01',1800,1620,1620,OrderStatus.PENDING_PROMOTION,'2025-07-01 08:30:00','2025-07-01 08:35:00',[0,1,2,3,4],0,null),
+  genOrder('7','ORD20250630007','ALG002','新店廣告·零售閃購',AppType.SHANFENG,RecommendChannel.DELIVERY,3,RecommendType.INVINCIBLE_STAR,3,'G10001','澳門美食集團','S20002','氹仔分店','2025-06-30',1200,1080,1080,OrderStatus.PENDING_PROMOTION,'2025-06-30 10:15:00','2025-06-30 10:20:00',[1],0,null),
+  genOrder('8','ORD20250629008','ALG003','盤活復蘇·團購到店',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.INVINCIBLE_STAR,4,'G10002','閃峰餐飲連鎖','S20003','珠海旗艦店','2025-06-29',2800,2520,2520,OrderStatus.PROMOTED,'2025-06-29 15:45:00',undefined,[0,1,2,3,4],0,null),
+  genOrder('9','ORD20250628009','ALG004','流量廣告·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-06-28',1600,1440,1440,OrderStatus.REFUNDED,'2025-06-28 09:20:00','2025-06-28 09:25:00',[0,2],0,null,1440),
+  genOrder('10','ORD20250627010','ALG001','無敵星星·夜宵專場',AppType.MFOOD,RecommendChannel.DELIVERY,3,RecommendType.INVINCIBLE_STAR,5,'G10001','澳門美食集團','S20005','新馬路店','2025-06-27',2200,1980,1980,OrderStatus.PROMOTED,'2025-06-27 20:10:00','2025-06-27 20:15:00',[4],0,null),
+  genOrder('11','ORD20250626011','ALG002','新店廣告·澳門專區',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.INVINCIBLE_STAR,2,'G10002','閃峰餐飲連鎖','S20001','澳門總店','2025-06-26',1900,1710,1710,OrderStatus.PENDING_PROMOTION,'2025-06-26 11:30:00','2025-06-26 11:35:00',[1,3],0,null),
+  genOrder('12','ORD20250625012','ALG003','盤活復蘇·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.INVINCIBLE_STAR,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-06-25',1400,1260,1260,OrderStatus.REFUNDED,'2025-06-25 13:50:00',undefined,[1,3],0,null,1260),
+  genOrder('13','ORD20250624013','ALG004','流量廣告·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.INVINCIBLE_STAR,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-06-24',2100,1890,1890,OrderStatus.PROMOTED,'2025-06-24 07:40:00',undefined,[0,1],0,null),
+  genOrder('14','ORD20250623014','ALG001','無敵星星·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10002','閃峰餐飲連鎖','S20004','黑沙環店','2025-06-23',3500,3150,3150,OrderStatus.REFUNDED,'2025-06-23 06:20:00','2025-06-23 06:25:00',[0,1,2,3,4,0,1],0,null,3150),
+  genOrder('15','ORD20250622015','ALG002','新店廣告·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-06-22',1700,1530,1530,OrderStatus.REFUNDED,'2025-06-22 10:05:00','2025-06-22 10:10:00',[0,1,2],0,null,1530),
+  // 盤活復甦訂單 (id: 101-115)
+  genOrder('101','ORD20250715101','ALG003','盤活復甦·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.REVITALIZATION_AD,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-15',3000,2700,2700,OrderStatus.PROMOTING,'2025-07-15 10:30:00','2025-07-15 10:35:00',[0,1,2],0,{count:3,discount:9}),
+  genOrder('102','ORD20250714102','ALG003','盤活復甦·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10002','閃峰餐飲連鎖','S20002','氹仔分店','2025-07-14',2500,2250,2250,OrderStatus.PENDING_PROMOTION,'2025-07-14 14:20:00','2025-07-14 14:25:00',[0,1],0,null),
+  genOrder('103','ORD20250713103','ALG003','盤活復甦·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.REVITALIZATION_AD,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-13',4000,3600,3600,OrderStatus.PROMOTED,'2025-07-13 09:15:00',undefined,[0,1,2,3],0,null),
+  genOrder('104','ORD20250712104','ALG003','盤活復甦·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-12',1500,1350,1350,OrderStatus.REFUNDED,'2025-07-12 16:40:00','2025-07-12 16:45:00',[0],0,null,1350),
+  genOrder('105','ORD20250711105','ALG003','盤活復甦·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.REVITALIZATION_AD,1,'G10002','閃峰餐飲連鎖','S20005','新馬路店','2025-07-11',5000,4500,4500,OrderStatus.REFUNDED,'2025-07-11 11:20:00',undefined,[0,1,2,3,4],0,null,4500),
+  genOrder('106','ORD20250710106','ALG003','盤活復甦·早鳥優惠',AppType.MFOOD,RecommendChannel.GROUP_BUY,1,RecommendType.REVITALIZATION_AD,2,'G10003','大灣區餐飲集團','S20001','澳門總店','2025-07-10',2000,1800,1800,OrderStatus.PENDING_PROMOTION,'2025-07-10 08:30:00','2025-07-10 08:35:00',[0,1],0,null),
+  genOrder('107','ORD20250709107','ALG003','盤活復甦·零售閃購',AppType.SHANFENG,RecommendChannel.DELIVERY,3,RecommendType.REVITALIZATION_AD,3,'G10001','澳門美食集團','S20002','氹仔分店','2025-07-09',3500,3150,3150,OrderStatus.PENDING_PROMOTION,'2025-07-09 10:15:00','2025-07-09 10:20:00',[0,1,2],0,null),
+  genOrder('108','ORD20250708108','ALG003','盤活復甦·團購到店',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,4,'G10002','閃峰餐飲連鎖','S20003','珠海旗艦店','2025-07-08',2800,2520,2520,OrderStatus.PROMOTED,'2025-07-08 15:45:00',undefined,[0,1],0,null),
+  genOrder('109','ORD20250707109','ALG003','盤活復甦·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-07-07',4500,4050,4050,OrderStatus.REFUNDED,'2025-07-07 09:20:00','2025-07-07 09:25:00',[0,1,2,3],0,null,4050),
+  genOrder('110','ORD20250706110','ALG003','盤活復甦·夜宵專場',AppType.MFOOD,RecommendChannel.DELIVERY,3,RecommendType.REVITALIZATION_AD,5,'G10001','澳門美食集團','S20005','新馬路店','2025-07-06',2200,1980,1980,OrderStatus.PROMOTED,'2025-07-06 20:10:00','2025-07-06 20:15:00',[0,1],0,null),
+  genOrder('111','ORD20250705111','ALG003','盤活復甦·澳門專區',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.REVITALIZATION_AD,2,'G10002','閃峰餐飲連鎖','S20001','澳門總店','2025-07-05',6000,5400,5400,OrderStatus.PENDING_PROMOTION,'2025-07-05 11:30:00','2025-07-05 11:35:00',[0,1,2,3,4,0],0,null),
+  genOrder('112','ORD20250704112','ALG003','盤活復甦·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-07-04',1400,1260,1260,OrderStatus.REFUNDED,'2025-07-04 13:50:00',undefined,[0,1],0,null,1260),
+  genOrder('113','ORD20250703113','ALG003','盤活復甦·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-07-03',3200,2880,2880,OrderStatus.PROMOTED,'2025-07-03 07:40:00',undefined,[0,1,2],0,null),
+  genOrder('114','ORD20250702114','ALG003','盤活復甦·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10002','閃峰餐飲連鎖','S20004','黑沙環店','2025-07-02',7000,6300,6300,OrderStatus.REFUNDED,'2025-07-02 06:20:00','2025-07-02 06:25:00',[0,1,2,3,4,0,1],0,null,6300),
+  genOrder('115','ORD20250701115','ALG003','盤活復甦·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-07-01',3800,3420,3420,OrderStatus.REFUNDED,'2025-07-01 10:05:00','2025-07-01 10:10:00',[0,1,2],0,null,3420),
 ]
 
 /* ---- 进度阶段定义 ---- */
@@ -282,8 +296,11 @@ export default function OrderDetail() {
   const slotsByDate = Array.from(slotsByDateMap.entries())
 
   const totalOriginal = order.slotPrices.reduce((s, sp) => s + sp.originalPrice, 0)
-  const totalActual = order.slotPrices.reduce((s, sp) => s + sp.actualPrice, 0)
-  const totalDiscount = totalOriginal - totalActual
+  const slotSubtotal = order.slotPrices.reduce((s, sp) => s + sp.actualPrice, 0)
+  const slotDiscountSaved = totalOriginal - slotSubtotal
+  const gradientMultiplier = order.gradientDiscount ? order.gradientDiscount.discount / 10 : 1
+  const finalPrice = Math.round(slotSubtotal * gradientMultiplier)
+  const totalSaved = totalOriginal - finalPrice
 
   const handleRefund = () => {
     setRefundModalVisible(true)
@@ -431,6 +448,7 @@ export default function OrderDetail() {
                           position: 'absolute', top: -4, left: '50%',
                           width: 46, height: 46, borderRadius: '50%',
                           border: '2px solid rgba(232,114,12,0.35)',
+                          marginLeft: -23,
                           animation: 'rippleExpand 2s ease-out infinite',
                           pointerEvents: 'none',
                         }} />
@@ -439,6 +457,7 @@ export default function OrderDetail() {
                           position: 'absolute', top: -4, left: '50%',
                           width: 46, height: 46, borderRadius: '50%',
                           border: '2px solid rgba(232,114,12,0.25)',
+                          marginLeft: -23,
                           animation: 'rippleExpand 2s ease-out infinite 0.8s',
                           pointerEvents: 'none',
                         }} />
@@ -558,24 +577,30 @@ export default function OrderDetail() {
             }}>
               {date}
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '35%' }} />
+              </colgroup>
               <thead>
                 <tr style={{ background: '#FAFAFA' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>時段</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>原價（MOP）</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>折扣</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>折後價（MOP）</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>時段</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>原價（MOP）</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折扣</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折後價（MOP）</th>
                 </tr>
               </thead>
               <tbody>
                 {slots.map((sp, i) => (
                   <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                    <td style={{ padding: '8px 16px' }}>{sp.slot}</td>
-                    <td style={{ padding: '8px 16px', textAlign: 'right', color: '#595959' }}>{sp.originalPrice}</td>
-                    <td style={{ padding: '8px 16px', textAlign: 'right' }}>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.slot}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                       {sp.discount < 10 ? <Tag color="green">{sp.discount}折</Tag> : <span style={{ color: '#8C8C8C' }}>無折扣</span>}
                     </td>
-                    <td style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>
                   </tr>
                 ))}
               </tbody>
@@ -586,24 +611,30 @@ export default function OrderDetail() {
         {/* 盘活复苏：按天展示 */}
         {order.recommendType === RecommendType.REVITALIZATION_AD && (
           <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '35%' }} />
+              </colgroup>
               <thead>
                 <tr style={{ background: '#FAFAFA' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>日期</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>原價（MOP）</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>折扣</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#8C8C8C', fontSize: 12 }}>折後價（MOP）</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>日期</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>原價（MOP）</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折扣</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折後價（MOP）</th>
                 </tr>
               </thead>
               <tbody>
                 {order.slotPrices.map((sp, i) => (
                   <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                    <td style={{ padding: '8px 16px' }}>{sp.date}</td>
-                    <td style={{ padding: '8px 16px', textAlign: 'right', color: '#595959' }}>{sp.originalPrice}</td>
-                    <td style={{ padding: '8px 16px', textAlign: 'right' }}>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.date}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                       {sp.discount < 10 ? <Tag color="green">{sp.discount}折</Tag> : <span style={{ color: '#8C8C8C' }}>無折扣</span>}
                     </td>
-                    <td style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>
                   </tr>
                 ))}
               </tbody>
@@ -611,49 +642,94 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {/* 汇总 */}
+        {/* 费用汇总 */}
         <div style={{
-          padding: '16px', background: '#FAFAFA', borderRadius: 8,
+          padding: '20px', background: 'linear-gradient(135deg, #FFF9F0, #FFF4E6)', borderRadius: 12,
+          border: '1px solid #FFE0B2',
         }}>
-          <div style={{
-            display: 'flex', justifyContent: 'flex-end', gap: 24, flexWrap: 'wrap', alignItems: 'center',
-          }}>
-            <div style={{ textAlign: 'center', minWidth: 72 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>時段合計</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{order.slotPrices.length} 個</div>
+          {/* 标题 */}
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#E8720C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}>💰</span> 費用明細
+          </div>
+
+          {/* 分步计算 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* 第1步：时段小计 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>① 時段原價合計</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>MOP {totalOriginal}</span>
+              <span style={{ fontSize: 11, color: '#BFBFBF' }}>（共 {order.slotPrices.length} 個時段）</span>
             </div>
-            <div style={{ textAlign: 'center', minWidth: 80 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>原始總價（MOP）</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{totalOriginal}</div>
+
+            {/* 第2步：时段折扣 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>② 時段折扣後</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#52C41A' }}>MOP {slotSubtotal}</span>
+              {slotDiscountSaved > 0 && (
+                <span style={{ fontSize: 11, color: '#52C41A', background: '#F6FFED', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>
+                  已省 {slotDiscountSaved} 元
+                </span>
+              )}
             </div>
-            <div style={{ textAlign: 'center', minWidth: 80 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>折扣優惠（MOP）</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#52C41A' }}>-{totalDiscount}</div>
-            </div>
+
+            {/* 第3步：梯度折扣 */}
             {order.gradientDiscount && (
-              <div style={{ textAlign: 'center', minWidth: 100 }}>
-                <div style={{ fontSize: 12, color: '#52C41A', marginBottom: 4 }}>梯度折扣</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#52C41A' }}>滿{order.gradientDiscount.count}個享{order.gradientDiscount.discount}折</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>③ 梯度折扣</span>
+                <span style={{ fontSize: 13, color: '#595959' }}>
+                  滿 {order.gradientDiscount.count} 個時段享 <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}折</strong>
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>
+                  → MOP {finalPrice}
+                </span>
+                {totalSaved > slotDiscountSaved && (
+                  <span style={{ fontSize: 11, color: '#E8720C', background: '#FFF7E6', padding: '1px 8px', borderRadius: 4, border: '1px solid #FFD591' }}>
+                    再省 {totalSaved - slotDiscountSaved} 元
+                  </span>
+                )}
               </div>
             )}
-            <div style={{
-              textAlign: 'center', minWidth: 120, padding: '8px 16px',
-              background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 8,
-            }}>
-              <div style={{ fontSize: 12, color: '#E8720C', marginBottom: 4, fontWeight: 500 }}>最終實付總價（MOP）</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>{totalActual}</div>
+
+            {/* 分隔线 */}
+            <div style={{ height: 1, background: '#FFE0B2', margin: '4px 0' }} />
+
+            {/* 最终实付 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>商家需支付</span>
+                <span style={{ fontSize: 11, color: '#8C8C8C' }}>
+                  {order.gradientDiscount
+                    ? `（${order.slotPrices.length}個時段 × 各時段折扣${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`
+                    : `（${order.slotPrices.length}個時段 × 各時段折扣）`
+                  }
+                </span>
+              </div>
+              <div style={{
+                padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
+              }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {finalPrice}</span>
+              </div>
             </div>
           </div>
-          {/* 计算公式 */}
+
+          {/* 计算公式详解 */}
           <div style={{
-            marginTop: 12, padding: '8px 12px', background: '#fff', borderRadius: 6,
-            border: '1px dashed #D9D9D9', fontSize: 12, color: '#8C8C8C', lineHeight: 1.8,
+            marginTop: 16, padding: '10px 14px', background: '#fff', borderRadius: 8,
+            border: '1px dashed #FFD591', fontSize: 12, color: '#8C8C8C', lineHeight: 2,
           }}>
-            <strong style={{ color: '#595959' }}>計算公式：</strong>
-            {order.gradientDiscount
-              ? <>原始總價 <span style={{ color: '#262626', fontWeight: 500 }}>{totalOriginal}</span> - 時段折扣 <span style={{ color: '#52C41A', fontWeight: 500 }}>{totalDiscount}</span> × 梯度折扣 <span style={{ color: '#52C41A', fontWeight: 500 }}>{order.gradientDiscount.discount}折</span> = 最終實付 <span style={{ color: '#E8720C', fontWeight: 700 }}>{totalActual}</span>（MOP）</>
-              : <>原始總價 <span style={{ color: '#262626', fontWeight: 500 }}>{totalOriginal}</span> - 時段折扣 <span style={{ color: '#52C41A', fontWeight: 500 }}>{totalDiscount}</span> = 最終實付 <span style={{ color: '#E8720C', fontWeight: 700 }}>{totalActual}</span>（MOP）</>
-            }
+            <div style={{ fontWeight: 600, color: '#595959', marginBottom: 4 }}>📐 計算公式：</div>
+            {order.slotPrices.map((sp, i) => (
+              <span key={i}>
+                {sp.slot} {sp.originalPrice}×{sp.discount / 10}{i < order.slotPrices.length - 1 ? ' + ' : ''}
+              </span>
+            ))}
+            {' = '}
+            <strong style={{ color: '#52C41A' }}>{slotSubtotal}</strong>
+            {order.gradientDiscount && (
+              <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: '#E8720C' }}>{finalPrice}</strong></>
+            )}
+            <span style={{ color: '#BFBFBF' }}>（MOP）</span>
           </div>
         </div>
 
