@@ -459,6 +459,45 @@ export default function PricingAdd() {
           </div>
         </div>
 
+        {/* 盘活复苏：購買多天折扣配置（梯度） */}
+        {isReviveAlgorithm && (
+          <div style={{
+            borderLeft: '4px solid #722ED1', borderRadius: 10,
+            background: '#fff', padding: '20px 24px', marginBottom: 16,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#F9F0FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 14 }}>🎯</span>
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
+              <Switch
+                checked={discountEnabled}
+                onChange={setDiscountEnabled}
+                style={{ marginLeft: 8 }}
+              />
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
+            </div>
+            {discountEnabled && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+                <Form.Item
+                  label="最低購買天數"
+                  name="minDays"
+                  rules={[{ required: true, message: '請輸入最低購買天數' }]}
+                >
+                  <InputNumber placeholder="請輸入" min={1} style={{ width: '100%' }} addonAfter="天" />
+                </Form.Item>
+                <Form.Item
+                  label="折扣階梯"
+                  name="discountTiers"
+                >
+                  <Input placeholder="如：7天9折 / 15天8折 / 30天75折" />
+                </Form.Item>
+              </div>
+            )}
+          </div>
+        )}
+        
         {/* 盘活复苏：商圈计价配置 */}
         {isReviveAlgorithm && (
           <div style={{
@@ -489,7 +528,7 @@ export default function PricingAdd() {
             </div>
             {districtPricings.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
-                請選擇商圈並點擊"新增"按鈕添加計價配置
+                請選擇商圈並點擊“新增”按鈕添加計價配置
               </div>
             ) : (
               districtPricings.map((config) => (
@@ -534,45 +573,6 @@ export default function PricingAdd() {
                   </Form.Item>
                 </div>
               ))
-            )}
-          </div>
-        )}
-
-        {/* 盘活复苏：購買多天折扣配置（梯度） */}
-        {isReviveAlgorithm && (
-          <div style={{
-            borderLeft: '4px solid #722ED1', borderRadius: 10,
-            background: '#fff', padding: '20px 24px', marginBottom: 16,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#F9F0FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14 }}>🎯</span>
-              </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
-              <Switch
-                checked={discountEnabled}
-                onChange={setDiscountEnabled}
-                style={{ marginLeft: 8 }}
-              />
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
-            </div>
-            {discountEnabled && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-                <Form.Item
-                  label="最低購買天數"
-                  name="minDays"
-                  rules={[{ required: true, message: '請輸入最低購買天數' }]}
-                >
-                  <InputNumber placeholder="請輸入" min={1} style={{ width: '100%' }} addonAfter="天" />
-                </Form.Item>
-                <Form.Item
-                  label="折扣階梯"
-                  name="discountTiers"
-                >
-                  <Input placeholder="如：7天9折 / 15天8折 / 30天75折" />
-                </Form.Item>
-              </div>
             )}
           </div>
         )}
