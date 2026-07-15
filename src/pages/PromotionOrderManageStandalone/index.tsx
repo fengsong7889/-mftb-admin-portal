@@ -12,7 +12,6 @@ enum OrderStatus {
   PROMOTING = 2,
   PROMOTED = 3,
   REFUNDED = 4,
-  CANCELLED = 5,
 }
 
 // 订单状态标签
@@ -21,7 +20,6 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = 
   [OrderStatus.PROMOTING]: { label: '推廣中', color: 'green' },
   [OrderStatus.PROMOTED]: { label: '已完成', color: 'purple' },
   [OrderStatus.REFUNDED]: { label: '已退款', color: 'orange' },
-  [OrderStatus.CANCELLED]: { label: '已取消', color: 'red' },
 }
 
 // 品牌枚举
@@ -110,7 +108,8 @@ const RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
 interface OrderItem {
   id: string
   orderNo: string
-  promotionName: string
+  algorithmId: string         // 算法ID
+  promotionName: string       // 算法名称
   app: AppType
   channel: RecommendChannel
   region: Region
@@ -136,6 +135,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '1',
     orderNo: 'ORD20250705001',
+    algorithmId: 'ALG001',
     promotionName: '無敵星星·黃金展位',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -158,6 +158,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '2',
     orderNo: 'ORD20250706002',
+    algorithmId: 'ALG002',
     promotionName: '新店廣告·首頁推薦',
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
@@ -180,6 +181,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '3',
     orderNo: 'ORD20250707003',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·外賣熱推',
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
@@ -201,6 +203,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '4',
     orderNo: 'ORD20250703004',
+    algorithmId: 'ALG004',
     promotionName: '流量廣告·團購精選',
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
@@ -223,6 +226,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '5',
     orderNo: 'ORD20250702005',
+    algorithmId: 'ALG001',
     promotionName: '無敵星星·週末專場',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
@@ -238,12 +242,13 @@ const mockOrders: OrderItem[] = [
     originalPrice: 2500,
     discountPrice: 2250,
     actualPrice: 2250,
-    status: OrderStatus.CANCELLED,
+    status: OrderStatus.REFUNDED,
     orderTime: '2025-07-02 11:20:00',
   },
   {
     id: '6',
     orderNo: 'ORD20250701006',
+    algorithmId: 'ALG001',
     promotionName: '無敵星星·早鳥優惠',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
@@ -266,6 +271,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '7',
     orderNo: 'ORD20250630007',
+    algorithmId: 'ALG002',
     promotionName: '新店廣告·零售閃購',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -288,6 +294,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '8',
     orderNo: 'ORD20250629008',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·團購到店',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
@@ -309,6 +316,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '9',
     orderNo: 'ORD20250628009',
+    algorithmId: 'ALG004',
     promotionName: '流量廣告·大首頁推薦',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
@@ -331,6 +339,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '10',
     orderNo: 'ORD20250627010',
+    algorithmId: 'ALG001',
     promotionName: '無敵星星·夜宵專場',
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
@@ -353,6 +362,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '11',
     orderNo: 'ORD20250626011',
+    algorithmId: 'ALG002',
     promotionName: '新店廣告·澳門專區',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -375,6 +385,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '12',
     orderNo: 'ORD20250625012',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·氹仔熱推',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
@@ -390,12 +401,13 @@ const mockOrders: OrderItem[] = [
     originalPrice: 1400,
     discountPrice: 1260,
     actualPrice: 1260,
-    status: OrderStatus.CANCELLED,
+    status: OrderStatus.REFUNDED,
     orderTime: '2025-06-25 13:50:00',
   },
   {
     id: '13',
     orderNo: 'ORD20250624013',
+    algorithmId: 'ALG004',
     promotionName: '流量廣告·珠海精選',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
@@ -417,6 +429,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '14',
     orderNo: 'ORD20250623014',
+    algorithmId: 'ALG001',
     promotionName: '無敵星星·全時段推廣',
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
@@ -439,6 +452,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '15',
     orderNo: 'ORD20250622015',
+    algorithmId: 'ALG002',
     promotionName: '新店廣告·閃購特惠',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -462,6 +476,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '101',
     orderNo: 'ORD20250715101',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·黃金展位',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -485,6 +500,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '102',
     orderNo: 'ORD20250714102',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·首頁推薦',
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
@@ -508,6 +524,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '103',
     orderNo: 'ORD20250713103',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·外賣熱推',
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
@@ -530,6 +547,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '104',
     orderNo: 'ORD20250712104',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·團購精選',
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
@@ -553,6 +571,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '105',
     orderNo: 'ORD20250711105',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·週末專場',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
@@ -569,12 +588,13 @@ const mockOrders: OrderItem[] = [
     originalPrice: 5000,
     discountPrice: 4500,
     actualPrice: 4500,
-    status: OrderStatus.CANCELLED,
+    status: OrderStatus.REFUNDED,
     orderTime: '2025-07-11 11:20:00',
   },
   {
     id: '106',
     orderNo: 'ORD20250710106',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·早鳥優惠',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
@@ -598,6 +618,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '107',
     orderNo: 'ORD20250709107',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·零售閃購',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -621,6 +642,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '108',
     orderNo: 'ORD20250708108',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·團購到店',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
@@ -643,6 +665,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '109',
     orderNo: 'ORD20250707109',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·大首頁推薦',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
@@ -666,6 +689,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '110',
     orderNo: 'ORD20250706110',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·夜宵專場',
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
@@ -689,6 +713,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '111',
     orderNo: 'ORD20250705111',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·澳門專區',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -712,6 +737,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '112',
     orderNo: 'ORD20250704112',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·氹仔熱推',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
@@ -728,12 +754,13 @@ const mockOrders: OrderItem[] = [
     originalPrice: 1400,
     discountPrice: 1260,
     actualPrice: 1260,
-    status: OrderStatus.CANCELLED,
+    status: OrderStatus.REFUNDED,
     orderTime: '2025-07-04 13:50:00',
   },
   {
     id: '113',
     orderNo: 'ORD20250703113',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·珠海精選',
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
@@ -756,6 +783,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '114',
     orderNo: 'ORD20250702114',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·全時段推廣',
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
@@ -779,6 +807,7 @@ const mockOrders: OrderItem[] = [
   {
     id: '115',
     orderNo: 'ORD20250701115',
+    algorithmId: 'ALG003',
     promotionName: '盤活復蘇·閃購特惠',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -815,6 +844,7 @@ export default function PromotionOrderManage() {
     channel: undefined as RecommendChannel | undefined,
     groupName: '',
     storeName: '',
+    algorithmKeyword: '',  // 算法名称/ID搜索关键字
     region: undefined as Region | undefined,
     status: undefined as OrderStatus | undefined,
     orderTimeRange: undefined as [any, any] | undefined,
@@ -848,6 +878,12 @@ export default function PromotionOrderManage() {
           return false
         }
       }
+      if (filters.algorithmKeyword) {
+        const kw = filters.algorithmKeyword.toLowerCase()
+        const matchId = order.algorithmId.toLowerCase().includes(kw)
+        const matchName = order.promotionName.toLowerCase().includes(kw)
+        if (!matchId && !matchName) return false
+      }
       if (filters.region !== undefined && order.region !== filters.region) {
         return false
       }
@@ -863,7 +899,7 @@ export default function PromotionOrderManage() {
     { key: 'orderNo', title: '訂單編號' },
     { key: 'groupInfo', title: '集團ID/集團名稱' },
     { key: 'storeInfo', title: '門店ID/門店名稱' },
-    { key: 'promotionName', title: '算法名稱' },
+    { key: 'algorithmInfo', title: '算法ID/算法名稱' },
     { key: 'app', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
     ...(orderType !== '盤活復蘇' ? [{ key: 'region', title: '所屬商圈' }] : []),
@@ -913,10 +949,15 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '算法名稱',
-      dataIndex: 'promotionName',
-      key: 'promotionName',
+      title: '算法ID/算法名稱',
+      key: 'algorithmInfo',
       width: 180,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.algorithmId}</span>
+          <span>{record.promotionName}</span>
+        </Space>
+      ),
     },
     {
       title: '所屬品牌',
@@ -1071,7 +1112,11 @@ export default function PromotionOrderManage() {
       width: 100,
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" size="small">
+        <Button 
+          type="link" 
+          size="small"
+          onClick={() => navigate(`/order-detail?id=${record.id}&type=${encodeURIComponent(orderType)}`)}
+        >
           詳情
         </Button>
       ),
@@ -1086,6 +1131,7 @@ export default function PromotionOrderManage() {
       channel: undefined,
       groupName: '',
       storeName: '',
+      algorithmKeyword: '',
       region: undefined,
       status: undefined,
       orderTimeRange: undefined,
@@ -1108,42 +1154,64 @@ export default function PromotionOrderManage() {
   return (
     <div className="content-area">
       {/* 页面标题 */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Button
-              type="primary"
-              icon={<ArrowLeftOutlined />}
+      <div style={{
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+      }}>
+        {/* 顶部渐变装饰线 */}
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{
+          padding: '16px 24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+        }}>
+          {/* 左侧：返回 + 标题 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />}
               onClick={() => navigate(backPath)}
-              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
-            >
-              返回
-            </Button>
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}>返回</Button>
+            {/* 分隔线 */}
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            {/* 标题区 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-                訂單列表
-              </h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>訂單列表</h2>
               {orderType && (
-                <span style={{ fontSize: 14, color: '#595959' }}>
-                  {Object.entries(RECOMMEND_TYPE_LABEL).find(([_, label]) => label === orderType)?.[0] && (
-                    <>{RECOMMEND_TYPE_ICON[Number(Object.entries(RECOMMEND_TYPE_LABEL).find(([_, label]) => label === orderType)?.[0]) as RecommendType]} {orderType}</>
-                  )}
-                </span>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '3px 12px', background: '#FFF7E6',
+                  border: '1px solid #FFD591', borderRadius: 4,
+                  fontSize: 13, color: '#E8720C', fontWeight: 500,
+                }}>
+                  {(() => {
+                    const typeKey = Number(Object.entries(RECOMMEND_TYPE_LABEL).find(([_, label]) => label === orderType)?.[0]) as RecommendType
+                    return <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_ICON[typeKey]}</span>
+                  })()}
+                  {orderType}
+                </div>
               )}
             </div>
           </div>
-          <Space size={12}>
-            <Button
-              type="primary"
-              icon={<ShoppingCartOutlined />}
-              onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
-              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
-            >
-              購買廣告
-            </Button>
-          </Space>
+          {/* 右侧：购买广告按钮 */}
+          <Button type="primary" icon={<ShoppingCartOutlined />}
+            onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
+            style={{
+              backgroundColor: '#E8720C', borderColor: '#E8720C',
+              borderRadius: 8, height: 36, padding: '0 18px',
+              boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>購買廣告</Button>
         </div>
-      </Card>
+      </div>
 
       {/* 搜索区域 */}
       <div className="search-section">
@@ -1198,6 +1266,30 @@ export default function PromotionOrderManage() {
                 allowClear
                 value={filters.storeName}
                 onChange={e => setFilters({ ...filters, storeName: e.target.value })}
+              />
+            </Form.Item>
+            <Form.Item label="算法名稱">
+              <Select
+                showSearch
+                allowClear
+                placeholder="支持ID或名稱查詢"
+                value={filters.algorithmKeyword || undefined}
+                onChange={value => setFilters({ ...filters, algorithmKeyword: value || '' })}
+                filterOption={(input, option) => {
+                  const keyword = input.toLowerCase()
+                  const label = (option?.label ?? '').toString().toLowerCase()
+                  const value = (option?.value ?? '').toString().toLowerCase()
+                  return label.includes(keyword) || value.includes(keyword)
+                }}
+                options={mockOrders
+                  .filter(o => !orderType || RECOMMEND_TYPE_LABEL[o.recommendType] === orderType)
+                  .reduce((acc, o) => {
+                    if (!acc.find(item => item.value === o.algorithmId)) {
+                      acc.push({ label: `${o.algorithmId} - ${o.promotionName}`, value: o.algorithmId })
+                    }
+                    return acc
+                  }, [] as { label: string; value: string }[])
+                }
               />
             </Form.Item>
             {orderType !== '盤活復蘇' && (

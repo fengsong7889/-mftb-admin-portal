@@ -104,13 +104,31 @@ export default function DebtDetail() {
   return (
     <div className="content-area">
       {/* 还款信息头部 */}
-      <div className="debt-detail-header">
-        <div className="debt-detail-title-row">
-          <Button type="link" onClick={() => navigate('/debt-reconcile')} className="debt-detail-back-link">
-            <ArrowLeftOutlined /> 返回
-          </Button>
-          <h3 className="debt-detail-title">還款信息</h3>
-        </div>
+      <div style={{
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div className="debt-detail-header" style={{ animation: 'headerFadeSlideIn 0.5s ease' }}>
+          <div className="debt-detail-title-row">
+            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/debt-reconcile')}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >返回</Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>還款信息</h2>
+            </div>
+          </div>
 
         {/* 进度条区域 */}
         <div className="debt-detail-progress-card">
@@ -150,6 +168,7 @@ export default function DebtDetail() {
             <span className="debt-detail-metric-label">剩餘待還</span>
             <span className="debt-detail-metric-value" style={{ color: '#E53935' }}>{fmtAmt(billInfo.remainAmount)}</span>
           </div>
+        </div>
         </div>
       </div>
 

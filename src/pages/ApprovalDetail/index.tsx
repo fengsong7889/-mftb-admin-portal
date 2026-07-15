@@ -283,18 +283,44 @@ export default function ApprovalDetail() {
   return (
     <div className="approval-detail-page">
       {/* 顶部标题栏 */}
-      <div className="approval-detail-header">
-        <div className="approval-detail-title">
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/approval-center')} className="approval-back-btn" />
-          <span>{typeTitleMap[type]}-{data.brand}-{data.applyDate.split(' ')[0]}</span>
-        </div>
-        <div className="approval-detail-actions">
-          <Button onClick={() => navigate('/approval-center')}>返回</Button>
-          {data.hasRevoke && (
-            <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
-          )}
-          <Button type="primary" onClick={handleApprove}>通過</Button>
-          <Button danger onClick={handleReject}>駁回</Button>
+      <div style={{
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{
+          padding: '16px 24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />}
+              onClick={() => navigate('/approval-center')}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >返回</Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+                {typeTitleMap[type]}-{data.brand}-{data.applyDate.split(' ')[0]}
+              </h2>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {data.hasRevoke && (
+              <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
+            )}
+            <Button type="primary" onClick={handleApprove}>通過</Button>
+            <Button danger onClick={handleReject}>駁回</Button>
+          </div>
         </div>
       </div>
 

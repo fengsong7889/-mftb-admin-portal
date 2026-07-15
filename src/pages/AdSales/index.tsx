@@ -96,53 +96,69 @@ export default function AdSales() {
   return (
     <div className="content-area">
       {/* 页面标题 */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{
+          padding: '16px 24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {currentStep >= 1 && (
-              <Button
-                type="primary"
-                icon={<ArrowLeftOutlined />}
-                onClick={handleGoBack}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
-              >
-                返回
-              </Button>
+              <>
+                <Button type="primary" icon={<ArrowLeftOutlined />}
+                  onClick={handleGoBack}
+                  style={{
+                    backgroundColor: '#E8720C', borderColor: '#E8720C',
+                    borderRadius: 8, height: 36, padding: '0 16px',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}>返回</Button>
+                <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+              </>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType
-                  ? '購買廣告'
-                  : '銷售訂單'}
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+                {currentStep >= 1 && selectedAlgorithmType ? '購買廣告' : '銷售訂單'}
               </h2>
               {currentStep >= 1 && selectedAlgorithmType && (
-                <span style={{ fontSize: 14, color: '#595959' }}>
-                  {RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.icon} {RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name}
-                </span>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '3px 12px', background: '#FFF7E6',
+                  border: '1px solid #FFD591', borderRadius: 4,
+                  fontSize: 13, color: '#E8720C', fontWeight: 500,
+                }}>
+                  <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.icon}</span>
+                  {RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name}
+                </div>
               )}
             </div>
           </div>
           {currentStep >= 1 && (
-            <Space size={12}>
-              <Button
-                type="primary"
-                icon={<OrderedListOutlined />}
-                onClick={() => {
-                  const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''
-                  navigate(`/promotion-order-manage?type=${encodeURIComponent(typeName)}&from=ad-sales`)
-                }}
-                style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
-              >
-                查看訂單
-              </Button>
-            </Space>
+            <Button type="primary" icon={<OrderedListOutlined />}
+              onClick={() => {
+                const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''
+                navigate(`/promotion-order-manage?type=${encodeURIComponent(typeName)}&from=ad-sales`)
+              }}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 18px',
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+              }}>查看訂單</Button>
           )}
         </div>
-      </Card>
+      </div>
 
-      {/* Step 1: 选择推荐类型 */}
+      {/* Step 1: 选择广告类型 */}
       {currentStep === 0 && (
-        <Card title="選擇推薦類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <Card title="選擇廣告類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <Tabs
             defaultActiveKey="delivery"
             onChange={(key) => setSelectedTab(key as 'delivery' | 'groupBuy')}

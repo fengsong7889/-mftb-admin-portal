@@ -46,3 +46,59 @@ body {
     transform: translateX(-50%);
   }
 }
+
+/* 订单详情顶部渐变装饰线 */
+@keyframes headerGradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 头部内容淡入滑入 */
+@keyframes headerFadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 状态标签微脉冲 */
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232,114,12,0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(232,114,12,0); }
+}
+
+/* 进度条前进闪光 */
+@keyframes progressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* 当前节点呼吸缩放 */
+@keyframes nodeBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* 波纹扩散 */
+@keyframes rippleExpand {
+  0% { transform: translateX(-50%) scale(1); opacity: 0.5; }
+  100% { transform: translateX(-50%) scale(1.8); opacity: 0; }
+}
+
+/* 旋转虚线环 */
+@keyframes spinDash {
+  0% { transform: translateX(-50%) rotate(0deg); }
+  100% { transform: translateX(-50%) rotate(360deg); }
+}
+
+/* 下一节点到达微反应 */
+@keyframes nextNodeReact {
+  0%, 60%, 100% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  75% { transform: scale(1.06); box-shadow: 0 0 0 4px rgba(232,114,12,0.15), 0 2px 8px rgba(232,114,12,0.2); }
+  85% { transform: scale(0.98); }
+}
+
+/* 连接线渐变流动 */
+@keyframes lineGlow {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(350%); }
+}

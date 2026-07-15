@@ -152,29 +152,45 @@ export default function AlgorithmAdd() {
     <div className="content-area">
       {/* 页面头部 */}
       <div style={{
-        background: '#fff', padding: '12px 20px', marginBottom: 12,
-        borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
       }}>
-        <Button
-          type="primary"
-          icon={<ArrowLeftOutlined />}
-          onClick={handleBack}
-          style={{ fontSize: 14 }}
-        >
-          返回
-        </Button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            {isDetailMode ? '算法詳情' : isEditMode ? '編輯算法' : '新增算法'}
-          </h2>
-          {selectedAlgorithmType && (
-            <span style={{ fontSize: 14, color: '#595959' }}>
-              {TYPE_ICON[selectedAlgorithmType]} {TYPE_LABEL[selectedAlgorithmType]}
-            </span>
-          )}
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{
+          padding: '16px 24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}>返回</Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+                {isDetailMode ? '算法詳情' : isEditMode ? '編輯算法' : '新增算法'}
+              </h2>
+              {selectedAlgorithmType && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '3px 12px', background: '#FFF7E6',
+                  border: '1px solid #FFD591', borderRadius: 4,
+                  fontSize: 13, color: '#E8720C', fontWeight: 500,
+                }}>
+                  <span style={{ fontSize: 14 }}>{TYPE_ICON[selectedAlgorithmType]}</span>
+                  {TYPE_LABEL[selectedAlgorithmType]}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

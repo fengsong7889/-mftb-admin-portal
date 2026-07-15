@@ -494,17 +494,30 @@ export default function Waterfall() {
   if (selectedAlgorithmType === null) {
     return (
       <div className="content-area">
-        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20 }}>
-              <WalletOutlined style={{ marginRight: 8, color: '#faad14' }} />
-              銷售定價
-            </h2>
-            <p style={{ margin: '8px 0 0', color: '#8c8c8c', fontSize: 13 }}>
-              管理各廣告類型的銷售定價配置，選擇類型查看詳情
-            </p>
+        <div style={{
+          position: 'relative', background: '#fff', marginBottom: 16,
+          borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+            backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+          }} />
+          <div style={{
+            padding: '16px 24px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+          }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+                <WalletOutlined style={{ marginRight: 8 }} />
+                銷售定價
+              </h2>
+              <p style={{ margin: '6px 0 0', color: '#8c8c8c', fontSize: 12 }}>
+                管理各廣告類型的銷售定價配置，選擇類型查看詳情
+              </p>
+            </div>
           </div>
-        </Card>
+        </div>
 
         <Card title="請選擇廣告類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <div style={{
@@ -550,30 +563,42 @@ export default function Waterfall() {
   return (
     <div className="content-area">
       {/* 标题区域 */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Space size={16}>
-            <Button
-              type="primary"
-              icon={<ArrowLeftOutlined />}
+      <div style={{
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{
+          padding: '16px 24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />}
               onClick={handleBackToCards}
-              style={{ fontSize: 14 }}
-            >
-              返回
-            </Button>
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >返回</Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-                定價列表
-              </h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>定價列表</h2>
               {selectedAlgorithmType != null && (
                 <span style={{ fontSize: 14, color: '#595959' }}>
                   {ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon} {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]}
                 </span>
               )}
             </div>
-          </Space>
+          </div>
         </div>
-      </Card>
+      </div>
 
       {/* 查询区域 */}
       <div className="search-section">
@@ -947,7 +972,7 @@ export default function Waterfall() {
                     </div>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="销售区域">
+                <Descriptions.Item label="销售區域">
                   <Tag color={viewingRecord.regionLimit === 'limited' ? 'red' : 'green'}>
                     {viewingRecord.regionLimit === 'limited' ? `限制(${viewingRecord.regionIds?.length || 0}個區域)` : '不限制'}
                   </Tag>

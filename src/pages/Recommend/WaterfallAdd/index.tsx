@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree, Upload } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined, UploadOutlined, ShopOutlined, PictureOutlined, DollarOutlined, BarChartOutlined, FundOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined, UploadOutlined, ShopOutlined, PictureOutlined, DollarOutlined, BarChartOutlined, FundOutlined, EditOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -141,6 +141,7 @@ interface RegionPricingConfig {
   discounts: Record<string, number | undefined>
   limitedTimeDiscount: boolean // 限时折扣开关
   discountDateRange?: [dayjs.Dayjs, dayjs.Dayjs] // 限时折扣日期周期
+  dailySalesLimit: number // 每天销售个数限制
 }
 
 // 梯度配置接口
@@ -219,6 +220,7 @@ export default function WaterfallAdd() {
   // 商圈选择弹窗
   const [regionSelectModalVisible, setRegionSelectModalVisible] = useState(false)
   const [selectedRegionNode, setSelectedRegionNode] = useState<{ key: string; title: string; level: number } | null>(null)
+  const [replacingRegion, setReplacingRegion] = useState<Region | null>(null) // 正在更换的商圈
   
 
   const [status, setStatus] = useState<ServiceStatus>(ServiceStatus.ENABLED)
@@ -237,7 +239,6 @@ export default function WaterfallAdd() {
   
   // 销售策略（仅无敌星星）
   const [presaleDays, setPresaleDays] = useState<number>(7) // 预售天数
-  const [dailySalesLimit, setDailySalesLimit] = useState<number>(2) // 每天销售个数限制
   const [merchantLimit, setMerchantLimit] = useState(false) // 商家限制
   const [selectedMerchants, setSelectedMerchants] = useState<Merchant[]>([]) // 选择的商家
   const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
@@ -260,7 +261,7 @@ export default function WaterfallAdd() {
   // 是否为盤活復蘇算法类型
   const isReviveAlgorithm = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
 
-  // 是否为單圖類型（無敵星星/盤活復蘇只有封面圖，合併進基礎信息卡片）
+  // 是否为單圖類型（無敵星星/盤活復蘇只有詳情圖，合併進基礎信息卡片）
   const isSingleImageType =
     selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ||
     selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
@@ -283,7 +284,6 @@ export default function WaterfallAdd() {
         channel: RecommendChannel.DELIVERY,
         algorithmType: urlAlgorithmType || AlgorithmType.INVINCIBLE_STAR,
         presaleDays: 7,
-        dailySalesLimit: 2,
         merchantLimit: false,
         dailyPrice: urlAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? 100 : undefined,
       }
@@ -298,7 +298,6 @@ export default function WaterfallAdd() {
         setSelectedAlgorithmType(mockRecord.algorithmType)
       }
       setPresaleDays(mockRecord.presaleDays)
-      setDailySalesLimit(mockRecord.dailySalesLimit)
       setMerchantLimit(mockRecord.merchantLimit)
       if (mockRecord.dailyPrice) {
         setDailyPrice(mockRecord.dailyPrice)
@@ -317,6 +316,7 @@ export default function WaterfallAdd() {
           : { breakfast: 8, lunch: 9, dinner: 8 },
         limitedTimeDiscount: false,
         discountDateRange: undefined,
+        dailySalesLimit: 2,
       }
       setSelectedRegions([Region.KOKSAA])
       setRegionPricingConfigs([mockRegionConfig])
@@ -423,6 +423,7 @@ export default function WaterfallAdd() {
       discounts: {},
       limitedTimeDiscount: false,
       discountDateRange: undefined,
+      dailySalesLimit: 2,
     }
     setRegionPricingConfigs([...regionPricingConfigs, newConfig])
     setSelectedRegions([...selectedRegions, region])
@@ -430,8 +431,30 @@ export default function WaterfallAdd() {
 
   // 删除区域计价配置
   const handleRemoveRegionConfig = (region: Region) => {
+    if (regionPricingConfigs.length === 1) {
+      Modal.confirm({
+        title: '删除确认',
+        content: '这是最后一个商圈配置，删除后需要重新选择商圈。是否继续？',
+        okText: '确认删除',
+        cancelText: '取消',
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setRegionPricingConfigs([])
+          setSelectedRegions([])
+        },
+      })
+      return
+    }
     setRegionPricingConfigs(regionPricingConfigs.filter(c => c.region !== region))
     setSelectedRegions(selectedRegions.filter(r => r !== region))
+  }
+
+  // 更换商圈
+  const handleReplaceRegion = (oldRegion: Region) => {
+    setSelectedRegionNode(null)
+    // 记录当前正在更换的商圈
+    setReplacingRegion(oldRegion)
+    setRegionSelectModalVisible(true)
   }
 
   // 更新区域计价
@@ -505,6 +528,18 @@ export default function WaterfallAdd() {
     )
   }
 
+  // 更新区域每天销售个数
+  const handleUpdateRegionDailySalesLimit = (region: Region, value: number | null) => {
+    setRegionPricingConfigs(configs =>
+      configs.map(config => {
+        if (config.region === region) {
+          return { ...config, dailySalesLimit: value ?? 2 }
+        }
+        return config
+      })
+    )
+  }
+
   // 添加梯度
   const handleAddGradient = () => {
     setGradients([...gradients, { count: 0, discount: 0 }])
@@ -552,6 +587,7 @@ export default function WaterfallAdd() {
           pricing: c.pricing,
           discountEnabled: c.discountEnabled,
           discounts: c.discountEnabled ? c.discounts : undefined,
+          dailySalesLimit: c.dailySalesLimit,
         })),
         gradients,
       }
@@ -638,29 +674,40 @@ export default function WaterfallAdd() {
     <div className="content-area">
       {/* 顶部标题栏 */}
       <div style={{
-        background: '#fff', padding: '12px 20px', marginBottom: 12,
-        borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
       }}>
-        <Button
-          type="primary"
-          icon={<ArrowLeftOutlined />}
-          onClick={handleBack}
-          style={{ fontSize: 14 }}
-        >
-          返回
-        </Button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價' : '新增定價'}
-          </h2>
-          {urlAlgorithmType != null && (
-            <span style={{ fontSize: 14, color: '#595959' }}>
-              {TYPE_ICON[urlAlgorithmType]} {ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.label || ''}
-            </span>
-          )}
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{
+          padding: '16px 24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >返回</Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+                {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價' : '新增定價'}
+              </h2>
+              {urlAlgorithmType != null && (
+                <span style={{ fontSize: 14, color: '#595959' }}>
+                  {TYPE_ICON[urlAlgorithmType]} {ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.label || ''}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -732,9 +779,9 @@ export default function WaterfallAdd() {
                 />
               </Form.Item>
             </div>
-            {/* 單圖類型：封面圖置於第二行，與算法名稱左對齊 */}
+            {/* 單圖類型：詳情圖置於第二行，與算法名稱左對齊 */}
             {isSingleImageType && (
-              <Form.Item label="封面圖" style={{ marginBottom: 0, marginTop: 16 }}>
+              <Form.Item label="詳情圖" style={{ marginBottom: 0, marginTop: 16 }}>
                 <Upload
                   disabled={isDetailMode}
                   listType="picture-card"
@@ -745,7 +792,7 @@ export default function WaterfallAdd() {
                   {coverFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳封面圖</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
                     </div>
                   )}
                 </Upload>
@@ -753,7 +800,7 @@ export default function WaterfallAdd() {
             )}
           </div>
 
-          {/* 推广图片（多圖類型：封面/詳情/宣傳；單圖類型已合併至基礎信息卡片） */}
+          {/* 推广图片（多圖類型：詳情/宣傳；單圖類型已合併至基礎信息卡片） */}
           {!isSingleImageType && (
           <div style={{ borderLeft: '4px solid #52c41a', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
@@ -764,7 +811,7 @@ export default function WaterfallAdd() {
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
-              <Form.Item label="封面圖">
+              <Form.Item label="詳情圖">
                 <Upload
                   listType="picture-card"
                   fileList={coverFileList}
@@ -774,7 +821,7 @@ export default function WaterfallAdd() {
                   {coverFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳封面圖</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
                     </div>
                   )}
                 </Upload>
@@ -913,24 +960,6 @@ export default function WaterfallAdd() {
                   />
                   <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
                     系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售
-                  </span>
-                </div>
-              </div>
-
-              {/* 每天销售个数 */}
-              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>每天銷售個數:</span>
-                  <InputNumber
-                    min={1}
-                    max={999}
-                    value={dailySalesLimit}
-                    onChange={(value) => setDailySalesLimit(value ?? 2)}
-                    addonAfter="個"
-                    style={{ width: 160 }}
-                  />
-                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
-                    基於商家所在位置所歸屬的區域進行限制，每天允許 {dailySalesLimit} 個商家購買。注意：商家是否在整個區域展示，將根據算法計算的短程/中程/遠程距離控制。
                   </span>
                 </div>
               </div>
@@ -1173,17 +1202,44 @@ export default function WaterfallAdd() {
               {regionPricingConfigs.map((config, index) => (
                 <div key={config.region} style={{ marginBottom: index < regionPricingConfigs.length - 1 ? 24 : 0, padding: 16, background: '#fafafa', borderRadius: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <Tag color="cyan" style={{ fontSize: 14, padding: '4px 12px' }}>
-                      {config.regionLabel}
-                    </Tag>
-                    {regionPricingConfigs.length > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <Tag color="cyan" style={{ fontSize: 14, padding: '4px 12px' }}>
+                        {config.regionLabel}
+                      </Tag>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 13, color: '#595959' }}>每天銷售個數:</span>
+                        <InputNumber
+                          min={1}
+                          max={999}
+                          value={config.dailySalesLimit}
+                          onChange={(value) => handleUpdateRegionDailySalesLimit(config.region, value)}
+                          addonAfter="個"
+                          style={{ width: 140 }}
+                        />
+                        <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          基於商家所在位置所歸屬的區域進行限制，每天允許 {config.dailySalesLimit} 個商家購買
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Button
+                        type="text"
+                        icon={<EditOutlined style={{ fontSize: 14, color: '#1890FF' }} />}
+                        onClick={() => handleReplaceRegion(config.region)}
+                        style={{ fontSize: 12, color: '#1890FF', padding: '2px 6px' }}
+                      >
+                        更換
+                      </Button>
                       <Button 
                         type="text" 
                         danger 
-                        icon={<DeleteFilled style={{ fontSize: 16 }} />}
+                        icon={<DeleteFilled style={{ fontSize: 14 }} />}
                         onClick={() => handleRemoveRegionConfig(config.region)}
-                      />
-                    )}
+                        style={{ fontSize: 12, padding: '2px 6px' }}
+                      >
+                        刪除
+                      </Button>
+                    </div>
                   </div>
 
                   {/* 时段售价 / 按天售价 */}
@@ -1383,9 +1439,9 @@ export default function WaterfallAdd() {
 
           {/* 商圈选择弹窗 */}
           <Modal
-            title="選擇商圈"
+            title={replacingRegion ? '更換商圈' : '選擇商圈'}
             open={regionSelectModalVisible}
-            onCancel={() => setRegionSelectModalVisible(false)}
+            onCancel={() => { setRegionSelectModalVisible(false); setReplacingRegion(null) }}
             onOk={() => {
               if (!selectedRegionNode) {
                 message.warning('請選擇一個區域或商圈')
@@ -1411,6 +1467,24 @@ export default function WaterfallAdd() {
               if (nodeId === 1) regionValue = Region.KOKSAA
               else if (nodeId === 7) regionValue = Region.FAHUA
               else regionValue = nodeToRegionMap[nodeId] || Region.KOKSAA
+              
+              // 更换商圈模式
+              if (replacingRegion) {
+                if (regionPricingConfigs.find(c => c.region === regionValue && c.region !== replacingRegion)) {
+                  message.warning('該區域已添加計價配置')
+                  return
+                }
+                setRegionPricingConfigs(configs => configs.map(c => 
+                  c.region === replacingRegion 
+                    ? { ...c, region: regionValue, regionLabel: selectedRegionNode.title }
+                    : c
+                ))
+                setSelectedRegions(regions => regions.map(r => r === replacingRegion ? regionValue : r))
+                setReplacingRegion(null)
+                setRegionSelectModalVisible(false)
+                message.success('商圈已更換')
+                return
+              }
               
               if (regionPricingConfigs.find(c => c.region === regionValue)) {
                 message.warning('該區域已添加計價配置')

@@ -78,6 +78,7 @@ const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
 const AdSales = lazy(() => import('./pages/AdSales'))
 const PromotionOrderManage = lazy(() => import('./pages/PromotionOrderManage'))
 const PromotionOrderManageStandalone = lazy(() => import('./pages/PromotionOrderManageStandalone'))
+const OrderDetail = lazy(() => import('./pages/OrderDetail'))
 // 推广通 - 報表分析
 const PromotionReportOverview = lazy(() => import('./pages/PromotionReport/Overview'))
 const PromotionReportOrder = lazy(() => import('./pages/PromotionReport/OrderReport'))
@@ -181,6 +182,7 @@ function AuthenticatedLayout() {
               <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
               <Route path="/ad-sales" element={<AdSales />} />
               <Route path="/promotion-order-manage" element={<PromotionOrderManageStandalone />} />
+              <Route path="/order-detail" element={<OrderDetail />} />
               <Route path="/merchant-order-manage" element={<PromotionOrderManage />} />
               {/* 推广通 - 報表分析 */}
               <Route path="/promotion-report-overview" element={<PromotionReportOverview />} />
