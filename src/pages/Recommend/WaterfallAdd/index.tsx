@@ -552,7 +552,7 @@ export default function WaterfallAdd() {
         </Button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-            {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價配置' : '定價配置'}
+            {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價' : '新增定價'}
           </h2>
           {urlAlgorithmType != null && (
             <span style={{ fontSize: 14, color: '#595959' }}>
@@ -828,10 +828,7 @@ export default function WaterfallAdd() {
                     style={{ width: 160 }}
                   />
                   <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
-                    {isReviveAlgorithm
-                      ? `商家所在區域（視算法配置：短程/中程/遠程），每天允許 ${dailySalesLimit} 個商家購買`
-                      : `每個區域，每天允許 ${dailySalesLimit} 個商家購買`
-                    }
+                    基於商家所在位置所歸屬的區域進行限制，每天允許 {dailySalesLimit} 個商家購買。注意：商家是否在整個區域展示，將根據算法計算的短程/中程/遠程距離控制。
                   </span>
                 </div>
               </div>

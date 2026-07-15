@@ -18,8 +18,29 @@ const mockGradients = [
 // 中文星期映射
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
-// Mock: 部分日期已售罄
-const SOLD_OUT_DATES = ['2025-07-08', '2025-07-12', '2025-07-15', '2025-07-20', '2025-07-25']
+/** 生成伪随机数（可预期） */
+function pseudoRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
+/** 日期状态枚举 */
+enum DateStatus {
+  AVAILABLE = 'available',
+  SOLD_OUT = 'soldOut',
+  UNAVAILABLE = 'unavailable',
+}
+
+/** 获取指定日期的状态（基于确定性随机） */
+function getDateStatus(inventoryId: number, dateStr: string): DateStatus {
+  const dateSeed = dateStr.split('-').reduce((acc, v) => acc + parseInt(v, 10), 0)
+  const seed = inventoryId * 10000 + dateSeed
+  const rand = pseudoRandom(seed)
+  // 约10%概率已售罄，约7%概率不可售，其余可购买
+  if (rand < 0.10) return DateStatus.SOLD_OUT
+  if (rand < 0.17) return DateStatus.UNAVAILABLE
+  return DateStatus.AVAILABLE
+}
 
 /** Mock数据 - 店铺列表（含BD信息） */
 const MOCK_STORES = [
@@ -248,7 +269,12 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   const isDateSoldOut = (date: Dayjs | null) => {
     if (!date) return false
-    return SOLD_OUT_DATES.includes(date.format('YYYY-MM-DD'))
+    return getDateStatus(inventoryItem.id, date.format('YYYY-MM-DD')) === DateStatus.SOLD_OUT
+  }
+
+  const isDateUnavailable = (date: Dayjs | null) => {
+    if (!date) return false
+    return getDateStatus(inventoryItem.id, date.format('YYYY-MM-DD')) === DateStatus.UNAVAILABLE
   }
 
   // 判断日期是否已锁定
@@ -309,6 +335,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     if (!date) return
     if (!isDateAvailable(date)) { message.warning('該日期不在可購買範圍內'); return }
     if (isDateSoldOut(date)) { message.warning('該日期已售罄'); return }
+    if (isDateUnavailable(date)) { message.warning('該日期不可售'); return }
     if (isDateLocked(date.format('YYYY-MM-DD'))) { message.info('該日期已被鎖定'); return }
     const dateStr = date.format('YYYY-MM-DD')
     if (selectedDates.includes(dateStr)) { setSelectedDates(selectedDates.filter(d => d !== dateStr)) }
@@ -344,11 +371,13 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     const dateStr = date.format('YYYY-MM-DD')
     const isSelected = selectedDates.includes(dateStr)
     const isSoldOut = isDateSoldOut(date)
+    const isUnavailable = isDateUnavailable(date)
     const isAvailable = isDateAvailable(date)
     const inCart = isDateLocked(dateStr)
     if (inCart) return { background: '#f9f0ff', cursor: 'not-allowed', border: '1px solid #d3adf7', color: '#722ed1' }
     if (!isAvailable) return { background: '#f5f5f5', cursor: 'not-allowed', border: '1px solid #e8e8e8', color: '#bfbfbf' }
     if (isSoldOut) return { background: '#fff2f0', cursor: 'not-allowed', border: '1px solid #ffccc7', color: '#ff4d4f' }
+    if (isUnavailable) return { background: '#f5f5f5', cursor: 'not-allowed', border: '1px solid #d9d9d9', color: '#8c8c8c' }
     if (isSelected) return { background: '#f6ffed', cursor: 'pointer', border: '2px solid #52c41a', color: '#52c41a', fontWeight: 600 }
     return { background: '#fff', cursor: 'pointer', border: '1px solid #e8e8e8', color: '#333' }
   }
@@ -487,35 +516,45 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 const isToday = date?.isSame(dayjs(), 'day')
                 const inCart = date ? isDateLocked(dateStr) : false
                 const remaining = date ? getLockedRemaining(dateStr) : 0
+                // Mock: 生成确定性库存数量（基于日期的 hash）
+                const mockInventory = date ? ((date.date() * 7 + date.month() * 13) % 15) + 2 : 0
                 return (
                   <div key={`${weekIndex}-${dayIndex}`} onClick={() => handleDateClick(date)}
-                    style={{ padding: '10px 8px', textAlign: 'center', minHeight: 64, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: dayIndex < 6 ? '1px solid #e8e8e8' : 'none', ...cellStyle, transition: 'all 0.2s' }}>
+                    style={{ padding: '8px 6px', textAlign: 'center', minHeight: 56, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: dayIndex < 6 ? '1px solid #e8e8e8' : 'none', ...cellStyle, transition: 'all 0.2s' }}>
                     {date ? (
                       <>
-                        <div style={{ fontSize: 15, fontWeight: isSelected ? 700 : (isToday ? 600 : 400), position: 'relative' }}>
+                        <div style={{ fontSize: 14, fontWeight: isSelected ? 700 : (isToday ? 600 : 400), position: 'relative' }}>
                           {date.date()}
                           {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
                         </div>
                         {inCart && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 2 }}>
-                            <span style={{ fontSize: 10, color: '#722ed1' }}>已鎖定</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#ff4d4f' }}>{remaining}</span>
-                            <span style={{ fontSize: 9, color: '#ff7875' }}>秒</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 1 }}>
+                            <span style={{ fontSize: 9, color: '#722ed1' }}>已鎖定</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#ff4d4f' }}>{remaining}</span>
+                            <span style={{ fontSize: 8, color: '#ff7875' }}>秒</span>
                           </div>
                         )}
                         {isDateSoldOut(date) && (
                           <>
-                            <span style={{ fontSize: 10, marginTop: 2 }}>已售罄</span>
-                            <span style={{ fontSize: 10, color: '#bfbfbf', marginTop: 1, textDecoration: 'line-through' }}>${inventoryItem.dailyPrice}</span>
+                            <span style={{ fontSize: 9, marginTop: 1 }}>已售罄</span>
+                            <span style={{ fontSize: 9, color: '#bfbfbf', textDecoration: 'line-through' }}>${inventoryItem.dailyPrice}</span>
+                            <span style={{ fontSize: 9, color: '#bfbfbf' }}>庫存：0</span>
                           </>
                         )}
-                        {isDateAvailable(date) && !isDateSoldOut(date) && !inCart && (
+                        {isDateUnavailable(date) && (
+                          <>
+                            <span style={{ fontSize: 9, marginTop: 1 }}>不可售</span>
+                            <span style={{ fontSize: 9, color: '#bfbfbf' }}>—</span>
+                          </>
+                        )}
+                        {isDateAvailable(date) && !isDateSoldOut(date) && !isDateUnavailable(date) && !inCart && (
                           <>
                             {isSelected
-                              ? <span style={{ fontSize: 10, color: '#E8720C', marginTop: 2, fontWeight: 600 }}>已選擇</span>
-                              : <span style={{ fontSize: 10, color: '#52c41a', marginTop: 2 }}>可購買</span>
+                              ? <span style={{ fontSize: 9, color: '#E8720C', marginTop: 1, fontWeight: 600 }}>已選擇</span>
+                              : <span style={{ fontSize: 9, color: '#52c41a', marginTop: 1 }}>可購買</span>
                             }
-                            <span style={{ fontSize: 10, color: '#ff4d4f', marginTop: 1, fontWeight: 500 }}>${inventoryItem.dailyPrice}</span>
+                            <span style={{ fontSize: 9, color: '#ff4d4f', fontWeight: 500 }}>${inventoryItem.dailyPrice}</span>
+                            <span style={{ fontSize: 9, color: mockInventory <= 4 ? '#ff4d4f' : '#8c8c8c', fontWeight: mockInventory <= 4 ? 600 : 400 }}>庫存：{mockInventory}</span>
                           </>
                         )}
                       </>

@@ -299,10 +299,14 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     message.success('繼續購買')
   }
 
-  // 生成所有日期列表
+  // 生成所有日期列表（从当天开始，不展示已过去的日期）
   const allDates = useMemo(() => {
-    const startDate = dayjs(inventoryItem.availableStartDate)
-    const endDate = dayjs(inventoryItem.availableEndDate)
+    const availableStart = dayjs(inventoryItem.availableStartDate)
+    const availableEnd = dayjs(inventoryItem.availableEndDate)
+    const today = dayjs().startOf('day')
+    // 起始日期取当天和可购买起始日期的较晚者
+    const startDate = today.isAfter(availableStart) ? today : availableStart
+    const endDate = availableEnd
     const dates: Dayjs[] = []
     
     let current = startDate
@@ -672,10 +676,16 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                       if (isLocked) {
                         status = 'locked'
                         availableSlots = availableCount
-                      } else if (soldOutCount > 0 && availableCount === 0) {
+                      } else if (soldOutCount > 0) {
+                        // 有已售罄時段 → 顯示為已售罄
                         status = 'soldOut'
                         availableSlots = 0
+                      } else if (availableCount < meal.slots.length) {
+                        // 有不可售時段 → 顯示為不可售
+                        status = 'unavailable'
+                        availableSlots = 0
                       } else if (availableCount > 0) {
+                        // 全部可售
                         status = 'available'
                         availableSlots = availableCount
                       } else {
@@ -695,6 +705,9 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                       const noDiscountSlots = getNoDiscountSlotsByRow(dateStr)
                       const hasNoDiscount = meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
                       
+                      // Mock: 生成确定性库存数量（基于 region + meal 的 hash）
+                      const mockInventory = ((Number(region.key) * 7 + meal.slots[0] * 13) % 20) + 3
+                      
                       return (
                         <td 
                           key={meal.key}
@@ -708,7 +721,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                             }
                           }}
                           style={{ 
-                            padding: '8px 6px', 
+                            padding: '6px 4px', 
                             textAlign: 'center',
                             cursor: isAvailable ? 'pointer' : 'not-allowed',
                             background: isSelected ? '#f6ffed' : 
@@ -724,53 +737,53 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           }}
                         >
                           {/* 状态标签 */}
-                          <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <div style={{ marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                             {status === 'available' && (
                               isSelected
-                                ? <Tag color="#E8720C" style={{ fontSize: 10, padding: '1px 4px' }}>已選擇</Tag>
-                                : <Tag color="success" style={{ fontSize: 10, padding: '1px 4px' }}>可購買</Tag>
+                                ? <Tag color="#E8720C" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>已選擇</Tag>
+                                : <Tag color="success" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>可購買</Tag>
                             )}
                             {status === 'locked' && (
                               <>
-                                <Tag color="#722ed1" style={{ fontSize: 10, padding: '1px 4px' }}>已鎖定</Tag>
+                                <Tag color="#722ed1" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>已鎖定</Tag>
                                 <span>
-                                  <span style={{ fontSize: 16, fontWeight: 700, color: '#ff4d4f' }}>
+                                  <span style={{ fontSize: 14, fontWeight: 700, color: '#ff4d4f' }}>
                                     {remainingSeconds}
                                   </span>
-                                  <span style={{ fontSize: 10, color: '#ff7875' }}>秒後釋放</span>
+                                  <span style={{ fontSize: 9, color: '#ff7875' }}>秒</span>
                                 </span>
                               </>
                             )}
                             {status === 'soldOut' && (
-                              <Tag color="error" style={{ fontSize: 10, padding: '1px 4px' }}>已售罄</Tag>
+                              <Tag color="error" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>已售罄</Tag>
                             )}
                             {status === 'unavailable' && (
-                              <Tag color="default" style={{ fontSize: 10, padding: '1px 4px' }}>不可售</Tag>
+                              <Tag color="default" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>不可售</Tag>
                             )}
                           </div>
 
                           {/* 价格 */}
                           {(isAvailable || isSoldOut || isLockedStatus) && (
-                            <>
-                              <div style={{ 
-                                fontSize: 16, 
-                                fontWeight: 700, 
-                                color: isSoldOut ? '#bfbfbf' : isLockedStatus ? '#722ed1' : '#fa541c',
-                                marginBottom: 2,
-                              }}>
-                                ${price}
-                              </div>
-                              {hasNoDiscount ? (
-                                <div style={{ fontSize: 10, color: '#fa541c', marginBottom: 2, fontWeight: 600 }}>無折扣</div>
-                              ) : (
-                                <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 2, textDecoration: 'line-through' }}>
-                                  原價：${inventoryItem.dailyPrice}
-                                </div>
-                              )}
-                            </>
+                            <div style={{ 
+                              fontSize: 14, 
+                              fontWeight: 700, 
+                              color: isSoldOut ? '#bfbfbf' : isLockedStatus ? '#722ed1' : '#fa541c',
+                              marginBottom: 1,
+                            }}>
+                              ${price}
+                            </div>
+                          )}
+                          {/* 库存 */}
+                          {(isAvailable || isLockedStatus) && (
+                            <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 1 }}>
+                              庫存：<span style={{ color: mockInventory <= 5 ? '#ff4d4f' : '#595959', fontWeight: mockInventory <= 5 ? 600 : 400 }}>{mockInventory}</span>
+                            </div>
+                          )}
+                          {isSoldOut && (
+                            <div style={{ fontSize: 10, color: '#bfbfbf', marginBottom: 1 }}>庫存：0</div>
                           )}
                           {!isAvailable && !isSoldOut && !isLockedStatus && (
-                            <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>--</div>
+                            <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 2 }}>--</div>
                           )}
                         </td>
                       )

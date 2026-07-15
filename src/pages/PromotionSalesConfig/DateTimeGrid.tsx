@@ -220,10 +220,14 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     message.success('繼續購買')
   }
 
-  // 生成所有日期列表
+  // 生成所有日期列表（从当天开始）
   const allDates = useMemo(() => {
-    const startDate = dayjs(inventoryItem.availableStartDate)
-    const endDate = dayjs(inventoryItem.availableEndDate)
+    const availableStart = dayjs(inventoryItem.availableStartDate)
+    const availableEnd = dayjs(inventoryItem.availableEndDate)
+    const today = dayjs().startOf('day')
+    // 从当天和可购买起始日期中取较晚的作为开始日期
+    const startDate = today.isAfter(availableStart) ? today : availableStart
+    const endDate = availableEnd
     const dates: Dayjs[] = []
     
     let current = startDate
@@ -556,16 +560,25 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         ? Math.max(0, 60 - Math.floor((currentTime - lockedCartItem.lockTime) / 1000))
                         : 0
                       
+                      // Mock 库存数据
+                      const mockInventory = ((Number(region.key) * 7 + meal.slots[0] * 13) % 20) + 3
+                      
                       let status: 'available' | 'soldOut' | 'unavailable' | 'locked'
                       let availableSlots: number
                       
                       if (isLocked) {
                         status = 'locked'
                         availableSlots = availableCount
-                      } else if (soldOutCount > 0 && availableCount === 0) {
+                      } else if (soldOutCount > 0) {
+                        // 有已售罄時段 → 顯示為已售罄
                         status = 'soldOut'
                         availableSlots = 0
+                      } else if (availableCount < meal.slots.length) {
+                        // 有不可售時段 → 顯示為不可售
+                        status = 'unavailable'
+                        availableSlots = 0
                       } else if (availableCount > 0) {
+                        // 全部可售
                         status = 'available'
                         availableSlots = availableCount
                       } else {
@@ -658,6 +671,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                                 </div>
                               )}
                             </>
+                          )}
+                          {/* 库存 */}
+                          {(isAvailable || isLockedStatus) && (
+                            <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 1 }}>
+                              庫存：<span style={{ color: mockInventory <= 5 ? '#ff4d4f' : '#595959', fontWeight: mockInventory <= 5 ? 600 : 400 }}>{mockInventory}</span>
+                            </div>
+                          )}
+                          {isSoldOut && (
+                            <div style={{ fontSize: 10, color: '#bfbfbf' }}>庫存：0</div>
                           )}
                           {!isAvailable && !isSoldOut && !isLockedStatus && (
                             <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>--</div>

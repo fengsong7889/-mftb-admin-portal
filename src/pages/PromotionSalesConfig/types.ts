@@ -144,7 +144,7 @@ const CHANNEL_TO_BIZ: Record<number, string> = {
 const BIZ_CHANNEL_POOL = ['food', 'supermarket', 'groupBuy']
 
 /** 可购买起始日期 */
-const PURCHASE_START_DATE = '2025-07-05'
+const PURCHASE_START_DATE = '2026-07-05'
 const PURCHASE_START_DAY = parseInt(PURCHASE_START_DATE.split('-')[2], 10)
 
 /** 根据日期计算行号（0-based） */
@@ -221,8 +221,8 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
           bizChannel,
           slotPosition,
           dailyPrice,
-          availableStartDate: type === AlgorithmType.HOT_REVIVE_AD ? '2025-07-01' : '2025-07-05',
-          availableEndDate: type === AlgorithmType.HOT_REVIVE_AD ? '2025-11-30' : '2025-07-18',
+          availableStartDate: type === AlgorithmType.HOT_REVIVE_AD ? '2026-07-01' : '2026-07-05',
+          availableEndDate: type === AlgorithmType.HOT_REVIVE_AD ? '2026-11-30' : '2026-07-28',
           totalSlots,
           soldSlots,
           algorithmType: type,
@@ -235,7 +235,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
   return items
 }
 
-/** 为指定日期生成48个时段状态 */
+/** 为指定日期生成48个时段状态（每天都有固定3个已售罄、2个不可售） */
 export function generateTimeSlotStatuses(inventoryId: number, date: string): TimeSlotStatus[] {
   const dateSeed = date.split('-').reduce((acc, v) => acc + parseInt(v, 10), 0)
   const statuses: TimeSlotStatus[] = []
@@ -250,86 +250,36 @@ export function generateTimeSlotStatuses(inventoryId: number, date: string): Tim
     statuses[i] = TimeSlotStatus.UNAVAILABLE
   }
 
-  // 根据日期确定行号
-  const rowIndex = getRowIndexByDate(date)
-
-  // 根据日期配置特定的不可售时段
-  const unavailableConfig: Record<number, number[]> = {
-    3: [14, 15, 16, 17, 18, 19, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47], // 第 4 行（07-08）：早餐+晚餐+夜宵
-    6: [14, 15, 16, 17, 18, 19, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47], // 第 7 行（07-11）：早餐+晚餐+夜宵
+  // 收集06:00-00:00的可售时段索引（共36个）
+  const availableSlots: number[] = []
+  for (let i = 12; i < 48; i++) {
+    availableSlots.push(i)
   }
 
-  // 应用特定日期的不可售配置
-  const unavailableSlots = unavailableConfig[rowIndex] || []
-  unavailableSlots.forEach(slotIndex => {
-    if (slotIndex < statuses.length) {
-      statuses[slotIndex] = TimeSlotStatus.UNAVAILABLE
-    }
-  })
-
-  // 按行配置售罄时段
-  const soldOutConfig: Record<number, number[]> = {
-    0: [22, 23, 24, 25, 26, 27], // 第 1 行（07-05）：午餐
-    2: [14, 15, 16, 17, 18, 19], // 第 3 行（07-07）：早餐
-    4: [34, 35, 36, 37, 38, 39, 40, 41], // 第 5 行（07-09）：晚餐
-    8: [28, 29, 30, 31, 32, 33], // 第 9 行（07-13）：下午茶
-    10: [34, 35, 36, 37, 38, 39, 40, 41], // 第 11 行（07-15）：晚餐
-    11: [42, 43, 44, 45, 46, 47], // 第 12 行（07-16）：夜宵
-    13: [14, 15, 16, 17, 18, 19], // 第 14 行（07-18）：早餐
-    17: [22, 23, 24, 25, 26, 27], // 第 18 行（07-22）：午餐
-    21: [34, 35, 36, 37, 38, 39, 40, 41], // 第 22 行（07-26）：晚餐
+  // 使用日期和库存ID作为种子生成确定性随机数
+  const seed = inventoryId * 10000 + dateSeed
+  
+  // Fisher-Yates 洗牌算法
+  const shuffled = [...availableSlots]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(pseudoRandom(seed + i) * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
 
-  // 应用当前行的售罄配置
-  const soldOutSlots = soldOutConfig[rowIndex] || []
-  soldOutSlots.forEach(slotIndex => {
-    if (slotIndex < statuses.length) {
-      statuses[slotIndex] = TimeSlotStatus.SOLD_OUT
-    }
+  // 固定分配：前3个为已售罄，接下来2个为不可售
+  const soldOutIndices = shuffled.slice(0, 3)
+  const unavailableIndices = shuffled.slice(3, 5)
+
+  // 设置已售罄
+  soldOutIndices.forEach(idx => {
+    statuses[idx] = TimeSlotStatus.SOLD_OUT
   })
 
-  // 按餐时段随机设置20%为不可售，确保每个餐时段都有分布
-  const mealSlots = [
-    { start: 12, end: 13 },  // 06:00-07:00
-    { start: 14, end: 19 },  // 早餐 07:00-10:00
-    { start: 20, end: 21 },  // 10:00-11:00
-    { start: 22, end: 27 },  // 午餐 11:00-14:00
-    { start: 28, end: 33 },  // 下午茶 14:00-17:00
-    { start: 34, end: 41 },  // 晚餐 17:00-21:00
-    { start: 42, end: 47 },  // 夜宵 21:00-00:00
-  ]
-  
-  // 对每个餐时段分别随机设置20%为不可售
-  mealSlots.forEach((meal, mealIndex) => {
-    const availableInMeal: number[] = []
-    for (let i = meal.start; i <= meal.end; i++) {
-      if (statuses[i] === TimeSlotStatus.AVAILABLE) {
-        availableInMeal.push(i)
-      }
-    }
-    
-    if (availableInMeal.length > 0) {
-      // 每个餐时段至少设置1个不可售（如果有可售时段）
-      const unavailableCount = Math.max(1, Math.floor(availableInMeal.length * 0.2))
-      
-      // 使用不同的种子确保每个餐时段的随机性不同
-      const mealSeed = inventoryId * 1000 + dateSeed * 100 + mealIndex * 10
-      
-      // Fisher-Yates 洗牌算法
-      const shuffled = [...availableInMeal]
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(pseudoRandom(mealSeed + i) * (i + 1))
-        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-      }
-      
-      const selectedSlots = shuffled.slice(0, unavailableCount)
-      
-      selectedSlots.forEach(slotIndex => {
-        statuses[slotIndex] = TimeSlotStatus.UNAVAILABLE
-      })
-    }
+  // 设置不可售
+  unavailableIndices.forEach(idx => {
+    statuses[idx] = TimeSlotStatus.UNAVAILABLE
   })
-  
+
   return statuses
 }
 
