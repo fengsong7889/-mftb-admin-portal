@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message } from 'antd'
+import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover } from 'antd'
 const { RangePicker } = DatePicker
 import { SearchOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -147,7 +147,7 @@ const mockOrders: OrderItem[] = [
     storeId: 'S20001',
     storeName: '澳門總店',
     purchaseDate: '2025-07-05',
-    mealSlots: ['07:00-10:00', '11:00-14:00'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)', '下午茶(2026-7-16)', '晚餐(2026-7-16)', '宵夜(2026-7-16)', '早餐(2026-7-17)', '午餐(2026-7-17)', '下午茶(2026-7-17)', '晚餐(2026-7-17)', '宵夜(2026-7-17)'],
     originalPrice: 2000,
     discountPrice: 1800,
     actualPrice: 1800,
@@ -162,14 +162,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
     region: Region.FAHUA,
-    recommendType: RecommendType.NEW_STORE_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 5,
     groupId: 'G10002',
     groupName: '閃峰餐飲連鎖',
     storeId: 'S20002',
     storeName: '氹仔分店',
     purchaseDate: '2025-07-06',
-    mealSlots: ['17:00-21:00'],
+    mealSlots: ['晚餐(2026-7-16)'],
     originalPrice: 1500,
     discountPrice: 1350,
     actualPrice: 1350,
@@ -184,15 +184,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.SANMA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 2,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
     storeId: 'S20003',
     storeName: '珠海旗艦店',
     purchaseDate: '2025-07-08',
-    mealSlots: [],
-    purchaseDays: ['2025-07-08', '2025-07-09', '2025-07-10'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)', '下午茶(2026-7-16)', '晚餐(2026-7-16)', '宵夜(2026-7-16)', '早餐(2026-7-17)'],
     originalPrice: 3000,
     discountPrice: 2700,
     actualPrice: 2700,
@@ -206,14 +205,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.KOKSAA,
-    recommendType: RecommendType.TRAFFIC_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 4,
     groupId: 'G10001',
     groupName: '澳門美食集團',
     storeId: 'S20004',
     storeName: '黑沙環店',
     purchaseDate: '2025-07-03',
-    mealSlots: ['07:00-10:00'],
+    mealSlots: ['早餐(2026-7-16)'],
     originalPrice: 1000,
     discountPrice: 900,
     actualPrice: 900,
@@ -235,7 +234,7 @@ const mockOrders: OrderItem[] = [
     storeId: 'S20005',
     storeName: '新馬路店',
     purchaseDate: '2025-07-02',
-    mealSlots: ['17:00-21:00', '21:00-02:00'],
+    mealSlots: ['晚餐(2026-7-16)', '宵夜(2026-7-16)'],
     originalPrice: 2500,
     discountPrice: 2250,
     actualPrice: 2250,
@@ -256,11 +255,11 @@ const mockOrders: OrderItem[] = [
     storeId: 'S20001',
     storeName: '澳門總店',
     purchaseDate: '2025-07-01',
-    mealSlots: ['07:00-10:00', '11:00-14:00'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)', '下午茶(2026-7-16)', '晚餐(2026-7-16)', '宵夜(2026-7-16)'],
     originalPrice: 1800,
     discountPrice: 1620,
     actualPrice: 1620,
-    status: OrderStatus.PROMOTING,
+    status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-01 08:30:00',
     payTime: '2025-07-01 08:35:00',
   },
@@ -271,14 +270,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.SANMA,
-    recommendType: RecommendType.NEW_STORE_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 3,
     groupId: 'G10001',
     groupName: '澳門美食集團',
     storeId: 'S20002',
     storeName: '氹仔分店',
     purchaseDate: '2025-06-30',
-    mealSlots: ['11:00-14:00'],
+    mealSlots: ['午餐(2026-7-16)'],
     originalPrice: 1200,
     discountPrice: 1080,
     actualPrice: 1080,
@@ -293,15 +292,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 4,
     groupId: 'G10002',
     groupName: '閃峰餐飲連鎖',
     storeId: 'S20003',
     storeName: '珠海旗艦店',
     purchaseDate: '2025-06-29',
-    mealSlots: [],
-    purchaseDays: ['2025-06-29', '2025-06-30', '2025-07-01', '2025-07-02'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)', '下午茶(2026-7-16)', '晚餐(2026-7-16)', '宵夜(2026-7-16)', '早餐(2026-7-17)'],
     originalPrice: 2800,
     discountPrice: 2520,
     actualPrice: 2520,
@@ -315,14 +313,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.KOKSAA,
-    recommendType: RecommendType.TRAFFIC_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
     storeId: 'S20004',
     storeName: '黑沙環店',
     purchaseDate: '2025-06-28',
-    mealSlots: ['07:00-10:00', '14:00-17:00'],
+    mealSlots: ['早餐(2026-7-16)', '下午茶(2026-7-16)'],
     originalPrice: 1600,
     discountPrice: 1440,
     actualPrice: 1440,
@@ -344,11 +342,11 @@ const mockOrders: OrderItem[] = [
     storeId: 'S20005',
     storeName: '新馬路店',
     purchaseDate: '2025-06-27',
-    mealSlots: ['21:00-02:00'],
+    mealSlots: ['宵夜(2026-7-16)'],
     originalPrice: 2200,
     discountPrice: 1980,
     actualPrice: 1980,
-    status: OrderStatus.PROMOTING,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-06-27 20:10:00',
     payTime: '2025-06-27 20:15:00',
   },
@@ -359,14 +357,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.KOKSAA,
-    recommendType: RecommendType.NEW_STORE_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 2,
     groupId: 'G10002',
     groupName: '閃峰餐飲連鎖',
     storeId: 'S20001',
     storeName: '澳門總店',
     purchaseDate: '2025-06-26',
-    mealSlots: ['11:00-14:00', '17:00-21:00'],
+    mealSlots: ['午餐(2026-7-16)', '晚餐(2026-7-16)'],
     originalPrice: 1900,
     discountPrice: 1710,
     actualPrice: 1710,
@@ -381,15 +379,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 3,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
     storeId: 'S20002',
     storeName: '氹仔分店',
     purchaseDate: '2025-06-25',
-    mealSlots: [],
-    purchaseDays: ['2025-06-25', '2025-06-26'],
+    mealSlots: ['午餐(2026-7-16)', '晚餐(2026-7-16)'],
     originalPrice: 1400,
     discountPrice: 1260,
     actualPrice: 1260,
@@ -403,14 +400,14 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.SANMA,
-    recommendType: RecommendType.TRAFFIC_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 4,
     groupId: 'G10001',
     groupName: '澳門美食集團',
     storeId: 'S20003',
     storeName: '珠海旗艦店',
     purchaseDate: '2025-06-24',
-    mealSlots: ['07:00-10:00', '11:00-14:00'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)'],
     originalPrice: 2100,
     discountPrice: 1890,
     actualPrice: 1890,
@@ -431,11 +428,11 @@ const mockOrders: OrderItem[] = [
     storeId: 'S20004',
     storeName: '黑沙環店',
     purchaseDate: '2025-06-23',
-    mealSlots: ['07:00-10:00', '11:00-14:00', '17:00-21:00'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)', '下午茶(2026-7-16)', '晚餐(2026-7-16)', '宵夜(2026-7-16)', '早餐(2026-7-17)', '午餐(2026-7-17)', '下午茶(2026-7-17)', '晚餐(2026-7-17)', '宵夜(2026-7-17)', '早餐(2026-7-18)', '午餐(2026-7-18)'],
     originalPrice: 3500,
     discountPrice: 3150,
     actualPrice: 3150,
-    status: OrderStatus.PROMOTING,
+    status: OrderStatus.REFUNDED,
     orderTime: '2025-06-23 06:20:00',
     payTime: '2025-06-23 06:25:00',
   },
@@ -446,20 +443,361 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.FAHUA,
-    recommendType: RecommendType.NEW_STORE_AD,
+    recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 5,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
     storeId: 'S20005',
     storeName: '新馬路店',
     purchaseDate: '2025-06-22',
-    mealSlots: ['午餐 11:00-14:00', '下午茶 14:00-17:00'],
+    mealSlots: ['早餐(2026-7-16)', '午餐(2026-7-16)', '下午茶(2026-7-16)'],
     originalPrice: 1700,
     discountPrice: 1530,
     actualPrice: 1530,
     status: OrderStatus.REFUNDED,
     orderTime: '2025-06-22 10:05:00',
     payTime: '2025-06-22 10:10:00',
+  },
+  // 盤活復蘇訂單數據（15條）
+  {
+    id: '101',
+    orderNo: 'ORD20250715101',
+    promotionName: '盤活復蘇·黃金展位',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 3,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20001',
+    storeName: '澳門總店',
+    purchaseDate: '2025-07-15',
+    mealSlots: [],
+    purchaseDays: ['2026-07-16', '2026-07-17', '2026-07-18'],
+    originalPrice: 3000,
+    discountPrice: 2700,
+    actualPrice: 2700,
+    status: OrderStatus.PROMOTING,
+    orderTime: '2025-07-15 10:30:00',
+    payTime: '2025-07-15 10:35:00',
+  },
+  {
+    id: '102',
+    orderNo: 'ORD20250714102',
+    promotionName: '盤活復蘇·首頁推薦',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.FAHUA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 5,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20002',
+    storeName: '氹仔分店',
+    purchaseDate: '2025-07-14',
+    mealSlots: [],
+    purchaseDays: ['2026-07-15', '2026-07-16'],
+    originalPrice: 2500,
+    discountPrice: 2250,
+    actualPrice: 2250,
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2025-07-14 14:20:00',
+    payTime: '2025-07-14 14:25:00',
+  },
+  {
+    id: '103',
+    orderNo: 'ORD20250713103',
+    promotionName: '盤活復蘇·外賣熱推',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.SANMA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 2,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20003',
+    storeName: '珠海旗艦店',
+    purchaseDate: '2025-07-13',
+    mealSlots: [],
+    purchaseDays: ['2026-07-14', '2026-07-15', '2026-07-16', '2026-07-17'],
+    originalPrice: 4000,
+    discountPrice: 3600,
+    actualPrice: 3600,
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-13 09:15:00',
+  },
+  {
+    id: '104',
+    orderNo: 'ORD20250712104',
+    promotionName: '盤活復蘇·團購精選',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 4,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20004',
+    storeName: '黑沙環店',
+    purchaseDate: '2025-07-12',
+    mealSlots: [],
+    purchaseDays: ['2026-07-13'],
+    originalPrice: 1500,
+    discountPrice: 1350,
+    actualPrice: 1350,
+    status: OrderStatus.REFUNDED,
+    orderTime: '2025-07-12 16:40:00',
+    payTime: '2025-07-12 16:45:00',
+  },
+  {
+    id: '105',
+    orderNo: 'ORD20250711105',
+    promotionName: '盤活復蘇·週末專場',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.FAHUA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 1,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20005',
+    storeName: '新馬路店',
+    purchaseDate: '2025-07-11',
+    mealSlots: [],
+    purchaseDays: ['2026-07-12', '2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16'],
+    originalPrice: 5000,
+    discountPrice: 4500,
+    actualPrice: 4500,
+    status: OrderStatus.CANCELLED,
+    orderTime: '2025-07-11 11:20:00',
+  },
+  {
+    id: '106',
+    orderNo: 'ORD20250710106',
+    promotionName: '盤活復蘇·早鳥優惠',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 2,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20001',
+    storeName: '澳門總店',
+    purchaseDate: '2025-07-10',
+    mealSlots: [],
+    purchaseDays: ['2026-07-11', '2026-07-12'],
+    originalPrice: 2000,
+    discountPrice: 1800,
+    actualPrice: 1800,
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2025-07-10 08:30:00',
+    payTime: '2025-07-10 08:35:00',
+  },
+  {
+    id: '107',
+    orderNo: 'ORD20250709107',
+    promotionName: '盤活復蘇·零售閃購',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.SANMA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 3,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20002',
+    storeName: '氹仔分店',
+    purchaseDate: '2025-07-09',
+    mealSlots: [],
+    purchaseDays: ['2026-07-10', '2026-07-11', '2026-07-12'],
+    originalPrice: 3500,
+    discountPrice: 3150,
+    actualPrice: 3150,
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2025-07-09 10:15:00',
+    payTime: '2025-07-09 10:20:00',
+  },
+  {
+    id: '108',
+    orderNo: 'ORD20250708108',
+    promotionName: '盤活復蘇·團購到店',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.FAHUA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 4,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20003',
+    storeName: '珠海旗艦店',
+    purchaseDate: '2025-07-08',
+    mealSlots: [],
+    purchaseDays: ['2026-07-09', '2026-07-10'],
+    originalPrice: 2800,
+    discountPrice: 2520,
+    actualPrice: 2520,
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-08 15:45:00',
+  },
+  {
+    id: '109',
+    orderNo: 'ORD20250707109',
+    promotionName: '盤活復蘇·大首頁推薦',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 1,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20004',
+    storeName: '黑沙環店',
+    purchaseDate: '2025-07-07',
+    mealSlots: [],
+    purchaseDays: ['2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11'],
+    originalPrice: 4500,
+    discountPrice: 4050,
+    actualPrice: 4050,
+    status: OrderStatus.REFUNDED,
+    orderTime: '2025-07-07 09:20:00',
+    payTime: '2025-07-07 09:25:00',
+  },
+  {
+    id: '110',
+    orderNo: 'ORD20250706110',
+    promotionName: '盤活復蘇·夜宵專場',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.SANMA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 5,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20005',
+    storeName: '新馬路店',
+    purchaseDate: '2025-07-06',
+    mealSlots: [],
+    purchaseDays: ['2026-07-07', '2026-07-08'],
+    originalPrice: 2200,
+    discountPrice: 1980,
+    actualPrice: 1980,
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-06 20:10:00',
+    payTime: '2025-07-06 20:15:00',
+  },
+  {
+    id: '111',
+    orderNo: 'ORD20250705111',
+    promotionName: '盤活復蘇·澳門專區',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 2,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20001',
+    storeName: '澳門總店',
+    purchaseDate: '2025-07-05',
+    mealSlots: [],
+    purchaseDays: ['2026-07-06', '2026-07-07', '2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11'],
+    originalPrice: 6000,
+    discountPrice: 5400,
+    actualPrice: 5400,
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2025-07-05 11:30:00',
+    payTime: '2025-07-05 11:35:00',
+  },
+  {
+    id: '112',
+    orderNo: 'ORD20250704112',
+    promotionName: '盤活復蘇·氹仔熱推',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.FAHUA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 3,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20002',
+    storeName: '氹仔分店',
+    purchaseDate: '2025-07-04',
+    mealSlots: [],
+    purchaseDays: ['2026-07-05', '2026-07-06'],
+    originalPrice: 1400,
+    discountPrice: 1260,
+    actualPrice: 1260,
+    status: OrderStatus.CANCELLED,
+    orderTime: '2025-07-04 13:50:00',
+  },
+  {
+    id: '113',
+    orderNo: 'ORD20250703113',
+    promotionName: '盤活復蘇·珠海精選',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.SANMA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 4,
+    groupId: 'G10001',
+    groupName: '澳門美食集團',
+    storeId: 'S20003',
+    storeName: '珠海旗艦店',
+    purchaseDate: '2025-07-03',
+    mealSlots: [],
+    purchaseDays: ['2026-07-04', '2026-07-05', '2026-07-06'],
+    originalPrice: 3200,
+    discountPrice: 2880,
+    actualPrice: 2880,
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-03 07:40:00',
+  },
+  {
+    id: '114',
+    orderNo: 'ORD20250702114',
+    promotionName: '盤活復蘇·全時段推廣',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 1,
+    groupId: 'G10002',
+    groupName: '閃峰餐飲連鎖',
+    storeId: 'S20004',
+    storeName: '黑沙環店',
+    purchaseDate: '2025-07-02',
+    mealSlots: [],
+    purchaseDays: ['2026-07-03', '2026-07-04', '2026-07-05', '2026-07-06', '2026-07-07', '2026-07-08', '2026-07-09'],
+    originalPrice: 7000,
+    discountPrice: 6300,
+    actualPrice: 6300,
+    status: OrderStatus.REFUNDED,
+    orderTime: '2025-07-02 06:20:00',
+    payTime: '2025-07-02 06:25:00',
+  },
+  {
+    id: '115',
+    orderNo: 'ORD20250701115',
+    promotionName: '盤活復蘇·閃購特惠',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.FAHUA,
+    recommendType: RecommendType.REVITALIZATION_AD,
+    slotPosition: 5,
+    groupId: 'G10003',
+    groupName: '大灣區餐飲集團',
+    storeId: 'S20005',
+    storeName: '新馬路店',
+    purchaseDate: '2025-07-01',
+    mealSlots: [],
+    purchaseDays: ['2026-07-02', '2026-07-03', '2026-07-04'],
+    originalPrice: 3800,
+    discountPrice: 3420,
+    actualPrice: 3420,
+    status: OrderStatus.REFUNDED,
+    orderTime: '2025-07-01 10:05:00',
+    payTime: '2025-07-01 10:10:00',
   },
 ]
 
@@ -611,31 +949,74 @@ export default function PromotionOrderManage() {
       width: 220,
       render: (_, record) => {
         if (orderType === '盤活復蘇' || record.recommendType === RecommendType.REVITALIZATION_AD) {
-          // 盤活復蘇：只展示天數+日期
+          // 盤活復蘇：展示天數，點擊弹窗查看具體日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {
-            const first = record.purchaseDays[0]
-            const last = record.purchaseDays[record.purchaseDays.length - 1]
             const days = record.purchaseDays.length
-            return (
-              <Space direction="vertical" size={2}>
-                <Tag color="green" style={{ margin: 0 }}>{days}天</Tag>
-                <span style={{ fontSize: 12, color: '#595959' }}>
-                  {first.slice(5)} ~ {last.slice(5)}
-                </span>
+
+            const dateContent = (
+              <Space direction="vertical" size={4}>
+                {record.purchaseDays.map((date, index) => (
+                  <Tag key={index} color="green" style={{ margin: 0 }}>
+                    {date}
+                  </Tag>
+                ))}
               </Space>
+            )
+
+            return (
+              <Popover
+                content={dateContent}
+                title="購買日期明細"
+                trigger="click"
+                placement="bottomLeft"
+              >
+                <Space size={4} style={{ cursor: 'pointer' }}>
+                  <Tag color="green" style={{ margin: 0 }}>{days}天</Tag>
+                  <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12, color: '#1890ff' }}>
+                    查看
+                  </Button>
+                </Space>
+              </Popover>
             )
           }
           return <span style={{ color: '#bfbfbf' }}>-</span>
         }
-        // 無敵星星：只展示時段
+        // 無敵星星：展示時段，最多2個，超出顯示弹窗
         if (record.mealSlots && record.mealSlots.length > 0) {
-          return (
-            <Space direction="vertical" size={2}>
+          const maxShow = 2
+          const visibleSlots = record.mealSlots.slice(0, maxShow)
+          const hiddenSlots = record.mealSlots.slice(maxShow)
+          const hasMore = hiddenSlots.length > 0
+
+          const slotContent = (
+            <Space direction="vertical" size={4}>
               {record.mealSlots.map((slot, index) => (
                 <Tag key={index} color="blue" style={{ margin: 0 }}>
                   {slot}
                 </Tag>
               ))}
+            </Space>
+          )
+
+          return (
+            <Space direction="vertical" size={2}>
+              {visibleSlots.map((slot, index) => (
+                <Tag key={index} color="blue" style={{ margin: 0 }}>
+                  {slot}
+                </Tag>
+              ))}
+              {hasMore && (
+                <Popover
+                  content={slotContent}
+                  title="全部購買時段"
+                  trigger="click"
+                  placement="bottomLeft"
+                >
+                  <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
+                    +{hiddenSlots.length} 更多
+                  </Button>
+                </Popover>
+              )}
             </Space>
           )
         }
@@ -819,20 +1200,22 @@ export default function PromotionOrderManage() {
                 onChange={e => setFilters({ ...filters, storeName: e.target.value })}
               />
             </Form.Item>
-            <Form.Item label="推廣商圈">
-              <Select
-                placeholder="全部"
-                allowClear
-                value={filters.region}
-                onChange={value => setFilters({ ...filters, region: value })}
-                options={Object.values(Region)
-                  .filter(v => typeof v === 'number')
-                  .map(region => ({
-                    label: REGION_LABEL[region],
-                    value: region,
-                  }))}
-              />
-            </Form.Item>
+            {orderType !== '盤活復蘇' && (
+              <Form.Item label="推廣商圈">
+                <Select
+                  placeholder="全部"
+                  allowClear
+                  value={filters.region}
+                  onChange={value => setFilters({ ...filters, region: value })}
+                  options={Object.values(Region)
+                    .filter(v => typeof v === 'number')
+                    .map(region => ({
+                      label: REGION_LABEL[region],
+                      value: region,
+                    }))}
+                />
+              </Form.Item>
+            )}
             <Form.Item label="訂單狀態">
               <Select
                 placeholder="全部"

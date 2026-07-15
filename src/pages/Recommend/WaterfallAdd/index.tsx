@@ -149,6 +149,34 @@ interface TimeSlotGradient {
   discount: number
 }
 
+// 商家接口
+interface Merchant {
+  id: string
+  groupId: string
+  groupName: string
+  storeId: string
+  storeName: string
+}
+
+// Mock数据 - 商家列表
+const MOCK_MERCHANTS: Merchant[] = [
+  { id: '1', groupId: 'G001', groupName: '美味集團', storeId: 'S001', storeName: '美味早餐店' },
+  { id: '2', groupId: 'G001', groupName: '美味集團', storeId: 'S002', storeName: '美味午餐廳' },
+  { id: '3', groupId: 'G001', groupName: '美味集團', storeId: 'S003', storeName: '美味下午茶' },
+  { id: '4', groupId: 'G002', groupName: '鮮美食堂', storeId: 'S004', storeName: '鮮美食堂-旗艦店' },
+  { id: '5', groupId: 'G002', groupName: '鮮美食堂', storeId: 'S005', storeName: '鮮美食堂-分店' },
+  { id: '6', groupId: 'G003', groupName: '快餐聯盟', storeId: 'S006', storeName: '快餐聯盟-中心店' },
+  { id: '7', groupId: 'G003', groupName: '快餐聯盟', storeId: 'S007', storeName: '快餐聯盟-東區店' },
+  { id: '8', groupId: 'G003', groupName: '快餐聯盟', storeId: 'S008', storeName: '快餐聯盟-西區店' },
+  { id: '9', groupId: 'G004', groupName: '火鍋大王', storeId: 'S009', storeName: '火鍋大王-總店' },
+  { id: '10', groupId: 'G004', groupName: '火鍋大王', storeId: 'S010', storeName: '火鍋大王-分店' },
+  { id: '11', groupId: 'G005', groupName: '咖啡物語', storeId: 'S011', storeName: '咖啡物語-旗艦店' },
+  { id: '12', groupId: 'G005', groupName: '咖啡物語', storeId: 'S012', storeName: '咖啡物語-分店' },
+  { id: '13', groupId: 'G006', groupName: '甜品王國', storeId: 'S013', storeName: '甜品王國-中心店' },
+  { id: '14', groupId: 'G006', groupName: '甜品王國', storeId: 'S014', storeName: '甜品王國-東區店' },
+  { id: '15', groupId: 'G007', groupName: '燒烤帝國', storeId: 'S015', storeName: '燒烤帝國-總店' },
+]
+
 export default function WaterfallAdd() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -211,8 +239,14 @@ export default function WaterfallAdd() {
   const [presaleDays, setPresaleDays] = useState<number>(7) // 预售天数
   const [dailySalesLimit, setDailySalesLimit] = useState<number>(2) // 每天销售个数限制
   const [merchantLimit, setMerchantLimit] = useState(false) // 商家限制
-  const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]) // 选择的商家
+  const [selectedMerchants, setSelectedMerchants] = useState<Merchant[]>([]) // 选择的商家
   const [onlySellTimeSlots, setOnlySellTimeSlots] = useState<string[]>(['fullDay']) // 只销售时段
+  
+  // 商家选择弹窗
+  const [merchantModalVisible, setMerchantModalVisible] = useState(false)
+  const [merchantSearchForm] = Form.useForm()
+  const [tempSelectedMerchants, setTempSelectedMerchants] = useState<Merchant[]>([]) // 弹窗临时选择
+  const [merchantSearchValues, setMerchantSearchValues] = useState<Record<string, string>>({}) // 已应用的搜索条件
   
   // 盘活复苏 - 按天定价配置
   const [dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
@@ -532,6 +566,74 @@ export default function WaterfallAdd() {
     }
   }
 
+  // 商家搜索过滤（支持集团ID/名称合并搜索、门店ID/名称合并搜索）
+  const filteredMerchants = useMemo(() => {
+    return MOCK_MERCHANTS.filter(m => {
+      if (merchantSearchValues.groupKeyword) {
+        const kw = merchantSearchValues.groupKeyword.toLowerCase()
+        if (!m.groupId.toLowerCase().includes(kw) && !m.groupName.toLowerCase().includes(kw)) return false
+      }
+      if (merchantSearchValues.storeKeyword) {
+        const kw = merchantSearchValues.storeKeyword.toLowerCase()
+        if (!m.storeId.toLowerCase().includes(kw) && !m.storeName.toLowerCase().includes(kw)) return false
+      }
+      return true
+    })
+  }, [merchantSearchValues])
+
+  // 集团下拉选项（去重）
+  const groupOptions = useMemo(() => {
+    const map = new Map<string, { label: string; value: string }>()
+    MOCK_MERCHANTS.forEach(m => {
+      if (!map.has(m.groupId)) {
+        map.set(m.groupId, { label: `${m.groupId} - ${m.groupName}`, value: m.groupId })
+      }
+    })
+    return Array.from(map.values())
+  }, [])
+
+  // 门店下拉选项（去重）
+  const storeOptions = useMemo(() => {
+    const map = new Map<string, { label: string; value: string }>()
+    MOCK_MERCHANTS.forEach(m => {
+      if (!map.has(m.storeId)) {
+        map.set(m.storeId, { label: `${m.storeId} - ${m.storeName}`, value: m.storeId })
+      }
+    })
+    return Array.from(map.values())
+  }, [])
+
+  // 商家搜索
+  const handleMerchantSearch = () => {
+    const values = merchantSearchForm.getFieldsValue() || {}
+    setMerchantSearchValues(values)
+  }
+
+  // 商家搜索重置
+  const handleMerchantSearchReset = () => {
+    merchantSearchForm.resetFields()
+    setMerchantSearchValues({})
+  }
+
+  // 打开商家选择弹窗
+  const handleOpenMerchantModal = () => {
+    setTempSelectedMerchants([...selectedMerchants])
+    merchantSearchForm.resetFields()
+    setMerchantModalVisible(true)
+  }
+
+  // 确认选择商家
+  const handleConfirmMerchants = () => {
+    setSelectedMerchants(tempSelectedMerchants)
+    setMerchantModalVisible(false)
+    message.success(`已選擇 ${tempSelectedMerchants.length} 個商家`)
+  }
+
+  // 删除已选商家
+  const handleRemoveMerchant = (merchantId: string) => {
+    setSelectedMerchants(selectedMerchants.filter(m => m.id !== merchantId))
+  }
+
   return (
     <div className="content-area">
       {/* 顶部标题栏 */}
@@ -833,27 +935,51 @@ export default function WaterfallAdd() {
                 </div>
               </div>
 
-              {/* 商家限制：Switch + 右侧按钮 */}
-              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+              {/* 屏蔽商家：Switch + 选择商家 + 备注 */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>商家限制:</span>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>屏蔽商家:</span>
                   <Switch 
                     checked={merchantLimit}
                     onChange={(checked) => setMerchantLimit(checked)}
-                    checkedChildren="限制"
-                    unCheckedChildren="不限制"
+                    checkedChildren="屏蔽"
+                    unCheckedChildren="不屏蔽"
                   />
                 </div>
                 {merchantLimit && (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Button icon={<PlusOutlined />} onClick={() => message.info('打開商家選擇界面')}>
-                      選擇商家
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Button 
+                      icon={<PlusOutlined />} 
+                      onClick={handleOpenMerchantModal}
+                      type={selectedMerchants.length > 0 ? 'default' : 'default'}
+                    >
+                      {selectedMerchants.length > 0 ? '管理商家' : '選擇商家'}
                     </Button>
                     {selectedMerchants.length > 0 && (
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>已選 {selectedMerchants.length} 個商家</span>
+                      <Space size={4} wrap>
+                        {selectedMerchants.slice(0, 3).map(m => (
+                          <Tag 
+                            key={m.id} 
+                            color="blue" 
+                            closable 
+                            onClose={(e) => { e.preventDefault(); handleRemoveMerchant(m.id) }}
+                            style={{ margin: 0 }}
+                          >
+                            {m.storeName}
+                          </Tag>
+                        ))}
+                        {selectedMerchants.length > 3 && (
+                          <Tag color="blue" style={{ margin: 0, cursor: 'pointer' }} onClick={handleOpenMerchantModal}>
+                            +{selectedMerchants.length - 3} 更多
+                          </Tag>
+                        )}
+                      </Space>
                     )}
                   </div>
                 )}
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                  被屏蔽的商家，無法購買該算法廣告，並且商家在購買界面無法查詢到該算法，對商家不可見。
+                </span>
               </div>
 
               {/* 可售时段（仅无敌星星） */}
@@ -1562,6 +1688,133 @@ export default function WaterfallAdd() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 商家选择弹窗 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />
+            </div>
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>選擇屏蔽商家</span>
+          </div>
+        }
+        open={merchantModalVisible}
+        onCancel={() => setMerchantModalVisible(false)}
+        width={800}
+        onOk={handleConfirmMerchants}
+        okText="確認選擇"
+        cancelText="取消"
+        destroyOnClose
+      >
+        {/* 查询条件 */}
+        <div className="search-section">
+          <Form form={merchantSearchForm} layout="inline" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <Form.Item label="集團" name="groupKeyword">
+              <Select
+                showSearch
+                allowClear
+                placeholder="支持集團ID及名稱搜索"
+                options={groupOptions}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+            <Form.Item label="門店" name="storeKeyword">
+              <Select
+                showSearch
+                allowClear
+                placeholder="支持門店ID及名稱搜索"
+                options={storeOptions}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+            <Form.Item>
+              <div className="search-actions">
+                <Button type="primary" onClick={handleMerchantSearch}>查詢</Button>
+                <Button onClick={handleMerchantSearchReset}>重置</Button>
+              </div>
+            </Form.Item>
+          </Form>
+        </div>
+
+        {/* 已选提示 */}
+        {tempSelectedMerchants.length > 0 && (
+          <div style={{ marginBottom: 12, padding: '6px 12px', background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: '#52c41a', fontWeight: 500 }}>
+              已選擇 {tempSelectedMerchants.length} 個商家
+            </span>
+            <Space size={4} wrap>
+              {tempSelectedMerchants.slice(0, 5).map(m => (
+                <Tag 
+                  key={m.id} 
+                  color="blue" 
+                  closable 
+                  onClose={(e) => { e.preventDefault(); setTempSelectedMerchants(tempSelectedMerchants.filter(s => s.id !== m.id)) }}
+                  style={{ margin: 0 }}
+                >
+                  {m.storeName}
+                </Tag>
+              ))}
+              {tempSelectedMerchants.length > 5 && (
+                <Tag color="blue" style={{ margin: 0 }}>+{tempSelectedMerchants.length - 5} 更多</Tag>
+              )}
+            </Space>
+          </div>
+        )}
+
+        {/* 商家列表 */}
+        <Table
+          rowKey="id"
+          dataSource={filteredMerchants}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50'],
+            showTotal: (total) => `共 ${total} 條`,
+            size: 'small',
+          }}
+          size="small"
+          scroll={{ y: 360 }}
+          rowSelection={{
+            type: 'checkbox',
+            selectedRowKeys: tempSelectedMerchants.map(m => m.id),
+            preserveSelectedRowKeys: true,
+            onChange: (selectedRowKeys, selectedRows) => {
+              // preserveSelectedRowKeys 会保留所有页的选择，selectedRows 包含所有已选数据
+              setTempSelectedMerchants(selectedRows.filter(Boolean))
+            },
+          }}
+          columns={[
+            {
+              title: '集團ID',
+              dataIndex: 'groupId',
+              key: 'groupId',
+              width: 100,
+            },
+            {
+              title: '集團名稱',
+              dataIndex: 'groupName',
+              key: 'groupName',
+              width: 140,
+            },
+            {
+              title: '門店ID',
+              dataIndex: 'storeId',
+              key: 'storeId',
+              width: 100,
+            },
+            {
+              title: '門店名稱',
+              dataIndex: 'storeName',
+              key: 'storeName',
+            },
+          ]}
+        />
       </Modal>
 
     </div>
