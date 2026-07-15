@@ -49,7 +49,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 /* ---- 视频源配置 ---- */
 // 本地视频(随项目构建部署到 GitHub Pages / 本地开发)
-const LOCAL_VIDEO = `${import.meta.env.BASE_URL}delivery-video.mp4`
+const LOCAL_VIDEO = `${import.meta.env.BASE_URL}MFTB.mp4`
 // 备用远程视频(阿里云OSS)
 const REMOTE_VIDEO = 'https://mftb-video-song.oss-cn-shenzhen.aliyuncs.com/%E9%80%81%E5%A4%96%E5%8D%96%E8%A7%86%E9%A2%91.mp4'
 
@@ -97,7 +97,7 @@ function VideoBackground() {
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           onLoadedData={handleVideoLoaded}
           onError={handleVideoError}
           src={videoSrc}
