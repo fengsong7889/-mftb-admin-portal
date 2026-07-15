@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message } from 'antd'
+import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message, Tabs } from 'antd'
 import {
   ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined,
   ShopOutlined, FileTextOutlined, DollarOutlined,
   ExclamationCircleOutlined, RollbackOutlined, DownOutlined, RightOutlined,
+  BarChartOutlined, EyeOutlined, AimOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -59,6 +60,18 @@ interface SlotPriceItem {
   actualPrice: number
 }
 
+/* ---- 推广数据接口 ---- */
+interface PromoRecord {
+  date: string          // 统计日期
+  region: string        // 商圈
+  waterfallName: string // 瀑布流名称
+  position: number      // 展示位置
+  slot?: string         // 展示时段（无敌星星用）
+  impressions: number   // 曝光量
+  clicks: number        // 点击量
+  clickRate: number     // 点击率（百分比）
+}
+
 interface OrderItem {
   id: string
   orderNo: string
@@ -85,6 +98,47 @@ interface OrderItem {
   cancelFeeRules: { maxDays: number; feePercent: number }[]
   refundAmount?: number
   promoStartDate?: string // 推广开始日期
+  promoData?: PromoRecord[] // 推广数据
+}
+
+/* ---- 推广数据 Mock ---- */
+const WATERFALL_NAMES = ['推薦瀑布流A', '推薦瀑布流B', '精選瀑布流C']
+
+function genInvincibleStarPromoData(regionName: string, slots: SlotPriceItem[]): PromoRecord[] {
+  const dateMap = new Map<string, SlotPriceItem[]>()
+  slots.forEach(sp => {
+    if (!dateMap.has(sp.date)) dateMap.set(sp.date, [])
+    dateMap.get(sp.date)!.push(sp)
+  })
+  const records: PromoRecord[] = []
+  Array.from(dateMap.entries()).forEach(([date, daySlots]) => {
+    daySlots.forEach((sp, i) => {
+      const imp = 800 + i * 320 + Math.floor(Math.random() * 500)
+      const clk = 60 + i * 25 + Math.floor(Math.random() * 40)
+      records.push({
+        date, region: regionName,
+        waterfallName: WATERFALL_NAMES[i % WATERFALL_NAMES.length],
+        position: (i % 5) + 1, slot: sp.slot,
+        impressions: imp, clicks: clk,
+        clickRate: +((clk / imp) * 100).toFixed(1),
+      })
+    })
+  })
+  return records
+}
+
+function genRevivePromoData(regionName: string, slots: SlotPriceItem[]): PromoRecord[] {
+  return slots.map((sp, i) => {
+    const imp = 1200 + i * 280 + Math.floor(Math.random() * 600)
+    const clk = 90 + i * 18 + Math.floor(Math.random() * 50)
+    return {
+      date: sp.date, region: regionName,
+      waterfallName: WATERFALL_NAMES[i % WATERFALL_NAMES.length],
+      position: (i % 3) + 1,
+      impressions: imp, clicks: clk,
+      clickRate: +((clk / imp) * 100).toFixed(1),
+    }
+  })
 }
 
 /* ---- Mock ---- */
@@ -127,6 +181,14 @@ function genOrder(
       slotPrices.push({ slot: def.slot, date, originalPrice: def.originalPrice, discount: d, actualPrice: Math.round(def.originalPrice * d / 10) })
     })
   }
+  // 为推广中的订单生成推广数据
+  let promoData: PromoRecord[] | undefined
+  if (status === OrderStatus.PROMOTING) {
+    const regionName = REGION_LABEL[region] || '未知'
+    promoData = isRevive
+      ? genRevivePromoData(regionName, slotPrices)
+      : genInvincibleStarPromoData(regionName, slotPrices)
+  }
   const cancelFeeRules = [
     { maxDays: 0, feePercent: 100 },
     { maxDays: 3, feePercent: 80 },
@@ -138,7 +200,7 @@ function genOrder(
     storeId: sid, storeName: sname, purchaseDate: pdate, originalPrice: orig,
     discountPrice: disc, actualPrice: actual, status, orderTime: otime, payTime: ptime,
     promoStartDate: isPast ? '2025-06-15' : '2026-07-16',
-    slotPrices, gradientDiscount: gradDisc, cancelFeeRules,
+    slotPrices, gradientDiscount: gradDisc, cancelFeeRules, promoData,
     ...(refundAmt !== undefined ? { refundAmount: refundAmt } : {}),
   }
 }
@@ -504,9 +566,27 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* 购买商家信息 */}
-      <Card title={<CardTitle icon={<ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text="購買商家信息" />}
-        style={{ marginBottom: 16, borderRadius: 8 }} styles={{ body: { padding: '16px 24px' } }}>
+      {/* Tab 切换区域 */}
+      <div style={{
+        background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden', marginBottom: 16,
+      }}>
+        <Tabs
+          defaultActiveKey="orderInfo"
+          style={{ padding: '0 24px' }}
+          items={[
+            {
+              key: 'orderInfo',
+              label: (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                  <FileTextOutlined style={{ color: '#1890ff' }} /> 訂單信息
+                </span>
+              ),
+              children: (
+                <div style={{ padding: '8px 0 0' }}>
+                  {/* 购买商家信息 */}
+                  <Card title={<CardTitle icon={<ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text="購買商家信息" />}
+                    style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: '16px 24px' } }}>
         <Descriptions column={2} labelStyle={{ color: '#8c8c8c', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
           <Descriptions.Item label="集團">
             <span>{order.groupName}</span>
@@ -517,9 +597,9 @@ export default function OrderDetail() {
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>（ID：{order.storeId}）</span>
           </Descriptions.Item>
         </Descriptions>
-      </Card>
+                  </Card>
 
-      {/* 订单信息 */}
+                  {/* 订单信息 */}
       <Card title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <CardTitle icon={<FileTextOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text="訂單信息" />
@@ -536,7 +616,7 @@ export default function OrderDetail() {
           </div>
         </div>
       }
-        style={{ marginBottom: 16, borderRadius: 8 }} styles={{ body: { padding: '16px 24px' } }}>
+        style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: '16px 24px' } }}>
         <Descriptions column={3} labelStyle={{ color: '#8c8c8c', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
           <Descriptions.Item label="廣告類型">
             <Tag color="gold">{RECOMMEND_TYPE_ICON[order.recommendType]} {RECOMMEND_TYPE_LABEL[order.recommendType]}</Tag>
@@ -549,9 +629,9 @@ export default function OrderDetail() {
           </Descriptions.Item>
           <Descriptions.Item label="算法名稱">{order.promotionName}</Descriptions.Item>
         </Descriptions>
-      </Card>
+                  </Card>
 
-      {/* 购买时段与价格明细 */}
+                  {/* 购买时段与价格明细 */}
       <Card
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
@@ -563,7 +643,7 @@ export default function OrderDetail() {
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>{slotsCollapsed ? '展開' : '收起'}</span>
           </div>
         }
-        style={{ marginBottom: 16, borderRadius: 8 }} styles={{ body: { padding: slotsCollapsed ? '0 24px' : '16px 24px' } }}>
+        style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: slotsCollapsed ? '0 24px' : '16px 24px' } }}>
 
         {!slotsCollapsed && (<>
         {/* 无敌星星：按日期分组 */}
@@ -750,8 +830,116 @@ export default function OrderDetail() {
             ))}
           </div>
         </div>
-        </>)}
-      </Card>
+                  </>)}
+                  </Card>
+                </div>
+              ),
+            },
+            ...(order.status === OrderStatus.PROMOTING && order.promoData && order.promoData.length > 0 ? [{
+              key: 'promoData',
+              label: (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                  <BarChartOutlined style={{ color: '#E8720C' }} /> 推廣數據
+                  <Tag color="processing" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>推廣中</Tag>
+                </span>
+              ),
+              children: (
+                <div style={{ padding: '8px 0 0' }}>
+                  {/* 汇总统计 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+                    {[
+                      { label: '總曝光量', value: order.promoData.reduce((s, d) => s + d.impressions, 0).toLocaleString(), icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
+                      { label: '總點擊量', value: order.promoData.reduce((s, d) => s + d.clicks, 0).toLocaleString(), icon: <AimOutlined />, color: '#52C41A', bg: '#F6FFED' },
+                      { label: '推廣天數', value: `${new Set(order.promoData.map(d => d.date)).size} 天`, icon: <ClockCircleOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+                      { label: '平均點擊率', value: `${(order.promoData.reduce((s, d) => s + d.clickRate, 0) / order.promoData.length).toFixed(1)}%`, icon: <BarChartOutlined />, color: '#E8720C', bg: '#FFF7E6' },
+                    ].map((stat, i) => (
+                      <div key={i} style={{
+                        padding: '16px', borderRadius: 10, background: stat.bg,
+                        border: `1px solid ${stat.color}22`, textAlign: 'center',
+                      }}>
+                        <div style={{ fontSize: 20, color: stat.color, marginBottom: 6 }}>{stat.icon}</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 推广数据明细 - 平铺表格 */}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
+                    {order.recommendType === RecommendType.INVINCIBLE_STAR ? '⭐ 無敵星星' : '🔥 盤活復蘇'} · 推廣數據明細
+                  </div>
+                  <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                      <colgroup>
+                        <col style={{ width: order.recommendType === RecommendType.INVINCIBLE_STAR ? '13%' : '15%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '16%' }} />
+                        <col style={{ width: '10%' }} />
+                        {order.recommendType === RecommendType.INVINCIBLE_STAR && <col style={{ width: '10%' }} />}
+                        <col style={{ width: order.recommendType === RecommendType.INVINCIBLE_STAR ? '13%' : '15%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '12%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#F0F5FF' }}>
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>統計日期</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>商圈</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>瀑布流名稱</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>展示位置</th>
+                          {order.recommendType === RecommendType.INVINCIBLE_STAR && (
+                            <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>展示時段</th>
+                          )}
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>曝光量</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>點擊量</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #D6E4FF', color: '#262626' }}>點擊率</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          let lastDate = ''
+                          return order.promoData.map((rec, ri) => {
+                            const isNewDate = rec.date !== lastDate
+                            lastDate = rec.date
+                            return (
+                              <tr key={ri} style={{
+                                borderTop: isNewDate && ri > 0 ? '2px solid #E8E8E8' : (ri > 0 ? '1px solid #f5f5f5' : 'none'),
+                                background: isNewDate && ri > 0 ? '#FAFFFE' : 'transparent',
+                              }}>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: isNewDate ? 600 : 400, color: isNewDate ? '#1890ff' : '#595959' }}>{rec.date}</td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  <Tag color="blue" style={{ margin: 0, fontSize: 12 }}>{rec.region}</Tag>
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  <Tag color="purple" style={{ margin: 0, fontSize: 12 }}>{rec.waterfallName}</Tag>
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  <Tag color="orange" style={{ margin: 0, fontSize: 12 }}>{rec.position}號位</Tag>
+                                </td>
+                                {order.recommendType === RecommendType.INVINCIBLE_STAR && (
+                                  <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 500 }}>{rec.slot || '-'}</td>
+                                )}
+                                <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  <span style={{
+                                    color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                    fontWeight: 600,
+                                  }}>{rec.clickRate}%</span>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ),
+            }] : []),
+          ]}
+        />
+      </div>
 
       {/* 底部操作栏 */}
       <div className="form-footer">

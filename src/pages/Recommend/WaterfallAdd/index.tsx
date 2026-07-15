@@ -1072,35 +1072,10 @@ export default function WaterfallAdd() {
           )}
 
 
-          {/* 盘活复苏 - 按天定价配置 + 梯度折扣 */}
+          {/* 盘活复苏 - 梯度折扣配置 */}
           {isReviveAlgorithm && (
             <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FundOutlined style={{ fontSize: 14, color: '#722ed1' }} />
-                </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>按天計價配置</span>
-                <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>每日定價</Tag>
-                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-              </div>
-              <div style={{ maxWidth: 400, marginBottom: 24 }}>
-                <Form.Item
-                  label="每天售價"
-                  style={{ marginBottom: 0 }}
-                >
-                  <InputNumber
-                    min={0}
-                    precision={2}
-                    placeholder="請輸入每天售價"
-                    style={{ width: '100%' }}
-                    addonAfter="MOP/天"
-                    value={dailyPrice}
-                    onChange={(value) => setDailyPrice(value ?? undefined)}
-                  />
-                </Form.Item>
-              </div>
               {/* 购买多天折扣配置（梯度） */}
-              <Divider style={{ margin: '16px 0' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
                 <Switch 
@@ -1169,8 +1144,7 @@ export default function WaterfallAdd() {
             </div>
           )}
 
-          {/* 区域计价配置 - 仅无敌星星显示 */}
-          {!isReviveAlgorithm && (
+          {/* 区域计价配置 - 无敌星星和盘活复苏都显示 */}
             <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1245,20 +1219,22 @@ export default function WaterfallAdd() {
                   {/* 时段售价 / 按天售价 */}
                   {isReviveAlgorithm ? (
                     // 盤活復蘇：按天计价
-                    <Form.Item
-                      label="每天售價"
-                      style={{ marginBottom: 0 }}
-                    >
-                      <InputNumber
-                        min={0}
-                        precision={2}
-                        placeholder="請輸入每天售價"
-                        style={{ width: '100%' }}
-                        addonAfter="MOP/天"
-                        value={config.pricing['fullDay']}
-                        onChange={(value) => handleUpdateRegionPricing(config.region, 'fullDay', value)}
-                      />
-                    </Form.Item>
+                    <div style={{ width: '100%' }}>
+                      <Form.Item
+                        label="每天售價"
+                        style={{ marginBottom: 0, maxWidth: 500 }}
+                      >
+                        <InputNumber
+                          min={0}
+                          precision={2}
+                          placeholder="請輸入每天售價"
+                          style={{ width: '100%' }}
+                          addonAfter="MOP/天"
+                          value={config.pricing['fullDay']}
+                          onChange={(value) => handleUpdateRegionPricing(config.region, 'fullDay', value)}
+                        />
+                      </Form.Item>
+                    </div>
                   ) : (
                     // 無敵星星：按时段计价
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
@@ -1356,7 +1332,6 @@ export default function WaterfallAdd() {
               </>
               )}
             </div>
-          )}
 
           {/* 时段个数折扣配置 - 仅无敌星星显示 */}
           {!isReviveAlgorithm && selectedRegions.length > 0 && (
@@ -1448,30 +1423,38 @@ export default function WaterfallAdd() {
                 return
               }
               // 根据树节点ID映射到Region（与地圖規劃商圈数据一致）
-              const nodeId = Number(selectedRegionNode.key)
-              const nodeToRegionMap: Record<number, Region> = {
-                2: Region.KOKSAA,    // 黑沙環區
-                3: Region.COSTA,     // 高士德區
-                4: Region.SANMA,     // 新馬路區
-                5: Region.SANWONG,   // 新皇朝區
-                6: Region.HKM,       // 港珠澳區
-                8: Region.FAHUA,     // 花城市區
-                9: Region.AIRPORT,   // 北安機場
-                10: Region.LHOTEL,   // 左酒店區
-                11: Region.RHOTEL,   // 右酒店區
-                12: Region.UM,       // 澳大專區
-                13: Region.HACS,     // 黑沙灘區
+              const nodeKey = selectedRegionNode.key
+              const keyToRegionMap: Record<string, Region> = {
+                '1-1': Region.KOKSAA,    // 黑沙環區
+                '1-2': Region.COSTA,     // 高士德區
+                '1-3': Region.SANMA,     // 新馬路區
+                '1-4': Region.SANWONG,   // 新皇朝區
+                '1-5': Region.HKM,       // 港珠澳區
+                '2-1': Region.FAHUA,     // 花城市區
+                '2-2': Region.AIRPORT,   // 北安機場
+                '2-3': Region.LHOTEL,    // 左酒店區
+                '2-4': Region.RHOTEL,    // 右酒店區
+                '2-5': Region.UM,        // 澳大專區
+                '2-6': Region.HACS,      // 黑沙灘區
+                '3-1': Region.KOKSAA,    // 拱北區域（暫用黑沙環）
+                '3-2': Region.COSTA,     // 橫琴區域（暫用高士德）
               }
               // 如果选择的是父节点（区域），默认取第一个子商圈
               let regionValue: Region
-              if (nodeId === 1) regionValue = Region.KOKSAA
-              else if (nodeId === 7) regionValue = Region.FAHUA
-              else regionValue = nodeToRegionMap[nodeId] || Region.KOKSAA
+              if (nodeKey === '1') regionValue = Region.KOKSAA
+              else if (nodeKey === '2') regionValue = Region.FAHUA
+              else if (nodeKey === '3') regionValue = Region.KOKSAA
+              else regionValue = keyToRegionMap[nodeKey]
+              
+              if (!regionValue) {
+                message.warning('無法識別所選區域，請重新選擇')
+                return
+              }
               
               // 更换商圈模式
               if (replacingRegion) {
                 if (regionPricingConfigs.find(c => c.region === regionValue && c.region !== replacingRegion)) {
-                  message.warning('該區域已添加計價配置')
+                  message.warning('該商圈已添加計價配置')
                   return
                 }
                 setRegionPricingConfigs(configs => configs.map(c => 
@@ -1487,7 +1470,7 @@ export default function WaterfallAdd() {
               }
               
               if (regionPricingConfigs.find(c => c.region === regionValue)) {
-                message.warning('該區域已添加計價配置')
+                message.warning('該商圈已添加計價配置')
                 return
               }
               handleAddRegionConfig(regionValue, selectedRegionNode.title)
