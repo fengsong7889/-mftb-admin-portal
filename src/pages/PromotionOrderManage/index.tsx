@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message } from 'antd'
+import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
 const { RangePicker } = DatePicker
 import { SearchOutlined, EyeOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -77,6 +77,35 @@ const REGION_LABEL: Record<number, string> = {
   [Region.HACS]: '黑沙灘區',
 }
 
+/** 商圈树形数据（一级：区域，二级：商圈） */
+const REGION_TREE_DATA = [
+  {
+    value: 'macau_area',
+    title: '澳門區域',
+    selectable: true,
+    children: [
+      { value: Region.KOKSAA, title: '黑沙環區' },
+      { value: Region.COSTA, title: '高士德區' },
+      { value: Region.SANMA, title: '新馬路區' },
+      { value: Region.SANWONG, title: '新皇朝區' },
+      { value: Region.HKM, title: '港珠澳區' },
+    ],
+  },
+  {
+    value: 'taipa_area',
+    title: '氹仔區域',
+    selectable: true,
+    children: [
+      { value: Region.FAHUA, title: '花城市區' },
+      { value: Region.AIRPORT, title: '北安機場' },
+      { value: Region.LHOTEL, title: '左酒店區' },
+      { value: Region.RHOTEL, title: '右酒店區' },
+      { value: Region.UM, title: '澳大專區' },
+      { value: Region.HACS, title: '黑沙灘區' },
+    ],
+  },
+]
+
 // 推荐类型枚举
 enum RecommendType {
   INVINCIBLE_STAR = 1,
@@ -113,7 +142,7 @@ interface OrderItem {
   promotionName: string
   app: AppType
   channel: RecommendChannel
-  region: Region
+  region: Region | Region[]  // 所屬商圈（無敵星星可能有多個）
   recommendType: RecommendType
   slotPosition: number
   groupId: string             // 集團ID
@@ -139,7 +168,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·黃金展位',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
-    region: Region.KOKSAA,
+    region: [Region.KOKSAA, Region.FAHUA],
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 3,
     groupId: 'G10001',
@@ -248,7 +277,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·早鳥優惠',
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
-    region: Region.KOKSAA,
+    region: [Region.KOKSAA, Region.SANMA],
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 2,
     groupId: 'G10003',
@@ -336,7 +365,7 @@ const mockOrders: OrderItem[] = [
     promotionName: '無敵星星·夜宵專場',
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
-    region: Region.SANMA,
+    region: [Region.SANMA, Region.FAHUA, Region.KOKSAA],
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 5,
     groupId: 'G10001',
@@ -525,11 +554,11 @@ export default function PromotionOrderManage() {
     { key: 'promotionName', title: '算法名稱' },
     { key: 'app', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
-    ...(orderType !== '盤活復蘇' ? [{ key: 'region', title: '所屬商圈' }] : []),
+    { key: 'region', title: '所屬商圈' },
     { key: 'purchaseContent', title: orderType === '無敵星星' ? '購買時段' : orderType === '盤活復蘇' ? '購買天數' : '購買內容' },
     { key: 'originalPrice', title: '訂單金額' },
     { key: 'discount', title: '優惠金額' },
-    { key: 'actualPrice', title: '實付金額' },
+    { key: 'actualPrice', title: '實付推廣金額' },
     { key: 'status', title: '訂單狀態' },
     { key: 'orderTime', title: '下單時間' },
     { key: 'action', title: '操作' },
@@ -595,13 +624,51 @@ export default function PromotionOrderManage() {
       width: 120,
       render: (channel: RecommendChannel) => CHANNEL_LABEL[channel],
     },
-    ...(orderType !== '盤活復蘇' ? [{
+    {
       title: '所屬商圈',
       dataIndex: 'region',
       key: 'region',
-      width: 100,
-      render: (region: Region) => REGION_LABEL[region],
-    }] : []),
+      width: 220,
+      render: (region: Region | Region[]) => {
+        const regions = Array.isArray(region) ? region : [region]
+        const maxShow = 2
+        const visibleRegions = regions.slice(0, maxShow)
+        const hiddenRegions = regions.slice(maxShow)
+        const hasMore = hiddenRegions.length > 0
+
+        const allContent = (
+          <Space direction="vertical" size={4}>
+            {regions.map((r, index) => (
+              <Tag key={index} color="blue" style={{ margin: 0 }}>
+                {REGION_LABEL[r]}
+              </Tag>
+            ))}
+          </Space>
+        )
+
+        return (
+          <Space direction="vertical" size={2}>
+            {visibleRegions.map((r, index) => (
+              <Tag key={index} color="blue" style={{ margin: 0 }}>
+                {REGION_LABEL[r]}
+              </Tag>
+            ))}
+            {hasMore && (
+              <Popover
+                content={allContent}
+                title="全部所屬商圈"
+                trigger="click"
+                placement="bottomLeft"
+              >
+                <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
+                  +{hiddenRegions.length} 更多
+                </Button>
+              </Popover>
+            )}
+          </Space>
+        )
+      },
+    },
     {
       title: orderType === '無敵星星' ? '購買時段' : orderType === '盤活復蘇' ? '購買天數' : '購買內容',
       key: 'purchaseContent',
@@ -657,7 +724,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '實付金額',
+      title: '實付推廣金額',
       dataIndex: 'actualPrice',
       key: 'actualPrice',
       width: 120,
@@ -832,17 +899,16 @@ export default function PromotionOrderManage() {
               />
             </Form.Item>
             <Form.Item label="推廣商圈">
-              <Select
+              <TreeSelect
                 placeholder="全部"
                 allowClear
+                showSearch
+                treeDefaultExpandAll
+                treeNodeFilterProp="title"
                 value={filters.region}
                 onChange={value => setFilters({ ...filters, region: value })}
-                options={Object.values(Region)
-                  .filter(v => typeof v === 'number')
-                  .map(region => ({
-                    label: REGION_LABEL[region],
-                    value: region,
-                  }))}
+                treeData={REGION_TREE_DATA}
+                style={{ width: '100%' }}
               />
             </Form.Item>
             <Form.Item label="訂單狀態">
