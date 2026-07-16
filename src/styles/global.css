@@ -84,6 +84,12 @@ body {
   100% { transform: scale(1.8); opacity: 0; }
 }
 
+/* 日期卡片选中时段标识圆点脉冲 */
+@keyframes dotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(255,77,79,0.4); }
+  50% { transform: scale(1.25); opacity: 0.85; box-shadow: 0 0 4px 1px rgba(255,77,79,0.25); }
+}
+
 /* 旋转虚线环 */
 @keyframes spinDash {
   0% { transform: translateX(-50%) rotate(0deg); }

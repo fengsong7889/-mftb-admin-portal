@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Tag, Button, Space, Divider, message, Table, Empty, Modal, Select, Card, Form, Input, DatePicker } from 'antd'
-import { ShoppingCartOutlined, CalendarOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ShoppingCartOutlined, CalendarOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
 import dayjs from 'dayjs'
@@ -86,6 +86,8 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [merchantBalance, setMerchantBalance] = useState(15800)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
+  const [isSoldOutModalVisible, setIsSoldOutModalVisible] = useState(false)
+  const [soldOutDetails, setSoldOutDetails] = useState<string[]>([])
   const [currentTime, setCurrentTime] = useState(Date.now())
 
   // 查询条件状态
@@ -280,18 +282,41 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   // 加入购物车
   const handleAddToCart = () => {
     if (selectedDates.length === 0) { message.warning('請先選擇購買日期'); return }
-    const days = selectedDates.length
+    
+    // 当选择天数≥2天时，随机抽取部分日期变为售罄
+    let finalDates = [...selectedDates]
+    if (selectedDates.length >= 2) {
+      const soldOutCount = Math.max(1, Math.floor(selectedDates.length * (0.2 + Math.random() * 0.1)))
+      const indices = [...Array(selectedDates.length).keys()]
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]]
+      }
+      const soldOutIndices = new Set(indices.slice(0, Math.min(soldOutCount, selectedDates.length - 1)))
+      const soldOut: string[] = []
+      finalDates = selectedDates.filter((d, idx) => {
+        if (soldOutIndices.has(idx)) { soldOut.push(d); return false }
+        return true
+      })
+      if (soldOut.length > 0) {
+        setSoldOutDetails(soldOut)
+        setIsSoldOutModalVisible(true)
+      }
+    }
+    
+    if (finalDates.length === 0) { setSelectedDates([]); return }
+    
+    const days = finalDates.length
     const basePrice = inventoryItem.dailyPrice * days
     const discount = currentDiscount?.discount ?? 100
     const salePrice = Math.round(basePrice * discount / 100)
     const newItem: CartItem = {
       key: `cart-${Date.now()}`,
-      dates: [...selectedDates],
+      dates: [...finalDates],
       days, originalPrice: basePrice, discount, salePrice,
       lockTime: Date.now(),
     }
     setCartItems(prev => [...prev, newItem])
-    message.success(`已加購 ${days} 天`)
     setSelectedDates([])
   }
 
@@ -385,6 +410,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
               const monthStr = month.format('YYYY-MM')
               const isSelected = currentMonth.format('YYYY-MM') === monthStr
               const isHovered = hoveredMonth === monthStr
+              const hasSelectedDates = datesByMonth.some(g => g.month === monthStr)
               return (
                 <div
                   key={monthStr}
@@ -392,7 +418,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                   onMouseEnter={() => setHoveredMonth(monthStr)}
                   onMouseLeave={() => setHoveredMonth(null)}
                   style={{
-                    flex: 1, padding: '8px 4px', borderRadius: 6,
+                    flex: 1, padding: '8px 4px', borderRadius: 6, position: 'relative',
                     border: isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
                     background: isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
                     cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
@@ -401,6 +427,14 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                   <span style={{ fontSize: 15, fontWeight: isSelected || isHovered ? 700 : 500, color: isSelected || isHovered ? '#fa8c16' : '#333' }}>
                     {month.format('M月')}
                   </span>
+                  {hasSelectedDates && (
+                    <div style={{
+                      position: 'absolute', top: 3, right: 3,
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: '#ff4d4f',
+                      animation: 'dotPulse 1.5s ease-in-out infinite',
+                    }} />
+                  )}
                 </div>
               )
             })}
@@ -665,6 +699,48 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         <p style={{ margin: '0 0 16px', fontSize: 14, color: '#595959' }}>
           <strong>取消：</strong>保留當前選擇，先完成下單後再選擇其他門店或算法
         </p>
+      </Modal>
+
+      {/* 日期售罄提醒弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span style={{ color: '#ff4d4f', fontWeight: 600 }}>部分日期已售罄</span>
+          </Space>
+        }
+        open={isSoldOutModalVisible}
+        onCancel={() => setIsSoldOutModalVisible(false)}
+        footer={[
+          <Button key="ok" type="primary" onClick={() => setIsSoldOutModalVisible(false)} style={{ background: '#fa8c16', borderColor: '#fa8c16', minWidth: 100 }}>
+            我知道了
+          </Button>
+        ]}
+        width={460}
+      >
+        <div style={{ padding: '8px 0' }}>
+          <p style={{ fontSize: 14, color: '#262626', marginBottom: 12, lineHeight: 1.6 }}>
+            以下日期在提交過程中已被其他商家搶購，已自動為您剔除，剩餘日期已成功加購。
+          </p>
+          <div style={{ 
+            background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 8, 
+            padding: '12px 16px', marginBottom: 16, maxHeight: 200, overflowY: 'auto',
+          }}>
+            {soldOutDetails.map((date, idx) => (
+              <div key={idx} style={{ 
+                display: 'flex', alignItems: 'center', gap: 8, 
+                padding: '6px 0', 
+                borderBottom: idx < soldOutDetails.length - 1 ? '1px dashed #ffccc7' : 'none',
+              }}>
+                <span style={{ fontSize: 13, color: '#ff4d4f' }}>✕</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{date}</span>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 13, color: '#ff4d4f', margin: 0, fontWeight: 500 }}>
+            ⏰ 剩餘日期已為您鎖定，請在 <span style={{ fontWeight: 700, fontSize: 16, color: '#ff4d4f', background: '#fff2f0', padding: '1px 6px', borderRadius: 4, border: '1px solid #ffccc7' }}>1 分鐘內</span> 完成支付，逾期系統將自動釋放鎖定日期供其他商家選購。
+          </p>
+        </div>
       </Modal>
     </div>
   )

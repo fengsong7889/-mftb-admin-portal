@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message, Tabs } from 'antd'
 import {
   ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined,
@@ -7,6 +7,56 @@ import {
   BarChartOutlined, EyeOutlined, AimOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+
+/* ---- 数字动画 Hook ---- */
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+  useEffect(() => {
+    const start = performance.now()
+    const animate = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
+      setValue(Math.round(target * eased))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate)
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+  return value
+}
+
+/* ---- 动画数字组件 ---- */
+function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; suffix?: string; prefix?: string }) {
+  const animated = useCountUp(value)
+  return <>{prefix}{animated.toLocaleString()}{suffix}</>
+}
+
+/* ---- 动画百分比组件 ---- */
+function AnimatedPercent({ values, suffix = '%' }: { values: number[]; suffix?: string }) {
+  const avg = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : 0
+  const [display, setDisplay] = useState(0)
+  const rafRef = useRef<number>(0)
+  useEffect(() => {
+    const start = performance.now()
+    const duration = 1200
+    const animate = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
+      setDisplay(+(avg * eased).toFixed(1))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate)
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [avg])
+  return <>{display}{suffix}</>
+}
 
 /* ---- 枚举 ---- */
 enum OrderStatus {
@@ -181,9 +231,9 @@ function genOrder(
       slotPrices.push({ slot: def.slot, date, originalPrice: def.originalPrice, discount: d, actualPrice: Math.round(def.originalPrice * d / 10) })
     })
   }
-  // 为推广中的订单生成推广数据
+  // 为推广中/已退款（推广中退款）的订单生成推广数据
   let promoData: PromoRecord[] | undefined
-  if (status === OrderStatus.PROMOTING) {
+  if (status === OrderStatus.PROMOTING || (status === OrderStatus.REFUNDED && id !== '5')) {
     const regionName = REGION_LABEL[region] || '未知'
     promoData = isRevive
       ? genRevivePromoData(regionName, slotPrices)
@@ -293,6 +343,7 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<OrderItem | null>(null)
   const [refundModalVisible, setRefundModalVisible] = useState(false)
   const [slotsCollapsed, setSlotsCollapsed] = useState(false)
+  const [promoAnimKey, setPromoAnimKey] = useState(0)
 
   useEffect(() => {
     if (orderId) {
@@ -573,6 +624,7 @@ export default function OrderDetail() {
       }}>
         <Tabs
           defaultActiveKey="orderInfo"
+          onChange={(key) => { if (key === 'promoData') setPromoAnimKey(k => k + 1) }}
           style={{ padding: '0 24px' }}
           items={[
             {
@@ -835,33 +887,85 @@ export default function OrderDetail() {
                 </div>
               ),
             },
-            ...(order.status === OrderStatus.PROMOTING && order.promoData && order.promoData.length > 0 ? [{
+            ...([{
               key: 'promoData',
               label: (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
                   <BarChartOutlined style={{ color: '#E8720C' }} /> 推廣數據
-                  <Tag color="processing" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>推廣中</Tag>
+                  {order.status === OrderStatus.PROMOTING && <Tag color="processing" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>推廣中</Tag>}
+                  {order.status === OrderStatus.PROMOTED && <Tag color="purple" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>已完成</Tag>}
+                  {order.status === OrderStatus.REFUNDED && <Tag color="orange" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>已退款</Tag>}
+                  {order.status === OrderStatus.PENDING_PROMOTION && <Tag color="default" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>待推廣</Tag>}
                 </span>
               ),
               children: (
                 <div style={{ padding: '8px 0 0' }}>
+                  {/* 待推广状态：显示全0 + 提醒 */}
+                  {order.status === OrderStatus.PENDING_PROMOTION && (
+                    <div style={{
+                      background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 8,
+                      padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <ExclamationCircleOutlined style={{ fontSize: 16, color: '#faad14' }} />
+                      <span style={{ fontSize: 13, color: '#8c6e00' }}>當前訂單尚未開始推廣，推廣數據將在推廣開始後產生，請耐心等待。</span>
+                    </div>
+                  )}
+                  {/* 已退款 + 无推广数据：提醒 */}
+                  {order.status === OrderStatus.REFUNDED && !order.promoData?.length && (
+                    <div style={{
+                      background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 8,
+                      padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <ExclamationCircleOutlined style={{ fontSize: 16, color: '#ff4d4f' }} />
+                      <span style={{ fontSize: 13, color: '#a8071a' }}>商家在推廣開始前已退款，暫無推廣數據產生。</span>
+                    </div>
+                  )}
+                  {/* 已退款 + 有推广数据：提醒 */}
+                  {order.status === OrderStatus.REFUNDED && order.promoData && order.promoData.length > 0 && (
+                    <div style={{
+                      background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8,
+                      padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <ExclamationCircleOutlined style={{ fontSize: 16, color: '#fa8c16' }} />
+                      <span style={{ fontSize: 13, color: '#873806' }}>商家在推廣過程中已退款，以下為退款前已產生的推廣數據，僅供參考。</span>
+                    </div>
+                  )}
                   {/* 汇总统计 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
-                    {[
-                      { label: '總曝光量', value: order.promoData.reduce((s, d) => s + d.impressions, 0).toLocaleString(), icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
-                      { label: '總點擊量', value: order.promoData.reduce((s, d) => s + d.clicks, 0).toLocaleString(), icon: <AimOutlined />, color: '#52C41A', bg: '#F6FFED' },
-                      { label: '推廣天數', value: `${new Set(order.promoData.map(d => d.date)).size} 天`, icon: <ClockCircleOutlined />, color: '#722ED1', bg: '#F9F0FF' },
-                      { label: '平均點擊率', value: `${(order.promoData.reduce((s, d) => s + d.clickRate, 0) / order.promoData.length).toFixed(1)}%`, icon: <BarChartOutlined />, color: '#E8720C', bg: '#FFF7E6' },
-                    ].map((stat, i) => (
-                      <div key={i} style={{
-                        padding: '16px', borderRadius: 10, background: stat.bg,
-                        border: `1px solid ${stat.color}22`, textAlign: 'center',
-                      }}>
-                        <div style={{ fontSize: 20, color: stat.color, marginBottom: 6 }}>{stat.icon}</div>
-                        <div style={{ fontSize: 22, fontWeight: 700, color: stat.color }}>{stat.value}</div>
-                        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{stat.label}</div>
-                      </div>
-                    ))}
+                  <div key={promoAnimKey} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+                    {(() => {
+                      const isStar = order.recommendType === RecommendType.INVINCIBLE_STAR
+                      const data = order.promoData || []
+                      const uniqueDates = new Set(data.map(d => d.date)).size
+                      const uniqueSlots = new Set(data.filter(d => d.slot).map(d => `${d.date}-${d.slot}`)).size
+                      const totalImpressions = data.reduce((s, d) => s + d.impressions, 0)
+                      const totalClicks = data.reduce((s, d) => s + d.clicks, 0)
+                      return [
+                        { label: '總曝光量', value: <AnimatedNumber value={totalImpressions} />, icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
+                        { label: '總點擊量', value: <AnimatedNumber value={totalClicks} />, icon: <AimOutlined />, color: '#52C41A', bg: '#F6FFED' },
+                        { label: isStar ? '推廣時段' : '推廣天數', value: isStar ? <AnimatedNumber value={uniqueSlots} suffix=" 個時段" /> : <AnimatedNumber value={uniqueDates} suffix=" 天" />, icon: <ClockCircleOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+                        { label: '平均點擊率', value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: '#E8720C', bg: '#FFF7E6' },
+                      ].map((stat, i) => (
+                        <div key={i} style={{
+                          padding: '16px', borderRadius: 12, background: stat.bg,
+                          border: `1px solid ${stat.color}22`, textAlign: 'center',
+                          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default',
+                          position: 'relative', overflow: 'hidden',
+                        }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.transform = 'translateY(-4px)'
+                            e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = 'none'
+                          }}
+                        >
+                          <div style={{ fontSize: 20, color: stat.color, marginBottom: 6 }}>{stat.icon}</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{stat.label}</div>
+                        </div>
+                      ))
+                    })()}
                   </div>
 
                   {/* 推广数据明细 - 平铺表格 */}
@@ -898,7 +1002,7 @@ export default function OrderDetail() {
                       <tbody>
                         {(() => {
                           let lastDate = ''
-                          return order.promoData.map((rec, ri) => {
+                          return (order.promoData || []).map((rec, ri) => {
                             const isNewDate = rec.date !== lastDate
                             lastDate = rec.date
                             return (
@@ -936,7 +1040,7 @@ export default function OrderDetail() {
                   </div>
                 </div>
               ),
-            }] : []),
+            }]),
           ]}
         />
       </div>

@@ -293,15 +293,15 @@ export function calcSlotPrice(dailyPrice: number, totalAvailableSlots: number): 
 export function getNoDiscountSlotsByRow(date: string): number[] {
   const rowIndex = getRowIndexByDate(date)
 
-  // 按行配置无折扣时段
+  // 按行配置无折扣时段（循环复用6种模式）
   const noDiscountConfig: Record<number, number[]> = {
-    0: [28, 29, 30, 31, 32, 33], // 第1行（07-05）：下午茶
-    1: [42, 43, 44, 45, 46, 47, 0, 1, 2, 3], // 第2行（07-06）：夜宵
-    2: [34, 35, 36, 37, 38, 39, 40, 41], // 第3行（07-07）：晚餐
-    3: [22, 23, 24, 25, 26, 27], // 第4行（07-08）：午餐
-    4: [34, 35, 36, 37, 38, 39, 40, 41], // 第5行（07-09）：晚餐
-    5: [22, 23, 24, 25, 26, 27], // 第6行（07-10）：午餐
+    0: [28, 29, 30, 31, 32, 33], // 下午茶无折扣
+    1: [42, 43, 44, 45, 46, 47, 0, 1, 2, 3], // 夜宵无折扣
+    2: [34, 35, 36, 37, 38, 39, 40, 41], // 晚餐无折扣
+    3: [22, 23, 24, 25, 26, 27], // 午餐无折扣
+    4: [34, 35, 36, 37, 38, 39, 40, 41], // 晚餐无折扣
+    5: [22, 23, 24, 25, 26, 27], // 午餐无折扣
   }
 
-  return noDiscountConfig[rowIndex] || []
+  return noDiscountConfig[rowIndex % 6] || []
 }
