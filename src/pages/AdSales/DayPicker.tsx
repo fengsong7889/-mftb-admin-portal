@@ -69,6 +69,18 @@ const ALGORITHM_BRAND_MAP: Record<string, string> = {
   search_algo: 'shanfeng',
 }
 
+/** Mock数据 - 算法退款配置（对应销售定价中的退款开关） */
+const ALGORITHM_REFUND_CONFIG: Record<string, boolean> = {
+  invincible_star: true,   // 无敌星星：允许退款
+  new_store_ad: false,     // 新店广告：不允许退款
+  hot_revive: true,        // 盘活复苏：允许退款
+  exclusive_merchant: false, // 独家商家：不允许退款
+  traffic_ad: true,        // 流量广告：允许退款
+  guess_you_like: false,   // 猜你喜欢：不允许退款
+  organic_traffic: true,   // 自然流量：允许退款
+  search_algo: true,       // 搜索算法：允许退款
+}
+
 /** BD选项 */
 const BD_OPTIONS = [
   { label: '張偉', value: 'bd-001' },
@@ -122,12 +134,15 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [hasSearched, setHasSearched] = useState(false)
   const [isConflictModalVisible, setIsConflictModalVisible] = useState(false)
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  const [currentAlgorithmRefundEnabled, setCurrentAlgorithmRefundEnabled] = useState<boolean | null>(null)
 
   // 检查购物车是否有加购数据
   const hasCartItems = cartItems.length > 0
 
   // 算法名称变更处理：自动带出品牌，并检查购物车冲突
   const handleAlgorithmChange = (value: string | null) => {
+    // 更新退款配置状态
+    setCurrentAlgorithmRefundEnabled(value ? ALGORITHM_REFUND_CONFIG[value] : null)
     if (hasCartItems && value !== searchAlgorithm) {
       setPendingAction(() => {
         setSearchAlgorithm(value)
@@ -459,6 +474,25 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             </Form.Item>
           </Form>
       </div>
+
+      {/* 不允许退款提醒 */}
+      {currentAlgorithmRefundEnabled === false && (
+        <div style={{
+          padding: '10px 16px',
+          background: '#fff2f0',
+          border: '1px solid #ffccc7',
+          borderRadius: 6,
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <span style={{ fontSize: 16 }}>⚠️</span>
+          <span style={{ fontSize: 13, color: '#cf1322', fontWeight: 500 }}>
+            當前選擇的算法<strong>不允許退款</strong>，下單後無法申請退款，請謹慎選擇。
+          </span>
+        </div>
+      )}
 
       {/* 购物车冲突提醒弹窗 */}
       <Modal

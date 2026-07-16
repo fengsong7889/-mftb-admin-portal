@@ -386,11 +386,6 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 options={[{ label: '閃峰', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} 
               />
             </Form.Item>
-            <Form.Item label="選擇BD">
-              <Select placeholder="全部" value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
-                filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
-                options={[{ label: '張偉', value: 'bd-001' }, { label: '李娜', value: 'bd-002' }, { label: '王強', value: 'bd-003' }, { label: '劉敏', value: 'bd-004' }]} />
-            </Form.Item>
             <Form.Item>
               <div className="search-actions">
                 <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
@@ -688,16 +683,16 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         okButtonProps={{ danger: true }}
       >
         <p style={{ margin: '16px 0 8px', fontSize: 14, lineHeight: 1.8 }}>
-          您當前已有加購數據，同一門店同一訂單僅支持選擇相同算法的廣告位。
+          您當前已有加購數據，同一訂單僅支持選擇相同算法的廣告位。
         </p>
         <p style={{ margin: '0 0 12px', fontSize: 14, color: '#595959' }}>
-          切換算法或門店後，已選的日期將被清空。您可以：
+          切換算法後，已選的日期將被清空。您可以：
         </p>
         <p style={{ margin: '0 0 8px', fontSize: 14, color: '#595959' }}>
           <strong>確認切換：</strong>清空已選日期，重新查詢
         </p>
         <p style={{ margin: '0 0 16px', fontSize: 14, color: '#595959' }}>
-          <strong>取消：</strong>保留當前選擇，先完成下單後再選擇其他門店或算法
+          <strong>取消：</strong>保留當前選擇，先完成下單後再選擇其他算法
         </p>
       </Modal>
 

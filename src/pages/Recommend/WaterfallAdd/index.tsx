@@ -208,6 +208,9 @@ export default function WaterfallAdd() {
     { id: 1, maxDays: 0, feePercent: 100 },
     { id: 2, maxDays: 3, feePercent: 80 },
   ])
+
+  // 退款开关
+  const [refundEnabled, setRefundEnabled] = useState(false)
   
   // 广告位选择（已移除展示位置）
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
@@ -1539,7 +1542,17 @@ export default function WaterfallAdd() {
           <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消訂單，扣費配置</span>
           <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
+            <Switch
+              size="small"
+              checked={refundEnabled}
+              onChange={(checked) => setRefundEnabled(checked)}
+              style={{ background: refundEnabled ? '#52c41a' : '#d9d9d9' }}
+            />
+          </div>
         </div>
+        {refundEnabled ? (
         <Table
           rowKey="id"
           dataSource={cancelFeeRules}
@@ -1629,6 +1642,15 @@ export default function WaterfallAdd() {
             },
           ]}
         />
+        ) : (
+          <div style={{
+            padding: '24px', textAlign: 'center',
+            background: '#fafafa', borderRadius: 8,
+            border: '1px dashed #d9d9d9',
+          }}>
+            <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置扣費規則</span>
+          </div>
+        )}
       </div>
 
       {/* 底部操作按钮 - 固定 */}

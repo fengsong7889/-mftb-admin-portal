@@ -128,6 +128,9 @@ export default function PricingAdd() {
   // 购买多天折扣开关
   const [discountEnabled, setDiscountEnabled] = useState(false)
 
+  // 退款开关
+  const [refundEnabled, setRefundEnabled] = useState(false)
+
   // 取消订单扣费梯度
   const [cancelFeeTiers, setCancelFeeTiers] = useState<CancelFeeTier[]>([
     { key: '1', remainDays: 0, ratio: 100 },
@@ -636,16 +639,35 @@ export default function PricingAdd() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消訂單，扣費配置</span>
             <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
+              <Switch
+                size="small"
+                checked={refundEnabled}
+                onChange={(checked) => setRefundEnabled(checked)}
+                style={{ background: refundEnabled ? '#52c41a' : '#d9d9d9' }}
+              />
+            </div>
           </div>
 
-          <Table
-            dataSource={cancelFeeTiers}
-            columns={cancelFeeColumns}
-            pagination={false}
-            size="middle"
-            rowKey="key"
-            style={{ marginBottom: 12 }}
-          />
+          {refundEnabled ? (
+            <Table
+              dataSource={cancelFeeTiers}
+              columns={cancelFeeColumns}
+              pagination={false}
+              size="middle"
+              rowKey="key"
+              style={{ marginBottom: 12 }}
+            />
+          ) : (
+            <div style={{
+              padding: '24px', textAlign: 'center',
+              background: '#fafafa', borderRadius: 8,
+              border: '1px dashed #d9d9d9',
+            }}>
+              <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置扣費規則</span>
+            </div>
+          )}
         </div>
       </Form>
 

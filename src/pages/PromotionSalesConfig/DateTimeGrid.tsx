@@ -253,11 +253,10 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     setPendingAction(null)
   }
 
-  // 查询：必须选择算法名称（品牌已自动带出）、门店名称
+  // 查询：必须选择算法名称（品牌已自动带出）
   const handleSearch = () => {
     if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
     if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
-    if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
     setHasSearched(true)
     // 自动选中第一个可用日期
     if (allDates.length > 0) {
@@ -509,32 +508,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ]}
               />
             </Form.Item>
-            <Form.Item label="門店名稱">
-              <Select
-                placeholder="支持ID和名稱搜索"
-                value={searchStoreName}
-                onChange={handleStoreChange}
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                options={STORE_OPTIONS}
-              />
-            </Form.Item>
-            <Form.Item label="選擇BD">
-              <Select
-                placeholder="選擇門店後自動帶出"
-                value={searchBD}
-                onChange={(v) => setSearchBD(v)}
-                allowClear
-                showSearch
-                filterOption={(input, option) => {
-                  const keyword = input.toLowerCase()
-                  const label = (option?.label ?? '').toString().toLowerCase()
-                  return label.includes(keyword)
-                }}
-                options={BD_OPTIONS}
-              />
-            </Form.Item>
             <Form.Item label="選擇日期">
               <DatePicker
                 value={searchDate}
@@ -564,21 +537,21 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       >
         <div style={{ padding: '8px 0' }}>
           <p style={{ marginBottom: 12, fontSize: 14, color: '#262626' }}>
-            您當前已有加購數據，同一門店同一訂單僅支持選擇相同算法的廣告位。
+            您當前已有加購數據，同一訂單僅支持選擇相同算法的廣告位。
           </p>
           <p style={{ marginBottom: 0, fontSize: 13, color: '#595959' }}>
-            切換算法或門店後，已選的商圈、時段將被清空。您可以：
+            切換算法後，已選的商圈、時段將被清空。您可以：
           </p>
           <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#595959' }}>
             <li>確認切換：清空已選商圈、時段，重新查詢</li>
-            <li>取消：保留當前選擇，先完成下單後再選擇其他門店或算法</li>
+            <li>取消：保留當前選擇，先完成下單後再選擇其他算法</li>
           </ul>
         </div>
       </Modal>
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
-          <Empty description="請先選擇所屬品牌、算法名稱、門店名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description="請先選擇所屬品牌、算法名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
       <div style={{ display: 'flex', gap: 16 }}>
@@ -661,16 +634,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           </div>
         ) : (
           <div>
-            <div style={{ 
-              padding: '8px 12px', background: '#fff7e6', borderRadius: 6, marginBottom: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              border: '1px solid #ffe58f',
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}>
-                📅 {activeDate.format('YYYY-MM-DD')}（{WEEKDAY_LABELS[activeDate.day()]}）
-              </span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>點擊格子選擇商圈和時段</span>
-            </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             {/* 表头 */}
