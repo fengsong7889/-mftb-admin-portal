@@ -167,6 +167,9 @@ const keyToPath: Record<string, string> = {
   'merchant-order-manage': '/merchant-order-manage',
   // 广告销售（商家推广工具下，复用店铺推广页面）
   'ad-sales': '/ad-sales',
+  // 赠送管理
+  'promotion-gift': '/promotion-gift',
+  'gift-detail': '/gift-detail',
   // 推广通 - 報表分析
   'promotion-report-overview': '/promotion-report-overview',
   'promotion-report-order': '/promotion-report-order',
@@ -415,6 +418,23 @@ const menuItems: MenuItem[] = [
         key: 'ad-sales',
         icon: <ShoppingFilled />,
         label: '銷售訂單',
+      },
+    ],
+  },
+  {
+    key: 'gift-management',
+    icon: <GiftOutlined />,
+    label: '贈送管理',
+    children: [
+      {
+        key: 'promotion-gift',
+        icon: <SendOutlined />,
+        label: '推廣贈送',
+      },
+      {
+        key: 'gift-detail',
+        icon: <FileTextOutlined />,
+        label: '贈送明細',
       },
     ],
   },
