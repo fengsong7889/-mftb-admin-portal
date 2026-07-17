@@ -421,7 +421,7 @@ const menuItems: MenuItem[] = [
       {
         key: 'ad-sales',
         icon: <ShoppingFilled />,
-        label: '銷售訂單',
+        label: '廣告銷售',
       },
     ],
   },

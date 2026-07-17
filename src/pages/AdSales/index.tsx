@@ -126,7 +126,7 @@ export default function AdSales() {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType ? '購買廣告' : '銷售訂單'}
+                {currentStep >= 1 && selectedAlgorithmType ? '購買廣告' : '廣告銷售'}
               </h2>
               {currentStep >= 1 && selectedAlgorithmType && (
                 <div style={{

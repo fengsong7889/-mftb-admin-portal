@@ -866,7 +866,7 @@ export default function PromotionOrderManage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const orderType = searchParams.get('type') || ''
-  // 来源标识：从「銷售訂單」(ad-sales) 进入则返回销售订单，否则返回「店鋪推廣」
+  // 来源标识：从「廣告銷售」(ad-sales) 进入则返回广告销售，否则返回「店鋪推廣」
   const fromSource = searchParams.get('from') || ''
   const backPath = fromSource === 'ad-sales' ? '/ad-sales' : '/promotion-sales-config'
 
