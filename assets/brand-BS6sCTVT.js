@@ -1,0 +1,1 @@
+const l="閃蜂",s="mFood",t=[{label:"全部",value:"all"},{label:s,value:"mFood"},{label:"閃蜂",value:"flashBee"}],A=[{label:s,value:"mFood"},{label:"閃蜂",value:"flashBee"}],N=e=>{if(e===1||e==="1"||e==="閃蜂")return!0;if(typeof e=="string"){const a=e.toLowerCase();if(a==="shanfeng"||a==="flashbee")return!0}return!1};export{t as B,s as a,l as b,A as c,N as i};
