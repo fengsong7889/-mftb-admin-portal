@@ -7,6 +7,7 @@ import {
   SearchOutlined, ReloadOutlined, EyeOutlined,
   FontSizeOutlined, EnvironmentOutlined, WifiOutlined,
 } from '@ant-design/icons'
+import BrandTag from '../../components/BrandTag'
 
 // ============================
 // 常量定义
@@ -202,7 +203,7 @@ export default function HintVerify() {
       sorter: (a, b) => a.priority - b.priority,
       defaultSortOrder: 'ascend',
     },
-    { title: '品牌', dataIndex: 'brand', width: 80 },
+    { title: '所屬品牌', dataIndex: 'brand', width: 80, render: (v: string) => <BrandTag value={v} /> },
     { title: '區域', dataIndex: 'region', width: 100 },
     { title: '人群', dataIndex: 'crowd', width: 90 },
     { title: '生效時間', dataIndex: 'effectDate', width: 190 },
