@@ -391,7 +391,7 @@ export default function GiftDetail() {
       {/* 操作按鈕 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button icon={<ExportOutlined />} onClick={handleExport}>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
             導出
           </Button>
         </div>
