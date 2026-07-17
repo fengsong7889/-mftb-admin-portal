@@ -1,7 +1,12 @@
 import { useState, useMemo } from 'react'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
 const { RangePicker } = DatePicker
-import { SearchOutlined, EyeOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import {
+  SearchOutlined,
+  ExportOutlined,
+  ArrowLeftOutlined,
+  ShoppingCartOutlined,
+} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -754,7 +759,7 @@ export default function PromotionOrderManage() {
       width: 100,
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" size="small" icon={<EyeOutlined />}>
+        <Button type="link" size="small" >
           查看詳情
         </Button>
       ),

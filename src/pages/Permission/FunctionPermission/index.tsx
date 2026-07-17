@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Button, Table, Modal, Form, Input, Tree, Space, message, Tag, Pagination } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import type { Role, UserAccount, MenuPermission } from '../types'
 import { menuPermissionTree, STORAGE_KEYS, PERMISSION_ACTIONS, getMenuActions } from '../types'
@@ -345,16 +349,16 @@ export default function FunctionPermission() {
           >
             {record.status === 'active' ? '停用' : '啟用'}
           </Button>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditPermission(record)}>
+          <Button type="link" size="small"  onClick={() => handleEditPermission(record)}>
             編輯權限
           </Button>
-          <Button type="link" size="small" icon={<UserOutlined />} onClick={() => handleBindUser(record)}>
+          <Button type="link" size="small"  onClick={() => handleBindUser(record)}>
             綁定賬號
           </Button>
           <Button type="link" size="small" onClick={() => handleEditRole(record)}>
             編輯信息
           </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record)}>
+          <Button type="link" size="small" danger  onClick={() => handleDelete(record)}>
             刪除
           </Button>
         </Space>

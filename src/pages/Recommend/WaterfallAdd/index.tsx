@@ -1,7 +1,20 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree, Upload } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, MinusOutlined, DeleteFilled, FileTextOutlined, SettingOutlined, DownOutlined, UploadOutlined, ShopOutlined, PictureOutlined, DollarOutlined, BarChartOutlined, FundOutlined, EditOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  SaveOutlined,
+  PlusOutlined,
+  DeleteFilled,
+  FileTextOutlined,
+  SettingOutlined,
+  DownOutlined,
+  ShopOutlined,
+  PictureOutlined,
+  BarChartOutlined,
+  FundOutlined,
+  EditOutlined,
+} from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -1613,7 +1626,7 @@ export default function WaterfallAdd() {
                       <Button
                         type="link"
                         size="small"
-                        icon={<PlusOutlined />}
+                        
                         onClick={() => {
                           const nextId = cancelFeeRules.length > 0 ? Math.max(...cancelFeeRules.map(r => r.id)) + 1 : 1
                           setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])

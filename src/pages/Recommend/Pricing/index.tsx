@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { Button, Space, Table, Tag, Input, Select, Form } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons'
+import {
+  SearchOutlined,
+  ReloadOutlined,
+  PlusOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
@@ -187,7 +191,7 @@ export default function Pricing() {
           <Button
             type="link"
             size="small"
-            icon={<EyeOutlined />}
+            
             onClick={() => navigate(`/recommend-pricing-add?id=${record.id}&mode=detail`)}
           >
             詳情

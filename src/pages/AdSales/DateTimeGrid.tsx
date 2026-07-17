@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal, TreeSelect, Input, Form } from 'antd'
-import { CalendarOutlined, DeleteOutlined, ShopOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import {
+  CalendarOutlined,
+  ShopOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -1208,7 +1213,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                     type="link"
                     size="small"
                     danger
-                    icon={<DeleteOutlined />}
+                    
                     style={{ padding: 0, fontSize: 12 }}
                     onClick={() => {
                       setCartItems(prev => prev.filter(item => item.key !== record.key))

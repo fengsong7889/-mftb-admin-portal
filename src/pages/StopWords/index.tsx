@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Card, Table, Button, Modal, Input, message, Popconfirm, Tag, Space } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+} from '@ant-design/icons'
 
 interface StopWord {
   id: string
@@ -55,7 +57,7 @@ export default function StopWords() {
           <Button
             type="link"
             size="small"
-            icon={<EditOutlined />}
+            
             onClick={() => handleEdit(record)}
           >
             編輯
@@ -67,7 +69,7 @@ export default function StopWords() {
             okText="確認"
             cancelText="取消"
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            <Button type="link" size="small" danger >
               刪除
             </Button>
           </Popconfirm>

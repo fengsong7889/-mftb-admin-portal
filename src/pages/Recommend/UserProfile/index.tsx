@@ -233,7 +233,7 @@ export default function UserProfile() {
         <Button 
           type="link" 
           size="small" 
-          icon={<EyeOutlined />}
+          
           onClick={() => handleViewDetail(record)}
         >
           查看詳情

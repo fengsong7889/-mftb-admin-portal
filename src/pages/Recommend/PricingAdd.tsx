@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useEffect } from 'react'
 import { Form, Input, InputNumber, Select, Button, Space, message, Tag, Modal, Tree, Switch, Table } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, DeleteFilled, EditOutlined, UploadOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  SaveOutlined,
+  PlusOutlined,
+  DeleteFilled,
+  EditOutlined,
+} from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
@@ -299,7 +305,7 @@ export default function PricingAdd() {
           <Button
             type="link"
             size="small"
-            icon={<PlusOutlined />}
+            
             onClick={handleAddCancelTier}
             disabled={isDetailMode}
             style={{ color: '#E8720C' }}

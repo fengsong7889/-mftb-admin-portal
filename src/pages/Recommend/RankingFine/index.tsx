@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Row, Col, Slider } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExperimentOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  ExperimentOutlined,
+} from '@ant-design/icons'
 import { 
   AppType, 
   RecommendChannel, 
@@ -268,7 +273,7 @@ export default function RankingFine() {
           <Button 
             type="link" 
             size="small" 
-            icon={<EyeOutlined />}
+            
             onClick={() => {
               setViewingRecord(record)
               setDetailVisible(true)
@@ -279,7 +284,7 @@ export default function RankingFine() {
           <Button 
             type="link" 
             size="small" 
-            icon={<ExperimentOutlined />}
+            
             onClick={() => {
               message.success('A/B測試已啟動')
             }}
@@ -289,7 +294,7 @@ export default function RankingFine() {
           <Button 
             type="link" 
             size="small" 
-            icon={<EditOutlined />}
+            
             onClick={() => {
               setEditingRecord(record)
               form.setFieldsValue({

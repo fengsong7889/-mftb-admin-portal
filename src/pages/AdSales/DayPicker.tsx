@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Tag, Button, Space, Divider, message, Table, Empty, Modal, Select, Card, Form, Input, DatePicker } from 'antd'
-import { ShoppingCartOutlined, CalendarOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import {
+  ShoppingCartOutlined,
+  CalendarOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
 import { RECOMMEND_TYPE_CONFIGS } from './types'
@@ -711,7 +716,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 { title: '售價', dataIndex: 'salePrice', key: 'salePrice', width: 80, align: 'right' as const, render: (price: number) => <span style={{ fontSize: 12, color: '#ff4d4f', fontWeight: 600 }}>${price}</span> },
                 { title: '操作', key: 'action', width: 60, align: 'center' as const,
                   render: (_, record) => (
-                    <Button type="link" size="small" danger icon={<DeleteOutlined />} style={{ padding: 0, fontSize: 12 }}
+                    <Button type="link" size="small" danger  style={{ padding: 0, fontSize: 12 }}
                       onClick={() => {
                         setCartItems(prev => prev.map(item => {
                           if (item.key === record.cartKey) {

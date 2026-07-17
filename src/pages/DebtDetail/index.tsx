@@ -4,7 +4,6 @@ import type { TableColumnsType } from 'antd'
 import {
   ArrowLeftOutlined,
   PlusOutlined,
-  DeleteOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -92,7 +91,7 @@ export default function DebtDetail() {
       render: (_, record) => (
         record.canDelete ? (
           <Popconfirm title="確認刪除該還款記錄？" onConfirm={() => handleDelete(record.key)} okText="確認" cancelText="取消">
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>刪除</Button>
+            <Button type="link" size="small" danger >刪除</Button>
           </Popconfirm>
         ) : (
           <span style={{ color: '#999' }}>--</span>

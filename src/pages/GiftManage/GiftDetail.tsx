@@ -7,7 +7,6 @@ import {
   ExportOutlined,
   PlusOutlined,
   MinusCircleOutlined,
-  EyeOutlined,
   UploadOutlined,
   SendOutlined,
 } from '@ant-design/icons'
@@ -24,11 +23,11 @@ const adTypeOptions = [
   { label: '推廣通', value: 'promotion' },
 ]
 
-/** 所屬品牌 */
+/** 所屬品牌（與全局字段枚舉統一：1=閃峰, 2=mFood） */
 const brandOptions = [
   { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
+  { label: '閃峰', value: '1' },
+  { label: 'mFood', value: '2' },
 ]
 
 /** 狀態（含審批流程狀態） */
@@ -48,7 +47,7 @@ const adTypeMap: Record<string, string> = {
   promotion: '推廣通',
 }
 
-const brandMap: Record<string, string> = { mFood: 'mFood', flashBee: '閃蜂' }
+const brandMap: Record<string, string> = { '1': '閃峰', '2': 'mFood' }
 
 const statusMap: Record<string, string> = {
   pending: '待審批',
@@ -70,8 +69,8 @@ const statusColorMap: Record<string, string> = {
 
 interface GiftDetailRecord {
   key: string
-  merchantId: string
-  merchantName: string
+  groupId: string
+  groupName: string
   brand: string
   adType: string
   totalDays: number
@@ -89,9 +88,9 @@ interface GiftDetailRecord {
 const mockData: GiftDetailRecord[] = [
   {
     key: '1',
-    merchantId: 'M001',
-    merchantName: '美味餐廳',
-    brand: 'mFood',
+    groupId: 'G001',
+    groupName: '美味餐廳集團',
+    brand: '2',
     adType: 'invincible_star',
     totalDays: 30,
     usedDays: 12,
@@ -99,15 +98,15 @@ const mockData: GiftDetailRecord[] = [
     giftTime: '2024-01-15',
     expireTime: '2024-07-15',
     status: 'active',
-    reason: '新商戶入駐扶持',
+    reason: '新集團入駐扶持',
     applicant: '張三',
     applyTime: '2024-01-15 10:30:00',
   },
   {
     key: '2',
-    merchantId: 'M002',
-    merchantName: '生鮮超市',
-    brand: 'flashBee',
+    groupId: 'G002',
+    groupName: '生鮮超市集團',
+    brand: '1',
     adType: 'revival',
     totalDays: 60,
     usedDays: 60,
@@ -115,15 +114,15 @@ const mockData: GiftDetailRecord[] = [
     giftTime: '2023-10-01',
     expireTime: '2024-04-01',
     status: 'deducted',
-    reason: '商戶盤活復蘇計劃',
+    reason: '集團盤活復蘇計劃',
     applicant: '李四',
     applyTime: '2023-10-01 14:20:00',
   },
   {
     key: '3',
-    merchantId: 'M003',
-    merchantName: '時尚百貨',
-    brand: 'mFood',
+    groupId: 'G003',
+    groupName: '時尚百貨集團',
+    brand: '2',
     adType: 'promotion',
     totalDays: 90,
     usedDays: 45,
@@ -137,9 +136,9 @@ const mockData: GiftDetailRecord[] = [
   },
   {
     key: '4',
-    merchantId: 'M004',
-    merchantName: '速遞物流',
-    brand: 'flashBee',
+    groupId: 'G004',
+    groupName: '速遞物流集團',
+    brand: '1',
     adType: 'invincible_star',
     totalDays: 15,
     usedDays: 0,
@@ -153,9 +152,9 @@ const mockData: GiftDetailRecord[] = [
   },
   {
     key: '5',
-    merchantId: 'M005',
-    merchantName: '甜品屋',
-    brand: 'mFood',
+    groupId: 'G005',
+    groupName: '甜品屋集團',
+    brand: '2',
     adType: 'invincible_star',
     totalDays: 7,
     usedDays: 0,
@@ -163,15 +162,15 @@ const mockData: GiftDetailRecord[] = [
     giftTime: '-',
     expireTime: '-',
     status: 'pending',
-    reason: '新商戶開業扶持',
+    reason: '新集團開業扶持',
     applicant: '關羽',
     applyTime: '2024-01-20 16:30:00',
   },
   {
     key: '6',
-    merchantId: 'M006',
-    merchantName: '火鍋城',
-    brand: 'flashBee',
+    groupId: 'G006',
+    groupName: '火鍋城集團',
+    brand: '1',
     adType: 'revival',
     totalDays: 14,
     usedDays: 0,
@@ -179,7 +178,7 @@ const mockData: GiftDetailRecord[] = [
     giftTime: '-',
     expireTime: '-',
     status: 'rejected',
-    reason: '商戶盤活復蘇計劃',
+    reason: '集團盤活復蘇計劃',
     applicant: '張飛',
     applyTime: '2024-01-18 09:45:00',
   },
@@ -254,15 +253,15 @@ export default function GiftDetail() {
 
   const columns: TableColumnsType<GiftDetailRecord> = [
     {
-      title: '商戶ID',
-      dataIndex: 'merchantId',
-      key: 'merchantId',
+      title: '集團ID',
+      dataIndex: 'groupId',
+      key: 'groupId',
       width: 100,
     },
     {
-      title: '商戶名稱',
-      dataIndex: 'merchantName',
-      key: 'merchantName',
+      title: '集團名稱',
+      dataIndex: 'groupName',
+      key: 'groupName',
       width: 130,
     },
     {
@@ -291,16 +290,11 @@ export default function GiftDetail() {
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
-      render: (days: number, record: GiftDetailRecord) => {
-        if (record.status === 'pending' || record.status === 'rejected') {
-          return <span style={{ color: '#8C8C8C' }}>- 天</span>
-        }
-        return (
-          <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-            {days} 天
-          </span>
-        )
-      },
+      render: (days: number) => (
+        <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
+          {days} 天
+        </span>
+      ),
     },
     {
       title: '贈送原因',
@@ -322,17 +316,6 @@ export default function GiftDetail() {
       width: 160,
     },
     {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => (
-        <Tag color={statusColorMap[status]}>
-          {statusMap[status] || status}
-        </Tag>
-      ),
-    },
-    {
       title: '操作',
       key: 'action',
       width: 100,
@@ -341,7 +324,6 @@ export default function GiftDetail() {
         <Button
           type="link"
           size="small"
-          icon={<EyeOutlined />}
           onClick={() => handleViewDetail(record)}
         >
           詳情
@@ -378,20 +360,17 @@ export default function GiftDetail() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
-          <Form.Item name="merchantId" label="商戶ID">
-            <Input placeholder="請輸入商戶ID" allowClear />
+          <Form.Item name="groupId" label="集團ID">
+            <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item name="merchantName" label="商戶名稱">
-            <Input placeholder="請輸入商戶名稱" allowClear />
+          <Form.Item name="groupName" label="集團名稱">
+            <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
           <Form.Item name="brand" label="所屬品牌">
             <Select placeholder="全部" allowClear options={brandOptions} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="adType" label="廣告類型">
             <Select placeholder="全部" allowClear options={adTypeOptions} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="status" label="狀態">
-            <Select placeholder="全部" allowClear options={statusOptions} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="dateRange" label="贈送時間">
             <RangePicker style={{ width: '100%' }} />
@@ -462,11 +441,11 @@ export default function GiftDetail() {
         </div>
         <Form form={addForm} layout="vertical" style={{ marginTop: 8 }}>
           <Form.Item
-            name="merchantId"
-            label="商戶ID"
-            rules={[{ required: true, message: '請輸入商戶ID' }]}
+            name="groupId"
+            label="集團ID"
+            rules={[{ required: true, message: '請輸入集團ID' }]}
           >
-            <Input placeholder="請輸入商戶ID" />
+            <Input placeholder="請輸入集團ID" />
           </Form.Item>
 
           <Form.Item
@@ -550,12 +529,12 @@ export default function GiftDetail() {
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>商戶ID</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.merchantId}</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>集團ID</div>
+                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.groupId}</div>
               </div>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>商戶名稱</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.merchantName}</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>集團名稱</div>
+                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.groupName}</div>
               </div>
               <div>
                 <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>所屬品牌</div>
@@ -631,8 +610,8 @@ export default function GiftDetail() {
           <div style={{ marginTop: 16 }}>
             <div style={{ padding: '12px 16px', background: '#FFF7E6', borderRadius: 8, marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: '#595959' }}>
-                <span>商戶：</span>
-                <span style={{ color: '#262626', fontWeight: 600 }}>{currentRecord.merchantName}</span>
+                <span>集團：</span>
+                <span style={{ color: '#262626', fontWeight: 600 }}>{currentRecord.groupName}</span>
                 <span style={{ margin: '0 12px' }}>|</span>
                 <span>廣告類型：</span>
                 <span style={{ color: '#262626', fontWeight: 600 }}>{adTypeMap[currentRecord.adType]}</span>

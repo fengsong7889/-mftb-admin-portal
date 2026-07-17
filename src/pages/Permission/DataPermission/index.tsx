@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Button, Table, Modal, Form, Input, Tree, Space, message, Tag, Tabs, Pagination, Select } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import type { LocationGroup, MerchantGroup } from '../types'
 import { locationOptions, countryOptions, countryLocationMap, merchantOptions, STORAGE_KEYS } from '../types'
@@ -558,10 +562,10 @@ export default function DataPermission() {
           >
             {record.status === 'active' ? '停用' : '啟用'}
           </Button>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditLocation(record)}>
+          <Button type="link" size="small"  onClick={() => handleEditLocation(record)}>
             編輯
           </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteLocation(record)}>
+          <Button type="link" size="small" danger  onClick={() => handleDeleteLocation(record)}>
             刪除
           </Button>
         </Space>
@@ -669,10 +673,10 @@ export default function DataPermission() {
           >
             {record.status === 'active' ? '停用' : '啟用'}
           </Button>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditMerchant(record)}>
+          <Button type="link" size="small"  onClick={() => handleEditMerchant(record)}>
             編輯
           </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteMerchant(record)}>
+          <Button type="link" size="small" danger  onClick={() => handleDeleteMerchant(record)}>
             刪除
           </Button>
         </Space>
