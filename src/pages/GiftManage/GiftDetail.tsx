@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message, Popconfirm, Upload } from 'antd'
+import { useState, useEffect } from 'react'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message, Popconfirm, Upload, Radio } from 'antd'
 import type { TableColumnsType } from 'antd'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions, BRAND_SHANFENG_LABEL } from '../../constants/brand'
@@ -20,9 +20,11 @@ const { TextArea } = Input
 /** 廣告類型 */
 const adTypeOptions = [
   { label: '全部', value: 'all' },
-  { label: '無敵星星', value: 'invincible_star' },
+  { label: '新店廣告', value: 'new_store' },
   { label: '盤活復蘇', value: 'revival' },
-  { label: '推廣通', value: 'promotion' },
+  { label: '獨家商家', value: 'exclusive' },
+  { label: '金牌商家', value: 'gold' },
+  { label: '人氣商家(KA)', value: 'ka' },
 ]
 
 /** 狀態（含審批流程狀態） */
@@ -37,9 +39,11 @@ const statusOptions = [
 ]
 
 const adTypeMap: Record<string, string> = {
-  invincible_star: '無敵星星',
+  new_store: '新店廣告',
   revival: '盤活復蘇',
-  promotion: '推廣通',
+  exclusive: '獨家商家',
+  gold: '金牌商家',
+  ka: '人氣商家(KA)',
 }
 
 const statusMap: Record<string, string> = {
@@ -64,6 +68,8 @@ interface GiftDetailRecord {
   key: string
   groupId: string
   groupName: string
+  storeId: string
+  storeName: string
   brand: string
   adType: string
   totalDays: number
@@ -83,8 +89,10 @@ const mockData: GiftDetailRecord[] = [
     key: '1',
     groupId: 'G001',
     groupName: '美味餐廳集團',
+    storeId: 'S1001',
+    storeName: '澳門總店',
     brand: '2',
-    adType: 'invincible_star',
+    adType: 'new_store',
     totalDays: 30,
     usedDays: 12,
     remainingDays: 18,
@@ -99,8 +107,10 @@ const mockData: GiftDetailRecord[] = [
     key: '2',
     groupId: 'G002',
     groupName: '生鮮超市集團',
+    storeId: 'S1002',
+    storeName: '氹仔分店',
     brand: '1',
-    adType: 'revival',
+    adType: 'gold',
     totalDays: 60,
     usedDays: 60,
     remainingDays: 0,
@@ -115,8 +125,10 @@ const mockData: GiftDetailRecord[] = [
     key: '3',
     groupId: 'G003',
     groupName: '時尚百貨集團',
+    storeId: 'S1003',
+    storeName: '新馬路店',
     brand: '2',
-    adType: 'promotion',
+    adType: 'exclusive',
     totalDays: 90,
     usedDays: 45,
     remainingDays: 45,
@@ -131,8 +143,10 @@ const mockData: GiftDetailRecord[] = [
     key: '4',
     groupId: 'G004',
     groupName: '速遞物流集團',
+    storeId: 'S1004',
+    storeName: '黑沙環店',
     brand: '1',
-    adType: 'invincible_star',
+    adType: 'new_store',
     totalDays: 15,
     usedDays: 0,
     remainingDays: 15,
@@ -147,8 +161,10 @@ const mockData: GiftDetailRecord[] = [
     key: '5',
     groupId: 'G005',
     groupName: '甜品屋集團',
+    storeId: 'S1005',
+    storeName: '官也街老店',
     brand: '2',
-    adType: 'invincible_star',
+    adType: 'new_store',
     totalDays: 7,
     usedDays: 0,
     remainingDays: 0,
@@ -163,8 +179,10 @@ const mockData: GiftDetailRecord[] = [
     key: '6',
     groupId: 'G006',
     groupName: '火鍋城集團',
+    storeId: 'S1006',
+    storeName: '珠海旗艦店',
     brand: '1',
-    adType: 'revival',
+    adType: 'ka',
     totalDays: 14,
     usedDays: 0,
     remainingDays: 0,
@@ -183,6 +201,9 @@ export default function GiftDetail() {
   const [deductModalVisible, setDeductModalVisible] = useState(false)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [addModalVisible, setAddModalVisible] = useState(false)
+  const [isGiftMode, setIsGiftMode] = useState(false)
+  const [successModalVisible, setSuccessModalVisible] = useState(false)
+  const [countdown, setCountdown] = useState(5)
   const [currentRecord, setCurrentRecord] = useState<GiftDetailRecord | null>(null)
   const [deductForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -229,6 +250,22 @@ export default function GiftDetail() {
 
   const handleAdd = () => {
     addForm.resetFields()
+    setIsGiftMode(false)
+    setAddModalVisible(true)
+  }
+
+  const handleGift = (record: GiftDetailRecord) => {
+    setCurrentRecord(record)
+    addForm.resetFields()
+    // 品牌值轉換：1 -> flashBee, 2 -> mFood
+    const brandValue = record.brand === '1' ? 'flashBee' : record.brand === '2' ? 'mFood' : record.brand
+    addForm.setFieldsValue({
+      groupDisplay: `${record.groupId} - ${record.groupName}`,
+      storeDisplay: `${record.storeId} - ${record.storeName}`,
+      brand: brandValue,
+      adType: record.adType,
+    })
+    setIsGiftMode(true)
     setAddModalVisible(true)
   }
 
@@ -237,25 +274,47 @@ export default function GiftDetail() {
       await addForm.validateFields()
       const values = addForm.getFieldsValue()
       console.log('提交贈送申請:', values)
-      message.success('贈送申請已提交，等待審批')
       setAddModalVisible(false)
+      setCountdown(5)
+      setSuccessModalVisible(true)
     } catch (error) {
       console.error('表單驗證失敗:', error)
     }
   }
 
+  // 倒計時邏輯
+  useEffect(() => {
+    if (!successModalVisible) return
+    if (countdown <= 0) {
+      setSuccessModalVisible(false)
+      return
+    }
+    const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [successModalVisible, countdown])
+
   const columns: TableColumnsType<GiftDetailRecord> = [
     {
-      title: '集團ID',
-      dataIndex: 'groupId',
-      key: 'groupId',
-      width: 100,
+      title: '集團ID/集團名稱',
+      key: 'groupInfo',
+      width: 160,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupId}</span>
+          <span>{record.groupName}</span>
+        </Space>
+      ),
     },
     {
-      title: '集團名稱',
-      dataIndex: 'groupName',
-      key: 'groupName',
-      width: 130,
+      title: '門店ID/門店名稱',
+      key: 'storeInfo',
+      width: 160,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeId}</span>
+          <span>{record.storeName}</span>
+        </Space>
+      ),
     },
     {
       title: '所屬品牌',
@@ -314,13 +373,22 @@ export default function GiftDetail() {
       width: 100,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          onClick={() => handleViewDetail(record)}
-        >
-          詳情
-        </Button>
+        <Space size={4}>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => handleViewDetail(record)}
+          >
+            詳情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => handleGift(record)}
+          >
+            贈送
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -353,11 +421,22 @@ export default function GiftDetail() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
-          <Form.Item name="groupId" label="集團ID">
-            <Input placeholder="請輸入集團ID" allowClear />
-          </Form.Item>
-          <Form.Item name="groupName" label="集團名稱">
-            <Input placeholder="請輸入集團名稱" allowClear />
+          <Form.Item name="groupInfo" label="集團ID/名稱">
+            <Select
+              placeholder="支持ID和名稱搜索查詢"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={[
+                { label: 'G001 - 美味餐廳集團', value: 'G001' },
+                { label: 'G002 - 生鮮超市集團', value: 'G002' },
+                { label: 'G003 - 時尚百貨集團', value: 'G003' },
+                { label: 'G004 - 速遞物流集團', value: 'G004' },
+                { label: 'G005 - 甜品屋集團', value: 'G005' },
+                { label: 'G006 - 火鍋城集團', value: 'G006' },
+              ]}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="brand" label="所屬品牌">
             <Select placeholder="全部" allowClear options={brandOptions} style={{ width: '100%' }} />
@@ -365,7 +444,27 @@ export default function GiftDetail() {
           <Form.Item name="adType" label="廣告類型">
             <Select placeholder="全部" allowClear options={adTypeOptions} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="dateRange" label="贈送時間">
+          <Form.Item name="storeInfo" label="門店ID/名稱">
+            <Select
+              placeholder="支持ID和名稱搜索查詢"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={[
+                { label: 'S1001 - 澳門總店', value: 'S1001' },
+                { label: 'S1002 - 氹仔分店', value: 'S1002' },
+                { label: 'S1003 - 新馬路店', value: 'S1003' },
+                { label: 'S1004 - 黑沙環店', value: 'S1004' },
+                { label: 'S1005 - 官也街老店', value: 'S1005' },
+                { label: 'S1006 - 珠海旗艦店', value: 'S1006' },
+              ]}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item name="applicant" label="申請人">
+            <Input placeholder="請輸入申請人" allowClear />
+          </Form.Item>
+          <Form.Item name="applyTime" label="申請時間">
             <RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item className="search-actions">
@@ -407,7 +506,7 @@ export default function GiftDetail() {
           showTotal: (total) => `共 ${total} 條`,
           pageSize: 10,
         }}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1500 }}
       />
 
       {/* 新增贈送彈窗 */}
@@ -433,12 +532,46 @@ export default function GiftDetail() {
           提交後將進入審批中心，審核通過後系統自動為商戶增加對應廣告天數。
         </div>
         <Form form={addForm} layout="vertical" style={{ marginTop: 8 }}>
-          <Form.Item
-            name="groupId"
-            label="集團ID"
-            rules={[{ required: true, message: '請輸入集團ID' }]}
-          >
-            <Input placeholder="請輸入集團ID" />
+          <Form.Item name="groupDisplay" label="集團ID/名稱" rules={[{ required: true, message: '請選擇集團ID/名稱' }]}>
+            {isGiftMode ? (
+              <Input disabled />
+            ) : (
+              <Select
+                showSearch
+                allowClear
+                placeholder="支持ID和名稱搜索查詢"
+                optionFilterProp="label"
+                options={[
+                  { label: 'G001 - 美味餐廳集團', value: 'G001 - 美味餐廳集團' },
+                  { label: 'G002 - 生鮮超市集團', value: 'G002 - 生鮮超市集團' },
+                  { label: 'G003 - 時尚百貨集團', value: 'G003 - 時尚百貨集團' },
+                  { label: 'G004 - 速遞物流集團', value: 'G004 - 速遞物流集團' },
+                  { label: 'G005 - 甜品屋集團', value: 'G005 - 甜品屋集團' },
+                  { label: 'G006 - 火鍋城集團', value: 'G006 - 火鍋城集團' },
+                ]}
+              />
+            )}
+          </Form.Item>
+
+          <Form.Item name="storeDisplay" label="門店ID/名稱" rules={[{ required: true, message: '請選擇門店ID/名稱' }]}>
+            {isGiftMode ? (
+              <Input disabled />
+            ) : (
+              <Select
+                showSearch
+                allowClear
+                placeholder="支持ID和名稱搜索查詢"
+                optionFilterProp="label"
+                options={[
+                  { label: 'S1001 - 澳門總店', value: 'S1001 - 澳門總店' },
+                  { label: 'S1002 - 氹仔分店', value: 'S1002 - 氹仔分店' },
+                  { label: 'S1003 - 新馬路店', value: 'S1003 - 新馬路店' },
+                  { label: 'S1004 - 黑沙環店', value: 'S1004 - 黑沙環店' },
+                  { label: 'S1005 - 官也街老店', value: 'S1005 - 官也街老店' },
+                  { label: 'S1006 - 珠海旗艦店', value: 'S1006 - 珠海旗艦店' },
+                ]}
+              />
+            )}
           </Form.Item>
 
           <Form.Item
@@ -446,10 +579,10 @@ export default function GiftDetail() {
             label="所屬品牌"
             rules={[{ required: true, message: '請選擇所屬品牌' }]}
           >
-            <Select
-              placeholder="請選擇所屬品牌"
-              options={brandOptions.filter(o => o.value !== 'all')}
-            />
+            <Radio.Group disabled={isGiftMode}>
+              <Radio value="flashBee">閃蜂</Radio>
+              <Radio value="mFood">mFood</Radio>
+            </Radio.Group>
           </Form.Item>
 
           <Form.Item
@@ -460,6 +593,7 @@ export default function GiftDetail() {
             <Select
               placeholder="請選擇廣告類型"
               options={adTypeOptions.filter(o => o.value !== 'all')}
+              disabled={isGiftMode}
             />
           </Form.Item>
 
@@ -492,18 +626,77 @@ export default function GiftDetail() {
 
           <Form.Item
             name="certificate"
-            label="申請憑證"
-            rules={[{ required: true, message: '請上傳申請憑證' }]}
+            label="相關憑證"
+            required
+            rules={[{
+              validator: (_, value) => {
+                const fileList = addForm.getFieldValue('certificate')
+                if (!fileList || (Array.isArray(fileList) && fileList.length === 0)) {
+                  return Promise.reject(new Error('請上傳相關憑證'))
+                }
+                return Promise.resolve()
+              }
+            }]}
           >
             <Upload
               beforeUpload={() => false}
-              maxCount={3}
-              accept="image/*,.pdf"
+              maxCount={5}
+              accept=".png,.jpg,.webp,.jpeg,.pdf"
+              listType="picture-card"
+              onChange={({ fileList }) => {
+                addForm.setFieldsValue({ certificate: fileList })
+                addForm.validateFields(['certificate'])
+              }}
             >
-              <Button icon={<UploadOutlined />}>上傳憑證</Button>
+              <div>
+                <PlusOutlined style={{ fontSize: 20, color: '#8C8C8C' }} />
+                <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>上傳憑證</div>
+              </div>
             </Upload>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+              支持 png、jpg、webp、jpeg、pdf；最大 10MB；最多上傳 5 張
+            </div>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 提交成功彈窗 */}
+      <Modal
+        open={successModalVisible}
+        onCancel={() => setSuccessModalVisible(false)}
+        footer={null}
+        width={420}
+        centered
+      >
+        <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+          <div style={{
+            width: 64,
+            height: 64,
+            margin: '0 auto 20px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #52C41A, #73D13D)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(82,196,26,0.3)',
+          }}>
+            <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
+          </div>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+            提交成功
+          </h3>
+          <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+            該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+          </p>
+          <Button
+            type="primary"
+            size="large"
+            onClick={() => setSuccessModalVisible(false)}
+            style={{ minWidth: 120, height: 40, borderRadius: 8 }}
+          >
+            我知道了{countdown > 0 && ` (${countdown}s)`}
+          </Button>
+        </div>
       </Modal>
 
       {/* 詳情彈窗 */}

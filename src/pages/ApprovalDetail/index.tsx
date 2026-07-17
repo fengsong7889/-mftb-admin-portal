@@ -25,7 +25,7 @@ interface ApprovalTimelineItem {
 
 /** 审批详情数据 */
 interface ApprovalDetailData {
-  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge'
+  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift'
   applicant: string
   applyDate: string
   flowNo: string
@@ -61,6 +61,13 @@ interface ApprovalDetailData {
   mergeToAmount?: number
   debtNote?: string
   repaymentStores?: { store: string; channel: string; amount: number; bd: string }[]
+  // 推广赠送
+  giftGroupId?: string
+  giftGroupName?: string
+  giftStoreId?: string
+  giftStoreName?: string
+  giftBrand?: string
+  giftAdType?: string
   // 通用
   groupId?: string
   groupName?: string
@@ -189,6 +196,31 @@ const mockDetails: Record<string, ApprovalDetailData> = {
       { node: '流程創建', time: '2026-01-16 09:19:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
+  gift: {
+    approvalType: 'gift',
+    applicant: '朱棣(002)',
+    applyDate: '2026-07-17 10:00:00',
+    flowNo: 'ZS202607170000',
+    flowStatus: '審核中',
+    brand: '閃蜂',
+    giftGroupId: 'G001',
+    giftGroupName: '廣州酒家',
+    giftStoreId: 'S1001',
+    giftStoreName: '澳門總店',
+    giftBrand: '閃蜂',
+    giftAdType: '新店廣告',
+    documents: [
+      { type: 'image' }, { type: 'image' },
+    ],
+    notes: '商家需要推廣支持，申請贈送推廣金。',
+    hasRevoke: true,
+    timeline: [
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-07-17 10:00:00', approver: '朱棣(002)', status: 'submitted', comment: '' },
+    ],
+  },
 }
 
 const typeTitleMap: Record<string, string> = {
@@ -196,6 +228,7 @@ const typeTitleMap: Record<string, string> = {
   deduct: '扣款審批',
   transfer: '轉賬審批',
   merge: '合併審批',
+  gift: '推廣贈送審批',
 }
 
 export default function ApprovalDetail() {
@@ -551,6 +584,39 @@ export default function ApprovalDetail() {
                 )}
               </div>
             </>
+          )}
+
+          {/* 推广赠送类型 */}
+          {type === 'gift' && (
+            <div className="approval-section">
+              <div className="approval-section-title approval-section-title--purple">贈送配置資訊</div>
+              <div className="approval-info-grid">
+                <div className="approval-info-item">
+                  <span className="approval-info-label">集團ID</span>
+                  <span className="approval-info-value">{data.giftGroupId}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">集團名稱</span>
+                  <span className="approval-info-value">{data.giftGroupName}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">門店ID</span>
+                  <span className="approval-info-value">{data.giftStoreId}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">門店名稱</span>
+                  <span className="approval-info-value">{data.giftStoreName}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">所屬品牌</span>
+                  <span className="approval-info-value">{data.giftBrand}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">廣告類型</span>
+                  <span className="approval-info-value">{data.giftAdType}</span>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* 相关凭证 */}

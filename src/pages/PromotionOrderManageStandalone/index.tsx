@@ -874,8 +874,8 @@ export default function PromotionOrderManage() {
     orderNo: '',
     app: undefined as AppType | undefined,
     channel: undefined as RecommendChannel | undefined,
-    groupName: '',
-    storeName: '',
+    groupInfo: undefined as string | undefined,
+    storeInfo: undefined as string | undefined,
     algorithmKeyword: '',  // 算法名称/ID搜索关键字
     region: undefined as Region | undefined,
     status: undefined as OrderStatus | undefined,
@@ -900,13 +900,13 @@ export default function PromotionOrderManage() {
       if (filters.channel !== undefined && order.channel !== filters.channel) {
         return false
       }
-      if (filters.groupName) {
-        if (!order.groupName.toLowerCase().includes(filters.groupName.toLowerCase())) {
+      if (filters.groupInfo) {
+        if (order.groupId !== filters.groupInfo) {
           return false
         }
       }
-      if (filters.storeName) {
-        if (!order.storeName.toLowerCase().includes(filters.storeName.toLowerCase())) {
+      if (filters.storeInfo) {
+        if (order.storeId !== filters.storeInfo) {
           return false
         }
       }
@@ -1198,8 +1198,8 @@ export default function PromotionOrderManage() {
       orderNo: '',
       app: undefined,
       channel: undefined,
-      groupName: '',
-      storeName: '',
+      groupInfo: undefined,
+      storeInfo: undefined,
       algorithmKeyword: '',
       region: undefined,
       status: undefined,
@@ -1321,20 +1321,38 @@ export default function PromotionOrderManage() {
                   }))}
               />
             </Form.Item>
-            <Form.Item label="集團名稱">
-              <Input
-                placeholder="請輸入集團名稱"
+            <Form.Item label="集團ID/名稱">
+              <Select
+                showSearch
                 allowClear
-                value={filters.groupName}
-                onChange={e => setFilters({ ...filters, groupName: e.target.value })}
+                placeholder="支持ID和名稱搜索查詢"
+                optionFilterProp="label"
+                value={filters.groupInfo}
+                onChange={val => setFilters({ ...filters, groupInfo: val })}
+                options={[
+                  { label: 'G10001 - 澳門美食集團', value: 'G10001' },
+                  { label: 'G10002 - 閃蜂餐飲連鎖', value: 'G10002' },
+                  { label: 'G10003 - 大灣區餐飲集團', value: 'G10003' },
+                ]}
+                style={{ width: '100%' }}
               />
             </Form.Item>
-            <Form.Item label="門店名稱">
-              <Input
-                placeholder="請輸入門店名稱"
+            <Form.Item label="門店ID/名稱">
+              <Select
+                showSearch
                 allowClear
-                value={filters.storeName}
-                onChange={e => setFilters({ ...filters, storeName: e.target.value })}
+                placeholder="支持ID和名稱搜索查詢"
+                optionFilterProp="label"
+                value={filters.storeInfo}
+                onChange={val => setFilters({ ...filters, storeInfo: val })}
+                options={[
+                  { label: 'S20001 - 澳門總店', value: 'S20001' },
+                  { label: 'S20002 - 氹仔分店', value: 'S20002' },
+                  { label: 'S20003 - 珠海旗艦店', value: 'S20003' },
+                  { label: 'S20004 - 黑沙環店', value: 'S20004' },
+                  { label: 'S20005 - 新馬路店', value: 'S20005' },
+                ]}
+                style={{ width: '100%' }}
               />
             </Form.Item>
             <Form.Item label="算法名稱">
