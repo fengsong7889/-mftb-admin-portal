@@ -414,14 +414,14 @@ const menuItems: MenuItem[] = [
         label: '銷售定價',
       },
       {
-        key: 'ad-sales',
-        icon: <ShoppingFilled />,
-        label: '銷售訂單',
-      },
-      {
         key: 'gift-detail',
         icon: <GiftOutlined />,
         label: '推廣贈送',
+      },
+      {
+        key: 'ad-sales',
+        icon: <ShoppingFilled />,
+        label: '銷售訂單',
       },
     ],
   },
