@@ -402,7 +402,7 @@ export default function AlgorithmAdd() {
                 </div>
               </div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
-                兩區可獨立配置配送範圍，對應區域的商家匹配對應大區的計算規則
+                澳門大區的商家匹配澳門的配送範圍，氹仔大區的商家匹配氹仔的配送範圍，兩區獨立計算、互不影響
               </div>
             </Form.Item>
           )}
