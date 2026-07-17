@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal, TreeSelect, Input, Form } from 'antd'
+import { Card, Tag, Space, message, Empty, Button, Table, Select, Radio, Modal, TreeSelect, Input, Form } from 'antd'
 import {
   CalendarOutlined,
   ShopOutlined,
@@ -189,7 +189,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
-  const [searchDate, setSearchDate] = useState<Dayjs | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [isConflictModalVisible, setIsConflictModalVisible] = useState(false)
@@ -292,7 +291,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     setSearchBrand(null)
     setSearchAlgorithm(null)
     setSearchStoreName(null)
-    setSearchDate(null)
     setSearchBD(null)
     setHasSearched(false)
   }
@@ -553,14 +551,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   return label.includes(keyword)
                 }}
                 options={BD_OPTIONS}
-              />
-            </Form.Item>
-            <Form.Item label="選擇日期">
-              <DatePicker
-                value={searchDate}
-                onChange={(date) => setSearchDate(date)}
-                format="YYYY-MM-DD"
-                style={{ width: '100%' }}
               />
             </Form.Item>
             <Form.Item>
