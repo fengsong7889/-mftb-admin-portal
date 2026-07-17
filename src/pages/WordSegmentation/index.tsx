@@ -178,13 +178,15 @@ export default function WordSegmentation() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<ImportOutlined />} onClick={handleBatchImport}>批量導入</Button>
-          <Button icon={<ExportOutlined />} onClick={handleBatchExport}>數據導出</Button>
+        <div className="action-section-left">
+          <Button className="btn-import" icon={<ImportOutlined />} onClick={handleBatchImport}>批量導入</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleBatchExport}>導出</Button>
           <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>批量刪除</Button>
+        </div>
+        <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增分詞</Button>
-        </Space>
-        {configComponent}
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

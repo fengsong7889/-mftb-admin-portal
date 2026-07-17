@@ -603,11 +603,13 @@ export default function HotSearchConfig() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增熱搜詞</Button>
+        <div className="action-section-left">
           <Button icon={<EyeOutlined />} onClick={() => navigate('/hot-search-verify')}>效果預覽</Button>
-        </Space>
-        {configComponent}
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增熱搜詞</Button>
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

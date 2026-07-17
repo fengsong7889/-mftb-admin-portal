@@ -798,8 +798,10 @@ export default function SearchWeightConfig() {
 
       {/* 功能區域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<ExportOutlined />}>數據導出</Button>
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+        </div>
+        <div className="action-section-right">
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -816,8 +818,8 @@ export default function SearchWeightConfig() {
           >
             新增商戶
           </Button>
-        </Space>
-        {configComponent}
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表區域 */}

@@ -340,11 +340,13 @@ export default function ApprovalCenter() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<ExportOutlined />}>數據導出</Button>
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
           <Button icon={<UserOutlined />} onClick={handleNotify}>審批人通知</Button>
-        </Space>
-              {configComponent}
+        </div>
+        <div className="action-section-right">
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

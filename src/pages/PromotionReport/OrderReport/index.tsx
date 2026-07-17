@@ -395,7 +395,7 @@ export default function PromotionReportOrder() {
             <Space>
               <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
               <Button icon={<ReloadOutlined />}>重置</Button>
-              <Button icon={<ExportOutlined />} onClick={handleExport}>導出Excel</Button>
+              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
             </Space>
           </div>
         </form>

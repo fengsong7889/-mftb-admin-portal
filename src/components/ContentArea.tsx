@@ -1,4 +1,4 @@
-import { Button, Space, Input, Select, DatePicker, Table } from 'antd'
+import { Button, Input, Select, DatePicker, Table } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -49,14 +49,16 @@ export default function ContentArea() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>
+            導出
+          </Button>
+        </div>
+        <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />}>
             新增
           </Button>
-          <Button icon={<ExportOutlined />}>
-            導出
-          </Button>
-        </Space>
+        </div>
       </div>
 
       {/* 数据列表区域 */}

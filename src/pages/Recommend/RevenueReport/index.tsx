@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Card, Col, Row, Select, Space, Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DownloadOutlined } from '@ant-design/icons'
+import { ExportOutlined } from '@ant-design/icons'
 import AppTabs from '../components/AppTabs'
 import { AppType, RecommendChannel, AlgorithmType, RECOMMEND_CHANNEL_OPTIONS, ALGORITHM_TYPE_OPTIONS } from '../constants'
 
@@ -86,7 +86,7 @@ export default function RevenueReport() {
             options={ALGORITHM_TYPE_OPTIONS}
           />
           <Button type="primary">查詢</Button>
-          <Button icon={<DownloadOutlined />}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
         </Space>
       </Card>
 

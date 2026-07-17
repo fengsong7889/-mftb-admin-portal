@@ -226,7 +226,7 @@ export default function DebtReconcile() {
         </div>
         <div className="debt-stat-card debt-stat-card--green">
           <ExportOutlined className="debt-stat-icon-btn" />
-          <span className="debt-stat-label">數據導出</span>
+          <span className="debt-stat-label">導出</span>
         </div>
         <div className="debt-stat-card debt-stat-card--purple">
           <ImportOutlined className="debt-stat-icon-btn" />

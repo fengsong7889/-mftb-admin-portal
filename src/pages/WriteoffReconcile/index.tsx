@@ -1,5 +1,5 @@
 import { useState , useMemo } from 'react'
-import { Button, Space, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
+import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
@@ -347,12 +347,14 @@ export default function WriteoffReconcile() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<ExportOutlined />} style={{ color: '#52C41A', borderColor: '#52C41A' }}>
-            數據導出
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>
+            導出
           </Button>
-        </Space>
-              {configComponent}
+        </div>
+        <div className="action-section-right">
+          {configComponent}
+        </div>
       </div>
 
       {/* 商家明细列表 */}

@@ -1,15 +1,20 @@
 import { useState } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message, Popconfirm } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message, Popconfirm, Upload } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
   ExportOutlined,
+  PlusOutlined,
   MinusCircleOutlined,
   EyeOutlined,
+  UploadOutlined,
+  SendOutlined,
 } from '@ant-design/icons'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
 
 const { RangePicker } = DatePicker
+const { TextArea } = Input
 
 /** 廣告類型 */
 const adTypeOptions = [
@@ -26,9 +31,12 @@ const brandOptions = [
   { label: '閃蜂', value: 'flashBee' },
 ]
 
-/** 狀態 */
+/** 狀態（含審批流程狀態） */
 const statusOptions = [
   { label: '全部', value: 'all' },
+  { label: '待審批', value: 'pending' },
+  { label: '已通過', value: 'approved' },
+  { label: '已駁回', value: 'rejected' },
   { label: '有效', value: 'active' },
   { label: '已扣除', value: 'deducted' },
   { label: '已過期', value: 'expired' },
@@ -43,12 +51,18 @@ const adTypeMap: Record<string, string> = {
 const brandMap: Record<string, string> = { mFood: 'mFood', flashBee: '閃蜂' }
 
 const statusMap: Record<string, string> = {
+  pending: '待審批',
+  approved: '已通過',
+  rejected: '已駁回',
   active: '有效',
   deducted: '已扣除',
   expired: '已過期',
 }
 
 const statusColorMap: Record<string, string> = {
+  pending: 'processing',
+  approved: 'success',
+  rejected: 'error',
   active: 'success',
   deducted: 'default',
   expired: 'warning',
@@ -67,6 +81,8 @@ interface GiftDetailRecord {
   expireTime: string
   status: string
   reason: string
+  applicant?: string
+  applyTime?: string
 }
 
 /** Mock 數據 */
@@ -84,6 +100,8 @@ const mockData: GiftDetailRecord[] = [
     expireTime: '2024-07-15',
     status: 'active',
     reason: '新商戶入駐扶持',
+    applicant: '張三',
+    applyTime: '2024-01-15 10:30:00',
   },
   {
     key: '2',
@@ -98,6 +116,8 @@ const mockData: GiftDetailRecord[] = [
     expireTime: '2024-04-01',
     status: 'deducted',
     reason: '商戶盤活復蘇計劃',
+    applicant: '李四',
+    applyTime: '2023-10-01 14:20:00',
   },
   {
     key: '3',
@@ -112,6 +132,8 @@ const mockData: GiftDetailRecord[] = [
     expireTime: '2024-12-31',
     status: 'active',
     reason: '大促活動支持',
+    applicant: '王五',
+    applyTime: '2024-01-01 09:15:00',
   },
   {
     key: '4',
@@ -126,13 +148,49 @@ const mockData: GiftDetailRecord[] = [
     expireTime: '2023-12-01',
     status: 'expired',
     reason: '合作夥伴獎勵',
+    applicant: '趙六',
+    applyTime: '2023-06-01 11:00:00',
+  },
+  {
+    key: '5',
+    merchantId: 'M005',
+    merchantName: '甜品屋',
+    brand: 'mFood',
+    adType: 'invincible_star',
+    totalDays: 7,
+    usedDays: 0,
+    remainingDays: 0,
+    giftTime: '-',
+    expireTime: '-',
+    status: 'pending',
+    reason: '新商戶開業扶持',
+    applicant: '關羽',
+    applyTime: '2024-01-20 16:30:00',
+  },
+  {
+    key: '6',
+    merchantId: 'M006',
+    merchantName: '火鍋城',
+    brand: 'flashBee',
+    adType: 'revival',
+    totalDays: 14,
+    usedDays: 0,
+    remainingDays: 0,
+    giftTime: '-',
+    expireTime: '-',
+    status: 'rejected',
+    reason: '商戶盤活復蘇計劃',
+    applicant: '張飛',
+    applyTime: '2024-01-18 09:45:00',
   },
 ]
 
 export default function GiftDetail() {
   const [form] = Form.useForm()
+  const [addForm] = Form.useForm()
   const [deductModalVisible, setDeductModalVisible] = useState(false)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [addModalVisible, setAddModalVisible] = useState(false)
   const [currentRecord, setCurrentRecord] = useState<GiftDetailRecord | null>(null)
   const [deductForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -177,6 +235,23 @@ export default function GiftDetail() {
     }
   }
 
+  const handleAdd = () => {
+    addForm.resetFields()
+    setAddModalVisible(true)
+  }
+
+  const handleAddOk = async () => {
+    try {
+      await addForm.validateFields()
+      const values = addForm.getFieldsValue()
+      console.log('提交贈送申請:', values)
+      message.success('贈送申請已提交，等待審批')
+      setAddModalVisible(false)
+    } catch (error) {
+      console.error('表單驗證失敗:', error)
+    }
+  }
+
   const columns: TableColumnsType<GiftDetailRecord> = [
     {
       title: '商戶ID',
@@ -188,7 +263,7 @@ export default function GiftDetail() {
       title: '商戶名稱',
       dataIndex: 'merchantName',
       key: 'merchantName',
-      width: 150,
+      width: 130,
     },
     {
       title: '所屬品牌',
@@ -201,45 +276,50 @@ export default function GiftDetail() {
       title: '廣告類型',
       dataIndex: 'adType',
       key: 'adType',
-      width: 120,
+      width: 110,
       render: (adType: string) => adTypeMap[adType] || adType,
     },
     {
-      title: '總贈送天數',
+      title: '贈送天數',
       dataIndex: 'totalDays',
       key: 'totalDays',
-      width: 110,
-      render: (days: number) => `${days} 天`,
-    },
-    {
-      title: '已使用天數',
-      dataIndex: 'usedDays',
-      key: 'usedDays',
-      width: 110,
+      width: 100,
       render: (days: number) => `${days} 天`,
     },
     {
       title: '剩餘天數',
       dataIndex: 'remainingDays',
       key: 'remainingDays',
-      width: 110,
-      render: (days: number) => (
-        <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-          {days} 天
-        </span>
-      ),
+      width: 100,
+      render: (days: number, record: GiftDetailRecord) => {
+        if (record.status === 'pending' || record.status === 'rejected') {
+          return <span style={{ color: '#8C8C8C' }}>- 天</span>
+        }
+        return (
+          <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
+            {days} 天
+          </span>
+        )
+      },
     },
     {
-      title: '贈送時間',
-      dataIndex: 'giftTime',
-      key: 'giftTime',
-      width: 120,
+      title: '贈送原因',
+      dataIndex: 'reason',
+      key: 'reason',
+      width: 180,
+      ellipsis: true,
     },
     {
-      title: '過期時間',
-      dataIndex: 'expireTime',
-      key: 'expireTime',
-      width: 120,
+      title: '申請人',
+      dataIndex: 'applicant',
+      key: 'applicant',
+      width: 100,
+    },
+    {
+      title: '申請時間',
+      dataIndex: 'applyTime',
+      key: 'applyTime',
+      width: 160,
     },
     {
       title: '狀態',
@@ -255,22 +335,27 @@ export default function GiftDetail() {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 100,
       fixed: 'right',
       render: (_, record) => (
-        <Space size={4}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
-            詳情
-          </Button>
-          {record.status === 'active' && record.remainingDays > 0 && (
-            <Button type="link" size="small" danger icon={<MinusCircleOutlined />} onClick={() => handleDeduct(record)}>
-              扣除
-            </Button>
-          )}
-        </Space>
+        <Button
+          type="link"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => handleViewDetail(record)}
+        >
+          詳情
+        </Button>
       ),
     },
   ]
+
+  /** 列字段配置 */
+  const columnMeta = columns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent, applyConfig } = useColumnConfig('gift-detail', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+  const configuredColumns = applyConfig(columns)
 
   return (
     <div className="content-area">
@@ -283,10 +368,10 @@ export default function GiftDetail() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#262626' }}>
-          贈送明細
+          推廣贈送
         </h2>
         <p style={{ margin: '8px 0 0', fontSize: 13, color: '#8C8C8C' }}>
-          查看商戶廣告贈送數據，支持扣除操作
+          為商戶贈送廣告推廣天數，提交後進入審批流程，審核通過後自動加天數
         </p>
       </div>
 
@@ -325,15 +410,23 @@ export default function GiftDetail() {
       </div>
 
       {/* 操作按鈕 */}
-      <div style={{ marginBottom: 16 }}>
-        <Button icon={<ExportOutlined />} onClick={handleExport}>
-          導出
-        </Button>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button icon={<ExportOutlined />} onClick={handleExport}>
+            導出
+          </Button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            新增贈送
+          </Button>
+          {configComponent}
+        </div>
       </div>
 
       {/* 表格 */}
       <Table
-        columns={columns}
+        columns={configuredColumns}
         dataSource={dataSource}
         loading={loading}
         pagination={{
@@ -344,6 +437,102 @@ export default function GiftDetail() {
         }}
         scroll={{ x: 1400 }}
       />
+
+      {/* 新增贈送彈窗 */}
+      <Modal
+        title="新增推廣贈送"
+        open={addModalVisible}
+        onOk={handleAddOk}
+        onCancel={() => setAddModalVisible(false)}
+        okText="提交申請"
+        cancelText="取消"
+        width={600}
+        okButtonProps={{ icon: <SendOutlined /> }}
+      >
+        <div style={{
+          padding: '10px 16px',
+          background: '#FFF7E6',
+          borderRadius: 8,
+          marginBottom: 16,
+          fontSize: 12,
+          color: '#8C6D1F',
+          lineHeight: 1.8,
+        }}>
+          提交後將進入審批中心，審核通過後系統自動為商戶增加對應廣告天數。
+        </div>
+        <Form form={addForm} layout="vertical" style={{ marginTop: 8 }}>
+          <Form.Item
+            name="merchantId"
+            label="商戶ID"
+            rules={[{ required: true, message: '請輸入商戶ID' }]}
+          >
+            <Input placeholder="請輸入商戶ID" />
+          </Form.Item>
+
+          <Form.Item
+            name="brand"
+            label="所屬品牌"
+            rules={[{ required: true, message: '請選擇所屬品牌' }]}
+          >
+            <Select
+              placeholder="請選擇所屬品牌"
+              options={brandOptions.filter(o => o.value !== 'all')}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="adType"
+            label="廣告類型"
+            rules={[{ required: true, message: '請選擇廣告類型' }]}
+          >
+            <Select
+              placeholder="請選擇廣告類型"
+              options={adTypeOptions.filter(o => o.value !== 'all')}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="giftDays"
+            label="贈送天數"
+            rules={[{ required: true, message: '請輸入贈送天數' }]}
+          >
+            <InputNumber
+              placeholder="請輸入贈送天數"
+              min={1}
+              max={365}
+              style={{ width: '100%' }}
+              addonAfter="天"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="reason"
+            label="贈送原因"
+            rules={[{ required: true, message: '請輸入贈送原因' }]}
+          >
+            <TextArea
+              placeholder="請輸入贈送原因，例如：新商戶入駐扶持、商戶盤活復蘇計劃等"
+              rows={3}
+              maxLength={200}
+              showCount
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="certificate"
+            label="申請憑證"
+            rules={[{ required: true, message: '請上傳申請憑證' }]}
+          >
+            <Upload
+              beforeUpload={() => false}
+              maxCount={3}
+              accept="image/*,.pdf"
+            >
+              <Button icon={<UploadOutlined />}>上傳憑證</Button>
+            </Upload>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* 詳情彈窗 */}
       <Modal
@@ -377,18 +566,8 @@ export default function GiftDetail() {
                 <div style={{ fontSize: 14, color: '#262626' }}>{adTypeMap[currentRecord.adType]}</div>
               </div>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>總贈送天數</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>贈送天數</div>
                 <div style={{ fontSize: 14, color: '#262626', fontWeight: 600 }}>{currentRecord.totalDays} 天</div>
-              </div>
-              <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>已使用天數</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.usedDays} 天</div>
-              </div>
-              <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>剩餘天數</div>
-                <div style={{ fontSize: 16, color: currentRecord.remainingDays > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 700 }}>
-                  {currentRecord.remainingDays} 天
-                </div>
               </div>
               <div>
                 <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>狀態</div>
@@ -397,13 +576,35 @@ export default function GiftDetail() {
                 </Tag>
               </div>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>贈送時間</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.giftTime}</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>申請人</div>
+                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.applicant || '-'}</div>
               </div>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>過期時間</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.expireTime}</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>申請時間</div>
+                <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.applyTime || '-'}</div>
               </div>
+              {currentRecord.status !== 'pending' && currentRecord.status !== 'rejected' && (
+                <>
+                  <div>
+                    <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>已使用天數</div>
+                    <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.usedDays} 天</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>剩餘天數</div>
+                    <div style={{ fontSize: 16, color: currentRecord.remainingDays > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 700 }}>
+                      {currentRecord.remainingDays} 天
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>贈送時間</div>
+                    <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.giftTime}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>過期時間</div>
+                    <div style={{ fontSize: 14, color: '#262626' }}>{currentRecord.expireTime}</div>
+                  </div>
+                </>
+              )}
             </div>
             <div style={{ marginTop: 16 }}>
               <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>贈送原因</div>

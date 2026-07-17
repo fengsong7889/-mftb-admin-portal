@@ -1,5 +1,5 @@
 import {useState, useMemo } from 'react'
-import { Button, Space, Input, Select, DatePicker, Table, Form, Card, Row, Col, Statistic } from 'antd'
+import { Button, Input, Select, DatePicker, Table, Form, Card, Row, Col, Statistic } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
@@ -289,10 +289,12 @@ export default function HotSearchReport() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<ExportOutlined />}>數據導出</Button>
-        </Space>
-              {configComponent}
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+        </div>
+        <div className="action-section-right">
+          {configComponent}
+        </div>
       </div>
 
       {/* 统计卡片 */}

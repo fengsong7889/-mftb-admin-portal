@@ -6,7 +6,7 @@ import {
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  SearchOutlined, CheckCircleOutlined, WarningOutlined,
+  SearchOutlined, CheckCircleOutlined, ReloadOutlined,
   ScissorOutlined, StopOutlined, SwapOutlined,
   ShopOutlined, InfoCircleOutlined, EnvironmentOutlined,
   KeyOutlined, TagOutlined,
@@ -554,7 +554,7 @@ function SearchVerifyPage() {
               disabled={!keyword.trim()} style={{ flex: 1 }}>
               校驗搜索
             </Button>
-            <Button size="large" icon={<WarningOutlined />} onClick={handleReset}>重置</Button>
+            <Button size="large" icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
           </Col>
         </Row>
       </Card>

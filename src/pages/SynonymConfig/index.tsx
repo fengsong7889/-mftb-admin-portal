@@ -392,17 +392,19 @@ export default function SynonymConfig() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增同義詞</Button>
+        <div className="action-section-left">
           <Button icon={<DeleteOutlined />} danger onClick={handleBatchDelete}>批量刪除</Button>
-          <Button icon={<ImportOutlined />}>批量導入</Button>
-          <Button icon={<ExportOutlined />}>導出</Button>
-        </Space>
-        <span style={{ color: '#999', fontSize: 13 }}>
-          共 <b style={{ color: '#E8720C' }}>{data.length}</b> 組同義詞
-          {selectedRowKeys.length > 0 && <span>，已選 <b>{selectedRowKeys.length}</b> 條</span>}
-        </span>
-              {configComponent}
+          <Button className="btn-import" icon={<ImportOutlined />}>批量導入</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          <span style={{ color: '#999', fontSize: 13 }}>
+            共 <b style={{ color: '#E8720C' }}>{data.length}</b> 組同義詞
+            {selectedRowKeys.length > 0 && <span>，已選 <b>{selectedRowKeys.length}</b> 條</span>}
+          </span>
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增同義詞</Button>
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

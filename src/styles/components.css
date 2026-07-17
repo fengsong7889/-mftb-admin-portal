@@ -722,8 +722,21 @@
   margin-bottom: 16px;
   display: flex;
   align-items: center;
-  /* 新增/操作按钮统一右对齐 */
+  /* 默认右对齐；左侧操作按钮通过 .action-section-left(margin-right:auto) 推至列表左侧 */
   justify-content: flex-end;
+  gap: 8px;
+}
+/* 左侧操作按钮组：导出及其它操作按钮（批量导入/批量删除/效果预览等），统一位于列表左侧 */
+.action-section-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+/* 右侧操作按钮组：仅允许「新增」按钮与「设置/列配置」按钮 */
+.action-section-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -796,15 +809,42 @@
   border-color: #F59432;
   box-shadow: 0 4px 10px rgba(232, 114, 12, 0.35);
 }
-/* 导出按钮 - 描边 + 绿色点缀 */
+/* 中性描边按钮（效果预览/审批人通知/商户合并等）默认灰、hover 品牌橙 */
 .action-section .ant-btn-default {
   border-color: #D9D9D9;
   color: #595959;
 }
 .action-section .ant-btn-default:hover {
+  border-color: #E8720C;
+  color: #E8720C;
+}
+/* 语义操作按钮：导出（绿 #52C41A） - 常显绿色描边 + 绿字 */
+.action-section .ant-btn.btn-export,
+.btn-export.ant-btn {
   border-color: #52C41A;
   color: #52C41A;
 }
+.action-section .ant-btn.btn-export:hover,
+.action-section .ant-btn.btn-export:focus,
+.btn-export.ant-btn:hover,
+.btn-export.ant-btn:focus {
+  border-color: #73D13D;
+  color: #73D13D;
+}
+/* 语义操作按钮：批量导入/上传（蓝 #1890FF） - 常显蓝色描边 + 蓝字 */
+.action-section .ant-btn.btn-import,
+.btn-import.ant-btn {
+  border-color: #1890FF;
+  color: #1890FF;
+}
+.action-section .ant-btn.btn-import:hover,
+.action-section .ant-btn.btn-import:focus,
+.btn-import.ant-btn:hover,
+.btn-import.ant-btn:focus {
+  border-color: #40A9FF;
+  color: #40A9FF;
+}
+/* 删除类使用 antd danger（红 #FF4D4F），无需额外样式 */
 
 /* --- 表格操作按钮（详情/编辑/删除/审批等） --- */
 .ant-table .ant-btn-link {

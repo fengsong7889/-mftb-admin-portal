@@ -57,10 +57,33 @@
 .approval-detail-right {
   width: 380px;
   flex-shrink: 0;
+  align-self: flex-start;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
   background: #fff;
   border-radius: 8px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* 右侧审批流滚动条 */
+.approval-detail-right::-webkit-scrollbar {
+  width: 6px;
+}
+
+.approval-detail-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.approval-detail-right::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+.approval-detail-right::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
 }
 
 /* 信息区块 */

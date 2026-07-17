@@ -379,11 +379,13 @@ export default function HotSearchLibrary() {
 
       {/* 操作区域 */}
       <div className="action-section">
-        <Space>
+        <div className="action-section-left">
+          <Button className="btn-import" icon={<ImportOutlined />} onClick={() => message.info('批量導入功能開發中')}>批量導入</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={() => message.success('導出成功')}>導出</Button>
+        </div>
+        <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增熱搜詞</Button>
-          <Button icon={<ImportOutlined />} onClick={() => message.info('批量導入功能開發中')}>批量導入</Button>
-          <Button icon={<ExportOutlined />} onClick={() => message.success('導出成功')}>數據導出</Button>
-        </Space>
+        </div>
       </div>
 
       {/* 列表区域 */}

@@ -377,12 +377,14 @@ export default function HintConfig() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<ExportOutlined />}>數據導出</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>新增</Button>
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}> 導出</Button>
           <Button icon={<EyeOutlined />} onClick={() => navigate('/hint-verify')}>效果預覽</Button>
-        </Space>
-              {configComponent}
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>新增</Button>
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

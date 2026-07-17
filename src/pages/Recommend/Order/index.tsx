@@ -217,11 +217,13 @@ export default function Order() {
       </div>
 
       {/* 功能区域 */}
-      <div className="action-section">
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
           <Button type="primary" icon={<PlusOutlined />}>新增訂單</Button>
         </Space>
-        {configComponent}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

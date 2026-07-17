@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Button, Space, Table, Tag, Select, Form, DatePicker } from 'antd'
+import { Button, Table, Tag, Select, Form, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DownloadOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ExportOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
   AppType, AlgorithmType, RecommendChannel,
   APP_OPTIONS,
@@ -196,9 +196,9 @@ export default function EffectReport() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
-          <Button icon={<DownloadOutlined />}>導出</Button>
-        </Space>
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+        </div>
       </div>
 
       {/* 列表区域 */}

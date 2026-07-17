@@ -239,17 +239,19 @@ export default function AccountBalance() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <Space>
+        <div className="action-section-left">
           {hasPermission('edit') && (
             <Button icon={<MergeCellsOutlined />}>
               商戶合併
             </Button>
           )}
-          <Button icon={<ExportOutlined />}>
-            數據導出
+          <Button className="btn-export" icon={<ExportOutlined />}>
+            導出
           </Button>
-        </Space>
-        {configComponent}
+        </div>
+        <div className="action-section-right">
+          {configComponent}
+        </div>
       </div>
 
       {/* 数据列表区域 */}
