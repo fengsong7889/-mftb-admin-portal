@@ -402,7 +402,7 @@ export default function AlgorithmAdd() {
                 </div>
               </div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
-                各大區可獨立配置配送範圍，短程 / 中程 / 遠程可多選
+                兩區可獨立配置配送範圍，對應區域的商家匹配對應大區的計算規則
               </div>
             </Form.Item>
           )}
