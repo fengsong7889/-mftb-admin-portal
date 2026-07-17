@@ -10,14 +10,9 @@ import {
 } from '@ant-design/icons'
 import { Line, Column, Pie, Area } from '@ant-design/charts'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
 
 const terminalOptions = [
   { label: '全部', value: 'all' },

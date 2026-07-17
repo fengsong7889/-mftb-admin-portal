@@ -9,15 +9,10 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-/** 所屬品牌 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
 
 /** 審批類型 */
 const approvalTypeOptions = [
@@ -53,7 +48,6 @@ const approvalStatusOptions = [
   { label: '待審批', value: 'pending' },
 ]
 
-const brandMap: Record<string, string> = { mFood: 'mFood', flashBee: '閃蜂' }
 const approvalTypeMap: Record<string, string> = { recharge: '充值', deduct: '扣款', transfer: '轉賬', merge: '合併' }
 const flowStatusMap: Record<string, string> = { pending: '審批中', approved: '已通過', rejected: '已駁回', cancelled: '已撤銷' }
 const approvalStatusMap: Record<string, string> = { approved: '通過', rejected: '駁回', pending: '待審批' }
@@ -189,17 +183,7 @@ export default function ApprovalCenter() {
       key: 'brand',
       width: 80,
       render: (v: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {brandMap[v] || v}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     { title: '流程編號', dataIndex: 'flowNo', key: 'flowNo', width: 130 },
@@ -383,7 +367,7 @@ export default function ApprovalCenter() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
               <div><span style={{ color: '#999' }}>集團ID：</span>{detailRecord.groupId}</div>
               <div><span style={{ color: '#999' }}>集團名稱：</span>{detailRecord.groupName}</div>
-              <div><span style={{ color: '#999' }}>所屬品牌：</span>{brandMap[detailRecord.brand]}</div>
+              <div><span style={{ color: '#999' }}>所屬品牌：</span><BrandTag value={detailRecord.brand} /></div>
               <div><span style={{ color: '#999' }}>流程編號：</span>{detailRecord.flowNo}</div>
               <div><span style={{ color: '#999' }}>審批類型：</span>{approvalTypeMap[detailRecord.approvalType]}</div>
               <div><span style={{ color: '#999' }}>申請人：</span>{detailRecord.applicant}</div>

@@ -7,15 +7,10 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-/** 品牌选项 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
 
 /** 业务频道选项 */
 const channelOptions = [
@@ -57,10 +52,6 @@ interface DetailRecord {
 }
 
 /** 品牌映射 */
-const brandMap: Record<string, string> = {
-  mFood: 'mFood',
-  flashBee: '閃蜂',
-}
 
 /** 交易类型映射 */
 const tradeTypeMap: Record<string, string> = {
@@ -205,17 +196,7 @@ export default function DetailQuery() {
       key: 'brand',
       width: 100,
       render: (val: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: val === '閃蜂' || val === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: val === '閃蜂' || val === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: val === '閃蜂' || val === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {brandMap[val] || val}
-        </Tag>
+        <BrandTag value={val} />
       ),
     },
     {

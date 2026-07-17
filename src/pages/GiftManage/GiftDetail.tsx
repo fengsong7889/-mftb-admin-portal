@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message, Popconfirm, Upload } from 'antd'
 import type { TableColumnsType } from 'antd'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions, BRAND_SHANFENG_LABEL } from '../../constants/brand'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -23,13 +25,6 @@ const adTypeOptions = [
   { label: '推廣通', value: 'promotion' },
 ]
 
-/** 所屬品牌（與全局字段枚舉統一：1=閃峰, 2=mFood） */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: '閃峰', value: '1' },
-  { label: 'mFood', value: '2' },
-]
-
 /** 狀態（含審批流程狀態） */
 const statusOptions = [
   { label: '全部', value: 'all' },
@@ -46,8 +41,6 @@ const adTypeMap: Record<string, string> = {
   revival: '盤活復蘇',
   promotion: '推廣通',
 }
-
-const brandMap: Record<string, string> = { '1': '閃峰', '2': 'mFood' }
 
 const statusMap: Record<string, string> = {
   pending: '待審批',
@@ -269,7 +262,7 @@ export default function GiftDetail() {
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (brand: string) => brandMap[brand] || brand,
+      render: (brand: string) => <BrandTag value={brand} />,
     },
     {
       title: '廣告類型',
@@ -538,7 +531,7 @@ export default function GiftDetail() {
               </div>
               <div>
                 <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>所屬品牌</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{brandMap[currentRecord.brand]}</div>
+                <div style={{ fontSize: 14, color: '#262626' }}><BrandTag value={currentRecord.brand} /></div>
               </div>
               <div>
                 <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>廣告類型</div>

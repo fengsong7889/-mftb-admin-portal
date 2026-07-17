@@ -461,7 +461,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             </Form.Item>
             <Form.Item label="所屬品牌">
               <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
-                options={[{ label: '閃峰', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
+                options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
             </Form.Item>
             <Form.Item label="門店名稱">
               <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />

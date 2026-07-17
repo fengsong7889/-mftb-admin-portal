@@ -9,6 +9,8 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -18,13 +20,6 @@ const userPermissions = {
   canBoost: true,   // 是否有加分權限
   canDemote: true,  // 是否有減分權限
 }
-
-/** 所屬品牌 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
 
 /** 搜索頻道 */
 const searchChannelOptions = [
@@ -100,7 +95,6 @@ interface InterventionRecord {
   operateTime: string
 }
 
-const brandMap: Record<string, string> = { mFood: 'mFood', flashBee: '閃蜂' }
 const channelMap: Record<string, string> = { home: '大首頁', takeaway: '外賣頻道', groupBuy: '團購頻道', supermarket: '超市頻道' }
 const adjustMethodMap: Record<string, string> = { discount: '分數打折', deduction: '固定扣分', fixedBoost: '固定加分', percentBoost: '分數加成' }
 const adjustMethodColorMap: Record<string, string> = { discount: 'orange', deduction: 'red', fixedBoost: 'green', percentBoost: 'blue' }
@@ -656,17 +650,7 @@ export default function SearchWeightConfig() {
       key: 'brand',
       width: 90,
       render: (v: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {brandMap[v] || v}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     {
@@ -1138,7 +1122,7 @@ export default function SearchWeightConfig() {
               </div>
               <div>
                 <span style={{ color: '#999' }}>所屬品牌：</span>
-                {brandMap[detailRecord.brand]}
+                <BrandTag value={detailRecord.brand} />
               </div>
               <div>
                 <span style={{ color: '#999' }}>干預方向：</span>

@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload, Card } from 'antd'
 import type { TableColumnsType } from 'antd'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -13,14 +15,6 @@ import {
 const { TextArea } = Input
 
 /* ===== 常量配置 ===== */
-
-/** 品牌 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mfood' },
-  { label: '閃峰', value: 'flashBee' },
-]
-const brandMap: Record<string, string> = { mfood: 'mFood', flashBee: '閃峰' }
 
 /** 搜索入口下拉选项 */
 const entryOptions = [
@@ -250,17 +244,7 @@ export default function HotSearchLibrary() {
     {
       title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 90,
       render: (v: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {brandMap[v]}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     {

@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { Tabs } from 'antd'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import BrandTag from '../../../components/BrandTag'
 
 const { Text } = Typography
 
@@ -469,7 +470,7 @@ export default function DimensionStrategy() {
 
     const actCols: TableColumnsType<ActivityRecord> = [
       { title: '活動類型', dataIndex: 'activityType', key: 'activityType', width: 120, render: (v: string) => <Tag color="blue">{activityTypeMap[v] || v}</Tag> },
-      { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> },
+      { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
       { title: '加分值', dataIndex: 'boostValue', key: 'boostValue', width: 80, render: (v: number, r: ActivityRecord) => r.boostMethod === 'weight_multiply' ? `${r.weightValue}×${r.multiplyValue}` : v },
       { title: '加分方式', dataIndex: 'boostMethod', key: 'boostMethod', width: 100, render: (v: BoostMethod) => <Tag color={v === 'fixed' ? 'blue' : 'purple'}>{boostMethodMap[v]}</Tag> },
       { title: '狀態', dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? '啟用' : '停用'}</Tag> },
@@ -489,7 +490,7 @@ export default function DimensionStrategy() {
 
     const adCols: TableColumnsType<AdRecord> = [
       { title: '廣告類型', dataIndex: 'adType', key: 'adType', width: 120, render: (v: string) => <Tag color="orange">{adTypeMap[v] || v}</Tag> },
-      { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> },
+      { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
       { title: '狀態', dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? '啟用' : '停用'}</Tag> },
       { title: '說明', dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
       { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },

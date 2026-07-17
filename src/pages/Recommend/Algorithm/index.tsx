@@ -5,6 +5,7 @@ import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS } from '../constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import BrandTag from '../../../components/BrandTag'
 
 /** 各业务类型对应的算法类型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
@@ -93,39 +94,29 @@ const TIME_SLOT_LABEL: Record<string, string> = {
   nightSnack: '夜宵(20:00-02:00)',
 }
 
-const BRAND_LABEL: Record<AppType, string> = {
-  [AppType.SHANFENG]: '閃峰',
-  [AppType.MFOOD]: 'mFood',
-}
-
-const BRAND_COLOR: Record<AppType, string> = {
-  [AppType.SHANFENG]: 'blue',
-  [AppType.MFOOD]: 'green',
-}
-
 export const mockAlgorithmData: AlgorithmRecord[] = [
   // 無敵星星 - 8条
-  { id: 1, name: '無敵星星-美食外賣閃峰版', code: 'ALG_STAR_001', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 2, name: '無敵星星-美食外賣閃峰版B', code: 'ALG_STAR_002', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 3, name: '無敵星星-超市百貨閃峰版', code: 'ALG_STAR_003', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 4, name: '無敵星星-團購到店閃峰版', code: 'ALG_STAR_004', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 1, name: '無敵星星-美食外賣閃蜂版', code: 'ALG_STAR_001', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 2, name: '無敵星星-美食外賣閃蜂版B', code: 'ALG_STAR_002', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 3, name: '無敵星星-超市百貨閃蜂版', code: 'ALG_STAR_003', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 4, name: '無敵星星-團購到店閃蜂版', code: 'ALG_STAR_004', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
   { id: 5, name: '無敵星星-美食外賣mFood版', code: 'ALG_STAR_005', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
   { id: 6, name: '無敵星星-美食外賣mFood版B', code: 'ALG_STAR_006', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 7, name: '無敵星星-超市百貨mFood版', code: 'ALG_STAR_007', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
   { id: 8, name: '無敵星星-團購到店mFood版', code: 'ALG_STAR_008', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   // 盤活復蘇 - 7条
-  { id: 9, name: '盤活復蘇-美食外賣閃峰版', code: 'ALG_REV_001', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 10, name: '盤活復蘇-美食外賣閃峰版B', code: 'ALG_REV_002', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 11, name: '盤活復蘇-超市百貨閃峰版', code: 'ALG_REV_003', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 12, name: '盤活復蘇-團購到店閃峰版', code: 'ALG_REV_004', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 9, name: '盤活復蘇-美食外賣閃蜂版', code: 'ALG_REV_001', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 10, name: '盤活復蘇-美食外賣閃蜂版B', code: 'ALG_REV_002', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 11, name: '盤活復蘇-超市百貨閃蜂版', code: 'ALG_REV_003', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 12, name: '盤活復蘇-團購到店閃蜂版', code: 'ALG_REV_004', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 13, name: '盤活復蘇-美食外賣mFood版', code: 'ALG_REV_005', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
   { id: 14, name: '盤活復蘇-美食外賣mFood版B', code: 'ALG_REV_006', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 15, name: '盤活復蘇-超市百貨mFood版', code: 'ALG_REV_007', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
   // 團購到店 - 無敵星星
-  { id: 16, name: '無敵星星-團購到店閃峰版', code: 'ALG_STAR_009', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 16, name: '無敵星星-團購到店閃蜂版', code: 'ALG_STAR_009', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 17, name: '無敵星星-團購到店mFood版', code: 'ALG_STAR_010', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
   // 團購到店 - 盤活復蘇
-  { id: 18, name: '盤活復蘇-團購到店閃峰版', code: 'ALG_REV_008', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 18, name: '盤活復蘇-團購到店閃蜂版', code: 'ALG_REV_008', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 19, name: '盤活復蘇-團購到店mFood版', code: 'ALG_REV_009', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
 ]
 
@@ -241,7 +232,7 @@ export default function Algorithm() {
     { title: '算法名稱', dataIndex: 'name', key: 'name', width: 200 },
     {
       title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
-      render: (v: AppType) => v ? <Tag color={BRAND_COLOR[v]}>{BRAND_LABEL[v]}</Tag> : '-',
+      render: (v: AppType) => v ? <BrandTag value={v} /> : '-',
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,

@@ -7,6 +7,7 @@ import {
   SearchOutlined, ReloadOutlined, EyeOutlined,
   FireOutlined, WifiOutlined,
 } from '@ant-design/icons'
+import { BRAND_OPTIONS as BRAND_OPTIONS_IMPORT } from '../../constants/brand'
 
 // ============================
 // 常量定义
@@ -17,11 +18,6 @@ const CHANNELS = [
   { key: 'takeaway', label: '外賣頻道' },
   { key: 'groupBuy', label: '團購頻道' },
   { key: 'supermarket', label: '超市頻道' },
-]
-
-const BRAND_OPTIONS = [
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
 ]
 
 const REGION_OPTIONS = [
@@ -164,7 +160,7 @@ export default function HotSearchVerify() {
             </Col>
             <Col span={6}>
               <Form.Item label="所屬品牌" style={{ marginBottom: 12 }}>
-                <Select value={brand} onChange={setBrand} options={BRAND_OPTIONS} />
+                <Select value={brand} onChange={setBrand} options={BRAND_OPTIONS_IMPORT} />
               </Form.Item>
             </Col>
             <Col span={6}>

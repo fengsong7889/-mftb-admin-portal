@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Button, Space, Table, Tag, Select, Form, Input, message, Modal } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import BrandTag from '../../components/BrandTag'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -22,12 +23,6 @@ export interface WaterfallSlotConfig {
   status: 'active' | 'inactive'
   updatedBy: string
   updatedAt: string
-}
-
-/** 品牌标签 */
-const APP_LABEL: Record<string, string> = {
-  shanfeng: '閃峰',
-  mfood: 'mFood',
 }
 
 /** 状态标签 */
@@ -52,17 +47,14 @@ const PROMOTION_NAMES = [
   '搜索算法品牌周',
 ]
 
-/** Mock数据 - 覆盖所有业务频道+页面位置+时段组合 */
+/** Mock数据 - 24条，閃蜂和mFood各12条 */
 export const mockData: WaterfallSlotConfig[] = (() => {
-  // 业务频道 × 页面位置的有效组合
-  const combos: { businessChannel: string; pageLocation: string }[] = [
-    { businessChannel: 'food', pageLocation: 'home' },
-    { businessChannel: 'food', pageLocation: 'delivery' },
-    { businessChannel: 'supermarket', pageLocation: 'home' },
-    { businessChannel: 'supermarket', pageLocation: 'supermarket' },
-    { businessChannel: 'groupBuy', pageLocation: 'home' },
-    { businessChannel: 'groupBuy', pageLocation: 'groupBuy' },
-  ]
+  const businessChannels = ['food', 'supermarket', 'groupBuy']
+  const pageLocations: Record<string, string> = {
+    food: 'home',
+    supermarket: 'supermarket',
+    groupBuy: 'groupBuy',
+  }
   const timeSlots = ['breakfast', 'lunch', 'afternoonTea', 'dinner', 'midnightSnack']
   const algorithmTypes = ['invincibleStar', 'youLike', 'newShopAd', 'activateAd', 'exclusiveShop']
   const algorithmNames: Record<string, string[]> = {
@@ -74,39 +66,45 @@ export const mockData: WaterfallSlotConfig[] = (() => {
   }
   const users = ['admin', 'operator', 'user001', 'user002']
   
+  // 生成品牌数组：12个闪峰 + 12个mFood，然后随机洗牌
+  const appPool = [...Array(12).fill('shanfeng'), ...Array(12).fill('mfood')]
+  for (let i = appPool.length - 1; i > 0; i--) {
+    const j = Math.floor(pseudoRandom(i * 31) * (i + 1))
+    ;[appPool[i], appPool[j]] = [appPool[j], appPool[i]]
+  }
+  
   const data: WaterfallSlotConfig[] = []
   let id = 1
   
-  // 每个组合 × 每个时段生成 2-3 条数据
-  for (const combo of combos) {
-    for (const ts of timeSlots) {
-      const count = 2 + Math.floor(pseudoRandom(id * 77) * 2)
-      for (let j = 0; j < count; j++) {
-        const seed = id * 100
-        const algorithmType = algorithmTypes[Math.floor(pseudoRandom(seed + 1) * algorithmTypes.length)]
-        const names = algorithmNames[algorithmType]
-        const algorithmName = names[Math.floor(pseudoRandom(seed + 2) * names.length)]
-        
-        data.push({
-          id,
-          promotionName: PROMOTION_NAMES[(id - 1) % PROMOTION_NAMES.length],
-          slotIndex: j + 1,
-          businessChannel: combo.businessChannel,
-          pageLocation: combo.pageLocation,
-          timeSlot: ts,
-          app: 'shanfeng',
-          position: j + 1,
-          algorithmId: Math.floor(pseudoRandom(seed + 3) * 10) + 1,
-          algorithmName,
-          algorithmType,
-          weight: Math.floor(pseudoRandom(seed + 4) * 50) + 40,
-          status: pseudoRandom(seed + 5) > 0.2 ? 'active' : 'inactive',
-          updatedBy: users[Math.floor(pseudoRandom(seed + 6) * users.length)],
-          updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} ${String(8 + Math.floor(pseudoRandom(seed + 7) * 12)).padStart(2, '0')}:${String(Math.floor(pseudoRandom(seed + 8) * 60)).padStart(2, '0')}:00`,
-        })
-        id++
-      }
-    }
+  // 生成24条数据，品牌随机交错分布
+  for (let i = 0; i < 24; i++) {
+    const seed = id * 100
+    const app = appPool[i]
+    const businessChannel = businessChannels[i % businessChannels.length]
+    const pageLocation = pageLocations[businessChannel]
+    const ts = timeSlots[i % timeSlots.length]
+    const algorithmType = algorithmTypes[Math.floor(pseudoRandom(seed + 1) * algorithmTypes.length)]
+    const names = algorithmNames[algorithmType]
+    const algorithmName = names[Math.floor(pseudoRandom(seed + 2) * names.length)]
+    
+    data.push({
+      id,
+      promotionName: PROMOTION_NAMES[(id - 1) % PROMOTION_NAMES.length],
+      slotIndex: (i % 5) + 1,
+      businessChannel,
+      pageLocation,
+      timeSlot: ts,
+      app,
+      position: (i % 5) + 1,
+      algorithmId: Math.floor(pseudoRandom(seed + 3) * 10) + 1,
+      algorithmName,
+      algorithmType,
+      weight: Math.floor(pseudoRandom(seed + 4) * 50) + 40,
+      status: pseudoRandom(seed + 5) > 0.2 ? 'active' : 'inactive',
+      updatedBy: users[Math.floor(pseudoRandom(seed + 6) * users.length)],
+      updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} ${String(8 + Math.floor(pseudoRandom(seed + 7) * 12)).padStart(2, '0')}:${String(Math.floor(pseudoRandom(seed + 8) * 60)).padStart(2, '0')}:00`,
+    })
+    id++
   }
   
   return data
@@ -243,9 +241,7 @@ export default function PromotionSlotConfig() {
       key: 'app',
       width: 100,
       render: (v: string) => (
-        <Tag color={v === 'shanfeng' ? 'gold' : 'orange'}>
-          {APP_LABEL[v]}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     {
@@ -319,7 +315,7 @@ export default function PromotionSlotConfig() {
               placeholder="全部" 
               allowClear
               options={[
-                { label: '閃峰', value: 'shanfeng' },
+                { label: '閃蜂', value: 'shanfeng' },
                 { label: 'mFood', value: 'mfood' },
               ]}
             />
@@ -369,8 +365,8 @@ export default function PromotionSlotConfig() {
       </div>
 
       {/* 功能区域 */}
-      <div className="action-section">
-        <Space>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <Button 
             type="primary" 
             icon={<PlusOutlined />}
@@ -378,9 +374,8 @@ export default function PromotionSlotConfig() {
           >
             新增策略
           </Button>
-
-        </Space>
-        {configComponent}
+          {configComponent}
+        </div>
       </div>
 
       {/* 列表区域 */}

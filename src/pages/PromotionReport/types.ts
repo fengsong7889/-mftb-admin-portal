@@ -29,7 +29,7 @@ export enum ReportApp {
 }
 
 export const REPORT_APP_LABEL: Record<ReportApp, string> = {
-  [ReportApp.SHANFENG]: '閃峰',
+  [ReportApp.SHANFENG]: '閃蜂',
   [ReportApp.MFOOD]: 'mFood',
 }
 

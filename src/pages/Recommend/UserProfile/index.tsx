@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, Row, Col, Statistic, Tag, Descriptions, Table, Input, Button, Space, Select, Form, Tabs, Timeline, Badge, Progress, Alert } from 'antd'
 import { SearchOutlined, UserOutlined, ShoppingOutlined, EyeOutlined, TrophyOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import BrandTag from '../../../components/BrandTag'
 
 // 设备类型
 const DEVICE_LABEL: Record<number, string> = {
@@ -15,12 +16,6 @@ const REGION_LABEL: Record<number, string> = {
   1: '澳門',
   2: '氹仔',
   3: '珠海',
-}
-
-// APP类型
-const APP_LABEL: Record<number, string> = {
-  1: '閃峰',
-  2: 'mFood',
 }
 
 // 用户分群
@@ -193,7 +188,7 @@ export default function UserProfile() {
       key: 'app',
       width: 100,
       render: (v: number) => (
-        <Tag color={v === 1 ? 'gold' : 'orange'}>{APP_LABEL[v]}</Tag>
+        <BrandTag value={v} />
       ),
     },
     {
@@ -276,7 +271,7 @@ export default function UserProfile() {
                 <Select 
                   placeholder="全部" 
                   options={[
-                    { label: '閃峰', value: 1 },
+                    { label: '閃蜂', value: 1 },
                     { label: 'mFood', value: 2 },
                   ]} 
                   allowClear 
@@ -377,9 +372,7 @@ export default function UserProfile() {
                   </Descriptions.Item>
                   <Descriptions.Item label="所屬區域">{REGION_LABEL[selectedUser.region]}</Descriptions.Item>
                   <Descriptions.Item label="APP">
-                    <Tag color={selectedUser.app === 1 ? 'gold' : 'orange'}>
-                      {APP_LABEL[selectedUser.app]}
-                    </Tag>
+                    <BrandTag value={selectedUser.app} />
                   </Descriptions.Item>
                   <Descriptions.Item label="註冊日期">{selectedUser.registerDate}</Descriptions.Item>
                   <Descriptions.Item label="用戶分群">

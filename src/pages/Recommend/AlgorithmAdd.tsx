@@ -125,14 +125,14 @@ export default function AlgorithmAdd() {
 
   // Mock商家数据
   const mockMerchants = [
-    { id: 'M001', name: '澳門茶餐廳', brand: '閃峰', businessType: '外賣到家' },
-    { id: 'M002', name: '葡撻專門店', brand: '閃峰', businessType: '團購到店' },
+    { id: 'M001', name: '澳門茶餐廳', brand: '閃蜂', businessType: '外賣到家' },
+    { id: 'M002', name: '葡撻專門店', brand: '閃蜂', businessType: '團購到店' },
     { id: 'M003', name: '海鲜美食坊', brand: 'mFood', businessType: '外賣到家' },
-    { id: 'M004', name: '日式拉面屋', brand: '閃峰', businessType: '外賣到家' },
+    { id: 'M004', name: '日式拉面屋', brand: '閃蜂', businessType: '外賣到家' },
     { id: 'M005', name: '泰式料理', brand: 'mFood', businessType: '團購到店' },
-    { id: 'M006', name: '美式漢堡', brand: '閃峰', businessType: '外賣到家' },
+    { id: 'M006', name: '美式漢堡', brand: '閃蜂', businessType: '外賣到家' },
     { id: 'M007', name: '意大利麵館', brand: 'mFood', businessType: '外賣到家' },
-    { id: 'M008', name: '法式甜品店', brand: '閃峰', businessType: '團購到店' },
+    { id: 'M008', name: '法式甜品店', brand: '閃蜂', businessType: '團購到店' },
   ]
 
   // 提交表单

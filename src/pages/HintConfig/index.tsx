@@ -12,16 +12,11 @@ import {
   DeleteOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
 import HintCreateModal from '../HintCreate'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-/** 所屬品牌 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
 
 /** 展示區域 */
 const regionOptions = [
@@ -125,7 +120,6 @@ interface HintRecord {
   crowd?: string
 }
 
-const brandMap: Record<string, string> = { mFood: 'mFood', flashBee: '閃蜂' }
 const channelMap: Record<string, string> = { home: '大首頁', takeaway: '外賣頻道', groupBuy: '團購頻道', supermarket: '超市頻道' }
 const terminalMap: Record<string, string> = { app: 'APP', wechatMini: '微信小程序', mpayMini: 'Mpay小應用', wechatH5: '微信H5' }
 const regionMap: Record<string, string> = { macau: '澳門', taipa: '氹仔', costa: '高仕德', venetian: '威尼斯', macauUni: '澳門大學' }
@@ -233,17 +227,7 @@ export default function HintConfig() {
       key: 'brand',
       width: 90,
       render: (v: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {brandMap[v] || v}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     {
@@ -500,7 +484,7 @@ export default function HintConfig() {
           <div style={{ padding: '8px 0' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
               <div><span style={{ color: '#999' }}>底紋ID：</span>{detailRecord.hintId}</div>
-              <div><span style={{ color: '#999' }}>所屬品牌：</span>{brandMap[detailRecord.brand]}</div>
+              <div><span style={{ color: '#999' }}>所屬品牌：</span><BrandTag value={detailRecord.brand} /></div>
               <div><span style={{ color: '#999' }}>底紋詞源：</span>{hintSourceMap[detailRecord.hintSource]}</div>
               <div><span style={{ color: '#999' }}>底紋詞：</span>{detailRecord.hintWord || (detailRecord.hotSearchRank ? `熱搜排名前${detailRecord.hotSearchRank}` : '-')}</div>
               <div><span style={{ color: '#999' }}>展示區域：</span>{detailRecord.region.map(r => regionMap[r]).join('、')}</div>

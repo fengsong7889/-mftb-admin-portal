@@ -1,3 +1,5 @@
+import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
+
 /** 所属APP */
 export enum AppType {
   SHANFENG = 1,
@@ -5,7 +7,7 @@ export enum AppType {
 }
 
 export const APP_OPTIONS = [
-  { label: '閃峰', value: AppType.SHANFENG },
+  { label: BRAND_SHANFENG_LABEL, value: AppType.SHANFENG },
   { label: 'mFood', value: AppType.MFOOD },
 ]
 

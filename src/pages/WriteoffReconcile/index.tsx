@@ -7,15 +7,9 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-/** 品牌选项 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: '1mFood', value: '1mFood' },
-  { label: '2閃蜂', value: 'flashBee' },
-]
 
 /** 商家明细记录类型 */
 interface ReconcileRecord {

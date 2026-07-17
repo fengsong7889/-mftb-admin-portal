@@ -388,7 +388,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 value={searchBrand} 
                 onChange={(v) => setSearchBrand(v)} 
                 allowClear
-                options={[{ label: '閃峰', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} 
+                options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} 
               />
             </Form.Item>
             <Form.Item>

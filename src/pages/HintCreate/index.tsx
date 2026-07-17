@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Select, Radio, Checkbox, DatePicker, Table, message, Divider } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { BRAND_SHANFENG_LABEL, BRAND_MFOOD_LABEL } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
 
@@ -14,8 +15,8 @@ const searchChannelOptions = [
 
 /** 所属品牌 */
 const brandOptions = [
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
+  { label: BRAND_MFOOD_LABEL, value: 'mFood' },
+  { label: BRAND_SHANFENG_LABEL, value: 'flashBee' },
   { label: '其它', value: 'other' },
 ]
 

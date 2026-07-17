@@ -11,6 +11,8 @@ import {
   SmileOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
 const { RangePicker: TimeRangePicker } = TimePicker
@@ -23,13 +25,6 @@ const searchEntryOptions = [
   { label: '外賣搜索', value: 'takeaway' },
   { label: '超市搜索', value: 'supermarket' },
   { label: '團購搜索', value: 'groupBuy' },
-]
-
-/** 品牌 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
 ]
 
 /** 展示終端 */
@@ -114,7 +109,6 @@ const mockLibWords = ['火鍋', '珍珠奶茶', '酸菜魚', '炸雞', '壽司',
 /* ======================== Map ======================== */
 
 const searchEntryMap: Record<string, string> = { home: '大首頁', takeaway: '外賣搜索', supermarket: '超市搜索', groupBuy: '團購搜索' }
-const brandMap: Record<string, string> = { mFood: 'mFood', flashBee: '閃蜂' }
 const terminalMap: Record<string, string> = { app: 'APP', wechatMini: '微信小程序', mpayMini: 'Mpay小應用', wechatH5: '微信H5' }
 const regionMap: Record<string, string> = { macau: '澳門', taipa: '氹仔', zhuhai: '珠海市' }
 const timeSlotMap: Record<string, string> = { allDay: '全時段', breakfast: '早餐', lunch: '午餐', afternoonTea: '下午茶', dinner: '晚餐', midnightSnack: '宵夜' }
@@ -386,17 +380,7 @@ export default function HotSearchConfig() {
       key: 'brand', 
       width: 100,
       render: (v: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {brandMap[v]}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     { 

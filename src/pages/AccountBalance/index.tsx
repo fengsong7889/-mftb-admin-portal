@@ -9,15 +9,10 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
 import { useAuth } from '../../contexts/AuthContext'
 import RechargeModal from './RechargeModal'
-
-/** 品牌选项 */
-const brandOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 /** 账户状态选项 */
 const statusOptions = [
@@ -153,17 +148,7 @@ export default function AccountBalance() {
       key: 'brand',
       width: 100,
       render: (val: string) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: val === '閃蜂' || val === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: val === '閃蜂' || val === 'flashBee' ? '#d4b106' : '#d46b08',
-          background: val === '閃蜂' || val === 'flashBee' ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {val === 'mFood' ? 'mFood' : '閃蜂'}
-        </Tag>
+        <BrandTag value={val} />
       ),
     },
     {

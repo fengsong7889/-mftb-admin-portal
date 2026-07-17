@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, Card, Select, Space, Tag, Empty, Form } from 'antd'
 import { SearchOutlined, ReloadOutlined, FireOutlined, WifiOutlined } from '@ant-design/icons'
+import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
 
 /** 搜索界面 */
 const searchPageOptions = [
@@ -8,11 +9,6 @@ const searchPageOptions = [
   { label: '外賣頁', value: 'takeaway' },
   { label: '團購頁', value: 'groupBuy' },
   { label: '超市頁', value: 'supermarket' },
-]
-
-const brandOptions = [
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
 ]
 
 const terminalOptions = [

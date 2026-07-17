@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Row, Col, Timeline, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import BrandTag from '../../../components/BrandTag'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -208,17 +209,7 @@ export default function StrategyOrchestration() {
       key: 'app', 
       width: 100,
       render: (v: AppType) => (
-        <Tag style={{ 
-          margin: 0,
-          padding: '2px 10px',
-          border: v === AppType.SHANFENG ? '1px solid #fadb14' : '1px solid #fa8c16',
-          color: v === AppType.SHANFENG ? '#d4b106' : '#d46b08',
-          background: v === AppType.SHANFENG ? '#fffbe6' : '#fff7e6',
-          borderRadius: 4,
-          fontWeight: 500
-        }}>
-          {v === AppType.SHANFENG ? '閃峰' : 'mFood'}
-        </Tag>
+        <BrandTag value={v} />
       ),
     },
     { 
@@ -530,17 +521,7 @@ export default function StrategyOrchestration() {
                 <strong>{viewingRecord.name}</strong>
               </Descriptions.Item>
               <Descriptions.Item label="所屬品牌">
-                <Tag style={{ 
-                  margin: 0,
-                  padding: '2px 10px',
-                  border: viewingRecord.app === AppType.SHANFENG ? '1px solid #fadb14' : '1px solid #fa8c16',
-                  color: viewingRecord.app === AppType.SHANFENG ? '#d4b106' : '#d46b08',
-                  background: viewingRecord.app === AppType.SHANFENG ? '#fffbe6' : '#fff7e6',
-                  borderRadius: 4,
-                  fontWeight: 500
-                }}>
-                  {viewingRecord.app === AppType.SHANFENG ? '閃峰' : 'mFood'}
-                </Tag>
+                <BrandTag value={viewingRecord.app} />
               </Descriptions.Item>
               <Descriptions.Item label="觸發方式">
                 <Tag color={TRIGGER_TYPE_COLOR[viewingRecord.triggerType]}>

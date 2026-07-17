@@ -11,6 +11,7 @@ import {
   ShopOutlined, InfoCircleOutlined, EnvironmentOutlined,
   KeyOutlined, TagOutlined,
 } from '@ant-design/icons'
+import { BRAND_OPTIONS } from '../../constants/brand'
 
 // ============================
 // 常量定义
@@ -21,11 +22,6 @@ const CHANNELS = [
   { key: 'takeaway', label: '外賣', icon: '🛵' },
   { key: 'supermarket', label: '超市', icon: '🛒' },
   { key: 'groupBuy', label: '團購', icon: '👥' },
-]
-
-const BRAND_OPTIONS = [
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
 ]
 
 // ============================

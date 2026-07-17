@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
+import BrandTag from '../../components/BrandTag'
 const { RangePicker } = DatePicker
 import {
   SearchOutlined,
@@ -36,7 +37,7 @@ enum AppType {
 }
 
 const APP_LABEL: Record<AppType, string> = {
-  [AppType.SHANFENG]: '閃峰',
+  [AppType.SHANFENG]: '閃蜂',
   [AppType.MFOOD]: 'mFood',
 }
 
@@ -199,7 +200,7 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 5,
     groupId: 'G10002',
-    groupName: '閃峰餐飲連鎖',
+    groupName: '閃蜂餐飲連鎖',
     storeId: 'S20002',
     storeName: '氹仔分店',
     purchaseDate: '2025-07-06',
@@ -265,7 +266,7 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
     groupId: 'G10002',
-    groupName: '閃峰餐飲連鎖',
+    groupName: '閃蜂餐飲連鎖',
     storeId: 'S20005',
     storeName: '新馬路店',
     purchaseDate: '2025-07-02',
@@ -330,7 +331,7 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.REVITALIZATION_AD,
     slotPosition: 4,
     groupId: 'G10002',
-    groupName: '閃峰餐飲連鎖',
+    groupName: '閃蜂餐飲連鎖',
     storeId: 'S20003',
     storeName: '珠海旗艦店',
     purchaseDate: '2025-06-29',
@@ -396,7 +397,7 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.NEW_STORE_AD,
     slotPosition: 2,
     groupId: 'G10002',
-    groupName: '閃峰餐飲連鎖',
+    groupName: '閃蜂餐飲連鎖',
     storeId: 'S20001',
     storeName: '澳門總店',
     purchaseDate: '2025-06-26',
@@ -461,7 +462,7 @@ const mockOrders: OrderItem[] = [
     recommendType: RecommendType.INVINCIBLE_STAR,
     slotPosition: 1,
     groupId: 'G10002',
-    groupName: '閃峰餐飲連鎖',
+    groupName: '閃蜂餐飲連鎖',
     storeId: 'S20004',
     storeName: '黑沙環店',
     purchaseDate: '2025-06-23',
@@ -617,9 +618,7 @@ export default function PromotionOrderManage() {
       key: 'app',
       width: 100,
       render: (app: AppType) => (
-        <Tag color={app === AppType.SHANFENG ? 'blue' : 'orange'}>
-          {APP_LABEL[app]}
-        </Tag>
+        <BrandTag value={app} />
       ),
     },
     {

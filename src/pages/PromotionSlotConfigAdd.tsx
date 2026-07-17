@@ -7,12 +7,12 @@ import { mockData } from './PromotionSlotConfig/index'
 
 /** 品牌选项 */
 const APP_OPTIONS = [
-  { label: '閃峰', value: 'shanfeng' },
+  { label: '閃蜂', value: 'shanfeng' },
   { label: 'mFood', value: 'mfood' },
 ]
 
 /** 品牌标签 */
-const APP_LABEL: Record<string, string> = { shanfeng: '閃峰', mfood: 'mFood' }
+const APP_LABEL: Record<string, string> = { shanfeng: '閃蜂', mfood: 'mFood' }
 
 /** 算法类型标签 */
 const ALGO_TYPE_LABEL: Record<string, string> = {
@@ -254,7 +254,7 @@ export default function PromotionSlotConfigAdd() {
   // 手机模型标题
   const phoneTitle = useMemo(() => {
     const app = form.getFieldValue('app') as string | undefined
-    const appName = app ? APP_LABEL[app] || app : '閃峰'
+    const appName = app ? APP_LABEL[app] || app : '閃蜂'
     return `瀑布流預覽-${appName}`
   }, [form])
 

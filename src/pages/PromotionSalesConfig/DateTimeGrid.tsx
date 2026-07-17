@@ -508,7 +508,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 onChange={(v) => setSearchBrand(v)}
                 allowClear
                 options={[
-                  { label: '閃峰', value: 'shanfeng' },
+                  { label: '閃蜂', value: 'shanfeng' },
                   { label: 'mFood', value: 'mfood' },
                 ]}
               />

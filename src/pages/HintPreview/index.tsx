@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Card, Select, Space, Tag, Form, Input, Row, Col, Divider, Modal } from 'antd'
 import { SearchOutlined, ReloadOutlined, EyeOutlined, EnvironmentOutlined } from '@ant-design/icons'
+import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
 
 /** 搜索频道 */
 const searchChannelOptions = [
@@ -8,11 +9,6 @@ const searchChannelOptions = [
   { label: '外賣頻道', value: 'takeaway' },
   { label: '團購頻道', value: 'groupBuy' },
   { label: '超市頻道', value: 'supermarket' },
-]
-
-const brandOptions = [
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
 ]
 
 const regionOptions = [
