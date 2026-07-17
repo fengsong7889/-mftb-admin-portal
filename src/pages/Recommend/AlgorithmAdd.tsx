@@ -63,7 +63,10 @@ export default function AlgorithmAdd() {
   const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
   const [merchantLimit, setMerchantLimit] = useState(false) // false: 不限制, true: 限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([])
-  const [deliveryRange, setDeliveryRange] = useState<string[]>([]) // 配送範圍：短程/中程/遠程
+  const [deliveryRangeByDistrict, setDeliveryRangeByDistrict] = useState<Record<string, string[]>>({
+    macau: [],
+    taipa: [],
+  })
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
@@ -336,7 +339,7 @@ export default function AlgorithmAdd() {
             </div>
           </Form.Item>
 
-          {/* 配送範圍計算（僅盤活復蘇） */}
+          {/* 配送範圍計算（僅盤活復蘇） - 按大區配置 */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
             <Form.Item
               label="配送範圍計算"
@@ -344,15 +347,63 @@ export default function AlgorithmAdd() {
               labelCol={{ flex: '150px' }}
               wrapperCol={{ flex: 1 }}
             >
-              <Checkbox.Group
-                options={[
-                  { label: '短程', value: 'short' },
-                  { label: '中程', value: 'medium' },
-                  { label: '遠程', value: 'long' },
-                ]}
-                value={deliveryRange}
-                onChange={(checkedValues) => setDeliveryRange(checkedValues as string[])}
-              />
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {/* 澳門大區 */}
+                <div style={{
+                  flex: 1, minWidth: 260,
+                  border: '1px solid #d6e4ff', borderRadius: 8,
+                  background: '#f0f5ff', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '8px 16px', background: '#e6f4ff',
+                    borderBottom: '1px solid #d6e4ff',
+                    fontSize: 13, fontWeight: 600, color: '#1890ff',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    🏙️ 澳門大區
+                  </div>
+                  <div style={{ padding: '12px 16px' }}>
+                    <Checkbox.Group
+                      options={[
+                        { label: '短程', value: 'short' },
+                        { label: '中程', value: 'medium' },
+                        { label: '遠程', value: 'long' },
+                      ]}
+                      value={deliveryRangeByDistrict.macau}
+                      onChange={(vals) => setDeliveryRangeByDistrict(prev => ({ ...prev, macau: vals as string[] }))}
+                    />
+                  </div>
+                </div>
+                {/* 氹仔大區 */}
+                <div style={{
+                  flex: 1, minWidth: 260,
+                  border: '1px solid #d6e4ff', borderRadius: 8,
+                  background: '#f0f5ff', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '8px 16px', background: '#e6f4ff',
+                    borderBottom: '1px solid #d6e4ff',
+                    fontSize: 13, fontWeight: 600, color: '#1890ff',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    🌉 氹仔大區
+                  </div>
+                  <div style={{ padding: '12px 16px' }}>
+                    <Checkbox.Group
+                      options={[
+                        { label: '短程', value: 'short' },
+                        { label: '中程', value: 'medium' },
+                        { label: '遠程', value: 'long' },
+                      ]}
+                      value={deliveryRangeByDistrict.taipa}
+                      onChange={(vals) => setDeliveryRangeByDistrict(prev => ({ ...prev, taipa: vals as string[] }))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+                各大區可獨立配置配送範圍，短程 / 中程 / 遠程可多選
+              </div>
             </Form.Item>
           )}
 
