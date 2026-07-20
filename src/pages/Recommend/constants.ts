@@ -51,6 +51,7 @@ export enum AlgorithmType {
   GUESS_YOU_LIKE = 6,     // 猜你喜欢
   ORGANIC_TRAFFIC = 7,    // 自然流量
   SEARCH_ALGORITHM = 9,   // 搜索算法
+  POPULAR_MERCHANT_KA = 10, // 人气商家(KA)
 }
 
 export const ALGORITHM_TYPE_OPTIONS = [
@@ -62,7 +63,21 @@ export const ALGORITHM_TYPE_OPTIONS = [
   { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
   { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
   { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
+  { label: '人氣商家(KA)', value: AlgorithmType.POPULAR_MERCHANT_KA },
 ]
+
+/** 算法类型对应卡片顶部装饰线颜色（与 CSS .algo-card-wrapper--* 类名一致） */
+export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
+  [AlgorithmType.INVINCIBLE_STAR]: 'gold',
+  [AlgorithmType.NEW_STORE_AD]: 'green',
+  [AlgorithmType.HOT_REVIVE_AD]: 'volcano',
+  [AlgorithmType.EXCLUSIVE_MERCHANT]: 'purple',
+  [AlgorithmType.TRAFFIC_AD]: 'cyan',
+  [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
+  [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
+  [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: 'red',
+} as Record<AlgorithmType, string>
 
 /** 区域（与地圖規劃商圈数据一致） */
 export enum Region {

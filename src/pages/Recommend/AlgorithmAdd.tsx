@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Popover, Switch } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
@@ -67,10 +67,117 @@ export default function AlgorithmAdd() {
     macau: [],
     taipa: [],
   })
+
+  // 盘活复苏 - 区域配置（固定可选项）
+  const ALL_REVIVE_DISTRICTS = [
+    { id: 'macau', label: '澳門' },
+    { id: 'taipa', label: '氹仔' },
+    { id: 'hengqin', label: '横琴合作區' },
+    { id: 'zhuhai', label: '珠海市' },
+  ]
+  const [reviveDistrictIds, setReviveDistrictIds] = useState<string[]>(['macau', 'taipa'])
+  const reviveDistricts = ALL_REVIVE_DISTRICTS.filter(d => reviveDistrictIds.includes(d.id))
+
+  const handleReviveDistrictChange = (ids: string[]) => {
+    if (ids.length === 0) return // 至少保留一个
+    setReviveDistrictIds(ids)
+    // 同步配送范围数据：新增区域初始化为空，删除区域移除
+    setDeliveryRangeByDistrict(prev => {
+      const next: Record<string, string[]> = {}
+      ids.forEach(id => { next[id] = prev[id] || [] })
+      return next
+    })
+  }
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
   const [isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
+
+  // 新店广告 - 波浪计算配置
+  const [newStoreCycle, setNewStoreCycle] = useState(30) // 新店周期（天）
+  const [waveInterval, setWaveInterval] = useState(5) // 波浪间隔（天）
+
+  // 大区列表（固定可选项）
+  const ALL_WAVE_DISTRICTS = [
+    { id: 'macau', label: '澳門' },
+    { id: 'taipa', label: '氹仔' },
+    { id: 'hengqin', label: '横琴合作區' },
+    { id: 'zhuhai', label: '珠海市' },
+  ]
+  const [selectedDistrictIds, setSelectedDistrictIds] = useState<string[]>(['macau', 'taipa'])
+  const waveDistricts = ALL_WAVE_DISTRICTS.filter(d => selectedDistrictIds.includes(d.id))
+
+  // 区域选择变更
+  const handleDistrictChange = (ids: string[]) => {
+    if (ids.length === 0) return // 至少保留一个
+    setSelectedDistrictIds(ids)
+    // 同步到已有节点：新增的区域初始化为空，删除的区域移除
+    setWaveNodes(prev => prev.map(n => {
+      const newRanges: Record<string, string[]> = {}
+      ids.forEach(id => { newRanges[id] = n.ranges[id] || [] })
+      return { ...n, ranges: newRanges }
+    }))
+  }
+
+  // 配置模式：shared=全部共享, independent=按区域独立配置
+  const [waveConfigMode, setWaveConfigMode] = useState<'shared' | 'independent'>('shared')
+
+  interface WaveNode {
+    day: number
+    ranges: Record<string, string[]> // key: district id, value: ['short','medium','long']
+  }
+  const [waveNodes, setWaveNodes] = useState<WaveNode[]>([])
+
+  // 波浪交替起始勾选
+  const [waveStartRanges, setWaveStartRanges] = useState<string[]>(['short'])
+
+  // 执行波浪交替：从用户实际勾选开始，递增到顶后回退到短循环
+  const applyWaveAlternating = () => {
+    if (waveNodes.length === 0 || waveStartRanges.length === 0) return
+    const allRanges = ['short', 'medium', 'long']
+    const selected = allRanges.filter(r => waveStartRanges.includes(r))
+    const missing = allRanges.filter(r => !waveStartRanges.includes(r))
+    // 生成循环模式：从勾选开始 → 递增加入缺失项到顶（短中遠）→ 回退到短 → 补全循环
+    const pattern: string[][] = [selected]
+    let current = [...selected]
+    for (const r of missing) {
+      current = [...current, r]
+      pattern.push([...current])
+    }
+    // 到顶后回退到短，逐步补全（跳过已存在的起始状态）
+    current = ['short']
+    if (current.join() !== pattern[0].join()) pattern.push([...current])
+    for (const r of ['medium', 'long']) {
+      current = [...current, r]
+      if (current.join() !== pattern[0].join()) pattern.push([...current])
+    }
+    setWaveNodes(prev => prev.map((node, idx) => {
+      const ranges = pattern[idx % pattern.length]
+      const newRanges: Record<string, string[]> = {}
+      waveDistricts.forEach(d => { newRanges[d.id] = ranges })
+      return { ...node, ranges: newRanges }
+    }))
+  }
+
+  // 根据新店周期和间隔计算波浪节点
+  const calculatedWaveNodes = useMemo(() => {
+    if (!newStoreCycle || !waveInterval || newStoreCycle <= 0 || waveInterval <= 0) return []
+    const nodes: { day: number }[] = []
+    for (let d = newStoreCycle; d > 0; d -= waveInterval) {
+      nodes.push({ day: d })
+    }
+    return nodes
+  }, [newStoreCycle, waveInterval])
+
+  // 当计算节点变化时，更新 waveNodes（保留已有配置）
+  useEffect(() => {
+    setWaveNodes(prev => {
+      return calculatedWaveNodes.map(cn => {
+        const existing = prev.find(p => p.day === cn.day)
+        return existing || { day: cn.day, ranges: {} }
+      })
+    })
+  }, [calculatedWaveNodes])
 
   // 编辑模式或详情模式下加载默认数据
   useEffect(() => {
@@ -254,7 +361,7 @@ export default function AlgorithmAdd() {
       </Card>
 
       {/* 算法参数区域 */}
-      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD) ? (
+      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD) ? (
         <Card 
           title={
             <Space>
@@ -339,6 +446,170 @@ export default function AlgorithmAdd() {
             </div>
           </Form.Item>
 
+          {/* 波浪計算（僅新店廣告） */}
+          {selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
+            <Form.Item
+              style={{ marginBottom: 16 }}
+              labelCol={{ flex: '150px' }}
+              wrapperCol={{ flex: 1 }}
+            >
+              {/* 策略类型模块区域 */}
+              <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fafafa', padding: '16px 20px' }}>
+                <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600, color: '#262626', paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>策略類型：波浪計算</div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>新店週期</span>
+                    <InputNumber
+                      min={1}
+                      max={365}
+                      value={newStoreCycle}
+                      onChange={(val) => setNewStoreCycle(val ?? 30)}
+                      style={{ width: 80 }}
+                      disabled={isDetailMode}
+                    />
+                    <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>天</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>波浪間隔</span>
+                    <InputNumber
+                      min={1}
+                      max={newStoreCycle}
+                      value={waveInterval}
+                      onChange={(val) => setWaveInterval(val ?? 5)}
+                      style={{ width: 80 }}
+                      disabled={isDetailMode}
+                    />
+                    <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>天切換一次</span>
+                  </div>
+                </div>
+
+                {/* 区域配置 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>區域配置：</span>
+                <span style={{ fontSize: 13, color: waveConfigMode === 'shared' ? '#262626' : '#8c8c8c' }}>全區通用</span>
+                <Switch
+                  checked={waveConfigMode === 'independent'}
+                  disabled={isDetailMode}
+                  onChange={(checked) => setWaveConfigMode(checked ? 'independent' : 'shared')}
+                />
+                <span style={{ fontSize: 13, color: waveConfigMode === 'independent' ? '#262626' : '#8c8c8c' }}>獨立配置</span>
+                {waveConfigMode === 'independent' && (
+                  <>
+                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap', marginLeft: 8 }}>展示區域：</span>
+                    <Checkbox.Group
+                      value={selectedDistrictIds}
+                      disabled={isDetailMode}
+                      onChange={(vals) => handleDistrictChange(vals as string[])}
+                      options={ALL_WAVE_DISTRICTS.map(d => ({ label: d.label, value: d.id }))}
+                    />
+                  </>
+                )}
+                </div>
+
+                {/* 快速配置 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>快速配置：</span>
+                  <Checkbox.Group
+                    value={waveStartRanges}
+                    disabled={isDetailMode}
+                    onChange={(vals) => setWaveStartRanges(vals as string[])}
+                    options={[
+                      { label: '短程', value: 'short' },
+                      { label: '中程', value: 'medium' },
+                      { label: '遠程', value: 'long' },
+                    ]}
+                  />
+                  <Button size="small" type="primary" disabled={isDetailMode || waveStartRanges.length === 0 || waveNodes.length === 0} onClick={applyWaveAlternating}>執行</Button>
+                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>（勾選起始範圍，點擊執行生成波浪節點）</span>
+                </div>
+
+                {/* 波浪节点配置表格 */}
+                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: waveConfigMode === 'shared' ? '80px 1fr' : `80px repeat(${waveDistricts.length}, 1fr)`,
+                  background: '#f0f5ff', borderBottom: '1px solid #d6e4ff',
+                  padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#1890ff',
+                }}>
+                  <span>剩餘天數</span>
+                  {waveConfigMode === 'shared' ? (
+                    <span>配送範圍（全部區域共享）</span>
+                  ) : (
+                    waveDistricts.map(d => <span key={d.id}>{d.label}</span>)
+                  )}
+                </div>
+                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                  {waveNodes.map((node, idx) => (
+                    <div key={node.day} style={{
+                      display: 'grid',
+                      gridTemplateColumns: waveConfigMode === 'shared' ? '80px 1fr' : `80px repeat(${waveDistricts.length}, 1fr)`,
+                      padding: '10px 16px', alignItems: 'center',
+                      borderBottom: idx < waveNodes.length - 1 ? '1px solid #f0f0f0' : 'none',
+                      background: idx % 2 === 0 ? '#ffffff' : '#fafafa',
+                    }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{node.day}天</span>
+                      {waveConfigMode === 'shared' ? (
+                        <Checkbox.Group
+                          options={[
+                            { label: '短程', value: 'short' },
+                            { label: '中程', value: 'medium' },
+                            { label: '遠程', value: 'long' },
+                          ]}
+                          value={node.ranges['macau'] || []}
+                          disabled={isDetailMode}
+                          onChange={(vals) => {
+                            setWaveNodes(prev => prev.map((n, i) => {
+                              if (i !== idx) return n
+                              const newRanges: Record<string, string[]> = {}
+                              waveDistricts.forEach(d => { newRanges[d.id] = vals as string[] })
+                              return { ...n, ranges: newRanges }
+                            }))
+                          }}
+                        />
+                      ) : (
+                        waveDistricts.map(d => (
+                          <Checkbox.Group
+                            key={d.id}
+                            options={[
+                              { label: '短程', value: 'short' },
+                              { label: '中程', value: 'medium' },
+                              { label: '遠程', value: 'long' },
+                            ]}
+                            value={node.ranges[d.id] || []}
+                            disabled={isDetailMode}
+                            onChange={(vals) => {
+                              setWaveNodes(prev => prev.map((n, i) => i === idx ? { ...n, ranges: { ...n.ranges, [d.id]: vals as string[] } } : n))
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ))}
+                </div>
+                </div>
+
+                {/* 波浪预览 */}
+                {waveNodes.length > 0 && (
+                  <div style={{ marginTop: 12, padding: '10px 14px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, fontSize: 12, color: '#595959', lineHeight: '22px' }}>
+                  <span style={{ fontWeight: 600, color: '#52c41a' }}>波浪預覽（{waveDistricts[0].label}）：</span>
+                  {waveNodes.map((n, i) => (
+                    <span key={n.day}>
+                      {n.day}天→{(n.ranges[waveDistricts[0].id] || []).length > 0 ? (n.ranges[waveDistricts[0].id] || []).map(r => r === 'short' ? '短' : r === 'medium' ? '中' : '遠').join('') : '—'}
+                      {i < waveNodes.length - 1 ? ' | ' : ''}
+                    </span>
+                  ))}
+                </div>
+                )}
+
+                {/* 周期结束提示 */}
+                <div style={{ marginTop: 12, padding: '10px 14px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6, fontSize: 12, color: '#d46b08', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ⚠️ 新店週期結束後，商家將自動退出新店廣告計算範圍，不再參與新店曝光。
+                </div>
+              </div>
+            </Form.Item>
+          )}
+
           {/* 配送範圍計算（僅盤活復蘇） - 按大區配置 */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
             <Form.Item
@@ -347,62 +618,48 @@ export default function AlgorithmAdd() {
               labelCol={{ flex: '150px' }}
               wrapperCol={{ flex: 1 }}
             >
+              {/* 区域选择 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>配置區域：</span>
+                <Checkbox.Group
+                  value={reviveDistrictIds}
+                  disabled={isDetailMode}
+                  onChange={(vals) => handleReviveDistrictChange(vals as string[])}
+                  options={ALL_REVIVE_DISTRICTS.map(d => ({ label: d.label, value: d.id }))}
+                />
+              </div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                {/* 澳門大區 */}
-                <div style={{
-                  flex: 1, minWidth: 260,
-                  border: '1px solid #d6e4ff', borderRadius: 8,
-                  background: '#f0f5ff', overflow: 'hidden',
-                }}>
-                  <div style={{
-                    padding: '8px 16px', background: '#e6f4ff',
-                    borderBottom: '1px solid #d6e4ff',
-                    fontSize: 13, fontWeight: 600, color: '#1890ff',
-                    display: 'flex', alignItems: 'center', gap: 6,
+                {reviveDistricts.map(d => (
+                  <div key={d.id} style={{
+                    flex: 1, minWidth: 260,
+                    border: '1px solid #d6e4ff', borderRadius: 8,
+                    background: '#f0f5ff', overflow: 'hidden',
                   }}>
-                    🏙️ 澳門大區
+                    <div style={{
+                      padding: '8px 16px', background: '#e6f4ff',
+                      borderBottom: '1px solid #d6e4ff',
+                      fontSize: 13, fontWeight: 600, color: '#1890ff',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      {d.label}
+                    </div>
+                    <div style={{ padding: '12px 16px' }}>
+                      <Checkbox.Group
+                        options={[
+                          { label: '短程', value: 'short' },
+                          { label: '中程', value: 'medium' },
+                          { label: '遠程', value: 'long' },
+                        ]}
+                        value={deliveryRangeByDistrict[d.id] || []}
+                        disabled={isDetailMode}
+                        onChange={(vals) => setDeliveryRangeByDistrict(prev => ({ ...prev, [d.id]: vals as string[] }))}
+                      />
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px' }}>
-                    <Checkbox.Group
-                      options={[
-                        { label: '短程', value: 'short' },
-                        { label: '中程', value: 'medium' },
-                        { label: '遠程', value: 'long' },
-                      ]}
-                      value={deliveryRangeByDistrict.macau}
-                      onChange={(vals) => setDeliveryRangeByDistrict(prev => ({ ...prev, macau: vals as string[] }))}
-                    />
-                  </div>
-                </div>
-                {/* 氹仔大區 */}
-                <div style={{
-                  flex: 1, minWidth: 260,
-                  border: '1px solid #d6e4ff', borderRadius: 8,
-                  background: '#f0f5ff', overflow: 'hidden',
-                }}>
-                  <div style={{
-                    padding: '8px 16px', background: '#e6f4ff',
-                    borderBottom: '1px solid #d6e4ff',
-                    fontSize: 13, fontWeight: 600, color: '#1890ff',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                    🌉 氹仔大區
-                  </div>
-                  <div style={{ padding: '12px 16px' }}>
-                    <Checkbox.Group
-                      options={[
-                        { label: '短程', value: 'short' },
-                        { label: '中程', value: 'medium' },
-                        { label: '遠程', value: 'long' },
-                      ]}
-                      value={deliveryRangeByDistrict.taipa}
-                      onChange={(vals) => setDeliveryRangeByDistrict(prev => ({ ...prev, taipa: vals as string[] }))}
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
-                澳門大區的商家匹配澳門的配送範圍，氹仔大區的商家匹配氹仔的配送範圍，兩區獨立計算、互不影響
+                {reviveDistricts.map(d => d.label).join('、')}的商家匹配各自區域的配送範圍，各區獨立計算、互不影響
               </div>
             </Form.Item>
           )}
@@ -733,6 +990,49 @@ export default function AlgorithmAdd() {
             </div>
 
 
+          )}
+
+          {/* 新店廣告：算法策略（波浪計算 + 輪詢曝光） */}
+          {selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
+            <div style={{
+              border: '1px solid #d6e4ff',
+              borderRadius: 8,
+              background: '#f0f5ff',
+              overflow: 'hidden',
+              marginBottom: 16,
+            }}>
+              {/* 標題欄 */}
+              <div style={{
+                fontSize: 14, fontWeight: 600, color: '#1890ff',
+                padding: '10px 20px',
+                borderBottom: '1px solid #d6e4ff',
+                background: '#e6f4ff',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <SettingOutlined />
+                算法策略
+              </div>
+
+              <div style={{ padding: '16px 20px' }}>
+                {/* 商家曝光策略 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                  <Select
+                    value="roundRobin"
+                    style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                    options={[{ label: '輪詢計算', value: 'roundRobin' }]}
+                    disabled={isDetailMode}
+                  />
+                </div>
+
+                {/* 輪詢說明 */}
+                <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                  <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                    系統自動統計各區域內符合新店週期的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保每位新店商家獲得均勻的曝光機會。過程中如有新開業商家，系統會自動納入候選集；如商家新店週期結束或取消推廣，系統會自動剔除，後續商家依次往前頂補位。
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
         </Form>
         </Card>

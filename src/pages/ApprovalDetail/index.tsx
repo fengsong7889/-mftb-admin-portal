@@ -68,6 +68,7 @@ interface ApprovalDetailData {
   giftStoreName?: string
   giftBrand?: string
   giftAdType?: string
+  giftDays?: number
   // 通用
   groupId?: string
   groupName?: string
@@ -209,6 +210,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     giftStoreName: '澳門總店',
     giftBrand: '閃蜂',
     giftAdType: '新店廣告',
+    giftDays: 30,
     documents: [
       { type: 'image' }, { type: 'image' },
     ],
@@ -216,8 +218,8 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     hasRevoke: true,
     timeline: [
       { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '2026-07-17 14:30:00', approver: '劉邦(000)', status: 'approved', comment: '同意贈送，商家推廣需求屬實。' },
+      { node: '業務主管審批', time: '2026-07-17 11:20:00', approver: '朱元璋(001)', status: 'approved', comment: '已核實商家資質，同意贈送。' },
       { node: '流程創建', time: '2026-07-17 10:00:00', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
@@ -613,7 +615,11 @@ export default function ApprovalDetail() {
                 </div>
                 <div className="approval-info-item">
                   <span className="approval-info-label">廣告類型</span>
-                  <span className="approval-info-value">{data.giftAdType}</span>
+                  <span className="approval-info-value approval-gift-highlight">{data.giftAdType}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">贈送天數</span>
+                  <span className="approval-info-value approval-gift-highlight">{data.giftDays} 天</span>
                 </div>
               </div>
             </div>

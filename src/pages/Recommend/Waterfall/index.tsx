@@ -16,6 +16,7 @@ import {
   RECOMMEND_CHANNEL_OPTIONS,
   ALGORITHM_TYPE_OPTIONS,
   REGION_OPTIONS,
+  ALGO_CARD_COLOR_MAP,
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
 import { mockAlgorithmData } from '../Algorithm'
@@ -26,6 +27,7 @@ const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: st
   { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: '超級曝光位，首頁頂部黃金坑位，強勢引流' },
   { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: '盤活熱門商家流量，提升店鋪曝光' },
   { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: '新店專屬推廣位，快速獲取首批顧客' },
+  { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: '人氣商家專屬推薦位，KA商家流量加持' },
   { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: '獨家商家專屬展示位，彰顯品牌實力' },
   { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: '精準流量投放，覆蓋目標用戶群體' },
   { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: '智能推薦，個性化匹配用戶偏好' },
@@ -71,6 +73,7 @@ const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
   [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家(KA)',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
   [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
@@ -82,6 +85,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.NEW_STORE_AD]: 'green',
   [AlgorithmType.HOT_REVIVE_AD]: 'volcano',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: 'purple',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: 'red',
   [AlgorithmType.TRAFFIC_AD]: 'cyan',
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
@@ -517,31 +521,26 @@ export default function Waterfall() {
             gap: 16,
           }}>
             {ALGORITHM_TYPE_CARDS.map(card => {
-              const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD
+              const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
               return (
-                <Card
+                <div
                   key={card.type}
-                  hoverable={enabled}
+                  className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
                   onClick={() => enabled && handleSelectType(card.type)}
-                  style={{
-                    cursor: enabled ? 'pointer' : 'not-allowed',
-                    opacity: enabled ? 1 : 0.5,
-                  }}
-                  bodyStyle={{ padding: 20 }}
                 >
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>{card.icon}</div>
-                    <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{ALGORITHM_TYPE_LABEL[card.type]}</h3>
-                    <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
-                      {card.description}
-                    </p>
-                    {enabled ? (
-                      <Tag color="blue" style={{ marginTop: 12 }}>查看/調整定價</Tag>
-                    ) : (
-                      <Tag color="default" style={{ marginTop: 12 }}>敬請期待</Tag>
-                    )}
+                  <div className="algo-card-inner">
+                    <div className="algo-card-icon">{card.icon}</div>
+                    <h3 className="algo-card-title">{ALGORITHM_TYPE_LABEL[card.type]}</h3>
+                    <p className="algo-card-desc">{card.description}</p>
+                    <div className="algo-card-tag">
+                      {enabled ? (
+                        <Tag color="blue">查看/調整定價</Tag>
+                      ) : (
+                        <Tag color="default">敬請期待</Tag>
+                      )}
+                    </div>
                   </div>
-                </Card>
+                </div>
               )
             })}
           </div>

@@ -7,7 +7,7 @@ import {
   OrderedListOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlgorithmType, Region, RecommendChannel, AppType } from '../Recommend/constants'
+import { AlgorithmType, Region, RecommendChannel, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
 import DateTimeGrid from './DateTimeGrid'
 import DayPicker from './DayPicker'
 import {
@@ -177,55 +177,51 @@ export default function PromotionSalesConfig() {
                       config.type === AlgorithmType.HOT_REVIVE_AD || 
                       config.type === AlgorithmType.NEW_STORE_AD || 
                       config.type === AlgorithmType.TRAFFIC_AD || 
-                      config.type === AlgorithmType.ORGANIC_TRAFFIC
+                      config.type === AlgorithmType.ORGANIC_TRAFFIC ||
+                      config.type === AlgorithmType.POPULAR_MERCHANT_KA
                     ).map(config => (
-                      <Card
+                      <div
                         key={config.type}
-                        hoverable={config.enabled}
+                        className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
                         onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)}
-                        style={{
-                          cursor: config.enabled ? 'pointer' : 'not-allowed',
-                          opacity: config.enabled ? 1 : 0.5,
-                          border: selectedAlgorithmType === config.type ? '2px solid #1890ff' : undefined,
-                        }}
-                        bodyStyle={{ padding: 20 }}
+                        style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
                       >
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 48, marginBottom: 12 }}>{config.icon}</div>
-                          <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{config.name}</h3>
-                          <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
-                            {config.description}
-                          </p>
-                          {!config.enabled && (
-                            <Tag color="default" style={{ marginTop: 12 }}>即將開放</Tag>
-                          )}
-                          {config.enabled && (
-                            <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center' }}>
-                              <Button
-                                size="small"
-                                icon={<OrderedListOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
-                                }}
-                              >
-                                查看訂單
-                              </Button>
-                              <Button
-                                type="primary"
-                                size="small"
-                                icon={<ShoppingCartOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleGoToPurchase(config)
-                                }}
-                              >
-                                購買廣告
-                              </Button>
-                            </div>
-                          )}
+                        <div className="algo-card-inner">
+                          <div className="algo-card-icon">{config.icon}</div>
+                          <h3 className="algo-card-title">{config.name}</h3>
+                          <p className="algo-card-desc">{config.description}</p>
+                          <div className="algo-card-tag">
+                            {!config.enabled && (
+                              <Tag color="default">即將開放</Tag>
+                            )}
+                            {config.enabled && (
+                              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                                <Button
+                                  size="small"
+                                  icon={<OrderedListOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
+                                  }}
+                                >
+                                  查看訂單
+                                </Button>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<ShoppingCartOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleGoToPurchase(config)
+                                  }}
+                                >
+                                  購買廣告
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 ),
@@ -243,53 +239,48 @@ export default function PromotionSalesConfig() {
                       config.type === AlgorithmType.INVINCIBLE_STAR || 
                       config.type === AlgorithmType.HOT_REVIVE_AD
                     ).map(config => (
-                      <Card
+                      <div
                         key={config.type}
-                        hoverable={config.enabled}
+                        className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
                         onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)}
-                        style={{
-                          cursor: config.enabled ? 'pointer' : 'not-allowed',
-                          opacity: config.enabled ? 1 : 0.5,
-                          border: selectedAlgorithmType === config.type ? '2px solid #1890ff' : undefined,
-                        }}
-                        bodyStyle={{ padding: 20 }}
+                        style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
                       >
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 48, marginBottom: 12 }}>{config.icon}</div>
-                          <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{config.name}</h3>
-                          <p style={{ margin: 0, color: '#8c8c8c', fontSize: 13, lineHeight: 1.6 }}>
-                            {config.description}
-                          </p>
-                          {!config.enabled && (
-                            <Tag color="default" style={{ marginTop: 12 }}>即將開放</Tag>
-                          )}
-                          {config.enabled && (
-                            <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center' }}>
-                              <Button
-                                size="small"
-                                icon={<OrderedListOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
-                                }}
-                              >
-                                查看訂單
-                              </Button>
-                              <Button
-                                type="primary"
-                                size="small"
-                                icon={<ShoppingCartOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleGoToPurchase(config)
-                                }}
-                              >
-                                購買廣告
-                              </Button>
-                            </div>
-                          )}
+                        <div className="algo-card-inner">
+                          <div className="algo-card-icon">{config.icon}</div>
+                          <h3 className="algo-card-title">{config.name}</h3>
+                          <p className="algo-card-desc">{config.description}</p>
+                          <div className="algo-card-tag">
+                            {!config.enabled && (
+                              <Tag color="default">即將開放</Tag>
+                            )}
+                            {config.enabled && (
+                              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                                <Button
+                                  size="small"
+                                  icon={<OrderedListOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
+                                  }}
+                                >
+                                  查看訂單
+                                </Button>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<ShoppingCartOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleGoToPurchase(config)
+                                  }}
+                                >
+                                  購買廣告
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 ),

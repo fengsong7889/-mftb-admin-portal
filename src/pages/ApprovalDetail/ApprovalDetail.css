@@ -164,6 +164,12 @@
   font-weight: 700;
 }
 
+/* 赠送配置审核重点字段突出 */
+.approval-gift-highlight {
+  color: #E8720C;
+  font-weight: 700;
+}
+
 /* 流程状态标签 */
 .approval-status-tag {
   font-size: 13px;

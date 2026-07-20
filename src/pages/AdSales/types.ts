@@ -102,7 +102,14 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     name: '新店廣告',
     icon: '🏪',
     description: '新店專屬推廣位，快速獲取首批顧客',
-    enabled: false,
+    enabled: true,
+  },
+  {
+    type: AlgorithmType.POPULAR_MERCHANT_KA,
+    name: '人氣商家(KA)',
+    icon: '🏆',
+    description: '人氣商家專屬推薦位，KA商家流量加持',
+    enabled: true,
   },
   {
     type: AlgorithmType.TRAFFIC_AD,
