@@ -455,7 +455,10 @@ export default function AlgorithmAdd() {
             >
               {/* 策略类型模块区域 */}
               <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fafafa', padding: '16px 20px' }}>
-                <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600, color: '#262626', paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>策略類型：波浪計算</div>
+                <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600, color: '#262626', paddingBottom: 12, borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <span>策略類型：波浪計算</span>
+                  <span style={{ fontSize: 12, fontWeight: 400, color: '#d46b08' }}>⚠️ 新店週期結束後，商家將自動退出新店廣告計算範圍，不再參與新店曝光。</span>
+                </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -587,24 +590,6 @@ export default function AlgorithmAdd() {
                     </div>
                   ))}
                 </div>
-                </div>
-
-                {/* 波浪预览 */}
-                {waveNodes.length > 0 && (
-                  <div style={{ marginTop: 12, padding: '10px 14px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, fontSize: 12, color: '#595959', lineHeight: '22px' }}>
-                  <span style={{ fontWeight: 600, color: '#52c41a' }}>波浪預覽（{waveDistricts[0].label}）：</span>
-                  {waveNodes.map((n, i) => (
-                    <span key={n.day}>
-                      {n.day}天→{(n.ranges[waveDistricts[0].id] || []).length > 0 ? (n.ranges[waveDistricts[0].id] || []).map(r => r === 'short' ? '短' : r === 'medium' ? '中' : '遠').join('') : '—'}
-                      {i < waveNodes.length - 1 ? ' | ' : ''}
-                    </span>
-                  ))}
-                </div>
-                )}
-
-                {/* 周期结束提示 */}
-                <div style={{ marginTop: 12, padding: '10px 14px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6, fontSize: 12, color: '#d46b08', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  ⚠️ 新店週期結束後，商家將自動退出新店廣告計算範圍，不再參與新店曝光。
                 </div>
               </div>
             </Form.Item>
