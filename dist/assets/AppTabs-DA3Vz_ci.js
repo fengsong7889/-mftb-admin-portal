@@ -1,0 +1,1 @@
+import{j as s}from"./index-Cql60XYt.js";import{d as a,A as e}from"./constants-D-U1pawe.js";import{T as i}from"./index-vDPMMYQc.js";function A({value:m=e.SHANFENG,onChange:t}){return s.jsx(i,{activeKey:String(m),onChange:r=>t==null?void 0:t(Number(r)),items:a.map(r=>({key:String(r.value),label:r.label})),style:{marginBottom:16}})}export{A};
