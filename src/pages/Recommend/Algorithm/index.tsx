@@ -136,6 +136,13 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 29, name: '人氣商家(KA)-美食外賣mFood版', code: 'ALG_KA_004', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 30, name: '人氣商家(KA)-美食外賣mFood版B', code: 'ALG_KA_005', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
   { id: 31, name: '人氣商家(KA)-超市百貨mFood版', code: 'ALG_KA_006', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
+  // 獨家商家 - 6条
+  { id: 32, name: '獨家商家-美食外賣閃蜂版', code: 'ALG_EXC_001', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 33, name: '獨家商家-美食外賣閃蜂版B', code: 'ALG_EXC_002', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 34, name: '獨家商家-超市百貨閃蜂版', code: 'ALG_EXC_003', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 2 },
+  { id: 35, name: '獨家商家-美食外賣mFood版', code: 'ALG_EXC_004', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 36, name: '獨家商家-美食外賣mFood版B', code: 'ALG_EXC_005', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 37, name: '獨家商家-超市百貨mFood版', code: 'ALG_EXC_006', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
 ]
 
 export default function Algorithm() {
@@ -357,7 +364,7 @@ export default function Algorithm() {
                     {ALGORITHM_TYPE_CARDS
                       .filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type))
                       .map(card => {
-                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
+                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.EXCLUSIVE_MERCHANT
                         return renderAlgoCard(card, enabled, 'delivery')
                       })}
                   </div>
