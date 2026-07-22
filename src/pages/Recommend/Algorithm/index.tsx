@@ -140,7 +140,7 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
 
 export default function Algorithm() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // 从 URL 参数恢复列表状态（从新增页返回时）
   const typeParam = searchParams.get('type')
@@ -171,19 +171,21 @@ export default function Algorithm() {
     return map
   }, [])
 
-  // 点击卡片 → 进入列表
+  // 点击卡片 → 进入列表（同步 type/tab 到 URL，使小蜜蜂 PRD 切换到列表界面）
   const handleSelectType = (type: AlgorithmType, tab: 'delivery' | 'groupBuy') => {
     setSelectedType(type)
     setBusinessType(tab)
     const data = filterByBusinessType(dataList.filter(item => item.type === type))
     setFilteredData(data)
+    setSearchParams({ type: String(type), tab }, { replace: true })
   }
 
-  // 返回卡片选择页
+  // 返回卡片选择页（清空 URL 参数，使小蜜蜂 PRD 切回卡片展示界面）
   const handleBackToCards = () => {
     setSelectedType(null)
     setFilteredData(dataList)
     setBusinessType('delivery')
+    setSearchParams({}, { replace: true })
   }
 
   // 启用/停用算法

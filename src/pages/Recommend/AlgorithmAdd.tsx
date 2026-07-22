@@ -131,26 +131,51 @@ export default function AlgorithmAdd() {
   // 波浪交替起始勾选
   const [waveStartRanges, setWaveStartRanges] = useState<string[]>(['short'])
 
-  // 执行波浪交替：从用户实际勾选开始，递增到顶后回退到短循环
+  // 执行波浪交替：取最大参数往后增长，直到远程后从短程开始循环
+  // 规则：
+  // 1. 第一行展示用户勾选的参数
+  // 2. 第二行取第一行最大的一个参数往后增长（遠程>中程>短程，循环）
+  // 3. 以此类推，直到满3个 [短程,中程,远程]，然后从 [短程] 开始自增循环
   const applyWaveAlternating = () => {
     if (waveNodes.length === 0 || waveStartRanges.length === 0) return
-    const allRanges = ['short', 'medium', 'long']
-    const selected = allRanges.filter(r => waveStartRanges.includes(r))
-    const missing = allRanges.filter(r => !waveStartRanges.includes(r))
-    // 生成循环模式：从勾选开始 → 递增加入缺失项到顶（短中遠）→ 回退到短 → 补全循环
-    const pattern: string[][] = [selected]
+    const cycle = ['short', 'medium', 'long']
+    const selected = cycle.filter(r => waveStartRanges.includes(r))
+
+    // 生成模式序列
+    const pattern: string[][] = []
+
+    // 阶段1：每次取当前组合中最大的往后加一个
+    // 规则：上一行包含远程 → 下一行必须是 [短程]
     let current = [...selected]
-    for (const r of missing) {
-      current = [...current, r]
+    pattern.push([...current])
+    while (current.length < 3) {
+      if (current.includes('long')) {
+        // 上一行有远程，下一行从短程开始
+        current = ['short']
+      } else {
+        const maxIdx = Math.max(...current.map(r => cycle.indexOf(r)))
+        const nextRange = cycle[(maxIdx + 1) % 3]
+        current = [...current, nextRange]
+      }
       pattern.push([...current])
     }
-    // 到顶后回退到短，逐步补全（跳过已存在的起始状态）
-    current = ['short']
-    if (current.join() !== pattern[0].join()) pattern.push([...current])
-    for (const r of ['medium', 'long']) {
-      current = [...current, r]
-      if (current.join() !== pattern[0].join()) pattern.push([...current])
+    // 阶段1结束，current 为 [短程,中程,远程]
+
+    // 阶段2：自增循环 [短程] → [短程,中程] → [短程,中程,远程] → 回到 [短程]...
+    // 规则：上一行包含远程 → 下一行必须是 [短程]
+    const loop: string[][] = [
+      ['short'],
+      ['short', 'medium'],
+      ['short', 'medium', 'long'],
+    ]
+    for (let si = 0; si < loop.length; si++) {
+      const step = loop[si]
+      if (current.join(',') !== step.join(',')) {
+        pattern.push([...step])
+      }
+      current = [...step]
     }
+
     setWaveNodes(prev => prev.map((node, idx) => {
       const ranges = pattern[idx % pattern.length]
       const newRanges: Record<string, string[]> = {}

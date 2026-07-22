@@ -34,6 +34,7 @@ const SearchVerifyDetail = lazy(() => import('./pages/SearchVerifyDetail'))
 const HintVerify = lazy(() => import('./pages/HintVerify'))
 const HotSearchVerify = lazy(() => import('./pages/HotSearchVerify'))
 const PageDescriptionEditor = lazy(() => import('./pages/PageDescriptionEditor'))
+const PagePRDView = lazy(() => import('./pages/PagePRDView'))
 // 搜索配置管理(新系统)
 const GlobalConfig = lazy(() => import('./pages/SearchConfigNew/GlobalConfig'))
 const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
@@ -196,6 +197,8 @@ function AuthenticatedLayout() {
               <Route path="/map-planning" element={<MapPlanning />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
+              {/* PRD需求查看 */}
+              <Route path="/page-prd-view" element={<PagePRDView />} />
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

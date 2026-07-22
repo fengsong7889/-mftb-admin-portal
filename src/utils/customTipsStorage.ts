@@ -11,6 +11,10 @@ export interface CustomPageTips {
     searchConditions?: { label: string; desc: string }[]
     fields?: { label: string; desc: string }[]
     actions?: string[]
+    interaction?: string[]
+    rules?: string[]
+    formulas?: string[]
+    notes?: string[]
   } | string
   /** 小蜜蜂知识库（气泡提示） */
   tips?: string[]

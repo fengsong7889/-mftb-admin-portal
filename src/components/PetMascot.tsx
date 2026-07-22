@@ -1,9 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Modal, Form, Input, Button, message, Space, Tag } from 'antd'
-import { EditOutlined, DeleteOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons'
-import { getPagePRD, type PagePRD } from './PageDescriptions'
-import { getCustomTips, saveCustomTips, deleteCustomTips, mergeTips, type CustomPageTips } from '../utils/customTipsStorage'
+import { getPagePRD, buildPrdKey, type PagePRD } from './PageDescriptions'
+import { getCustomTips, mergeTips } from '../utils/customTipsStorage'
 import { useAuth } from '../contexts/AuthContext'
 import PikachuFace from './PikachuFace'
 import './PetMascot.css'
@@ -273,11 +271,8 @@ export default function PetMascot() {
   const [isDragging, setIsDragging] = useState(false)
   const [showBubble, setShowBubble] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [showPRD, setShowPRD] = useState(false)
-  const [prd, setPrd] = useState<PagePRD | null>(null)
   const [pageTipIndex, setPageTipIndex] = useState(0)
   const [isPageTip, setIsPageTip] = useState(false)
-  const [customTips, setCustomTips] = useState<CustomPageTips | null>(null)
   const posRef = useRef(pos)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const bubbleTimerRef = useRef<number | null>(null)
@@ -285,14 +280,12 @@ export default function PetMascot() {
 
   const current = expressions[currentIndex]
 
-  // 获取当前页面的PRD
-  const defaultPrd = getPagePRD(location.pathname)
+  // 根据 pathname + search 构建子界面 PRD 键（卡片/列表/各广告类型新增页独立描述）
+  const prdKey = buildPrdKey(location.pathname, location.search)
 
-  // 加载自定义提示
-  useEffect(() => {
-    const custom = getCustomTips(location.pathname)
-    setCustomTips(custom)
-  }, [location.pathname])
+  // 获取当前页面的PRD
+  const defaultPrd = getPagePRD(prdKey)
+  const customTips = getCustomTips(prdKey)
 
   // 合并默认和自定义提示
   const currentPrd: PagePRD | null = defaultPrd ? {
@@ -310,7 +303,7 @@ export default function PetMascot() {
       const timer = setTimeout(() => setShowBubble(false), 5000)
       return () => clearTimeout(timer)
     }
-  }, [location.pathname])
+  }, [prdKey])
 
   useEffect(() => {
     posRef.current = pos
@@ -354,39 +347,13 @@ export default function PetMascot() {
     }
   }, [currentPrd, defaultPrd, isPageTip])
 
-  // 点击 - 弹出 PRD 弹窗
+  // 点击 - 跳转到PRD全页查看
   const handleClick = () => {
     if (dragMovedRef.current) {
       dragMovedRef.current = false
       return
     }
-    const pagePrd = getPagePRD(location.pathname)
-    const custom = getCustomTips(location.pathname)
-    setCustomTips(custom)
-    if (pagePrd) {
-      setPrd({ ...pagePrd, ...mergeTips(pagePrd, custom) })
-    } else {
-      setPrd(null)
-    }
-    setShowPRD(true)
-  }
-
-  // 打开编辑页面
-  const handleOpenEdit = () => {
-    // 先关闭PRD弹窗
-    setShowPRD(false)
-    // 跳转到编辑页面，并传递当前页面路径
-    navigate(`/page-description-editor?path=${encodeURIComponent(location.pathname)}`)
-  }
-
-  // 保存编辑（此功能已移至独立页面，保留以兼容旧代码）
-  const handleSaveEdit = () => {
-    message.info('已移至獨立編輯頁面')
-  }
-
-  // 恢复默认（此功能已移至独立页面，保留以兼容旧代码）
-  const handleResetDefault = () => {
-    message.info('已移至獨立編輯頁面')
+    navigate(`/page-prd-view?from=${encodeURIComponent(prdKey)}`)
   }
 
   // 获取气泡显示内容
@@ -402,11 +369,20 @@ export default function PetMascot() {
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     dragMovedRef.current = false
-    const startX = e.clientX - posRef.current.x
-    const startY = e.clientY - posRef.current.y
-    dragOffsetRef.current = { x: startX, y: startY }
+    const startX = e.clientX
+    const startY = e.clientY
+    const origPosX = posRef.current.x
+    const origPosY = posRef.current.y
+    dragOffsetRef.current = { x: e.clientX - origPosX, y: e.clientY - origPosY }
+    let hasDragged = false
 
     const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      // 超过 5px 才算拖拽，避免微抖动吞掉点击
+      if (!hasDragged && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+      hasDragged = true
+      dragMovedRef.current = true
       const newX = ev.clientX - dragOffsetRef.current.x
       const newY = ev.clientY - dragOffsetRef.current.y
       const maxX = window.innerWidth - 90
@@ -416,7 +392,6 @@ export default function PetMascot() {
         y: Math.max(0, Math.min(maxY, newY)),
       })
       setIsDragging(true)
-      dragMovedRef.current = true
     }
 
     const onUp = () => {
@@ -447,162 +422,6 @@ export default function PetMascot() {
           <PikachuFace expression={current.name} size={81} />
         </div>
       </div>
-
-      {/* PRD 需求文档弹窗 */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20 }}>🐝</span>
-            <span>界面需求說明 - {prd?.title || '頁面'}</span>
-            {customTips && <Tag color="orange">自定義</Tag>}
-          </div>
-        }
-        open={showPRD}
-        onCancel={() => setShowPRD(false)}
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <Button onClick={() => setShowPRD(false)}>關閉</Button>
-            {hasPermission('edit') && (
-              <Button type="primary" icon={<EditOutlined />} onClick={handleOpenEdit}>
-                編輯說明
-              </Button>
-            )}
-          </div>
-        }
-        width={720}
-      >
-        {customTips?.prdContent ? (
-          typeof customTips.prdContent === 'string' ? (
-            /* 字符串类型 - 富文本HTML */
-            customTips.prdContent.trim() ? (
-              <div 
-                style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}
-                dangerouslySetInnerHTML={{ __html: customTips.prdContent }} 
-              />
-            ) : null
-          ) : (customTips.prdContent.description || customTips.prdContent.features?.length || customTips.prdContent.searchConditions?.length || customTips.prdContent.fields?.length || customTips.prdContent.actions?.length) ? (
-            /* 对象类型 - 结构化PRD内容 - 只在有内容时展示 */
-            <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '4px 0' }}>
-              {/* 模块路径 - 始终展示 */}
-              <div style={{ marginBottom: 16, padding: '8px 12px', background: '#FFF7ED', borderRadius: 8, borderLeft: '3px solid #E8720C' }}>
-                <span style={{ color: '#999', fontSize: 12 }}>所屬模塊：</span>
-                <span style={{ color: '#666', fontSize: 13, fontWeight: 500 }}>{prd?.module}</span>
-              </div>
-
-              {/* 功能描述 - 只在有内容时展示 */}
-              {customTips.prdContent.description && (
-                <div style={{ marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                    功能描述
-                  </h4>
-                  <p style={{ fontSize: 13, color: '#555', lineHeight: 1.8, margin: 0, paddingLeft: 12 }}>
-                    {customTips.prdContent.description}
-                  </p>
-                </div>
-              )}
-
-              {/* 功能要点 */}
-              {customTips.prdContent.features && customTips.prdContent.features.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                    功能要點
-                  </h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#FAFAFA' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>功能名稱</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customTips.prdContent.features.map((feature, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{feature.label}</td>
-                          <td style={{ padding: '8px 12px', color: '#555' }}>{feature.desc}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* 查询条件 */}
-              {customTips.prdContent.searchConditions && customTips.prdContent.searchConditions.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                    查詢條件
-                  </h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#FAFAFA' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>查詢條件</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customTips.prdContent.searchConditions.map((condition, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{condition.label}</td>
-                          <td style={{ padding: '8px 12px', color: '#555' }}>{condition.desc}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* 字段说明 */}
-              {customTips.prdContent.fields && customTips.prdContent.fields.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                    字段說明
-                  </h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#FAFAFA' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>字段名稱</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }}>說明</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customTips.prdContent.fields.map((field, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#333' }}>{field.label}</td>
-                          <td style={{ padding: '8px 12px', color: '#555' }}>{field.desc}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* 操作说明 */}
-              {customTips.prdContent.actions && customTips.prdContent.actions.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 14, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ display: 'inline-block', width: 4, height: 14, background: '#E8720C', borderRadius: 2 }} />
-                    操作說明
-                  </h4>
-                  <ul style={{ paddingLeft: 24, margin: 0 }}>
-                    {customTips.prdContent.actions.map((action, i) => (
-                      <li key={i} style={{ fontSize: 13, color: '#555', lineHeight: 2 }}>{action}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : null
-        ) : (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#999' }}>
-            <p style={{ fontSize: 40, margin: '0 0 12px' }}>🐝</p>
-            <p>當前頁面暫無需求說明</p>
-          </div>
-        )}
-      </Modal>
     </>
   )
 }
