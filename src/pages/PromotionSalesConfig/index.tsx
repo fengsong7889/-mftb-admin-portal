@@ -195,7 +195,7 @@ export default function PromotionSalesConfig() {
                               <Tag color="default">即將開放</Tag>
                             )}
                             {config.enabled && (
-                              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
                                 <Button
                                   size="small"
                                   icon={<OrderedListOutlined />}
@@ -206,17 +206,19 @@ export default function PromotionSalesConfig() {
                                 >
                                   查看訂單
                                 </Button>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  icon={<ShoppingCartOutlined />}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleGoToPurchase(config)
-                                  }}
-                                >
-                                  購買廣告
-                                </Button>
+                                {config.type !== AlgorithmType.NEW_STORE_AD && (
+                                  <Button
+                                    type="primary"
+                                    size="small"
+                                    icon={<ShoppingCartOutlined />}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleGoToPurchase(config)
+                                    }}
+                                  >
+                                    購買廣告
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </div>

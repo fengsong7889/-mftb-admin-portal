@@ -12,7 +12,9 @@ enum OrderStatus {
   PENDING_PROMOTION = 1,
   PROMOTING = 2,
   PROMOTED = 3,
-  REFUNDED = 4,
+  CANCELLED = 4,
+  ABORTED = 5,
+  REFUNDED = 6,
 }
 
 // 订单状态标签
@@ -20,7 +22,9 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = 
   [OrderStatus.PENDING_PROMOTION]: { label: '待推廣', color: 'blue' },
   [OrderStatus.PROMOTING]: { label: '推廣中', color: 'green' },
   [OrderStatus.PROMOTED]: { label: '已完成', color: 'purple' },
-  [OrderStatus.REFUNDED]: { label: '已退款', color: 'orange' },
+  [OrderStatus.CANCELLED]: { label: '已取消', color: 'red' },
+  [OrderStatus.ABORTED]: { label: '已中止', color: 'orange' },
+  [OrderStatus.REFUNDED]: { label: '已退款', color: 'red' },
 }
 
 import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
@@ -164,6 +168,112 @@ interface OrderItem {
 
 // Mock 订单数据（15条）
 const mockOrders: OrderItem[] = [
+  // 新店廣告 - 5天推廣期（當天±2天）- 置頂方便查看
+  {
+    id: '211',
+    orderNo: 'ORD20260723211',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·外賣版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 1,
+    groupId: 'G10004',
+    groupName: '新澳茶餐廳',
+    storeId: 'S30011',
+    storeName: '黑沙環旗艦店',
+    purchaseDate: '2026-07-21',
+    mealSlots: [],
+    purchaseDays: ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25'],
+    status: OrderStatus.PROMOTING,
+    orderTime: '2026-07-20 10:00:00',
+    payTime: '2026-07-20 10:05:00',
+  } as any,
+  {
+    id: '212',
+    orderNo: 'ORD20260723212',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·團購版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.FAHUA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 2,
+    groupId: 'G10005',
+    groupName: '灣仔海鮮坊',
+    storeId: 'S30012',
+    storeName: '氹仔新店',
+    purchaseDate: '2026-07-21',
+    mealSlots: [],
+    purchaseDays: ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25'],
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2026-07-20 14:30:00',
+    payTime: '2026-07-20 14:35:00',
+  } as any,
+  {
+    id: '213',
+    orderNo: 'ORD20260723213',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·超市版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.SANMA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 3,
+    groupId: 'G10006',
+    groupName: '珠海美食居',
+    storeId: 'S30013',
+    storeName: '珠海旗艦店',
+    purchaseDate: '2026-07-21',
+    mealSlots: [],
+    purchaseDays: ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25'],
+    status: OrderStatus.PROMOTED,
+    orderTime: '2026-07-18 09:00:00',
+    payTime: '2026-07-18 09:10:00',
+  } as any,
+  {
+    id: '214',
+    orderNo: 'ORD20260723214',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·外賣版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.HKM,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 4,
+    groupId: 'G10007',
+    groupName: '澳門甜品屋',
+    storeId: 'S30014',
+    storeName: '高士德新店',
+    purchaseDate: '2026-07-21',
+    mealSlots: [],
+    purchaseDays: ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25'],
+    status: OrderStatus.CANCELLED,
+    orderTime: '2026-07-19 11:00:00',
+    payTime: '2026-07-19 11:05:00',
+  } as any,
+  {
+    id: '215',
+    orderNo: 'ORD20260723215',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·首頁版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.COSTA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 5,
+    groupId: 'G10004',
+    groupName: '新澳茶餐廳',
+    storeId: 'S30015',
+    storeName: '新馬路旗艦店',
+    purchaseDate: '2026-07-21',
+    mealSlots: [],
+    purchaseDays: ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25'],
+    status: OrderStatus.ABORTED,
+    orderTime: '2026-07-17 16:00:00',
+    payTime: '2026-07-17 16:10:00',
+  } as any,
   {
     id: '1',
     orderNo: 'ORD20250705001',
@@ -364,7 +474,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 1600,
     discountPrice: 1440,
     actualPrice: 1440,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-06-28 09:20:00',
     payTime: '2025-06-28 09:25:00',
   },
@@ -433,7 +543,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 1400,
     discountPrice: 1260,
     actualPrice: 1260,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-06-25 13:50:00',
   },
   {
@@ -477,7 +587,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 3500,
     discountPrice: 3150,
     actualPrice: 3150,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-06-23 06:20:00',
     payTime: '2025-06-23 06:25:00',
   },
@@ -500,7 +610,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 1700,
     discountPrice: 1530,
     actualPrice: 1530,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-06-22 10:05:00',
     payTime: '2025-06-22 10:10:00',
   },
@@ -714,7 +824,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 4500,
     discountPrice: 4050,
     actualPrice: 4050,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-07-07 09:20:00',
     payTime: '2025-07-07 09:25:00',
   },
@@ -786,7 +896,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 1400,
     discountPrice: 1260,
     actualPrice: 1260,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-07-04 13:50:00',
   },
   {
@@ -832,7 +942,7 @@ const mockOrders: OrderItem[] = [
     originalPrice: 7000,
     discountPrice: 6300,
     actualPrice: 6300,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-07-02 06:20:00',
     payTime: '2025-07-02 06:25:00',
   },
@@ -856,10 +966,219 @@ const mockOrders: OrderItem[] = [
     originalPrice: 3800,
     discountPrice: 3420,
     actualPrice: 3420,
-    status: OrderStatus.REFUNDED,
+    status: OrderStatus.PROMOTED,
     orderTime: '2025-07-01 10:05:00',
     payTime: '2025-07-01 10:10:00',
   },
+  // 新店廣告訂單數據（10條）
+  {
+    id: '201',
+    orderNo: 'ORD20250720201',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·外賣版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 1,
+    groupId: 'G10004',
+    groupName: '新澳茶餐廳',
+    storeId: 'S30001',
+    storeName: '黑沙環新店',
+    purchaseDate: '2025-07-20',
+    mealSlots: [],
+    purchaseDays: ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25', '2026-07-26', '2026-07-27'],
+    status: OrderStatus.PROMOTING,
+    orderTime: '2025-07-20 09:00:00',
+    payTime: '2025-07-20 09:05:00',
+  } as any,
+  {
+    id: '202',
+    orderNo: 'ORD20250719202',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·首頁版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.FAHUA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 2,
+    groupId: 'G10005',
+    groupName: '灣仔海鮮坊',
+    storeId: 'S30002',
+    storeName: '花城分店',
+    purchaseDate: '2025-07-19',
+    mealSlots: [],
+    purchaseDays: ['2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24'],
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2025-07-19 11:30:00',
+    payTime: '2025-07-19 11:35:00',
+  } as any,
+  {
+    id: '203',
+    orderNo: 'ORD20250718203',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·團購版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.SANMA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 3,
+    groupId: 'G10006',
+    groupName: '珠海美食居',
+    storeId: 'S30003',
+    storeName: '新馬路旗艦店',
+    purchaseDate: '2025-07-18',
+    mealSlots: [],
+    purchaseDays: ['2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25', '2026-07-26', '2026-07-27', '2026-07-28'],
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-18 14:20:00',
+  } as any,
+  {
+    id: '204',
+    orderNo: 'ORD20250717204',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·超市版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 4,
+    groupId: 'G10004',
+    groupName: '新澳茶餐廳',
+    storeId: 'S30004',
+    storeName: '高士德分店',
+    purchaseDate: '2025-07-17',
+    mealSlots: [],
+    purchaseDays: ['2026-07-18', '2026-07-19', '2026-07-20'],
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-17 16:45:00',
+    payTime: '2025-07-17 16:50:00',
+  } as any,
+  {
+    id: '205',
+    orderNo: 'ORD20250716205',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·外賣版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.SANMA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 5,
+    groupId: 'G10007',
+    groupName: '澳門甜品屋',
+    storeId: 'S30005',
+    storeName: '新馬路總店',
+    purchaseDate: '2025-07-16',
+    mealSlots: [],
+    purchaseDays: ['2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23'],
+    status: OrderStatus.PROMOTING,
+    orderTime: '2025-07-16 10:10:00',
+    payTime: '2025-07-16 10:15:00',
+  } as any,
+  {
+    id: '206',
+    orderNo: 'ORD20250715206',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·首頁版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.AIRPORT,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 1,
+    groupId: 'G10005',
+    groupName: '灣仔海鮮坊',
+    storeId: 'S30006',
+    storeName: '北安機場店',
+    purchaseDate: '2025-07-15',
+    mealSlots: [],
+    purchaseDays: ['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19'],
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2025-07-15 08:30:00',
+    payTime: '2025-07-15 08:35:00',
+  } as any,
+  {
+    id: '207',
+    orderNo: 'ORD20250714207',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·團購版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.HKM,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 2,
+    groupId: 'G10006',
+    groupName: '珠海美食居',
+    storeId: 'S30007',
+    storeName: '港珠澳大橋店',
+    purchaseDate: '2025-07-14',
+    mealSlots: [],
+    purchaseDays: ['2026-07-15', '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20'],
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-14 13:00:00',
+  } as any,
+  {
+    id: '208',
+    orderNo: 'ORD20250713208',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·外賣版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.UM,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 3,
+    groupId: 'G10007',
+    groupName: '澳門甜品屋',
+    storeId: 'S30008',
+    storeName: '澳大分店',
+    purchaseDate: '2025-07-13',
+    mealSlots: [],
+    purchaseDays: ['2026-07-14', '2026-07-15', '2026-07-16'],
+    status: OrderStatus.PROMOTED,
+    orderTime: '2025-07-13 15:30:00',
+    payTime: '2025-07-13 15:35:00',
+  } as any,
+  {
+    id: '209',
+    orderNo: 'ORD20250712209',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·首頁版',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.COSTA,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 4,
+    groupId: 'G10004',
+    groupName: '新澳茶餐廳',
+    storeId: 'S30009',
+    storeName: '高士德旗艦店',
+    purchaseDate: '2025-07-12',
+    mealSlots: [],
+    purchaseDays: ['2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20'],
+    status: OrderStatus.CANCELLED,
+    orderTime: '2025-07-12 09:45:00',
+    payTime: '2025-07-12 09:50:00',
+  } as any,
+  {
+    id: '210',
+    orderNo: 'ORD20250711210',
+    algorithmId: 'ALG005',
+    promotionName: '新店廣告·團購版',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.GROUP_BUY,
+    region: Region.HACS,
+    recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 5,
+    groupId: 'G10005',
+    groupName: '灣仔海鮮坊',
+    storeId: 'S30010',
+    storeName: '黑沙灘店',
+    purchaseDate: '2025-07-11',
+    mealSlots: [],
+    purchaseDays: ['2026-07-12', '2026-07-13', '2026-07-14', '2026-07-15'],
+    status: OrderStatus.ABORTED,
+    orderTime: '2025-07-11 17:20:00',
+    payTime: '2025-07-11 17:25:00',
+  } as any,
 ]
 
 export default function PromotionOrderManage() {
@@ -936,10 +1255,12 @@ export default function PromotionOrderManage() {
     { key: 'app', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
     { key: 'region', title: '所屬商圈' },
-    { key: 'purchaseContent', title: orderType === '無敵星星' ? '購買時段' : orderType === '盤活復蘇' ? '購買天數' : '購買內容' },
-    { key: 'originalPrice', title: '訂單金額' },
-    { key: 'discount', title: '優惠金額' },
-    { key: 'actualPrice', title: '實付推廣金額' },
+    { key: 'purchaseContent', title: orderType === '無敵星星' ? '購買時段' : (orderType === '盤活復蘇' || orderType === '新店廣告') ? '推廣天數' : '購買內容' },
+    ...(orderType !== '新店廣告' ? [
+      { key: 'originalPrice', title: '訂單金額' },
+      { key: 'discount', title: '優惠金額' },
+      { key: 'actualPrice', title: '實付推廣金額' },
+    ] : []),
     { key: 'status', title: '訂單狀態' },
     { key: 'orderTime', title: '下單時間' },
     { key: 'action', title: '操作' },
@@ -1054,11 +1375,11 @@ export default function PromotionOrderManage() {
       },
     },
     {
-      title: orderType === '無敵星星' ? '購買時段' : orderType === '盤活復蘇' ? '購買天數' : '購買內容',
+      title: orderType === '無敵星星' ? '購買時段' : (orderType === '盤活復蘇' || orderType === '新店廣告') ? '推廣天數' : '購買內容',
       key: 'purchaseContent',
       width: 220,
       render: (_, record) => {
-        if (orderType === '盤活復蘇' || record.recommendType === RecommendType.REVITALIZATION_AD) {
+        if (orderType === '盤活復蘇' || orderType === '新店廣告' || record.recommendType === RecommendType.REVITALIZATION_AD || record.recommendType === RecommendType.NEW_STORE_AD) {
           // 盤活復蘇：展示天數，點擊弹窗查看具體日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {
             const days = record.purchaseDays.length
@@ -1076,7 +1397,7 @@ export default function PromotionOrderManage() {
             return (
               <Popover
                 content={dateContent}
-                title="購買日期明細"
+                title="推廣日期明細"
                 trigger="click"
                 placement="bottomLeft"
               >
@@ -1133,7 +1454,8 @@ export default function PromotionOrderManage() {
         return <span style={{ color: '#bfbfbf' }}>-</span>
       },
     },
-    {
+    // 新店廣告：無金額字段，跳過
+    ...(orderType !== '新店廣告' ? [{
       title: '訂單金額',
       dataIndex: 'originalPrice',
       key: 'originalPrice',
@@ -1144,7 +1466,7 @@ export default function PromotionOrderManage() {
       title: '優惠金額',
       key: 'discount',
       width: 120,
-      render: (_, record) => (
+      render: (_: any, record: OrderItem) => (
         <span style={{ color: '#fa8c16' }}>
           -${record.originalPrice - record.actualPrice}
         </span>
@@ -1158,14 +1480,20 @@ export default function PromotionOrderManage() {
       render: (price: number) => (
         <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${price}</span>
       ),
-    },
+    }] : []),
     {
       title: '訂單狀態',
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status: OrderStatus) => {
-        const { label, color } = ORDER_STATUS_MAP[status]
+      render: (status: OrderStatus, record: OrderItem) => {
+        // 盤活復蘇和無敵星星：已取消/已中止 顯示為已退款
+        const isNewStore = record.recommendType === RecommendType.NEW_STORE_AD
+        let displayStatus = status
+        if (!isNewStore && (status === OrderStatus.CANCELLED || status === OrderStatus.ABORTED)) {
+          displayStatus = OrderStatus.REFUNDED
+        }
+        const { label, color } = ORDER_STATUS_MAP[displayStatus]
         return <Tag color={color}>{label}</Tag>
       },
     },
@@ -1184,7 +1512,7 @@ export default function PromotionOrderManage() {
         <Button 
           type="link" 
           size="small"
-          onClick={() => navigate(`/order-detail?id=${record.id}&type=${encodeURIComponent(orderType)}`)}
+          onClick={() => navigate(`/order-detail?id=${record.id}&type=${encodeURIComponent(orderType)}${fromSource ? `&from=${encodeURIComponent(fromSource)}` : ''}`)}
         >
           詳情
         </Button>
@@ -1269,16 +1597,18 @@ export default function PromotionOrderManage() {
               )}
             </div>
           </div>
-          {/* 右侧：购买广告按钮 */}
-          <Button type="primary" icon={<ShoppingCartOutlined />}
-            onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
-            style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C',
-              borderRadius: 8, height: 36, padding: '0 18px',
-              boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>購買廣告</Button>
+          {/* 右侧：购买广告按钮（新店廣告無購買入口） */}
+          {orderType !== '新店廣告' && (
+            <Button type="primary" icon={<ShoppingCartOutlined />}
+              onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 18px',
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>購買廣告</Button>
+          )}
         </div>
       </div>
 
@@ -1400,6 +1730,14 @@ export default function PromotionOrderManage() {
                 onChange={value => setFilters({ ...filters, status: value })}
                 options={Object.values(OrderStatus)
                   .filter(v => typeof v === 'number')
+                  .filter(status => {
+                    // 新店廣告：不顯示已退款
+                    if (orderType === '新店廣告') {
+                      return status !== OrderStatus.REFUNDED
+                    }
+                    // 盤活復蘇/無敵星星：不顯示已取消/已中止
+                    return status !== OrderStatus.CANCELLED && status !== OrderStatus.ABORTED
+                  })
                   .map(status => ({
                     label: ORDER_STATUS_MAP[status as OrderStatus].label,
                     value: status,

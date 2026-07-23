@@ -648,6 +648,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
+    // 訂單列表 / 訂單詳情 歸屬「廣告銷售」菜單高亮
+    : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
+      ? 'ad-sales'
     : (pathToKey[location.pathname] || 'home')
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {

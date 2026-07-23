@@ -63,13 +63,17 @@ enum OrderStatus {
   PENDING_PROMOTION = 1,
   PROMOTING = 2,
   PROMOTED = 3,
-  REFUNDED = 4,
+  CANCELLED = 4,
+  ABORTED = 5,
+  REFUNDED = 6,
 }
 const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
   [OrderStatus.PENDING_PROMOTION]: { label: '待推廣', color: 'blue' },
   [OrderStatus.PROMOTING]: { label: '推廣中', color: 'green' },
   [OrderStatus.PROMOTED]: { label: '已完成', color: 'purple' },
-  [OrderStatus.REFUNDED]: { label: '已退款', color: 'orange' },
+  [OrderStatus.CANCELLED]: { label: '已取消', color: 'red' },
+  [OrderStatus.ABORTED]: { label: '已中止', color: 'orange' },
+  [OrderStatus.REFUNDED]: { label: '已退款', color: 'red' },
 }
 
 enum AppType { SHANFENG = 1, MFOOD = 2 }
@@ -151,6 +155,7 @@ interface OrderItem {
   refundEnabled?: boolean // 是否允许退款
   promoStartDate?: string // 推广开始日期
   promoData?: PromoRecord[] // 推广数据
+  purchaseDays?: string[] // 新店廣告：推廣日期列表
 }
 
 /* ---- 推广数据 Mock ---- */
@@ -186,6 +191,20 @@ function genRevivePromoData(regionName: string, slots: SlotPriceItem[]): PromoRe
     const clk = 90 + i * 18 + Math.floor(Math.random() * 50)
     return {
       date: sp.date, region: regionName,
+      waterfallName: WATERFALL_NAMES[i % WATERFALL_NAMES.length],
+      position: (i % 3) + 1,
+      impressions: imp, clicks: clk,
+      clickRate: +((clk / imp) * 100).toFixed(1),
+    }
+  })
+}
+
+function genNewStorePromoData(regionName: string, purchaseDays: string[]): PromoRecord[] {
+  return purchaseDays.map((date, i) => {
+    const imp = 1000 + i * 250 + Math.floor(Math.random() * 500)
+    const clk = 80 + i * 15 + Math.floor(Math.random() * 40)
+    return {
+      date, region: regionName,
       waterfallName: WATERFALL_NAMES[i % WATERFALL_NAMES.length],
       position: (i % 3) + 1,
       impressions: imp, clicks: clk,
@@ -259,9 +278,9 @@ function genOrder(
     } else {
       slotPrices.forEach(sp => { sp.region = Array.isArray(region) ? region[0] : region })
     }
-  // 为推广中/已退款（推广中退款）的订单生成推广数据
+  // 为推广中的订单生成推广数据
   let promoData: PromoRecord[] | undefined
-  if (status === OrderStatus.PROMOTING || (status === OrderStatus.REFUNDED && id !== '5')) {
+  if (status === OrderStatus.PROMOTING) {
     const regionName = REGION_LABEL[Array.isArray(region) ? region[0] : region] || '未知'
     promoData = isRevive
       ? genRevivePromoData(regionName, slotPrices)
@@ -289,34 +308,72 @@ const mockOrders: OrderItem[] = [
   genOrder('1','ORD20250705001','ALG001','無敵星星·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,[1,6,4],RecommendType.INVINCIBLE_STAR,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-05',2000,1800,1440,OrderStatus.PROMOTING,'2025-07-05 10:30:00','2025-07-05 10:35:00',[0,1,2,3,4,0,1,2,3,4],0,{count:10,discount:8},undefined,true,[[1,6,4],[2,3]]),
   genOrder('2','ORD20250706002','ALG002','無敵星星·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10002','閃蜂餐飲連鎖','S20002','氹仔分店','2025-07-06',1500,1350,1350,OrderStatus.PENDING_PROMOTION,'2025-07-06 14:20:00','2025-07-06 14:25:00',[3],0,null,undefined,false),
   genOrder('3','ORD20250707003','ALG003','盤活復蘇·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.INVINCIBLE_STAR,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-08',3000,2700,2700,OrderStatus.PROMOTED,'2025-07-07 09:15:00',undefined,[0,1,2,3,4],0,null),
-  genOrder('4','ORD20250703004','ALG004','流量廣告·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-03',1000,900,900,OrderStatus.REFUNDED,'2025-07-03 16:40:00','2025-07-03 16:45:00',[0],0,null,900),
-  genOrder('5','ORD20250702005','ALG001','無敵星星·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.INVINCIBLE_STAR,1,'G10002','閃蜂餐飲連鎖','S20005','新馬路店','2025-07-02',2500,2250,2250,OrderStatus.REFUNDED,'2025-07-02 11:20:00',undefined,[3,4],0,null,2250),
+  genOrder('4','ORD20250703004','ALG004','流量廣告·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-03',1000,900,900,OrderStatus.REFUNDED,'2025-07-03 16:40:00','2025-07-03 16:45:00',[0],0,null,180),
+  genOrder('5','ORD20250702005','ALG001','無敵星星·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.INVINCIBLE_STAR,1,'G10002','閃蜂餐飲連鎖','S20005','新馬路店','2025-07-02',2500,2250,2250,OrderStatus.REFUNDED,'2025-07-02 11:20:00',undefined,[3,4],0,null,1125),
   genOrder('6','ORD20250701006','ALG001','無敵星星·早鳥優惠',AppType.MFOOD,RecommendChannel.GROUP_BUY,1,RecommendType.INVINCIBLE_STAR,2,'G10003','大灣區餐飲集團','S20001','澳門總店','2025-07-01',1800,1620,1620,OrderStatus.PENDING_PROMOTION,'2025-07-01 08:30:00','2025-07-01 08:35:00',[0,1,2,3,4],0,null),
   genOrder('7','ORD20250630007','ALG002','新店廣告·零售閃購',AppType.SHANFENG,RecommendChannel.DELIVERY,3,RecommendType.INVINCIBLE_STAR,3,'G10001','澳門美食集團','S20002','氹仔分店','2025-06-30',1200,1080,1080,OrderStatus.PENDING_PROMOTION,'2025-06-30 10:15:00','2025-06-30 10:20:00',[1],0,null,undefined,false),
   genOrder('8','ORD20250629008','ALG003','盤活復蘇·團購到店',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.INVINCIBLE_STAR,4,'G10002','閃蜂餐飲連鎖','S20003','珠海旗艦店','2025-06-29',2800,2520,2520,OrderStatus.PROMOTED,'2025-06-29 15:45:00',undefined,[0,1,2,3,4],0,null),
-  genOrder('9','ORD20250628009','ALG004','流量廣告·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-06-28',1600,1440,1440,OrderStatus.REFUNDED,'2025-06-28 09:20:00','2025-06-28 09:25:00',[0,2],0,null,1440),
+  genOrder('9','ORD20250628009','ALG004','流量廣告·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-06-28',1600,1440,1440,OrderStatus.PROMOTED,'2025-06-28 09:20:00','2025-06-28 09:25:00',[0,2],0,null,1440),
   genOrder('10','ORD20250627010','ALG001','無敵星星·夜宵專場',AppType.MFOOD,RecommendChannel.DELIVERY,3,RecommendType.INVINCIBLE_STAR,5,'G10001','澳門美食集團','S20005','新馬路店','2025-06-27',2200,1980,1980,OrderStatus.PROMOTED,'2025-06-27 20:10:00','2025-06-27 20:15:00',[4],0,null),
   genOrder('11','ORD20250626011','ALG002','新店廣告·澳門專區',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.INVINCIBLE_STAR,2,'G10002','閃蜂餐飲連鎖','S20001','澳門總店','2025-06-26',1900,1710,1710,OrderStatus.PENDING_PROMOTION,'2025-06-26 11:30:00','2025-06-26 11:35:00',[1,3],0,null,undefined,false),
-  genOrder('12','ORD20250625012','ALG003','盤活復蘇·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.INVINCIBLE_STAR,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-06-25',1400,1260,1260,OrderStatus.REFUNDED,'2025-06-25 13:50:00',undefined,[1,3],0,null,1260),
+  genOrder('12','ORD20250625012','ALG003','盤活復蘇·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.INVINCIBLE_STAR,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-06-25',1400,1260,1260,OrderStatus.PROMOTED,'2025-06-25 13:50:00',undefined,[1,3],0,null,1260),
   genOrder('13','ORD20250624013','ALG004','流量廣告·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.INVINCIBLE_STAR,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-06-24',2100,1890,1890,OrderStatus.PROMOTED,'2025-06-24 07:40:00',undefined,[0,1],0,null),
-  genOrder('14','ORD20250623014','ALG001','無敵星星·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-06-23',3500,3150,3150,OrderStatus.REFUNDED,'2025-06-23 06:20:00','2025-06-23 06:25:00',[0,1,2,3,4,0,1],0,null,3150),
-  genOrder('15','ORD20250622015','ALG002','新店廣告·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-06-22',1700,1530,1530,OrderStatus.REFUNDED,'2025-06-22 10:05:00','2025-06-22 10:10:00',[0,1,2],0,null,1530),
+  genOrder('14','ORD20250623014','ALG001','無敵星星·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-06-23',3500,3150,3150,OrderStatus.PROMOTED,'2025-06-23 06:20:00','2025-06-23 06:25:00',[0,1,2,3,4,0,1],0,null,3150),
+  genOrder('15','ORD20250622015','ALG002','新店廣告·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-06-22',1700,1530,1530,OrderStatus.PROMOTED,'2025-06-22 10:05:00','2025-06-22 10:10:00',[0,1,2],0,null,1530),
   // 盤活復甦訂單 (id: 101-115)
   genOrder('101','ORD20250715101','ALG003','盤活復甦·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.REVITALIZATION_AD,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-15',3000,2700,2700,OrderStatus.PROMOTING,'2025-07-15 10:30:00','2025-07-15 10:35:00',[0,1,2],0,{count:3,discount:9}),
   genOrder('102','ORD20250714102','ALG003','盤活復甦·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10002','閃蜂餐飲連鎖','S20002','氹仔分店','2025-07-14',2500,2250,2250,OrderStatus.PENDING_PROMOTION,'2025-07-14 14:20:00','2025-07-14 14:25:00',[0,1],0,null,undefined,false),
   genOrder('103','ORD20250713103','ALG003','盤活復甦·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.REVITALIZATION_AD,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-13',4000,3600,3600,OrderStatus.PROMOTED,'2025-07-13 09:15:00',undefined,[0,1,2,3],0,null),
-  genOrder('104','ORD20250712104','ALG003','盤活復甦·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-12',1500,1350,1350,OrderStatus.REFUNDED,'2025-07-12 16:40:00','2025-07-12 16:45:00',[0],0,null,1350),
-  genOrder('105','ORD20250711105','ALG003','盤活復甦·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.REVITALIZATION_AD,1,'G10002','閃蜂餐飲連鎖','S20005','新馬路店','2025-07-11',5000,4500,4500,OrderStatus.REFUNDED,'2025-07-11 11:20:00',undefined,[0,1,2,3,4],0,null,4500),
+  genOrder('104','ORD20250712104','ALG003','盤活復甦·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-12',1500,1350,1350,OrderStatus.REFUNDED,'2025-07-12 16:40:00','2025-07-12 16:45:00',[0],0,null,270),
+  genOrder('105','ORD20250711105','ALG003','盤活復甦·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.REVITALIZATION_AD,1,'G10002','閃蜂餐飲連鎖','S20005','新馬路店','2025-07-11',5000,4500,4500,OrderStatus.REFUNDED,'2025-07-11 11:20:00',undefined,[0,1,2,3,4],0,null,2250),
   genOrder('106','ORD20250710106','ALG003','盤活復甦·早鳥優惠',AppType.MFOOD,RecommendChannel.GROUP_BUY,1,RecommendType.REVITALIZATION_AD,2,'G10003','大灣區餐飲集團','S20001','澳門總店','2025-07-10',2000,1800,1800,OrderStatus.PENDING_PROMOTION,'2025-07-10 08:30:00','2025-07-10 08:35:00',[0,1],0,null),
   genOrder('107','ORD20250709107','ALG003','盤活復·零售閃購',AppType.SHANFENG,RecommendChannel.DELIVERY,3,RecommendType.REVITALIZATION_AD,3,'G10001','澳門美食集團','S20002','氹仔分店','2025-07-09',3500,3150,3150,OrderStatus.PENDING_PROMOTION,'2025-07-09 10:15:00','2025-07-09 10:20:00',[0,1,2],0,null,undefined,false),
   genOrder('108','ORD20250708108','ALG003','盤活復甦·團購到店',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,4,'G10002','閃蜂餐飲連鎖','S20003','珠海旗艦店','2025-07-08',2800,2520,2520,OrderStatus.PROMOTED,'2025-07-08 15:45:00',undefined,[0,1],0,null),
-  genOrder('109','ORD20250707109','ALG003','盤活復甦·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-07-07',4500,4050,4050,OrderStatus.REFUNDED,'2025-07-07 09:20:00','2025-07-07 09:25:00',[0,1,2,3],0,null,4050),
+  genOrder('109','ORD20250707109','ALG003','盤活復甦·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-07-07',4500,4050,4050,OrderStatus.PROMOTED,'2025-07-07 09:20:00','2025-07-07 09:25:00',[0,1,2,3],0,null,4050),
   genOrder('110','ORD20250706110','ALG003','盤活復甦·夜宵專場',AppType.MFOOD,RecommendChannel.DELIVERY,3,RecommendType.REVITALIZATION_AD,5,'G10001','澳門美食集團','S20005','新馬路店','2025-07-06',2200,1980,1980,OrderStatus.PROMOTED,'2025-07-06 20:10:00','2025-07-06 20:15:00',[0,1],0,null),
   genOrder('111','ORD20250705111','ALG003','盤活復甦·澳門專區',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.REVITALIZATION_AD,2,'G10002','閃蜂餐飲連鎖','S20001','澳門總店','2025-07-05',6000,5400,5400,OrderStatus.PENDING_PROMOTION,'2025-07-05 11:30:00','2025-07-05 11:35:00',[0,1,2,3,4,0],0,null,undefined,false),
-  genOrder('112','ORD20250704112','ALG003','盤活復甦·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-07-04',1400,1260,1260,OrderStatus.REFUNDED,'2025-07-04 13:50:00',undefined,[0,1],0,null,1260),
+  genOrder('112','ORD20250704112','ALG003','盤活復甦·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-07-04',1400,1260,1260,OrderStatus.PROMOTED,'2025-07-04 13:50:00',undefined,[0,1],0,null,1260),
   genOrder('113','ORD20250703113','ALG003','盤活復甦·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-07-03',3200,2880,2880,OrderStatus.PROMOTED,'2025-07-03 07:40:00',undefined,[0,1,2],0,null),
-  genOrder('114','ORD20250702114','ALG003','盤活復甦·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-07-02',7000,6300,6300,OrderStatus.REFUNDED,'2025-07-02 06:20:00','2025-07-02 06:25:00',[0,1,2,3,4,0,1],0,null,6300),
-  genOrder('115','ORD20250701115','ALG003','盤活復甦·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-07-01',3800,3420,3420,OrderStatus.REFUNDED,'2025-07-01 10:05:00','2025-07-01 10:10:00',[0,1,2],0,null,3420),
+  genOrder('114','ORD20250702114','ALG003','盤活復甦·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-07-02',7000,6300,6300,OrderStatus.PROMOTED,'2025-07-02 06:20:00','2025-07-02 06:25:00',[0,1,2,3,4,0,1],0,null,6300),
+  genOrder('115','ORD20250701115','ALG003','盤活復甦·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-07-01',3800,3420,3420,OrderStatus.PROMOTED,'2025-07-01 10:05:00','2025-07-01 10:10:00',[0,1,2],0,null,3420),
+]
+
+/* ---- 新店廣告 Mock ---- */
+function genNewStoreOrder(
+  id: string, orderNo: string, app: AppType, channel: RecommendChannel,
+  region: number | number[], status: OrderStatus, groupName: string, storeName: string,
+  purchaseDays: string[], orderTime: string, payTime?: string,
+): OrderItem {
+  const pDays = purchaseDays
+  const regionName = REGION_LABEL[Array.isArray(region) ? region[0] : region] || '未知'
+  return {
+    id, orderNo, algorithmId: 'ALG-NS001', promotionName: '新店廣告·開業推廣',
+    app, channel, region, recommendType: RecommendType.NEW_STORE_AD,
+    slotPosition: 1, groupId: 'G10001', groupName, storeId: 'S-NS' + id, storeName,
+    purchaseDate: pDays[0], originalPrice: 0, discountPrice: 0, actualPrice: 0,
+    status, orderTime, payTime, slotPrices: [], gradientDiscount: null,
+    cancelFeeRules: [], promoData: genNewStorePromoData(regionName, pDays),
+    purchaseDays: pDays, refundEnabled: true, promoStartDate: '2026-07-16',
+  }
+}
+
+const newStoreOrders: OrderItem[] = [
+  genNewStoreOrder('201','ORD20250716201',AppType.SHANFENG,RecommendChannel.DELIVERY,1,OrderStatus.PROMOTING,'澳門美食集團','澳門總店',['2026-07-16','2026-07-17','2026-07-18'],'2025-07-16 10:30:00','2025-07-16 10:35:00'),
+  genNewStoreOrder('202','ORD20250715202',AppType.MFOOD,RecommendChannel.DELIVERY,3,OrderStatus.PENDING_PROMOTION,'閃蜂餐飲連鎖','氹仔分店',['2026-07-15','2026-07-16','2026-07-17'],'2025-07-15 14:20:00','2025-07-15 14:25:00'),
+  genNewStoreOrder('203','ORD20250714203',AppType.SHANFENG,RecommendChannel.GROUP_BUY,6,OrderStatus.PROMOTED,'大灣區餐飲集團','珠海旗艦店',['2025-06-20','2025-06-21','2025-06-22'],'2025-07-14 09:15:00',undefined),
+  genNewStoreOrder('204','ORD20250713204',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,OrderStatus.PROMOTED,'澳門美食集團','黑沙環店',['2025-06-18','2025-06-19','2025-06-20','2025-06-21'],'2025-07-13 16:40:00','2025-07-13 16:45:00'),
+  genNewStoreOrder('205','ORD20250712205',AppType.SHANFENG,RecommendChannel.DELIVERY,3,OrderStatus.PROMOTING,'閃蜂餐飲連鎖','新馬路店',['2026-07-12','2026-07-13','2026-07-14'],'2025-07-12 11:20:00',undefined),
+  genNewStoreOrder('206','ORD20250711206',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,OrderStatus.PENDING_PROMOTION,'大灣區餐飲集團','澳門總店',['2026-07-11','2026-07-12'],'2025-07-11 08:30:00','2025-07-11 08:35:00'),
+  genNewStoreOrder('207','ORD20250710207',AppType.SHANFENG,RecommendChannel.DELIVERY,1,OrderStatus.PROMOTED,'澳門美食集團','氹仔分店',['2025-06-22','2025-06-23','2025-06-24'],'2025-07-10 10:15:00','2025-07-10 10:20:00'),
+  genNewStoreOrder('208','ORD20250709208',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,OrderStatus.PROMOTED,'閃蜂餐飲連鎖','珠海旗艦店',['2025-06-25','2025-06-26'],'2025-07-09 15:45:00',undefined),
+  genNewStoreOrder('209','ORD20250708209',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,OrderStatus.PENDING_PROMOTION,'大灣區餐飲集團','黑沙環店',['2026-07-08','2026-07-09','2026-07-10'],'2025-07-08 09:20:00','2025-07-08 09:25:00'),
+  genNewStoreOrder('210','ORD20250707210',AppType.MFOOD,RecommendChannel.DELIVERY,1,OrderStatus.PROMOTING,'澳門美食集團','新馬路店',['2026-07-07','2026-07-08','2026-07-09','2026-07-10'],'2025-07-07 20:10:00','2025-07-07 20:15:00'),
+  // 5天推廣期（當天±2天）- 覆蓋所有狀態
+  genNewStoreOrder('211','ORD20260723211',AppType.SHANFENG,RecommendChannel.DELIVERY,1,OrderStatus.PROMOTING,'新澳茶餐廳','黑沙環旗艦店',['2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'],'2026-07-20 10:00:00','2026-07-20 10:05:00'),
+  genNewStoreOrder('212','ORD20260723212',AppType.MFOOD,RecommendChannel.GROUP_BUY,3,OrderStatus.PENDING_PROMOTION,'灣仔海鮮坊','氹仔新店',['2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'],'2026-07-20 14:30:00','2026-07-20 14:35:00'),
+  genNewStoreOrder('213','ORD20260723213',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,OrderStatus.PROMOTED,'珠海美食居','珠海旗艦店',['2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'],'2026-07-18 09:00:00','2026-07-18 09:10:00'),
+  genNewStoreOrder('214','ORD20260723214',AppType.MFOOD,RecommendChannel.DELIVERY,4,OrderStatus.CANCELLED,'澳門甜品屋','高士德新店',['2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'],'2026-07-19 11:00:00','2026-07-19 11:05:00'),
+  genNewStoreOrder('215','ORD20260723215',AppType.SHANFENG,RecommendChannel.DELIVERY,2,OrderStatus.ABORTED,'新澳茶餐廳','新馬路旗艦店',['2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'],'2026-07-17 16:00:00','2026-07-17 16:10:00'),
 ]
 
 /* ---- 进度阶段定义 ---- */
@@ -332,6 +389,8 @@ function getStageIndex(status: OrderStatus): number {
     case OrderStatus.PENDING_PROMOTION: return 1
     case OrderStatus.PROMOTING: return 2
     case OrderStatus.PROMOTED: return 3
+    case OrderStatus.CANCELLED: return 3
+    case OrderStatus.ABORTED: return 3
     case OrderStatus.REFUNDED: return 3
     default: return 0
   }
@@ -342,7 +401,6 @@ function getStageTime(status: OrderStatus, stageIdx: number, order: OrderItem): 
   if (stageIdx === 1) return order.payTime || ''
   if (stageIdx === 2) return order.promoStartDate || ''
   if (stageIdx === 3) {
-    if (order.status === OrderStatus.REFUNDED) return '已退款'
     return ''
   }
   return ''
@@ -369,6 +427,9 @@ export default function OrderDetail() {
   const [searchParams] = useSearchParams()
   const orderId = searchParams.get('id')
   const orderType = searchParams.get('type') || ''
+  // 来源标识：透传回訂單列表，保證返回鏈路（廣告銷售 vs 店鋪推廣）不丟失
+  const fromSource = searchParams.get('from') || ''
+  const backToListPath = `/promotion-order-manage?type=${encodeURIComponent(orderType)}${fromSource ? `&from=${encodeURIComponent(fromSource)}` : ''}`
   const [order, setOrder] = useState<OrderItem | null>(null)
   const [refundModalVisible, setRefundModalVisible] = useState(false)
   const [slotsCollapsed, setSlotsCollapsed] = useState(false)
@@ -376,23 +437,32 @@ export default function OrderDetail() {
 
   useEffect(() => {
     if (orderId) {
-      setOrder(mockOrders.find(o => o.id === orderId) || null)
+      setOrder([...mockOrders, ...newStoreOrders].find(o => o.id === orderId) || null)
     }
   }, [orderId])
 
   // 计算退款信息
   const refundInfo = useMemo(() => {
     if (!order) return null
-    const rules = order.cancelFeeRules
+    const rules = [...order.cancelFeeRules].sort((a, b) => a.maxDays - b.maxDays)
     const today = new Date()
     const promoStart = order.promoStartDate ? new Date(order.promoStartDate) : null
 
+    // 已退款 → 以退款金額為源，反推扣費比例並匹配到對應規則
+    if (order.status === OrderStatus.REFUNDED) {
+      const refundAmount = order.refundAmount ?? 0
+      const feePercent = order.actualPrice > 0
+        ? Math.round((1 - refundAmount / order.actualPrice) * 100)
+        : 0
+      // 根據扣費比例匹配到對應的規則（feePercent 為0表示超出規則全額退款）
+      const matchedRule = rules.find(r => r.feePercent === feePercent) ?? null
+      const daysBefore = matchedRule?.maxDays ?? 0
+      return { daysBefore, feePercent, refundAmount, matchedRule, isPromoting: false }
+    }
+
     // 推广中或已完成 → 退款金额为0
     if (order.status === OrderStatus.PROMOTING || order.status === OrderStatus.PROMOTED) {
-      return { daysBefore: 0, feePercent: 100, refundAmount: 0, isPromoting: true }
-    }
-    if (order.status === OrderStatus.REFUNDED) {
-      return { daysBefore: 0, feePercent: 0, refundAmount: order.refundAmount || 0, isPromoting: false }
+      return { daysBefore: 0, feePercent: 100, refundAmount: 0, matchedRule: null, isPromoting: true }
     }
 
     // 待推广 → 基于规则计算
@@ -401,9 +471,11 @@ export default function OrderDetail() {
       const daysBefore = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
       // 找到匹配的扣费规则
       let feePercent = 100
-      for (const rule of rules.sort((a, b) => a.maxDays - b.maxDays)) {
+      let matchedRule: { maxDays: number; feePercent: number } | null = null
+      for (const rule of rules) {
         if (daysBefore <= rule.maxDays) {
           feePercent = rule.feePercent
+          matchedRule = rule
           break
         }
       }
@@ -412,7 +484,7 @@ export default function OrderDetail() {
         feePercent = 0
       }
       const refundAmount = Math.round(order.actualPrice * (1 - feePercent / 100))
-      return { daysBefore, feePercent, refundAmount, isPromoting: false }
+      return { daysBefore, feePercent, refundAmount, matchedRule, isPromoting: false }
     }
     return null
   }, [order])
@@ -428,6 +500,26 @@ export default function OrderDetail() {
   const statusInfo = ORDER_STATUS_MAP[order.status]
   const currentStage = getStageIndex(order.status)
   const isRefunded = order.status === OrderStatus.REFUNDED
+  const isNewStore = order.recommendType === RecommendType.NEW_STORE_AD
+
+  // 新店廣告：計算每推廣日的狀態
+  const getDayStatus = (day: string): OrderStatus => {
+    const today = new Date().toISOString().split('T')[0]
+    if (order.status === OrderStatus.PROMOTED) return OrderStatus.PROMOTED
+    if (order.status === OrderStatus.CANCELLED) {
+      return day < today ? OrderStatus.PROMOTED : OrderStatus.CANCELLED
+    }
+    if (order.status === OrderStatus.ABORTED) {
+      return day < today ? OrderStatus.PROMOTED : OrderStatus.ABORTED
+    }
+    if (order.status === OrderStatus.PROMOTING) {
+      if (day < today) return OrderStatus.PROMOTED
+      if (day === today) return OrderStatus.PROMOTING
+      return OrderStatus.PENDING_PROMOTION
+    }
+    // PENDING_PROMOTION
+    return day < today ? OrderStatus.PROMOTED : OrderStatus.PENDING_PROMOTION
+  }
 
   // 按日期分组时段（普通计算，不用 useMemo，因为已在条件返回之后）
   const slotsByDateMap = new Map<string, SlotPriceItem[]>()
@@ -449,9 +541,10 @@ export default function OrderDetail() {
   }
 
   const confirmRefund = () => {
-    setOrder(prev => prev ? { ...prev, status: OrderStatus.REFUNDED, refundAmount: refundInfo?.refundAmount || 0 } : null)
+    const newStatus = isNewStore ? OrderStatus.CANCELLED : OrderStatus.PROMOTED
+    setOrder(prev => prev ? { ...prev, status: newStatus } : null)
     setRefundModalVisible(false)
-    message.success('退款成功')
+    message.success(isNewStore ? '已取消推廣' : '退款成功')
   }
 
   return (
@@ -474,7 +567,7 @@ export default function OrderDetail() {
           {/* 左侧：返回 + 标题 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(orderType)}`)}
+              onClick={() => navigate(backToListPath)}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 16px',
@@ -716,7 +809,7 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text="購買商圈時段與價格" />
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? '推廣商圈與日期' : '購買商圈時段與價格'} />
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
@@ -841,8 +934,50 @@ export default function OrderDetail() {
           )
         })()}
 
+        {/* 新店廣告：推廣商圈與日期（無價格） */}
+        {isNewStore && (() => {
+          const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
+          return (
+            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{
+                background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
+                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <Tag color="blue" style={{ margin: 0 }}>{REGION_LABEL[regionVal]}</Tag>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '50%' }} />
+                  <col style={{ width: '50%' }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ background: '#FAFAFA' }}>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>推廣日期</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>推廣狀態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(order.purchaseDays || []).map((day, i) => {
+                    const dayStatus = getDayStatus(day)
+                    return (
+                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                        <td style={{ padding: '8px 16px', textAlign: 'center' }}>{day}</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                          <Tag color={ORDER_STATUS_MAP[dayStatus]?.color || 'default'} style={{ margin: 0 }}>
+                            {ORDER_STATUS_MAP[dayStatus]?.label || '未知'}
+                          </Tag>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
+
         {/* 费用汇总 */}
-        <div style={{
+        {!isNewStore && <div style={{
           padding: '20px', background: 'linear-gradient(135deg, #FFF9F0, #FFF4E6)', borderRadius: 12,
           border: '1px solid #FFE0B2',
         }}>
@@ -930,24 +1065,29 @@ export default function OrderDetail() {
             )}
             <span style={{ color: '#BFBFBF' }}>（MOP）</span>
           </div>
-        </div>
+        </div>}
 
         </>
                   )}
                   </Card>
 
-                  {/* 取消扣费规则 - 独立区块，不随折叠 */}
-                  <div style={{
+                  {/* 訂單退款扣費比例 - 独立区块，新店廣告不顯示 */}
+                  {!isNewStore && <div style={{
                     marginBottom: 16, padding: '14px 20px', borderRadius: 8,
                     background: order.refundEnabled === false ? '#fff2f0' : '#FAFAFA',
                     border: order.refundEnabled === false ? '1px solid #ffccc7' : '1px solid #F0F0F0',
                   }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 4, height: 14, background: '#FF4D4F', borderRadius: 2, display: 'inline-block' }} />
-                      取消扣費規則
+                      訂單退款扣費比例
                       {order.refundEnabled === false && (
                         <Tag color="error" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>
                           不允許退款
+                        </Tag>
+                      )}
+                      {isRefunded && (
+                        <Tag color="red" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>
+                          已退款
                         </Tag>
                       )}
                     </div>
@@ -956,16 +1096,46 @@ export default function OrderDetail() {
                         ⚠️ 當前訂單所選算法不允許退款，下單後無法申請退款。
                       </div>
                     ) : (
-                      <div style={{ fontSize: 12, color: '#8C8C8C' }}>
-                        {order.cancelFeeRules.map((rule, i) => (
-                          <span key={i}>
-                            {i > 0 && ' | '}
-                            推廣前 {rule.maxDays} 天內扣 {rule.feePercent}%
-                          </span>
-                        ))}
-                      </div>
+                      <>
+                        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                          {order.cancelFeeRules.map((rule, i) => (
+                            <span key={i}>
+                              {i > 0 && ' | '}
+                              推廣前 {rule.maxDays} 天內扣 {rule.feePercent}%
+                            </span>
+                          ))}
+                        </div>
+                        {/* 已退款訂單：展示退款金額與匹配到的規則 */}
+                        {isRefunded && (
+                          <div style={{
+                            marginTop: 12, padding: '12px 16px', borderRadius: 8,
+                            background: '#fff2f0', border: '1px solid #ffccc7',
+                            display: 'flex', flexDirection: 'column', gap: 8,
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: 12, color: '#8C8C8C' }}>匹配規則</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#cf1322' }}>
+                                {refundInfo?.matchedRule
+                                  ? `推廣前 ${refundInfo.matchedRule.maxDays} 天內扣 ${refundInfo.matchedRule.feePercent}%`
+                                  : `推廣前 ${refundInfo?.daysBefore ?? 0} 天以上，不扣費`}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: 12, color: '#8C8C8C' }}>扣費比例</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{refundInfo?.feePercent ?? 0}%</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #ffccc7', paddingTop: 8 }}>
+                              <span style={{ fontSize: 12, color: '#8C8C8C' }}>退款金額</span>
+                              <span style={{ fontSize: 16, fontWeight: 700, color: '#cf1322' }}>MOP {refundInfo?.refundAmount ?? 0}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: '#bfbfbf' }}>
+                              計算公式：退款金額 = 實付 MOP {order.actualPrice} × (1 - {refundInfo?.feePercent ?? 0}%) = MOP {refundInfo?.refundAmount ?? 0}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
-                  </div>
+                  </div>}
                 </div>
               ),
             },
@@ -976,7 +1146,6 @@ export default function OrderDetail() {
                   <BarChartOutlined style={{ color: '#E8720C' }} /> 推廣數據
                   {order.status === OrderStatus.PROMOTING && <Tag color="processing" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>推廣中</Tag>}
                   {order.status === OrderStatus.PROMOTED && <Tag color="purple" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>已完成</Tag>}
-                  {order.status === OrderStatus.REFUNDED && <Tag color="orange" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>已退款</Tag>}
                   {order.status === OrderStatus.PENDING_PROMOTION && <Tag color="default" style={{ fontSize: 10, borderRadius: 4, margin: 0, padding: '0 6px', lineHeight: '18px' }}>待推廣</Tag>}
                 </span>
               ),
@@ -990,26 +1159,6 @@ export default function OrderDetail() {
                     }}>
                       <ExclamationCircleOutlined style={{ fontSize: 16, color: '#faad14' }} />
                       <span style={{ fontSize: 13, color: '#8c6e00' }}>當前訂單尚未開始推廣，推廣數據將在推廣開始後產生，請耐心等待。</span>
-                    </div>
-                  )}
-                  {/* 已退款 + 无推广数据：提醒 */}
-                  {order.status === OrderStatus.REFUNDED && !order.promoData?.length && (
-                    <div style={{
-                      background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 8,
-                      padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10,
-                    }}>
-                      <ExclamationCircleOutlined style={{ fontSize: 16, color: '#ff4d4f' }} />
-                      <span style={{ fontSize: 13, color: '#a8071a' }}>商家在推廣開始前已退款，暫無推廣數據產生。</span>
-                    </div>
-                  )}
-                  {/* 已退款 + 有推广数据：提醒 */}
-                  {order.status === OrderStatus.REFUNDED && order.promoData && order.promoData.length > 0 && (
-                    <div style={{
-                      background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8,
-                      padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10,
-                    }}>
-                      <ExclamationCircleOutlined style={{ fontSize: 16, color: '#fa8c16' }} />
-                      <span style={{ fontSize: 13, color: '#873806' }}>商家在推廣過程中已退款，以下為退款前已產生的推廣數據，僅供參考。</span>
                     </div>
                   )}
                   {/* 汇总统计 */}
@@ -1053,11 +1202,11 @@ export default function OrderDetail() {
                   {/* 推广数据明细 - 按日期分组，商圈 rowSpan 合并 */}
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
-                    {order.recommendType === RecommendType.INVINCIBLE_STAR ? '⭐ 無敵星星' : '🔥 盤活復蘇'} · 推廣數據明細
+                    {order.recommendType === RecommendType.INVINCIBLE_STAR ? '⭐ 無敵星星' : order.recommendType === RecommendType.NEW_STORE_AD ? '🏪 新店廣告' : '🔥 盤活復蘇'} · 推廣數據明細
                   </div>
                   {(order.promoData || []).length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '24px 0', color: '#8C8C8C', fontSize: 13 }}>暫無推廣數據</div>
-                  ) : order.recommendType === RecommendType.REVITALIZATION_AD ? (
+                  ) : order.recommendType === RecommendType.REVITALIZATION_AD || order.recommendType === RecommendType.NEW_STORE_AD ? (
                     /* 盘活复苏：单商圈标题 + 平铺推广日期 */
                     (() => {
                       const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
@@ -1123,14 +1272,16 @@ export default function OrderDetail() {
                           </div>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                             <colgroup>
+                              <col style={{ width: '15%' }} />
+                              <col style={{ width: '15%' }} />
+                              <col style={{ width: '20%' }} />
                               <col style={{ width: '18%' }} />
-                              <col style={{ width: '22%' }} />
-                              <col style={{ width: '20%' }} />
-                              <col style={{ width: '20%' }} />
+                              <col style={{ width: '16%' }} />
                             </colgroup>
                             <thead>
                               <tr style={{ background: '#FAFAFA' }}>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>所屬商圈</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>時段</th>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>曝光量</th>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>點擊量</th>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>點擊率</th>
@@ -1149,28 +1300,50 @@ export default function OrderDetail() {
                                 })
                                 let rowIdx = 0
                                 return regionGroups.map(({ region: r, recs: rRecs }) => {
-                                  return rRecs.map((rec, si) => {
-                                    const idx = rowIdx++
-                                    return (
-                                      <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                                        {si === 0 && (
-                                          <td rowSpan={rRecs.length} style={{
-                                            padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
-                                            background: '#FAFAFA', borderRight: '1px solid #f0f0f0',
-                                          }}>
-                                            <Tag color="blue" style={{ margin: 0 }}>{r}</Tag>
+                                  // 按時段分組
+                                  const slotGroups: { slot: string; recs: PromoRecord[] }[] = []
+                                  const slotMap = new Map<string, PromoRecord[]>()
+                                  rRecs.forEach(rec => {
+                                    const slotName = rec.slot || '全時段'
+                                    if (!slotMap.has(slotName)) {
+                                      slotMap.set(slotName, [])
+                                      slotGroups.push({ slot: slotName, recs: slotMap.get(slotName)! })
+                                    }
+                                    slotMap.get(slotName)!.push(rec)
+                                  })
+                                  const regionRowCount = rRecs.length
+                                  return slotGroups.flatMap(({ slot: s, recs: sRecs }, slotIdx) => {
+                                    return sRecs.map((rec, si) => {
+                                      const idx = rowIdx++
+                                      return (
+                                        <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                          {si === 0 && slotIdx === 0 && (
+                                            <td rowSpan={regionRowCount} style={{
+                                              padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
+                                              background: '#FAFAFA', borderRight: '1px solid #f0f0f0',
+                                            }}>
+                                              <Tag color="blue" style={{ margin: 0 }}>{r}</Tag>
+                                            </td>
+                                          )}
+                                          {si === 0 && (
+                                            <td rowSpan={sRecs.length} style={{
+                                              padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
+                                              borderRight: '1px solid #f0f0f0',
+                                            }}>
+                                              <Tag color="default" style={{ margin: 0 }}>{s}</Tag>
+                                            </td>
+                                          )}
+                                          <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
+                                          <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
+                                          <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                                            <span style={{
+                                              color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                              fontWeight: 600,
+                                            }}>{rec.clickRate}%</span>
                                           </td>
-                                        )}
-                                        <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
-                                        <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
-                                        <td style={{ padding: '8px 16px', textAlign: 'center' }}>
-                                          <span style={{
-                                            color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
-                                            fontWeight: 600,
-                                          }}>{rec.clickRate}%</span>
-                                        </td>
-                                      </tr>
-                                    )
+                                        </tr>
+                                      )
+                                    })
                                   })
                                 })
                               })()}
@@ -1189,33 +1362,65 @@ export default function OrderDetail() {
 
       {/* 底部操作栏 */}
       <div className="form-footer">
-        <Button onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(orderType)}`)}>
+        <Button onClick={() => navigate(backToListPath)}>
           返回列表
         </Button>
         {(order.status === OrderStatus.PENDING_PROMOTION || order.status === OrderStatus.PROMOTING) && order.refundEnabled !== false && (
           <Button type="primary" danger icon={<RollbackOutlined />}
             onClick={handleRefund}>
-            申請退款
+            {isNewStore ? '取消推廣' : '申請退款'}
           </Button>
         )}
       </div>
 
-      {/* 退款确认弹窗 */}
+      {/* 退款/取消推廣确认弹窗 */}
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ExclamationCircleOutlined style={{ color: '#FF4D4F', fontSize: 18 }} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: '#262626' }}>確認退款</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#262626' }}>{isNewStore ? '確認取消推廣' : '確認退款'}</span>
           </div>
         }
         open={refundModalVisible}
         onOk={confirmRefund}
         onCancel={() => setRefundModalVisible(false)}
-        okText="確認退款"
+        okText={isNewStore ? '確認取消' : '確認退款'}
         cancelText="取消"
         okButtonProps={{ danger: true }}
       >
-        {refundInfo?.isPromoting ? (
+        {isNewStore ? (
+          <div>
+            <div style={{
+              background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 8,
+              padding: 16, marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 13, color: '#595959', lineHeight: 2 }}>
+                <div style={{ marginBottom: 8 }}>
+                  新店入駐後，系統將自動開通 <strong style={{ color: '#E8720C' }}>60 天</strong> 的新店推廣期。在此期間：
+                </div>
+                <div style={{ paddingLeft: 8 }}>
+                  • 若商家入駐後過一段時間才開始推廣，按剩餘可用天數推廣<br />
+                  • 推廣期間，操作「取消推廣」，取消後天數仍會持續扣減<br />
+                  • 當 60 天推廣期過後，將無法再享受新店推廣
+                </div>
+              </div>
+            </div>
+            <div style={{
+              background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 8,
+              padding: 12, marginBottom: 12,
+            }}>
+              <div style={{ fontSize: 13, color: '#FF4D4F', fontWeight: 600 }}>
+                ⚠️ 取消後推廣天數仍會繼續倒數，請確認後再操作。
+              </div>
+            </div>
+            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+              <Descriptions.Item label="訂單編號">{order.orderNo}</Descriptions.Item>
+              <Descriptions.Item label="剩餘推廣天數">
+                <span style={{ color: '#E8720C', fontWeight: 600 }}>{order.purchaseDays?.length || 0} 天</span>
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        ) : refundInfo?.isPromoting ? (
           <div>
             <div style={{
               background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 8,

@@ -206,17 +206,19 @@ export default function AdSales() {
                                 >
                                   查看訂單
                                 </Button>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  icon={<ShoppingCartOutlined />}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleGoToPurchase(config)
-                                  }}
-                                >
-                                  購買廣告
-                                </Button>
+                                {config.type !== AlgorithmType.NEW_STORE_AD && (
+                                  <Button
+                                    type="primary"
+                                    size="small"
+                                    icon={<ShoppingCartOutlined />}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleGoToPurchase(config)
+                                    }}
+                                  >
+                                    購買廣告
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </div>
