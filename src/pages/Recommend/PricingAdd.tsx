@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useEffect } from 'react'
-import { Form, Input, InputNumber, Select, Button, Space, message, Tag, Modal, Tree, Switch, Table } from 'antd'
+import { Form, Input, InputNumber, Select, Button, Space, message, Tag, Modal, Tree, Switch, Table, Card } from 'antd'
 import {
   ArrowLeftOutlined,
   SaveOutlined,
   PlusOutlined,
   DeleteFilled,
   EditOutlined,
+  AppstoreOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -340,7 +342,7 @@ export default function PricingAdd() {
         }} />
         <div style={{
           padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />}
@@ -349,11 +351,23 @@ export default function PricingAdd() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}>返回</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{pageTitle}</h2>
-              {isReviveAlgorithm && <span style={{ fontSize: 14 }}>🔥 盤活復蘇</span>}
+              {isReviveAlgorithm && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '3px 12px', background: '#FFF7E6',
+                  border: '1px solid #FFD591', borderRadius: 4,
+                  fontSize: 13, color: '#E8720C', fontWeight: 500,
+                }}>
+                  <span style={{ fontSize: 14 }}>🔥</span>
+                  盤活復蘇
+                </div>
+              )}
             </div>
           </div>
           {!isDetailMode && (
@@ -361,6 +375,8 @@ export default function PricingAdd() {
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 18px',
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}>保存</Button>
           )}
         </div>
@@ -372,24 +388,29 @@ export default function PricingAdd() {
         disabled={isDetailMode}
       >
         {/* 基础信息 */}
-        <div style={{
-          borderLeft: '4px solid #1890FF', borderRadius: 10,
-          background: '#fff', padding: '20px 24px', marginBottom: 16,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#E6F7FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14 }}>📋</span>
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基礎信息</span>
-          </div>
+        <Card
+          title={
+            <Space>
+              <AppstoreOutlined style={{ fontSize: 16, color: '#1890ff' }} />
+              <span style={{ fontSize: 15, fontWeight: 500 }}>基礎信息</span>
+            </Space>
+          }
+          style={{
+            marginTop: 16,
+            backgroundColor: '#fafbfc',
+            border: '1px solid #e8eaed',
+            borderRadius: 8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          }}
+          headStyle={{
+            backgroundColor: '#f0f5ff',
+            borderBottom: '1px solid #d6e4ff',
+            borderRadius: '8px 8px 0 0',
+          }}
+        >
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item
-              label={<span><span style={{ color: 'red' }}>* </span>算法名稱</span>}
-              name="algorithmType"
-              rules={[{ required: true, message: '請選擇算法' }]}
-            >
+            <Form.Item label="算法名稱" name="algorithmType" rules={[{ required: true, message: '請選擇算法' }]}>
               <Select
                 placeholder="請選擇算法"
                 options={ALGORITHM_OPTIONS}
@@ -402,19 +423,11 @@ export default function PricingAdd() {
               />
             </Form.Item>
 
-            <Form.Item
-              label={<span><span style={{ color: 'red' }}>* </span>所屬品牌</span>}
-              name="app"
-              rules={[{ required: true, message: '請選擇所屬品牌' }]}
-            >
+            <Form.Item label="所屬品牌" name="app" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
               <Select placeholder="請選擇所屬品牌" options={APP_OPTIONS} />
             </Form.Item>
 
-            <Form.Item
-              label={<span><span style={{ color: 'red' }}>* </span>業務頻道</span>}
-              name="channel"
-              rules={[{ required: true, message: '請選擇業務頻道' }]}
-            >
+            <Form.Item label="業務頻道" name="channel" rules={[{ required: true, message: '請選擇業務頻道' }]}>
               <Select placeholder="請選擇業務頻道" options={CHANNEL_OPTIONS} />
             </Form.Item>
           </div>
@@ -429,21 +442,30 @@ export default function PricingAdd() {
               <span>上傳詳情圖</span>
             </div>
           </Form.Item>
-        </div>
+        </Card>
 
         {/* 销售策略 */}
-        <div style={{
-          borderLeft: '4px solid #E8720C', borderRadius: 10,
-          background: '#fff', padding: '20px 24px', marginBottom: 16,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#FFF7E6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14 }}>📊</span>
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>銷售策略</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>策略配置</Tag>
-          </div>
+        <Card
+          title={
+            <Space>
+              <SettingOutlined style={{ fontSize: 16, color: '#E8720C' }} />
+              <span style={{ fontSize: 15, fontWeight: 500 }}>銷售策略</span>
+            </Space>
+          }
+          extra={<Tag color="orange" style={{ fontSize: 11 }}>策略配置</Tag>}
+          style={{
+            marginTop: 16,
+            backgroundColor: '#ffffff',
+            border: '1px solid #e8eaed',
+            borderRadius: 12,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+          }}
+          headStyle={{
+            borderBottom: '1px solid #ffe7ba',
+            borderRadius: '12px 12px 0 0',
+            padding: '16px 24px',
+          }}
+        >
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -466,22 +488,18 @@ export default function PricingAdd() {
               <span style={{ fontSize: 12, color: '#8c8c8c' }}>被屏蔽的商家，無法購買該算法廣告，並且商家在購買界面無法查詢到該算法，對商家不可見。</span>
             </div>
           </div>
-        </div>
-
+        </Card>
         {/* 盘活复苏：商圈计价配置 */}
         {isReviveAlgorithm && (
-          <div style={{
-            borderLeft: '4px solid #722ED1', borderRadius: 10,
-            background: '#fff', padding: '20px 24px', marginBottom: 16,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#F9F0FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14 }}>🏪</span>
-              </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>商圈計價配置</span>
-              <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>分區定價</Tag>
-              <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          <Card
+            title={
+              <Space>
+                <span style={{ fontSize: 16 }}>🏪</span>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>商圈計價配置</span>
+                <Tag color="purple" style={{ fontSize: 11 }}>分區定價</Tag>
+              </Space>
+            }
+            extra={
               <Button
                 type="primary"
                 size="small"
@@ -491,11 +509,24 @@ export default function PricingAdd() {
                   setReplacingRegion(null)
                   setRegionSelectModalVisible(true)
                 }}
-                style={{ borderRadius: 6, backgroundColor: '#722ED1', borderColor: '#722ED1' }}
+                style={{ borderRadius: 6 }}
               >
                 選擇商圈
               </Button>
-            </div>
+            }
+            style={{
+              marginTop: 16,
+              backgroundColor: '#fafbfc',
+              border: '1px solid #e8eaed',
+              borderRadius: 8,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+            headStyle={{
+              backgroundColor: '#f9f0ff',
+              borderBottom: '1px solid #d3adf7',
+              borderRadius: '8px 8px 0 0',
+            }}
+          >
             {districtPricings.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
                 請選擇商圈並點擊“新增”按鈕添加計價配置
@@ -544,28 +575,37 @@ export default function PricingAdd() {
                 </div>
               ))
             )}
-          </div>
+          </Card>
         )}
 
         {/* 盘活复苏：購買多天折扣配置（梯度）- 選擇商圈後才展示 */}
         {isReviveAlgorithm && districtPricings.length > 0 && (
-          <div style={{
-            borderLeft: '4px solid #13c2c2', borderRadius: 10,
-            background: '#fff', padding: '20px 24px', marginBottom: 16,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#F9F0FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14 }}>🎯</span>
-              </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
-              <Switch
-                checked={discountEnabled}
-                onChange={setDiscountEnabled}
-                style={{ marginLeft: 8 }}
-              />
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
-            </div>
+          <Card
+            title={
+              <Space>
+                <span style={{ fontSize: 16 }}>🎯</span>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>購買多天折扣配置（梯度）</span>
+              </Space>
+            }
+            extra={
+              <Space>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
+                <Switch checked={discountEnabled} onChange={setDiscountEnabled} />
+              </Space>
+            }
+            style={{
+              marginTop: 16,
+              backgroundColor: '#ffffff',
+              border: '1px solid #e8eaed',
+              borderRadius: 12,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+            }}
+            headStyle={{
+              borderBottom: '1px solid #b5f5ec',
+              borderRadius: '12px 12px 0 0',
+              padding: '16px 24px',
+            }}
+          >
             {discountEnabled && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
                 <Form.Item
@@ -583,22 +623,31 @@ export default function PricingAdd() {
                 </Form.Item>
               </div>
             )}
-          </div>
+          </Card>
         )}
 
         {/* 非盘活复苏：区域和单日单价 */}
         {!isReviveAlgorithm && (
-          <div style={{
-            borderLeft: '4px solid #722ED1', borderRadius: 10,
-            background: '#fff', padding: '20px 24px', marginBottom: 16,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#F9F0FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14 }}>💰</span>
-              </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>價格配置</span>
-            </div>
+          <Card
+            title={
+              <Space>
+                <span style={{ fontSize: 16 }}>💰</span>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>價格配置</span>
+              </Space>
+            }
+            style={{
+              marginTop: 16,
+              backgroundColor: '#fafbfc',
+              border: '1px solid #e8eaed',
+              borderRadius: 8,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+            headStyle={{
+              backgroundColor: '#f9f0ff',
+              borderBottom: '1px solid #d3adf7',
+              borderRadius: '8px 8px 0 0',
+            }}
+          >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
               <Form.Item
                 label="區域"
@@ -630,22 +679,20 @@ export default function PricingAdd() {
                 <Input placeholder="如：7天9折 / 30天8折" />
               </Form.Item>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* 取消订单，扣费配置 */}
-        <div style={{
-          borderLeft: '4px solid #F5222D', borderRadius: 10,
-          background: '#fff', padding: '20px 24px', marginBottom: 16,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#FFF1F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14 }}>⚙️</span>
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消訂單，扣費配置</span>
-            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Card
+          title={
+            <Space>
+              <SettingOutlined style={{ fontSize: 16, color: '#F5222D' }} />
+              <span style={{ fontSize: 15, fontWeight: 500 }}>取消訂單，扣費配置</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
+            </Space>
+          }
+          extra={
+            <Space>
               <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
               <Switch
                 size="small"
@@ -653,8 +700,21 @@ export default function PricingAdd() {
                 onChange={(checked) => setRefundEnabled(checked)}
                 style={{ background: refundEnabled ? '#52c41a' : '#d9d9d9' }}
               />
-            </div>
-          </div>
+            </Space>
+          }
+          style={{
+            marginTop: 16,
+            backgroundColor: '#ffffff',
+            border: '1px solid #e8eaed',
+            borderRadius: 12,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+          }}
+          headStyle={{
+            borderBottom: '1px solid #ffa39e',
+            borderRadius: '12px 12px 0 0',
+            padding: '16px 24px',
+          }}
+        >
 
           {refundEnabled ? (
             <Table
@@ -674,7 +734,7 @@ export default function PricingAdd() {
               <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置扣費規則</span>
             </div>
           )}
-        </div>
+        </Card>
       </Form>
 
       {/* 商圈选择弹窗 */}

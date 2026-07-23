@@ -28,18 +28,12 @@ import {
   ThunderboltOutlined,
   StopOutlined,
   SafetyCertificateOutlined,
-  RocketOutlined,
   AppstoreOutlined,
-  DollarOutlined,
   OrderedListOutlined,
-  CalendarOutlined,
   PieChartOutlined,
-  ExperimentOutlined,
   BlockOutlined,
   GiftOutlined,
   TagOutlined,
-  ClockCircleOutlined,
-  UserOutlined,
   DashboardOutlined,
   TeamOutlined,
   ShopOutlined,
@@ -50,12 +44,12 @@ import {
   CarOutlined,
   BulbOutlined,
   LockOutlined,
-  SendOutlined,
   FileTextOutlined,
   StarOutlined,
   ProfileOutlined,
   BranchesOutlined,
   ShoppingFilled,
+  RedEnvelopeOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -97,29 +91,7 @@ const keyToPath: Record<string, string> = {
   'search-verify-detail': '/search-verify-detail',
   'hint-verify': '/hint-verify',
   'hot-search-verify': '/hot-search-verify',
-  // 推薦管理
-  'recommend-dashboard': '/recommend-dashboard',
-  'recommend-recall-strategy': '/recommend-recall-strategy',
-  'recommend-recall-source': '/recommend-recall-source',
-  'recommend-recall-analysis': '/recommend-recall-analysis',
-  'recommend-ranking-coarse': '/recommend-ranking-coarse',
-  'recommend-ranking-fine': '/recommend-ranking-fine',
-  'recommend-ranking-rerank': '/recommend-ranking-rerank',
-  'recommend-strategy-adtype': '/recommend-strategy-adtype',
-  'recommend-strategy-orchestration': '/recommend-strategy-orchestration',
-  'recommend-strategy-timeslot': '/recommend-strategy-timeslot',
-  'recommend-ab-test': '/recommend-ab-test',
-  'recommend-slot': '/recommend-slot',
-  'recommend-pricing': '/recommend-pricing',
-  'recommend-merchant-rule': '/recommend-merchant-rule',
-  'recommend-package': '/recommend-package',
-  'recommend-order': '/recommend-order',
-  'recommend-calendar': '/recommend-calendar',
-  'recommend-effect-report': '/recommend-effect-report',
-  'recommend-revenue-report': '/recommend-revenue-report',
-  'recommend-user-profile': '/recommend-user-profile',
-  'recommend-algorithm-monitor': '/recommend-algorithm-monitor',
-  'recommend-algorithm': '/recommend-algorithm',
+
   // 權限管理
   'function-permission': '/function-permission',
   'data-permission': '/data-permission',
@@ -167,8 +139,10 @@ const keyToPath: Record<string, string> = {
   'merchant-order-manage': '/merchant-order-manage',
   // 广告销售（商家推广工具下，复用店铺推广页面）
   'ad-sales': '/ad-sales',
-  // 推广赠送（商家推广工具下）
+  // 推广赠送（一级菜单「赠送管理」下）
   'gift-detail': '/gift-detail',
+  // 消费明细（一级菜单「赠送管理」下）
+  'gift-consume-detail': '/gift-consume-detail',
   // 推广通 - 報表分析
   'promotion-report-overview': '/promotion-report-overview',
   'promotion-report-order': '/promotion-report-order',
@@ -414,9 +388,21 @@ const menuItems: MenuItem[] = [
         label: '銷售定價',
       },
       {
-        key: 'gift-detail',
+        key: 'gift-manage',
         icon: <GiftOutlined />,
-        label: '推廣贈送',
+        label: '贈送管理',
+        children: [
+          {
+            key: 'gift-detail',
+            icon: <RedEnvelopeOutlined />,
+            label: '推廣贈送',
+          },
+          {
+            key: 'gift-consume-detail',
+            icon: <FileTextOutlined />,
+            label: '消費明細',
+          },
+        ],
       },
       {
         key: 'ad-sales',
@@ -646,155 +632,7 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
-  {
-    key: 'recommend',
-    icon: <SendOutlined />,
-    label: '推薦管理',
-    children: [
-      {
-        key: 'recommend-recall-group',
-        icon: <AimOutlined />,
-        label: '召回層配置',
-        children: [
-          {
-            key: 'recommend-recall-strategy',
-            icon: <AimOutlined />,
-            label: '召回策略管理',
-          },
-          {
-            key: 'recommend-recall-source',
-            icon: <DatabaseOutlined />,
-            label: '召回源配置',
-          },
-          {
-            key: 'recommend-recall-analysis',
-            icon: <BarChartOutlined />,
-            label: '召回效果分析',
-          },
-        ],
-      },
-      {
-        key: 'recommend-ranking-group',
-        icon: <LineChartOutlined />,
-        label: '排序層配置',
-        children: [
-          {
-            key: 'recommend-ranking-coarse',
-            icon: <ThunderboltOutlined />,
-            label: '粗排配置',
-          },
-          {
-            key: 'recommend-ranking-fine',
-            icon: <LineChartOutlined />,
-            label: '精排配置',
-          },
-          {
-            key: 'recommend-ranking-rerank',
-            icon: <SwapOutlined />,
-            label: '重排策略',
-          },
-        ],
-      },
-      {
-        key: 'recommend-strategy-group',
-        icon: <ThunderboltOutlined />,
-        label: '策略層配置',
-        children: [
-          {
-            key: 'recommend-strategy-adtype',
-            icon: <TagOutlined />,
-            label: '廣告類型策略',
-          },
-          {
-            key: 'recommend-strategy-orchestration',
-            icon: <SettingOutlined />,
-            label: '策略編排引擎',
-          },
-          {
-            key: 'recommend-strategy-timeslot',
-            icon: <ClockCircleOutlined />,
-            label: '時段策略',
-          },
-          {
-            key: 'recommend-ab-test',
-            icon: <ExperimentOutlined />,
-            label: 'A/B測試平台',
-          },
-        ],
-      },
-      {
-        key: 'recommend-delivery-group',
-        icon: <BlockOutlined />,
-        label: '投放層配置',
-        children: [
-          {
-            key: 'recommend-slot',
-            icon: <OrderedListOutlined />,
-            label: '坑位管理',
-          },
-          {
-            key: 'recommend-pricing',
-            icon: <DollarOutlined />,
-            label: '定價策略',
-          },
-          {
-            key: 'recommend-merchant-rule',
-            icon: <AppstoreOutlined />,
-            label: '商家推薦規則',
-          },
-        ],
-      },
-      {
-        key: 'recommend-order-group',
-        icon: <OrderedListOutlined />,
-        label: '訂單管理',
-        children: [
-          {
-            key: 'recommend-order',
-            icon: <FileSearchOutlined />,
-            label: '訂單列表',
-          },
-          {
-            key: 'recommend-calendar',
-            icon: <CalendarOutlined />,
-            label: '投放日曆',
-          },
-          {
-            key: 'recommend-package',
-            icon: <GiftOutlined />,
-            label: '投放包管理',
-          },
-        ],
-      },
-      {
-        key: 'recommend-analytics-group',
-        icon: <BarChartOutlined />,
-        label: '效果分析',
-        children: [
-          {
-            key: 'recommend-effect-report',
-            icon: <LineChartOutlined />,
-            label: '效果報表',
-          },
-          {
-            key: 'recommend-revenue-report',
-            icon: <FundOutlined />,
-            label: '營收報表',
-          },
-          {
-            key: 'recommend-user-profile',
-            icon: <UserOutlined />,
-            label: '用戶畫像',
-          },
-          {
-            key: 'recommend-algorithm-monitor',
-            icon: <DashboardOutlined />,
-            label: '算法監控',
-          },
-        ],
-      },
-    ],
-  },
+
 ]
 
 interface SidebarProps {

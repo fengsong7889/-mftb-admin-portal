@@ -821,28 +821,28 @@
 /* 语义操作按钮：导出（绿 #52C41A） - 常显绿色描边 + 绿字 */
 .action-section .ant-btn.btn-export,
 .btn-export.ant-btn {
-  border-color: #52C41A;
-  color: #52C41A;
+  border-color: #52C41A !important;
+  color: #52C41A !important;
 }
 .action-section .ant-btn.btn-export:hover,
 .action-section .ant-btn.btn-export:focus,
 .btn-export.ant-btn:hover,
 .btn-export.ant-btn:focus {
-  border-color: #73D13D;
-  color: #73D13D;
+  border-color: #73D13D !important;
+  color: #73D13D !important;
 }
 /* 语义操作按钮：批量导入/上传（蓝 #1890FF） - 常显蓝色描边 + 蓝字 */
 .action-section .ant-btn.btn-import,
 .btn-import.ant-btn {
-  border-color: #1890FF;
-  color: #1890FF;
+  border-color: #1890FF !important;
+  color: #1890FF !important;
 }
 .action-section .ant-btn.btn-import:hover,
 .action-section .ant-btn.btn-import:focus,
 .btn-import.ant-btn:hover,
 .btn-import.ant-btn:focus {
-  border-color: #40A9FF;
-  color: #40A9FF;
+  border-color: #40A9FF !important;
+  color: #40A9FF !important;
 }
 /* 删除类使用 antd danger（红 #FF4D4F），无需额外样式 */
 

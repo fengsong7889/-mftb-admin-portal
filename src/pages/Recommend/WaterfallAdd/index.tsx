@@ -752,7 +752,7 @@ export default function WaterfallAdd() {
       <div style={{ padding: 0 }}>
         <Form form={form} layout="vertical" disabled={isDetailMode}>
           {/* 基础信息 */}
-          <div style={{ borderLeft: '4px solid #1890ff', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
@@ -839,7 +839,7 @@ export default function WaterfallAdd() {
 
           {/* 推广图片（多圖類型：詳情/宣傳；單圖類型已合併至基礎信息卡片） */}
           {!isSingleImageType && (
-          <div style={{ borderLeft: '4px solid #52c41a', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <PictureOutlined style={{ fontSize: 14, color: '#52c41a' }} />
@@ -899,7 +899,7 @@ export default function WaterfallAdd() {
 
           {/* 广告位选择 */}
           {canShowPositions && (
-            <div style={{ borderLeft: '4px solid #1890ff', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <SettingOutlined style={{ fontSize: 14, color: '#1890ff' }} />
@@ -974,7 +974,7 @@ export default function WaterfallAdd() {
 
           {/* 销售策略（无敌星星 + 盘活复苏） */}
           {(
-            <div style={{ borderLeft: '4px solid #fa8c16', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
@@ -1095,7 +1095,7 @@ export default function WaterfallAdd() {
             </div>
           )}
           {showNotAvailable && (
-            <div style={{ borderLeft: '4px solid #d9d9d9', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ textAlign: 'center', padding: '32px 0', color: '#8c8c8c' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
                 <div style={{ fontSize: 15, fontWeight: 500, color: '#595959', marginBottom: 6 }}>
@@ -1110,7 +1110,7 @@ export default function WaterfallAdd() {
 
 
           {/* 区域计价配置 - 无敌星星和盘活复苏都显示 */}
-            <div style={{ borderLeft: '4px solid #722ed1', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <FundOutlined style={{ fontSize: 14, color: '#722ed1' }} />
@@ -1300,7 +1300,7 @@ export default function WaterfallAdd() {
 
           {/* 盘活复苏 - 梯度折扣配置（选择商圈后才展示） */}
           {isReviveAlgorithm && regionPricingConfigs.length > 0 && (
-            <div style={{ borderLeft: '4px solid #13c2c2', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {/* 购买多天折扣配置（梯度） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
@@ -1372,7 +1372,7 @@ export default function WaterfallAdd() {
 
           {/* 时段个数折扣配置 - 仅无敌星星显示 */}
           {!isReviveAlgorithm && selectedRegions.length > 0 && (
-            <div style={{ borderLeft: '4px solid #13c2c2', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BarChartOutlined style={{ fontSize: 14, color: '#13c2c2' }} />
@@ -1572,7 +1572,7 @@ export default function WaterfallAdd() {
       </div>
 
       {/* 取消扣费规则配置 */}
-      <div style={{ borderLeft: '4px solid #f5222d', borderRadius: 10, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />

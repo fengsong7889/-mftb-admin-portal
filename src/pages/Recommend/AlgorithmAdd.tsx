@@ -314,15 +314,9 @@ export default function AlgorithmAdd() {
                 {isDetailMode ? '算法詳情' : isEditMode ? '編輯算法' : '新增算法'}
               </h2>
               {selectedAlgorithmType && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '3px 12px', background: '#FFF7E6',
-                  border: '1px solid #FFD591', borderRadius: 4,
-                  fontSize: 13, color: '#E8720C', fontWeight: 500,
-                }}>
-                  <span style={{ fontSize: 14 }}>{TYPE_ICON[selectedAlgorithmType]}</span>
-                  {TYPE_LABEL[selectedAlgorithmType]}
-                </div>
+                <span style={{ fontSize: 14, color: '#595959' }}>
+                  {TYPE_ICON[selectedAlgorithmType]} {TYPE_LABEL[selectedAlgorithmType]}
+                </span>
               )}
             </div>
           </div>
@@ -390,8 +384,8 @@ export default function AlgorithmAdd() {
         <Card 
           title={
             <Space>
-              <SettingOutlined style={{ fontSize: 18, color: '#52c41a' }} />
-              <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: 0.5 }}>算法參數</span>
+              <SettingOutlined style={{ fontSize: 16, color: '#E8720C' }} />
+              <span style={{ fontSize: 15, fontWeight: 500 }}>算法參數</span>
             </Space>
           }
           extra={
@@ -401,16 +395,15 @@ export default function AlgorithmAdd() {
           }
           style={{ 
             marginTop: 16,
-            backgroundColor: '#ffffff',
+            backgroundColor: '#fafbfc',
             border: '1px solid #e8eaed',
-            borderRadius: 12,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            borderRadius: 8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
           }}
           headStyle={{
-            backgroundColor: 'linear-gradient(135deg, #f6ffed 0%, #e6f7e6 100%)',
-            borderBottom: '2px solid #b7eb8f',
-            borderRadius: '12px 12px 0 0',
-            padding: '16px 24px'
+            backgroundColor: '#FFF7E6',
+            borderBottom: '1px solid #FFD591',
+            borderRadius: '8px 8px 0 0'
           }}
         >
         <Form

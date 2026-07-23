@@ -38,31 +38,7 @@ const PagePRDView = lazy(() => import('./pages/PagePRDView'))
 // 搜索配置管理(新系统)
 const GlobalConfig = lazy(() => import('./pages/SearchConfigNew/GlobalConfig'))
 const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
-// 推荐管理
-const RecommendDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
-const RecommendAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
-const RecommendAlgorithmMonitor = lazy(() => import('./pages/Recommend/AlgorithmMonitor'))
-const RecommendSlot = lazy(() => import('./pages/Recommend/Slot'))
-const RecommendPricing = lazy(() => import('./pages/Recommend/Pricing'))
-const RecommendPricingAdd = lazy(() => import('./pages/Recommend/PricingAdd'))
-const RecommendPackage = lazy(() => import('./pages/Recommend/Package'))
-const RecommendOrder = lazy(() => import('./pages/Recommend/Order'))
-const RecommendCalendar = lazy(() => import('./pages/Recommend/Calendar'))
-const RecommendEffectReport = lazy(() => import('./pages/Recommend/EffectReport'))
-const RecommendRevenueReport = lazy(() => import('./pages/Recommend/RevenueReport'))
-// 推荐管理 - 新增模块
-const RecommendRecallStrategy = lazy(() => import('./pages/Recommend/RecallStrategy'))
-const RecommendRecallSource = lazy(() => import('./pages/Recommend/RecallSource'))
-const RecommendRecallAnalysis = lazy(() => import('./pages/Recommend/RecallAnalysis'))
-const RecommendRankingCoarse = lazy(() => import('./pages/Recommend/RankingCoarse'))
-const RecommendRankingFine = lazy(() => import('./pages/Recommend/RankingFine'))
-const RecommendRankingRerank = lazy(() => import('./pages/Recommend/RankingRerank'))
-const RecommendStrategyAdType = lazy(() => import('./pages/Recommend/StrategyAdType'))
-const RecommendStrategyOrchestration = lazy(() => import('./pages/Recommend/StrategyOrchestration'))
-const RecommendStrategyTimeslot = lazy(() => import('./pages/Recommend/StrategyTimeslot'))
-const RecommendABTest = lazy(() => import('./pages/Recommend/ABTest'))
-const RecommendMerchantRule = lazy(() => import('./pages/Recommend/MerchantRule'))
-const RecommendUserProfile = lazy(() => import('./pages/Recommend/UserProfile'))
+
 // 權限管理
 const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
 const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
@@ -82,6 +58,9 @@ const PromotionOrderManageStandalone = lazy(() => import('./pages/PromotionOrder
 const OrderDetail = lazy(() => import('./pages/OrderDetail'))
 // 赠送管理
 const GiftDetail = lazy(() => import('./pages/GiftManage/GiftDetail'))
+const GiftAdd = lazy(() => import('./pages/GiftManage/GiftAdd'))
+const GiftDetailView = lazy(() => import('./pages/GiftManage/GiftDetailView'))
+const GiftConsumeDetail = lazy(() => import('./pages/GiftManage/GiftConsumeDetail'))
 // 推广通 - 報表分析
 const PromotionReportOverview = lazy(() => import('./pages/PromotionReport/Overview'))
 const PromotionReportOrder = lazy(() => import('./pages/PromotionReport/OrderReport'))
@@ -144,31 +123,7 @@ function AuthenticatedLayout() {
               {/* 搜索配置管理(新系统) */}
               <Route path="/global-config" element={<GlobalConfig />} />
               <Route path="/channel-strategy" element={<DimensionStrategy />} />
-              {/* 推荐管理 */}
-              <Route path="/recommend-dashboard" element={<RecommendDashboard />} />
-              <Route path="/recommend-algorithm" element={<RecommendAlgorithm />} />
-              <Route path="/recommend-algorithm-monitor" element={<RecommendAlgorithmMonitor />} />
-              <Route path="/recommend-slot" element={<RecommendSlot />} />
-              <Route path="/recommend-pricing" element={<RecommendPricing />} />
-              <Route path="/recommend-pricing-add" element={<RecommendPricingAdd />} />
-              <Route path="/recommend-package" element={<RecommendPackage />} />
-              <Route path="/recommend-order" element={<RecommendOrder />} />
-              <Route path="/recommend-calendar" element={<RecommendCalendar />} />
-              <Route path="/recommend-effect-report" element={<RecommendEffectReport />} />
-              <Route path="/recommend-revenue-report" element={<RecommendRevenueReport />} />
-              {/* 推荐管理 - 新增路由 */}
-              <Route path="/recommend-recall-strategy" element={<RecommendRecallStrategy />} />
-              <Route path="/recommend-recall-source" element={<RecommendRecallSource />} />
-              <Route path="/recommend-recall-analysis" element={<RecommendRecallAnalysis />} />
-              <Route path="/recommend-ranking-coarse" element={<RecommendRankingCoarse />} />
-              <Route path="/recommend-ranking-fine" element={<RecommendRankingFine />} />
-              <Route path="/recommend-ranking-rerank" element={<RecommendRankingRerank />} />
-              <Route path="/recommend-strategy-adtype" element={<RecommendStrategyAdType />} />
-              <Route path="/recommend-strategy-orchestration" element={<RecommendStrategyOrchestration />} />
-              <Route path="/recommend-strategy-timeslot" element={<RecommendStrategyTimeslot />} />
-              <Route path="/recommend-ab-test" element={<RecommendABTest />} />
-              <Route path="/recommend-merchant-rule" element={<RecommendMerchantRule />} />
-              <Route path="/recommend-user-profile" element={<RecommendUserProfile />} />
+
               {/* 權限管理 */}
               <Route path="/function-permission" element={<FunctionPermission />} />
               <Route path="/data-permission" element={<DataPermission />} />
@@ -189,6 +144,9 @@ function AuthenticatedLayout() {
               <Route path="/merchant-order-manage" element={<PromotionOrderManage />} />
               {/* 赠送管理 */}
               <Route path="/gift-detail" element={<GiftDetail />} />
+              <Route path="/gift-add" element={<GiftAdd />} />
+              <Route path="/gift-detail-view" element={<GiftDetailView />} />
+              <Route path="/gift-consume-detail" element={<GiftConsumeDetail />} />
               {/* 推广通 - 報表分析 */}
               <Route path="/promotion-report-overview" element={<PromotionReportOverview />} />
               <Route path="/promotion-report-order" element={<PromotionReportOrder />} />
