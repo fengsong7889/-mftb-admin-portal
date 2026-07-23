@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message, Tabs } from 'antd'
 import {
-  ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined,
+  ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined,
   ShopOutlined, FileTextOutlined, DollarOutlined,
   ExclamationCircleOutlined, RollbackOutlined, DownOutlined, RightOutlined,
   BarChartOutlined, EyeOutlined, AimOutlined,
@@ -156,6 +156,10 @@ interface OrderItem {
   promoStartDate?: string // 推广开始日期
   promoData?: PromoRecord[] // 推广数据
   purchaseDays?: string[] // 新店廣告：推廣日期列表
+  terminalTime?: string // 終態（已退款/已取消/已中止/已完成）發生的日期時間
+  operatorName?: string // 操作人姓名
+  operatorId?: string // 操作人工號
+  terminalActor?: 'staff' | 'merchant' // 終態操作發起方：業務人員 / 商家
 }
 
 /* ---- 推广数据 Mock ---- */
@@ -225,6 +229,26 @@ const slotDefs = [
 const dates = ['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20']
 const pastDates = ['2025-06-20', '2025-06-21', '2025-06-22', '2025-06-23', '2025-06-24']
 
+// 操作人（用於終態訂單：已取消 / 已中止 / 已退款）
+const OPERATORS = [
+  { name: '陳嘉豪', id: 'EMP10086' },
+  { name: '李詠欣', id: 'EMP10237' },
+  { name: '黃俊傑', id: 'EMP10555' },
+]
+
+// 終態狀態（已退款 / 已取消 / 已中止）需要記錄發生時間與操作人
+const TERMINAL_STATUSES = [OrderStatus.REFUNDED, OrderStatus.CANCELLED, OrderStatus.ABORTED]
+
+// 無敵星星 / 盤活復蘇：這些已退款訂單為「未推廣即退款」，沒有推廣數據；其餘已退款訂單為「推廣後才退款」，有推廣數據
+const REFUNDED_BEFORE_PROMO_IDS = new Set(['5', '105'])
+
+// 根據訂單生成終態時間與操作人信息（僅終態訂單使用）
+function genTerminalInfo(id: string, baseTime: string): { terminalTime: string; operatorName: string; operatorId: string } {
+  const op = OPERATORS[Number(id.replace(/\D/g, '')) % OPERATORS.length]
+  const day = (baseTime || '').split(' ')[0]
+  return { terminalTime: `${day} 18:32:45`, operatorName: op.name, operatorId: op.id }
+}
+
 function genOrder(
   id: string, orderNo: string, algoId: string, promoName: string,
   app: AppType, channel: RecommendChannel, region: number | number[],
@@ -278,9 +302,12 @@ function genOrder(
     } else {
       slotPrices.forEach(sp => { sp.region = Array.isArray(region) ? region[0] : region })
     }
-  // 为推广中的订单生成推广数据
+  // 生成推广数据：推广中、已完成，以及「推廣後才退款」的已退款订单（未推廣即退款的除外）
   let promoData: PromoRecord[] | undefined
-  if (status === OrderStatus.PROMOTING) {
+  const hasPromoData = status === OrderStatus.PROMOTING
+    || status === OrderStatus.PROMOTED
+    || (status === OrderStatus.REFUNDED && !REFUNDED_BEFORE_PROMO_IDS.has(id))
+  if (hasPromoData) {
     const regionName = REGION_LABEL[Array.isArray(region) ? region[0] : region] || '未知'
     promoData = isRevive
       ? genRevivePromoData(regionName, slotPrices)
@@ -291,6 +318,13 @@ function genOrder(
     { maxDays: 3, feePercent: 80 },
     { maxDays: 7, feePercent: 50 },
   ]
+  const isTerminal = TERMINAL_STATUSES.includes(status)
+  // 已退款：部分為業務人員退款（顯示姓名+工號），部分為商家退款（顯示門店名稱+ID）；取消/中止統一為業務人員
+  const terminalActor: 'staff' | 'merchant' = (status === OrderStatus.REFUNDED && Number(id) % 2 === 0) ? 'merchant' : 'staff'
+  const lastPromoDate = slotPrices.length ? slotPrices[slotPrices.length - 1].date : (isPast ? pastDates[0] : dates[0])
+  const terminalExtra = isTerminal
+    ? { ...genTerminalInfo(id, otime), terminalActor }
+    : (status === OrderStatus.PROMOTED ? { terminalTime: `${lastPromoDate} 22:10:30` } : {})
   return {
     id, orderNo, algorithmId: algoId, promotionName: promoName, app, channel, region,
     recommendType: recType, slotPosition: slotPos, groupId: gid, groupName: gname,
@@ -300,6 +334,7 @@ function genOrder(
     slotPrices, gradientDiscount: gradDisc, cancelFeeRules, promoData,
     ...(refundAmt !== undefined ? { refundAmount: refundAmt } : {}),
     refundEnabled,
+    ...terminalExtra,
   }
 }
 
@@ -354,6 +389,9 @@ function genNewStoreOrder(
     status, orderTime, payTime, slotPrices: [], gradientDiscount: null,
     cancelFeeRules: [], promoData: genNewStorePromoData(regionName, pDays),
     purchaseDays: pDays, refundEnabled: true, promoStartDate: '2026-07-16',
+    ...(TERMINAL_STATUSES.includes(status)
+      ? { ...genTerminalInfo(id, orderTime), terminalActor: 'staff' as const }
+      : (status === OrderStatus.PROMOTED ? { terminalTime: `${pDays[pDays.length - 1]} 22:10:30` } : {})),
   }
 }
 
@@ -399,9 +437,9 @@ function getStageIndex(status: OrderStatus): number {
 function getStageTime(status: OrderStatus, stageIdx: number, order: OrderItem): string {
   if (stageIdx === 0) return order.orderTime
   if (stageIdx === 1) return order.payTime || ''
-  if (stageIdx === 2) return order.promoStartDate || ''
+  if (stageIdx === 2) return order.promoStartDate ? `${order.promoStartDate} 09:00:00` : ''
   if (stageIdx === 3) {
-    return ''
+    return order.terminalTime || ''
   }
   return ''
 }
@@ -498,9 +536,39 @@ export default function OrderDetail() {
   }
 
   const statusInfo = ORDER_STATUS_MAP[order.status]
-  const currentStage = getStageIndex(order.status)
   const isRefunded = order.status === OrderStatus.REFUNDED
   const isNewStore = order.recommendType === RecommendType.NEW_STORE_AD
+
+  // 新店廣告已取消：保留「待推廣 / 推廣中」節點展示，但因未推廣即取消，兩節點以另色標記並打叉
+  const isNewStoreCancelled = isNewStore && order.status === OrderStatus.CANCELLED
+  const progressStages = isNewStoreCancelled
+    ? [
+        { key: 'ordered', label: '下單成功' },
+        { key: 'pending', label: '待推廣' },
+        { key: 'promoting', label: '推廣中' },
+        { key: 'cancelled', label: '已取消' },
+      ]
+    : PROGRESS_STAGES
+  const lastStageIdx = progressStages.length - 1
+  const currentStage = isNewStoreCancelled ? lastStageIdx : getStageIndex(order.status)
+  // 無敵星星 / 盤活復蘇：部分已退款訂單為「未推廣即退款」，待推廣 + 推廣中節點需打叉
+  const isRefundedBeforePromo = isRefunded && REFUNDED_BEFORE_PROMO_IDS.has(order.id)
+  // 未推廣即結束（已取消 / 未推廣即退款）：待推廣(1)、推廣中(2) 兩節點以叉號 + 另色標記
+  const skipStageIdxs: number[] = (isNewStoreCancelled || isRefundedBeforePromo) ? [1, 2] : []
+
+  // 最後一個節點（終態）的主題色：已完成維持橙色，已退款/已取消/已中止分別區分
+  const terminalTheme = (() => {
+    switch (order.status) {
+      case OrderStatus.REFUNDED:  // 已退款（無敵星星、盤活復蘇）→ 紅色
+        return { grad: 'linear-gradient(135deg, #FF4D4F, #FF7875)', main: '#FF4D4F', shadow: 'rgba(255,77,79,', ripple: 'rgba(255,77,79,' }
+      case OrderStatus.CANCELLED: // 已取消（新店廣告）→ 灰色
+        return { grad: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', main: '#8C8C8C', shadow: 'rgba(140,140,140,', ripple: 'rgba(140,140,140,' }
+      case OrderStatus.ABORTED:   // 已中止（新店廣告）→ 紅色
+        return { grad: 'linear-gradient(135deg, #FF4D4F, #FF7875)', main: '#FF4D4F', shadow: 'rgba(255,77,79,', ripple: 'rgba(255,77,79,' }
+      default:                    // 已完成（維持橙色）
+        return { grad: 'linear-gradient(135deg, #E8720C, #F59432)', main: '#E8720C', shadow: 'rgba(232,114,12,', ripple: 'rgba(232,114,12,' }
+    }
+  })()
 
   // 新店廣告：計算每推廣日的狀態
   const getDayStatus = (day: string): OrderStatus => {
@@ -535,6 +603,9 @@ export default function OrderDetail() {
   const gradientMultiplier = order.gradientDiscount ? order.gradientDiscount.discount / 10 : 1
   const finalPrice = Math.round(slotSubtotal * gradientMultiplier)
   const totalSaved = totalOriginal - finalPrice
+
+  // 已退款：以「實付推廣金額」(finalPrice) 為基準計算退款，保證與費用明細一致，一目了然
+  const refundAmountByPaid = Math.round(finalPrice * (1 - (refundInfo?.feePercent ?? 0) / 100))
 
   const handleRefund = () => {
     setRefundModalVisible(true)
@@ -598,15 +669,25 @@ export default function OrderDetail() {
       }}>
         <div style={{ padding: '24px 32px 20px', animation: 'headerFadeSlideIn 0.5s ease' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-            {PROGRESS_STAGES.map((stage, idx) => {
+            {progressStages.map((stage, idx) => {
               const isPast = idx < currentStage
               const isCurrent = idx === currentStage
               const isFuture = idx > currentStage
-              const stageTime = getStageTime(order.status, idx, order)
+              const isSkip = skipStageIdxs.includes(idx)
+              const stageTime = isSkip ? '' : getStageTime(order.status, idx, order)
+              // 終態節點（已退款/已取消/已中止）：展示發起方信息（業務人員：姓名+工號；商家：門店名稱+ID）
+              const isTerminalNode = idx === lastStageIdx && TERMINAL_STATUSES.includes(order.status)
+              const isMerchantActor = order.terminalActor === 'merchant'
+              const showActor = isTerminalNode && (isMerchantActor ? !!order.storeName : !!order.operatorName)
+              const terminalActionWord = order.status === OrderStatus.REFUNDED ? '退款'
+                : order.status === OrderStatus.CANCELLED ? '取消'
+                : order.status === OrderStatus.ABORTED ? '中止' : ''
+              const terminalActorTypeLabel = (isMerchantActor ? '商家' : '業務人員') + terminalActionWord
 
               /** 阶段图标 */
               const stageIcon = () => {
-                if (isRefunded && idx === 3) return <RollbackOutlined style={{ fontSize: 15, color: '#fff' }} />
+                if (isSkip) return <CloseOutlined style={{ fontSize: 15, color: '#fff' }} />
+                if (isRefunded && idx === lastStageIdx) return <RollbackOutlined style={{ fontSize: 15, color: '#fff' }} />
                 if (isPast) return <CheckOutlined style={{ fontSize: 15, color: '#fff' }} />
                 if (isCurrent) return (
                   <div style={{
@@ -618,16 +699,18 @@ export default function OrderDetail() {
               }
 
               /** 阶段背景渐变 */
-              const nodeBg = isPast
-                ? 'linear-gradient(135deg, #52C41A, #73D13D)'
-                : isCurrent
-                  ? 'linear-gradient(135deg, #E8720C, #F59432)'
-                  : '#fff'
+              const nodeBg = isSkip
+                ? 'linear-gradient(135deg, #FF7875, #FFA39E)'
+                : isPast
+                  ? 'linear-gradient(135deg, #52C41A, #73D13D)'
+                  : isCurrent
+                    ? terminalTheme.grad
+                    : '#fff'
 
               return (
                 <div key={stage.key} style={{
                   display: 'flex', alignItems: 'flex-start',
-                  flex: idx < PROGRESS_STAGES.length - 1 ? 1 : 'none',
+                  flex: idx < lastStageIdx ? 1 : 'none',
                 }}>
                   {/* 阶段节点 + 标签 */}
                   <div style={{
@@ -641,10 +724,12 @@ export default function OrderDetail() {
                       border: isFuture ? '2px solid #E8E8E8' : 'none',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       boxShadow: isCurrent
-                        ? '0 0 0 4px rgba(232,114,12,0.12), 0 2px 8px rgba(232,114,12,0.25)'
-                        : isPast
-                          ? '0 2px 6px rgba(82,196,26,0.25)'
-                          : '0 1px 3px rgba(0,0,0,0.06)',
+                        ? `0 0 0 4px ${terminalTheme.shadow}0.12), 0 2px 8px ${terminalTheme.shadow}0.25)`
+                        : isSkip
+                          ? '0 2px 6px rgba(255,77,79,0.25)'
+                          : isPast
+                            ? '0 2px 6px rgba(82,196,26,0.25)'
+                            : '0 1px 3px rgba(0,0,0,0.06)',
                       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       zIndex: 2,
                       animation: isCurrent
@@ -656,13 +741,18 @@ export default function OrderDetail() {
                     {/* 阶段标签 */}
                     <div style={{
                       marginTop: 10, fontSize: 13,
-                      fontWeight: isCurrent ? 700 : isPast ? 600 : 400,
-                      color: isPast ? '#52C41A' : isCurrent ? '#E8720C' : '#8C8C8C',
+                      fontWeight: isCurrent ? 700 : (isSkip || isPast) ? 600 : 400,
+                      color: isSkip ? '#FF4D4F' : isPast ? '#52C41A' : isCurrent ? terminalTheme.main : '#8C8C8C',
                       whiteSpace: 'nowrap', transition: 'color 0.3s',
                       animation: isCurrent ? 'nodeBreath 2s ease-in-out infinite' : 'none',
-                      textShadow: isCurrent ? '0 0 8px rgba(232,114,12,0.3)' : 'none',
+                      textShadow: isCurrent ? `0 0 8px ${terminalTheme.ripple}0.3)` : 'none',
                     }}>
-                      {isRefunded && idx === 3 ? '已退款' : stage.label}
+                      {idx === lastStageIdx
+                        ? (isRefunded ? '已退款'
+                          : order.status === OrderStatus.CANCELLED ? '已取消'
+                          : order.status === OrderStatus.ABORTED ? '已中止'
+                          : stage.label)
+                        : stage.label}
                     </div>
                     {/* 时间信息 */}
                     {stageTime && (
@@ -675,6 +765,37 @@ export default function OrderDetail() {
                         {stageTime}
                       </div>
                     )}
+                    {/* 發起方信息（終態節點：已退款/已取消/已中止） */}
+                    {showActor && (
+                      <div style={{
+                        marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap',
+                        padding: '3px 10px', background: '#FFF1F0',
+                        border: '1px solid #FFCCC7', borderRadius: 4,
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#cf1322', marginBottom: 2 }}>
+                          {terminalActorTypeLabel}
+                        </div>
+                        {isMerchantActor ? (
+                          <>
+                            <div style={{ fontSize: 11, color: '#595959' }}>
+                              門店：{order.storeName}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                              門店ID：{order.storeId}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 11, color: '#595959' }}>
+                              操作人：{order.operatorName}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                              工號：{order.operatorId}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                     {/* 当前阶段波纹动效 */}
                     {isCurrent && (
                       <>
@@ -682,7 +803,7 @@ export default function OrderDetail() {
                         <div style={{
                           position: 'absolute', top: -4, left: '50%',
                           width: 46, height: 46, borderRadius: '50%',
-                          border: '2px solid rgba(232,114,12,0.35)',
+                          border: `2px solid ${terminalTheme.ripple}0.35)`,
                           marginLeft: -23,
                           animation: 'rippleExpand 2s ease-out infinite',
                           pointerEvents: 'none',
@@ -691,7 +812,7 @@ export default function OrderDetail() {
                         <div style={{
                           position: 'absolute', top: -4, left: '50%',
                           width: 46, height: 46, borderRadius: '50%',
-                          border: '2px solid rgba(232,114,12,0.25)',
+                          border: `2px solid ${terminalTheme.ripple}0.25)`,
                           marginLeft: -23,
                           animation: 'rippleExpand 2s ease-out infinite 0.8s',
                           pointerEvents: 'none',
@@ -700,14 +821,16 @@ export default function OrderDetail() {
                     )}
                   </div>
                   {/* 连接线 */}
-                  {idx < PROGRESS_STAGES.length - 1 && (
+                  {idx < lastStageIdx && (
                     <div style={{
                       flex: 1, height: 3, marginTop: 18, minWidth: 32,
-                      background: idx < currentStage
-                        ? 'linear-gradient(90deg, #52C41A, #73D13D)'
-                        : idx === currentStage
-                          ? 'linear-gradient(90deg, #E8720C, #F59432)'
-                          : '#F0F0F0',
+                      background: skipStageIdxs.length > 0
+                        ? '#F0F0F0'
+                        : idx < currentStage
+                          ? 'linear-gradient(90deg, #52C41A, #73D13D)'
+                          : idx === currentStage
+                            ? 'linear-gradient(90deg, #E8720C, #F59432)'
+                            : '#F0F0F0',
                       borderRadius: 2,
                       position: 'relative',
                       overflow: 'hidden',
@@ -1030,7 +1153,7 @@ export default function OrderDetail() {
             {/* 最终实付 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>商家需支付</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>實付推廣金額</span>
                 <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                   {order.gradientDiscount
                     ? `（${order.slotPrices.length}個時段 × 各時段折扣${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`
@@ -1038,12 +1161,21 @@ export default function OrderDetail() {
                   }
                 </span>
               </div>
-              <div style={{
-                padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
-                borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
-              }}>
-                <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {finalPrice}</span>
-              </div>
+              {isRefunded ? (
+                <div style={{
+                  padding: '5px 18px', background: '#FFF7E6', border: '1px solid #FFD591',
+                  borderRadius: 8,
+                }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: '#E8720C' }}>MOP {finalPrice}</span>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                  borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
+                }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {finalPrice}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1124,12 +1256,17 @@ export default function OrderDetail() {
                               <span style={{ fontSize: 12, color: '#8C8C8C' }}>扣費比例</span>
                               <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{refundInfo?.feePercent ?? 0}%</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #ffccc7', paddingTop: 8 }}>
-                              <span style={{ fontSize: 12, color: '#8C8C8C' }}>退款金額</span>
-                              <span style={{ fontSize: 16, fontWeight: 700, color: '#cf1322' }}>MOP {refundInfo?.refundAmount ?? 0}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #ffccc7', paddingTop: 12, marginTop: 4 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: '#cf1322' }}>退款金額</span>
+                              <div style={{
+                                padding: '6px 20px', background: 'linear-gradient(135deg, #FF4D4F, #FF7875)',
+                                borderRadius: 8, boxShadow: '0 2px 8px rgba(255,77,79,0.35)',
+                              }}>
+                                <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {refundAmountByPaid}</span>
+                              </div>
                             </div>
                             <div style={{ fontSize: 11, color: '#bfbfbf' }}>
-                              計算公式：退款金額 = 實付 MOP {order.actualPrice} × (1 - {refundInfo?.feePercent ?? 0}%) = MOP {refundInfo?.refundAmount ?? 0}
+                              計算公式：退款金額 = 實付推廣金額 MOP {finalPrice} × (1 - {refundInfo?.feePercent ?? 0}%) = MOP {refundAmountByPaid}
                             </div>
                           </div>
                         )}

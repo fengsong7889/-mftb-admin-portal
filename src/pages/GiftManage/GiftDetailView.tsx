@@ -761,7 +761,7 @@ export default function GiftDetailView() {
         destroyOnClose
       >
         {deductTarget && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8, paddingBottom: 24 }}>
             <div style={{ display: 'flex', gap: 24 }}>
               <div>
                 <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>贈送ID</div>
