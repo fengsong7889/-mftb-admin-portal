@@ -16,7 +16,7 @@ import {
   EditOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { MapContainer, TileLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { 
   AppType, 
@@ -190,6 +190,27 @@ const MOCK_MERCHANTS: Merchant[] = [
   { id: '14', groupId: 'G006', groupName: '甜品王國', storeId: 'S014', storeName: '甜品王國-東區店' },
   { id: '15', groupId: 'G007', groupName: '燒烤帝國', storeId: 'S015', storeName: '燒烤帝國-總店' },
 ]
+
+/**
+ * 地圖尺寸修復器（解決 Leaflet 放在 Modal 彈窗中的灰屏 / 只加載左上角瓦片問題）
+ * - active 變為 true（彈窗打開）後，等待彈窗動畫結束再 invalidateSize 重新測量容器尺寸
+ * - 同時移除 Leaflet 前綴署名，底部僅保留「高德地图」
+ */
+function MapResizer({ active }: { active: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    // 只保留高德地图署名，移除 Leaflet 前綴
+    map.attributionControl.setPrefix(false)
+    if (!active) return
+    // 彈窗有展開動畫，延遲重新計算尺寸並定位到澳門/珠海
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+      map.setView([22.1987, 113.5439], 12)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [active, map])
+  return null
+}
 
 export default function WaterfallAdd() {
   const navigate = useNavigate()
@@ -1515,7 +1536,7 @@ export default function WaterfallAdd() {
                       level: info.node.children ? 1 : 2,
                     })
                   }}
-                  style={{ padding: 12, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', minHeight: 300 }}
+                  style={{ padding: 12, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', minHeight: 520 }}
                 />
                 {selectedRegionNode && (
                   <div style={{ marginTop: 8, padding: '8px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
@@ -1526,17 +1547,21 @@ export default function WaterfallAdd() {
                 )}
               </div>
               {/* 右侧地图区域 */}
-              <div style={{ flex: 1, borderRadius: 6, overflow: 'hidden', border: '1px solid #f0f0f0', minHeight: 350 }}>
+              <div style={{ flex: 1, borderRadius: 6, overflow: 'hidden', border: '1px solid #f0f0f0', minHeight: 520, height: 520 }}>
                 <MapContainer
                   center={[22.1987, 113.5439]}
-                  zoom={13}
+                  zoom={12}
                   style={{ height: '100%', width: '100%' }}
+                  preferCanvas
                 >
                   <TileLayer
                     attribution='&copy; <a href="https://www.amap.com/">高德地图</a>'
                     url="https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"
                     subdomains="1234"
+                    updateWhenIdle={false}
+                    keepBuffer={4}
                   />
+                  <MapResizer active={regionSelectModalVisible} />
                 </MapContainer>
               </div>
             </div>

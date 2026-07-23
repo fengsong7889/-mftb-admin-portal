@@ -1002,24 +1002,24 @@ export default function AlgorithmAdd() {
 
           )}
 
-          {/* ===== 獨家商家：保單類型計算（獨立模塊） ===== */}
+          {/* ===== 獨家商家：計算訂單類型（獨立模塊） ===== */}
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
             <Form.Item
-              label="保單類型計算"
+              label="計算訂單類型"
               style={{ marginBottom: 16 }}
               labelCol={{ flex: '150px' }}
               wrapperCol={{ flex: 1 }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                 <Form.Item name="orderTypeDelivery" noStyle valuePropName="checked">
-                  <Checkbox disabled={isDetailMode}>外賣訂單</Checkbox>
+                  <Checkbox disabled={isDetailMode}>配送訂單</Checkbox>
                 </Form.Item>
                 <Form.Item name="orderTypePickup" noStyle valuePropName="checked">
                   <Checkbox disabled={isDetailMode}>自取訂單</Checkbox>
                 </Form.Item>
               </div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
-                勾選參與保單類型計算的訂單類型，至少選擇一項
+                請選擇參與成交量統計的訂單履約方式，以保障商家訂單成交量統計的準確性
               </div>
             </Form.Item>
           )}
