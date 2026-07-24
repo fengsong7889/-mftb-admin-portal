@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS } from '../pages/Permission/types'
+import { login as loginApi, logout as logoutApi, TOKEN_KEY } from '../api'
 
 export interface UserInfo {
   username: string
@@ -20,7 +21,7 @@ export interface UserInfo {
 interface AuthContextType {
   isAuthenticated: boolean
   user: UserInfo | null
-  login: (username: string, password: string) => { success: boolean; message?: string }
+  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>
   logout: () => void
   updateAvatar: (avatar: string) => void
   hasPermission: (permission: string) => boolean // 权限检查方法
@@ -28,28 +29,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
-
-// 从环境变量读取 Mock 凭据（.env.local 已 gitignore）
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'change-me'
-const GUEST_PASSWORD = import.meta.env.VITE_GUEST_PASSWORD || 'change-me'
-
-const DEFAULT_ADMIN_USER: UserInfo = {
-  username: 'admin',
-  name: 'Bee',
-  empId: 'SF0001',
-  avatar: 'pikachu-default', // 默认小蜜蜂头像
-  role: 'admin',
-  department: '集团总裁办',
-  position: '高级副总裁',
-}
-
-const DEFAULT_GUEST_USER: UserInfo = {
-  username: 'guest',
-  name: '訪客',
-  empId: 'G0001',
-  avatar: 'pikachu-default', // 默认小蜜蜂头像
-  role: 'guest',
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 从 localStorage 初始化登录状态
@@ -62,35 +41,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : null
   })
 
-  const login = useCallback((username: string, password: string) => {
-    // admin 账号登录
-    if (username === 'admin' && password === ADMIN_PASSWORD) {
+  const login = useCallback(async (username: string, password: string) => {
+    try {
+      const result = await loginApi({ username, password })
+      // 将后端返回的用户信息映射为前端 UserInfo
+      const backendUser = result.userInfo
+      const mappedUser: UserInfo = {
+        username: backendUser.username,
+        name: backendUser.name,
+        empId: backendUser.empId,
+        avatar: backendUser.avatar || 'pikachu-default',
+        role: backendUser.role === 'admin' ? 'admin' : 'guest',
+        department: backendUser.department,
+        position: backendUser.position,
+      }
       setIsAuthenticated(true)
-      setUser({ ...DEFAULT_ADMIN_USER })
-      // 保存到 localStorage
+      setUser(mappedUser)
+      // 保存 Token 与登录状态
+      localStorage.setItem(TOKEN_KEY, result.token)
       localStorage.setItem('is_authenticated', 'true')
-      localStorage.setItem('user_info', JSON.stringify(DEFAULT_ADMIN_USER))
+      localStorage.setItem('user_info', JSON.stringify(mappedUser))
       return { success: true }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '登錄失敗'
+      return { success: false, message: msg }
     }
-    // guest 账号登录
-    if (username === 'guest' && password === GUEST_PASSWORD) {
-      setIsAuthenticated(true)
-      setUser({ ...DEFAULT_GUEST_USER })
-      // 保存到 localStorage
-      localStorage.setItem('is_authenticated', 'true')
-      localStorage.setItem('user_info', JSON.stringify(DEFAULT_GUEST_USER))
-      return { success: true }
-    }
-    if (username !== 'admin' && username !== 'guest') {
-      return { success: false, message: '賬號不存在' }
-    }
-    return { success: false, message: '密碼錯誤，請重新輸入' }
   }, [])
 
   const logout = useCallback(() => {
+    // 通知后端登出(失败不阻断本地清理)
+    logoutApi().catch(() => {})
     setIsAuthenticated(false)
     setUser(null)
-    // 清除 localStorage
+    // 清除本地登录信息
+    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem('is_authenticated')
     localStorage.removeItem('user_info')
   }, [])

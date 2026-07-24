@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
 import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
+import RouteErrorBoundary from './components/RouteErrorBoundary'
 import './App.css'
 
 /* 懒加载所有页面组件，避免启动时一次性加载所有模块 */
@@ -89,8 +90,9 @@ function AuthenticatedLayout() {
       <Layout>
         <HeaderBar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
         <Content className="app-content">
-          <Suspense fallback={<PageLoading />}>
-            <Routes>
+          <RouteErrorBoundary>
+            <Suspense fallback={<PageLoading />}>
+              <Routes>
               <Route path="/" element={<Home />} />
               {/* 財務管理 */}
               <Route path="/account-balance" element={<AccountBalance />} />
@@ -159,8 +161,9 @@ function AuthenticatedLayout() {
               <Route path="/page-prd-view" element={<PagePRDView />} />
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </RouteErrorBoundary>
         </Content>
       </Layout>
       <PetMascot />

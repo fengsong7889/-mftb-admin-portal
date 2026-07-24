@@ -63,31 +63,8 @@ export default function AlgorithmAdd() {
   const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
   const [merchantLimit, setMerchantLimit] = useState(false) // false: 不限制, true: 限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([])
-  const [deliveryRangeByDistrict, setDeliveryRangeByDistrict] = useState<Record<string, string[]>>({
-    macau: [],
-    taipa: [],
-  })
-
-  // 盘活复苏 - 区域配置（固定可选项）
-  const ALL_REVIVE_DISTRICTS = [
-    { id: 'macau', label: '澳門' },
-    { id: 'taipa', label: '氹仔' },
-    { id: 'hengqin', label: '横琴合作區' },
-    { id: 'zhuhai', label: '珠海市' },
-  ]
-  const [reviveDistrictIds, setReviveDistrictIds] = useState<string[]>(['macau', 'taipa'])
-  const reviveDistricts = ALL_REVIVE_DISTRICTS.filter(d => reviveDistrictIds.includes(d.id))
-
-  const handleReviveDistrictChange = (ids: string[]) => {
-    if (ids.length === 0) return // 至少保留一个
-    setReviveDistrictIds(ids)
-    // 同步配送范围数据：新增区域初始化为空，删除区域移除
-    setDeliveryRangeByDistrict(prev => {
-      const next: Record<string, string[]> = {}
-      ids.forEach(id => { next[id] = prev[id] || [] })
-      return next
-    })
-  }
+  // 盘活复苏 - 配送范围计算（4 个固定参数：短程/中程/远程/跨桥）
+  const [reviveDeliveryRange, setReviveDeliveryRange] = useState<string[]>([])
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
   const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
@@ -613,7 +590,7 @@ export default function AlgorithmAdd() {
             </Form.Item>
           )}
 
-          {/* 配送範圍計算（僅盤活復蘇） - 按大區配置 */}
+          {/* 配送範圍計算（僅盤活復蘇） - 4 個固定參數 */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
             <Form.Item
               label="配送範圍計算"
@@ -621,49 +598,17 @@ export default function AlgorithmAdd() {
               labelCol={{ flex: '150px' }}
               wrapperCol={{ flex: 1 }}
             >
-              {/* 区域选择 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>配置區域：</span>
-                <Checkbox.Group
-                  value={reviveDistrictIds}
-                  disabled={isDetailMode}
-                  onChange={(vals) => handleReviveDistrictChange(vals as string[])}
-                  options={ALL_REVIVE_DISTRICTS.map(d => ({ label: d.label, value: d.id }))}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                {reviveDistricts.map(d => (
-                  <div key={d.id} style={{
-                    flex: 1, minWidth: 260,
-                    border: '1px solid #d6e4ff', borderRadius: 8,
-                    background: '#f0f5ff', overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      padding: '8px 16px', background: '#e6f4ff',
-                      borderBottom: '1px solid #d6e4ff',
-                      fontSize: 13, fontWeight: 600, color: '#1890ff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      {d.label}
-                    </div>
-                    <div style={{ padding: '12px 16px' }}>
-                      <Checkbox.Group
-                        options={[
-                          { label: '短程', value: 'short' },
-                          { label: '中程', value: 'medium' },
-                          { label: '遠程', value: 'long' },
-                        ]}
-                        value={deliveryRangeByDistrict[d.id] || []}
-                        disabled={isDetailMode}
-                        onChange={(vals) => setDeliveryRangeByDistrict(prev => ({ ...prev, [d.id]: vals as string[] }))}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
-                {reviveDistricts.map(d => d.label).join('、')}的商家匹配各自區域的配送範圍，各區獨立計算、互不影響
-              </div>
+              <Checkbox.Group
+                options={[
+                  { label: '短程', value: 'short' },
+                  { label: '中程', value: 'medium' },
+                  { label: '遠程', value: 'long' },
+                  { label: '跨橋', value: 'cross_bridge' },
+                ]}
+                value={reviveDeliveryRange}
+                disabled={isDetailMode}
+                onChange={(vals) => setReviveDeliveryRange(vals as string[])}
+              />
             </Form.Item>
           )}
 
