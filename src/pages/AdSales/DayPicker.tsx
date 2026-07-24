@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
 import { RECOMMEND_TYPE_CONFIGS } from './types'
+import { AlgorithmType } from '../Recommend/constants'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 
@@ -22,6 +23,29 @@ const mockGradients = [
 
 // 中文星期映射
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
+/** 可售天数（含当天），超出即为待开售：盘活复苏 150 天，其他 12 天 */
+const REVIVE_SELLABLE_DAYS = 150
+const DEFAULT_SELLABLE_DAYS = 12
+/** 开售时间（火车票式，每日该时点放出新一天的可购买日期） */
+const PRESALE_OPEN_HOUR = 10
+
+/** 根据算法类型取可售天数 */
+function getSellableDays(algorithmType: AlgorithmType): number {
+  return algorithmType === AlgorithmType.HOT_REVIVE_AD ? REVIVE_SELLABLE_DAYS : DEFAULT_SELLABLE_DAYS
+}
+/** 计算某日期相对今天的天数偏移（今天=0） */
+function getDayOffset(date: Dayjs): number {
+  return date.startOf('day').diff(dayjs().startOf('day'), 'day')
+}
+/** 是否为待开售日期（超出可售窗口，暂不可购买） */
+function isPresaleDate(date: Dayjs, sellableDays: number): boolean {
+  return getDayOffset(date) >= sellableDays
+}
+/** 待开售日期的开售时间（提前 sellableDays 天、于 PRESALE_OPEN_HOUR 点开售） */
+function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
+  return date.startOf('day').subtract(sellableDays - 1, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
+}
 
 /** 生成伪随机数（可预期） */
 function pseudoRandom(seed: number): number {
@@ -130,6 +154,10 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [isSoldOutModalVisible, setIsSoldOutModalVisible] = useState(false)
   const [soldOutDetails, setSoldOutDetails] = useState<string[]>([])
   const [currentTime, setCurrentTime] = useState(Date.now())
+  // 待开售日期提醒弹窗
+  const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
+  // 当前库存项的可售天数（盘活复苏 150 天，其他 12 天）
+  const sellableDays = getSellableDays(inventoryItem.algorithmType)
 
   // 查询条件状态
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
@@ -355,6 +383,14 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   // 切换日期选择
   const handleDateClick = (date: Dayjs | null) => {
     if (!date) return
+    if (isPresaleDate(date, sellableDays)) {
+      setPresaleInfo({
+        date: date.format('YYYY-MM-DD'),
+        weekday: WEEKDAY_LABELS[date.day()],
+        openTime: getPresaleOpenTime(date, sellableDays).format('M月D日 HH:mm'),
+      })
+      return
+    }
     if (!isDateAvailable(date)) { message.warning('該日期不在可購買範圍內'); return }
     if (isDateSoldOut(date)) { message.warning('該日期已售罄'); return }
     if (isDateUnavailable(date)) { message.warning('該日期不可售'); return }
@@ -413,6 +449,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   // 获取单元格样式
   const getCellStyle = (date: Dayjs | null) => {
     if (!date) return { background: '#fafafa', cursor: 'default', border: '1px solid #e8e8e8' }
+    if (isPresaleDate(date, sellableDays)) return { background: '#fafafa', cursor: 'pointer', border: '1px dashed #d9d9d9', color: '#bfbfbf' }
     const dateStr = date.format('YYYY-MM-DD')
     const isSelected = selectedDates.includes(dateStr)
     const isSoldOut = isDateSoldOut(date)
@@ -589,6 +626,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 const isToday = date?.isSame(dayjs(), 'day')
                 const inCart = date ? isDateLocked(dateStr) : false
                 const remaining = date ? getLockedRemaining(dateStr) : 0
+                const presale = date ? isPresaleDate(date, sellableDays) : false
                 // Mock: 生成确定性库存数量（基于日期的 hash）
                 const mockInventory = date ? ((date.date() * 7 + date.month() * 13) % 15) + 2 : 0
                 return (
@@ -600,27 +638,30 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                           {date.date()}
                           {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
                         </div>
-                        {inCart && (
+                        {presale && (
+                          <span style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                        )}
+                        {!presale && inCart && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 1 }}>
                             <span style={{ fontSize: 9, color: '#722ed1' }}>已鎖定</span>
                             <span style={{ fontSize: 11, fontWeight: 700, color: '#ff4d4f' }}>{remaining}</span>
                             <span style={{ fontSize: 8, color: '#ff7875' }}>秒</span>
                           </div>
                         )}
-                        {isDateSoldOut(date) && (
+                        {!presale && isDateSoldOut(date) && (
                           <>
                             <span style={{ fontSize: 9, marginTop: 1 }}>已售罄</span>
                             <span style={{ fontSize: 9, color: '#bfbfbf', textDecoration: 'line-through' }}>${inventoryItem.dailyPrice}</span>
                             <span style={{ fontSize: 9, color: '#bfbfbf' }}>庫存：0</span>
                           </>
                         )}
-                        {isDateUnavailable(date) && (
+                        {!presale && isDateUnavailable(date) && (
                           <>
                             <span style={{ fontSize: 9, marginTop: 1 }}>不可售</span>
                             <span style={{ fontSize: 9, color: '#bfbfbf' }}>—</span>
                           </>
                         )}
-                        {isDateAvailable(date) && !isDateSoldOut(date) && !isDateUnavailable(date) && !inCart && (
+                        {!presale && isDateAvailable(date) && !isDateSoldOut(date) && !isDateUnavailable(date) && !inCart && (
                           <>
                             {isSelected
                               ? <span style={{ fontSize: 9, color: '#E8720C', marginTop: 1, fontWeight: 600 }}>已選擇</span>
@@ -851,6 +892,39 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             ⏰ 剩餘日期已為您鎖定，請在 <span style={{ fontWeight: 700, fontSize: 16, color: '#ff4d4f', background: '#fff2f0', padding: '1px 6px', borderRadius: 4, border: '1px solid #ffccc7' }}>1 分鐘內</span> 完成支付，逾期系統將自動釋放鎖定日期供其他商家選購。
           </p>
         </div>
+      </Modal>
+
+      {/* 待开售日期提醒弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>該日期尚未開售</span>
+          </Space>
+        }
+        open={!!presaleInfo}
+        onCancel={() => setPresaleInfo(null)}
+        footer={[
+          <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
+            我知道了
+          </Button>
+        ]}
+        width={420}
+      >
+        {presaleInfo && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{
+              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
+              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ fontSize: 13, color: '#595959' }}>⏰ 開售時間：</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
+            </div>
+            <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
+              每日 {PRESALE_OPEN_HOUR}:00 會放出新一天的可購買日期，請屆時再來搶購。
+            </p>
+          </div>
+        )}
       </Modal>
     </div>
   )

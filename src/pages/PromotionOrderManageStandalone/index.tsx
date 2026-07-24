@@ -140,6 +140,12 @@ const RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
   [RecommendType.TRAFFIC_AD]: 'purple',
 }
 
+// 下单人类型枚举
+enum OrderOperatorType {
+  MERCHANT = 1,  // 商家
+  STAFF = 2,     // 业务人员
+}
+
 // 订单接口定义
 interface OrderItem {
   id: string
@@ -164,6 +170,17 @@ interface OrderItem {
   status: OrderStatus
   orderTime: string
   payTime?: string
+  refundAmount?: number       // 退款推廣金額
+  refundTime?: string         // 退款時間
+  refundOperatorType?: OrderOperatorType  // 退款人類型
+  refundOperatorId?: string   // 退款人ID
+  refundOperatorName?: string // 退款人姓名
+  cancelTime?: string         // 取消/中止時間
+  cancelOperatorId?: string   // 取消/中止人工號
+  cancelOperatorName?: string // 取消/中止人姓名
+  operatorType?: OrderOperatorType  // 下單人類型
+  operatorId?: string         // 下單人ID（商家=門店ID，業務人員=工號）
+  operatorName?: string       // 下單人姓名
 }
 
 // Mock 订单数据（15条）
@@ -189,6 +206,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTING,
     orderTime: '2026-07-20 10:00:00',
     payTime: '2026-07-20 10:05:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30011',
+    operatorName: '黑沙環旗艦店',
   } as any,
   {
     id: '212',
@@ -210,6 +230,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2026-07-20 14:30:00',
     payTime: '2026-07-20 14:35:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00425',
+    operatorName: '張偉强',
   } as any,
   {
     id: '213',
@@ -231,6 +254,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2026-07-18 09:00:00',
     payTime: '2026-07-18 09:10:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30005',
+    operatorName: '氹仔美食店',
   } as any,
   {
     id: '214',
@@ -252,6 +278,12 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.CANCELLED,
     orderTime: '2026-07-19 11:00:00',
     payTime: '2026-07-19 11:05:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00178',
+    operatorName: '王美玲',
+    cancelTime: '2026-07-19 15:20:00',
+    cancelOperatorId: 'EMP00512',
+    cancelOperatorName: '陳志明',
   } as any,
   {
     id: '215',
@@ -273,6 +305,12 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.ABORTED,
     orderTime: '2026-07-17 16:00:00',
     payTime: '2026-07-17 16:10:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30008',
+    operatorName: '澳大分店',
+    cancelTime: '2026-07-18 10:05:00',
+    cancelOperatorId: 'EMP00337',
+    cancelOperatorName: '李家俊',
   } as any,
   {
     id: '1',
@@ -296,6 +334,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTING,
     orderTime: '2025-07-05 10:30:00',
     payTime: '2025-07-05 10:35:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20001',
+    operatorName: '澳門總店',
   },
   {
     id: '2',
@@ -319,6 +360,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-06 14:20:00',
     payTime: '2025-07-06 14:25:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00203',
+    operatorName: '李美琪',
   },
   {
     id: '3',
@@ -341,6 +385,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 2700,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-07 09:15:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20003',
+    operatorName: '珠海旗艦店',
   },
   {
     id: '4',
@@ -364,6 +411,14 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.REFUNDED,
     orderTime: '2025-07-03 16:40:00',
     payTime: '2025-07-03 16:45:00',
+    refundAmount: 900,
+    refundTime: '2025-07-04 10:30:00',
+    refundOperatorType: OrderOperatorType.STAFF,
+    refundOperatorId: 'EMP00156',
+    refundOperatorName: '黃嘉欣',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20004',
+    operatorName: '黑沙環店',
   },
   {
     id: '5',
@@ -386,6 +441,14 @@ const mockOrders: OrderItem[] = [
     actualPrice: 2250,
     status: OrderStatus.REFUNDED,
     orderTime: '2025-07-02 11:20:00',
+    refundAmount: 2250,
+    refundTime: '2025-07-03 14:20:00',
+    refundOperatorType: OrderOperatorType.MERCHANT,
+    refundOperatorId: 'S20002',
+    refundOperatorName: '氹仔分店',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP0086',
+    operatorName: '陳小明',
   },
   {
     id: '6',
@@ -409,6 +472,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-01 08:30:00',
     payTime: '2025-07-01 08:35:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00289',
+    operatorName: '鄭家豪',
   },
   {
     id: '7',
@@ -432,6 +498,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-06-30 10:15:00',
     payTime: '2025-06-30 10:20:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20002',
+    operatorName: '氹仔分店',
   },
   {
     id: '8',
@@ -454,6 +523,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 2520,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-29 15:45:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00156',
+    operatorName: '黃嘉欣',
   },
   {
     id: '9',
@@ -477,6 +549,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-28 09:20:00',
     payTime: '2025-06-28 09:25:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20004',
+    operatorName: '黑沙環店',
   },
   {
     id: '10',
@@ -500,6 +575,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-27 20:10:00',
     payTime: '2025-06-27 20:15:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00312',
+    operatorName: '林志偉',
   },
   {
     id: '11',
@@ -523,6 +601,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-06-26 11:30:00',
     payTime: '2025-06-26 11:35:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20001',
+    operatorName: '澳門總店',
   },
   {
     id: '12',
@@ -545,6 +626,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 1260,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-25 13:50:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP0086',
+    operatorName: '陳小明',
   },
   {
     id: '13',
@@ -567,6 +651,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 1890,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-24 07:40:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20003',
+    operatorName: '珠海旗艦店',
   },
   {
     id: '14',
@@ -590,6 +677,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-23 06:20:00',
     payTime: '2025-06-23 06:25:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00203',
+    operatorName: '李美琪',
   },
   {
     id: '15',
@@ -613,6 +703,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-06-22 10:05:00',
     payTime: '2025-06-22 10:10:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20005',
+    operatorName: '新馬路店',
   },
   // 盤活復蘇訂單數據（15條）
   {
@@ -638,6 +731,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTING,
     orderTime: '2025-07-15 10:30:00',
     payTime: '2025-07-15 10:35:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20001',
+    operatorName: '澳門總店',
   },
   {
     id: '102',
@@ -662,6 +758,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-14 14:20:00',
     payTime: '2025-07-14 14:25:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00156',
+    operatorName: '黃嘉欣',
   },
   {
     id: '103',
@@ -685,6 +784,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 3600,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-13 09:15:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00425',
+    operatorName: '張偉强',
   },
   {
     id: '104',
@@ -709,6 +811,14 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.REFUNDED,
     orderTime: '2025-07-12 16:40:00',
     payTime: '2025-07-12 16:45:00',
+    refundAmount: 1350,
+    refundTime: '2025-07-13 09:15:00',
+    refundOperatorType: OrderOperatorType.STAFF,
+    refundOperatorId: 'EMP00203',
+    refundOperatorName: '李美琪',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20004',
+    operatorName: '黑沙環店',
   },
   {
     id: '105',
@@ -732,6 +842,14 @@ const mockOrders: OrderItem[] = [
     actualPrice: 4500,
     status: OrderStatus.REFUNDED,
     orderTime: '2025-07-11 11:20:00',
+    refundAmount: 4500,
+    refundTime: '2025-07-12 16:00:00',
+    refundOperatorType: OrderOperatorType.MERCHANT,
+    refundOperatorId: 'S20005',
+    refundOperatorName: '新馬路店',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00312',
+    operatorName: '林志偉',
   },
   {
     id: '106',
@@ -756,6 +874,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-10 08:30:00',
     payTime: '2025-07-10 08:35:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20001',
+    operatorName: '澳門總店',
   },
   {
     id: '107',
@@ -780,6 +901,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-09 10:15:00',
     payTime: '2025-07-09 10:20:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00178',
+    operatorName: '王美玲',
   },
   {
     id: '108',
@@ -803,6 +927,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 2520,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-08 15:45:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20003',
+    operatorName: '珠海旗艦店',
   },
   {
     id: '109',
@@ -827,6 +954,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-07 09:20:00',
     payTime: '2025-07-07 09:25:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00289',
+    operatorName: '鄭家豪',
   },
   {
     id: '110',
@@ -851,6 +981,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-06 20:10:00',
     payTime: '2025-07-06 20:15:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20005',
+    operatorName: '新馬路店',
   },
   {
     id: '111',
@@ -875,6 +1008,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-05 11:30:00',
     payTime: '2025-07-05 11:35:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP0086',
+    operatorName: '陳小明',
   },
   {
     id: '112',
@@ -898,6 +1034,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 1260,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-04 13:50:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20002',
+    operatorName: '氹仔分店',
   },
   {
     id: '113',
@@ -921,6 +1060,9 @@ const mockOrders: OrderItem[] = [
     actualPrice: 2880,
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-03 07:40:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00312',
+    operatorName: '林志偉',
   },
   {
     id: '114',
@@ -945,6 +1087,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-02 06:20:00',
     payTime: '2025-07-02 06:25:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S20001',
+    operatorName: '澳門總店',
   },
   {
     id: '115',
@@ -969,6 +1114,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-01 10:05:00',
     payTime: '2025-07-01 10:10:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00156',
+    operatorName: '黃嘉欣',
   },
   // 新店廣告訂單數據（10條）
   {
@@ -991,6 +1139,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTING,
     orderTime: '2025-07-20 09:00:00',
     payTime: '2025-07-20 09:05:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30001',
+    operatorName: '黑沙環新店',
   } as any,
   {
     id: '202',
@@ -1012,6 +1163,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-19 11:30:00',
     payTime: '2025-07-19 11:35:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00425',
+    operatorName: '張偉强',
   } as any,
   {
     id: '203',
@@ -1032,6 +1186,9 @@ const mockOrders: OrderItem[] = [
     purchaseDays: ['2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25', '2026-07-26', '2026-07-27', '2026-07-28'],
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-18 14:20:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30003',
+    operatorName: '新馬路旗艦店',
   } as any,
   {
     id: '204',
@@ -1053,6 +1210,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-17 16:45:00',
     payTime: '2025-07-17 16:50:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00178',
+    operatorName: '王美玲',
   } as any,
   {
     id: '205',
@@ -1074,6 +1234,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTING,
     orderTime: '2025-07-16 10:10:00',
     payTime: '2025-07-16 10:15:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30005',
+    operatorName: '新馬路總店',
   } as any,
   {
     id: '206',
@@ -1095,6 +1258,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PENDING_PROMOTION,
     orderTime: '2025-07-15 08:30:00',
     payTime: '2025-07-15 08:35:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP0086',
+    operatorName: '陳小明',
   } as any,
   {
     id: '207',
@@ -1115,6 +1281,9 @@ const mockOrders: OrderItem[] = [
     purchaseDays: ['2026-07-15', '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20'],
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-14 13:00:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30007',
+    operatorName: '港珠澳大橋店',
   } as any,
   {
     id: '208',
@@ -1136,6 +1305,9 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.PROMOTED,
     orderTime: '2025-07-13 15:30:00',
     payTime: '2025-07-13 15:35:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00312',
+    operatorName: '林志偉',
   } as any,
   {
     id: '209',
@@ -1157,6 +1329,12 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.CANCELLED,
     orderTime: '2025-07-12 09:45:00',
     payTime: '2025-07-12 09:50:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'S30009',
+    operatorName: '高士德旗艦店',
+    cancelTime: '2025-07-12 14:30:00',
+    cancelOperatorId: 'EMP00512',
+    cancelOperatorName: '陳志明',
   } as any,
   {
     id: '210',
@@ -1178,6 +1356,12 @@ const mockOrders: OrderItem[] = [
     status: OrderStatus.ABORTED,
     orderTime: '2025-07-11 17:20:00',
     payTime: '2025-07-11 17:25:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP00289',
+    operatorName: '鄭家豪',
+    cancelTime: '2025-07-11 20:00:00',
+    cancelOperatorId: 'EMP00337',
+    cancelOperatorName: '李家俊',
   } as any,
 ]
 
@@ -1200,6 +1384,10 @@ export default function PromotionOrderManage() {
     status: undefined as OrderStatus | undefined,
     orderTimeRange: undefined as [any, any] | undefined,
     promoTimeRange: undefined as [any, any] | undefined,
+    refundTimeRange: undefined as [any, any] | undefined,
+    operatorKeyword: '',   // 下单人搜索关键字
+    refundOperatorKeyword: '', // 退款人搜索关键字
+    cancelOperatorKeyword: '', // 取消人搜索关键字
   })
 
   // 根据 orderType 过滤对应类型的订单
@@ -1242,6 +1430,24 @@ export default function PromotionOrderManage() {
       if (filters.status !== undefined && order.status !== filters.status) {
         return false
       }
+      if (filters.operatorKeyword) {
+        const kw = filters.operatorKeyword.toLowerCase()
+        const matchId = (order.operatorId || '').toLowerCase().includes(kw)
+        const matchName = (order.operatorName || '').toLowerCase().includes(kw)
+        if (!matchId && !matchName) return false
+      }
+      if (filters.refundOperatorKeyword) {
+        const kw = filters.refundOperatorKeyword.toLowerCase()
+        const matchId = (order.refundOperatorId || '').toLowerCase().includes(kw)
+        const matchName = (order.refundOperatorName || '').toLowerCase().includes(kw)
+        if (!matchId && !matchName) return false
+      }
+      if (filters.cancelOperatorKeyword) {
+        const kw = filters.cancelOperatorKeyword.toLowerCase()
+        const matchId = (order.cancelOperatorId || '').toLowerCase().includes(kw)
+        const matchName = (order.cancelOperatorName || '').toLowerCase().includes(kw)
+        if (!matchId && !matchName) return false
+      }
       return true
     })
   }, [filters, orderType])
@@ -1262,6 +1468,15 @@ export default function PromotionOrderManage() {
       { key: 'actualPrice', title: '實付推廣金額' },
     ] : []),
     { key: 'status', title: '訂單狀態' },
+    ...(orderType !== '新店廣告' ? [
+      { key: 'refundAmount', title: '退款推廣金額' },
+      { key: 'refundOperator', title: '退款人' },
+      { key: 'refundTime', title: '退款時間' },
+    ] : [
+      { key: 'cancelOperator', title: '取消人' },
+      { key: 'cancelTime', title: '取消時間' },
+    ]),
+    { key: 'operator', title: '下單人' },
     { key: 'orderTime', title: '下單時間' },
     { key: 'action', title: '操作' },
   ], [orderType])
@@ -1480,7 +1695,8 @@ export default function PromotionOrderManage() {
       render: (price: number) => (
         <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${price}</span>
       ),
-    }] : []),
+    }
+    ] : []),
     {
       title: '訂單狀態',
       dataIndex: 'status',
@@ -1495,6 +1711,76 @@ export default function PromotionOrderManage() {
         }
         const { label, color } = ORDER_STATUS_MAP[displayStatus]
         return <Tag color={color}>{label}</Tag>
+      },
+    },
+    // 退款推廣金額 - 僅無敵星星和盤活復蘇顯示，放在訂單狀態後面
+    ...(orderType !== '新店廣告' ? [{
+      title: '退款推廣金額',
+      dataIndex: 'refundAmount',
+      key: 'refundAmount',
+      width: 120,
+      render: (amount: number | undefined) => {
+        if (amount === undefined || amount === null) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${amount}</span>
+      },
+    }] : []),
+    // 退款人 - 僅無敵星星和盤活復蘇顯示
+    ...(orderType !== '新店廣告' ? [{
+      title: '退款人',
+      key: 'refundOperator',
+      width: 160,
+      render: (_: any, record: OrderItem) => {
+        if (!record.refundOperatorType || !record.refundOperatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <Space direction="vertical" size={0}>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.refundOperatorId}</span>
+            <span>{record.refundOperatorName}</span>
+          </Space>
+        )
+      },
+    }] : []),
+    // 退款時間 - 僅無敵星星和盤活復蘇顯示
+    ...(orderType !== '新店廣告' ? [{
+      title: '退款時間',
+      dataIndex: 'refundTime',
+      key: 'refundTime',
+      width: 160,
+      render: (time: string | undefined) => time || <span style={{ color: '#bfbfbf' }}>-</span>,
+    }] : []),
+    // 取消人 - 僅新店廣告顯示（記錄取消/中止操作人）
+    ...(orderType === '新店廣告' ? [{
+      title: '取消人',
+      key: 'cancelOperator',
+      width: 160,
+      render: (_: any, record: OrderItem) => {
+        if (!record.cancelOperatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <Space direction="vertical" size={0}>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.cancelOperatorId}</span>
+            <span>{record.cancelOperatorName}</span>
+          </Space>
+        )
+      },
+    },
+    {
+      title: '取消時間',
+      dataIndex: 'cancelTime',
+      key: 'cancelTime',
+      width: 160,
+      render: (time: string | undefined) => time || <span style={{ color: '#bfbfbf' }}>-</span>,
+    }] : []),
+    {
+      title: '下單人',
+      key: 'operator',
+      width: 160,
+      render: (_: any, record: OrderItem) => {
+        if (!record.operatorType || !record.operatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <Space direction="vertical" size={0}>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.operatorId}</span>
+            <span>{record.operatorName}</span>
+          </Space>
+        )
       },
     },
     {
@@ -1533,6 +1819,10 @@ export default function PromotionOrderManage() {
       status: undefined,
       orderTimeRange: undefined,
       promoTimeRange: undefined,
+      refundTimeRange: undefined,
+      operatorKeyword: '',
+      refundOperatorKeyword: '',
+      cancelOperatorKeyword: '',
     })
   }
 
@@ -1750,6 +2040,44 @@ export default function PromotionOrderManage() {
             <Form.Item label="推廣時間">
               <RangePicker style={{ width: '100%' }} />
             </Form.Item>
+            {orderType !== '新店廣告' && (
+              <>
+                <Form.Item label="退款人">
+                  <Input
+                    placeholder="工號/門店ID/姓名"
+                    allowClear
+                    value={filters.refundOperatorKeyword}
+                    onChange={e => setFilters({ ...filters, refundOperatorKeyword: e.target.value })}
+                  />
+                </Form.Item>
+                <Form.Item label="退款時間">
+                  <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+              </>
+            )}
+            {orderType === '新店廣告' && (
+              <>
+                <Form.Item label="取消人">
+                  <Input
+                    placeholder="工號/姓名"
+                    allowClear
+                    value={filters.cancelOperatorKeyword}
+                    onChange={e => setFilters({ ...filters, cancelOperatorKeyword: e.target.value })}
+                  />
+                </Form.Item>
+                <Form.Item label="取消時間">
+                  <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+              </>
+            )}
+            <Form.Item label="下單人">
+              <Input
+                placeholder="工號/門店ID/姓名"
+                allowClear
+                value={filters.operatorKeyword}
+                onChange={e => setFilters({ ...filters, operatorKeyword: e.target.value })}
+              />
+            </Form.Item>
             <Form.Item>
               <div className="search-actions">
                 <Button type="primary" icon={<SearchOutlined />}>
@@ -1784,7 +2112,7 @@ export default function PromotionOrderManage() {
               console.log('选中行:', selectedRowKeys, selectedRows)
             },
           }}
-          scroll={{ x: 2200 }}
+          scroll={{ x: 2800 }}
           pagination={{
             total: filteredOrders.length,
             pageSize: 10,

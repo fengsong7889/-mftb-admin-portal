@@ -1,3 +1,4 @@
+import dayjs from 'dayjs'
 import { AlgorithmType, Region, RecommendChannel, AppType } from '../Recommend/constants'
 
 /** 时段状态枚举 */
@@ -150,14 +151,17 @@ const CHANNEL_TO_BIZ: Record<number, string> = {
 }
 const BIZ_CHANNEL_POOL = ['food', 'supermarket', 'groupBuy']
 
-/** 可购买起始日期 */
-const PURCHASE_START_DATE = '2026-07-05'
-const PURCHASE_START_DAY = parseInt(PURCHASE_START_DATE.split('-')[2], 10)
+/** 可购买滚动窗口天数（非盘活复苏类型：今天起 12 天） */
+const ROLLING_WINDOW_DAYS = 12
+/** 盘活复苏类型滚动窗口天数（今天起 150 天） */
+const REVIVE_WINDOW_DAYS = 150
 
-/** 根据日期计算行号（0-based） */
+/** 根据日期计算行号（0-based，相对今天的天数偏移，永不为负） */
 export function getRowIndexByDate(date: string): number {
-  const currentDay = parseInt(date.split('-')[2], 10)
-  return currentDay - PURCHASE_START_DAY
+  const today = dayjs().startOf('day')
+  const target = dayjs(date).startOf('day')
+  const diff = target.diff(today, 'day')
+  return diff < 0 ? 0 : diff
 }
 
 /** 生成伪随机数（可预期） */
@@ -185,6 +189,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
     [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
     [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
     [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
+    [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家(KA)',
   }
   
   // 各类型的推广名称后缀
@@ -228,8 +233,10 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
           bizChannel,
           slotPosition,
           dailyPrice,
-          availableStartDate: type === AlgorithmType.HOT_REVIVE_AD ? '2026-07-01' : '2026-07-05',
-          availableEndDate: type === AlgorithmType.HOT_REVIVE_AD ? '2026-11-30' : '2026-07-28',
+          availableStartDate: dayjs().format('YYYY-MM-DD'),
+          availableEndDate: dayjs()
+            .add(type === AlgorithmType.HOT_REVIVE_AD ? REVIVE_WINDOW_DAYS : ROLLING_WINDOW_DAYS, 'day')
+            .format('YYYY-MM-DD'),
           totalSlots,
           soldSlots,
           algorithmType: type,

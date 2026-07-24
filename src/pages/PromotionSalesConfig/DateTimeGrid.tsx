@@ -17,7 +17,7 @@ import {
   type InventoryItem,
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
-import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES } from '../Recommend/constants'
+import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES, AlgorithmType } from '../Recommend/constants'
 
 interface CartItem {
   key: string
@@ -135,8 +135,34 @@ const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星
 const LOCK_DURATION_SECONDS = 60
 const LOCK_DURATION_MS = LOCK_DURATION_SECONDS * 1000
 
+/** 可售天数（含当天），超出该窗口即为待开售日期：盘活复苏 150 天，其他类型 12 天 */
+const REVIVE_SELLABLE_DAYS = 150
+const DEFAULT_SELLABLE_DAYS = 12
+/** 开售时间（每日该时点放出新一天的可购买日期，火车票式） */
+const PRESALE_OPEN_HOUR = 10
+
+/** 根据算法类型取可售天数 */
+function getSellableDays(algorithmType: AlgorithmType): number {
+  return algorithmType === AlgorithmType.HOT_REVIVE_AD ? REVIVE_SELLABLE_DAYS : DEFAULT_SELLABLE_DAYS
+}
+
+/** 计算某日期相对今天的天数偏移（今天=0） */
+function getDayOffset(date: Dayjs): number {
+  return date.startOf('day').diff(dayjs().startOf('day'), 'day')
+}
+/** 是否为待开售日期（超出可售窗口，暂不可购买） */
+function isPresaleDate(date: Dayjs, sellableDays: number): boolean {
+  return getDayOffset(date) >= sellableDays
+}
+/** 待开售日期的开售时间（提前 sellableDays 天、于 PRESALE_OPEN_HOUR 点开售） */
+function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
+  return date.startOf('day').subtract(sellableDays - 1, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
+}
+
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const navigate = useNavigate()
+  // 当前库存项的可售天数（盘活复苏 150 天，其他 12 天）
+  const sellableDays = getSellableDays(inventoryItem.algorithmType)
   const [selectedDates, setSelectedDates] = useState<Dayjs[]>([])
   const [activeDate, setActiveDate] = useState<Dayjs | null>(null) // 当前查看的日期
   const [hoveredDate, setHoveredDate] = useState<string | null>(null)
@@ -182,6 +208,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [hasSearched, setHasSearched] = useState(false)
   const [isConflictModalVisible, setIsConflictModalVisible] = useState(false)
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  // 预售日期提醒弹窗
+  const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
 
   // 当前活动日期的字符串
   const activeDateStr = activeDate?.format('YYYY-MM-DD') || ''
@@ -433,6 +461,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
   // 点击日期（单选切换：点击新日期取消之前的选中）
   const handleDateClick = (date: Dayjs) => {
+    // 预售日期：暂不可购买，弹窗提示开售时间
+    if (isPresaleDate(date, sellableDays)) {
+      setPresaleInfo({
+        date: date.format('YYYY-MM-DD'),
+        weekday: WEEKDAY_LABELS[date.day()],
+        openTime: getPresaleOpenTime(date, sellableDays).format('M月D日 HH:mm'),
+      })
+      return
+    }
     const dateStr = date.format('YYYY-MM-DD')
     setSelectedDates(prev => {
       const exists = prev.some(d => d.format('YYYY-MM-DD') === dateStr)
@@ -581,6 +618,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   const isSelected = selectedDates.some(d => d.format('YYYY-MM-DD') === dateStr)
                   const isToday = dateStr === dayjs().format('YYYY-MM-DD')
                   const isHovered = hoveredDate === dateStr
+                  const presale = isPresaleDate(date, sellableDays)
                   return (
                     <div
                       key={dateStr}
@@ -591,8 +629,12 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         flex: 1,
                         padding: '6px 4px',
                         borderRadius: 6,
-                        border: isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                        background: isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : isToday ? '#f6ffed' : '#fff',
+                        border: presale
+                          ? '1px dashed #d9d9d9'
+                          : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
+                        background: presale
+                          ? '#fafafa'
+                          : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : isToday ? '#f6ffed' : '#fff',
                         cursor: 'pointer',
                         textAlign: 'center',
                         transition: 'all 0.2s',
@@ -609,12 +651,16 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           animation: 'dotPulse 1.5s ease-in-out infinite',
                         }} />
                       )}
-                      <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: isSelected || isHovered ? '#fa8c16' : '#333' }}>
+                      <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: presale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
                         {date.format('MM-DD')}
                       </span>
-                      <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
-                        {isToday ? '今天' : WEEKDAY_LABELS[date.day()]}
-                      </span>
+                      {presale ? (
+                        <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
+                          {isToday ? '今天' : WEEKDAY_LABELS[date.day()]}
+                        </span>
+                      )}
                     </div>
                   )
                 })}
@@ -1439,6 +1485,39 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             ⏰ 剩餘時段已為您鎖定，請在 <span style={{ fontWeight: 700, fontSize: 16, color: '#ff4d4f', background: '#fff2f0', padding: '1px 6px', borderRadius: 4, border: '1px solid #ffccc7' }}>{LOCK_DURATION_SECONDS >= 60 ? `${LOCK_DURATION_SECONDS / 60} 分鐘內` : `${LOCK_DURATION_SECONDS} 秒內`}</span> 完成支付，逾期系統將自動釋放鎖定時段供其他商家選購。
           </p>
         </div>
+      </Modal>
+
+      {/* 預售日期提醒弹窗（火车票式：提示何时開售） */}
+      <Modal
+        title={
+          <Space>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>該日期尚未開售</span>
+          </Space>
+        }
+        open={!!presaleInfo}
+        onCancel={() => setPresaleInfo(null)}
+        footer={[
+          <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
+            我知道了
+          </Button>,
+        ]}
+        width={420}
+      >
+        {presaleInfo && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{
+              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
+              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ fontSize: 13, color: '#595959' }}>⏰ 開售時間：</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
+            </div>
+            <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
+              每日 {PRESALE_OPEN_HOUR}:00 會放出新一天的可購買日期，請屆時再來搶購。
+            </p>
+          </div>
+        )}
       </Modal>
     </div>
   )
