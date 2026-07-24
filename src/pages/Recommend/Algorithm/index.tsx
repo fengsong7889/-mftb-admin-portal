@@ -348,7 +348,7 @@ export default function Algorithm() {
         </div>
       </div>
 
-        <Card title="請選擇算法類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <Tabs
             defaultActiveKey="delivery"
             items={[

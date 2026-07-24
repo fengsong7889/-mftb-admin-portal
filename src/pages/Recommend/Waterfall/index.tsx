@@ -34,6 +34,30 @@ const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: st
   { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: '搜索算法優化，提升搜索轉化率' },
 ]
 
+/** 各業務類型（tab）對應的廣告類型列表 */
+const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
+  delivery: [
+    AlgorithmType.INVINCIBLE_STAR,
+    AlgorithmType.HOT_REVIVE_AD,
+    AlgorithmType.POPULAR_MERCHANT_KA,
+    AlgorithmType.EXCLUSIVE_MERCHANT,
+    AlgorithmType.TRAFFIC_AD,
+    AlgorithmType.GUESS_YOU_LIKE,
+    AlgorithmType.ORGANIC_TRAFFIC,
+    AlgorithmType.SEARCH_ALGORITHM,
+  ],
+  groupBuy: [
+    AlgorithmType.INVINCIBLE_STAR,
+    AlgorithmType.HOT_REVIVE_AD,
+  ],
+}
+
+/** 各業務類型（tab）對應的業務频道：外賣到家=美食外賣+超市百貨，團購到店=團購到店 */
+const TAB_BIZ_CHANNELS: Record<string, string[]> = {
+  delivery: ['food', 'supermarket'],
+  groupBuy: ['groupBuy'],
+}
+
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
   [RecommendChannel.HOME]: '大首頁-Feed',
   [RecommendChannel.DELIVERY]: '外賣頻道-Feed',
@@ -239,7 +263,8 @@ export default function Waterfall() {
   // 点击卡片进入列表
   const handleSelectType = (type: AlgorithmType) => {
     setSelectedAlgorithmType(type)
-    setFilteredData(mockData.filter(item => item.algorithmType === type))
+    const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
+    setFilteredData(mockData.filter(item => item.algorithmType === type && allowed.includes(item.bizChannel ?? '')))
     searchForm.resetFields()
   }
 
@@ -261,7 +286,12 @@ export default function Waterfall() {
   
   // 搜索处理
   const handleSearch = (values: any) => {
-    let result = [...mockData]
+    // 基礎範圍：當前選中的廣告類型 + 當前業務類型（tab）允許的業務频道
+    const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
+    let result = mockData.filter(item =>
+      (selectedAlgorithmType == null || item.algorithmType === selectedAlgorithmType) &&
+      allowed.includes(item.bizChannel ?? '')
+    )
     
     // 配置ID搜索
     if (values.adId) {
@@ -271,6 +301,11 @@ export default function Waterfall() {
     // 瀑布流名称搜索
     if (values.promotionName) {
       result = result.filter(item => item.promotionName?.includes(values.promotionName))
+    }
+    
+    // 業務频道搜索
+    if (values.bizChannel !== undefined && values.bizChannel !== null) {
+      result = result.filter(item => item.bizChannel === values.bizChannel)
     }
     
     // 所属品牌搜索
@@ -289,7 +324,11 @@ export default function Waterfall() {
   // 重置搜索
   const handleReset = () => {
     searchForm.resetFields()
-    setFilteredData(mockData)
+    const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
+    setFilteredData(mockData.filter(item =>
+      (selectedAlgorithmType == null || item.algorithmType === selectedAlgorithmType) &&
+      allowed.includes(item.bizChannel ?? '')
+    ))
   }
 
   // 算法类型变化
@@ -513,36 +552,48 @@ export default function Waterfall() {
           </div>
         </div>
 
-        <Card title="請選擇廣告類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: 16,
-          }}>
-            {ALGORITHM_TYPE_CARDS.map(card => {
-              const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
-              return (
-                <div
-                  key={card.type}
-                  className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
-                  onClick={() => enabled && handleSelectType(card.type)}
-                >
-                  <div className="algo-card-inner">
-                    <div className="algo-card-icon">{card.icon}</div>
-                    <h3 className="algo-card-title">{ALGORITHM_TYPE_LABEL[card.type]}</h3>
-                    <p className="algo-card-desc">{card.description}</p>
-                    <div className="algo-card-tag">
-                      {enabled ? (
-                        <Tag color="blue">查看/調整定價</Tag>
-                      ) : (
-                        <Tag color="default">敬請期待</Tag>
-                      )}
-                    </div>
-                  </div>
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+          <Tabs
+            activeKey={bizTypeTab}
+            onChange={(key) => setBizTypeTab(key)}
+            items={['delivery', 'groupBuy'].map(tabKey => ({
+              key: tabKey,
+              label: tabKey === 'delivery' ? '外賣到家' : '團購到店',
+              children: (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 16,
+                }}>
+                  {ALGORITHM_TYPE_CARDS
+                    .filter(card => TAB_ALGORITHM_MAP[tabKey].includes(card.type))
+                    .map(card => {
+                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
+                      return (
+                        <div
+                          key={card.type}
+                          className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
+                          onClick={() => enabled && handleSelectType(card.type)}
+                        >
+                          <div className="algo-card-inner">
+                            <div className="algo-card-icon">{card.icon}</div>
+                            <h3 className="algo-card-title">{ALGORITHM_TYPE_LABEL[card.type]}</h3>
+                            <p className="algo-card-desc">{card.description}</p>
+                            <div className="algo-card-tag">
+                              {enabled ? (
+                                <Tag color="blue">查看/調整定價</Tag>
+                              ) : (
+                                <Tag color="default">敬請期待</Tag>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
-              )
-            })}
-          </div>
+              ),
+            }))}
+          />
         </Card>
       </div>
     )
@@ -612,6 +663,9 @@ export default function Waterfall() {
                 { label: '搜索算法-綜合版', value: '搜索算法-綜合版' },
               ]}
             />
+          </Form.Item>
+          <Form.Item label="業務頻道" name="bizChannel">
+            <Select placeholder="全部" options={bizChannelOptions} allowClear />
           </Form.Item>
           <Form.Item label="所屬品牌" name="app">
             <Select placeholder="全部" options={APP_OPTIONS} allowClear />

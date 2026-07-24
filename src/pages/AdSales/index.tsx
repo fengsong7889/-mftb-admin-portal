@@ -158,7 +158,7 @@ export default function AdSales() {
 
       {/* Step 1: 选择广告类型 */}
       {currentStep === 0 && (
-        <Card title="選擇廣告類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <Tabs
             defaultActiveKey="delivery"
             onChange={(key) => setSelectedTab(key as 'delivery' | 'groupBuy')}
