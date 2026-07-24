@@ -100,25 +100,6 @@ const brandCompareData = [
   { brand: '閃蜂', type: '展示次數', value: 6520 },
   { brand: '閃蜂', type: '點擊次數', value: 898 },
 ]
-  /** 列配置元数据 */
-  const columnMeta = useMemo(() => [
-    { key: 'date', title: '日期' },
-    { key: 'hintWord', title: '底紋詞' },
-    { key: 'hintType', title: '詞源類型' },
-    { key: 'searchPage', title: '搜索界面' },
-    { key: 'brand', title: '品牌' },
-    { key: 'terminal', title: '展示終端' },
-    { key: 'region', title: '區域' },
-    { key: 'showCount', title: '展示次數' },
-    { key: 'clickCount', title: '點擊次數' },
-    { key: 'clickRate', title: '點擊率' },
-    { key: 'ctr', title: 'CTR' },
-  ], [])
-
-  const { configComponent, applyConfig } = useColumnConfig('hint-report', columnMeta)
-
-  
-
 const columns: TableColumnsType<ReportData> = [
   { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
   { title: '底紋詞', dataIndex: 'hintWord', key: 'hintWord', width: 140 },
@@ -199,6 +180,23 @@ const brandColumnConfig = {
 }
 
 export default function HintReport() {
+  /** 列配置元数据 */
+  const columnMeta = useMemo(() => [
+    { key: 'date', title: '日期' },
+    { key: 'hintWord', title: '底紋詞' },
+    { key: 'hintType', title: '詞源類型' },
+    { key: 'searchPage', title: '搜索界面' },
+    { key: 'brand', title: '品牌' },
+    { key: 'terminal', title: '展示終端' },
+    { key: 'region', title: '區域' },
+    { key: 'showCount', title: '展示次數' },
+    { key: 'clickCount', title: '點擊次數' },
+    { key: 'clickRate', title: '點擊率' },
+    { key: 'ctr', title: 'CTR' },
+  ], [])
+
+  const { configComponent, applyConfig } = useColumnConfig('hint-report', columnMeta)
+
   return (
     <div className="content-area">
       {/* 查询区域 */}

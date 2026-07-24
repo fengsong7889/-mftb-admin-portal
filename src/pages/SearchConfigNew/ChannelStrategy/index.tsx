@@ -259,6 +259,43 @@ export default function DimensionStrategy() {
   const updateBiz = (updater: (prev: BizConfig) => BizConfig) =>
     setConfig(prev => ({ ...prev, [activeBiz]: updater(prev[activeBiz]) }))
 
+  // 活動類目列配置
+  const actColumnMeta = useMemo(() => [
+    { key: 'activityType', title: '活動類型' },
+    { key: 'appChannel', title: '適用頻道' },
+    { key: 'boostValue', title: '加分值' },
+    { key: 'boostMethod', title: '加分方式' },
+    { key: 'status', title: '狀態' },
+    { key: 'description', title: '說明' },
+    { key: 'updatedBy', title: '最後更新人' },
+    { key: 'updatedAt', title: '最後更新時間' },
+    { key: 'action', title: '操作' },
+  ], [])
+
+  const { configComponent: actConfigComponent, applyConfig: actApplyConfig } = useColumnConfig(
+    'dimension-strategy-activity',
+    actColumnMeta,
+    [{ key: 'action', visible: true, locked: 'tail' as const }]
+  )
+
+  // 廣告類目列配置
+  const adColumnMeta = useMemo(() => [
+    { key: 'adType', title: '廣告類型' },
+    { key: 'appChannel', title: '適用頻道' },
+    { key: 'boostValue', title: '加分值' },
+    { key: 'status', title: '狀態' },
+    { key: 'description', title: '說明' },
+    { key: 'updatedBy', title: '最後更新人' },
+    { key: 'updatedAt', title: '最後更新時間' },
+    { key: 'action', title: '操作' },
+  ], [])
+
+  const { configComponent: adConfigComponent, applyConfig: adApplyConfig } = useColumnConfig(
+    'dimension-strategy-ad',
+    adColumnMeta,
+    [{ key: 'action', visible: true, locked: 'tail' as const }]
+  )
+
   /* ---- 活動 CRUD ---- */
   const [actModalOpen, setActModalOpen] = useState(false)
   const [editingAct, setEditingAct] = useState<ActivityRecord | null>(null)
@@ -322,8 +359,8 @@ export default function DimensionStrategy() {
     setAdBoostTiers([defaultBoostTier])
     // ad_consumption默认只展示一个扣分梯队，其他广告保留所有梯队
     const defaultDemoteTiers = r.key === 'ad_consumption'
-      ? (r.demoteTiers && r.demoteTiers.length > 0 ? [r.demoteTiers[0]] : [{ days: 3, deductionType: 'percent_deduction', deductionValue: 10 }])
-      : (r.demoteTiers && r.demoteTiers.length > 0 ? r.demoteTiers : [{ days: 3, deductionType: 'percent_deduction', deductionValue: 10 }])
+      ? (r.demoteTiers && r.demoteTiers.length > 0 ? [r.demoteTiers[0]] : [{ days: 3, deductionType: 'percent_deduction' as const, deductionValue: 10 }])
+      : (r.demoteTiers && r.demoteTiers.length > 0 ? r.demoteTiers : [{ days: 3, deductionType: 'percent_deduction' as const, deductionValue: 10 }])
     setAdDemoteTiers(defaultDemoteTiers)
     setAdModalOpen(true)
     setTimeout(() => adForm.setFieldsValue({ ...r, appChannel: r.appChannel || 'all' }), 0)
@@ -430,43 +467,6 @@ export default function DimensionStrategy() {
       if (commercialSearchText && !r.adName.includes(commercialSearchText) && !(adTypeMap[r.adType] || '').includes(commercialSearchText)) return false
       return true
     })
-
-    // 活動類目列配置
-    const actColumnMeta = useMemo(() => [
-      { key: 'activityType', title: '活動類型' },
-      { key: 'appChannel', title: '適用頻道' },
-      { key: 'boostValue', title: '加分值' },
-      { key: 'boostMethod', title: '加分方式' },
-      { key: 'status', title: '狀態' },
-      { key: 'description', title: '說明' },
-      { key: 'updatedBy', title: '最後更新人' },
-      { key: 'updatedAt', title: '最後更新時間' },
-      { key: 'action', title: '操作' },
-    ], [])
-
-    const { configComponent: actConfigComponent, applyConfig: actApplyConfig } = useColumnConfig(
-      'dimension-strategy-activity',
-      actColumnMeta,
-      [{ key: 'action', visible: true, locked: 'tail' as const }]
-    )
-
-    // 廣告類目列配置
-    const adColumnMeta = useMemo(() => [
-      { key: 'adType', title: '廣告類型' },
-      { key: 'appChannel', title: '適用頻道' },
-      { key: 'boostValue', title: '加分值' },
-      { key: 'status', title: '狀態' },
-      { key: 'description', title: '說明' },
-      { key: 'updatedBy', title: '最後更新人' },
-      { key: 'updatedAt', title: '最後更新時間' },
-      { key: 'action', title: '操作' },
-    ], [])
-
-    const { configComponent: adConfigComponent, applyConfig: adApplyConfig } = useColumnConfig(
-      'dimension-strategy-ad',
-      adColumnMeta,
-      [{ key: 'action', visible: true, locked: 'tail' as const }]
-    )
 
     const actCols: TableColumnsType<ActivityRecord> = [
       { title: '活動類型', dataIndex: 'activityType', key: 'activityType', width: 120, render: (v: string) => <Tag color="blue">{activityTypeMap[v] || v}</Tag> },

@@ -429,9 +429,9 @@ export default function HotSearchConfig() {
                 }}
               >
                 <span style={{ fontSize: 11 }}>🔥</span>
-                <span>{v.replace(/[🔥⭐🎉🎊💥🆕👑🎁💰🏷️🍜🍕🍔🧋🍰☕]/gu, '').trim()}</span>
+                <span>{v.replace(/\p{Extended_Pictographic}/gu, '').trim()}</span>
                 <span style={{ fontSize: 11 }}>⭐</span>
-                <span>{v.replace(/[🔥⭐🎉🎊💥🆕👑🎁💰🏷️🍜🍕🍔🧋🍰☕]/gu, '').trim()}</span>
+                <span>{v.replace(/\p{Extended_Pictographic}/gu, '').trim()}</span>
               </div>
             </div>
           )

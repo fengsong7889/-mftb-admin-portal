@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react'
-import type { Role } from '../pages/Permission/types'
+import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS } from '../pages/Permission/types'
 
 export interface UserInfo {
@@ -28,6 +28,10 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
+
+// 从环境变量读取 Mock 凭据（.env.local 已 gitignore）
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'change-me'
+const GUEST_PASSWORD = import.meta.env.VITE_GUEST_PASSWORD || 'change-me'
 
 const DEFAULT_ADMIN_USER: UserInfo = {
   username: 'admin',
@@ -60,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback((username: string, password: string) => {
     // admin 账号登录
-    if (username === 'admin' && password === '111222') {
+    if (username === 'admin' && password === ADMIN_PASSWORD) {
       setIsAuthenticated(true)
       setUser({ ...DEFAULT_ADMIN_USER })
       // 保存到 localStorage
@@ -69,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true }
     }
     // guest 账号登录
-    if (username === 'guest' && password === '123456') {
+    if (username === 'guest' && password === GUEST_PASSWORD) {
       setIsAuthenticated(true)
       setUser({ ...DEFAULT_GUEST_USER })
       // 保存到 localStorage
@@ -102,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   /** 获取角色权限 */
-  const getRolePermissions = useCallback((roleId: string): string[] => {
+  const getRolePermissions = useCallback((roleId: string): MenuPermission[] => {
     const rolesStr = localStorage.getItem(STORAGE_KEYS.ROLES)
     if (!rolesStr) return []
     
@@ -119,10 +123,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // 检查用户绑定的角色是否包含该权限
     if (user.functionRoles && user.functionRoles.length > 0) {
-      const allPermissions = user.functionRoles
+      const allActions = user.functionRoles
         .map(roleId => getRolePermissions(roleId))
         .flat()
-      return allPermissions.includes(permission)
+        .flatMap(p => p.actions)
+      return allActions.includes(permission)
     }
     
     // guest 只有查看权限，没有编辑权限

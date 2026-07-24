@@ -301,7 +301,13 @@ export default function PromotionReportOrder() {
             <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>時間範圍</label>
             <RangePicker
               value={dateRange}
-              onChange={(dates) => dates ? setDateRange([dates[0], dates[1]]) : setDateRange(undefined)}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  setDateRange([dates[0], dates[1]])
+                } else {
+                  setDateRange(undefined)
+                }
+              }}
               style={{ width: '100%' }}
             />
           </div>

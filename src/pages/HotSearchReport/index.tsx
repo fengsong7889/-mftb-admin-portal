@@ -111,25 +111,6 @@ const brandCompareData = [
   { brand: '閃蜂', type: '點擊次數', value: 1456 },
   { brand: '閃蜂', type: '店鋪訪問', value: 1123 },
 ]
-  /** 列配置元数据 */
-  const columnMeta = useMemo(() => [
-    { key: 'date', title: '日期' },
-    { key: 'word', title: '熱搜詞' },
-    { key: 'promotionType', title: '推廣類型' },
-    { key: 'searchPage', title: '搜索界面' },
-    { key: 'brand', title: '品牌' },
-    { key: 'terminal', title: '展示終端' },
-    { key: 'region', title: '區域' },
-    { key: 'timeSlot', title: '時段' },
-    { key: 'showCount', title: '展示次數' },
-    { key: 'clickCount', title: '點擊次數' },
-    { key: 'clickRate', title: '點擊率' },
-  ], [])
-
-  const { configComponent, applyConfig } = useColumnConfig('hot-search-report', columnMeta)
-
-  
-
 const columns: TableColumnsType<ReportData> = [
   { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
   { title: '熱搜詞', dataIndex: 'word', key: 'word', width: 150 },
@@ -250,6 +231,23 @@ const brandColumnConfig = {
 }
 
 export default function HotSearchReport() {
+  /** 列配置元数据 */
+  const columnMeta = useMemo(() => [
+    { key: 'date', title: '日期' },
+    { key: 'word', title: '熱搜詞' },
+    { key: 'promotionType', title: '推廣類型' },
+    { key: 'searchPage', title: '搜索界面' },
+    { key: 'brand', title: '品牌' },
+    { key: 'terminal', title: '展示終端' },
+    { key: 'region', title: '區域' },
+    { key: 'timeSlot', title: '時段' },
+    { key: 'showCount', title: '展示次數' },
+    { key: 'clickCount', title: '點擊次數' },
+    { key: 'clickRate', title: '點擊率' },
+  ], [])
+
+  const { configComponent, applyConfig } = useColumnConfig('hot-search-report', columnMeta)
+
   return (
     <div className="content-area">
       {/* 查询区域 */}
