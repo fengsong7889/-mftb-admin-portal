@@ -12,6 +12,13 @@ export interface ApiResult<T = unknown> {
 /** 本地存储的 Token key */
 export const TOKEN_KEY = 'mftb_token'
 
+/**
+ * 自定义请求头：抑制全局错误提示
+ * 当请求 config 中携带 { silent: true } 时，响应拦截器不会自动弹出错误 toast，
+ * 由调用方自行处理错误提示（如登录接口的 mock 降级场景）。
+ */
+export const SILENT_HEADER = 'X-Request-Silent'
+
 /** 业务成功状态码 */
 const SUCCESS_CODE = 200
 /** 未认证状态码 */
@@ -51,21 +58,25 @@ request.interceptors.response.use(
       handleUnauthorized()
       return Promise.reject(new Error(res.message || '登录已过期'))
     }
-    // 其它业务错误: 弹出提示
-    message.error(res.message || '请求失败')
+    // 其它业务错误: 弹出提示（除非调用方声明静默）
+    const silent = response.config?.headers?.[SILENT_HEADER] === '1'
+    if (!silent) {
+      message.error(res.message || '请求失败')
+    }
     return Promise.reject(new Error(res.message || '请求失败'))
   },
   (error) => {
     // HTTP 层错误
     const status = error?.response?.status
+    const silent = error?.config?.headers?.[SILENT_HEADER] === '1'
     if (status === UNAUTHORIZED_CODE) {
       handleUnauthorized()
     } else if (status === 403) {
-      message.error('没有访问权限')
+      if (!silent) message.error('没有访问权限')
     } else if (status >= 500) {
-      message.error('服务器异常, 请稍后重试')
+      if (!silent) message.error('服务器异常, 请稍后重试')
     } else {
-      message.error(error?.message || '网络异常')
+      if (!silent) message.error(error?.message || '网络异常')
     }
     return Promise.reject(error)
   },

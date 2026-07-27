@@ -111,7 +111,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.NEW_STORE_AD]: 'green',
   [AlgorithmType.HOT_REVIVE_AD]: 'volcano',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: 'purple',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: 'red',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: 'geekblue',
   [AlgorithmType.TRAFFIC_AD]: 'cyan',
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',

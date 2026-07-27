@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
 import { mockAlgorithmData } from './Algorithm/index'
 import './WeightSlider.css'
@@ -35,13 +35,15 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.GOLD_AD]: '💰',
 }
 
-/** 獨家商家 - 店鋪等級保障單量配置（等級 / 標籤色 / 默認保障單量） */
+/** 店鋪等級配置（獨家商家保障單量 / 品牌商家保障流量共用）：等級 / 標籤 / 標籤色 / 默認值 */
 const STORE_LEVEL_BLOCK_OPTIONS = [
-  { level: 'S', color: '#F5222D', defaultOrders: 20 },
-  { level: 'A', color: '#E8720C', defaultOrders: 15 },
-  { level: 'B', color: '#1890FF', defaultOrders: 10 },
-  { level: 'C', color: '#52C41A', defaultOrders: 8 },
-  { level: 'D', color: '#722ED1', defaultOrders: 5 },
+  { level: 'KA', label: '大KA', color: '#F5222D', defaultOrders: 30 },
+  { level: 'RECHARGE', label: '充值大戶', color: '#FAAD14', defaultOrders: 25 },
+  { level: 'A', label: 'A級', color: '#E8720C', defaultOrders: 20 },
+  { level: 'B', label: 'B級', color: '#1890FF', defaultOrders: 15 },
+  { level: 'C', label: 'C級', color: '#52C41A', defaultOrders: 10 },
+  { level: 'D', label: 'D級', color: '#722ED1', defaultOrders: 8 },
+  { level: 'E', label: 'E級', color: '#13C2C2', defaultOrders: 5 },
 ]
 
 export default function AlgorithmAdd() {
@@ -301,7 +303,7 @@ export default function AlgorithmAdd() {
       </Card>
 
       {/* 算法参数区域 */}
-      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA) ? (
+      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT) ? (
         <Card 
           title={
             <Space>
@@ -845,22 +847,38 @@ export default function AlgorithmAdd() {
               <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
                 請選擇參與成交量統計的訂單履約方式，以保障商家訂單成交量統計的準確性
               </div>
-              {/* 店鋪等級保障單量配置 */}
-              <div style={{ marginTop: 12, padding: '12px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+              {/* 店鋪等級保障單量配置（樣式與品牌商家店鋪等級配置保持一致） */}
+              <div style={{ marginTop: 12, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>店鋪等級保障單量</div>
                 <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
                   按店鋪等級單獨配置保障單量：當用戶在該門店的下單數量達到所配置單量時，該門店將不再在獨家區域展示
                 </div>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, color, defaultOrders }) => (
-                    <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{
-                        padding: '0 8px', height: 22, lineHeight: '22px', borderRadius: 4,
-                        fontSize: 12, fontWeight: 600, color,
-                        background: `${color}14`, border: `1px solid ${color}4D`,
-                      }}>{level}級</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, label, color, defaultOrders }) => (
+                    <div key={level} style={{
+                      background: '#fff',
+                      border: `1px solid ${color}33`,
+                      borderTop: `3px solid ${color}`,
+                      borderRadius: 8,
+                      padding: '12px 12px 14px',
+                      textAlign: 'center',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                        <span style={{
+                          padding: '0 12px', height: 24, lineHeight: '24px', borderRadius: 12,
+                          fontSize: 13, fontWeight: 700, color: '#fff',
+                          background: color, display: 'inline-block', whiteSpace: 'nowrap',
+                        }}>{label}</span>
+                      </div>
                       <Form.Item name={['levelBlockOrders', level]} noStyle initialValue={defaultOrders}>
-                        <InputNumber min={1} precision={0} style={{ width: 100 }} addonAfter="單" disabled={isDetailMode} />
+                        <InputNumber
+                          min={1}
+                          precision={0}
+                          style={{ width: '100%' }}
+                          addonAfter="單"
+                          disabled={isDetailMode}
+                        />
                       </Form.Item>
                     </div>
                   ))}
@@ -871,6 +889,123 @@ export default function AlgorithmAdd() {
 
           {/* ===== 獨家商家：算法策略（獨立模塊，與盤活復蘇/無敵星星互不影響） ===== */}
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
+              <div style={{
+                border: '1px solid #d6e4ff',
+                borderRadius: 8,
+                background: '#f0f5ff',
+                overflow: 'hidden',
+                marginBottom: 16,
+              }}>
+                    {/* 標題欄 */}
+                    <div style={{
+                      fontSize: 14, fontWeight: 600, color: '#1890ff',
+                      padding: '10px 20px',
+                      borderBottom: '1px solid #d6e4ff',
+                      background: '#e6f4ff',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <SettingOutlined />
+                      算法策略
+                    </div>
+
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                      <Form.Item
+                        name="merchantExposureStrategy"
+                        style={{ flex: 1, marginBottom: 0 }}
+                        wrapperCol={{ span: 24 }}
+                      >
+                        <Select
+                          placeholder="請選擇"
+                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          options={[
+                            { label: '輪詢計算', value: 'random' },
+                          ]}
+                          disabled={isDetailMode}
+                        />
+                      </Form.Item>
+                    </div>
+
+                      {/* 按轮询维度配置 */}
+                      {merchantExposureStrategy === 'random' && (
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                  </div>
+            </div>
+          )}
+
+          {/* ===== 品牌商家(KA)：流量曝光保障（獨立模塊，互不影響） ===== */}
+          {selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT && (
+            <Form.Item
+              label="流量曝光保障"
+              style={{ marginBottom: 16 }}
+              labelCol={{ flex: '150px' }}
+              wrapperCol={{ flex: 1 }}
+            >
+              {/* 店鋪等級保障流量配置 */}
+              <div style={{ padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+                {/* 標題區：明確提示這是店鋪等級配置 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(232,114,12,0.12)', color: '#E8720C', fontSize: 14,
+                  }}>
+                    <ShopOutlined />
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>店鋪等級保障流量</span>
+                  <span style={{
+                    padding: '0 8px', height: 20, lineHeight: '20px', borderRadius: 10,
+                    fontSize: 11, fontWeight: 500, color: '#E8720C',
+                    background: 'rgba(232,114,12,0.08)', border: '1px solid rgba(232,114,12,0.3)',
+                  }}>按店鋪等級配置</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12, paddingLeft: 36 }}>
+                  店鋪等級不一樣，保障的流量不一樣：按店鋪等級單獨配置保障曝光流量，等級越高保障曝光越多
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, label, color, defaultOrders }) => (
+                    <div key={level} style={{
+                      background: '#fff',
+                      border: `1px solid ${color}33`,
+                      borderTop: `3px solid ${color}`,
+                      borderRadius: 8,
+                      padding: '12px 12px 14px',
+                      textAlign: 'center',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                        <span style={{
+                          padding: '0 12px', height: 24, lineHeight: '24px', borderRadius: 12,
+                          fontSize: 13, fontWeight: 700, color: '#fff',
+                          background: color, display: 'inline-block', whiteSpace: 'nowrap',
+                        }}>{label}</span>
+                      </div>
+                      <Form.Item name={['brandLevelTraffic', level]} noStyle initialValue={defaultOrders * 100}>
+                        <InputNumber
+                          min={1}
+                          precision={0}
+                          style={{ width: '100%' }}
+                          addonAfter="次"
+                          disabled={isDetailMode}
+                        />
+                      </Form.Item>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Form.Item>
+          )}
+
+          {/* ===== 品牌商家(KA)：算法策略（獨立模塊，複製自獨家商家，互不影響） ===== */}
+          {selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT && (
               <div style={{
                 border: '1px solid #d6e4ff',
                 borderRadius: 8,

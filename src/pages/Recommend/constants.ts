@@ -80,7 +80,7 @@ export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
   [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: 'red',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: 'geekblue',
   [AlgorithmType.BRAND_MERCHANT]: 'orange',
   [AlgorithmType.GOLD_AD]: 'yellow',
 } as Record<AlgorithmType, string>

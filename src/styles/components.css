@@ -25,14 +25,30 @@
 }
 .logo-text {
   color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  line-height: 1.15;
+}
+.logo-text-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.logo-text-main {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   white-space: nowrap;
-  overflow: hidden;
+}
+.logo-text-sub {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
 }
 .logo-icon {
   font-size: 24px;
@@ -1526,6 +1542,30 @@
   text-align: center;
   margin-bottom: 22px;
 }
+/* 登錄卡頂部品牌 Logo 徽章：毛玻璃圓形底 + 橙色光暈呼吸 */
+.login-brand-badge {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: 0 0 24px rgba(232, 114, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  animation: brandBadgeGlow 3s ease-in-out infinite;
+}
+@keyframes brandBadgeGlow {
+  0%, 100% {
+    box-shadow: 0 0 24px rgba(232, 114, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 38px rgba(243, 156, 18, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+}
 .login-title-v2 h2 {
   font-size: 17px;
   font-weight: 600;
@@ -2291,6 +2331,7 @@
 .algo-card-wrapper--lime::before { background: linear-gradient(90deg, #a0d911, #d3f26a); }
 .algo-card-wrapper--magenta::before { background: linear-gradient(90deg, #eb2f96, #ff85c0); }
 .algo-card-wrapper--red::before { background: linear-gradient(90deg, #ff4d4f, #ff7875); }
+.algo-card-wrapper--geekblue::before { background: linear-gradient(90deg, #2f54eb, #85a5ff); }
 .algo-card-wrapper--orange::before { background: linear-gradient(90deg, #E8720C, #FFB347); }
 .algo-card-wrapper--yellow::before { background: linear-gradient(90deg, #fadb14, #fff566); }
 

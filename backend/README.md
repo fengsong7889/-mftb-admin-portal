@@ -1,4 +1,4 @@
-# MFTB 通用管理平台 - 后端服务
+# MFTB 搜广推系统 - 后端服务
 
 Spring Boot 3 + MyBatis-Plus + Spring Security + JWT + MySQL 8 的后端服务，为前端 React 管理后台提供 REST API。
 

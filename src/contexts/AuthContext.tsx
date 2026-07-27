@@ -41,8 +41,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : null
   })
 
+  /**
+   * 前端 Mock 登录：当后端不可用时（如部署在 GitHub Pages 纯-static 环境），
+   * 使用环境变量中的凭据进行本地登录，保证演示环境可用。
+   */
+  const mockLogin = (username: string, password: string): { success: boolean; message?: string; user?: UserInfo } => {
+    const adminPwd = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
+    const guestPwd = import.meta.env.VITE_GUEST_PASSWORD as string | undefined
+    const trimmed = username.trim().toLowerCase()
+
+    // 管理员账号：admin / 环境变量密码
+    if (trimmed === 'admin' && adminPwd && password === adminPwd) {
+      return {
+        success: true,
+        user: {
+          username: 'admin',
+          name: '系統管理員',
+          empId: 'EMP001',
+          avatar: 'pikachu-default',
+          role: 'admin',
+          department: '技術部',
+          position: '系統管理員',
+        },
+      }
+    }
+    // 访客账号：guest / 环境变量密码
+    if (trimmed === 'guest' && guestPwd && password === guestPwd) {
+      return {
+        success: true,
+        user: {
+          username: 'guest',
+          name: '訪客用户',
+          empId: 'EMP999',
+          avatar: 'pikachu-default',
+          role: 'guest',
+          department: '運營部',
+          position: '訪客',
+        },
+      }
+    }
+    return { success: false, message: '賬號或密碼錯誤（Mock 模式：admin / VITE_ADMIN_PASSWORD；guest / VITE_GUEST_PASSWORD）' }
+  }
+
   const login = useCallback(async (username: string, password: string) => {
     try {
+      // 优先尝试调用后端登录接口
       const result = await loginApi({ username, password })
       // 将后端返回的用户信息映射为前端 UserInfo
       const backendUser = result.userInfo
@@ -63,7 +106,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('user_info', JSON.stringify(mappedUser))
       return { success: true }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '登錄失敗'
+      // 后端不可用时（如部署在 GitHub Pages 无后端环境），降级到前端 Mock 登录
+      const fallback = mockLogin(username, password)
+      if (fallback.success) {
+        setIsAuthenticated(true)
+        setUser(fallback.user!)
+        localStorage.setItem('is_authenticated', 'true')
+        localStorage.setItem('user_info', JSON.stringify(fallback.user))
+        // Mock 模式不写入真实 Token，仅写入标志位避免下次再调后端
+        localStorage.setItem(TOKEN_KEY, 'mock-token')
+        return { success: true }
+      }
+      const msg = fallback.message || (err instanceof Error ? err.message : '登錄失敗')
       return { success: false, message: msg }
     }
   }, [])

@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * MFTB 通用管理平台后端启动类
+ * MFTB 搜广推系统后端启动类
  */
 @SpringBootApplication
 @MapperScan("com.mftb.admin.mapper")

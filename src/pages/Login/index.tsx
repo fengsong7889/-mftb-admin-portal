@@ -11,6 +11,7 @@ import {
   CheckOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
+import BrandLogo from '../../components/BrandLogo'
 import '../../styles/components.css'
 
 /* ---- 动物验证码题库 ---- */
@@ -107,7 +108,8 @@ function VideoBackground() {
       <div className="video-overlay" />
 
       <div className="video-brand">
-        <span className="video-brand-text">MFTB // 通用管理平台</span>
+        <BrandLogo size={36} style={{ margin: '0 auto 8px' }} />
+        <span className="video-brand-text">MFTB // 搜廣推系統</span>
       </div>
     </div>
   )
@@ -306,7 +308,11 @@ export default function Login() {
           </div>
 
           <div className="login-title-v2">
-            <h2>您好！歡迎登錄MFTB通用管理平台</h2>
+            {/* 品牌 Logo 徽章 */}
+            <div className="login-brand-badge">
+              <BrandLogo size={44} />
+            </div>
+            <h2>您好！歡迎登錄MFTB搜廣推系統</h2>
           </div>
 
           {/* 账号密码登录面板 */}

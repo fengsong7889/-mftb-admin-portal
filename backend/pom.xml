@@ -15,7 +15,7 @@
     <artifactId>mftb-admin</artifactId>
     <version>1.0.0</version>
     <name>mftb-admin</name>
-    <description>MFTB 通用管理平台后端服务</description>
+    <description>MFTB 搜广推系统后端服务</description>
 
     <properties>
         <java.version>17</java.version>

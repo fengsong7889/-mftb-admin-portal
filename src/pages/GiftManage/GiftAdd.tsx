@@ -5,13 +5,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const { TextArea } = Input
 
-/** 廣告類型 */
+/** 廣告類型（僅保留新店廣告與盤活復蘇） */
 const adTypeOptions = [
   { label: '新店廣告', value: 'new_store' },
   { label: '盤活復蘇', value: 'revival' },
-  { label: '獨家商家', value: 'exclusive' },
-  { label: '金牌商家', value: 'gold' },
-  { label: '人氣商家', value: 'ka' },
 ]
 
 /** 集團選項 */

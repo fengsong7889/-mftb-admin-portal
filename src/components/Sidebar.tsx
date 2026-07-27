@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Layout, Menu, message, Modal, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
+import BrandLogo from './BrandLogo'
 import {
   AccountBookOutlined,
   WalletOutlined,
@@ -514,11 +515,14 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     >
       <div className="sidebar-logo">
         {collapsed ? (
-          <span className="logo-icon">⚡</span>
+          <BrandLogo size={32} />
         ) : (
           <span className="logo-text">
-            <span className="logo-icon-inline">⚡</span>
-            MFTB通用總後台
+            <span className="logo-text-row">
+              <BrandLogo size={28} />
+              <span className="logo-text-main">MFTB搜廣推系統</span>
+            </span>
+            <span className="logo-text-sub">MFTB Search · Ads · Recommendation</span>
           </span>
         )}
       </div>
