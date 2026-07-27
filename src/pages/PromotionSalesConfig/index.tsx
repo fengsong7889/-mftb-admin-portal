@@ -11,6 +11,8 @@ import { AlgorithmType, Region, RecommendChannel, AppType, ALGO_CARD_COLOR_MAP }
 import { useCardOrder } from '../../hooks/useCardOrder'
 import DateTimeGrid from './DateTimeGrid'
 import DayPicker from './DayPicker'
+import NewStoreDayPicker from './NewStoreDayPicker'
+import PopularSkinPicker from './PopularSkinPicker'
 import {
   type InventoryItem,
   type RecommendTypeConfig,
@@ -78,6 +80,13 @@ export default function PromotionSalesConfig() {
   const handleGoToPurchase = (config: RecommendTypeConfig) => {
     if (!config.enabled) {
       message.info('該類型暫未開放，敬請期待')
+      return
+    }
+    // 新店广告：进入赠送天数选购界面；人气商家：进入皮肤套件选购界面（均无需库存数据）
+    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA) {
+      setSelectedAlgorithmType(config.type)
+      setSelectedInventory(null)
+      setCurrentStep(1)
       return
     }
     setSelectedAlgorithmType(config.type)
@@ -309,8 +318,22 @@ export default function PromotionSalesConfig() {
         </Card>
       )}
 
+      {/* Step 2: 選擇贈送推廣天數並提交訂單 - 新店廣告 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <NewStoreDayPicker />
+        </Card>
+      )}
+
+      {/* Step 2: 选择皮肤套件并购买 - 人氣商家 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <PopularSkinPicker />
+        </Card>
+      )}
+
       {/* Step 2: 选择时段并加购 - 無敵星星 */}
-      {currentStep === 1 && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
+      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DateTimeGrid
             inventoryItem={selectedInventory}

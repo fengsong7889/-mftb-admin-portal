@@ -12,7 +12,7 @@
  *  - 內置預覽：運營人員可查看所配置皮膚在小圖/大圖模式下的展示效果
  */
 import { useState, useEffect } from 'react'
-import { Button, ColorPicker, Form, Input, InputNumber, Radio, Select, Switch, Upload, message, Modal } from 'antd'
+import { Button, ColorPicker, Form, Input, InputNumber, Radio, Select, Space, Switch, Table, Upload, message, Modal } from 'antd'
 import type { UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -24,6 +24,7 @@ import {
   EyeOutlined,
   CheckCircleOutlined,
   PercentageOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -75,6 +76,13 @@ const PREVIEW_DISHES = [
 interface DayDiscountGradient {
   days: number
   discount: number
+}
+
+/** 退費比例規則（剩餘天數 ≤ maxDays 時，退款按 feePercent% 扣費） */
+interface CancelFeeRule {
+  id: number
+  maxDays: number
+  feePercent: number
 }
 
 /** 單款皮膚配置 */
@@ -174,6 +182,9 @@ export default function PopularSkinPricing() {
   // 購買多天折扣配置（梯度）
   const [gradientEnabled, setGradientEnabled] = useState(false)
   const [gradients, setGradients] = useState<DayDiscountGradient[]>([])
+  // 退費比例配置：人氣商家默認不允許退款（與訂單側業務規則一致），開啟後可配置退費比例梯度
+  const [refundEnabled, setRefundEnabled] = useState(false)
+  const [cancelFeeRules, setCancelFeeRules] = useState<CancelFeeRule[]>([{ id: 1, maxDays: 3, feePercent: 50 }])
   // 詳情圖（基礎信息卡片，與無敵星星/盤活復蘇保持一致）
   const [detailFileList, setDetailFileList] = useState<UploadFile[]>([])
 
@@ -202,6 +213,12 @@ export default function PopularSkinPricing() {
       ])
       // 回填詳情圖 Mock 數據
       setDetailFileList([{ uid: '-1', name: 'detail.svg', status: 'done', url: MOCK_DETAIL_IMAGE }])
+      // 回填退費比例 Mock 規則（開關保持默認不允許退款）
+      setCancelFeeRules([
+        { id: 1, maxDays: 1, feePercent: 80 },
+        { id: 2, maxDays: 3, feePercent: 50 },
+        { id: 3, maxDays: 7, feePercent: 20 },
+      ])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId, form])
@@ -317,7 +334,7 @@ export default function PopularSkinPricing() {
         }
       }
       setLoading(true)
-      console.log('提交皮膚定價:', { ...values, skins, status, gradientEnabled, gradients, detailFileList })
+      console.log('提交皮膚定價:', { ...values, skins, status, gradientEnabled, gradients, refundEnabled, cancelFeeRules, detailFileList })
       message.success(isEditMode ? '編輯成功' : '新增成功')
       navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
     } catch {
@@ -841,6 +858,122 @@ export default function PopularSkinPricing() {
             )
           ) : (
             <div style={{ fontSize: 13, color: '#8c8c8c' }}>未啟用梯度折扣，商家購買時一律按原價計算</div>
+          )}
+        </div>
+
+        {/* 訂單退款，退費比例配置（與無敵星星/盤活復蘇定價保持一致） */}
+        <div style={cardShellStyle}>
+          {cardTitle(
+            <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#fff1f0', '訂單退款，退費比例配置',
+            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>商家退款時會計算距離訂單推廣開始時間，按剩餘天數匹配退費比例；匹配成功按規則執行，反之不扣費</span>,
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
+              <Switch
+                size="small"
+                checked={refundEnabled}
+                disabled={isDetailMode}
+                onChange={checked => setRefundEnabled(checked)}
+                style={{ background: refundEnabled ? '#52c41a' : '#d9d9d9' }}
+              />
+            </div>,
+          )}
+          {refundEnabled ? (
+            <Table
+              rowKey="id"
+              dataSource={cancelFeeRules}
+              pagination={false}
+              bordered
+              size="small"
+              columns={[
+                {
+                  title: '廣告推廣',
+                  dataIndex: 'maxDays',
+                  width: 220,
+                  render: (_, record: CancelFeeRule) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>剩餘天數 ≤</span>
+                      <InputNumber
+                        disabled={isDetailMode}
+                        min={0}
+                        max={999}
+                        value={record.maxDays === 999 ? undefined : record.maxDays}
+                        onChange={(val) => {
+                          setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, maxDays: val ?? 0 } : r))
+                        }}
+                        addonAfter={record.maxDays === 999 ? '' : '天'}
+                        placeholder={record.maxDays === 999 ? '不限' : ''}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                  ),
+                },
+                {
+                  title: '比例配置',
+                  dataIndex: 'feePercent',
+                  width: 160,
+                  render: (_, record: CancelFeeRule) => (
+                    <InputNumber
+                      disabled={isDetailMode}
+                      min={0}
+                      max={100}
+                      value={record.feePercent}
+                      onChange={(val) => {
+                        setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, feePercent: val ?? 0 } : r))
+                      }}
+                      addonAfter="%"
+                      style={{ width: '100%' }}
+                    />
+                  ),
+                },
+                {
+                  title: '操作',
+                  width: 120,
+                  align: 'center',
+                  render: (_: unknown, record: CancelFeeRule) => {
+                    if (isDetailMode) return <span style={{ color: '#bfbfbf' }}>—</span>
+                    const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
+                    return (
+                      <Space size={4}>
+                        {isLastRow && (
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => {
+                              const nextId = cancelFeeRules.length > 0 ? Math.max(...cancelFeeRules.map(r => r.id)) + 1 : 1
+                              setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
+                            }}
+                          >
+                            新增梯度
+                          </Button>
+                        )}
+                        <Button
+                          type="link"
+                          size="small"
+                          danger
+                          onClick={() => {
+                            if (cancelFeeRules.length <= 1) {
+                              message.warning('至少保留一條規則')
+                              return
+                            }
+                            setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
+                          }}
+                        >
+                          刪除
+                        </Button>
+                      </Space>
+                    )
+                  },
+                },
+              ]}
+            />
+          ) : (
+            <div style={{
+              padding: '24px', textAlign: 'center',
+              background: '#fafafa', borderRadius: 8,
+              border: '1px dashed #d9d9d9',
+            }}>
+              <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，商家退訂不退費用；開啟開關後可配置退費比例</span>
+            </div>
           )}
         </div>
 

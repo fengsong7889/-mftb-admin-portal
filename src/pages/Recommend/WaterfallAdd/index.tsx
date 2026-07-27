@@ -1584,14 +1584,14 @@ function WaterfallAddGeneral() {
         </Form>
       </div>
 
-      {/* 取消扣费规则配置 */}
+      {/* 訂單退款，退費比例配置 */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>取消訂單，扣費配置</span>
-          <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>訂單退款，退費比例配置</span>
+          <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>商家退款時會計算距離訂單推廣開始時間，按剩餘天數匹配退費比例；匹配成功按規則執行，反之不扣費</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
@@ -1699,7 +1699,7 @@ function WaterfallAddGeneral() {
             background: '#fafafa', borderRadius: 8,
             border: '1px dashed #d9d9d9',
           }}>
-            <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置扣費規則</span>
+            <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置退費比例</span>
           </div>
         )}
       </div>

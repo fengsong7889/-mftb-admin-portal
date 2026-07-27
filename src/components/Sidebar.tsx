@@ -467,9 +467,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
-    // 訂單列表 / 訂單詳情 歸屬「廣告銷售」菜單高亮
+    // 訂單列表 / 訂單詳情：按來源高亮（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）
     : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
-      ? 'ad-sales'
+      ? (new URLSearchParams(location.search).get('from') === 'ad-sales' ? 'ad-sales' : 'promotion-sales-config')
     : (pathToKey[location.pathname] || 'home')
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {

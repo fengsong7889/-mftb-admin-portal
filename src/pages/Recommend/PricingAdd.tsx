@@ -682,13 +682,13 @@ export default function PricingAdd() {
           </Card>
         )}
 
-        {/* 取消订单，扣费配置 */}
+        {/* 订单退款，退费比例配置 */}
         <Card
           title={
             <Space>
               <SettingOutlined style={{ fontSize: 16, color: '#F5222D' }} />
-              <span style={{ fontSize: 15, fontWeight: 500 }}>取消訂單，扣費配置</span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>當剩餘天數沒有匹配到規則，取消則不扣費</span>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>訂單退款，退費比例配置</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>商家退款時會計算距離訂單推廣開始時間，按剩餘天數匹配退費比例；匹配成功按規則執行，反之不扣費</span>
             </Space>
           }
           extra={
@@ -731,7 +731,7 @@ export default function PricingAdd() {
               background: '#fafafa', borderRadius: 8,
               border: '1px dashed #d9d9d9',
             }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置扣費規則</span>
+              <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置退費比例</span>
             </div>
           )}
         </Card>

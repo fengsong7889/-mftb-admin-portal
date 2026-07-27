@@ -14,9 +14,10 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 
 /**
- * 人氣商家 - 購買廣告（皮膚售賣）
+ * 人氣商家 - 購買廣告（皮膚售賣，店鋪推廣版）
  * 對應銷售定價「人氣商家」皮膚定價配置：業務配置多套皮膚（邊框 + 大圖 + 菜品展示佈局）並按天定價，
- * 商家在此選擇皮膚套件 + 購買時長完成下單，購買後 APP 瀑布流店鋪卡片按所選皮膚展示。
+ * 選擇皮膚套件 + 購買時長完成下單，購買後 APP 瀑布流店鋪卡片按所選皮膚展示。
+ * 與廣告銷售購買界面唯一區別：無需選擇門店（只選算法名稱 + 所屬品牌）。
  */
 
 /** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 */
@@ -177,23 +178,6 @@ const QUICK_DAY_OPTIONS = [7, 15, 30, 60, 90]
 const MIN_BUY_DAYS = 1
 const MAX_BUY_DAYS = 180
 
-/** Mock數據 - 店鋪列表（含BD信息，與其它購買界面一致） */
-const MOCK_STORES = [
-  { id: '10001', name: '威尼斯人酒店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10002', name: '皇朝廣場店', bd: 'bd-002', bdName: '李娜' },
-  { id: '10003', name: '黑馬仕美食街', bd: 'bd-003', bdName: '王強' },
-  { id: '10004', name: '新葡京旗艦店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10005', name: '官也街老店', bd: 'bd-004', bdName: '劉敏' },
-  { id: '10006', name: '麥當勞', bd: 'bd-002', bdName: '李娜' },
-  { id: '10007', name: '肯德基', bd: 'bd-003', bdName: '王強' },
-]
-const STORE_OPTIONS = MOCK_STORES.map(s => ({ label: `${s.name}（ID：${s.id}）`, value: s.id }))
-const BD_OPTIONS = [
-  { label: '張偉', value: 'bd-001' },
-  { label: '李娜', value: 'bd-002' },
-  { label: '王強', value: 'bd-003' },
-  { label: '劉敏', value: 'bd-004' },
-]
 /** 人氣商家算法選項（選擇後自動帶出品牌） */
 const ALGORITHM_OPTIONS = [
   { label: '人氣商家-首頁版', value: 'popular_merchant_ka', brand: 'shanfeng' },
@@ -203,11 +187,9 @@ const ALGORITHM_OPTIONS = [
 export default function PopularSkinPicker() {
   const navigate = useNavigate()
 
-  // 查詢條件（算法名稱 / 所屬品牌 / 門店名稱 / 歸屬BD，與其它購買界面保持一致）
+  // 查詢條件（算法名稱 / 所屬品牌；店鋪推廣入口無需選擇門店）
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
-  const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
-  const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
 
   // 選購狀態
@@ -221,7 +203,7 @@ export default function PopularSkinPicker() {
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
 
   const selectedSkin = SALE_SKINS.find(s => s.id === selectedSkinId) || null
-  const selectedStore = MOCK_STORES.find(s => s.id === searchStoreName) || null
+  const selectedAlgorithm = ALGORITHM_OPTIONS.find(o => o.value === searchAlgorithm) || null
   const endDate = startDate.add(buyDays - 1, 'day')
 
   // 階梯輪播預覽：所選皮膚為階梯輪播佈局時逐張輪播，切換皮膚時重置
@@ -255,21 +237,14 @@ export default function PopularSkinPicker() {
     setSearchAlgorithm(value)
     setSearchBrand(ALGORITHM_OPTIONS.find(o => o.value === value)?.brand ?? null)
   }
-  // 門店變更：自動帶出BD
-  const handleStoreChange = (value: string | null) => {
-    setSearchStoreName(value)
-    setSearchBD(MOCK_STORES.find(s => s.id === value)?.bd ?? null)
-  }
 
   const handleSearch = () => {
     if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
     if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
-    if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
     setHasSearched(true)
   }
   const handleReset = () => {
     setSearchAlgorithm(null); setSearchBrand(null)
-    setSearchStoreName(null); setSearchBD(null)
     setHasSearched(false); setSelectedSkinId(null)
   }
 
@@ -286,7 +261,7 @@ export default function PopularSkinPicker() {
   }
   const handleViewOrder = () => {
     setIsSuccessModalVisible(false)
-    navigate(`/promotion-order-manage?type=${encodeURIComponent('人氣商家')}&from=ad-sales`)
+    navigate(`/promotion-order-manage?type=${encodeURIComponent('人氣商家')}`)
   }
   const handleContinuePurchase = () => {
     setIsSuccessModalVisible(false)
@@ -300,7 +275,7 @@ export default function PopularSkinPicker() {
       <div style={{
         fontSize: nameSize, fontWeight: 600, color: '#262626',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>{selectedStore?.name || '示例店鋪'}</div>
+      }}>{'示例店鋪'}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#FA8C16' }}>⭐ 4.6</span>
         <span style={{ fontSize: 10, color: '#8C8C8C' }}>月售 1196</span>
@@ -328,7 +303,7 @@ export default function PopularSkinPicker() {
       boxShadow: skin.borderType === 'color' ? `0 2px 8px ${skin.borderColor}33` : '0 1px 4px rgba(0,0,0,0.04)',
     }}>
       <div style={{ display: 'flex', gap: large ? 10 : 8 }}>
-        {renderStoreLogo(selectedStore?.name || '示例店鋪', large ? 56 : 44)}
+        {renderStoreLogo('示例店鋪', large ? 56 : 44)}
         <div style={{ flex: 1, minWidth: 0 }}>
           {previewInfoRows(large ? 13 : 12)}
         </div>
@@ -451,7 +426,7 @@ export default function PopularSkinPicker() {
             position: 'absolute', bottom: -14, right: -10, fontSize: 88, fontWeight: 900, lineHeight: 1,
             color: 'rgba(255,255,255,0.12)', userSelect: 'none', pointerEvents: 'none',
           }}>人</span>
-          {renderStoreLogo(selectedStore?.name || '示例店鋪', 40)}
+          {renderStoreLogo('示例店鋪', 40)}
           {/* 豎排標語：白→半透漸變字溶入底色，不加任何牌面/邊框 */}
           <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{
@@ -518,9 +493,9 @@ export default function PopularSkinPicker() {
 
   return (
     <div>
-      {/* 查詢區域 - 與其它購買界面保持一致 */}
+      {/* 查詢區域 - 店鋪推廣入口無需選擇門店 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
-        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
           <Form.Item label="算法名稱">
             <Select placeholder="請輸入搜索" value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
               options={ALGORITHM_OPTIONS.map(o => ({ label: o.label, value: o.value }))} />
@@ -528,12 +503,6 @@ export default function PopularSkinPicker() {
           <Form.Item label="所屬品牌">
             <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
-          </Form.Item>
-          <Form.Item label="門店名稱">
-            <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
-          </Form.Item>
-          <Form.Item label="歸屬BD">
-            <Select placeholder="選擇門店後自動帶出" value={searchBD} onChange={v => setSearchBD(v)} allowClear showSearch optionFilterProp="label" options={BD_OPTIONS} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -546,7 +515,7 @@ export default function PopularSkinPicker() {
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
-          <Empty description="請先選擇算法名稱、所屬品牌、門店名稱，點擊查詢後展示可購買的皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description="請先選擇算法名稱、所屬品牌，點擊查詢後展示可購買的皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -711,8 +680,8 @@ export default function PopularSkinPicker() {
               </div>
               <div style={{ fontSize: 13, color: '#595959', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>購買門店</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedStore?.name || '-'}</span>
+                  <span>購買算法</span>
+                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedAlgorithm?.label || '-'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>皮膚套件</span>

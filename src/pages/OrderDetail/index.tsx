@@ -91,18 +91,20 @@ const REGION_LABEL: Record<number, string> = {
   6: '花城市區', 7: '北安機場', 8: '左酒店區', 9: '右酒店區', 10: '澳大專區', 11: '黑沙灘區',
 }
 
-enum RecommendType { INVINCIBLE_STAR = 1, REVITALIZATION_AD = 2, NEW_STORE_AD = 3, TRAFFIC_AD = 4 }
+enum RecommendType { INVINCIBLE_STAR = 1, REVITALIZATION_AD = 2, NEW_STORE_AD = 3, TRAFFIC_AD = 4, POPULAR_MERCHANT = 5 }
 const RECOMMEND_TYPE_LABEL: Record<RecommendType, string> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
   [RecommendType.REVITALIZATION_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
   [RecommendType.TRAFFIC_AD]: '流量廣告',
+  [RecommendType.POPULAR_MERCHANT]: '人氣商家',
 }
 const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
   [RecommendType.INVINCIBLE_STAR]: '⭐',
   [RecommendType.REVITALIZATION_AD]: '🔥',
   [RecommendType.NEW_STORE_AD]: '🏪',
   [RecommendType.TRAFFIC_AD]: '📊',
+  [RecommendType.POPULAR_MERCHANT]: '🏆',
 }
 
 /* ---- 接口 ---- */
@@ -155,7 +157,8 @@ interface OrderItem {
   refundEnabled?: boolean // 是否允许退款
   promoStartDate?: string // 推广开始日期
   promoData?: PromoRecord[] // 推广数据
-  purchaseDays?: string[] // 新店廣告：推廣日期列表
+  purchaseDays?: string[] // 新店廣告/人氣商家：推廣日期列表
+  skinName?: string // 人氣商家：皮膚套件名稱
   terminalTime?: string // 終態（已退款/已取消/已中止/已完成）發生的日期時間
   operatorName?: string // 操作人姓名
   operatorId?: string // 操作人工號
@@ -414,6 +417,77 @@ const newStoreOrders: OrderItem[] = [
   genNewStoreOrder('215','ORD20260723215',AppType.SHANFENG,RecommendChannel.DELIVERY,2,OrderStatus.ABORTED,'新澳茶餐廳','新馬路旗艦店',['2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'],'2026-07-17 16:00:00','2026-07-17 16:10:00'),
 ]
 
+/* ---- 人氣商家 Mock ---- */
+// 生成連續購買日期（起始日 + 天數）
+function genPopularDays(startDate: string, days: number): string[] {
+  const start = new Date(startDate)
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    return d.toISOString().split('T')[0]
+  })
+}
+
+// 人氣商家訂單：皮膚套件按天計價（參考盤活復蘇按天模式），滿7天享95折梯度；不允許退款，僅可取消
+function genPopularOrder(
+  id: string, orderNo: string, algoId: string, promoName: string,
+  app: AppType, channel: RecommendChannel, region: number, slotPos: number,
+  gid: string, gname: string, sid: string, sname: string,
+  skinName: string, pricePerDay: number, startDate: string, days: number,
+  status: OrderStatus, otime: string, ptime?: string,
+): OrderItem {
+  const pDays = genPopularDays(startDate, days)
+  const slotPrices: SlotPriceItem[] = pDays.map((date, i) => ({
+    slot: `Day${i + 1}`, date, originalPrice: pricePerDay, discount: 10, actualPrice: pricePerDay, region,
+  }))
+  const originalPrice = pricePerDay * days
+  const actualPrice = days >= 7 ? Math.round(originalPrice * 0.95) : originalPrice
+  const regionName = REGION_LABEL[region] || '未知'
+  // 推廣中：僅已推廣日期產生數據；已完成：全部日期；待推廣/已取消：無數據
+  const today = new Date().toISOString().split('T')[0]
+  const promoData = status === OrderStatus.PROMOTED
+    ? genRevivePromoData(regionName, slotPrices)
+    : status === OrderStatus.PROMOTING
+      ? genRevivePromoData(regionName, slotPrices.filter(sp => sp.date <= today))
+      : undefined
+  return {
+    id, orderNo, algorithmId: algoId, promotionName: promoName, app, channel, region,
+    recommendType: RecommendType.POPULAR_MERCHANT, slotPosition: slotPos,
+    groupId: gid, groupName: gname, storeId: sid, storeName: sname, skinName,
+    purchaseDate: otime.split(' ')[0], originalPrice,
+    discountPrice: actualPrice, actualPrice, status, orderTime: otime, payTime: ptime,
+    promoStartDate: pDays[0], purchaseDays: pDays,
+    slotPrices, gradientDiscount: days >= 7 ? { count: 7, discount: 9.5 } : null,
+    cancelFeeRules: [], promoData, refundEnabled: false,
+    ...(status === OrderStatus.CANCELLED
+      ? { ...genTerminalInfo(id, otime), terminalActor: 'staff' as const }
+      : (status === OrderStatus.PROMOTED ? { terminalTime: `${pDays[pDays.length - 1]} 22:10:30` } : {})),
+  }
+}
+
+// 與訂單列表一致的15條人氣商家訂單（待推廣×4、推廣中×4、已完成×4、已取消×3）
+const popularOrders: OrderItem[] = [
+  // 推廣中 ×4
+  genPopularOrder('301','ORD20260725301','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,1,1,'G10008','威尼斯人餐飲集團','S30021','威尼斯人酒店','紅運當頭',28,'2026-07-26',7,OrderStatus.PROMOTING,'2026-07-25 10:20:00','2026-07-25 10:21:00'),
+  genPopularOrder('305','ORD20260724305','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,2,2,'G10011','肯德基餐飲集團','S30025','肯德基','碧海藍天',20,'2026-07-25',7,OrderStatus.PROMOTING,'2026-07-24 11:10:00','2026-07-24 11:12:00'),
+  genPopularOrder('308','ORD20260726308','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,4,3,'G10012','澳門塔餐飲集團','S30028','澳門塔旋轉餐廳','青峰翡翠',24,'2026-07-27',7,OrderStatus.PROMOTING,'2026-07-26 09:30:00','2026-07-26 09:32:00'),
+  genPopularOrder('312','ORD20260723312','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,5,4,'G10013','高士德飲食集團','S30032','高士德麵家','極光幻彩',36,'2026-07-24',7,OrderStatus.PROMOTING,'2026-07-23 16:05:00','2026-07-23 16:06:00'),
+  // 待推廣 ×4
+  genPopularOrder('302','ORD20260725302','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,6,2,'G10009','皇朝飲食集團','S30022','皇朝廣場店','橙意滿滿',18,'2026-07-28',3,OrderStatus.PENDING_PROMOTION,'2026-07-24 15:40:00','2026-07-24 15:42:00'),
+  genPopularOrder('304','ORD20260726304','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,3,1,'G10014','麥當勞餐飲集團','S30024','麥當勞','紫氣東來',22,'2026-08-03',5,OrderStatus.PENDING_PROMOTION,'2026-07-26 14:00:00','2026-07-26 14:02:00'),
+  genPopularOrder('309','ORD20260726309','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,8,5,'G10015','巴黎人餐飲集團','S30029','巴黎人法餐廳','粉黛甜心',26,'2026-08-05',5,OrderStatus.PENDING_PROMOTION,'2026-07-26 17:45:00','2026-07-26 17:46:00'),
+  genPopularOrder('313','ORD20260727313','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,1,2,'G10016','黑沙環飲食集團','S30033','黑沙環燒臘','紅運當頭',28,'2026-08-02',6,OrderStatus.PENDING_PROMOTION,'2026-07-27 08:50:00','2026-07-27 08:52:00'),
+  // 已完成 ×4
+  genPopularOrder('303','ORD20260710303','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,3,3,'G10010','澳門美食集團','S30023','黑馬仕美食街','金碧輝煌',32,'2026-07-11',7,OrderStatus.PROMOTED,'2026-07-10 09:05:00','2026-07-10 09:06:00'),
+  genPopularOrder('306','ORD20260704306','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.SUPERMARKET,10,1,'G10017','新濠餐飲集團','S30026','新濠天地食府','簡約無框',8,'2026-07-05',4,OrderStatus.PROMOTED,'2026-07-04 10:30:00','2026-07-04 10:31:00'),
+  genPopularOrder('310','ORD20260705310','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,9,4,'G10018','銀河餐飲集團','S30030','新馬路茶餐廳','暗夜黑金',30,'2026-07-06',7,OrderStatus.PROMOTED,'2026-07-05 13:20:00','2026-07-05 13:21:00'),
+  genPopularOrder('314','ORD20260713314','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.GROUP_BUY,11,5,'G10019','港珠澳飲食集團','S30034','港珠澳漁港','碧海藍天',20,'2026-07-14',5,OrderStatus.PROMOTED,'2026-07-13 19:10:00','2026-07-13 19:11:00'),
+  // 已取消 ×3（未推廣即取消）
+  genPopularOrder('307','ORD20260724307','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,7,2,'G10020','銀河酒店集團','S30027','銀河酒店餐廳','翠綠生機',20,'2026-08-01',3,OrderStatus.CANCELLED,'2026-07-24 09:40:00','2026-07-24 09:41:00'),
+  genPopularOrder('311','ORD20260725311','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,6,3,'G10021','氹仔飲食集團','S30031','氹仔小食店','橘光暮色',25,'2026-07-30',4,OrderStatus.CANCELLED,'2026-07-25 11:25:00','2026-07-25 11:26:00'),
+  genPopularOrder('315','ORD20260726315','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,2,1,'G10022','花城市餐飲集團','S30035','花城市甜品','橙意滿滿',18,'2026-08-04',3,OrderStatus.CANCELLED,'2026-07-26 20:15:00','2026-07-26 20:16:00'),
+]
+
 /* ---- 进度阶段定义 ---- */
 const PROGRESS_STAGES = [
   { key: 'ordered', label: '下單成功' },
@@ -475,7 +549,7 @@ export default function OrderDetail() {
 
   useEffect(() => {
     if (orderId) {
-      setOrder([...mockOrders, ...newStoreOrders].find(o => o.id === orderId) || null)
+      setOrder([...mockOrders, ...newStoreOrders, ...popularOrders].find(o => o.id === orderId) || null)
     }
   }, [orderId])
 
@@ -538,10 +612,11 @@ export default function OrderDetail() {
   const statusInfo = ORDER_STATUS_MAP[order.status]
   const isRefunded = order.status === OrderStatus.REFUNDED
   const isNewStore = order.recommendType === RecommendType.NEW_STORE_AD
+  const isPopular = order.recommendType === RecommendType.POPULAR_MERCHANT
 
-  // 新店廣告已取消：保留「待推廣 / 推廣中」節點展示，但因未推廣即取消，兩節點以另色標記並打叉
-  const isNewStoreCancelled = isNewStore && order.status === OrderStatus.CANCELLED
-  const progressStages = isNewStoreCancelled
+  // 新店廣告/人氣商家已取消：保留「待推廣 / 推廣中」節點展示，但因未推廣即取消，兩節點以另色標記並打叉
+  const isCancelledBeforePromo = (isNewStore || isPopular) && order.status === OrderStatus.CANCELLED
+  const progressStages = isCancelledBeforePromo
     ? [
         { key: 'ordered', label: '下單成功' },
         { key: 'pending', label: '待推廣' },
@@ -550,11 +625,11 @@ export default function OrderDetail() {
       ]
     : PROGRESS_STAGES
   const lastStageIdx = progressStages.length - 1
-  const currentStage = isNewStoreCancelled ? lastStageIdx : getStageIndex(order.status)
+  const currentStage = isCancelledBeforePromo ? lastStageIdx : getStageIndex(order.status)
   // 無敵星星 / 盤活復蘇：部分已退款訂單為「未推廣即退款」，待推廣 + 推廣中節點需打叉
   const isRefundedBeforePromo = isRefunded && REFUNDED_BEFORE_PROMO_IDS.has(order.id)
   // 未推廣即結束（已取消 / 未推廣即退款）：待推廣(1)、推廣中(2) 兩節點以叉號 + 另色標記
-  const skipStageIdxs: number[] = (isNewStoreCancelled || isRefundedBeforePromo) ? [1, 2] : []
+  const skipStageIdxs: number[] = (isCancelledBeforePromo || isRefundedBeforePromo) ? [1, 2] : []
 
   // 最後一個節點（終態）的主題色：已完成維持橙色，已退款/已取消/已中止分別區分
   const terminalTheme = (() => {
@@ -924,6 +999,11 @@ export default function OrderDetail() {
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>{order.algorithmId}</span>
           </Descriptions.Item>
           <Descriptions.Item label="算法名稱">{order.promotionName}</Descriptions.Item>
+          {order.skinName && (
+            <Descriptions.Item label="皮膚套件">
+              <Tag color="geekblue">{order.skinName}</Tag>
+            </Descriptions.Item>
+          )}
         </Descriptions>
                   </Card>
 
@@ -932,7 +1012,7 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? '推廣商圈與日期' : '購買商圈時段與價格'} />
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? '推廣商圈與日期' : isPopular ? '購買商圈天數與價格' : '購買商圈時段與價格'} />
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
@@ -1014,8 +1094,8 @@ export default function OrderDetail() {
           </div>
         ))}
 
-        {/* 盘活复苏：单商圈，商圈为标题，下方平铺推广日期 */}
-        {order.recommendType === RecommendType.REVITALIZATION_AD && (() => {
+        {/* 盘活复苏/人氣商家（按天計價）：单商圈，商圈为标题，下方平铺推广日期 */}
+        {(order.recommendType === RecommendType.REVITALIZATION_AD || isPopular) && (() => {
           const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
           return (
             <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
@@ -1024,20 +1104,28 @@ export default function OrderDetail() {
                 fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 <Tag color="blue" style={{ margin: 0 }}>{REGION_LABEL[regionVal]}</Tag>
+                {isPopular && order.skinName && (
+                  <>
+                    <Tag color="geekblue" style={{ margin: 0 }}>{order.skinName}</Tag>
+                    <span style={{ fontSize: 11, color: '#8C8C8C', fontWeight: 400 }}>皮膚套件按天計價，滿7天享95折</span>
+                  </>
+                )}
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <colgroup>
-                  <col style={{ width: '25%' }} />
-                  <col style={{ width: '25%' }} />
-                  <col style={{ width: '20%' }} />
-                  <col style={{ width: '30%' }} />
+                  <col style={{ width: isPopular ? '22%' : '25%' }} />
+                  <col style={{ width: isPopular ? '20%' : '25%' }} />
+                  <col style={{ width: isPopular ? '18%' : '20%' }} />
+                  <col style={{ width: isPopular ? '20%' : '30%' }} />
+                  {isPopular && <col style={{ width: '20%' }} />}
                 </colgroup>
                 <thead>
                   <tr style={{ background: '#FAFAFA' }}>
                     <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>推廣日期</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>原價（MOP）</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? '每日單價（MOP）' : '原價（MOP）'}</th>
                     <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折扣</th>
                     <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折後價（MOP）</th>
+                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>推廣狀態</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1049,6 +1137,17 @@ export default function OrderDetail() {
                         {sp.discount < 10 ? <Tag color="green">{sp.discount}折</Tag> : <span style={{ color: '#8C8C8C' }}>無折扣</span>}
                       </td>
                       <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>
+                      {isPopular && (() => {
+                        // 人氣商家：每推廣日展示當日狀態（已完成/推廣中/待推廣/已取消）
+                        const dayStatus = getDayStatus(sp.date)
+                        return (
+                          <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                            <Tag color={ORDER_STATUS_MAP[dayStatus]?.color || 'default'} style={{ margin: 0 }}>
+                              {ORDER_STATUS_MAP[dayStatus]?.label || '未知'}
+                            </Tag>
+                          </td>
+                        )
+                      })()}
                     </tr>
                   ))}
                 </tbody>
@@ -1168,14 +1267,14 @@ export default function OrderDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* 第1步：时段小计 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>① 時段原價合計</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{isPopular ? '① 每日原價合計' : '① 時段原價合計'}</span>
               <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>MOP {totalOriginal}</span>
-              <span style={{ fontSize: 11, color: '#BFBFBF' }}>（共 {order.slotPrices.length} 個時段）</span>
+              <span style={{ fontSize: 11, color: '#BFBFBF' }}>（共 {order.slotPrices.length} {isPopular ? '天' : '個時段'}）</span>
             </div>
 
             {/* 第2步：时段折扣 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>② 時段折扣後</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{isPopular ? '② 每日折扣後' : '② 時段折扣後'}</span>
               <span style={{ fontSize: 14, fontWeight: 600, color: '#52C41A' }}>MOP {slotSubtotal}</span>
               {slotDiscountSaved > 0 && (
                 <span style={{ fontSize: 11, color: '#52C41A', background: '#F6FFED', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>
@@ -1189,7 +1288,7 @@ export default function OrderDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>③ 梯度折扣</span>
                 <span style={{ fontSize: 13, color: '#595959' }}>
-                  滿 {order.gradientDiscount.count} 個時段享 <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}折</strong>
+                  滿 {order.gradientDiscount.count} {isPopular ? '天' : '個時段'}享 <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}折</strong>
                 </span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>
                   → MOP {finalPrice}
@@ -1211,8 +1310,10 @@ export default function OrderDetail() {
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>實付推廣金額</span>
                 <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                   {order.gradientDiscount
-                    ? `（${order.slotPrices.length}個時段 × 各時段折扣${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`
-                    : `（${order.slotPrices.length}個時段 × 各時段折扣）`
+                    ? (isPopular
+                      ? `（${order.slotPrices.length}天 × 每日單價${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`
+                      : `（${order.slotPrices.length}個時段 × 各時段折扣${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`)
+                    : (isPopular ? `（${order.slotPrices.length}天 × 每日單價）` : `（${order.slotPrices.length}個時段 × 各時段折扣）`)
                   }
                 </span>
               </div>
@@ -1394,11 +1495,11 @@ export default function OrderDetail() {
                   {/* 推广数据明细 - 按日期分组，商圈 rowSpan 合并 */}
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
-                    {order.recommendType === RecommendType.INVINCIBLE_STAR ? '⭐ 無敵星星' : order.recommendType === RecommendType.NEW_STORE_AD ? '🏪 新店廣告' : '🔥 盤活復蘇'} · 推廣數據明細
+                    {order.recommendType === RecommendType.INVINCIBLE_STAR ? '⭐ 無敵星星' : order.recommendType === RecommendType.NEW_STORE_AD ? '🏪 新店廣告' : isPopular ? '🏆 人氣商家' : '🔥 盤活復蘇'} · 推廣數據明細
                   </div>
                   {(order.promoData || []).length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '24px 0', color: '#8C8C8C', fontSize: 13 }}>暫無推廣數據</div>
-                  ) : order.recommendType === RecommendType.REVITALIZATION_AD || order.recommendType === RecommendType.NEW_STORE_AD ? (
+                  ) : order.recommendType === RecommendType.REVITALIZATION_AD || order.recommendType === RecommendType.NEW_STORE_AD || isPopular ? (
                     /* 盘活复苏：单商圈标题 + 平铺推广日期 */
                     (() => {
                       const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
