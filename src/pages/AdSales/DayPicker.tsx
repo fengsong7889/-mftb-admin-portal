@@ -503,7 +503,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             <Form.Item label="門店名稱">
               <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
             </Form.Item>
-            <Form.Item label="選擇BD">
+            <Form.Item label="歸屬BD">
               <Select placeholder="選擇門店後自動帶出" value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
                 filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
                 options={BD_OPTIONS} />

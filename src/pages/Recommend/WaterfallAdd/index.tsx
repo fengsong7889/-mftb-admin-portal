@@ -31,6 +31,7 @@ import {
   ALGORITHM_TYPE_OPTIONS,
 } from '../constants'
 import dayjs from 'dayjs'
+import PopularSkinPricing from './PopularSkinPricing'
 
 /** 算法类型图标 */
 const TYPE_ICON: Record<number, string> = {
@@ -213,6 +214,17 @@ function MapResizer({ active }: { active: boolean }) {
 }
 
 export default function WaterfallAdd() {
+  const [searchParams] = useSearchParams()
+  const typeParam = searchParams.get('type')
+  // 人氣商家：獨立的皮膚定價界面（賣皮膚模式，上傳皮膚樣式並配售價）
+  if (typeParam && Number(typeParam) === AlgorithmType.POPULAR_MERCHANT_KA) {
+    return <PopularSkinPricing />
+  }
+  return <WaterfallAddGeneral />
+}
+
+/** 通用銷售定價表單（無敵星星/盤活復蘇等） */
+function WaterfallAddGeneral() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlAlgorithmType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
@@ -627,6 +639,7 @@ export default function WaterfallAdd() {
           dailySalesLimit: c.dailySalesLimit,
         })),
         gradients,
+        status,
       }
       
       console.log('提交數據:', submitData)
@@ -1691,7 +1704,26 @@ export default function WaterfallAdd() {
         )}
       </div>
 
-      {/* 底部操作按钮 - 固定 */}
+      {/* 狀態設置 */}
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>狀態設置</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: '#595959' }}>狀態：</span>
+          <Switch
+            checked={status === ServiceStatus.ENABLED}
+            disabled={isDetailMode}
+            onChange={(checked) => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
+            checkedChildren="啟用"
+            unCheckedChildren="停用"
+          />
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>停用後該定價不再對商家開放購買</span>
+        </div>
+      </div>
+
+      {/* 底部操作按钮 - 固定（取消/保存） */}
       {!isDetailMode && (
       <div className="form-footer">
         <Button onClick={handleBack}>

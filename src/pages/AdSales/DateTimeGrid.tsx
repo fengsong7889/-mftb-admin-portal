@@ -575,7 +575,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 options={STORE_OPTIONS}
               />
             </Form.Item>
-            <Form.Item label="選擇BD">
+            <Form.Item label="歸屬BD">
               <Select
                 placeholder="選擇門店後自動帶出"
                 value={searchBD}

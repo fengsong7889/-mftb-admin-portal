@@ -120,15 +120,9 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.GOLD_AD]: 'gold',
 }
 
-// Mock数据 - 瀑布流坑位配置（無敵星星15条 + 盤活復蘇15条）
+// Mock数据 - 瀑布流坑位配置（每個業務類型 Tab 下，無敵星星/盤活復蘇/人氣商家各 15 条）
 const generateMockData = (): WaterfallSlotConfig[] => {
   const data: WaterfallSlotConfig[] = []
-  const channels = [
-    RecommendChannel.HOME,
-    RecommendChannel.DELIVERY,
-    RecommendChannel.GROUP_BUY,
-    RecommendChannel.SUPERMARKET,
-  ]
   const apps = [AppType.SHANFENG, AppType.MFOOD]
   const algorithms = [
     { id: 1, name: '無敵星星-首頁版', type: AlgorithmType.INVINCIBLE_STAR },
@@ -139,6 +133,7 @@ const generateMockData = (): WaterfallSlotConfig[] => {
     { id: 6, name: '猜你喜歡-主力版', type: AlgorithmType.GUESS_YOU_LIKE },
     { id: 7, name: '自然流量-默認', type: AlgorithmType.ORGANIC_TRAFFIC },
     { id: 8, name: '搜索算法-綜合版', type: AlgorithmType.SEARCH_ALGORITHM },
+    { id: 9, name: '人氣商家-首頁版', type: AlgorithmType.POPULAR_MERCHANT_KA },
   ]
   const users = ['admin', 'operator', 'user001', 'user002']
 
@@ -170,10 +165,13 @@ const generateMockData = (): WaterfallSlotConfig[] => {
     return x - Math.floor(x)
   }
   
-  // 生成30条数据（無敵星星 15 条 + 盤活復蘇 15 条）
+  // 按「算法類型 × 業務類型 Tab」定向生成，保證每個 Tab 下各類型默認恰好 15 條（不被 Tab 的 bizChannel 過濾拆散）
   const typeConfigs = [
-    { type: AlgorithmType.INVINCIBLE_STAR, algorithm: algorithms[0], count: 15 },
-    { type: AlgorithmType.HOT_REVIVE_AD, algorithm: algorithms[2], count: 15 },
+    { type: AlgorithmType.INVINCIBLE_STAR, algorithm: algorithms[0], count: 15, bizType: 'delivery' },
+    { type: AlgorithmType.HOT_REVIVE_AD, algorithm: algorithms[2], count: 15, bizType: 'delivery' },
+    { type: AlgorithmType.POPULAR_MERCHANT_KA, algorithm: algorithms[8], count: 15, bizType: 'delivery' },
+    { type: AlgorithmType.INVINCIBLE_STAR, algorithm: algorithms[0], count: 15, bizType: 'groupBuy' },
+    { type: AlgorithmType.HOT_REVIVE_AD, algorithm: algorithms[2], count: 15, bizType: 'groupBuy' },
   ]
   let globalIndex = 0
   for (const cfg of typeConfigs) {
@@ -185,11 +183,15 @@ const generateMockData = (): WaterfallSlotConfig[] => {
       const dateStr = date.toISOString().split('T')[0]
       
       const app = apps[Math.floor(pseudoRandom(seed + 1) * apps.length)]
-      const channel = channels[Math.floor(pseudoRandom(seed + 2) * channels.length)]
-      // 大首頁隨機分配業務頻道，其他頻道直接映射
-      const bizChannel = channel === RecommendChannel.HOME
-        ? BIZ_CHANNEL_POOL[Math.floor(pseudoRandom(seed + 30) * BIZ_CHANNEL_POOL.length)]
-        : CHANNEL_TO_BIZ[channel]
+      // 展示頁面與業務頻道按所屬業務類型 Tab 定向分配，確保不跨 Tab 流失
+      const channel = cfg.bizType === 'groupBuy'
+        ? (pseudoRandom(seed + 2) > 0.5 ? RecommendChannel.HOME : RecommendChannel.GROUP_BUY)
+        : [RecommendChannel.HOME, RecommendChannel.DELIVERY, RecommendChannel.SUPERMARKET][Math.floor(pseudoRandom(seed + 2) * 3)]
+      const bizChannel = cfg.bizType === 'groupBuy'
+        ? 'groupBuy'
+        : (channel === RecommendChannel.HOME
+          ? ['food', 'supermarket'][Math.floor(pseudoRandom(seed + 30) * 2)]
+          : CHANNEL_TO_BIZ[channel])
       const slotPosition = 1 + Math.floor(pseudoRandom(seed + 3) * 10)
       const algorithm = cfg.algorithm
       const status = j < 10 ? ServiceStatus.ENABLED : ServiceStatus.DISABLED
@@ -673,6 +675,7 @@ export default function Waterfall() {
                 { label: '猜你喜歡-主力版', value: '猜你喜歡-主力版' },
                 { label: '自然流量-默認', value: '自然流量-默認' },
                 { label: '搜索算法-綜合版', value: '搜索算法-綜合版' },
+                { label: '人氣商家-首頁版', value: '人氣商家-首頁版' },
               ]}
             />
           </Form.Item>
