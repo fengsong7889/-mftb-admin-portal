@@ -8,14 +8,30 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, Region, RecommendChannel, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
+import { useCardOrder } from '../../hooks/useCardOrder'
 import DateTimeGrid from './DateTimeGrid'
 import DayPicker from './DayPicker'
+import NewStoreDayPicker from './NewStoreDayPicker'
 import {
   type InventoryItem,
   type RecommendTypeConfig,
   RECOMMEND_TYPE_CONFIGS,
   generateMockInventory,
 } from './types'
+
+// 各 Tab 展示的卡片默认类型顺序
+const DELIVERY_CARD_TYPES: AlgorithmType[] = [
+  AlgorithmType.INVINCIBLE_STAR,
+  AlgorithmType.HOT_REVIVE_AD,
+  AlgorithmType.NEW_STORE_AD,
+  AlgorithmType.TRAFFIC_AD,
+  AlgorithmType.ORGANIC_TRAFFIC,
+  AlgorithmType.POPULAR_MERCHANT_KA,
+]
+const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [
+  AlgorithmType.INVINCIBLE_STAR,
+  AlgorithmType.HOT_REVIVE_AD,
+]
 
 // 根据URL参数计算初始状态
 const getInitialState = (searchParams: URLSearchParams) => {
@@ -55,10 +71,21 @@ export default function AdSales() {
   const [selectedApp, setSelectedApp] = useState<AppType | null | undefined>(null)
   const [selectedTab, setSelectedTab] = useState<'delivery' | 'groupBuy'>('delivery')
 
+  // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
+  const deliveryCardOrder = useCardOrder('ad-sales-card-order-delivery', DELIVERY_CARD_TYPES)
+  const groupBuyCardOrder = useCardOrder('ad-sales-card-order-groupBuy', GROUP_BUY_CARD_TYPES)
+
   // 購買廣告 - 直接进入日期时段选择界面
   const handleGoToPurchase = (config: RecommendTypeConfig) => {
     if (!config.enabled) {
       message.info('該類型暫未開放，敬請期待')
+      return
+    }
+    // 新店廣告：进入赠送天数选购界面（无需库存数据）
+    if (config.type === AlgorithmType.NEW_STORE_AD) {
+      setSelectedAlgorithmType(config.type)
+      setSelectedInventory(null)
+      setCurrentStep(1)
       return
     }
     setSelectedAlgorithmType(config.type)
@@ -172,19 +199,16 @@ export default function AdSales() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
                   }}>
-                    {RECOMMEND_TYPE_CONFIGS.filter(config => 
-                      config.type === AlgorithmType.INVINCIBLE_STAR || 
-                      config.type === AlgorithmType.HOT_REVIVE_AD || 
-                      config.type === AlgorithmType.NEW_STORE_AD || 
-                      config.type === AlgorithmType.TRAFFIC_AD || 
-                      config.type === AlgorithmType.ORGANIC_TRAFFIC ||
-                      config.type === AlgorithmType.POPULAR_MERCHANT_KA
+                    {deliveryCardOrder.sortCards(
+                      RECOMMEND_TYPE_CONFIGS.filter(config => DELIVERY_CARD_TYPES.includes(config.type)),
+                      config => config.type,
                     ).map(config => (
                       <div
                         key={config.type}
                         className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
                         onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}&from=ad-sales`)}
                         style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
+                        {...deliveryCardOrder.getDragProps(config.type)}
                       >
                         <div className="algo-card-inner">
                           <div className="algo-card-icon">{config.icon}</div>
@@ -206,19 +230,17 @@ export default function AdSales() {
                                 >
                                   查看訂單
                                 </Button>
-                                {config.type !== AlgorithmType.NEW_STORE_AD && (
-                                  <Button
-                                    type="primary"
-                                    size="small"
-                                    icon={<ShoppingCartOutlined />}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleGoToPurchase(config)
-                                    }}
-                                  >
-                                    購買廣告
-                                  </Button>
-                                )}
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<ShoppingCartOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleGoToPurchase(config)
+                                  }}
+                                >
+                                  購買廣告
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -237,15 +259,16 @@ export default function AdSales() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
                   }}>
-                    {RECOMMEND_TYPE_CONFIGS.filter(config => 
-                      config.type === AlgorithmType.INVINCIBLE_STAR || 
-                      config.type === AlgorithmType.HOT_REVIVE_AD
+                    {groupBuyCardOrder.sortCards(
+                      RECOMMEND_TYPE_CONFIGS.filter(config => GROUP_BUY_CARD_TYPES.includes(config.type)),
+                      config => config.type,
                     ).map(config => (
                       <div
                         key={config.type}
                         className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
                         onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}&from=ad-sales`)}
                         style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
+                        {...groupBuyCardOrder.getDragProps(config.type)}
                       >
                         <div className="algo-card-inner">
                           <div className="algo-card-icon">{config.icon}</div>
@@ -292,8 +315,15 @@ export default function AdSales() {
         </Card>
       )}
 
+      {/* Step 2: 選擇贈送推廣天數並提交訂單 - 新店廣告 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <NewStoreDayPicker />
+        </Card>
+      )}
+
       {/* Step 2: 选择时段并加购 - 無敵星星 */}
-      {currentStep === 1 && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
+      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DateTimeGrid
             inventoryItem={selectedInventory}

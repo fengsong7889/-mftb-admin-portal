@@ -107,7 +107,7 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
   },
   {
     type: AlgorithmType.POPULAR_MERCHANT_KA,
-    name: '人氣商家(KA)',
+    name: '人氣商家',
     icon: '🏆',
     description: '人氣商家專屬推薦位，KA商家流量加持',
     enabled: true,
@@ -189,7 +189,9 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
     [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
     [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
     [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
-    [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家(KA)',
+    [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
+    [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
+    [AlgorithmType.GOLD_AD]: '點金廣告',
   }
   
   // 各类型的推广名称后缀

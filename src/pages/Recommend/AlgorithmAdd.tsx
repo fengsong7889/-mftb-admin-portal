@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Popover, Switch } from 'antd'
+import { useState, useEffect, useRef } from 'react'
+import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
@@ -16,6 +16,9 @@ const TYPE_LABEL: Record<number, string> = {
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
   [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
   [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
+  [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
+  [AlgorithmType.GOLD_AD]: '點金廣告',
 }
 
 const TYPE_ICON: Record<number, string> = {
@@ -27,7 +30,19 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.GUESS_YOU_LIKE]: '💡',
   [AlgorithmType.ORGANIC_TRAFFIC]: '🌿',
   [AlgorithmType.SEARCH_ALGORITHM]: '🔍',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: '🏆',
+  [AlgorithmType.BRAND_MERCHANT]: '💎',
+  [AlgorithmType.GOLD_AD]: '💰',
 }
+
+/** 獨家商家 - 店鋪等級保障單量配置（等級 / 標籤色 / 默認保障單量） */
+const STORE_LEVEL_BLOCK_OPTIONS = [
+  { level: 'S', color: '#F5222D', defaultOrders: 20 },
+  { level: 'A', color: '#E8720C', defaultOrders: 15 },
+  { level: 'B', color: '#1890FF', defaultOrders: 10 },
+  { level: 'C', color: '#52C41A', defaultOrders: 8 },
+  { level: 'D', color: '#722ED1', defaultOrders: 5 },
+]
 
 export default function AlgorithmAdd() {
   const navigate = useNavigate()
@@ -70,116 +85,45 @@ export default function AlgorithmAdd() {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
   const [isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
-  // 新店广告 - 波浪计算配置
-  const [newStoreCycle, setNewStoreCycle] = useState(30) // 新店周期（天）
-  const [waveInterval, setWaveInterval] = useState(5) // 波浪间隔（天）
-
-  // 大区列表（固定可选项）
-  const ALL_WAVE_DISTRICTS = [
-    { id: 'macau', label: '澳門' },
-    { id: 'taipa', label: '氹仔' },
-    { id: 'hengqin', label: '横琴合作區' },
-    { id: 'zhuhai', label: '珠海市' },
+  // 新店广告 - 波浪计算配置（周期/间隔为默认值，后续如需调整仅改以下常量）
+  /** 新店週期默認天數 */
+  const NEW_STORE_CYCLE_DAYS = 60
+  /** 波浪間隔（天）：每 N 天切換一次配送範圍 */
+  const WAVE_INTERVAL_DAYS = 5
+  /** 配送範圍選項 */
+  const WAVE_RANGE_OPTIONS = [
+    { value: 'short', label: '短程' },
+    { value: 'medium', label: '中程' },
+    { value: 'long', label: '遠程' },
   ]
-  const [selectedDistrictIds, setSelectedDistrictIds] = useState<string[]>(['macau', 'taipa'])
-  const waveDistricts = ALL_WAVE_DISTRICTS.filter(d => selectedDistrictIds.includes(d.id))
-
-  // 区域选择变更
-  const handleDistrictChange = (ids: string[]) => {
-    if (ids.length === 0) return // 至少保留一个
-    setSelectedDistrictIds(ids)
-    // 同步到已有节点：新增的区域初始化为空，删除的区域移除
-    setWaveNodes(prev => prev.map(n => {
-      const newRanges: Record<string, string[]> = {}
-      ids.forEach(id => { newRanges[id] = n.ranges[id] || [] })
-      return { ...n, ranges: newRanges }
-    }))
-  }
-
-  // 配置模式：shared=全部共享, independent=按区域独立配置
-  const [waveConfigMode, setWaveConfigMode] = useState<'shared' | 'independent'>('shared')
 
   interface WaveNode {
     day: number
-    ranges: Record<string, string[]> // key: district id, value: ['short','medium','long']
+    ranges: string[] // ['short','medium','long']
   }
-  const [waveNodes, setWaveNodes] = useState<WaveNode[]>([])
 
-  // 波浪交替起始勾选
-  const [waveStartRanges, setWaveStartRanges] = useState<string[]>(['short'])
-
-  // 执行波浪交替：取最大参数往后增长，直到远程后从短程开始循环
-  // 规则：
-  // 1. 第一行展示用户勾选的参数
-  // 2. 第二行取第一行最大的一个参数往后增长（遠程>中程>短程，循环）
-  // 3. 以此类推，直到满3个 [短程,中程,远程]，然后从 [短程] 开始自增循环
-  const applyWaveAlternating = () => {
-    if (waveNodes.length === 0 || waveStartRanges.length === 0) return
-    const cycle = ['short', 'medium', 'long']
-    const selected = cycle.filter(r => waveStartRanges.includes(r))
-
-    // 生成模式序列
-    const pattern: string[][] = []
-
-    // 阶段1：每次取当前组合中最大的往后加一个
-    // 规则：上一行包含远程 → 下一行必须是 [短程]
-    let current = [...selected]
-    pattern.push([...current])
-    while (current.length < 3) {
-      if (current.includes('long')) {
-        // 上一行有远程，下一行从短程开始
-        current = ['short']
-      } else {
-        const maxIdx = Math.max(...current.map(r => cycle.indexOf(r)))
-        const nextRange = cycle[(maxIdx + 1) % 3]
-        current = [...current, nextRange]
-      }
-      pattern.push([...current])
+  // 按周期与间隔生成剩余天数节点：60, 55, ..., 5
+  const buildWaveNodes = (): WaveNode[] => {
+    const nodes: WaveNode[] = []
+    for (let d = NEW_STORE_CYCLE_DAYS; d > 0; d -= WAVE_INTERVAL_DAYS) {
+      nodes.push({ day: d, ranges: [] })
     }
-    // 阶段1结束，current 为 [短程,中程,远程]
+    return nodes
+  }
+  const [waveNodes, setWaveNodes] = useState<WaveNode[]>(buildWaveNodes)
 
-    // 阶段2：自增循环 [短程] → [短程,中程] → [短程,中程,远程] → 回到 [短程]...
-    // 规则：上一行包含远程 → 下一行必须是 [短程]
-    const loop: string[][] = [
-      ['short'],
-      ['short', 'medium'],
-      ['short', 'medium', 'long'],
-    ]
-    for (let si = 0; si < loop.length; si++) {
-      const step = loop[si]
-      if (current.join(',') !== step.join(',')) {
-        pattern.push([...step])
-      }
-      current = [...step]
-    }
-
-    setWaveNodes(prev => prev.map((node, idx) => {
-      const ranges = pattern[idx % pattern.length]
-      const newRanges: Record<string, string[]> = {}
-      waveDistricts.forEach(d => { newRanges[d.id] = ranges })
-      return { ...node, ranges: newRanges }
+  // 单元格勾选：切换某节点的某个配送范围
+  const handleToggleWaveCell = (idx: number, range: string, checked: boolean) => {
+    setWaveNodes(prev => prev.map((n, i) => {
+      if (i !== idx) return n
+      return { ...n, ranges: checked ? [...n.ranges, range] : n.ranges.filter(r => r !== range) }
     }))
   }
 
-  // 根据新店周期和间隔计算波浪节点
-  const calculatedWaveNodes = useMemo(() => {
-    if (!newStoreCycle || !waveInterval || newStoreCycle <= 0 || waveInterval <= 0) return []
-    const nodes: { day: number }[] = []
-    for (let d = newStoreCycle; d > 0; d -= waveInterval) {
-      nodes.push({ day: d })
-    }
-    return nodes
-  }, [newStoreCycle, waveInterval])
-
-  // 当计算节点变化时，更新 waveNodes（保留已有配置）
-  useEffect(() => {
-    setWaveNodes(prev => {
-      return calculatedWaveNodes.map(cn => {
-        const existing = prev.find(p => p.day === cn.day)
-        return existing || { day: cn.day, ranges: {} }
-      })
-    })
-  }, [calculatedWaveNodes])
+  // 清空全部勾选
+  const handleClearWaveNodes = () => {
+    setWaveNodes(prev => prev.map(n => ({ ...n, ranges: [] })))
+  }
 
   // 编辑模式或详情模式下加载默认数据
   useEffect(() => {
@@ -357,7 +301,7 @@ export default function AlgorithmAdd() {
       </Card>
 
       {/* 算法参数区域 */}
-      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT) ? (
+      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA) ? (
         <Card 
           title={
             <Space>
@@ -397,6 +341,29 @@ export default function AlgorithmAdd() {
           }}
         >
 
+          {/* 人气商家：仅显示商家状态计算定时器 */}
+          {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? (
+            <Form.Item
+              label="定時器"
+              style={{ flex: 1, marginBottom: 16 }}
+              labelCol={{ flex: '150px' }}
+              wrapperCol={{ flex: 1 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>每</span>
+                <Form.Item name="merchantStatusTimer" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber
+                    min={1}
+                    max={60}
+                    placeholder="分鐘"
+                    style={{ width: 60, borderRadius: 8, fontSize: 14 }}
+                  />
+                </Form.Item>
+                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>分鐘計算切換大小圖模式</span>
+              </div>
+            </Form.Item>
+          ) : (
+            <>
           {/* 商家状态计算 */}
           <Form.Item
             label="商家狀態計算"
@@ -440,6 +407,8 @@ export default function AlgorithmAdd() {
               <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>分鐘校驗數據一致性</span>
             </div>
           </Form.Item>
+            </>
+          )}
 
           {/* 波浪計算（僅新店廣告） */}
           {selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
@@ -455,136 +424,53 @@ export default function AlgorithmAdd() {
                   <span style={{ fontSize: 12, fontWeight: 400, color: '#d46b08' }}>⚠️ 新店週期結束後，商家將自動退出新店廣告計算範圍，不再參與新店曝光。</span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>新店週期</span>
-                    <InputNumber
-                      min={1}
-                      max={365}
-                      value={newStoreCycle}
-                      onChange={(val) => setNewStoreCycle(val ?? 30)}
-                      style={{ width: 80 }}
-                      disabled={isDetailMode}
-                    />
-                    <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>天</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>波浪間隔</span>
-                    <InputNumber
-                      min={1}
-                      max={newStoreCycle}
-                      value={waveInterval}
-                      onChange={(val) => setWaveInterval(val ?? 5)}
-                      style={{ width: 80 }}
-                      disabled={isDetailMode}
-                    />
-                    <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>天切換一次</span>
-                  </div>
-                </div>
-
-                {/* 区域配置 */}
+                {/* 默認參數說明 + 清空操作（緊鄰說明文字，便於發現） */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>區域配置：</span>
-                <span style={{ fontSize: 13, color: waveConfigMode === 'shared' ? '#262626' : '#8c8c8c' }}>全區通用</span>
-                <Switch
-                  checked={waveConfigMode === 'independent'}
-                  disabled={isDetailMode}
-                  onChange={(checked) => setWaveConfigMode(checked ? 'independent' : 'shared')}
-                />
-                <span style={{ fontSize: 13, color: waveConfigMode === 'independent' ? '#262626' : '#8c8c8c' }}>獨立配置</span>
-                {waveConfigMode === 'independent' && (
-                  <>
-                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap', marginLeft: 8 }}>展示區域：</span>
-                    <Checkbox.Group
-                      value={selectedDistrictIds}
-                      disabled={isDetailMode}
-                      onChange={(vals) => handleDistrictChange(vals as string[])}
-                      options={ALL_WAVE_DISTRICTS.map(d => ({ label: d.label, value: d.id }))}
-                    />
-                  </>
-                )}
+                  <span style={{ fontSize: 13, color: '#595959' }}>
+                    新店週期默認 <span style={{ fontWeight: 700, color: '#E8720C' }}>{NEW_STORE_CYCLE_DAYS}</span> 天，每 <span style={{ fontWeight: 700, color: '#E8720C' }}>{WAVE_INTERVAL_DAYS}</span> 天切換一次配送範圍，共 <span style={{ fontWeight: 700, color: '#262626' }}>{waveNodes.length}</span> 個節點（按剩餘天數由多到少）
+                  </span>
+                  <Button size="small" danger disabled={isDetailMode} onClick={handleClearWaveNodes}>清空全部</Button>
                 </div>
 
-                {/* 快速配置 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>快速配置：</span>
-                  <Checkbox.Group
-                    value={waveStartRanges}
-                    disabled={isDetailMode}
-                    onChange={(vals) => setWaveStartRanges(vals as string[])}
-                    options={[
-                      { label: '短程', value: 'short' },
-                      { label: '中程', value: 'medium' },
-                      { label: '遠程', value: 'long' },
-                    ]}
-                  />
-                  <Button size="small" type="primary" disabled={isDetailMode || waveStartRanges.length === 0 || waveNodes.length === 0} onClick={applyWaveAlternating}>執行</Button>
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>（勾選起始範圍，點擊執行生成波浪節點）</span>
+                {/* 波浪節點勾選矩陣：緊湊固定列寬 */}
+                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, overflow: 'hidden', background: '#fff', width: 'fit-content' }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '90px repeat(3, 96px)',
+                    background: '#f0f5ff', borderBottom: '1px solid #d6e4ff',
+                    padding: '8px 16px', alignItems: 'center',
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1890ff' }}>剩餘天數</span>
+                    {WAVE_RANGE_OPTIONS.map(opt => (
+                      <span key={opt.value} style={{ fontSize: 13, fontWeight: 600, color: '#1890ff', textAlign: 'center' }}>{opt.label}</span>
+                    ))}
+                  </div>
+                  <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                    {waveNodes.map((node, idx) => (
+                      <div key={node.day} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '90px repeat(3, 96px)',
+                        padding: '6px 16px', alignItems: 'center',
+                        borderBottom: idx < waveNodes.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        background: node.ranges.length > 0 ? '#fffcf5' : (idx % 2 === 0 ? '#ffffff' : '#fafafa'),
+                        transition: 'background 0.2s',
+                      }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{node.day} 天</span>
+                        {WAVE_RANGE_OPTIONS.map(opt => (
+                          <div key={opt.value} style={{ textAlign: 'center' }}>
+                            <Checkbox
+                              checked={node.ranges.includes(opt.value)}
+                              disabled={isDetailMode}
+                              onChange={(e) => handleToggleWaveCell(idx, opt.value, e.target.checked)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-
-                {/* 波浪节点配置表格 */}
-                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: waveConfigMode === 'shared' ? '80px 1fr' : `80px repeat(${waveDistricts.length}, 1fr)`,
-                  background: '#f0f5ff', borderBottom: '1px solid #d6e4ff',
-                  padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#1890ff',
-                }}>
-                  <span>剩餘天數</span>
-                  {waveConfigMode === 'shared' ? (
-                    <span>配送範圍（全部區域共享）</span>
-                  ) : (
-                    waveDistricts.map(d => <span key={d.id}>{d.label}</span>)
-                  )}
-                </div>
-                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                  {waveNodes.map((node, idx) => (
-                    <div key={node.day} style={{
-                      display: 'grid',
-                      gridTemplateColumns: waveConfigMode === 'shared' ? '80px 1fr' : `80px repeat(${waveDistricts.length}, 1fr)`,
-                      padding: '10px 16px', alignItems: 'center',
-                      borderBottom: idx < waveNodes.length - 1 ? '1px solid #f0f0f0' : 'none',
-                      background: idx % 2 === 0 ? '#ffffff' : '#fafafa',
-                    }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{node.day}天</span>
-                      {waveConfigMode === 'shared' ? (
-                        <Checkbox.Group
-                          options={[
-                            { label: '短程', value: 'short' },
-                            { label: '中程', value: 'medium' },
-                            { label: '遠程', value: 'long' },
-                          ]}
-                          value={node.ranges['macau'] || []}
-                          disabled={isDetailMode}
-                          onChange={(vals) => {
-                            setWaveNodes(prev => prev.map((n, i) => {
-                              if (i !== idx) return n
-                              const newRanges: Record<string, string[]> = {}
-                              waveDistricts.forEach(d => { newRanges[d.id] = vals as string[] })
-                              return { ...n, ranges: newRanges }
-                            }))
-                          }}
-                        />
-                      ) : (
-                        waveDistricts.map(d => (
-                          <Checkbox.Group
-                            key={d.id}
-                            options={[
-                              { label: '短程', value: 'short' },
-                              { label: '中程', value: 'medium' },
-                              { label: '遠程', value: 'long' },
-                            ]}
-                            value={node.ranges[d.id] || []}
-                            disabled={isDetailMode}
-                            onChange={(vals) => {
-                              setWaveNodes(prev => prev.map((n, i) => i === idx ? { ...n, ranges: { ...n.ranges, [d.id]: vals as string[] } } : n))
-                            }}
-                          />
-                        ))
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
+                  勾選各節點對應的配送範圍；點擊「清空全部」可一鍵清除所有勾選。
                 </div>
               </div>
             </Form.Item>
@@ -959,6 +845,27 @@ export default function AlgorithmAdd() {
               <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
                 請選擇參與成交量統計的訂單履約方式，以保障商家訂單成交量統計的準確性
               </div>
+              {/* 店鋪等級保障單量配置 */}
+              <div style={{ marginTop: 12, padding: '12px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>店鋪等級保障單量</div>
+                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
+                  按店鋪等級單獨配置保障單量：當用戶在該門店的下單數量達到所配置單量時，該門店將不再在獨家區域展示
+                </div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, color, defaultOrders }) => (
+                    <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        padding: '0 8px', height: 22, lineHeight: '22px', borderRadius: 4,
+                        fontSize: 12, fontWeight: 600, color,
+                        background: `${color}14`, border: `1px solid ${color}4D`,
+                      }}>{level}級</span>
+                      <Form.Item name={['levelBlockOrders', level]} noStyle initialValue={defaultOrders}>
+                        <InputNumber min={1} precision={0} style={{ width: 100 }} addonAfter="單" disabled={isDetailMode} />
+                      </Form.Item>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </Form.Item>
           )}
 
@@ -995,7 +902,6 @@ export default function AlgorithmAdd() {
                           placeholder="請選擇"
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                           options={[
-                            { label: '維度計算', value: 'merchant' },
                             { label: '輪詢計算', value: 'random' },
                           ]}
                           disabled={isDetailMode}
@@ -1013,266 +919,57 @@ export default function AlgorithmAdd() {
                           </div>
                         </div>
                       )}
+                  </div>
+            </div>
+          )}
 
-                      {/* 按商家维度配置 */}
-                      {merchantExposureStrategy === 'merchant' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#ffffff', border: '1px solid #e8eaed', borderRadius: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>
-                              <span style={{ color: '#1890ff', fontWeight: 600 }}>*</span> 選擇維度:
+          {/* ===== 人氣商家：算法策略（僅輪詢計算） ===== */}
+          {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA && (
+              <div style={{
+                border: '1px solid #d6e4ff',
+                borderRadius: 8,
+                background: '#f0f5ff',
+                overflow: 'hidden',
+                marginBottom: 16,
+              }}>
+                    {/* 標題欄 */}
+                    <div style={{
+                      fontSize: 14, fontWeight: 600, color: '#1890ff',
+                      padding: '10px 20px',
+                      borderBottom: '1px solid #d6e4ff',
+                      background: '#e6f4ff',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <SettingOutlined />
+                      算法策略
+                    </div>
+
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>大小圖展示策略</span>
+                      <Form.Item
+                        name="merchantExposureStrategy"
+                        style={{ flex: 1, marginBottom: 0 }}
+                        wrapperCol={{ span: 24 }}
+                      >
+                        <Select
+                          placeholder="請選擇"
+                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          options={[
+                            { label: '輪詢計算', value: 'random' },
+                          ]}
+                          disabled={isDetailMode}
+                        />
+                      </Form.Item>
+                    </div>
+
+                      {/* 按轮询维度配置 */}
+                      {merchantExposureStrategy === 'random' && (
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
                             </span>
-                            {dimensionItems.length < DIMENSION_OPTIONS.length && (
-                              <>
-                                <Select
-                                  placeholder="選擇維度"
-                                  style={{ width: 140, height: 28 }}
-                                  size="small"
-                                  value={selectedDimension}
-                                  onChange={(val) => setSelectedDimension(val)}
-                                  options={DIMENSION_OPTIONS.filter(o => !dimensionItems.find(d => d.type === o.value))}
-                                  disabled={isDetailMode}
-                                />
-                                <Button
-                                  type="dashed"
-                                  size="small"
-                                  icon={<PlusOutlined />}
-                                  disabled={isDetailMode || !selectedDimension}
-                                  onClick={() => {
-                                    if (selectedDimension) {
-                                      setDimensionItems([...dimensionItems, { id: Date.now().toString(), type: selectedDimension, weight: undefined }])
-                                      setSelectedDimension(undefined)
-                                    }
-                                  }}
-                                >
-                                  新增
-                                </Button>
-                                <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>（至少一項，多項可設置權重，權重高的優先曝光）</span>
-                              </>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {dimensionItems.map((item, index) => {
-                              const opt = DIMENSION_OPTIONS.find(o => o.value === item.type)
-                              return (
-                                <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', padding: '10px 12px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
-                                  {/* 第一行：参数名 + 描述 + 删除 */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 13, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>{opt?.label}</span>
-                                    {item.type === 'orderCompletion' ? (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        近
-                                        <InputNumber
-                                          min={1}
-                                          max={365}
-                                          value={orderCompletionDays}
-                                          onChange={(val) => setOrderCompletionDays(val ?? 30)}
-                                          style={{ width: 64 }}
-                                          size="small"
-                                          disabled={isDetailMode}
-                                        />
-                                        天訂單完成比例（貝葉斯平滑）
-                                        <Popover
-                                          trigger="click"
-                                          placement="right"
-                                          title={<span style={{ fontWeight: 600, color: '#52c41a' }}>📊 貝葉斯平滑說明</span>}
-                                          content={
-                                            <div style={{ maxWidth: 280, fontSize: 12, lineHeight: '20px' }}>
-                                              <div style={{ marginBottom: 6 }}>
-                                                <strong>修正完成率</strong> = (完成單數 + α) / (總單數 + β)
-                                              </div>
-                                              <div style={{ color: '#595959' }}>
-                                                • <strong>α</strong>：固定值 5，預設已完成訂單數
-                                                <br />
-                                                • <strong>β</strong>：固定值 10，預設總訂單數
-                                                <br />
-                                                • <strong>作用</strong>：單量越少，完成率越被拉向 50%，避免小樣本偏差
-                                                <br />
-                                                • <strong>單量越大</strong>，修正率越接近真實完成率
-                                              </div>
-                                              <div style={{ marginTop: 8, padding: '6px 8px', background: '#f6ffed', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
-                                                例：1單完成1單 → 修正率=(1+5)/(1+10)=54.5%
-                                                <br />
-                                                20單完成10單 → 修正率=(10+5)/(20+10)=50%
-                                              </div>
-                                            </div>
-                                          }
-                                        >
-                                          <QuestionCircleOutlined style={{ color: '#1890ff', cursor: 'pointer', fontSize: 14 }} />
-                                        </Popover>
-                                      </span>
-                                    ) : item.type === 'distance' ? (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        {opt?.desc}
-                                        <Popover
-                                          trigger="click"
-                                          placement="right"
-                                          title={<span style={{ fontWeight: 600, color: '#722ed1' }}>📏 距離衰減說明</span>}
-                                          content={
-                                            <div style={{ maxWidth: 280, fontSize: 12, lineHeight: '20px' }}>
-                                              <div style={{ marginBottom: 6 }}>
-                                                <strong>距離分</strong> = e<sup>-0.1 × 距離(km)</sup>
-                                              </div>
-                                              <div style={{ color: '#595959' }}>
-                                                • 距離越近，分數越接近 1
-                                                <br />
-                                                • 距離越遠，分數指數衰減趨近 0
-                                                <br />
-                                                • <strong>衰減係數 0.1</strong>：每增加 10km，分數約下降 63%
-                                              </div>
-                                              <div style={{ marginTop: 8, padding: '6px 8px', background: '#f9f0ff', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
-                                                1km → 0.90 &nbsp; 3km → 0.74 &nbsp; 5km → 0.61
-                                                <br />
-                                                8km → 0.45 &nbsp; 15km → 0.22 &nbsp; 30km → 0.05
-                                              </div>
-                                            </div>
-                                          }
-                                        >
-                                          <QuestionCircleOutlined style={{ color: '#722ed1', cursor: 'pointer', fontSize: 14 }} />
-                                        </Popover>
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c' }}>（{opt?.desc}）</span>
-                                    )}
-                                    {!isDetailMode && (
-                                      <DeleteOutlined
-                                        style={{ color: '#ff4d4f', fontSize: 16, cursor: 'pointer' }}
-                                        onClick={() => setDimensionItems(dimensionItems.filter((_, i) => i !== index))}
-                                      />
-                                    )}
-                                  </div>
-                                  {/* 第二行：权重滑块 */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 0 }}>
-                                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>權重:</span>
-                                    <div className="ws-wrapper">
-                                      <div className="ws-slider-box">
-                                        <div className="ws-tooltip" style={{ left: `${((item.weight ?? 1) - 1) / 9 * 100}%`, opacity: tooltipVisible[item.id] ? 1 : 0, transition: 'opacity 0.25s ease, left 0.25s ease-out', pointerEvents: 'none' }}>
-                                          <div className="ws-tooltip-box">{item.weight ?? 1}</div>
-                                          <div className="ws-tooltip-arrow" />
-                                        </div>
-                                        <div className="ws-rail">
-                                          <div className="ws-fill" style={{ width: `${((item.weight ?? 1) - 1) / 9 * 100}%` }} />
-                                        </div>
-                                        <input
-                                          type="range"
-                                          className="ws-input"
-                                          min={1}
-                                          max={10}
-                                          value={item.weight ?? 1}
-                                          disabled={isDetailMode}
-                                          onMouseDown={() => {
-                                            if (hideTimerRef.current[item.id]) clearTimeout(hideTimerRef.current[item.id])
-                                            setTooltipVisible(prev => ({ ...prev, [item.id]: true }))
-                                          }}
-                                          onMouseUp={() => {
-                                            hideTimerRef.current[item.id] = setTimeout(() => {
-                                              setTooltipVisible(prev => ({ ...prev, [item.id]: false }))
-                                            }, 2000)
-                                          }}
-                                          onTouchStart={() => {
-                                            if (hideTimerRef.current[item.id]) clearTimeout(hideTimerRef.current[item.id])
-                                            setTooltipVisible(prev => ({ ...prev, [item.id]: true }))
-                                          }}
-                                          onTouchEnd={() => {
-                                            hideTimerRef.current[item.id] = setTimeout(() => {
-                                              setTooltipVisible(prev => ({ ...prev, [item.id]: false }))
-                                            }, 2000)
-                                          }}
-                                          onChange={(e) => {
-                                            const val = Number(e.target.value)
-                                            const newItems = [...dimensionItems]
-                                            newItems[index].weight = val
-                                            setDimensionItems(newItems)
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="ws-ticks">
-                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                          <div key={n} className="ws-tick">
-                                            <div className={`ws-tick-bar ${n <= (item.weight ?? 1) ? 'on' : ''}`} />
-                                            <span className={`ws-tick-num ${n === (item.weight ?? 1) ? 'on' : ''}`}>{n}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-
-                          {/* 计算公式 */}
-                          <div style={{ marginTop: 16, padding: '10px 12px', background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
-                            <div style={{ display: 'flex', gap: 24, marginBottom: 12 }}>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#1890ff' }}>計算公式：</div>
-                                <div>最終得分 = (質量分/5 × W₁) + (修正完成率 × W₂) + (扶持分 × W₃) + (距離分 × W₄)</div>
-                                <div style={{ marginTop: 4, color: '#8c8c8c' }}>扶持分 = max(0, (8-首投天數)/7)；距離分 = e^(-0.1×距離km)</div>
-                              </div>
-                              <div style={{ flex: 1, borderLeft: '1px solid #e8e8e8', paddingLeft: 16 }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#52c41a' }}>示例：</div>
-                                <div style={{ marginBottom: 8 }}>假設權重：W₁=6, W₂=3, W₃=1, W₄=4（α=5, β=10 固定）</div>
-                                <div style={{ display: 'flex', gap: 16 }}>
-                                  <div style={{ flex: 1 }}>
-                                    <div>商家A：質量4分 + 20單完成10單 + 首投15天 + 距離2km</div>
-                                    <div style={{ color: '#8c8c8c' }}>修正率=(10+5)/(20+10)=50%，距離分=e^(-0.1×2)=0.82</div>
-                                    <div style={{ color: '#8c8c8c' }}>得分 = 0.8×6 + 0.5×3 + 0×1 + 0.82×4 = <span style={{ color: '#1890ff', fontWeight: 600 }}>9.58</span></div>
-                                  </div>
-                                  <div style={{ flex: 1 }}>
-                                    <div>商家B：質量3分 + 1單完成1單 + 首投2天 + 距離8km</div>
-                                    <div style={{ color: '#8c8c8c' }}>修正率=(1+5)/(1+10)=54.5%，距離分=e^(-0.1×8)=0.45</div>
-                                    <div style={{ color: '#8c8c8c' }}>得分 = 0.6×6 + 0.545×3 + 0.857×1 + 0.45×4 = <span style={{ color: '#1890ff', fontWeight: 600 }}>7.7</span></div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 曝光分配策略 */}
-                            <div style={{ padding: '10px 12px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 4 }}>
-                              <div style={{ fontWeight: 600, marginBottom: 8, color: '#d46b08', fontSize: 12 }}>
-                                🎯 曝光分配策略：加權隨機（輪盤賭）
-                              </div>
-                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                                單坑位場景下，每次用戶請求到達時，按商家得分權重隨機抽取一個商家展示。分數越高，被抽中概率越大，但低分商家也有機會曝光。
-                              </div>
-                              <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                  <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>分配公式：</span>
-                                  <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(商家i) = score_i / Σ(所有商家得分)</span>
-                                  <Popover
-                                    trigger="click"
-                                    placement="right"
-                                    title={<span style={{ fontWeight: 600, color: '#d46b08' }}>📊 分配示例</span>}
-                                    content={
-                                      <div style={{ maxWidth: 320, fontSize: 12 }}>
-                                        <div style={{ color: '#595959', marginBottom: 8 }}>
-                                          假設 5 個商家得分：A=6, B=7, C=10, D=5, E=9.5，總分=37.5
-                                        </div>
-                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                                          {[
-                                            { name: 'C', score: 10, color: '#1890ff' },
-                                            { name: 'E', score: 9.5, color: '#722ed1' },
-                                            { name: 'B', score: 7, color: '#52c41a' },
-                                            { name: 'A', score: 6, color: '#fa8c16' },
-                                            { name: 'D', score: 5, color: '#eb2f96' },
-                                          ].map(m => (
-                                            <div key={m.name} style={{ flex: '1 1 70px', padding: '4px 6px', background: '#fafafa', borderRadius: 4, border: '1px solid #f0f0f0', textAlign: 'center' }}>
-                                              <div style={{ fontWeight: 600, color: m.color, fontSize: 12 }}>商家{m.name}</div>
-                                              <div style={{ fontSize: 10, color: '#8c8c8c' }}>得分 {m.score}</div>
-                                              <div style={{ fontSize: 11, fontWeight: 600, color: '#595959' }}>{(m.score / 37.5 * 100).toFixed(1)}%</div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '18px', padding: '4px 6px', background: '#f6ffed', borderRadius: 4 }}>
-                                          💡 長期效果：請求 1000 次，C 約 267 次，E 約 253 次，B 約 187 次，A 約 160 次，D 約 133 次
-                                        </div>
-                                      </div>
-                                    }
-                                  >
-                                    <QuestionCircleOutlined style={{ color: '#d46b08', cursor: 'pointer', fontSize: 13 }} />
-                                  </Popover>
-                                </div>
-                              </div>
-                            </div>
                           </div>
                         </div>
                       )}

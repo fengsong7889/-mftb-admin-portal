@@ -21,6 +21,7 @@ import {
 import type { WaterfallSlotConfig } from '../types'
 import { mockAlgorithmData } from '../Algorithm'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useCardOrder } from '../../../hooks/useCardOrder'
 
 /** 广告类型卡片配置 */
 const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
@@ -96,11 +97,13 @@ const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
   [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家(KA)',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
   [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
   [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
+  [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
+  [AlgorithmType.GOLD_AD]: '點金廣告',
 }
 
 const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
@@ -113,6 +116,8 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
   [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
+  [AlgorithmType.BRAND_MERCHANT]: 'orange',
+  [AlgorithmType.GOLD_AD]: 'gold',
 }
 
 // Mock数据 - 瀑布流坑位配置（無敵星星15条 + 盤活復蘇15条）
@@ -242,6 +247,10 @@ export default function Waterfall() {
   const [editingRecord, setEditingRecord] = useState<WaterfallSlotConfig | null>(null)
   const [viewingRecord, setViewingRecord] = useState<WaterfallSlotConfig | null>(null)
   const [form] = Form.useForm()
+
+  // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
+  const deliveryCardOrder = useCardOrder('waterfall-card-order-delivery', TAB_ALGORITHM_MAP.delivery)
+  const groupBuyCardOrder = useCardOrder('waterfall-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy)
 
   // 各算法类型对应的记录数
   const typeCountMap = useMemo(() => {
@@ -565,15 +574,18 @@ export default function Waterfall() {
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                   gap: 16,
                 }}>
-                  {ALGORITHM_TYPE_CARDS
-                    .filter(card => TAB_ALGORITHM_MAP[tabKey].includes(card.type))
-                    .map(card => {
+                  {(tabKey === 'delivery' ? deliveryCardOrder : groupBuyCardOrder).sortCards(
+                    ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP[tabKey].includes(card.type)),
+                    card => card.type,
+                  ).map(card => {
+                      const cardOrder = tabKey === 'delivery' ? deliveryCardOrder : groupBuyCardOrder
                       const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
                       return (
                         <div
                           key={card.type}
                           className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
                           onClick={() => enabled && handleSelectType(card.type)}
+                          {...cardOrder.getDragProps(card.type)}
                         >
                           <div className="algo-card-inner">
                             <div className="algo-card-icon">{card.icon}</div>

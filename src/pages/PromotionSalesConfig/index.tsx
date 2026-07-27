@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, Region, RecommendChannel, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
+import { useCardOrder } from '../../hooks/useCardOrder'
 import DateTimeGrid from './DateTimeGrid'
 import DayPicker from './DayPicker'
 import {
@@ -16,6 +17,20 @@ import {
   RECOMMEND_TYPE_CONFIGS,
   generateMockInventory,
 } from './types'
+
+// 各 Tab 展示的卡片默认类型顺序
+const DELIVERY_CARD_TYPES: AlgorithmType[] = [
+  AlgorithmType.INVINCIBLE_STAR,
+  AlgorithmType.HOT_REVIVE_AD,
+  AlgorithmType.NEW_STORE_AD,
+  AlgorithmType.TRAFFIC_AD,
+  AlgorithmType.ORGANIC_TRAFFIC,
+  AlgorithmType.POPULAR_MERCHANT_KA,
+]
+const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [
+  AlgorithmType.INVINCIBLE_STAR,
+  AlgorithmType.HOT_REVIVE_AD,
+]
 
 // 根据URL参数计算初始状态
 const getInitialState = (searchParams: URLSearchParams) => {
@@ -54,6 +69,10 @@ export default function PromotionSalesConfig() {
   const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(initial.inventory)
   const [selectedApp, setSelectedApp] = useState<AppType | null | undefined>(null)
   const [selectedTab, setSelectedTab] = useState<'delivery' | 'groupBuy'>('delivery')
+
+  // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
+  const deliveryCardOrder = useCardOrder('promotion-sales-card-order-delivery', DELIVERY_CARD_TYPES)
+  const groupBuyCardOrder = useCardOrder('promotion-sales-card-order-groupBuy', GROUP_BUY_CARD_TYPES)
 
   // 購買廣告 - 直接进入日期时段选择界面
   const handleGoToPurchase = (config: RecommendTypeConfig) => {
@@ -172,19 +191,16 @@ export default function PromotionSalesConfig() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
                   }}>
-                    {RECOMMEND_TYPE_CONFIGS.filter(config => 
-                      config.type === AlgorithmType.INVINCIBLE_STAR || 
-                      config.type === AlgorithmType.HOT_REVIVE_AD || 
-                      config.type === AlgorithmType.NEW_STORE_AD || 
-                      config.type === AlgorithmType.TRAFFIC_AD || 
-                      config.type === AlgorithmType.ORGANIC_TRAFFIC ||
-                      config.type === AlgorithmType.POPULAR_MERCHANT_KA
+                    {deliveryCardOrder.sortCards(
+                      RECOMMEND_TYPE_CONFIGS.filter(config => DELIVERY_CARD_TYPES.includes(config.type)),
+                      config => config.type,
                     ).map(config => (
                       <div
                         key={config.type}
                         className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
                         onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)}
                         style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
+                        {...deliveryCardOrder.getDragProps(config.type)}
                       >
                         <div className="algo-card-inner">
                           <div className="algo-card-icon">{config.icon}</div>
@@ -237,15 +253,16 @@ export default function PromotionSalesConfig() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
                   }}>
-                    {RECOMMEND_TYPE_CONFIGS.filter(config => 
-                      config.type === AlgorithmType.INVINCIBLE_STAR || 
-                      config.type === AlgorithmType.HOT_REVIVE_AD
+                    {groupBuyCardOrder.sortCards(
+                      RECOMMEND_TYPE_CONFIGS.filter(config => GROUP_BUY_CARD_TYPES.includes(config.type)),
+                      config => config.type,
                     ).map(config => (
                       <div
                         key={config.type}
                         className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
                         onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)}
                         style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
+                        {...groupBuyCardOrder.getDragProps(config.type)}
                       >
                         <div className="algo-card-inner">
                           <div className="algo-card-icon">{config.icon}</div>

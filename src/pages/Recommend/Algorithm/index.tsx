@@ -5,6 +5,7 @@ import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS, ALGO_CARD_COLOR_MAP } from '../constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useCardOrder, type CardDragProps } from '../../../hooks/useCardOrder'
 import BrandTag from '../../../components/BrandTag'
 
 /** 各业务类型对应的算法类型列表 */
@@ -14,6 +15,8 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.HOT_REVIVE_AD,
     AlgorithmType.NEW_STORE_AD,
     AlgorithmType.POPULAR_MERCHANT_KA,
+    AlgorithmType.BRAND_MERCHANT,
+    AlgorithmType.GOLD_AD,
     AlgorithmType.EXCLUSIVE_MERCHANT,
     AlgorithmType.TRAFFIC_AD,
     AlgorithmType.GUESS_YOU_LIKE,
@@ -31,7 +34,9 @@ const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: st
   { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: '超級曝光位，首頁頂部黃金坑位，強勢引流' },
   { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: '盤活熱門商家流量，提升店鋪曝光' },
   { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: '新店專屬推廣位，快速獲取首批顧客' },
-  { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: '人氣商家專屬推薦位，KA商家流量加持' },
+  { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: '人氣商家專屬推薦位，流量加持' },
+  { type: AlgorithmType.BRAND_MERCHANT, icon: '💎', description: '品牌商家專屬展示位，KA商家尊享' },
+  { type: AlgorithmType.GOLD_AD, icon: '💰', description: '點金廣告，精準投放高效轉化' },
   { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: '獨家商家專屬展示位，彰顯品牌實力' },
   { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: '精準流量投放，覆蓋目標用戶群體' },
   { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: '智能推薦，個性化匹配用戶偏好' },
@@ -56,11 +61,13 @@ const TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.NEW_STORE_AD]: '新店廣告',
   [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家(KA)',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
   [AlgorithmType.TRAFFIC_AD]: '流量廣告',
   [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
   [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
   [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
+  [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
+  [AlgorithmType.GOLD_AD]: '點金廣告',
 } as Record<AlgorithmType, string>
 
 const TYPE_COLOR: Record<AlgorithmType, string> = {
@@ -73,6 +80,8 @@ const TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
   [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
+  [AlgorithmType.BRAND_MERCHANT]: 'orange',
+  [AlgorithmType.GOLD_AD]: 'gold',
 } as Record<AlgorithmType, string>
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {
@@ -129,13 +138,13 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 23, name: '新店廣告-美食外賣mFood版', code: 'ALG_NEW_004', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 24, name: '新店廣告-美食外賣mFood版B', code: 'ALG_NEW_005', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
   { id: 25, name: '新店廣告-超市百貨mFood版', code: 'ALG_NEW_006', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  // 人氣商家(KA) - 6条
-  { id: 26, name: '人氣商家(KA)-美食外賣閃蜂版', code: 'ALG_KA_001', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 27, name: '人氣商家(KA)-美食外賣閃蜂版B', code: 'ALG_KA_002', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 28, name: '人氣商家(KA)-超市百貨閃蜂版', code: 'ALG_KA_003', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 29, name: '人氣商家(KA)-美食外賣mFood版', code: 'ALG_KA_004', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 30, name: '人氣商家(KA)-美食外賣mFood版B', code: 'ALG_KA_005', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 31, name: '人氣商家(KA)-超市百貨mFood版', code: 'ALG_KA_006', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
+  // 人氣商家 - 6条
+  { id: 26, name: '人氣商家-美食外賣閃蜂版', code: 'ALG_KA_001', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 27, name: '人氣商家-美食外賣閃蜂版B', code: 'ALG_KA_002', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 28, name: '人氣商家-超市百貨閃蜂版', code: 'ALG_KA_003', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 29, name: '人氣商家-美食外賣mFood版', code: 'ALG_KA_004', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 30, name: '人氣商家-美食外賣mFood版B', code: 'ALG_KA_005', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 31, name: '人氣商家-超市百貨mFood版', code: 'ALG_KA_006', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
   // 獨家商家 - 6条
   { id: 32, name: '獨家商家-美食外賣閃蜂版', code: 'ALG_EXC_001', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
   { id: 33, name: '獨家商家-美食外賣閃蜂版B', code: 'ALG_EXC_002', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
@@ -143,6 +152,16 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 35, name: '獨家商家-美食外賣mFood版', code: 'ALG_EXC_004', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 36, name: '獨家商家-美食外賣mFood版B', code: 'ALG_EXC_005', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 37, name: '獨家商家-超市百貨mFood版', code: 'ALG_EXC_006', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
+  // 品牌商家(KA) - 4条
+  { id: 38, name: '品牌商家-美食外賣閃蜂版', code: 'ALG_BRD_001', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 39, name: '品牌商家-美食外賣mFood版', code: 'ALG_BRD_002', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 40, name: '品牌商家-超市百貨閃蜂版', code: 'ALG_BRD_003', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 41, name: '品牌商家-超市百貨mFood版', code: 'ALG_BRD_004', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
+  // 點金廣告 - 4条
+  { id: 42, name: '點金廣告-美食外賣閃蜂版', code: 'ALG_GLD_001', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
+  { id: 43, name: '點金廣告-美食外賣mFood版', code: 'ALG_GLD_002', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  { id: 44, name: '點金廣告-超市百貨閃蜂版', code: 'ALG_GLD_003', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
+  { id: 45, name: '點金廣告-超市百貨mFood版', code: 'ALG_GLD_004', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
 ]
 
 export default function Algorithm() {
@@ -156,6 +175,10 @@ export default function Algorithm() {
   const [selectedType, setSelectedType] = useState<AlgorithmType | null>(initialType)
   const [businessType, setBusinessType] = useState<'delivery' | 'groupBuy'>(tabParam || 'delivery')
   const [dataList, setDataList] = useState<AlgorithmRecord[]>(mockAlgorithmData)
+
+  // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
+  const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery)
+  const groupBuyCardOrder = useCardOrder('algorithm-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy)
 
   /** 根据业务类型过滤数据 */
   const filterByBusinessType = (data: AlgorithmRecord[]) => {
@@ -286,12 +309,13 @@ export default function Algorithm() {
     },
   ]
 
-  /** 渲染算法类型卡片（带高级 hover 动效） */
-  const renderAlgoCard = (card: { type: AlgorithmType; icon: string; description: string }, enabled: boolean, tab: 'delivery' | 'groupBuy') => (
+  /** 渲染算法类型卡片（带高级 hover 动效，支持拖拽交换位置） */
+  const renderAlgoCard = (card: { type: AlgorithmType; icon: string; description: string }, enabled: boolean, tab: 'delivery' | 'groupBuy', dragProps: CardDragProps) => (
     <div
       key={card.type}
       className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
       onClick={() => enabled && handleSelectType(card.type, tab)}
+      {...dragProps}
     >
       <div className="algo-card-inner">
         <div className="algo-card-icon">
@@ -361,11 +385,12 @@ export default function Algorithm() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
                   }}>
-                    {ALGORITHM_TYPE_CARDS
-                      .filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type))
-                      .map(card => {
-                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.EXCLUSIVE_MERCHANT
-                        return renderAlgoCard(card, enabled, 'delivery')
+                    {deliveryCardOrder.sortCards(
+                      ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type)),
+                      card => card.type,
+                    ).map(card => {
+                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.GOLD_AD
+                        return renderAlgoCard(card, enabled, 'delivery', deliveryCardOrder.getDragProps(card.type))
                       })}
                   </div>
                 ),
@@ -379,9 +404,10 @@ export default function Algorithm() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
                   }}>
-                    {ALGORITHM_TYPE_CARDS
-                      .filter(card => TAB_ALGORITHM_MAP.groupBuy.includes(card.type))
-                      .map(card => renderAlgoCard(card, true, 'groupBuy'))}
+                    {groupBuyCardOrder.sortCards(
+                      ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP.groupBuy.includes(card.type)),
+                      card => card.type,
+                    ).map(card => renderAlgoCard(card, true, 'groupBuy', groupBuyCardOrder.getDragProps(card.type)))}
                   </div>
                 ),
               },

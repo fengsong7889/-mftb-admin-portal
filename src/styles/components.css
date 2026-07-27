@@ -2291,6 +2291,8 @@
 .algo-card-wrapper--lime::before { background: linear-gradient(90deg, #a0d911, #d3f26a); }
 .algo-card-wrapper--magenta::before { background: linear-gradient(90deg, #eb2f96, #ff85c0); }
 .algo-card-wrapper--red::before { background: linear-gradient(90deg, #ff4d4f, #ff7875); }
+.algo-card-wrapper--orange::before { background: linear-gradient(90deg, #E8720C, #FFB347); }
+.algo-card-wrapper--yellow::before { background: linear-gradient(90deg, #fadb14, #fff566); }
 
 /* Card lift + shadow on hover */
 .algo-card-wrapper:hover {

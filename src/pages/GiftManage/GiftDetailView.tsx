@@ -52,7 +52,7 @@ const adTypeMap: Record<string, string> = {
   revival: '盤活復蘇',
   exclusive: '獨家商家',
   gold: '金牌商家',
-  ka: '人氣商家(KA)',
+  ka: '人氣商家',
 }
 
 const adTypeColorMap: Record<string, string> = {

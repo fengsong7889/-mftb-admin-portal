@@ -11,7 +11,7 @@ const adTypeOptions = [
   { label: '盤活復蘇', value: 'revival' },
   { label: '獨家商家', value: 'exclusive' },
   { label: '金牌商家', value: 'gold' },
-  { label: '人氣商家(KA)', value: 'ka' },
+  { label: '人氣商家', value: 'ka' },
 ]
 
 /** 集團選項 */

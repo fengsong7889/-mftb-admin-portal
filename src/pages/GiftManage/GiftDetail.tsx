@@ -20,7 +20,7 @@ const adTypeOptions = [
   { label: '盤活復蘇', value: 'revival' },
   { label: '獨家商家', value: 'exclusive' },
   { label: '金牌商家', value: 'gold' },
-  { label: '人氣商家(KA)', value: 'ka' },
+  { label: '人氣商家', value: 'ka' },
 ]
 
 const adTypeMap: Record<string, string> = {
@@ -28,7 +28,7 @@ const adTypeMap: Record<string, string> = {
   revival: '盤活復蘇',
   exclusive: '獨家商家',
   gold: '金牌商家',
-  ka: '人氣商家(KA)',
+  ka: '人氣商家',
 }
 
 

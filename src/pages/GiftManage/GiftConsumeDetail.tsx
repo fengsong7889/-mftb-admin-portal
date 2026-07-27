@@ -20,7 +20,7 @@ const adTypeOptions = [
   { label: '盤活復蘇', value: 'revival' },
   { label: '獨家商家', value: 'exclusive' },
   { label: '金牌商家', value: 'gold' },
-  { label: '人氣商家(KA)', value: 'ka' },
+  { label: '人氣商家', value: 'ka' },
 ]
 
 const adTypeMap: Record<string, string> = {
@@ -28,7 +28,7 @@ const adTypeMap: Record<string, string> = {
   revival: '盤活復蘇',
   exclusive: '獨家商家',
   gold: '金牌商家',
-  ka: '人氣商家(KA)',
+  ka: '人氣商家',
 }
 
 const adTypeColorMap: Record<string, string> = {
@@ -187,7 +187,7 @@ const mockData: GiftConsumeRecord[] = [
     balanceChange: 4,
     changeDate: '2024-02-28',
     algorithmId: 'A005',
-    algorithmName: '人氣商家(KA)-首頁版',
+    algorithmName: '人氣商家-首頁版',
     giftId: '2401-004',
     orderNo: 'AD202402280001',
     remainingDays: 14,
@@ -440,7 +440,7 @@ export default function GiftConsumeDetail() {
                 { label: 'A002 - 盤活復蘇-團購版', value: 'A002' },
                 { label: 'A003 - 獨家商家-超市版', value: 'A003' },
                 { label: 'A004 - 金牌商家-全渠道', value: 'A004' },
-                { label: 'A005 - 人氣商家(KA)-首頁版', value: 'A005' },
+                { label: 'A005 - 人氣商家-首頁版', value: 'A005' },
               ]}
               style={{ width: '100%' }}
             />
