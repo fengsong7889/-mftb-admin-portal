@@ -90,6 +90,17 @@ body {
   50% { transform: scale(1.25); opacity: 0.85; box-shadow: 0 0 4px 1px rgba(255,77,79,0.25); }
 }
 
+/* 不允许退款警示标签脉冲（红色光晕扩散 + 微缩放） */
+@keyframes refundWarnPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,77,79,0.45); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(255,77,79,0); }
+}
+
+/* 皮膚預覽階梯輪播：離場卡輪空後歸位到隊尾階梯位，輕移淡入 */
+@keyframes dishBackIn {
+  from { opacity: 0; transform: translateX(14px) scale(0.96); }
+}
+
 /* 旋转虚线环 */
 @keyframes spinDash {
   0% { transform: translateX(-50%) rotate(0deg); }

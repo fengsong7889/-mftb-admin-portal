@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
 import { RECOMMEND_TYPE_CONFIGS } from './types'
+import GradientDiscountBanner from './GradientDiscountBanner'
 import { AlgorithmType } from '../Recommend/constants'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -517,25 +518,6 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           </Form>
       </div>
 
-      {/* 不允许退款提醒 */}
-      {currentAlgorithmRefundEnabled === false && (
-        <div style={{
-          padding: '10px 16px',
-          background: '#fff2f0',
-          border: '1px solid #ffccc7',
-          borderRadius: 6,
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <span style={{ fontSize: 16 }}>⚠️</span>
-          <span style={{ fontSize: 13, color: '#cf1322', fontWeight: 500 }}>
-            當前選擇的算法<strong>不允許退款</strong>，下單後無法申請退款，請謹慎選擇。
-          </span>
-        </div>
-      )}
-
       {/* 购物车冲突提醒弹窗 */}
       <Modal
         title="提示"
@@ -565,6 +547,14 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           <Empty description="請先選擇所屬品牌、算法名稱、門店名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
+      <>
+      {/* 梯度折扣横幅：展示算法配置的多天折扣规则 */}
+      <GradientDiscountBanner
+        tiers={mockGradients.map(g => ({ threshold: g.minDays, discount: g.discount }))}
+        unitLabel="天"
+        currentCount={selectedDates.length}
+        refundDisabled={currentAlgorithmRefundEnabled === false}
+      />
       <div style={{ display: 'flex', gap: 16 }}>
         {/* 左侧：月份选择 + 日历 */}
         <div style={{ flex: 1 }}>
@@ -808,6 +798,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         </Card>
       </div>
       </div>
+      </>
       )}
 
       {/* 支付确认弹窗 */}

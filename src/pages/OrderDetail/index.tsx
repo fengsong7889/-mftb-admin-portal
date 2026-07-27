@@ -1099,6 +1099,61 @@ export default function OrderDetail() {
           )
         })()}
 
+        {/* 費用明細（新店廣告：贈送天數抵扣，無現金支付） */}
+        {isNewStore && (() => {
+          const days = order.purchaseDays || []
+          const deductDays = days.length
+          return (
+            <div style={{
+              padding: '20px', background: 'linear-gradient(135deg, #FFF9F0, #FFF4E6)', borderRadius: 12,
+              border: '1px solid #FFE0B2',
+            }}>
+              {/* 标题 */}
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#E8720C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 16 }}>💰</span> 費用明細
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* 推廣天數 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>推廣天數</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{deductDays} 天</span>
+                  {deductDays > 0 && (
+                    <span style={{ fontSize: 11, color: '#BFBFBF' }}>（{days[0]} ~ {days[deductDays - 1]}）</span>
+                  )}
+                </div>
+
+                {/* 分隔线 */}
+                <div style={{ height: 1, background: '#FFE0B2', margin: '4px 0' }} />
+
+                {/* 使用抵扣天數 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>使用抵扣天數</span>
+                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>（1 個推廣日抵扣 1 天）</span>
+                  </div>
+                  <div style={{
+                    padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                    borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
+                  }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{deductDays} 天</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 计算公式详解 */}
+              <div style={{
+                marginTop: 16, padding: '10px 14px', background: '#fff', borderRadius: 8,
+                border: '1px dashed #FFD591', fontSize: 12, color: '#8C8C8C', lineHeight: 2,
+              }}>
+                <div style={{ fontWeight: 600, color: '#595959', marginBottom: 4 }}>📐 計算公式：</div>
+                {deductDays} 個推廣日 × 1 天/日 = <strong style={{ color: '#E8720C' }}>{deductDays}</strong>
+                <span style={{ color: '#BFBFBF' }}>（天）</span>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* 费用汇总 */}
         {!isNewStore && <div style={{
           padding: '20px', background: 'linear-gradient(135deg, #FFF9F0, #FFF4E6)', borderRadius: 12,

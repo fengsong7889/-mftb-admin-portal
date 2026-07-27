@@ -18,6 +18,7 @@ import {
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
 import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES, AlgorithmType } from '../Recommend/constants'
+import GradientDiscountBanner from './GradientDiscountBanner'
 
 interface CartItem {
   key: string
@@ -599,25 +600,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           </Form>
       </div>
 
-      {/* 不允许退款提醒 */}
-      {currentAlgorithmRefundEnabled === false && (
-        <div style={{
-          padding: '10px 16px',
-          background: '#fff2f0',
-          border: '1px solid #ffccc7',
-          borderRadius: 6,
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <span style={{ fontSize: 16 }}>⚠️</span>
-          <span style={{ fontSize: 13, color: '#cf1322', fontWeight: 500 }}>
-            當前選擇的算法<strong>不允許退款</strong>，下單後無法申請退款，請謹慎選擇。
-          </span>
-        </div>
-      )}
-
       {/* 购物车冲突提醒弹窗 */}
       <Modal
         title="提示"
@@ -647,6 +629,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           <Empty description="請先選擇所屬品牌、算法名稱、門店名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
+      <>
+      {/* 梯度折扣横幅：展示算法配置的多时段折扣规则 */}
+      <GradientDiscountBanner
+        tiers={MULTI_SLOT_DISCOUNT_TIERS.map(t => ({ threshold: t.minSlots, discount: t.discount }))}
+        unitLabel="個時段"
+        scopeLabel="單日"
+        currentCount={activeDate ? cartItems.filter(i => i.date === activeDateStr).length + selectedCells.filter(c => c.date === activeDateStr).length : 0}
+        refundDisabled={currentAlgorithmRefundEnabled === false}
+      />
       <div style={{ display: 'flex', gap: 16 }}>
         {/* 左侧：日期×时段表格 */}
         <div style={{ flex: 1 }}>
@@ -1362,6 +1353,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         </Card>
       </div>
       </div>
+      </>
       )}
 
       {/* 支付确认弹窗 */}

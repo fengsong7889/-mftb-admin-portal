@@ -5,14 +5,14 @@
  * 商家購買後皮膚將應用在 APP 瀑布流列表的商家卡片上。
  *
  * 皮膚組成元素（參考 APP 實際展示樣式）：
- *  - 標籤圖標：上傳圖標（「人氣」標籤樣式），展示在店鋪名稱旁，小圖/大圖模式通用
  *  - 卡片邊框：支持 無邊框 / 選擇配色 / 上傳邊框圖 三種方式，小圖/大圖模式通用
  *  - 大圖模式左側豎版主圖：必須上傳（小圖模式無需上傳圖片）
+ *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播（餐品一張張往上輪播），由商家選擇
  *  - 售價按天計算（MOP/天）
  *  - 內置預覽：運營人員可查看所配置皮膚在小圖/大圖模式下的展示效果
  */
 import { useState, useEffect } from 'react'
-import { Button, ColorPicker, Form, Input, InputNumber, Select, Switch, Upload, message, Modal } from 'antd'
+import { Button, ColorPicker, Form, Input, InputNumber, Radio, Select, Switch, Upload, message, Modal } from 'antd'
 import type { UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -54,7 +54,22 @@ const COLOR_PRESETS = [
 ]
 
 /** 可上傳圖片的字段 */
-type SkinImageField = 'tagIcon' | 'borderImage' | 'bigImage'
+type SkinImageField = 'borderImage' | 'bigImage'
+
+/** 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播 */
+type DishLayout = 'grid' | 'carousel'
+const DISH_LAYOUT_OPTIONS = [
+  { value: 'grid', label: '大圖拼列（1大2小）' },
+  { value: 'carousel', label: '階梯輪播' },
+]
+
+/** 預覽用 Mock 餐品（麥當勞示意，bg 為餐品底圖漸變，铺滿整張卡片） */
+const PREVIEW_DISHES = [
+  { emoji: '🍔', name: '招牌雙層牛堡·特惠一人餐', price: '$43.3', original: '$65', discount: '6.6折', bg: 'linear-gradient(135deg, #FFE2B8, #FFAE5E)' },
+  { emoji: '🍟', name: '黃金薯條（大）', price: '$12.9', original: '$19', discount: '6.8折', bg: 'linear-gradient(135deg, #FFF3C4, #FFD662)' },
+  { emoji: '🥤', name: '冰爽可樂（中）', price: '$5.9', original: '$9', discount: '6.5折', bg: 'linear-gradient(135deg, #C9E7FF, #7FB8F0)' },
+  { emoji: '🍦', name: '新地雪糕', price: '$8.9', original: '$12', discount: '7.4折', bg: 'linear-gradient(135deg, #FFE9F0, #FFC1D4)' },
+]
 
 /** 按天梯度折扣配置（購買天數≥ days 時享 discount 折，參考盤活復蘇梯度配置） */
 interface DayDiscountGradient {
@@ -69,8 +84,8 @@ interface SkinItem {
   name: string
   /** 售價 MOP/天 */
   price?: number
-  /** 標籤圖標（dataURL，類似「新店」標籤樣式） */
-  tagIcon: string | null
+  /** 菜品展示佈局（大圖模式）：大圖拼列 / 階梯輪播 */
+  dishLayout: DishLayout
   /** 邊框方式：無 / 配色 / 上傳邊框圖 */
   borderType: 'none' | 'color' | 'image'
   /** 邊框顏色（borderType=color 時生效） */
@@ -88,7 +103,7 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   id: skinIdSeed++,
   name: '',
   price: undefined,
-  tagIcon: null,
+  dishLayout: 'grid',
   borderType: 'image',
   borderColor: '#FF4D4F',
   borderImage: null,
@@ -98,15 +113,6 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
 
 /** 生成 SVG dataURL，用於編輯/詳情模式回顯已上傳的 Mock 圖片 */
 const svgDataUrl = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-
-/** Mock 標籤圖標：「人氣」膠囊標籤 */
-const buildMockTagIcon = (from: string, to: string) => svgDataUrl(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="88" height="40" viewBox="0 0 88 40">`
-  + `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>`
-  + `<rect width="88" height="40" rx="20" fill="url(#g)"/>`
-  + `<text x="44" y="27" font-size="20" font-weight="700" fill="#fff" text-anchor="middle" font-family="PingFang SC, sans-serif">人氣</text>`
-  + `</svg>`,
-)
 
 /** Mock 大圖模式主圖：3:4 豎版漸變主圖 */
 const buildMockBigImage = (from: string, to: string, label: string) => svgDataUrl(
@@ -132,17 +138,17 @@ const MOCK_DETAIL_IMAGE = svgDataUrl(
 const buildMockSkins = (): SkinItem[] => [
   createSkin({
     name: '紅運當頭', price: 28, borderType: 'color', borderColor: '#FF4D4F',
-    tagIcon: buildMockTagIcon('#FF4D4F', '#FF7A45'),
+    dishLayout: 'grid',
     bigImage: buildMockBigImage('#FF4D4F', '#FFA39E', '紅運當頭'),
   }),
   createSkin({
     name: '橙意滿滿', price: 18, borderType: 'color', borderColor: '#E8720C',
-    tagIcon: buildMockTagIcon('#E8720C', '#F59432'),
+    dishLayout: 'carousel',
     bigImage: buildMockBigImage('#E8720C', '#FFB347', '橙意滿滿'),
   }),
   createSkin({
     name: '簡約無框', price: 8, borderType: 'none',
-    tagIcon: buildMockTagIcon('#8C8C8C', '#BFBFBF'),
+    dishLayout: 'grid',
     bigImage: buildMockBigImage('#595959', '#8C8C8C', '簡約無框'),
   }),
 ]
@@ -161,6 +167,8 @@ export default function PopularSkinPricing() {
   const [skins, setSkins] = useState<SkinItem[]>(() => (urlId ? buildMockSkins() : [createSkin()]))
   // 預覽中的皮膚
   const [previewSkin, setPreviewSkin] = useState<SkinItem | null>(null)
+  // 階梯輪播餐品指針：current 為當前張，prev 為正在向左滑出的上一張
+  const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
   // 狀態（底部 Switch：啟用/停用）
   const [status, setStatus] = useState<ServiceStatus>(ServiceStatus.ENABLED)
   // 購買多天折扣配置（梯度）
@@ -197,6 +205,16 @@ export default function PopularSkinPricing() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId, form])
+
+  // 階梯輪播：當前張向左滑出、下一張從後方呈現上來，關閉彈窗/切換佈局時自動停止
+  useEffect(() => {
+    if (!previewSkin || previewSkin.dishLayout !== 'carousel') return
+    setDishState({ current: 0, prev: null })
+    const timer = setInterval(() => {
+      setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
+    }, 2200)
+    return () => clearInterval(timer)
+  }, [previewSkin])
 
   // 更新指定皮膚的字段
   const updateSkin = (id: number, patch: Partial<SkinItem>) => {
@@ -385,17 +403,157 @@ export default function PopularSkinPricing() {
     ) : null
   )
 
-  /** 店鋪名稱行（標籤圖標 + 名稱） */
-  const previewTitleRow = (skin: SkinItem) => (
+  /** 店鋪名稱行（Mock 麥當勞門店，名稱前不展示連鎖圖標） */
+  const previewTitleRow = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-      {skin.tagIcon && <img src={skin.tagIcon} alt="標籤" style={{ height: 18, flexShrink: 0 }} />}
       <span style={{ fontSize: 14, fontWeight: 600, color: '#262626', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        小貝全球獨家烤鴨專門店
+        McDonald's（氹仔泉福店）
       </span>
     </div>
   )
 
-  const previewMetaStyle: React.CSSProperties = { fontSize: 11, color: '#8C8C8C', marginTop: 4 }
+  /** 預覽小圖：麥當勞店鋪 LOGO（紅底金拱門，SVG 矢量保證清晰） */
+  const previewStoreLogo = (size: number) => (
+    <div style={{
+      width: size, height: size, borderRadius: 10, flexShrink: 0,
+      background: '#DA291C',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 100 100">
+        <path
+          d="M12 90 C12 16 50 16 50 58 C50 16 88 16 88 90"
+          fill="none" stroke="#FFC72C" strokeWidth="14" strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  )
+
+  /** 店鋪信息區（小圖/大圖模式共用，字段內容保持一致） */
+  const previewInfoBlock = () => (
+    <>
+      {previewTitleRow()}
+      {/* 評分 + 月售 + 起送/減配/時長/距離 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#FA8C16' }}>⭐ 4.6</span>
+        <span style={{ fontSize: 12, color: '#595959' }}>月售 1196</span>
+        <span style={{ fontSize: 12, color: '#595959' }}>起送$40・減配$0~3・32分鐘・1.9km</span>
+      </div>
+      {/* 標籤行：銷量/店鋪標籤與評價標籤合併展示一排，不換行 */}
+      <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'nowrap' }}>
+        <span style={{ fontSize: 10, color: '#1565C0', background: '#E3F2FD', borderRadius: 3, padding: '2px 6px', whiteSpace: 'nowrap' }}>全澳銷量第1名</span>
+        <span style={{ fontSize: 10, color: '#722ED1', background: '#F9F0FF', borderRadius: 3, padding: '2px 6px', whiteSpace: 'nowrap' }}>熱門店鋪</span>
+        <span style={{ fontSize: 10, color: '#D46B08', background: '#FFF3E8', borderRadius: 3, padding: '2px 6px', whiteSpace: 'nowrap' }}>金黃酥脆，澳門人氣漢堡首選！</span>
+        <span style={{ fontSize: 10, color: '#8C8C8C', background: '#F5F5F5', borderRadius: 3, padding: '2px 6px', whiteSpace: 'nowrap' }}>千人收藏好店</span>
+      </div>
+    </>
+  )
+
+  /** 菜品佈局① 大圖拼列：左侧1張大圖（價格疊展示）+ 右侧2張小圖（參考圖一） */
+  const renderDishGrid = () => (
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginTop: 10 }}>
+      {/* 左側大圖：餐品铺滿整張卡 + 底部價格/名稱漸變遮罩 */}
+      <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: PREVIEW_DISHES[0].bg, height: 148 }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, lineHeight: 1 }}>
+          {PREVIEW_DISHES[0].emoji}
+        </div>
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, padding: '18px 10px 8px',
+          background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.55))',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>{PREVIEW_DISHES[0].price}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', textDecoration: 'line-through' }}>{PREVIEW_DISHES[0].original}</span>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {PREVIEW_DISHES[0].name}
+          </div>
+        </div>
+      </div>
+      {/* 右側兩張小圖：餐品 + 底部名稱遮罩 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {PREVIEW_DISHES.slice(1, 3).map(dish => (
+          <div key={dish.name} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: dish.bg, height: 70 }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, lineHeight: 1 }}>
+              {dish.emoji}
+            </div>
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 8px 4px',
+              background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.55))',
+              fontSize: 11, fontWeight: 600, color: '#fff',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{dish.name}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  /** 菜品佈局② 階梯輪播：頂層向左滑出的同時，後方卡片沿階梯位置彈性頂上來（同一 DOM 持續過渡，位置/縮放/透明度連貫動畫） */
+  const renderDishCarousel = () => {
+    const n = PREVIEW_DISHES.length
+    // 堆疊深度位：0=前方主卡，1/2=後方階梯卡（依次右移、收窄、淡化）
+    const depthStyles: React.CSSProperties[] = [
+      { top: 0, bottom: 0, left: 0, right: '28%', zIndex: 3, opacity: 1, transform: 'translateX(0) rotate(0deg)', boxShadow: '4px 0 12px rgba(0,0,0,0.12)' },
+      { top: 8, bottom: 8, left: 34, right: 0, zIndex: 2, opacity: 0.75, transform: 'translateX(0) rotate(0deg)', boxShadow: 'none' },
+      { top: 16, bottom: 16, left: 68, right: -6, zIndex: 1, opacity: 0.5, transform: 'translateX(0) rotate(0deg)', boxShadow: 'none' },
+    ]
+    // 離場位：沿主卡位置向左滑出，輕微旋轉淡出（容器 overflow hidden 裁剪，不滑出遮擋其他內容）
+    const exitStyle: React.CSSProperties = { top: 0, bottom: 0, left: 0, right: '28%', zIndex: 4, opacity: 0, transform: 'translateX(-118%) rotate(-5deg)' }
+    return (
+      <div style={{ position: 'relative', height: 158, marginTop: 10, overflow: 'hidden' }}>
+        {PREVIEW_DISHES.map((dish, i) => {
+          const depth = (i - dishState.current + n) % n
+          const prevDepth = dishState.prev !== null ? (i - dishState.prev + n) % n : depth
+          // 剛從主卡位離場：帶過渡向左滑出；離場後歸隊：直接停到隊尾階梯位淡入，不做跨屏橫穿
+          const isExiting = depth > 2 && prevDepth === 0
+          const reJoining = depth <= 2 && prevDepth > 2
+          const style = depth <= 2 ? depthStyles[depth] : isExiting ? exitStyle : { ...depthStyles[2], opacity: 0, zIndex: 0 }
+          const isFront = depth === 0 || isExiting
+          return (
+            <div key={dish.name} style={{
+              position: 'absolute', borderRadius: 10, overflow: 'hidden', background: dish.bg, pointerEvents: 'none',
+              transition: reJoining ? 'none' : 'all 0.65s cubic-bezier(0.34, 1.25, 0.5, 1)',
+              animation: reJoining ? 'dishBackIn 0.5s ease' : undefined,
+              ...style,
+            }}>
+              {/* 餐品铺滿整卡，後方卡同步縮小，頂上來時平滑放大 */}
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 118, lineHeight: 1,
+                transform: isFront ? 'scale(1)' : 'scale(0.55)',
+                filter: isFront ? 'none' : 'saturate(0.85)',
+                transition: reJoining ? 'none' : 'transform 0.65s cubic-bezier(0.34, 1.25, 0.5, 1), filter 0.4s ease',
+              }}>{dish.emoji}</div>
+              {/* 折扣膠囊 + 名稱條：僅前方主卡展示，頂上來後延遲淡入 */}
+              <div style={{ opacity: isFront ? 1 : 0, transition: 'opacity 0.3s ease 0.25s' }}>
+                <div style={{ position: 'absolute', left: 8, bottom: 30, display: 'flex', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#E8302D', background: '#fff', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 2 }}>🏷️ {dish.discount}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#E8302D', padding: '3px 8px', display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                    {dish.price}
+                    <span style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.8)', textDecoration: 'line-through' }}>{dish.original}</span>
+                  </span>
+                </div>
+                <div style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '4px 8px',
+                  background: 'rgba(255,255,255,0.92)', fontSize: 12, fontWeight: 600, color: '#262626',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{dish.name}</div>
+              </div>
+            </div>
+          )
+        })}
+        {/* 輪播指示點 */}
+        <div style={{ position: 'absolute', right: 4, bottom: 4, zIndex: 5, display: 'flex', gap: 4 }}>
+          {PREVIEW_DISHES.map((_, i) => (
+            <span key={i} style={{
+              width: i === dishState.current ? 12 : 5, height: 5, borderRadius: 3,
+              background: i === dishState.current ? '#E8302D' : '#D9D9D9', transition: 'all 0.3s',
+            }} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="content-area">
@@ -479,7 +637,7 @@ export default function PopularSkinPricing() {
           {cardTitle(
             <SkinOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', '皮膚列表',
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
-              小圖模式無需上傳圖片（由標籤 + 邊框自動組成），大圖模式需上傳左側豎版主圖
+              小圖模式無需上傳圖片（由邊框自動組成），大圖模式需上傳左側豎版主圖
             </span>,
             !isDetailMode && (
               <Button
@@ -548,12 +706,17 @@ export default function PopularSkinPricing() {
                 </div>
               </div>
 
-              {/* 第二行：標籤圖標 / 邊框 / 大圖主圖 */}
+              {/* 第二行：菜品展示佈局 / 邊框 / 大圖主圖 */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px' }}>
                 <div>
-                  <div style={fieldLabelStyle}>標籤圖標</div>
-                  {renderUploadBox(skin, 'tagIcon', 88, 88, '上傳圖標')}
-                  <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4 }}>展示在店鋪名稱旁，「人氣」標籤</div>
+                  <div style={fieldLabelStyle}>{requiredMark}菜品展示佈局</div>
+                  <Radio.Group
+                    value={skin.dishLayout}
+                    disabled={isDetailMode}
+                    onChange={e => updateSkin(skin.id, { dishLayout: e.target.value })}
+                    options={DISH_LAYOUT_OPTIONS}
+                  />
+                  <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4 }}>大圖模式下餐品展示效果，可在預覽中查看</div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -708,60 +871,45 @@ export default function PopularSkinPricing() {
       >
         {previewSkin && (
           <div style={{ background: '#F5F5F5', borderRadius: 8, padding: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* 小圖模式 */}
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>小圖模式（列表卡片）</div>
+              <div style={{ maxWidth: 520 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>小圖模式</div>
                 <div style={previewCardStyle(previewSkin)}>
                   {previewBorderOverlay(previewSkin)}
                   <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{
-                      width: 76, height: 76, borderRadius: 8, background: '#f0f0f0', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
-                    }}>🍣</div>
+                    {previewStoreLogo(76)}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {previewTitleRow(previewSkin)}
-                      <div style={previewMetaStyle}>★4.5 月售 1196</div>
-                      <div style={previewMetaStyle}>起送$80・配送$12・30分鐘・2.5km</div>
-                      <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                        <span style={{ fontSize: 10, color: '#1565C0', background: '#E3F2FD', borderRadius: 3, padding: '1px 5px' }}>全澳銷量第1名</span>
-                        <span style={{ fontSize: 10, color: '#722ED1', background: '#F9F0FF', borderRadius: 3, padding: '1px 5px' }}>熱門店鋪</span>
-                      </div>
+                      {previewInfoBlock()}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* 大圖模式 */}
+              {/* 大圖模式：左側豎版主圖 + 右側店鋪信息/優惠券/品牌說/商品列 */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>大圖模式（大卡曝光）</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>大圖模式</div>
                 <div style={previewCardStyle(previewSkin)}>
                   {previewBorderOverlay(previewSkin)}
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
                     {previewSkin.bigImage
-                      ? <img src={previewSkin.bigImage} alt="主圖" style={{ width: 90, height: 120, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                      ? (
+                        <div style={{ width: 130, flexShrink: 0, alignSelf: 'stretch' }}>
+                          <img src={previewSkin.bigImage} alt="主圖" style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                        </div>
+                      )
                       : (
                         <div style={{
-                          width: 90, height: 120, borderRadius: 8, flexShrink: 0,
+                          width: 130, flexShrink: 0, alignSelf: 'stretch', borderRadius: 8,
                           border: '1px dashed #d9d9d9', background: '#fafafa',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 11, color: '#8C8C8C', textAlign: 'center', padding: 8,
                         }}>未上傳主圖</div>
                       )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {previewTitleRow(previewSkin)}
-                      <div style={previewMetaStyle}>★4.5 起送$80・專送$12・30分鐘</div>
-                      <div style={{
-                        marginTop: 8, height: 64, borderRadius: 8, background: '#f0f0f0',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 24, position: 'relative',
-                      }}>
-                        🍔
-                        <span style={{
-                          position: 'absolute', left: 6, bottom: 6, fontSize: 10, color: '#fff',
-                          background: '#FF4D4F', borderRadius: 3, padding: '1px 5px', fontWeight: 600,
-                        }}>$9.9</span>
-                      </div>
+                      {previewInfoBlock()}
+                      {/* 菜品展示區：按皮膚配置的佈局展示 */}
+                      {previewSkin.dishLayout === 'grid' ? renderDishGrid() : renderDishCarousel()}
                     </div>
                   </div>
                 </div>
