@@ -1,0 +1,38 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-label="MFTB 搜廣推系統">
+  <!-- MFTB 搜廣推系統品牌 Logo（AI 智慧搜索鏡）：與 src/components/BrandLogo.tsx 保持一致 -->
+  <defs>
+    <linearGradient id="mftb-favicon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8720C" />
+      <stop offset="55%" stop-color="#F59432" />
+      <stop offset="100%" stop-color="#FFB347" />
+    </linearGradient>
+    <radialGradient id="mftb-favicon-core" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#FFE3BD" />
+      <stop offset="55%" stop-color="#FFB347" />
+      <stop offset="100%" stop-color="#F59432" />
+    </radialGradient>
+  </defs>
+
+  <!-- 智能軌道環（傾斜橢圓） -->
+  <g transform="rotate(-28 13.5 13.5)">
+    <ellipse cx="13.5" cy="13.5" rx="12.3" ry="4.8" fill="none" stroke="url(#mftb-favicon-grad)" stroke-width="1.1" opacity="0.75" />
+  </g>
+
+  <!-- 搜索鏡：鏡框圓環 -->
+  <circle cx="13.5" cy="13.5" r="8" fill="none" stroke="url(#mftb-favicon-grad)" stroke-width="2.4" stroke-linecap="round" />
+
+  <!-- 鏡片內 AI 神經網絡 -->
+  <path d="M13.5 9 L9.8 16.4 M13.5 9 L17.2 16.4 M9.8 16.4 L17.2 16.4" stroke="#F59432" stroke-width="0.7" opacity="0.55" stroke-linecap="round" />
+  <path d="M13.5 13.6 L13.5 9 M13.5 13.6 L9.8 16.4 M13.5 13.6 L17.2 16.4" stroke="url(#mftb-favicon-grad)" stroke-width="1" stroke-linecap="round" />
+  <circle cx="13.5" cy="9" r="1.25" fill="url(#mftb-favicon-grad)" />
+  <circle cx="9.8" cy="16.4" r="1.25" fill="url(#mftb-favicon-grad)" />
+  <circle cx="17.2" cy="16.4" r="1.25" fill="url(#mftb-favicon-grad)" />
+  <circle cx="13.5" cy="13.6" r="3.1" fill="#FFB347" opacity="0.28" />
+  <circle cx="13.5" cy="13.6" r="1.9" fill="url(#mftb-favicon-core)" />
+
+  <!-- 鏡柄 -->
+  <line x1="19.4" y1="19.4" x2="23.2" y2="23.2" stroke="url(#mftb-favicon-grad)" stroke-width="2.4" stroke-linecap="round" />
+
+  <!-- 鏡柄末端廣告菱形 -->
+  <path d="M24.6 22 L27.2 24.6 L24.6 27.2 L22 24.6 Z" fill="url(#mftb-favicon-grad)" />
+</svg>

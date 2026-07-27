@@ -1887,18 +1887,16 @@ export default function PromotionOrderManage() {
               )}
             </div>
           </div>
-          {/* 右侧：购买广告按钮（新店廣告無購買入口） */}
-          {orderType !== '新店廣告' && (
-            <Button type="primary" icon={<ShoppingCartOutlined />}
-              onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 18px',
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>購買廣告</Button>
-          )}
+          {/* 右侧：购买广告按钮 */}
+          <Button type="primary" icon={<ShoppingCartOutlined />}
+            onClick={() => navigate(`${backPath}?type=${encodeURIComponent(orderType)}`)}
+            style={{
+              backgroundColor: '#E8720C', borderColor: '#E8720C',
+              borderRadius: 8, height: 36, padding: '0 18px',
+              boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>購買廣告</Button>
         </div>
       </div>
 
