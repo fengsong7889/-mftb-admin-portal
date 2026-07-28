@@ -1,0 +1,35 @@
+.org-container {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* 左侧组织架构树面板 */
+.org-tree-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafafa;
+  overflow-y: auto;
+}
+
+.org-tree-panel-title {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.org-tree-panel .ant-tree {
+  background: transparent;
+}
+
+/* 右侧主区 */
+.org-main {
+  flex: 1;
+  min-width: 0;
+}

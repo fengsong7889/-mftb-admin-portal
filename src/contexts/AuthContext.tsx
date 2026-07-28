@@ -12,6 +12,7 @@ export interface UserInfo {
   department?: string // 所在部门
   position?: string // 职位
   functionRoles?: string[] // 绑定的功能角色ID数组
+  permissions?: MenuPermission[] // 后端登录时下发的合并菜单权限
   dataPermissions?: {
     locations?: string[] // 有权限的地点
     merchants?: string[] // 有权限的商家
@@ -97,6 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: backendUser.role === 'admin' ? 'admin' : 'guest',
         department: backendUser.department,
         position: backendUser.position,
+        functionRoles: backendUser.functionRoleIds?.map(String),
+        permissions: backendUser.permissions,
       }
       setIsAuthenticated(true)
       setUser(mappedUser)
@@ -158,8 +161,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return false
     // admin 拥有所有权限
     if (user.role === 'admin') return true
-    
-    // 检查用户绑定的角色是否包含该权限
+
+    // 优先使用后端登录时下发的合并菜单权限
+    if (user.permissions && user.permissions.length > 0) {
+      return user.permissions.some(p => p.actions.includes(permission))
+    }
+
+    // 兼容旧逻辑：检查用户绑定的角色是否包含该权限（localStorage 角色数据）
     if (user.functionRoles && user.functionRoles.length > 0) {
       const allActions = user.functionRoles
         .map(roleId => getRolePermissions(roleId))

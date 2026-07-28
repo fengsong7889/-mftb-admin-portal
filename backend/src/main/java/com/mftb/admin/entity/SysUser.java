@@ -37,11 +37,23 @@ public class SysUser {
     /** 角色: admin/guest */
     private String role;
 
-    /** 所在部门 */
+    /** 绑定的功能角色ID JSON数组, 如 [1,3] */
+    private String functionRoles;
+
+    /** 所在部门ID (关联 sys_department) */
+    private Long departmentId;
+
+    /** 所在部门名称快照 */
     private String department;
 
-    /** 职位 */
+    /** 职位ID (关联 sys_position) */
+    private Long positionId;
+
+    /** 职位名称快照 */
     private String position;
+
+    /** 职级快照 (如 M3 / T5 / P2, 随职位带出) */
+    private String jobLevel;
 
     /** 状态: 1=启用 0=停用 */
     private Integer status;

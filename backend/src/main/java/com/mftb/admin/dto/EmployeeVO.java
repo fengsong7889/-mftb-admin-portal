@@ -1,43 +1,47 @@
 package com.mftb.admin.dto;
 
 import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.util.JsonUtils;
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 用户信息视图对象 (对前端返回, 不含密码)
+ * 员工视图对象 (不含密码)
  */
 @Data
-public class UserInfoVO {
+public class EmployeeVO {
 
     private Long id;
     private String username;
     private String name;
     private String empId;
-    private String avatar;
     private String role;
     private Long departmentId;
     private String department;
+    private Long positionId;
     private String position;
-    /** 绑定的功能角色ID */
+    /** 职级 (随职位带出) */
+    private String jobLevel;
+    private Integer status;
     private List<Long> functionRoleIds;
-    /** 合并后的菜单权限 (登录时下发, 前端据此做权限判断) */
-    private List<MenuPermissionDTO> permissions;
+    private LocalDateTime createdAt;
 
-    public static UserInfoVO from(SysUser user) {
-        UserInfoVO vo = new UserInfoVO();
+    public static EmployeeVO from(SysUser user, List<Long> functionRoleIds) {
+        EmployeeVO vo = new EmployeeVO();
         vo.setId(user.getId());
         vo.setUsername(user.getUsername());
         vo.setName(user.getName());
         vo.setEmpId(user.getEmpId());
-        vo.setAvatar(user.getAvatar());
         vo.setRole(user.getRole());
         vo.setDepartmentId(user.getDepartmentId());
         vo.setDepartment(user.getDepartment());
+        vo.setPositionId(user.getPositionId());
         vo.setPosition(user.getPosition());
-        vo.setFunctionRoleIds(JsonUtils.parseLongList(user.getFunctionRoles()));
+        vo.setJobLevel(user.getJobLevel());
+        vo.setStatus(user.getStatus());
+        vo.setFunctionRoleIds(functionRoleIds);
+        vo.setCreatedAt(user.getCreatedAt());
         return vo;
     }
 }

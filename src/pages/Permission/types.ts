@@ -217,6 +217,41 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 集团人事
+  'hr': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 员工管理
+  'employee-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 组织管理
+  'organization-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 职位管理
+  'position-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 角色管理
+  'role-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
   // 功能权限
   'function-permission': [
     { key: 'view', label: '查看' },
@@ -781,11 +816,21 @@ export const menuPermissionTree: PermissionModule[] = [
     ],
   },
   {
+    key: 'hr',
+    name: '集團人事',
+    children: [
+      { key: 'employee-management', name: '員工管理' },
+      { key: 'organization-management', name: '組織管理' },
+      { key: 'position-management', name: '職位管理' },
+    ],
+  },
+  {
     key: 'permission',
     name: '權限管理',
     children: [
-      { key: 'function-permission', name: '功能權限' },
-      { key: 'data-permission', name: '數據權限' },
+      { key: 'role-management', name: '角色管理' },
+      { key: 'function-permission', name: '功能授權' },
+      { key: 'data-permission', name: '數據授權' },
     ],
   },
   {
@@ -863,4 +908,26 @@ export const STORAGE_KEYS = {
   USER_ACCOUNTS: 'permission_user_accounts',
   LOCATION_GROUPS: 'permission_location_groups',
   MERCHANT_GROUPS: 'permission_merchant_groups',
+  DATA_AUTHORIZATIONS: 'permission_data_authorizations',
 } as const
+
+/** 数据授权对象类型 */
+export const DATA_TARGET_TYPE = {
+  ROLE: 'role',
+  DEPARTMENT: 'department',
+} as const
+
+export type DataTargetType = typeof DATA_TARGET_TYPE[keyof typeof DATA_TARGET_TYPE]
+
+/** 数据授权记录（一条 = 角色/部门 + 地区 + 商家范围） */
+export interface DataAuthorization {
+  id: string
+  targetType: DataTargetType
+  targetId: number
+  country: string // 授权地区（countryOptions.key）
+  allMerchants: boolean // 是否授权该地区全部商家
+  merchants: string[] // 指定商家ID（allMerchants 为 false 时生效）
+  createdAt: string
+  updatedBy?: string // 最后更新人
+  updatedAt?: string // 最后更新时间
+}

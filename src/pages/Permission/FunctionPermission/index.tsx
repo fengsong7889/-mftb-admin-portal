@@ -1,17 +1,26 @@
-import { useState, useEffect } from 'react'
-import { Button, Table, Modal, Form, Input, Tree, Space, message, Tag, Pagination } from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import {
-  PlusOutlined,
-  CheckCircleOutlined,
-  StopOutlined,
-} from '@ant-design/icons'
+import { PlusOutlined } from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
-import type { Role, UserAccount, MenuPermission } from '../types'
-import { menuPermissionTree, STORAGE_KEYS, PERMISSION_ACTIONS, getMenuActions } from '../types'
+import type { MenuPermission } from '../types'
+import { menuPermissionTree, getMenuActions } from '../types'
+import { fetchRoles, updateRolePermissions } from '../../../api/role'
+import type { RoleItem } from '../../../api/role'
+import { DEPT_STATUS, fetchDepartments, updateDepartmentPermissions } from '../../../api/department'
+import type { DepartmentItem } from '../../../api/department'
 import './index.css'
 
-const { TextArea } = Input
+/** 授权对象类型（Tab） */
+const TARGET_TYPE = {
+  ROLE: 'role',
+  DEPARTMENT: 'department',
+} as const
+
+type TargetType = typeof TARGET_TYPE[keyof typeof TARGET_TYPE]
+
+/** 角色/部门状态：启用 */
+const STATUS_ENABLED = 1
 
 /** 将权限树转换为 Tree 组件数据 */
 const convertToTreeData = (modules: typeof menuPermissionTree): DataNode[] => {
@@ -57,422 +66,390 @@ const getLeafKeys = (modules: typeof menuPermissionTree): string[] => {
 
 const LEAF_KEYS = getLeafKeys(menuPermissionTree)
 
-/** 默认所有功能操作 */
-const DEFAULT_ACTIONS = PERMISSION_ACTIONS.map(a => a.key)
+/** 菜单key → 菜单名称 映射（用于列表展示授权功能） */
+const MENU_NAME_MAP: Record<string, string> = (() => {
+  const map: Record<string, string> = {}
+  const traverse = (items: typeof menuPermissionTree) => {
+    items.forEach(item => {
+      map[item.key] = item.name
+      if (item.children) {
+        traverse(item.children)
+      }
+    })
+  }
+  traverse(menuPermissionTree)
+  return map
+})()
 
-/** 模拟员工账号数据 */
-const mockUsers: UserAccount[] = [
-  { empId: 'A0001', name: '小蜜蜂', username: 'admin', roles: [], department: '技術部' },
-  { empId: 'G0001', name: '訪客', username: 'guest', roles: [], department: '運營部' },
-  { empId: 'E0001', name: '張三', username: 'zhangsan', roles: [], department: '財務部' },
-  { empId: 'E0002', name: '李四', username: 'lisi', roles: [], department: '運營部' },
-  { empId: 'E0003', name: '王五', username: 'wangwu', roles: [], department: '技術部' },
-]
+/** 某菜单的默认操作（该菜单支持的全部操作） */
+const defaultActionsOf = (menuKey: string): string[] => getMenuActions(menuKey).map(a => a.key)
+
+/** 平铺部门列表构建 TreeSelect 树数据 */
+interface DeptTreeOption {
+  value: number
+  title: string
+  disabled?: boolean
+  children?: DeptTreeOption[]
+}
+
+function buildDeptTreeData(list: DepartmentItem[], disabledIds?: Set<number>): DeptTreeOption[] {
+  const nodeMap = new Map<number, DeptTreeOption>()
+  list.forEach(dept => {
+    nodeMap.set(dept.id, {
+      value: dept.id,
+      title: dept.name,
+      disabled: dept.status !== DEPT_STATUS.ENABLED || (disabledIds?.has(dept.id) ?? false),
+      children: [],
+    })
+  })
+  const roots: DeptTreeOption[] = []
+  list.forEach(dept => {
+    const node = nodeMap.get(dept.id)!
+    const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+    if (parent) {
+      parent.children!.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
 
 export default function FunctionPermission() {
-  const [roles, setRoles] = useState<Role[]>([])
-  const [permissionModalVisible, setPermissionModalVisible] = useState(false)
-  const [bindUserModalVisible, setBindUserModalVisible] = useState(false)
-  const [createModalVisible, setCreateModalVisible] = useState(false)
-  const [currentRole, setCurrentRole] = useState<Role | null>(null)
-  const [checkedKeys, setCheckedKeys] = useState<string[]>([])
-  const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
-  const [checkedActions, setCheckedActions] = useState<string[]>([])
-  const [selectedUserKeys, setSelectedUserKeys] = useState<string[]>([])
-  const [form] = Form.useForm()
-  const [searchText, setSearchText] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [roles, setRoles] = useState<RoleItem[]>([])
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState<TargetType>(TARGET_TYPE.ROLE)
 
-  // 从 localStorage 加载数据
-  useEffect(() => {
-    const savedRoles = localStorage.getItem(STORAGE_KEYS.ROLES)
-    if (savedRoles) {
-      const parsedRoles = JSON.parse(savedRoles)
-      // 如果数据少于15条，重新生成
-      if (parsedRoles.length < 15) {
-        generateInitialRoles()
-      } else {
-        setRoles(parsedRoles)
-      }
-    } else {
-      generateInitialRoles()
+  // 新增/编辑授权弹窗
+  const [modalVisible, setModalVisible] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [targetId, setTargetId] = useState<number>()
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([])
+  const [actionsMap, setActionsMap] = useState<Record<string, string[]>>({})
+  const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
+
+  // 授权详情弹窗
+  const [detailRecord, setDetailRecord] = useState<RoleItem | DepartmentItem | null>(null)
+
+  /** 加载角色与部门列表 */
+  const fetchList = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [roleList, deptList] = await Promise.all([fetchRoles(), fetchDepartments()])
+      setRoles(roleList)
+      setDepartments(deptList)
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  /** 生成初始角色数据 */
-  const generateInitialRoles = () => {
-    const roleTemplates = [
-      { name: '财务主管', desc: '财务管理相关权限', menus: ['account-balance', 'batch-query', 'detail-query', 'writeoff-reconcile', 'debt-reconcile'] },
-      { name: '搜索运营', desc: '搜索配置和管理权限', menus: ['hint-config', 'hot-search-config', 'search-weight-config', 'search-verify'] },
-      { name: '推广金管理员', desc: '推广金充值和管理权限', menus: ['account-balance', 'batch-query', 'detail-query'] },
-      { name: '内容审核员', desc: '内容审核和查看权限', menus: ['hint-config', 'hot-search-config', 'hint-verify', 'hot-search-verify'] },
-      { name: '数据分析师', desc: '数据查看和导出权限', menus: ['recommend-effect-report', 'recommend-revenue-report', 'hint-report', 'hot-search-report'] },
-      { name: '系统管理员', desc: '系统配置和管理权限', menus: ['global-config', 'channel-strategy', 'word-segmentation', 'synonym-config'] },
-      { name: '商户运营', desc: '商户推广和订单管理', menus: ['recommend-dashboard', 'recommend-order', 'recommend-calendar'] },
-      { name: '算法工程师', desc: '算法配置和监控权限', menus: ['recommend-algorithm', 'recommend-algorithm-monitor'] },
-      { name: '财务审计', desc: '财务审计和对账权限', menus: ['writeoff-reconcile', 'debt-reconcile', 'debt-detail', 'approval-center'] },
-      { name: '关键词运营', desc: '词库管理权限', menus: ['word-segmentation', 'synonym-config', 'hot-search-library', 'stop-words'] },
-      { name: '报表查看员', desc: '只读报表权限', menus: ['hint-report', 'hot-search-report', 'recommend-effect-report'] },
-      { name: '搜索配置员', desc: '搜索基础配置权限', menus: ['global-config', 'hint-config', 'hot-search-config'] },
-      { name: '权限管理员', desc: '权限管理和分配权限', menus: ['function-permission', 'data-permission'] },
-      { name: '订单处理员', desc: '订单查询和处理权限', menus: ['recommend-order', 'batch-query', 'detail-query'] },
-      { name: '投放优化师', desc: '投放策略和价格配置', menus: ['recommend-slot', 'recommend-pricing', 'recommend-package'] },
-    ]
+  useEffect(() => {
+    fetchList()
+  }, [fetchList])
 
-    const initialRoles: Role[] = roleTemplates.map((template, index) => ({
-      id: (index + 1).toString(),
-      name: template.name,
-      description: template.desc,
-      permissions: template.menus.map(menuKey => ({
-        menuKey,
-        actions: ['view', 'create', 'edit', 'export'],
-      })),
-      userCount: Math.floor(Math.random() * 10),
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      status: index < 12 ? 'active' : 'inactive',
-    }))
+  /** 已授权的角色（形成列表数据） */
+  const roleRows = useMemo(() => roles.filter(r => r.permissions.length > 0), [roles])
+  /** 已授权的部门 */
+  const deptRows = useMemo(() => departments.filter(d => d.permissions.length > 0), [departments])
 
-    setRoles(initialRoles)
-    localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(initialRoles))
-  }
+  /** 新增授权时可选的对象（启用中且尚未授权） */
+  const availableRoles = useMemo(
+    () => roles.filter(r => r.status === STATUS_ENABLED && r.permissions.length === 0),
+    [roles],
+  )
+  const authedDeptIds = useMemo(() => new Set(deptRows.map(d => d.id)), [deptRows])
 
-  /** 保存角色数据 */
-  const saveRoles = (newRoles: Role[]) => {
-    setRoles(newRoles)
-    localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(newRoles))
-  }
-
-  /** 新建角色 */
+  /** 打开新增授权弹窗 */
   const handleCreate = () => {
-    form.resetFields()
-    setCurrentRole(null)
-    setCreateModalVisible(true)
+    setEditingId(null)
+    setTargetId(undefined)
+    setCheckedKeys([])
+    setActionsMap({})
+    setSelectedMenuKey(null)
+    setModalVisible(true)
   }
 
-  /** 提交新建/编辑角色 */
-  const handleCreateSubmit = async () => {
-    const values = await form.validateFields()
-    const newRole: Role = {
-      id: currentRole ? currentRole.id : Date.now().toString(),
-      name: values.name,
-      description: values.description || '',
-      permissions: currentRole ? currentRole.permissions : [],
-      userCount: currentRole ? currentRole.userCount : 0,
-      createdAt: currentRole ? currentRole.createdAt : new Date().toISOString(),
-      status: currentRole ? currentRole.status : 'active',
-    }
-
-    if (currentRole) {
-      const newRoles = roles.map(r => r.id === currentRole.id ? newRole : r)
-      saveRoles(newRoles)
-      message.success('角色信息已更新')
-    } else {
-      const newRoles = [...roles, newRole]
-      saveRoles(newRoles)
-      message.success('角色创建成功')
-    }
-    setCreateModalVisible(false)
-  }
-
-  /** 编辑角色信息 */
-  const handleEditRole = (record: Role) => {
-    setCurrentRole(record)
-    form.setFieldsValue({
-      name: record.name,
-      description: record.description,
-    })
-    setCreateModalVisible(true)
-  }
-
-  /** 编辑权限 */
-  const handleEditPermission = (record: Role) => {
-    setCurrentRole(record)
-    // 提取已选择的菜单key
+  /** 打开编辑授权弹窗 */
+  const handleEdit = (record: RoleItem | DepartmentItem) => {
+    setEditingId(record.id)
+    setTargetId(record.id)
     const menuKeys = record.permissions.map(p => p.menuKey)
     setCheckedKeys(menuKeys)
-    // 默认选择第一个叶子节点
-    const firstLeaf = LEAF_KEYS.find(key => menuKeys.includes(key)) || LEAF_KEYS[0]
-    setSelectedMenuKey(firstLeaf)
-    const perm = record.permissions.find(p => p.menuKey === firstLeaf)
-    setCheckedActions(perm ? perm.actions : [])
-    setPermissionModalVisible(true)
-  }
-
-  /** 保存权限 */
-  const handleSavePermission = () => {
-    if (!currentRole) return
-    
-    // 构建新的权限列表
-    const newPermissions: MenuPermission[] = []
-    
-    // 遍历所有选中的菜单
-    checkedKeys.forEach(menuKey => {
-      // 如果是叶子节点且有选中
-      if (LEAF_KEYS.includes(menuKey)) {
-        const perm = currentRole.permissions.find(p => p.menuKey === menuKey)
-        const actions = menuKey === selectedMenuKey ? checkedActions : (perm ? perm.actions : DEFAULT_ACTIONS)
-        if (actions.length > 0) {
-          newPermissions.push({ menuKey, actions })
-        }
-      }
+    const map: Record<string, string[]> = {}
+    record.permissions.forEach(p => {
+      map[p.menuKey] = p.actions
     })
-    
-    const newRoles = roles.map(r =>
-      r.id === currentRole.id ? { ...r, permissions: newPermissions } : r
-    )
-    saveRoles(newRoles)
-    message.success('权限配置已保存')
-    setPermissionModalVisible(false)
-  }
-
-  /** 绑定账号 */
-  const handleBindUser = (record: Role) => {
-    setCurrentRole(record)
-    // 获取已绑定该角色的用户
-    const boundUsers = mockUsers.filter(u => u.roles.includes(record.id))
-    setSelectedUserKeys(boundUsers.map(u => u.empId))
-    setBindUserModalVisible(true)
-  }
-
-  /** 保存绑定的账号 */
-  const handleSaveBindUser = () => {
-    if (!currentRole) return
-    // 这里只是模拟，实际需要更新用户数据
-    const newRoles = roles.map(r =>
-      r.id === currentRole.id
-        ? { ...r, userCount: selectedUserKeys.length }
-        : r
-    )
-    saveRoles(newRoles)
-    message.success(`已绑定 ${selectedUserKeys.length} 个账号`)
-    setBindUserModalVisible(false)
-  }
-
-  /** 切换状态 */
-  const handleToggleStatus = (record: Role) => {
-    const newStatus: 'active' | 'inactive' = record.status === 'active' ? 'inactive' : 'active'
-    const newRoles = roles.map(r =>
-      r.id === record.id ? { ...r, status: newStatus } : r
-    )
-    saveRoles(newRoles)
-    message.success(newStatus === 'active' ? '已启用' : '已停用')
-  }
-
-  /** 删除角色 */
-  const handleDelete = (record: Role) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除角色"${record.name}"吗？`,
-      onOk: () => {
-        const newRoles = roles.filter(r => r.id !== record.id)
-        saveRoles(newRoles)
-        message.success('角色已删除')
-      },
-    })
-  }
-
-  /** 选择菜单 */
-  const handleSelectMenu = (menuKey: string) => {
-    setSelectedMenuKey(menuKey)
-    // 加载该菜单已选的操作
-    const perm = currentRole?.permissions.find(p => p.menuKey === menuKey)
-    setCheckedActions(perm ? perm.actions : DEFAULT_ACTIONS)
+    setActionsMap(map)
+    setSelectedMenuKey(LEAF_KEYS.find(key => menuKeys.includes(key)) ?? null)
+    setModalVisible(true)
   }
 
   /** 全选/取消全选 */
   const handleCheckAll = (checked: boolean) => {
     setCheckedKeys(checked ? ALL_MENU_KEYS : [])
-    setSelectedMenuKey(null)
-    setCheckedActions([])
+    if (!checked) {
+      setSelectedMenuKey(null)
+    }
   }
 
-  /** 过滤用户 */
-  const filteredUsers = mockUsers.filter(user =>
-    user.name.includes(searchText) ||
-    user.empId.includes(searchText) ||
-    user.username.includes(searchText)
-  )
+  /** 当前选中菜单的操作权限（未配置过则默认全选该菜单支持的操作） */
+  const currentActions = selectedMenuKey
+    ? actionsMap[selectedMenuKey] ?? defaultActionsOf(selectedMenuKey)
+    : []
 
-  const columns: TableColumnsType<Role> = [
+  /** 勾选/取消某个操作 */
+  const handleToggleAction = (actionKey: string, checked: boolean) => {
+    if (!selectedMenuKey) return
+    const next = checked
+      ? [...currentActions, actionKey]
+      : currentActions.filter(a => a !== actionKey)
+    setActionsMap(prev => ({ ...prev, [selectedMenuKey]: next }))
+  }
+
+  /** 保存授权（形成/更新一条授权数据） */
+  const handleSave = async () => {
+    if (targetId == null) {
+      message.warning(activeTab === TARGET_TYPE.ROLE ? '請選擇要授權的角色' : '請選擇要授權的部門')
+      return
+    }
+    const permissions: MenuPermission[] = []
+    checkedKeys.forEach(menuKey => {
+      if (!LEAF_KEYS.includes(menuKey)) return
+      const actions = actionsMap[menuKey] ?? defaultActionsOf(menuKey)
+      if (actions.length > 0) {
+        permissions.push({ menuKey, actions })
+      }
+    })
+    if (permissions.length === 0) {
+      message.warning('請至少勾選一個授權功能')
+      return
+    }
+    setSubmitting(true)
+    try {
+      if (activeTab === TARGET_TYPE.ROLE) {
+        await updateRolePermissions(targetId, permissions)
+      } else {
+        await updateDepartmentPermissions(targetId, permissions)
+      }
+      message.success(editingId ? '授權已更新' : '授權已創建')
+      setModalVisible(false)
+      fetchList()
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** 删除授权（清空该对象的菜单权限） */
+  const handleDelete = async (record: RoleItem | DepartmentItem) => {
+    try {
+      if (activeTab === TARGET_TYPE.ROLE) {
+        await updateRolePermissions(record.id, [])
+      } else {
+        await updateDepartmentPermissions(record.id, [])
+      }
+      message.success('授權已刪除')
+      fetchList()
+    } catch {
+      // 错误提示由请求层统一处理
+    }
+  }
+
+  /** 详情弹窗：授权菜单与对应功能操作 */
+  const detailColumns: TableColumnsType<MenuPermission> = [
     {
-      title: '角色名稱',
-      dataIndex: 'name',
-      key: 'name',
-      width: 180,
+      title: '授權菜單',
+      dataIndex: 'menuKey',
+      key: 'menuKey',
+      width: 200,
+      render: (menuKey: string) => MENU_NAME_MAP[menuKey] ?? menuKey,
     },
     {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 250,
-      ellipsis: true,
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: 'active' | 'inactive') => (
-        <Tag color={status === 'active' ? 'green' : 'default'}>
-          {status === 'active' ? '啟用' : '停用'}
-        </Tag>
-      ),
-    },
-    {
-      title: '綁定賬號數',
-      dataIndex: 'userCount',
-      key: 'userCount',
-      width: 120,
-      render: (count: number) => (
-        <Tag color="blue">{count} 個</Tag>
-      ),
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (date: string) => new Date(date).toLocaleString('zh-TW', { hour12: false }),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 340,
-      render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button 
-            type="link" 
-            size="small" 
-            icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === 'active' ? '停用' : '啟用'}
-          </Button>
-          <Button type="link" size="small"  onClick={() => handleEditPermission(record)}>
-            編輯權限
-          </Button>
-          <Button type="link" size="small"  onClick={() => handleBindUser(record)}>
-            綁定賬號
-          </Button>
-          <Button type="link" size="small" onClick={() => handleEditRole(record)}>
-            編輯信息
-          </Button>
-          <Button type="link" size="small" danger  onClick={() => handleDelete(record)}>
-            刪除
-          </Button>
+      title: '對應功能',
+      dataIndex: 'actions',
+      key: 'actions',
+      render: (actions: string[], record) => (
+        <Space size={4} wrap>
+          {actions.map(actionKey => {
+            const label = getMenuActions(record.menuKey).find(a => a.key === actionKey)?.label ?? actionKey
+            return <Tag key={actionKey} color="blue">{label}</Tag>
+          })}
         </Space>
       ),
     },
   ]
 
-  const userColumns: TableColumnsType<UserAccount> = [
-    {
-      title: '工號',
-      dataIndex: 'empId',
-      key: 'empId',
-      width: 100,
-    },
-    {
-      title: '姓名',
-      dataIndex: 'name',
-      key: 'name',
-      width: 120,
-    },
-    {
-      title: '用戶名',
-      dataIndex: 'username',
-      key: 'username',
-      width: 120,
-    },
-    {
-      title: '部門',
-      dataIndex: 'department',
-      key: 'department',
-      width: 120,
-    },
-    {
-      title: '狀態',
-      key: 'status',
-      width: 100,
-      render: (_, record) => (
-        selectedUserKeys.includes(record.empId)
-          ? <Tag color="green">已綁定</Tag>
-          : <Tag color="default">未綁定</Tag>
-      ),
-    },
-  ]
-
-  return (
-    <div className="permission-container">
-      <div className="permission-header">
-        <h2>功能權限</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          新建角色
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={roles.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-        rowKey="id"
-        pagination={false}
-        bordered
-      />
-
-      <div className="permission-pagination">
-        <Pagination
-          current={currentPage}
-          pageSize={pageSize}
-          total={roles.length}
-          showSizeChanger
-          showQuickJumper
-          showTotal={(total) => `共 ${total} 條數據`}
-          onChange={(page, size) => {
-            setCurrentPage(page)
-            if (size !== pageSize) {
-              setPageSize(size)
-              setCurrentPage(1)
-            }
-          }}
-        />
-      </div>
-
-      {/* 新建/编辑角色弹窗 */}
-      <Modal
-        title={currentRole ? '編輯角色信息' : '新建角色'}
-        open={createModalVisible}
-        onOk={handleCreateSubmit}
-        onCancel={() => setCreateModalVisible(false)}
-        width={500}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="角色名稱"
-            rules={[{ required: true, message: '请输入角色名称' }]}
-          >
-            <Input placeholder="例如：财务主管" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="描述"
-          >
-            <TextArea rows={3} placeholder="请输入角色描述" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* 编辑权限弹窗 */}
-      <Modal
-        title={`編輯權限 - ${currentRole?.name}`}
-        open={permissionModalVisible}
-        onOk={handleSavePermission}
-        onCancel={() => setPermissionModalVisible(false)}
-        width={900}
-        okText="保存"
+  /** 操作列（角色/部门通用） */
+  const renderActions = (record: RoleItem | DepartmentItem) => (
+    <Space size={4}>
+      <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
+        詳情
+      </Button>
+      <Button type="link" size="small" onClick={() => handleEdit(record)}>
+        編輯
+      </Button>
+      <Popconfirm
+        title="確認刪除"
+        description={`確定要刪除「${record.name}」的授權嗎？刪除後其成員將失去對應菜單權限。`}
+        onConfirm={() => handleDelete(record)}
+        okText="確認"
         cancelText="取消"
       >
+        <Button type="link" size="small" danger>
+          刪除
+        </Button>
+      </Popconfirm>
+    </Space>
+  )
+
+  const roleColumns: TableColumnsType<RoleItem> = [
+    { title: '角色名稱', dataIndex: 'name', key: 'name', width: 200 },
+    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 120, render: (v: number) => `${v} 人` },
+    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    {
+      title: '最後更新時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 170,
+      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+    },
+    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
+  ]
+
+  const deptColumns: TableColumnsType<DepartmentItem> = [
+    { title: '部門名稱', dataIndex: 'name', key: 'name', width: 200 },
+    { title: '上級部門', dataIndex: 'parentName', key: 'parentName', width: 180, render: (v: string) => v || '-' },
+    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 120, render: (v: number) => `${v} 人` },
+    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    {
+      title: '最後更新時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 170,
+      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+    },
+    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
+  ]
+
+  /** 授权列表（角色/部门 Tab 内容） */
+  const renderTabContent = (type: TargetType) => (
+    <div>
+      <div className="action-section">
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            新增
+          </Button>
+        </div>
+      </div>
+      {type === TARGET_TYPE.ROLE ? (
+        <Table
+          columns={roleColumns}
+          dataSource={roleRows}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (t) => `共 ${t} 條數據`,
+          }}
+          locale={{ emptyText: '暫無授權數據，點擊「新增」為角色配置功能授權' }}
+        />
+      ) : (
+        <Table
+          columns={deptColumns}
+          dataSource={deptRows}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (t) => `共 ${t} 條數據`,
+          }}
+          locale={{ emptyText: '暫無授權數據，點擊「新增」為部門配置功能授權' }}
+        />
+      )}
+    </div>
+  )
+
+  /** 弹窗中编辑对象的名称（编辑模式展示） */
+  const editingName = editingId != null
+    ? (activeTab === TARGET_TYPE.ROLE
+      ? roles.find(r => r.id === editingId)?.name
+      : departments.find(d => d.id === editingId)?.name)
+    : undefined
+
+  return (
+    <div>
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as TargetType)}
+        items={[
+          { key: TARGET_TYPE.ROLE, label: '角色授權', children: renderTabContent(TARGET_TYPE.ROLE) },
+          { key: TARGET_TYPE.DEPARTMENT, label: '部門授權', children: renderTabContent(TARGET_TYPE.DEPARTMENT) },
+        ]}
+      />
+
+      {/* 新增/编辑授权弹窗 */}
+      <Modal
+        title={
+          editingId
+            ? `編輯授權 - ${editingName ?? ''}`
+            : (activeTab === TARGET_TYPE.ROLE ? '新增角色授權' : '新增部門授權')
+        }
+        open={modalVisible}
+        onOk={handleSave}
+        onCancel={() => setModalVisible(false)}
+        confirmLoading={submitting}
+        okText="保存"
+        cancelText="取消"
+        width={920}
+        destroyOnClose
+      >
+        {/* 授权对象选择（编辑模式锁定） */}
+        <div className="permission-target-bar">
+          <span className="permission-target-label">
+            {activeTab === TARGET_TYPE.ROLE ? '授權角色：' : '授權部門：'}
+          </span>
+          {activeTab === TARGET_TYPE.ROLE ? (
+            <Select
+              className="permission-target-select"
+              placeholder="請選擇角色"
+              showSearch
+              optionFilterProp="label"
+              disabled={editingId != null}
+              value={targetId}
+              onChange={(id) => setTargetId(id)}
+              options={(editingId != null ? roles : availableRoles).map(r => ({
+                value: r.id,
+                label: r.name,
+              }))}
+            />
+          ) : (
+            <TreeSelect
+              className="permission-target-select"
+              placeholder="請選擇部門"
+              showSearch
+              treeDefaultExpandAll
+              treeNodeFilterProp="title"
+              disabled={editingId != null}
+              value={targetId}
+              onChange={(id) => setTargetId(id)}
+              treeData={buildDeptTreeData(departments, editingId != null ? undefined : authedDeptIds)}
+            />
+          )}
+          <Tag color={activeTab === TARGET_TYPE.ROLE ? 'blue' : 'purple'}>
+            {activeTab === TARGET_TYPE.ROLE
+              ? '加入該角色的員工將獲得所配置的權限'
+              : '進入該部門的人員將自動獲得所配置的權限'}
+          </Tag>
+        </div>
+
+        {/* 权限配置工作台 */}
         <div className="permission-edit-container">
           {/* 左侧：菜单树 */}
           <div className="permission-menu-tree">
@@ -486,7 +463,7 @@ export default function FunctionPermission() {
               onCheck={(keys) => setCheckedKeys(keys as string[])}
               onSelect={(keys) => {
                 if (keys.length > 0 && LEAF_KEYS.includes(keys[0] as string)) {
-                  handleSelectMenu(keys[0] as string)
+                  setSelectedMenuKey(keys[0] as string)
                 }
               }}
               treeData={convertToTreeData(menuPermissionTree)}
@@ -496,9 +473,7 @@ export default function FunctionPermission() {
 
           {/* 右侧：功能操作勾选 */}
           <div className="permission-actions-panel">
-            <h4 className="permission-actions-title">
-              请选择功能
-            </h4>
+            <h4 className="permission-actions-title">請選擇功能</h4>
             {selectedMenuKey && (
               <div className="permission-actions-list">
                 {getMenuActions(selectedMenuKey).map(action => (
@@ -506,13 +481,8 @@ export default function FunctionPermission() {
                     <input
                       type="checkbox"
                       id={`action-${action.key}`}
-                      checked={checkedActions.includes(action.key)}
-                      onChange={(e) => {
-                        const newActions = e.target.checked
-                          ? [...checkedActions, action.key]
-                          : checkedActions.filter(a => a !== action.key)
-                        setCheckedActions(newActions)
-                      }}
+                      checked={currentActions.includes(action.key)}
+                      onChange={(e) => handleToggleAction(action.key, e.target.checked)}
                     />
                     <label htmlFor={`action-${action.key}`}>{action.label}</label>
                   </div>
@@ -520,42 +490,29 @@ export default function FunctionPermission() {
               </div>
             )}
             <div className="permission-actions-tip">
-              提示：勾選左側菜單後，在右側勾選對應的功能操作權限
+              提示：勾選左側菜單後，點擊菜單名稱可在右側細化功能操作權限；登錄時系統會合併「角色權限 + 部門權限」生效
             </div>
           </div>
         </div>
       </Modal>
 
-      {/* 绑定账号弹窗 */}
+      {/* 授权详情弹窗 */}
       <Modal
-        title={`綁定賬號 - ${currentRole?.name}`}
-        open={bindUserModalVisible}
-        onOk={handleSaveBindUser}
-        onCancel={() => setBindUserModalVisible(false)}
-        width={800}
-        okText={`保存 (${selectedUserKeys.length} 個)`}
-        cancelText="取消"
+        title={`授權詳情 - ${detailRecord?.name ?? ''}`}
+        open={detailRecord != null}
+        onCancel={() => setDetailRecord(null)}
+        footer={null}
+        width={680}
       >
-        <div className="bind-user-container">
-          <Input.Search
-            placeholder="搜索姓名、工號、用戶名"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ marginBottom: 16 }}
-          />
-          <Table
-            columns={userColumns}
-            dataSource={filteredUsers}
-            rowKey="empId"
-            pagination={false}
-            rowSelection={{
-              selectedRowKeys: selectedUserKeys,
-              onChange: (keys) => setSelectedUserKeys(keys as string[]),
-            }}
-            size="small"
-            scroll={{ y: 400 }}
-          />
-        </div>
+        <Table
+          columns={detailColumns}
+          dataSource={detailRecord?.permissions ?? []}
+          rowKey="menuKey"
+          size="small"
+          pagination={false}
+          scroll={{ y: 420 }}
+          locale={{ emptyText: '暫無授權功能' }}
+        />
       </Modal>
     </div>
   )

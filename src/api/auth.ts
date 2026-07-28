@@ -1,5 +1,6 @@
 import request from './request'
 import { SILENT_HEADER } from './request'
+import type { MenuPermission } from '../pages/Permission/types'
 
 /** 登录请求参数 */
 export interface LoginParams {
@@ -17,6 +18,8 @@ export interface UserInfo {
   role: string
   department?: string
   position?: string
+  functionRoleIds?: number[] // 绑定的功能角色ID
+  permissions?: MenuPermission[] // 登录时下发的合并菜单权限
 }
 
 /** 登录响应 */

@@ -51,6 +51,10 @@ import {
   BranchesOutlined,
   ShoppingFilled,
   RedEnvelopeOutlined,
+  UserOutlined,
+  ApartmentOutlined,
+  IdcardOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -93,7 +97,12 @@ const keyToPath: Record<string, string> = {
   'hint-verify': '/hint-verify',
   'hot-search-verify': '/hot-search-verify',
 
+  // 集團人事
+  'employee-management': '/employee-management',
+  'organization-management': '/organization-management',
+  'position-management': '/position-management',
   // 權限管理
+  'role-management': '/role-management',
   'function-permission': '/function-permission',
   'data-permission': '/data-permission',
   // 系統設置
@@ -435,19 +444,46 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    key: 'hr',
+    icon: <TeamOutlined />,
+    label: '集團人事',
+    children: [
+      {
+        key: 'employee-management',
+        icon: <UserOutlined />,
+        label: '員工管理',
+      },
+      {
+        key: 'organization-management',
+        icon: <ApartmentOutlined />,
+        label: '組織管理',
+      },
+      {
+        key: 'position-management',
+        icon: <IdcardOutlined />,
+        label: '職位管理',
+      },
+    ],
+  },
+  {
     key: 'permission',
     icon: <LockOutlined />,
     label: '權限管理',
     children: [
       {
+        key: 'role-management',
+        icon: <SolutionOutlined />,
+        label: '角色管理',
+      },
+      {
         key: 'function-permission',
         icon: <AppstoreOutlined />,
-        label: '功能權限',
+        label: '功能授權',
       },
       {
         key: 'data-permission',
         icon: <DatabaseOutlined />,
-        label: '數據權限',
+        label: '數據授權',
       },
     ],
   },

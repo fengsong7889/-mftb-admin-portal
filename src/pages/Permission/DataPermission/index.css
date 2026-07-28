@@ -1,36 +1,46 @@
-.data-permission-container {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  min-height: calc(100vh - 120px);
-}
-
-.data-permission-container h2 {
-  margin: 0 0 20px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #262626;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f0f0f0;
-}
-
-.data-permission-tab-content {
-  padding-top: 16px;
-}
-
-.data-permission-header {
+/* 数据授权弹窗：授权对象选择栏 */
+.data-auth-target-bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+/* 弹窗表单行（授权地区 / 商家范围） */
+.data-auth-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.data-permission-pagination {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
+.data-auth-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #262626;
+  flex-shrink: 0;
 }
 
-.action-split {
-  color: #d9d9d9;
-  margin: 0 4px;
+.data-auth-target-select {
+  width: 260px;
+}
+
+/* 指定商家选择面板 */
+.data-auth-merchant-panel {
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.data-auth-merchant-search {
+  margin-bottom: 12px;
+}
+
+.data-auth-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #8c8c8c;
 }

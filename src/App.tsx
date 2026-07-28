@@ -40,7 +40,11 @@ const PagePRDView = lazy(() => import('./pages/PagePRDView'))
 const GlobalConfig = lazy(() => import('./pages/SearchConfigNew/GlobalConfig'))
 const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStrategy'))
 
-// 權限管理
+// 集團人事
+const EmployeeManagement = lazy(() => import('./pages/Permission/Employee'))
+const OrganizationManagement = lazy(() => import('./pages/Permission/Organization'))
+const PositionManagement = lazy(() => import('./pages/Permission/Position'))
+const RoleManagement = lazy(() => import('./pages/Permission/RoleManagement'))
 const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
 const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
 // 商家推广工具
@@ -126,7 +130,11 @@ function AuthenticatedLayout() {
               <Route path="/global-config" element={<GlobalConfig />} />
               <Route path="/channel-strategy" element={<DimensionStrategy />} />
 
-              {/* 權限管理 */}
+              {/* 集團人事 */}
+              <Route path="/employee-management" element={<EmployeeManagement />} />
+              <Route path="/organization-management" element={<OrganizationManagement />} />
+              <Route path="/position-management" element={<PositionManagement />} />
+              <Route path="/role-management" element={<RoleManagement />} />
               <Route path="/function-permission" element={<FunctionPermission />} />
               <Route path="/data-permission" element={<DataPermission />} />
               {/* 商家推广工具 */}

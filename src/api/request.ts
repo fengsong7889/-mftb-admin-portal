@@ -25,12 +25,20 @@ const SUCCESS_CODE = 200
 const UNAUTHORIZED_CODE = 401
 
 /**
- * 创建 axios 实例
+ * 计算 API 基础地址: 统一保证以 /api 结尾
  * 开发环境通过 Vite proxy 代理到后端 (见 vite.config.ts)
- * 生产环境通过 VITE_API_BASE_URL 环境变量指定后端地址
+ * 生产环境通过 VITE_API_BASE_URL 环境变量指定后端地址（可不带 /api 前缀, 此处自动补全）
  */
+function resolveBaseURL(): string {
+  const raw = import.meta.env.VITE_API_BASE_URL as string | undefined
+  if (!raw) return '/api'
+  const trimmed = raw.replace(/\/+$/, '')
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
+}
+
+/** 创建 axios 实例 */
 const request: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: resolveBaseURL(),
   timeout: 15000,
 })
 
@@ -54,13 +62,13 @@ request.interceptors.response.use(
     if (res.code === SUCCESS_CODE) {
       return res.data as never
     }
-    // 未认证: 清除登录态并跳转登录页
+    const silent = response.config?.headers?.[SILENT_HEADER] === '1'
+    // 未认证: 清除登录态并跳转登录页（静默请求由调用方自行处理, 如登录接口的 mock 降级）
     if (res.code === UNAUTHORIZED_CODE) {
-      handleUnauthorized()
+      if (!silent) handleUnauthorized()
       return Promise.reject(new Error(res.message || '登录已过期'))
     }
     // 其它业务错误: 弹出提示（除非调用方声明静默）
-    const silent = response.config?.headers?.[SILENT_HEADER] === '1'
     if (!silent) {
       message.error(res.message || '请求失败')
     }
@@ -71,7 +79,7 @@ request.interceptors.response.use(
     const status = error?.response?.status
     const silent = error?.config?.headers?.[SILENT_HEADER] === '1'
     if (status === UNAUTHORIZED_CODE) {
-      handleUnauthorized()
+      if (!silent) handleUnauthorized()
     } else if (status === 403) {
       if (!silent) message.error('没有访问权限')
     } else if (status >= 500) {

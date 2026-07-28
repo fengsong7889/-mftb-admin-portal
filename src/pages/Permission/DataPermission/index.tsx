@@ -1,887 +1,481 @@
-import { useState, useEffect } from 'react'
-import { Button, Table, Modal, Form, Input, Tree, Space, message, Tag, Tabs, Pagination, Select } from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Input, Modal, Popconfirm, Radio, Select, Space, Table, Tabs, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import {
-  PlusOutlined,
-  CheckCircleOutlined,
-  StopOutlined,
-} from '@ant-design/icons'
-import type { DataNode } from 'antd/es/tree'
-import type { LocationGroup, MerchantGroup } from '../types'
-import { locationOptions, countryOptions, countryLocationMap, merchantOptions, STORAGE_KEYS } from '../types'
+import { PlusOutlined } from '@ant-design/icons'
+import type { DataAuthorization, DataTargetType } from '../types'
+import { DATA_TARGET_TYPE, STORAGE_KEYS, countryOptions, merchantOptions } from '../types'
+import { fetchRoles } from '../../../api/role'
+import type { RoleItem } from '../../../api/role'
+import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
+import type { DepartmentItem } from '../../../api/department'
+import { useAuth } from '../../../contexts/AuthContext'
 import './index.css'
 
-const { TextArea } = Input
-const { TabPane } = Tabs
+/** 角色状态：启用 */
+const STATUS_ENABLED = 1
 
-/** 将地点选项转换为 Tree 组件数据 */
-const locationTreeData: DataNode[] = locationOptions.map(loc => ({
-  title: loc.label,
-  key: loc.key,
-}))
+/** 地区 Tag 颜色 */
+const COUNTRY_COLOR_MAP: Record<string, string> = {
+  china: 'blue',
+  hongkong: 'purple',
+  macau: 'orange',
+  taiwan: 'cyan',
+  japan: 'red',
+  south_korea: 'magenta',
+  singapore: 'green',
+  malaysia: 'lime',
+  thailand: 'volcano',
+  vietnam: 'gold',
+  philippines: 'geekblue',
+  indonesia: 'purple',
+  usa: 'red',
+  uk: 'blue',
+  australia: 'orange',
+}
+
+/** 地区 key → 名称 */
+const COUNTRY_NAME_MAP: Record<string, string> = Object.fromEntries(
+  countryOptions.map(c => [c.key, c.label]),
+)
+
+/** 从 localStorage 加载数据授权记录 */
+const loadAuthorizations = (): DataAuthorization[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DATA_AUTHORIZATIONS)
+    return raw ? (JSON.parse(raw) as DataAuthorization[]) : []
+  } catch {
+    return []
+  }
+}
+
+/** 平铺部门列表构建 TreeSelect 树数据 */
+interface DeptTreeOption {
+  value: number
+  title: string
+  disabled?: boolean
+  children?: DeptTreeOption[]
+}
+
+function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
+  const nodeMap = new Map<number, DeptTreeOption>()
+  list.forEach(dept => {
+    nodeMap.set(dept.id, {
+      value: dept.id,
+      title: dept.name,
+      disabled: dept.status !== DEPT_STATUS.ENABLED,
+      children: [],
+    })
+  })
+  const roots: DeptTreeOption[] = []
+  list.forEach(dept => {
+    const node = nodeMap.get(dept.id)!
+    const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+    if (parent) {
+      parent.children!.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
+
+/** 列表行（授权记录 + 授权对象信息） */
+interface AuthRow extends DataAuthorization {
+  targetName: string
+  parentName?: string
+  userCount: number
+}
 
 export default function DataPermission() {
-  const [locationGroups, setLocationGroups] = useState<LocationGroup[]>([])
-  const [merchantGroups, setMerchantGroups] = useState<MerchantGroup[]>([])
-  const [locationModalVisible, setLocationModalVisible] = useState(false)
-  const [merchantModalVisible, setMerchantModalVisible] = useState(false)
-  const [currentLocationGroup, setCurrentLocationGroup] = useState<LocationGroup | null>(null)
-  const [selectedLocationCountry, setSelectedLocationCountry] = useState<string>('') // 当前选择的国家（地点）
-  const [currentMerchantGroup, setCurrentMerchantGroup] = useState<MerchantGroup | null>(null)
-  const [selectedMerchantCountry, setSelectedMerchantCountry] = useState<string>('') // 当前选择的国家（商家）
-  const [checkedLocations, setCheckedLocations] = useState<string[]>([])
+  const { user } = useAuth()
+  const [roles, setRoles] = useState<RoleItem[]>([])
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [authorizations, setAuthorizations] = useState<DataAuthorization[]>(() => loadAuthorizations())
+  const [activeTab, setActiveTab] = useState<DataTargetType>(DATA_TARGET_TYPE.ROLE)
+
+  // 新增/编辑授权弹窗
+  const [modalVisible, setModalVisible] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [targetId, setTargetId] = useState<number>()
+  const [country, setCountry] = useState<string>()
+  const [allMerchants, setAllMerchants] = useState(true)
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([])
-  const [locationForm] = Form.useForm()
-  const [merchantForm] = Form.useForm()
   const [merchantSearchText, setMerchantSearchText] = useState('')
-  const [locationCurrentPage, setLocationCurrentPage] = useState(1)
-  const [locationPageSize, setLocationPageSize] = useState(10)
-  const [merchantCurrentPage, setMerchantCurrentPage] = useState(1)
-  const [merchantPageSize, setMerchantPageSize] = useState(10)
 
-  // 从 localStorage 加载数据
-  useEffect(() => {
-    const savedLocationGroups = localStorage.getItem(STORAGE_KEYS.LOCATION_GROUPS)
-    const savedMerchantGroups = localStorage.getItem(STORAGE_KEYS.MERCHANT_GROUPS)
+  // 授权详情弹窗
+  const [detailRecord, setDetailRecord] = useState<AuthRow | null>(null)
 
-    if (savedLocationGroups) {
-      const parsedLocationGroups = JSON.parse(savedLocationGroups)
-      // 检查第一条数据是否有country字段，如果没有则重新生成
-      if (parsedLocationGroups.length === 0 || !parsedLocationGroups[0].country) {
-        generateInitialLocationGroups()
-      } else {
-        setLocationGroups(parsedLocationGroups)
-      }
-    } else {
-      generateInitialLocationGroups()
-    }
-
-    if (savedMerchantGroups) {
-      const parsedMerchantGroups = JSON.parse(savedMerchantGroups)
-      // 检查第一条数据是否有country字段，如果没有则重新生成
-      if (parsedMerchantGroups.length === 0 || !parsedMerchantGroups[0].country) {
-        generateInitialMerchantGroups()
-      } else {
-        setMerchantGroups(parsedMerchantGroups)
-      }
-    } else {
-      generateInitialMerchantGroups()
+  /** 加载角色与部门列表 */
+  const fetchList = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [roleList, deptList] = await Promise.all([fetchRoles(), fetchDepartments()])
+      setRoles(roleList)
+      setDepartments(deptList)
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  /** 生成初始地点组数据 */
-  const generateInitialLocationGroups = () => {
-    const locationGroupData = [
-      {
-        name: '华南地区',
-        desc: '华南区域地点',
-        country: 'china',
-        locations: ['guangzhou', 'shenzhen', 'zhuhai', 'dongguan', 'foshan', 'zhongshan', 'huizhou', 'jiangmen', 'zhaoqing'],
-      },
-      {
-        name: '华东地区',
-        desc: '华东区域地点',
-        country: 'china',
-        locations: ['shanghai', 'hangzhou', 'nanjing', 'suzhou', 'wuxi', 'ningbo', 'hefei', 'wenzhou', 'changzhou'],
-      },
-      {
-        name: '华北地区',
-        desc: '华北区域地点',
-        country: 'china',
-        locations: ['beijing', 'tianjin', 'shijiazhuang', 'taiyuan', 'datong', 'baoding', 'tangshan', 'handan', 'langfang'],
-      },
-      {
-        name: '东京都心',
-        desc: '日本东京核心区域',
-        country: 'japan',
-        locations: ['tokyo', 'osaka', 'kyoto', 'nagoya'],
-      },
-      {
-        name: '首尔都市圈',
-        desc: '韩国首尔及周边',
-        country: 'south_korea',
-        locations: ['seoul', 'busan', 'incheon', 'daegu'],
-      },
-      {
-        name: '新加坡全境',
-        desc: '新加坡全国地点',
-        country: 'singapore',
-        locations: ['singapore'],
-      },
-      {
-        name: '泰国旅游区',
-        desc: '泰国热门旅游城市',
-        country: 'thailand',
-        locations: ['bangkok', 'chiang_mai', 'phuket', 'pattaya'],
-      },
-      {
-        name: '港澳地区',
-        desc: '港澳区域地点',
-        country: 'hongkong',
-        locations: ['hongkong', 'macau', 'taipa', 'coloane', 'kowloon', 'new_territories', 'hong_kong_island', 'taipa_cotai'],
-      },
-      {
-        name: '台湾地区',
-        desc: '台湾主要城市',
-        country: 'taiwan',
-        locations: ['taipei', 'kaohsiung', 'taichung', 'tainan'],
-      },
-      {
-        name: '马来西亚西部',
-        desc: '马来西亚西海岸城市',
-        country: 'malaysia',
-        locations: ['kuala_lumpur', 'penang', 'johor_bahru', 'malacca'],
-      },
-      {
-        name: '越南核心区',
-        desc: '越南主要城市',
-        country: 'vietnam',
-        locations: ['ho_chi_minh', 'hanoi', 'da_nang', 'hai_phong'],
-      },
-      {
-        name: '印尼爪哇岛',
-        desc: '印度尼西亚核心区域',
-        country: 'indonesia',
-        locations: ['jakarta', 'surabaya', 'bandung', 'medan'],
-      },
-      {
-        name: '菲律宾马尼拉',
-        desc: '菲律宾首都圈',
-        country: 'philippines',
-        locations: ['manila', 'cebu', 'davao', 'quezon_city'],
-      },
-      {
-        name: '美国东海岸',
-        desc: '美国东部主要城市',
-        country: 'usa',
-        locations: ['new_york', 'chicago', 'houston', 'phoenix'],
-      },
-      {
-        name: '英国伦敦圈',
-        desc: '英国主要城市',
-        country: 'uk',
-        locations: ['london', 'manchester', 'birmingham', 'edinburgh'],
-      },
-      {
-        name: '澳大利亚东部',
-        desc: '澳洲东海岸城市',
-        country: 'australia',
-        locations: ['sydney', 'melbourne', 'brisbane', 'perth'],
-      },
-    ]
+  useEffect(() => {
+    fetchList()
+  }, [fetchList])
 
-    const initialLocationGroups: LocationGroup[] = locationGroupData.map((item, index) => ({
-      id: (index + 1).toString(),
-      name: item.name,
-      description: item.desc,
-      country: item.country,
-      locations: item.locations,
-      userCount: Math.floor(Math.random() * 8),
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      status: index < 12 ? 'active' : 'inactive',
-    }))
-
-    setLocationGroups(initialLocationGroups)
-    localStorage.setItem(STORAGE_KEYS.LOCATION_GROUPS, JSON.stringify(initialLocationGroups))
+  /** 持久化授权记录 */
+  const saveAuthorizations = (next: DataAuthorization[]) => {
+    setAuthorizations(next)
+    localStorage.setItem(STORAGE_KEYS.DATA_AUTHORIZATIONS, JSON.stringify(next))
   }
 
-  /** 生成初始商家组数据 */
-  const generateInitialMerchantGroups = () => {
-    const merchantGroupData = [
-      {
-        name: '中国商家组',
-        desc: '中国大陆地区商家',
-        country: 'china',
-        merchants: ['G10001', 'G10002', 'G10005', 'G10006', 'G10007', 'G10009'],
-      },
-      {
-        name: '澳门商家组',
-        desc: '澳门地区商家',
-        country: 'macau',
-        merchants: ['G10003', 'G10004', 'G10008', 'G10010'],
-      },
-      {
-        name: '日本商家组',
-        desc: '日本地区商家',
-        country: 'japan',
-        merchants: ['G10011', 'G10012', 'G10013'],
-      },
-      {
-        name: '韩国商家组',
-        desc: '韩国地区商家',
-        country: 'south_korea',
-        merchants: ['G10014', 'G10015'],
-      },
-      {
-        name: '新加坡商家组',
-        desc: '新加坡地区商家',
-        country: 'singapore',
-        merchants: ['G10016', 'G10017'],
-      },
-      {
-        name: '泰国商家组',
-        desc: '泰国地区商家',
-        country: 'thailand',
-        merchants: ['G10018', 'G10019'],
-      },
-      {
-        name: '马来西亚商家组',
-        desc: '马来西亚地区商家',
-        country: 'malaysia',
-        merchants: ['G10020', 'G10021'],
-      },
-      {
-        name: '越南商家组',
-        desc: '越南地区商家',
-        country: 'vietnam',
-        merchants: ['G10022', 'G10023'],
-      },
-      {
-        name: '美国商家组',
-        desc: '美国地区商家',
-        country: 'usa',
-        merchants: ['G10024', 'G10025'],
-      },
-      {
-        name: '英国商家组',
-        desc: '英国地区商家',
-        country: 'uk',
-        merchants: ['G10026', 'G10027'],
-      },
-      {
-        name: '澳大利亚商家组',
-        desc: '澳大利亚地区商家',
-        country: 'australia',
-        merchants: ['G10028', 'G10029'],
-      },
-    ]
-
-    const initialMerchantGroups: MerchantGroup[] = merchantGroupData.map((item, index) => ({
-      id: (index + 1).toString(),
-      name: item.name,
-      description: item.desc,
-      country: item.country,
-      merchants: item.merchants,
-      userCount: Math.floor(Math.random() * 6),
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      status: index < 10 ? 'active' : 'inactive',
-    }))
-
-    setMerchantGroups(initialMerchantGroups)
-    localStorage.setItem(STORAGE_KEYS.MERCHANT_GROUPS, JSON.stringify(initialMerchantGroups))
-  }
-
-  /** 保存地点组数据 */
-  const saveLocationGroups = (newGroups: LocationGroup[]) => {
-    setLocationGroups(newGroups)
-    localStorage.setItem(STORAGE_KEYS.LOCATION_GROUPS, JSON.stringify(newGroups))
-  }
-
-  /** 保存商家组数据 */
-  const saveMerchantGroups = (newGroups: MerchantGroup[]) => {
-    setMerchantGroups(newGroups)
-    localStorage.setItem(STORAGE_KEYS.MERCHANT_GROUPS, JSON.stringify(newGroups))
-  }
-
-  /** 处理国家选择变化（地点） */
-  const handleLocationCountryChange = (country: string) => {
-    setSelectedLocationCountry(country)
-    // 清空已选地点
-    setCheckedLocations([])
-  }
-
-  /** 处理国家选择变化（商家） */
-  const handleMerchantCountryChange = (country: string) => {
-    setSelectedMerchantCountry(country)
-    // 清空已选商家
-    setSelectedMerchants([])
-  }
-
-  /** 根据国家过滤地点树 */
-  const getFilteredLocationTree = (country: string): DataNode[] => {
-    if (!country) return locationTreeData
-    
-    const allowedLocations = countryLocationMap[country] || []
-    
-    return locationTreeData.map(region => ({
-      ...region,
-      children: region.children?.filter(child => 
-        allowedLocations.includes(child.key as string)
-      ),
-    })).filter(region => region.children && region.children.length > 0)
-  }
-
-  /** 根据国家过滤商家列表 */
-  const getFilteredMerchants = (country: string) => {
-    if (!country) return merchantOptions
-    return merchantOptions.filter(merchant => merchant.country === country)
-  }
-
-  /** 新建地点组 */
-  const handleCreateLocation = () => {
-    locationForm.resetFields()
-    setCurrentLocationGroup(null)
-    setCheckedLocations([])
-    setSelectedLocationCountry('') // 重置国家选择
-    setLocationModalVisible(true)
-  }
-
-  /** 提交地点组 */
-  const handleLocationSubmit = async () => {
-    const values = await locationForm.validateFields()
-    const newGroup: LocationGroup = {
-      id: currentLocationGroup ? currentLocationGroup.id : Date.now().toString(),
-      name: values.name,
-      description: values.description || '',
-      country: selectedLocationCountry, // 使用状态中的国家
-      locations: checkedLocations,
-      userCount: currentLocationGroup ? currentLocationGroup.userCount : 0,
-      createdAt: currentLocationGroup ? currentLocationGroup.createdAt : new Date().toISOString(),
-      status: currentLocationGroup ? currentLocationGroup.status : 'active',
-    }
-
-    if (currentLocationGroup) {
-      const newGroups = locationGroups.map(g => g.id === currentLocationGroup.id ? newGroup : g)
-      saveLocationGroups(newGroups)
-      message.success('地点组已更新')
-    } else {
-      const newGroups = [...locationGroups, newGroup]
-      saveLocationGroups(newGroups)
-      message.success('地点组创建成功')
-    }
-    setLocationModalVisible(false)
-  }
-
-  /** 编辑地点组 */
-  const handleEditLocation = (record: LocationGroup) => {
-    setCurrentLocationGroup(record)
-    locationForm.setFieldsValue({
-      name: record.name,
-      description: record.description,
-    })
-    setSelectedLocationCountry(record.country) // 设置国家
-    setCheckedLocations(record.locations)
-    setLocationModalVisible(true)
-  }
-
-  /** 切换地点组状态 */
-  const handleToggleLocationStatus = (record: LocationGroup) => {
-    const newStatus: 'active' | 'inactive' = record.status === 'active' ? 'inactive' : 'active'
-    const newGroups = locationGroups.map(g =>
-      g.id === record.id ? { ...g, status: newStatus } : g
-    )
-    saveLocationGroups(newGroups)
-    message.success(newStatus === 'active' ? '已启用' : '已停用')
-  }
-
-  /** 删除地点组 */
-  const handleDeleteLocation = (record: LocationGroup) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除地点组"${record.name}"吗？`,
-      onOk: () => {
-        const newGroups = locationGroups.filter(g => g.id !== record.id)
-        saveLocationGroups(newGroups)
-        message.success('地点组已删除')
-      },
-    })
-  }
-
-  /** 新建商家组 */
-  const handleCreateMerchant = () => {
-    merchantForm.resetFields()
-    setCurrentMerchantGroup(null)
-    setSelectedMerchants([])
-    setSelectedMerchantCountry('') // 重置国家选择
-    setMerchantModalVisible(true)
-  }
-
-  /** 提交商家组 */
-  const handleMerchantSubmit = async () => {
-    const values = await merchantForm.validateFields()
-    const newGroup: MerchantGroup = {
-      id: currentMerchantGroup ? currentMerchantGroup.id : Date.now().toString(),
-      name: values.name,
-      description: values.description || '',
-      country: selectedMerchantCountry, // 使用状态中的国家
-      merchants: selectedMerchants,
-      userCount: currentMerchantGroup ? currentMerchantGroup.userCount : 0,
-      createdAt: currentMerchantGroup ? currentMerchantGroup.createdAt : new Date().toISOString(),
-      status: currentMerchantGroup ? currentMerchantGroup.status : 'active',
-    }
-
-    if (currentMerchantGroup) {
-      const newGroups = merchantGroups.map(g => g.id === currentMerchantGroup.id ? newGroup : g)
-      saveMerchantGroups(newGroups)
-      message.success('商家组已更新')
-    } else {
-      const newGroups = [...merchantGroups, newGroup]
-      saveMerchantGroups(newGroups)
-      message.success('商家组创建成功')
-    }
-    setMerchantModalVisible(false)
-  }
-
-  /** 编辑商家组 */
-  const handleEditMerchant = (record: MerchantGroup) => {
-    setCurrentMerchantGroup(record)
-    merchantForm.setFieldsValue({
-      name: record.name,
-      description: record.description,
-    })
-    setSelectedMerchantCountry(record.country) // 设置国家
-    setSelectedMerchants(record.merchants)
-    setMerchantModalVisible(true)
-  }
-
-  /** 切换商家组状态 */
-  const handleToggleMerchantStatus = (record: MerchantGroup) => {
-    const newStatus: 'active' | 'inactive' = record.status === 'active' ? 'inactive' : 'active'
-    const newGroups = merchantGroups.map(g =>
-      g.id === record.id ? { ...g, status: newStatus } : g
-    )
-    saveMerchantGroups(newGroups)
-    message.success(newStatus === 'active' ? '已启用' : '已停用')
-  }
-
-  /** 删除商家组 */
-  const handleDeleteMerchant = (record: MerchantGroup) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除商家组"${record.name}"吗？`,
-      onOk: () => {
-        const newGroups = merchantGroups.filter(g => g.id !== record.id)
-        saveMerchantGroups(newGroups)
-        message.success('商家组已删除')
-      },
-    })
-  }
-
-  /** 过滤商家 */
-  const filteredMerchants = getFilteredMerchants(selectedMerchantCountry).filter(merchant =>
-    merchant.name.includes(merchantSearchText) ||
-    merchant.address.includes(merchantSearchText)
+  /** 角色授权列表 */
+  const roleRows = useMemo<AuthRow[]>(
+    () => authorizations
+      .filter(a => a.targetType === DATA_TARGET_TYPE.ROLE)
+      .map(a => {
+        const role = roles.find(r => r.id === a.targetId)
+        return {
+          ...a,
+          targetName: role?.name ?? '（角色已刪除）',
+          userCount: role?.userCount ?? 0,
+        }
+      }),
+    [authorizations, roles],
   )
 
-  // 地点组表格列
-  const locationColumns: TableColumnsType<LocationGroup> = [
-    {
-      title: '授權國家',
-      dataIndex: 'country',
-      key: 'country',
-      width: 120,
-      render: (country: string) => {
-        const c = countryOptions.find(c => c.key === country)
-        // 不同国家使用不同颜色
-        const colorMap: Record<string, string> = {
-          china: 'blue',
-          hongkong: 'purple',
-          macau: 'orange',
-          taiwan: 'cyan',
-          japan: 'red',
-          south_korea: 'magenta',
-          singapore: 'green',
-          malaysia: 'lime',
-          thailand: 'volcano',
-          vietnam: 'gold',
-          philippines: 'geekblue',
-          indonesia: 'purple',
-          usa: 'red',
-          uk: 'blue',
-          australia: 'orange',
+  /** 部门授权列表 */
+  const deptRows = useMemo<AuthRow[]>(
+    () => authorizations
+      .filter(a => a.targetType === DATA_TARGET_TYPE.DEPARTMENT)
+      .map(a => {
+        const dept = departments.find(d => d.id === a.targetId)
+        return {
+          ...a,
+          targetName: dept?.name ?? '（部門已刪除）',
+          parentName: dept?.parentName,
+          userCount: dept?.userCount ?? 0,
         }
-        const color = colorMap[country] || 'default'
-        return c ? <Tag color={color}>{c.label}</Tag> : '-'
-      },
-    },
+      }),
+    [authorizations, departments],
+  )
+
+  /** 新增授权时可选的角色（启用中） */
+  const availableRoles = useMemo(
+    () => roles.filter(r => r.status === STATUS_ENABLED),
+    [roles],
+  )
+
+  /** 弹窗中当前地区的商家列表（按搜索过滤） */
+  const merchantList = useMemo(() => {
+    if (!country) return []
+    return merchantOptions.filter(m =>
+      m.country === country &&
+      (m.name.includes(merchantSearchText) || m.address.includes(merchantSearchText)),
+    )
+  }, [country, merchantSearchText])
+
+  /** 详情弹窗：授权覆盖的商家列表 */
+  const detailMerchants = useMemo(() => {
+    if (!detailRecord) return []
+    if (detailRecord.allMerchants) {
+      return merchantOptions.filter(m => m.country === detailRecord.country)
+    }
+    return merchantOptions.filter(m => detailRecord.merchants.includes(m.id))
+  }, [detailRecord])
+
+  /** 打开新增授权弹窗 */
+  const handleCreate = () => {
+    setEditingId(null)
+    setTargetId(undefined)
+    setCountry(undefined)
+    setAllMerchants(true)
+    setSelectedMerchants([])
+    setMerchantSearchText('')
+    setModalVisible(true)
+  }
+
+  /** 打开编辑授权弹窗 */
+  const handleEdit = (record: AuthRow) => {
+    setEditingId(record.id)
+    setTargetId(record.targetId)
+    setCountry(record.country)
+    setAllMerchants(record.allMerchants)
+    setSelectedMerchants(record.merchants)
+    setMerchantSearchText('')
+    setModalVisible(true)
+  }
+
+  /** 切换授权地区（清空已选商家） */
+  const handleCountryChange = (value: string) => {
+    setCountry(value)
+    setSelectedMerchants([])
+    setMerchantSearchText('')
+  }
+
+  /** 保存授权（形成/更新一条授权数据） */
+  const handleSave = () => {
+    if (targetId == null) {
+      message.warning(activeTab === DATA_TARGET_TYPE.ROLE ? '請選擇要授權的角色' : '請選擇要授權的部門')
+      return
+    }
+    if (!country) {
+      message.warning('請選擇授權地區')
+      return
+    }
+    if (!allMerchants && selectedMerchants.length === 0) {
+      message.warning('請至少選擇一個商家')
+      return
+    }
+    const duplicated = authorizations.some(a =>
+      a.id !== editingId &&
+      a.targetType === activeTab &&
+      a.targetId === targetId &&
+      a.country === country,
+    )
+    if (duplicated) {
+      message.warning('該對象在此地區已存在授權，請直接編輯原授權數據')
+      return
+    }
+    // 最后更新人：当前登录人（优先姓名）
+    const operator = user?.name || user?.username || '-'
+    const updatedAt = new Date().toISOString()
+    if (editingId) {
+      const next = authorizations.map(a =>
+        a.id === editingId
+          ? { ...a, targetId, country, allMerchants, merchants: allMerchants ? [] : selectedMerchants, updatedBy: operator, updatedAt }
+          : a,
+      )
+      saveAuthorizations(next)
+      message.success('授權已更新')
+    } else {
+      const record: DataAuthorization = {
+        id: Date.now().toString(),
+        targetType: activeTab,
+        targetId,
+        country,
+        allMerchants,
+        merchants: allMerchants ? [] : selectedMerchants,
+        createdAt: updatedAt,
+        updatedBy: operator,
+        updatedAt,
+      }
+      saveAuthorizations([...authorizations, record])
+      message.success('授權已創建')
+    }
+    setModalVisible(false)
+  }
+
+  /** 删除授权 */
+  const handleDelete = (record: AuthRow) => {
+    saveAuthorizations(authorizations.filter(a => a.id !== record.id))
+    message.success('授權已刪除')
+  }
+
+  /** 授权地区列 */
+  const renderCountryTag = (value: string) => (
+    <Tag color={COUNTRY_COLOR_MAP[value] || 'default'}>{COUNTRY_NAME_MAP[value] ?? value}</Tag>
+  )
+
+  /** 操作列（角色/部门通用） */
+  const renderActions = (record: AuthRow) => (
+    <Space size={4}>
+      <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
+        詳情
+      </Button>
+      <Button type="link" size="small" onClick={() => handleEdit(record)}>
+        編輯
+      </Button>
+      <Popconfirm
+        title="確認刪除"
+        description={`確定要刪除「${record.targetName}」在「${COUNTRY_NAME_MAP[record.country] ?? record.country}」的數據授權嗎？`}
+        onConfirm={() => handleDelete(record)}
+        okText="確認"
+        cancelText="取消"
+      >
+        <Button type="link" size="small" danger>
+          刪除
+        </Button>
+      </Popconfirm>
+    </Space>
+  )
+
+  const roleColumns: TableColumnsType<AuthRow> = [
+    { title: '角色名稱', dataIndex: 'targetName', key: 'targetName', width: 180 },
+    { title: '授權地區', dataIndex: 'country', key: 'country', width: 120, render: renderCountryTag },
+    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => `${v} 人` },
+    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '授權地點組',
-      dataIndex: 'name',
-      key: 'name',
-      width: 180,
+      title: '最後更新時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 170,
+      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 250,
-      ellipsis: true,
-    },
-    {
-      title: '包含地點',
-      dataIndex: 'locations',
-      key: 'locations',
-      width: 250,
-      render: (locations: string[]) => (
-        <Space wrap>
-          {locations.map(locKey => {
-            const loc = locationOptions.find(l => l.key === locKey)
-            return loc ? <Tag key={locKey} color="blue">{loc.label}</Tag> : null
-          })}
-        </Space>
-      ),
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: 'active' | 'inactive') => (
-        <Tag color={status === 'active' ? 'green' : 'default'}>
-          {status === 'active' ? '啟用' : '停用'}
-        </Tag>
-      ),
-    },
-    {
-      title: '綁定賬號數',
-      dataIndex: 'userCount',
-      key: 'userCount',
-      width: 120,
-      render: (count: number) => (
-        <Tag color="green">{count} 個</Tag>
-      ),
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (date: string) => new Date(date).toLocaleString('zh-TW', { hour12: false }),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 240,
-      render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button 
-            type="link" 
-            size="small" 
-            icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-            onClick={() => handleToggleLocationStatus(record)}
-          >
-            {record.status === 'active' ? '停用' : '啟用'}
-          </Button>
-          <Button type="link" size="small"  onClick={() => handleEditLocation(record)}>
-            編輯
-          </Button>
-          <Button type="link" size="small" danger  onClick={() => handleDeleteLocation(record)}>
-            刪除
-          </Button>
-        </Space>
-      ),
-    },
+    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
-  // 商家组表格列
-  const merchantColumns: TableColumnsType<MerchantGroup> = [
+  const deptColumns: TableColumnsType<AuthRow> = [
+    { title: '部門名稱', dataIndex: 'targetName', key: 'targetName', width: 180 },
+    { title: '上級部門', dataIndex: 'parentName', key: 'parentName', width: 150, render: (v: string) => v || '-' },
+    { title: '授權地區', dataIndex: 'country', key: 'country', width: 120, render: renderCountryTag },
+    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => `${v} 人` },
+    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '授權國家',
-      dataIndex: 'country',
-      key: 'country',
-      width: 120,
-      render: (country: string) => {
-        const c = countryOptions.find(c => c.key === country)
-        // 不同国家使用不同颜色
-        const colorMap: Record<string, string> = {
-          china: 'blue',
-          hongkong: 'purple',
-          macau: 'orange',
-          taiwan: 'cyan',
-          japan: 'red',
-          south_korea: 'magenta',
-          singapore: 'green',
-          malaysia: 'lime',
-          thailand: 'volcano',
-          vietnam: 'gold',
-          philippines: 'geekblue',
-          indonesia: 'purple',
-          usa: 'red',
-          uk: 'blue',
-          australia: 'orange',
-        }
-        const color = colorMap[country] || 'default'
-        return c ? <Tag color={color}>{c.label}</Tag> : '-'
-      },
+      title: '最後更新時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 170,
+      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
-    {
-      title: '商家組名稱',
-      dataIndex: 'name',
-      key: 'name',
-      width: 180,
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 250,
-      ellipsis: true,
-    },
-    {
-      title: '包含商家',
-      dataIndex: 'merchants',
-      key: 'merchants',
-      width: 300,
-      render: (merchants: string[]) => (
-        <Space wrap>
-          {merchants.slice(0, 3).map(merchantId => {
-            const merchant = merchantOptions.find(m => m.id === merchantId)
-            return merchant ? <Tag key={merchantId} color="purple">{merchant.name}</Tag> : null
-          })}
-          {merchants.length > 3 && <Tag color="default">+{merchants.length - 3}</Tag>}
-        </Space>
-      ),
-    },
-    {
-      title: '狀態',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: 'active' | 'inactive') => (
-        <Tag color={status === 'active' ? 'green' : 'default'}>
-          {status === 'active' ? '啟用' : '停用'}
-        </Tag>
-      ),
-    },
-    {
-      title: '綁定賬號數',
-      dataIndex: 'userCount',
-      key: 'userCount',
-      width: 120,
-      render: (count: number) => (
-        <Tag color="green">{count} 個</Tag>
-      ),
-    },
-    {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (date: string) => new Date(date).toLocaleString('zh-TW', { hour12: false }),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 240,
-      render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button 
-            type="link" 
-            size="small" 
-            icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-            onClick={() => handleToggleMerchantStatus(record)}
-          >
-            {record.status === 'active' ? '停用' : '啟用'}
-          </Button>
-          <Button type="link" size="small"  onClick={() => handleEditMerchant(record)}>
-            編輯
-          </Button>
-          <Button type="link" size="small" danger  onClick={() => handleDeleteMerchant(record)}>
-            刪除
-          </Button>
-        </Space>
-      ),
-    },
+    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
-  const merchantTableColumns = [
-    {
-      title: '商家ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 100,
-    },
-    {
-      title: '商家名稱',
-      dataIndex: 'name',
-      key: 'name',
-      width: 200,
-    },
-    {
-      title: '註冊地址',
-      dataIndex: 'address',
-      key: 'address',
-    },
+  const merchantTableColumns: TableColumnsType<typeof merchantOptions[number]> = [
+    { title: '商家ID', dataIndex: 'id', key: 'id', width: 100 },
+    { title: '商家名稱', dataIndex: 'name', key: 'name', width: 200 },
+    { title: '註冊地址', dataIndex: 'address', key: 'address' },
   ]
+
+  /** 授权列表（角色/部门 Tab 内容） */
+  const renderTabContent = (type: DataTargetType) => (
+    <div>
+      <div className="action-section">
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            新增
+          </Button>
+        </div>
+      </div>
+      <Table
+        columns={type === DATA_TARGET_TYPE.ROLE ? roleColumns : deptColumns}
+        dataSource={type === DATA_TARGET_TYPE.ROLE ? roleRows : deptRows}
+        rowKey="id"
+        loading={loading}
+        pagination={{
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (t) => `共 ${t} 條數據`,
+        }}
+        locale={{
+          emptyText: type === DATA_TARGET_TYPE.ROLE
+            ? '暫無授權數據，點擊「新增」為角色授權地區商家數據'
+            : '暫無授權數據，點擊「新增」為部門授權地區商家數據',
+        }}
+      />
+    </div>
+  )
+
+  /** 弹窗中编辑对象的名称（编辑模式展示） */
+  const editingName = editingId != null
+    ? (activeTab === DATA_TARGET_TYPE.ROLE ? roleRows : deptRows).find(r => r.id === editingId)?.targetName
+    : undefined
 
   return (
-    <div className="data-permission-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>數據權限</h2>
-        <Button 
-          danger 
-          onClick={() => {
-            localStorage.removeItem(STORAGE_KEYS.LOCATION_GROUPS)
-            localStorage.removeItem(STORAGE_KEYS.MERCHANT_GROUPS)
-            message.success('数据已重置，请刷新页面')
-            window.location.reload()
-          }}
-        >
-          重置数据
-        </Button>
-      </div>
+    <div>
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as DataTargetType)}
+        items={[
+          { key: DATA_TARGET_TYPE.ROLE, label: '角色授權', children: renderTabContent(DATA_TARGET_TYPE.ROLE) },
+          { key: DATA_TARGET_TYPE.DEPARTMENT, label: '部門授權', children: renderTabContent(DATA_TARGET_TYPE.DEPARTMENT) },
+        ]}
+      />
 
-      <Tabs defaultActiveKey="location">
-        <TabPane tab="地點維度" key="location">
-          <div className="data-permission-tab-content">
-            <div className="data-permission-header">
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateLocation}>
-                新建地點組
-              </Button>
-            </div>
-            <Table
-              columns={locationColumns}
-              dataSource={locationGroups.slice((locationCurrentPage - 1) * locationPageSize, locationCurrentPage * locationPageSize)}
-              rowKey="id"
-              pagination={false}
-              bordered
-            />
-            <div className="data-permission-pagination">
-              <Pagination
-                current={locationCurrentPage}
-                pageSize={locationPageSize}
-                total={locationGroups.length}
-                showSizeChanger
-                showQuickJumper
-                showTotal={(total) => `共 ${total} 條數據`}
-                onChange={(page, size) => {
-                  setLocationCurrentPage(page)
-                  if (size !== locationPageSize) {
-                    setLocationPageSize(size)
-                    setLocationCurrentPage(1)
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </TabPane>
-
-        <TabPane tab="商家維度" key="merchant">
-          <div className="data-permission-tab-content">
-            <div className="data-permission-header">
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateMerchant}>
-                新建商家組
-              </Button>
-            </div>
-            <Table
-              columns={merchantColumns}
-              dataSource={merchantGroups.slice((merchantCurrentPage - 1) * merchantPageSize, merchantCurrentPage * merchantPageSize)}
-              rowKey="id"
-              pagination={false}
-              bordered
-            />
-            <div className="data-permission-pagination">
-              <Pagination
-                current={merchantCurrentPage}
-                pageSize={merchantPageSize}
-                total={merchantGroups.length}
-                showSizeChanger
-                showQuickJumper
-                showTotal={(total) => `共 ${total} 條數據`}
-                onChange={(page, size) => {
-                  setMerchantCurrentPage(page)
-                  if (size !== merchantPageSize) {
-                    setMerchantPageSize(size)
-                    setMerchantCurrentPage(1)
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </TabPane>
-      </Tabs>
-
-      {/* 地点组弹窗 */}
+      {/* 新增/编辑授权弹窗 */}
       <Modal
-        title={currentLocationGroup ? '編輯地點組' : '新建地點組'}
-        open={locationModalVisible}
-        onOk={handleLocationSubmit}
-        onCancel={() => setLocationModalVisible(false)}
-        width={600}
+        title={
+          editingId
+            ? `編輯數據授權 - ${editingName ?? ''}`
+            : (activeTab === DATA_TARGET_TYPE.ROLE ? '新增角色數據授權' : '新增部門數據授權')
+        }
+        open={modalVisible}
+        onOk={handleSave}
+        onCancel={() => setModalVisible(false)}
         okText="保存"
         cancelText="取消"
+        width={760}
+        destroyOnClose
       >
-        <Form form={locationForm} layout="vertical">
-          <Form.Item
-            name="name"
-            label="地點組名稱"
-            rules={[{ required: true, message: '请输入地点组名称' }]}
-          >
-            <Input placeholder="例如：华南地区" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="描述"
-          >
-            <TextArea rows={2} placeholder="请输入描述" />
-          </Form.Item>
-          <Form.Item
-            label="授權國家"
-            rules={[{ required: true, message: '请选择国家' }]}
-          >
+        {/* 授权对象选择（编辑模式锁定） */}
+        <div className="data-auth-target-bar">
+          <span className="data-auth-label">
+            {activeTab === DATA_TARGET_TYPE.ROLE ? '授權角色：' : '授權部門：'}
+          </span>
+          {activeTab === DATA_TARGET_TYPE.ROLE ? (
             <Select
-              value={selectedLocationCountry}
-              onChange={handleLocationCountryChange}
-              placeholder="请选择国家"
-              options={countryOptions}
+              className="data-auth-target-select"
+              placeholder="請選擇角色"
+              showSearch
+              optionFilterProp="label"
+              disabled={editingId != null}
+              value={targetId}
+              onChange={(id) => setTargetId(id)}
+              options={(editingId != null ? roles : availableRoles).map(r => ({
+                value: r.id,
+                label: r.name,
+              }))}
             />
-          </Form.Item>
-          <Form.Item label="選擇地點（{selectedLocationCountry ? countryOptions.find(c => c.key === selectedLocationCountry)?.label : '请选择国家'}）">
-            <Tree
-              checkable
-              checkedKeys={checkedLocations}
-              onCheck={(keys) => setCheckedLocations(keys as string[])}
-              treeData={getFilteredLocationTree(selectedLocationCountry)}
+          ) : (
+            <TreeSelect
+              className="data-auth-target-select"
+              placeholder="請選擇部門"
+              showSearch
+              treeDefaultExpandAll
+              treeNodeFilterProp="title"
+              disabled={editingId != null}
+              value={targetId}
+              onChange={(id) => setTargetId(id)}
+              treeData={buildDeptTreeData(departments)}
             />
-          </Form.Item>
-        </Form>
-      </Modal>
+          )}
+          <Tag color={activeTab === DATA_TARGET_TYPE.ROLE ? 'blue' : 'purple'}>
+            {activeTab === DATA_TARGET_TYPE.ROLE
+              ? '加入該角色的員工可查看所授權地區的商家數據'
+              : '進入該部門的人員可查看所授權地區的商家數據'}
+          </Tag>
+        </div>
 
-      {/* 商家组弹窗 */}
-      <Modal
-        title={currentMerchantGroup ? '編輯商家組' : '新建商家組'}
-        open={merchantModalVisible}
-        onOk={handleMerchantSubmit}
-        onCancel={() => setMerchantModalVisible(false)}
-        width={800}
-        okText={`保存 (${selectedMerchants.length} 個)`}
-        cancelText="取消"
-      >
-        <Form form={merchantForm} layout="vertical">
-          <Form.Item
-            name="name"
-            label="商家組名稱"
-            rules={[{ required: true, message: '请输入商家组名称' }]}
-          >
-            <Input placeholder="例如：中国商家组" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="描述"
-          >
-            <TextArea rows={2} placeholder="请输入描述" />
-          </Form.Item>
-          <Form.Item
-            label="授權國家"
-            rules={[{ required: true, message: '请选择国家' }]}
-          >
-            <Select
-              value={selectedMerchantCountry}
-              onChange={handleMerchantCountryChange}
-              placeholder="请选择国家"
-              options={countryOptions}
-            />
-          </Form.Item>
-          <Form.Item label="選擇商家（{selectedMerchantCountry ? countryOptions.find(c => c.key === selectedMerchantCountry)?.label : '请选择国家'}）">
+        {/* 授权地区 + 商家范围 */}
+        <div className="data-auth-field">
+          <span className="data-auth-label">授權地區：</span>
+          <Select
+            className="data-auth-target-select"
+            placeholder="請選擇地區"
+            showSearch
+            optionFilterProp="label"
+            value={country}
+            onChange={handleCountryChange}
+            options={countryOptions.map(c => ({ value: c.key, label: c.label }))}
+          />
+        </div>
+
+        <div className="data-auth-field">
+          <span className="data-auth-label">商家範圍：</span>
+          <Radio.Group
+            value={allMerchants}
+            onChange={(e) => setAllMerchants(e.target.value)}
+            options={[
+              { value: true, label: '該地區全部商家（含後續新入駐商家）' },
+              { value: false, label: '指定商家' },
+            ]}
+          />
+        </div>
+
+        {/* 指定商家：搜索 + 勾选 */}
+        {!allMerchants && (
+          <div className="data-auth-merchant-panel">
             <Input.Search
               placeholder="搜索商家名稱、註冊地址"
               value={merchantSearchText}
               onChange={(e) => setMerchantSearchText(e.target.value)}
-              style={{ marginBottom: 12 }}
+              allowClear
+              className="data-auth-merchant-search"
             />
             <Table
               columns={merchantTableColumns}
-              dataSource={filteredMerchants}
+              dataSource={merchantList}
               rowKey="id"
               pagination={false}
               size="small"
@@ -889,10 +483,49 @@ export default function DataPermission() {
                 selectedRowKeys: selectedMerchants,
                 onChange: (keys) => setSelectedMerchants(keys as string[]),
               }}
-              scroll={{ y: 300 }}
+              scroll={{ y: 260 }}
+              locale={{ emptyText: country ? '該地區暫無商家' : '請先選擇授權地區' }}
             />
-          </Form.Item>
-        </Form>
+            <div className="data-auth-tip">
+              已選 {selectedMerchants.length} 個商家
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 授权详情弹窗 */}
+      <Modal
+        title={`授權詳情 - ${detailRecord?.targetName ?? ''}`}
+        open={detailRecord != null}
+        onCancel={() => setDetailRecord(null)}
+        footer={null}
+        width={680}
+      >
+        {detailRecord && (
+          <>
+            <div className="data-auth-field">
+              <span className="data-auth-label">授權地區：</span>
+              {renderCountryTag(detailRecord.country)}
+            </div>
+            <div className="data-auth-field">
+              <span className="data-auth-label">商家範圍：</span>
+              {detailRecord.allMerchants ? (
+                <Tag color="green">該地區全部商家（{detailMerchants.length} 家，含後續新入駐商家）</Tag>
+              ) : (
+                <Tag color="purple">指定商家（{detailMerchants.length} 家）</Tag>
+              )}
+            </div>
+            <Table
+              columns={merchantTableColumns}
+              dataSource={detailMerchants}
+              rowKey="id"
+              size="small"
+              pagination={false}
+              scroll={{ y: 320 }}
+              locale={{ emptyText: '該地區暫無商家' }}
+            />
+          </>
+        )}
       </Modal>
     </div>
   )
