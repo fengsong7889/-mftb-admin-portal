@@ -17,6 +17,17 @@ import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchPositions } from '../../../api/position'
 import type { PositionItem } from '../../../api/position'
+import {
+  mockFetchEmployees,
+  mockCreateEmployee,
+  mockUpdateEmployee,
+  mockResetPassword,
+  mockUpdateEmployeeStatus,
+  mockDeleteEmployee,
+  mockFetchRoles,
+  mockFetchDepartments,
+  mockFetchPositions,
+} from '../../../api/mock/hr-mock'
 
 /** 员工状态枚举 */
 const EMPLOYEE_STATUS = {
@@ -34,7 +45,6 @@ const statusOptions = [
 
 /** 新增/编辑表单值 */
 interface EmployeeFormValues {
-  username: string
   password?: string
   name: string
   empId: string
@@ -113,7 +123,10 @@ export default function EmployeeManagement() {
       setDataSource(result.records)
       setTotal(result.total)
     } catch {
-      // 错误提示由请求层统一处理
+      // 后端不可用时降级到 Mock 数据
+      const result = mockFetchEmployees({ page, size: pageSize, keyword, status })
+      setDataSource(result.records)
+      setTotal(result.total)
     } finally {
       setLoading(false)
     }
@@ -129,7 +142,7 @@ export default function EmployeeManagement() {
       const list = await fetchRoles()
       setRoles(list)
     } catch {
-      // 错误提示由请求层统一处理
+      setRoles(mockFetchRoles())
     }
   }, [])
 
@@ -143,7 +156,7 @@ export default function EmployeeManagement() {
       const list = await fetchDepartments()
       setDepartments(list)
     } catch {
-      // 错误提示由请求层统一处理
+      setDepartments(mockFetchDepartments())
     }
   }, [])
 
@@ -157,7 +170,7 @@ export default function EmployeeManagement() {
       const list = await fetchPositions()
       setPositions(list)
     } catch {
-      // 错误提示由请求层统一处理
+      setPositions(mockFetchPositions())
     }
   }, [])
 
@@ -200,7 +213,6 @@ export default function EmployeeManagement() {
   const handleEdit = (record: EmployeeItem) => {
     setEditing(record)
     form.setFieldsValue({
-      username: record.username,
       name: record.name,
       empId: record.empId,
       departmentId: record.departmentId ?? undefined,
@@ -226,18 +238,29 @@ export default function EmployeeManagement() {
         await updateEmployee(editing.id, payload)
         message.success('員工信息已更新')
       } else {
+        // 工号即登录账号
         await createEmployee({
           ...payload,
-          username: values.username.trim(),
+          username: values.empId.trim(),
           password: values.password,
         })
-        message.success('員工創建成功，可使用該賬號登錄')
+        message.success(`員工創建成功，登錄賬號：${values.empId.trim()}`)
       }
       setEditModalVisible(false)
       fetchList()
       fetchRoleList()
     } catch {
-      // 错误提示由请求层统一处理
+      // 后端不可用时降级到 Mock
+      if (editing) {
+        mockUpdateEmployee(editing.id, payload)
+        message.success('員工信息已更新（Mock 模式）')
+      } else {
+        mockCreateEmployee({ ...payload, username: values.empId.trim(), password: values.password })
+        message.success(`員工創建成功（Mock 模式），登錄賬號：${values.empId.trim()}`)
+      }
+      setEditModalVisible(false)
+      fetchList()
+      fetchRoleList()
     } finally {
       setSubmitting(false)
     }
@@ -260,7 +283,9 @@ export default function EmployeeManagement() {
       message.success('密碼已重置')
       setPwdModalVisible(false)
     } catch {
-      // 错误提示由请求层统一处理
+      mockResetPassword(pwdTarget.id)
+      message.success('密碼已重置（Mock 模式）')
+      setPwdModalVisible(false)
     } finally {
       setSubmitting(false)
     }
@@ -274,7 +299,9 @@ export default function EmployeeManagement() {
       message.success(next === EMPLOYEE_STATUS.ENABLED ? '已啟用' : '已停用')
       fetchList()
     } catch {
-      // 错误提示由请求层统一处理
+      mockUpdateEmployeeStatus(record.id, next)
+      message.success((next === EMPLOYEE_STATUS.ENABLED ? '已啟用' : '已停用') + '（Mock 模式）')
+      fetchList()
     }
   }
 
@@ -286,7 +313,10 @@ export default function EmployeeManagement() {
       fetchList()
       fetchRoleList()
     } catch {
-      // 错误提示由请求层统一处理
+      mockDeleteEmployee(record.id)
+      message.success('員工已刪除（Mock 模式）')
+      fetchList()
+      fetchRoleList()
     }
   }
 
@@ -439,15 +469,16 @@ export default function EmployeeManagement() {
         destroyOnClose
       >
         <Form form={form} layout="vertical">
+          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
+            <Input placeholder="請輸入員工姓名" allowClear />
+          </Form.Item>
           <Form.Item
-            name="username"
-            label="登錄賬號"
-            rules={[
-              { required: true, message: '請輸入登錄賬號' },
-              { pattern: /^[a-zA-Z0-9_]{3,20}$/, message: '3-20位字母/數字/下劃線' },
-            ]}
+            name="empId"
+            label="工號"
+            extra="工號同時作為登錄賬號使用"
+            rules={[{ required: true, message: '請輸入工號' }]}
           >
-            <Input placeholder="員工登錄系統使用的賬號" disabled={!!editing} allowClear />
+            <Input placeholder="例如：EMP1001，將作為登錄賬號" allowClear disabled={!!editing} />
           </Form.Item>
           {!editing && (
             <Form.Item
@@ -461,12 +492,6 @@ export default function EmployeeManagement() {
               <Input.Password placeholder="請輸入初始登錄密碼" />
             </Form.Item>
           )}
-          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
-            <Input placeholder="請輸入員工姓名" allowClear />
-          </Form.Item>
-          <Form.Item name="empId" label="工號" rules={[{ required: true, message: '請輸入工號' }]}>
-            <Input placeholder="例如：EMP1001" allowClear />
-          </Form.Item>
           <Form.Item name="departmentId" label="所屬部門" extra="部門在「組織管理」中維護，加入部門後自動獲得部門授權的菜單權限">
             <TreeSelect
               treeData={deptTreeData}
