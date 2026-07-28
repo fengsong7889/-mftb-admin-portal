@@ -25,6 +25,7 @@ import {
   CheckCircleOutlined,
   PercentageOutlined,
   SettingOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -182,6 +183,8 @@ export default function PopularSkinPricing() {
   // 購買多天折扣配置（梯度）
   const [gradientEnabled, setGradientEnabled] = useState(false)
   const [gradients, setGradients] = useState<DayDiscountGradient[]>([])
+  // 預售天數（銷售策略，與無敵星星/盤活復蘇保持一致）：限制商家最多可購買未來幾天內的皮膚推廣
+  const [presaleDays, setPresaleDays] = useState<number>(7)
   // 退費比例配置：人氣商家默認不允許退款（與訂單側業務規則一致），開啟後可配置退費比例梯度
   const [refundEnabled, setRefundEnabled] = useState(false)
   const [cancelFeeRules, setCancelFeeRules] = useState<CancelFeeRule[]>([{ id: 1, maxDays: 3, feePercent: 50 }])
@@ -213,6 +216,8 @@ export default function PopularSkinPricing() {
       ])
       // 回填詳情圖 Mock 數據
       setDetailFileList([{ uid: '-1', name: 'detail.svg', status: 'done', url: MOCK_DETAIL_IMAGE }])
+      // 回填預售天數 Mock 數據
+      setPresaleDays(30)
       // 回填退費比例 Mock 規則（開關保持默認不允許退款）
       setCancelFeeRules([
         { id: 1, maxDays: 1, feePercent: 80 },
@@ -334,7 +339,7 @@ export default function PopularSkinPricing() {
         }
       }
       setLoading(true)
-      console.log('提交皮膚定價:', { ...values, skins, status, gradientEnabled, gradients, refundEnabled, cancelFeeRules, detailFileList })
+      console.log('提交皮膚定價:', { ...values, skins, status, gradientEnabled, gradients, presaleDays, refundEnabled, cancelFeeRules, detailFileList })
       message.success(isEditMode ? '編輯成功' : '新增成功')
       navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
     } catch {
@@ -647,6 +652,27 @@ export default function PopularSkinPricing() {
               )}
             </Upload>
           </Form.Item>
+        </div>
+
+        {/* 銷售策略：預售天數（與無敵星星/盤活復蘇定價保持一致，限制廣告銷售可購買的天數範圍） */}
+        <div style={cardShellStyle}>
+          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', '銷售策略')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數:</span>
+            <InputNumber
+              min={1}
+              max={90}
+              precision={0}
+              value={presaleDays}
+              disabled={isDetailMode}
+              onChange={(value) => setPresaleDays(value || 7)}
+              addonAfter="天"
+              style={{ width: 160 }}
+            />
+            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
+              系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售；商家單次最多可購買未來 {presaleDays} 天內的皮膚推廣
+            </span>
+          </div>
         </div>
 
         {/* 皮膚列表 */}

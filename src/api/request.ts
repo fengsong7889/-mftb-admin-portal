@@ -27,9 +27,10 @@ const UNAUTHORIZED_CODE = 401
 /**
  * 创建 axios 实例
  * 开发环境通过 Vite proxy 代理到后端 (见 vite.config.ts)
+ * 生产环境通过 VITE_API_BASE_URL 环境变量指定后端地址
  */
 const request: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 15000,
 })
 

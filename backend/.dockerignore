@@ -1,0 +1,9 @@
+target/
+*.log
+.idea/
+*.iml
+.git/
+.gitignore
+README.md
+.qoder/
+node_modules/
