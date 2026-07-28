@@ -198,7 +198,7 @@ function popularDays(startDate: string, days: number): string[] {
   })
 }
 
-// 人氣商家訂單生成器（皮膚套件按天計價，滿7天享95折；不允許退款，僅可取消）
+// 人氣商家訂單生成器（皮膚套件按天計價，滿7天享95折；付費購買，支持退款）
 function genPopularOrder(
   id: string, orderNo: string, algorithmId: string, promotionName: string,
   app: AppType, channel: RecommendChannel, region: Region, slotPosition: number,
@@ -206,7 +206,7 @@ function genPopularOrder(
   skinName: string, pricePerDay: number, startDate: string, days: number,
   status: OrderStatus, orderTime: string, payTime: string | undefined,
   operatorType: OrderOperatorType, operatorId: string, operatorName: string,
-  cancelInfo?: { cancelTime: string; cancelOperatorId: string; cancelOperatorName: string },
+  refundInfo?: { refundTime: string; refundOperatorId: string; refundOperatorName: string },
 ): OrderItem {
   const purchaseDays = popularDays(startDate, days)
   const originalPrice = pricePerDay * days
@@ -219,11 +219,11 @@ function genPopularOrder(
     originalPrice, discountPrice: actualPrice, actualPrice,
     status, orderTime, payTime,
     operatorType, operatorId, operatorName,
-    ...(cancelInfo || {}),
+    ...(refundInfo || {}),
   }
 }
 
-// 人氣商家 Mock 訂單（15條：待推廣×4、推廣中×4、已完成×4、已取消×3）
+// 人氣商家 Mock 訂單（15條：待推廣×4、推廣中×4、已完成×4、已退款×3）
 const popularOrders: OrderItem[] = [
   // 推廣中 ×4
   genPopularOrder('301','ORD20260725301','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.KOKSAA,1,'G10008','威尼斯人餐飲集團','S30021','威尼斯人酒店','紅運當頭',28,'2026-07-26',7,OrderStatus.PROMOTING,'2026-07-25 10:20:00','2026-07-25 10:21:00',OrderOperatorType.MERCHANT,'S30021','威尼斯人酒店'),
@@ -231,19 +231,19 @@ const popularOrders: OrderItem[] = [
   genPopularOrder('308','ORD20260726308','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,Region.SANWONG,3,'G10012','澳門塔餐飲集團','S30028','澳門塔旋轉餐廳','青峰翡翠',24,'2026-07-27',7,OrderStatus.PROMOTING,'2026-07-26 09:30:00','2026-07-26 09:32:00',OrderOperatorType.STAFF,'EMP00425','張偉強'),
   genPopularOrder('312','ORD20260723312','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.HKM,4,'G10013','高士德飲食集團','S30032','高士德麵家','極光幻彩',36,'2026-07-24',7,OrderStatus.PROMOTING,'2026-07-23 16:05:00','2026-07-23 16:06:00',OrderOperatorType.MERCHANT,'S30032','高士德麵家'),
   // 待推廣 ×4
-  genPopularOrder('302','ORD20260725302','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.FAHUA,2,'G10009','皇朝飲食集團','S30022','皇朝廣場店','橙意滿滿',18,'2026-07-28',3,OrderStatus.PENDING_PROMOTION,'2026-07-24 15:40:00','2026-07-24 15:42:00',OrderOperatorType.STAFF,'EMP00425','張偉強'),
-  genPopularOrder('304','ORD20260726304','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.SANMA,1,'G10014','麥當勞餐飲集團','S30024','麥當勞','紫氣東來',22,'2026-08-03',5,OrderStatus.PENDING_PROMOTION,'2026-07-26 14:00:00','2026-07-26 14:02:00',OrderOperatorType.MERCHANT,'S30024','麥當勞'),
-  genPopularOrder('309','ORD20260726309','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,Region.LHOTEL,5,'G10015','巴黎人餐飲集團','S30029','巴黎人法餐廳','粉黛甜心',26,'2026-08-05',5,OrderStatus.PENDING_PROMOTION,'2026-07-26 17:45:00','2026-07-26 17:46:00',OrderOperatorType.STAFF,'EMP00512','陳美琪'),
-  genPopularOrder('313','ORD20260727313','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.KOKSAA,2,'G10016','黑沙環飲食集團','S30033','黑沙環燒臘','紅運當頭',28,'2026-08-02',6,OrderStatus.PENDING_PROMOTION,'2026-07-27 08:50:00','2026-07-27 08:52:00',OrderOperatorType.MERCHANT,'S30033','黑沙環燒臘'),
+  genPopularOrder('302','ORD20260725302','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.FAHUA,2,'G10009','皇朝飲食集團','S30022','皇朝廣場店','橙意滿滿',18,'2026-07-28',7,OrderStatus.PENDING_PROMOTION,'2026-07-24 15:40:00','2026-07-24 15:42:00',OrderOperatorType.STAFF,'EMP00425','張偉強'),
+  genPopularOrder('304','ORD20260726304','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.SANMA,1,'G10014','麥當勞餐飲集團','S30024','麥當勞','紫氣東來',22,'2026-08-03',7,OrderStatus.PENDING_PROMOTION,'2026-07-26 14:00:00','2026-07-26 14:02:00',OrderOperatorType.MERCHANT,'S30024','麥當勞'),
+  genPopularOrder('309','ORD20260726309','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,Region.LHOTEL,5,'G10015','巴黎人餐飲集團','S30029','巴黎人法餐廳','粉黛甜心',26,'2026-08-05',7,OrderStatus.PENDING_PROMOTION,'2026-07-26 17:45:00','2026-07-26 17:46:00',OrderOperatorType.STAFF,'EMP00512','陳美琪'),
+  genPopularOrder('313','ORD20260727313','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.KOKSAA,2,'G10016','黑沙環飲食集團','S30033','黑沙環燒臘','紅運當頭',28,'2026-08-02',7,OrderStatus.PENDING_PROMOTION,'2026-07-27 08:50:00','2026-07-27 08:52:00',OrderOperatorType.MERCHANT,'S30033','黑沙環燒臘'),
   // 已完成 ×4
   genPopularOrder('303','ORD20260710303','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.SANMA,3,'G10010','澳門美食集團','S30023','黑馬仕美食街','金碧輝煌',32,'2026-07-11',7,OrderStatus.PROMOTED,'2026-07-10 09:05:00','2026-07-10 09:06:00',OrderOperatorType.MERCHANT,'S30023','黑馬仕美食街'),
-  genPopularOrder('306','ORD20260704306','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.SUPERMARKET,Region.UM,1,'G10017','新濠餐飲集團','S30026','新濠天地食府','簡約無框',8,'2026-07-05',4,OrderStatus.PROMOTED,'2026-07-04 10:30:00','2026-07-04 10:31:00',OrderOperatorType.STAFF,'EMP00318','李嘉欣'),
+  genPopularOrder('306','ORD20260704306','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.SUPERMARKET,Region.UM,1,'G10017','新濠餐飲集團','S30026','新濠天地食府','簡約無框',8,'2026-07-05',7,OrderStatus.PROMOTED,'2026-07-04 10:30:00','2026-07-04 10:31:00',OrderOperatorType.STAFF,'EMP00318','李嘉欣'),
   genPopularOrder('310','ORD20260705310','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.RHOTEL,4,'G10018','銀河餐飲集團','S30030','新馬路茶餐廳','暗夜黑金',30,'2026-07-06',7,OrderStatus.PROMOTED,'2026-07-05 13:20:00','2026-07-05 13:21:00',OrderOperatorType.MERCHANT,'S30030','新馬路茶餐廳'),
-  genPopularOrder('314','ORD20260713314','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.GROUP_BUY,Region.HACS,5,'G10019','港珠澳飲食集團','S30034','港珠澳漁港','碧海藍天',20,'2026-07-14',5,OrderStatus.PROMOTED,'2026-07-13 19:10:00','2026-07-13 19:11:00',OrderOperatorType.STAFF,'EMP00425','張偉強'),
-  // 已取消 ×3（未推廣即取消，不允許退款）
-  genPopularOrder('307','ORD20260724307','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.AIRPORT,2,'G10020','銀河酒店集團','S30027','銀河酒店餐廳','翠綠生機',20,'2026-08-01',3,OrderStatus.CANCELLED,'2026-07-24 09:40:00','2026-07-24 09:41:00',OrderOperatorType.MERCHANT,'S30027','銀河酒店餐廳',{ cancelTime: '2026-07-25 15:20:00', cancelOperatorId: 'EMP00512', cancelOperatorName: '陳美琪' }),
-  genPopularOrder('311','ORD20260725311','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.FAHUA,3,'G10021','氹仔飲食集團','S30031','氹仔小食店','橘光暮色',25,'2026-07-30',4,OrderStatus.CANCELLED,'2026-07-25 11:25:00','2026-07-25 11:26:00',OrderOperatorType.STAFF,'EMP00318','李嘉欣',{ cancelTime: '2026-07-26 10:05:00', cancelOperatorId: 'EMP00318', cancelOperatorName: '李嘉欣' }),
-  genPopularOrder('315','ORD20260726315','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,Region.COSTA,1,'G10022','花城市餐飲集團','S30035','花城市甜品','橙意滿滿',18,'2026-08-04',3,OrderStatus.CANCELLED,'2026-07-26 20:15:00','2026-07-26 20:16:00',OrderOperatorType.MERCHANT,'S30035','花城市甜品',{ cancelTime: '2026-07-27 09:30:00', cancelOperatorId: 'EMP00512', cancelOperatorName: '陳美琪' }),
+  genPopularOrder('314','ORD20260713314','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.GROUP_BUY,Region.HACS,5,'G10019','港珠澳飲食集團','S30034','港珠澳漁港','碧海藍天',20,'2026-07-14',7,OrderStatus.PROMOTED,'2026-07-13 19:10:00','2026-07-13 19:11:00',OrderOperatorType.STAFF,'EMP00425','張偉強'),
+  // 已退款 ×3（付費購買，未推廣即退款）
+  genPopularOrder('307','ORD20260724307','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.DELIVERY,Region.AIRPORT,2,'G10020','銀河酒店集團','S30027','銀河酒店餐廳','翠綠生機',20,'2026-08-01',7,OrderStatus.REFUNDED,'2026-07-24 09:40:00','2026-07-24 09:41:00',OrderOperatorType.MERCHANT,'S30027','銀河酒店餐廳',{ refundTime: '2026-07-25 15:20:00', refundOperatorId: 'EMP00512', refundOperatorName: '陳美琪' }),
+  genPopularOrder('311','ORD20260725311','ALG_KA_004','人氣商家-外賣版',AppType.MFOOD,RecommendChannel.DELIVERY,Region.FAHUA,3,'G10021','氹仔飲食集團','S30031','氹仔小食店','橘光暮色',25,'2026-07-30',7,OrderStatus.REFUNDED,'2026-07-25 11:25:00','2026-07-25 11:26:00',OrderOperatorType.STAFF,'EMP00318','李嘉欣',{ refundTime: '2026-07-26 10:05:00', refundOperatorId: 'EMP00318', refundOperatorName: '李嘉欣' }),
+  genPopularOrder('315','ORD20260726315','ALG_KA_001','人氣商家-首頁版',AppType.SHANFENG,RecommendChannel.GROUP_BUY,Region.COSTA,1,'G10022','花城市餐飲集團','S30035','花城市甜品','橙意滿滿',18,'2026-08-04',7,OrderStatus.REFUNDED,'2026-07-26 20:15:00','2026-07-26 20:16:00',OrderOperatorType.MERCHANT,'S30035','花城市甜品',{ refundTime: '2026-07-27 09:30:00', refundOperatorId: 'EMP00512', refundOperatorName: '陳美琪' }),
 ]
 
 // Mock 订单数据
@@ -1533,9 +1533,12 @@ export default function PromotionOrderManage() {
       { key: 'actualPrice', title: '實付推廣金額' },
     ] : []),
     { key: 'status', title: '訂單狀態' },
-    ...(orderType === '新店廣告' || orderType === '人氣商家' ? [
+    ...(orderType === '新店廣告' ? [
       { key: 'cancelOperator', title: '取消人' },
       { key: 'cancelTime', title: '取消時間' },
+    ] : orderType === '人氣商家' ? [
+      { key: 'refundOperator', title: '退款人' },
+      { key: 'refundTime', title: '退款時間' },
     ] : [
       { key: 'refundAmount', title: '退款推廣金額' },
       { key: 'refundOperator', title: '退款人' },
@@ -1769,9 +1772,8 @@ export default function PromotionOrderManage() {
       key: 'status',
       width: 100,
       render: (status: OrderStatus, record: OrderItem) => {
-        // 盤活復蘇和無敵星星：已取消/已中止 顯示為已退款；新店廣告/人氣商家（不允許退款）保留已取消
+        // 盤活復蘇/無敵星星/人氣商家：已取消/已中止 顯示為已退款；新店廣告保留已取消
         const keepCancelDisplay = record.recommendType === RecommendType.NEW_STORE_AD
-          || record.recommendType === RecommendType.POPULAR_MERCHANT
         let displayStatus = status
         if (!keepCancelDisplay && (status === OrderStatus.CANCELLED || status === OrderStatus.ABORTED)) {
           displayStatus = OrderStatus.REFUNDED
@@ -1780,7 +1782,7 @@ export default function PromotionOrderManage() {
         return <Tag color={color}>{label}</Tag>
       },
     },
-    // 退款推廣金額 - 僅無敵星星和盤活復蘇顯示（人氣商家不允許退款），放在訂單狀態後面
+    // 退款推廣金額 - 僅無敵星星和盤活復蘇顯示，放在訂單狀態後面
     ...(orderType !== '新店廣告' && orderType !== '人氣商家' ? [{
       title: '退款推廣金額',
       dataIndex: 'refundAmount',
@@ -1791,13 +1793,13 @@ export default function PromotionOrderManage() {
         return <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${amount}</span>
       },
     }] : []),
-    // 退款人 - 僅無敵星星和盤活復蘇顯示
-    ...(orderType !== '新店廣告' && orderType !== '人氣商家' ? [{
+    // 退款人 - 無敵星星/盤活復蘇/人氣商家顯示
+    ...(orderType !== '新店廣告' ? [{
       title: '退款人',
       key: 'refundOperator',
       width: 160,
       render: (_: any, record: OrderItem) => {
-        if (!record.refundOperatorType || !record.refundOperatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!record.refundOperatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
         return (
           <Space direction="vertical" size={0}>
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.refundOperatorId}</span>
@@ -1806,16 +1808,16 @@ export default function PromotionOrderManage() {
         )
       },
     }] : []),
-    // 退款時間 - 僅無敵星星和盤活復蘇顯示
-    ...(orderType !== '新店廣告' && orderType !== '人氣商家' ? [{
+    // 退款時間 - 無敵星星/盤活復蘇/人氣商家顯示
+    ...(orderType !== '新店廣告' ? [{
       title: '退款時間',
       dataIndex: 'refundTime',
       key: 'refundTime',
       width: 160,
       render: (time: string | undefined) => time || <span style={{ color: '#bfbfbf' }}>-</span>,
     }] : []),
-    // 取消人 - 新店廣告/人氣商家顯示（記錄取消/中止操作人）
-    ...(orderType === '新店廣告' || orderType === '人氣商家' ? [{
+    // 取消人 - 僅新店廣告顯示
+    ...(orderType === '新店廣告' ? [{
       title: '取消人',
       key: 'cancelOperator',
       width: 160,
@@ -2090,6 +2092,10 @@ export default function PromotionOrderManage() {
                     if (orderType === '新店廣告') {
                       return status !== OrderStatus.REFUNDED
                     }
+                    // 人氣商家：不顯示已取消/已中止（付費購買顯示已退款）
+                    if (orderType === '人氣商家') {
+                      return status !== OrderStatus.CANCELLED && status !== OrderStatus.ABORTED
+                    }
                     // 盤活復蘇/無敵星星：不顯示已取消/已中止
                     return status !== OrderStatus.CANCELLED && status !== OrderStatus.ABORTED
                   })
@@ -2110,6 +2116,21 @@ export default function PromotionOrderManage() {
                 <Form.Item label="退款人">
                   <Input
                     placeholder="工號/門店ID/姓名"
+                    allowClear
+                    value={filters.refundOperatorKeyword}
+                    onChange={e => setFilters({ ...filters, refundOperatorKeyword: e.target.value })}
+                  />
+                </Form.Item>
+                <Form.Item label="退款時間">
+                  <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+              </>
+            )}
+            {orderType === '人氣商家' && (
+              <>
+                <Form.Item label="退款人">
+                  <Input
+                    placeholder="工號/姓名"
                     allowClear
                     value={filters.refundOperatorKeyword}
                     onChange={e => setFilters({ ...filters, refundOperatorKeyword: e.target.value })}

@@ -22,6 +22,8 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.GUESS_YOU_LIKE,
     AlgorithmType.ORGANIC_TRAFFIC,
     AlgorithmType.SEARCH_ALGORITHM,
+    AlgorithmType.GOLDEN_SIGNBOARD,
+    AlgorithmType.PRODUCT_PROMO,
   ],
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
@@ -42,6 +44,8 @@ const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: st
   { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: '智能推薦，個性化匹配用戶偏好' },
   { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: '自然流量曝光，提升店鋪基礎流量' },
   { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: '搜索算法優化，提升搜索轉化率' },
+  { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: '金字招牌商家，品質保證優先推薦' },
+  { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: '商品折扣秒殺活動，智能促銷匹配' },
 ]
 
 interface AlgorithmRecord {
@@ -68,6 +72,8 @@ const TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
   [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
   [AlgorithmType.GOLD_AD]: '點金廣告',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
+  [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
 } as Record<AlgorithmType, string>
 
 const TYPE_COLOR: Record<AlgorithmType, string> = {
@@ -82,6 +88,8 @@ const TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
   [AlgorithmType.BRAND_MERCHANT]: 'orange',
   [AlgorithmType.GOLD_AD]: 'gold',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
+  [AlgorithmType.PRODUCT_PROMO]: 'red',
 } as Record<AlgorithmType, string>
 
 const CHANNEL_LABEL: Record<RecommendChannel, string> = {

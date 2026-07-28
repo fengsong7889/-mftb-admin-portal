@@ -19,6 +19,8 @@ const TYPE_LABEL: Record<number, string> = {
   [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
   [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
   [AlgorithmType.GOLD_AD]: '點金廣告',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
+  [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
 }
 
 const TYPE_ICON: Record<number, string> = {
@@ -33,6 +35,8 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.POPULAR_MERCHANT_KA]: '🏆',
   [AlgorithmType.BRAND_MERCHANT]: '💎',
   [AlgorithmType.GOLD_AD]: '💰',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: '🏅',
+  [AlgorithmType.PRODUCT_PROMO]: '🎯',
 }
 
 /** 店鋪等級配置（獨家商家保障單量 / 品牌商家保障流量共用）：等級 / 標籤 / 標籤色 / 默認值 */

@@ -54,6 +54,8 @@ export enum AlgorithmType {
   POPULAR_MERCHANT_KA = 10, // 人气商家
   BRAND_MERCHANT = 11,       // 品牌商家(KA)
   GOLD_AD = 12,              // 点金广告
+  GOLDEN_SIGNBOARD = 13,     // 金字招牌
+  PRODUCT_PROMO = 14,        // 商品促销
 }
 
 export const ALGORITHM_TYPE_OPTIONS = [
@@ -68,6 +70,8 @@ export const ALGORITHM_TYPE_OPTIONS = [
   { label: '人氣商家', value: AlgorithmType.POPULAR_MERCHANT_KA },
   { label: '品牌商家(KA)', value: AlgorithmType.BRAND_MERCHANT },
   { label: '點金廣告', value: AlgorithmType.GOLD_AD },
+  { label: '金字招牌', value: AlgorithmType.GOLDEN_SIGNBOARD },
+  { label: '商品促銷', value: AlgorithmType.PRODUCT_PROMO },
 ]
 
 /** 算法类型对应卡片顶部装饰线颜色（与 CSS .algo-card-wrapper--* 类名一致） */
@@ -83,6 +87,8 @@ export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.POPULAR_MERCHANT_KA]: 'geekblue',
   [AlgorithmType.BRAND_MERCHANT]: 'orange',
   [AlgorithmType.GOLD_AD]: 'yellow',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
+  [AlgorithmType.PRODUCT_PROMO]: 'red',
 } as Record<AlgorithmType, string>
 
 /** 区域（与地圖規劃商圈数据一致） */

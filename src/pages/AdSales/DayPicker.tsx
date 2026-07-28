@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Tag, Button, Space, Divider, message, Table, Empty, Modal, Select, Card, Form, Input, DatePicker } from 'antd'
+import { Tag, Button, Space, Divider, message, Table, Empty, Modal, Select, Card, Form, Input, InputNumber, DatePicker } from 'antd'
 import {
   ShoppingCartOutlined,
   CalendarOutlined,
@@ -21,6 +21,11 @@ const mockGradients = [
   { minDays: 14, discount: 85 },
   { minDays: 30, discount: 80 },
 ]
+
+/** Mock 贈送管理發放的贈送天數餘額（按算法維度，僅盤活復蘇有發放記錄；實際應由接口返回） */
+const MOCK_GIFT_DAYS_BY_ALGORITHM: Record<string, number> = {
+  hot_revive: 8, // 盤活復蘇-團購版：贈送管理已發放 8 天
+}
 
 // 中文星期映射
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
@@ -153,6 +158,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [monthPage, setMonthPage] = useState(0)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [merchantBalance, setMerchantBalance] = useState(15800)
+  // 贈送天數抵扣：贈送管理發放的天數餘額（按算法維度）與本單使用天數
+  const [giftDaysBalance, setGiftDaysBalance] = useState(0)
+  const [giftDaysUsed, setGiftDaysUsed] = useState(0)
+  // 支付成功彈窗展示的實付金額（支付後購物車已清空，需單獨留存）
+  const [paidAmount, setPaidAmount] = useState(0)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [isSoldOutModalVisible, setIsSoldOutModalVisible] = useState(false)
@@ -175,6 +185,12 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   // 检查购物车是否有加购数据
   const hasCartItems = cartItems.length > 0
+
+  // 贈送天數餘額按算法維度獲取，切換算法時同步刷新並清零已選抵扣天數
+  useEffect(() => {
+    setGiftDaysBalance(searchAlgorithm ? (MOCK_GIFT_DAYS_BY_ALGORITHM[searchAlgorithm] ?? 0) : 0)
+    setGiftDaysUsed(0)
+  }, [searchAlgorithm])
 
   // 算法名称变更处理：自动带出品牌，并检查购物车冲突
   const handleAlgorithmChange = (value: string | null) => {
@@ -373,8 +389,18 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const cartSummary = useMemo(() => {
     const totalOriginal = cartItems.reduce((sum, item) => sum + item.originalPrice, 0)
     const totalSale = cartItems.reduce((sum, item) => sum + item.salePrice, 0)
-    return { totalOriginal, totalSale, totalDiscount: totalOriginal - totalSale }
+    const totalDays = cartItems.reduce((sum, item) => sum + item.days, 0)
+    return { totalOriginal, totalSale, totalDays, totalDiscount: totalOriginal - totalSale }
   }, [cartItems])
+
+  // 贈送天數抵扣：本單最多可用 = min(贈送餘額, 購物車總天數)；抵扣金額按折後日均價計算
+  const maxGiftDaysUsable = Math.min(giftDaysBalance, cartSummary.totalDays)
+  const effectiveGiftDays = Math.min(giftDaysUsed, maxGiftDaysUsable)
+  const giftDeduction = useMemo(() => {
+    if (effectiveGiftDays <= 0 || cartSummary.totalDays === 0) return 0
+    return Math.min(cartSummary.totalSale, Math.round(cartSummary.totalSale / cartSummary.totalDays * effectiveGiftDays))
+  }, [effectiveGiftDays, cartSummary])
+  const payableAmount = cartSummary.totalSale - giftDeduction
 
   // 按月分组已选日期
   const datesByMonth = useMemo(() => {
@@ -489,7 +515,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   const handlePayment = () => { setIsPaymentModalVisible(true) }
   const handleConfirmPayment = () => {
-    setMerchantBalance(prev => prev - cartSummary.totalSale)
+    // 扣除推廣金（已扣除贈送抵扣）與本單使用的贈送天數
+    setMerchantBalance(prev => prev - payableAmount)
+    if (effectiveGiftDays > 0) setGiftDaysBalance(prev => prev - effectiveGiftDays)
+    setPaidAmount(payableAmount)
+    setGiftDaysUsed(0)
     setIsPaymentModalVisible(false)
     setCartItems([])
     setIsSuccessModalVisible(true)
@@ -822,19 +852,50 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>推廣金餘額</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
           </div>
+          {/* 贈送天數抵扣：贈送管理發放的推廣天數可抵扣本單費用（按折後日均價折算） */}
+          <div style={{ border: '1px solid #FFD591', background: '#FFF7E6', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>🎁 贈送天數抵扣</span>
+              <span style={{ fontSize: 11, color: '#8c8c8c' }}>可用餘額 <span style={{ fontWeight: 700, color: '#E8720C' }}>{giftDaysBalance}</span> 天</span>
+            </div>
+            {giftDaysBalance === 0 ? (
+              <div style={{ fontSize: 11, color: '#bfbfbf' }}>暫無可用贈送天數，可在贈送管理獲得後使用</div>
+            ) : cartSummary.totalDays === 0 ? (
+              <div style={{ fontSize: 11, color: '#bfbfbf' }}>加購日期後可選擇抵扣天數</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>抵扣</span>
+                  <InputNumber
+                    size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
+                    onChange={(v) => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
+                    style={{ width: 72 }}
+                  />
+                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>天</span>
+                  <Button size="small" type="link" style={{ padding: 0, fontSize: 12, marginLeft: 'auto' }}
+                    onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>全部抵扣</Button>
+                </div>
+                <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
+                  本單最多可抵 {maxGiftDaysUsable} 天，按折後日均價折算，當前抵扣 <span style={{ fontWeight: 700, color: '#E8720C' }}>-${giftDeduction}</span>
+                </div>
+              </>
+            )}
+          </div>
           <table style={{ width: '100%', fontSize: 12, marginBottom: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
                 <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>訂單金額（原價）</th>
                 <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>訂單優惠</th>
+                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#E8720C', fontSize: 12, fontWeight: 600 }}>贈送抵扣</th>
                 <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>實付總額</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 16, fontWeight: 600, color: '#595959' }}>${cartSummary.totalOriginal}</span></td>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>-${cartSummary.totalDiscount}</span></td>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center', background: '#fff7f7' }}><span style={{ fontSize: 20, fontWeight: 700, color: '#ff4d4f' }}>${cartSummary.totalSale}</span></td>
+                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 15, fontWeight: 600, color: '#595959' }}>${cartSummary.totalOriginal}</span></td>
+                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 15, fontWeight: 600, color: '#fa8c16' }}>-${cartSummary.totalDiscount}</span></td>
+                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 15, fontWeight: 600, color: '#E8720C' }}>-${giftDeduction}</span></td>
+                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center', background: '#fff7f7' }}><span style={{ fontSize: 20, fontWeight: 700, color: '#ff4d4f' }}>${payableAmount}</span></td>
               </tr>
             </tbody>
           </table>
@@ -873,7 +934,10 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>訂單金額（原價）：</span><span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>訂單優惠：</span><span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>實付金額：</span><span style={{ fontWeight: 700 }}>${cartSummary.totalSale}</span></div>
+          {effectiveGiftDays > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#E8720C' }}><span>🎁 贈送天數抵扣（{effectiveGiftDays}天）：</span><span style={{ fontWeight: 600 }}>-${giftDeduction}</span></div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>實付金額：</span><span style={{ fontWeight: 700 }}>${payableAmount}</span></div>
         </div>
       </Modal>
 
@@ -885,7 +949,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>恭喜！購買成功</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8, marginBottom: 16 }}>
             <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已扣除推廣金</p>
-            <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${cartSummary.totalSale}</p>
+            <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidAmount}</p>
           </div>
         </div>
       </Modal>

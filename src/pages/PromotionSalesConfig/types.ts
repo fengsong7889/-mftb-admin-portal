@@ -133,6 +133,20 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     description: '獨家商家專屬展示位，彰顯品牌實力',
     enabled: false,
   },
+  {
+    type: AlgorithmType.GOLDEN_SIGNBOARD,
+    name: '金字招牌',
+    icon: '🏅',
+    description: '金字招牌商家，品質保證優先推薦',
+    enabled: false,
+  },
+  {
+    type: AlgorithmType.PRODUCT_PROMO,
+    name: '商品促銷',
+    icon: '🎯',
+    description: '商品折扣秒殺活動，智能促銷匹配',
+    enabled: false,
+  },
 ]
 
 /** 频道标签映射 */
@@ -192,6 +206,8 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
     [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
     [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
     [AlgorithmType.GOLD_AD]: '點金廣告',
+    [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
+    [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
   }
   
   // 各类型的推广名称后缀
