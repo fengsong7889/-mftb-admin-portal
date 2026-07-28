@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
-import { Button, Card, DatePicker, Empty, Form, InputNumber, Modal, Select, Space, Tag, message } from 'antd'
+import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, Tag, message } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -10,8 +10,11 @@ import {
   ShoppingCartOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import GradientDiscountBanner from './GradientDiscountBanner'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+
+const { RangePicker } = DatePicker
 
 /**
  * 人氣商家 - 購買廣告（皮膚售賣）
@@ -171,11 +174,22 @@ const DISCOUNT_TIERS = [
   { minDays: 30, discount: 85 },
 ]
 
-/** 購買天數快捷檔 */
-const QUICK_DAY_OPTIONS = [7, 15, 30, 60, 90]
-/** 天數可選範圍 */
-const MIN_BUY_DAYS = 1
+/** 最長可購買天數（滾動窗口，超出即為待開售日期） */
 const MAX_BUY_DAYS = 180
+/** 人氣商家皮膚售賣不允許退款（對應銷售定價中的退款開關） */
+const REFUND_ENABLED = false
+/** 待開售日期每日放票時間（同盤活復蘇，火車票式滾動開售） */
+const PRESALE_OPEN_HOUR = 10
+/** 待開售日期的開售時間（提前 MAX_BUY_DAYS 天、於 PRESALE_OPEN_HOUR 點開售） */
+function getPresaleOpenTime(date: Dayjs): Dayjs {
+  return date.startOf('day').subtract(MAX_BUY_DAYS, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
+}
+
+/** 中文星期映射（週日開頭，與日曆列對齊） */
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
+/** 月份選擇器每頁展示數（超出用上下頁按鈕切換） */
+const MONTHS_PER_PAGE = 6
 
 /** Mock數據 - 店鋪列表（含BD信息，與其它購買界面一致） */
 const MOCK_STORES = [
@@ -212,8 +226,15 @@ export default function PopularSkinPicker() {
 
   // 選購狀態
   const [selectedSkinId, setSelectedSkinId] = useState<number | null>(null)
-  const [startDate, setStartDate] = useState<Dayjs>(dayjs().add(1, 'day'))
-  const [buyDays, setBuyDays] = useState<number>(QUICK_DAY_OPTIONS[0])
+  // 自選日期狀態：已選日期 / 日曆當前月 / 批量添加範圍 / 每週休息日
+  const [customDates, setCustomDates] = useState<string[]>([])
+  const [calMonth, setCalMonth] = useState<Dayjs>(dayjs().add(1, 'day').startOf('month'))
+  const [hoveredCalMonth, setHoveredCalMonth] = useState<string | null>(null)
+  const [monthPage, setMonthPage] = useState(0)
+  const [batchRange, setBatchRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
+  const [excludedWeekdays, setExcludedWeekdays] = useState<number[]>([])
+  // 待開售提醒彈窗（同盤活復蘇規範）
+  const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
   const [merchantBalance, setMerchantBalance] = useState(15800)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
@@ -222,7 +243,26 @@ export default function PopularSkinPicker() {
 
   const selectedSkin = SALE_SKINS.find(s => s.id === selectedSkinId) || null
   const selectedStore = MOCK_STORES.find(s => s.id === searchStoreName) || null
-  const endDate = startDate.add(buyDays - 1, 'day')
+
+  // 自選日期可選範圍：最早次日生效，最晚 MAX_BUY_DAYS 天內
+  const customMinDate = dayjs().add(1, 'day').startOf('day')
+  const customMaxDate = dayjs().add(MAX_BUY_DAYS, 'day').startOf('day')
+  // 自選日期：可切換的月份列表（覆蓋整個可選範圍，補齊至整頁，補出的月份整月待開售）
+  const calMonths: Dayjs[] = []
+  for (let m = customMinDate.startOf('month'); !m.isAfter(customMaxDate, 'month'); m = m.add(1, 'month')) calMonths.push(m)
+  while (calMonths.length % MONTHS_PER_PAGE !== 0) calMonths.push(calMonths[calMonths.length - 1].add(1, 'month'))
+  // 月份分頁：每頁 6 個，超出用上下頁按鈕切換
+  const monthPageCount = Math.ceil(calMonths.length / MONTHS_PER_PAGE)
+  const visibleMonths = calMonths.slice(monthPage * MONTHS_PER_PAGE, (monthPage + 1) * MONTHS_PER_PAGE)
+  // 生效購買天數：取已選日期數
+  const effectiveDays = customDates.length
+  // 投放時段文案（結算欄 / 支付彈窗）：首末日期區間
+  const periodText = customDates.length > 0
+    ? `${dayjs(customDates[0]).format('MM-DD')} ~ ${dayjs(customDates[customDates.length - 1]).format('MM-DD')}（自選${customDates.length}天）`
+    : '未選擇'
+  const periodTextFull = customDates.length > 0
+    ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（自選${customDates.length}天）`
+    : '未選擇'
 
   // 階梯輪播預覽：所選皮膚為階梯輪播佈局時逐張輪播，切換皮膚時重置
   useEffect(() => {
@@ -234,21 +274,47 @@ export default function PopularSkinPicker() {
     return () => clearInterval(timer)
   }, [selectedSkin])
 
-  // 命中折扣檔位
+  // 命中折扣檔位（按生效購買天數計算，兩種模式通用）
   const currentTier = useMemo(() => {
     for (let i = DISCOUNT_TIERS.length - 1; i >= 0; i--) {
-      if (buyDays >= DISCOUNT_TIERS[i].minDays) return DISCOUNT_TIERS[i]
+      if (effectiveDays >= DISCOUNT_TIERS[i].minDays) return DISCOUNT_TIERS[i]
     }
     return null
-  }, [buyDays])
+  }, [effectiveDays])
 
   // 費用計算
   const priceSummary = useMemo(() => {
     if (!selectedSkin) return { original: 0, sale: 0, saved: 0 }
-    const original = selectedSkin.pricePerDay * buyDays
+    const original = selectedSkin.pricePerDay * effectiveDays
     const sale = currentTier ? Math.round(original * currentTier.discount / 100) : original
     return { original, sale, saved: original - sale }
-  }, [selectedSkin, buyDays, currentTier])
+  }, [selectedSkin, effectiveDays, currentTier])
+
+  // 自選日期：當前月日曆網格（週日開頭，含首尾空位）
+  const customCalendarGrid = useMemo(() => {
+    const firstDay = calMonth.startOf('month')
+    const daysInMonth = calMonth.daysInMonth()
+    const weeks: (Dayjs | null)[][] = []
+    let week: (Dayjs | null)[] = []
+    for (let i = 0; i < firstDay.day(); i++) week.push(null)
+    for (let d = 1; d <= daysInMonth; d++) {
+      week.push(firstDay.date(d))
+      if (week.length === 7) { weeks.push(week); week = [] }
+    }
+    if (week.length > 0) { while (week.length < 7) week.push(null); weeks.push(week) }
+    return weeks
+  }, [calMonth])
+
+  // 自選日期：按月分組摘要（customDates 有序，分組後天然按時間排列）
+  const customDatesByMonth = useMemo(() => {
+    const grouped: Record<string, number[]> = {}
+    customDates.forEach(ds => {
+      const d = dayjs(ds)
+      const key = d.format('YYYY年M月')
+      ;(grouped[key] = grouped[key] || []).push(d.date())
+    })
+    return Object.entries(grouped).map(([month, days]) => ({ month, days }))
+  }, [customDates])
 
   // 算法變更：自動帶出品牌
   const handleAlgorithmChange = (value: string | null) => {
@@ -273,9 +339,47 @@ export default function PopularSkinPicker() {
     setHasSearched(false); setSelectedSkinId(null)
   }
 
+  // 自選日期：點擊日曆單日選中/取消
+  const handleCustomDateClick = (date: Dayjs | null) => {
+    if (!date) return
+    if (date.isBefore(customMinDate, 'day')) { message.warning('最早可選次日（購買後於開始日期 00:00 生效）'); return }
+    if (date.isAfter(customMaxDate, 'day')) {
+      // 待開售日期：彈窗提示開售時間（同盤活復蘇規範）
+      setPresaleInfo({
+        date: date.format('YYYY-MM-DD'),
+        weekday: WEEKDAY_LABELS[date.day()],
+        openTime: getPresaleOpenTime(date).format('M月D日 HH:mm'),
+      })
+      return
+    }
+    const key = date.format('YYYY-MM-DD')
+    setCustomDates(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key].sort())
+  }
+  // 自選日期：切換每週休息日（批量添加時自動跳過）
+  const handleToggleWeekday = (day: number) => {
+    setExcludedWeekdays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
+  }
+  // 自選日期：按範圍批量添加（自動跳過休息日與不可選日期）
+  const handleBatchAdd = () => {
+    if (!batchRange || !batchRange[0] || !batchRange[1]) { message.warning('請先選擇日期範圍'); return }
+    const merged = new Set(customDates)
+    let added = 0
+    for (let d = batchRange[0].startOf('day'); !d.isAfter(batchRange[1], 'day'); d = d.add(1, 'day')) {
+      if (d.isBefore(customMinDate, 'day') || d.isAfter(customMaxDate, 'day')) continue
+      if (excludedWeekdays.includes(d.day())) continue
+      const key = d.format('YYYY-MM-DD')
+      if (!merged.has(key)) { merged.add(key); added++ }
+    }
+    if (added === 0) { message.info('該範圍內沒有可添加的日期'); return }
+    setCustomDates([...merged].sort())
+    message.success(`已添加 ${added} 天${excludedWeekdays.length > 0 ? '（已自動跳過休息日）' : ''}`)
+  }
+  const handleClearCustomDates = () => setCustomDates([])
+
   // 訂單支付
   const handlePayment = () => {
     if (!selectedSkin) { message.warning('請先選擇皮膚套件'); return }
+    if (customDates.length === 0) { message.warning('請先在日曆中選擇投放日期'); return }
     if (priceSummary.sale > merchantBalance) { message.error('推廣金餘額不足，請先充值'); return }
     setIsPaymentModalVisible(true)
   }
@@ -622,68 +726,196 @@ export default function PopularSkinPicker() {
               </div>
             </Card>
 
-            {/* ② 選擇購買時長 */}
+            {/* ② 選擇購買時長：自選日期（日曆跳選），滿足打烊、休息日等靈活投放需求 */}
             <Card
               title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>選擇購買時長</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>按天計價，購買越多折扣越大</span></Space>}
               bodyStyle={{ padding: '16px 20px' }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959' }}>開始日期：</span>
-                  <DatePicker
-                    value={startDate}
-                    allowClear={false}
-                    disabledDate={d => d.isBefore(dayjs().add(1, 'day'), 'day')}
-                    onChange={d => { if (d) setStartDate(d) }}
-                  />
-                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（最早次日生效）</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959' }}>結束日期：</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{endDate.format('YYYY-MM-DD')}</span>
-                </div>
-              </div>
+              {/* 梯度折扣橫幅：常駐展示折扣規則與不可退款標識（同盤活復蘇） */}
+              <GradientDiscountBanner
+                tiers={DISCOUNT_TIERS.map(t => ({ threshold: t.minDays, discount: t.discount }))}
+                unitLabel="天"
+                currentCount={customDates.length}
+                refundDisabled={!REFUND_ENABLED}
+              />
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959' }}>購買天數：</span>
-                {QUICK_DAY_OPTIONS.map(d => {
-                  const isActive = buyDays === d
-                  const tier = [...DISCOUNT_TIERS].reverse().find(t => d >= t.minDays)
-                  return (
-                    <div
-                      key={d}
-                      onClick={() => setBuyDays(d)}
-                      style={{
-                        position: 'relative', padding: '6px 18px', borderRadius: 6, cursor: 'pointer',
-                        border: isActive ? '2px solid #E8720C' : '1px solid #d9d9d9',
-                        background: isActive ? '#FFF7E6' : '#fff',
-                        color: isActive ? '#E8720C' : '#595959',
-                        fontSize: 13, fontWeight: isActive ? 600 : 400,
-                        transition: 'all 0.2s',
-                      }}
+              <div>
+                  {/* 月份橫向選擇器（樣式同盤活復蘇購買界面）：一排 6 個月，超出用上下頁按鈕切換（同無敵星星風格） */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <Button
+                      size="small"
+                      disabled={monthPage === 0}
+                      onClick={() => setMonthPage(p => Math.max(0, p - 1))}
                     >
-                      {d}天
-                      {tier && (
-                        <span style={{
-                          position: 'absolute', top: -9, right: -8, fontSize: 10, color: '#fff',
-                          background: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', borderRadius: 8,
-                          padding: '0 6px', lineHeight: '16px', fontWeight: 600,
-                        }}>{tier.discount / 10}折</span>
-                      )}
+                      ◀
+                    </Button>
+                    <div style={{ flex: 1, display: 'flex', gap: 4 }}>
+                    {visibleMonths.map(m => {
+                      const monthStr = m.format('YYYY-MM')
+                      const isSelected = m.isSame(calMonth, 'month')
+                      const isHovered = hoveredCalMonth === monthStr
+                      const hasSelectedDates = customDates.some(d => dayjs(d).isSame(m, 'month'))
+                      // 整月待開售：月初首日即超出可購範圍，直接標記待開售（同盤活復蘇）
+                      const monthPresale = m.startOf('month').isAfter(customMaxDate, 'day')
+                      return (
+                        <div
+                          key={monthStr}
+                          onClick={() => {
+                            if (monthPresale) {
+                              // 整月待開售：彈窗提示首日開售時間（同盤活復蘇規範）
+                              const firstDay = m.startOf('month')
+                              setPresaleInfo({
+                                date: firstDay.format('YYYY-MM-DD'),
+                                weekday: WEEKDAY_LABELS[firstDay.day()],
+                                openTime: getPresaleOpenTime(firstDay).format('M月D日 HH:mm'),
+                              })
+                              return
+                            }
+                            setCalMonth(m)
+                          }}
+                          onMouseEnter={() => setHoveredCalMonth(monthStr)}
+                          onMouseLeave={() => setHoveredCalMonth(null)}
+                          style={{
+                            flex: 1, padding: '8px 4px', borderRadius: 6, position: 'relative',
+                            border: monthPresale
+                              ? '1px dashed #d9d9d9'
+                              : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
+                            background: monthPresale
+                              ? '#fafafa'
+                              : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
+                            cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s', whiteSpace: 'nowrap', overflow: 'hidden',
+                          }}
+                        >
+                          <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
+                            {m.year() === dayjs().year() ? m.format('M月') : m.format('YY年M月')}
+                          </span>
+                          {monthPresale && (
+                            <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                          )}
+                          {hasSelectedDates && (
+                            <div style={{
+                              position: 'absolute', top: 3, right: 3,
+                              width: 8, height: 8, borderRadius: '50%',
+                              background: '#ff4d4f',
+                              animation: 'dotPulse 1.5s ease-in-out infinite',
+                            }} />
+                          )}
+                        </div>
+                      )
+                    })}
                     </div>
-                  )
-                })}
-                <span style={{ fontSize: 13, color: '#595959', marginLeft: 8 }}>自定義：</span>
-                <InputNumber
-                  min={MIN_BUY_DAYS}
-                  max={MAX_BUY_DAYS}
-                  precision={0}
-                  value={buyDays}
-                  onChange={v => { if (v) setBuyDays(v) }}
-                  addonAfter="天"
-                  style={{ width: 120 }}
-                />
-              </div>
+                    <Button
+                      size="small"
+                      disabled={monthPage >= monthPageCount - 1}
+                      onClick={() => setMonthPage(p => Math.min(monthPageCount - 1, p + 1))}
+                    >
+                      ▶
+                    </Button>
+                  </div>
+
+                  {/* 批量添加工具欄：日期範圍 + 每週休息日排除 */}
+                  <div style={{ background: '#FAFAFA', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: '#595959' }}>批量添加：</span>
+                      <RangePicker
+                        size="small"
+                        value={batchRange}
+                        onChange={v => setBatchRange(v)}
+                        disabledDate={d => d.isBefore(customMinDate, 'day') || d.isAfter(customMaxDate, 'day')}
+                      />
+                      <Button size="small" type="primary" onClick={handleBatchAdd}>添加至日曆</Button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>每週休息日（批量添加時自動跳過）：</span>
+                      {WEEKDAY_LABELS.map((label, i) => {
+                        const isExcluded = excludedWeekdays.includes(i)
+                        return (
+                          <div
+                            key={label}
+                            onClick={() => handleToggleWeekday(i)}
+                            style={{
+                              padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                              border: isExcluded ? '1px solid #FF4D4F' : '1px solid #d9d9d9',
+                              background: isExcluded ? '#FFF1F0' : '#fff',
+                              color: isExcluded ? '#FF4D4F' : '#595959',
+                              textDecoration: isExcluded ? 'line-through' : 'none',
+                              transition: 'all 0.2s',
+                            }}
+                          >週{label}</div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 日曆網格：週日開頭，綠色選中樣式與逐日購買日曆保持一致 */}
+                  <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAFAFA', borderBottom: '1px solid #f0f0f0' }}>
+                      {WEEKDAY_LABELS.map((w, i) => (
+                        <div key={w} style={{ padding: '8px 0', textAlign: 'center', fontSize: 12, fontWeight: 600, color: i === 0 || i === 6 ? '#FA8C16' : '#595959' }}>週{w}</div>
+                      ))}
+                    </div>
+                    {customCalendarGrid.map((week, wi) => (
+                      <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                        {week.map((date, di) => {
+                          if (!date) return <div key={di} style={{ height: 48 }} />
+                          const dateKey = date.format('YYYY-MM-DD')
+                          const isPast = date.isBefore(customMinDate, 'day')
+                          // 待開售：超出可購窗口的日期，標記待開售（同盤活復蘇）
+                          const isPresale = date.isAfter(customMaxDate, 'day')
+                          const isSelected = customDates.includes(dateKey)
+                          return (
+                            <div
+                              key={di}
+                              onClick={() => handleCustomDateClick(date)}
+                              style={{
+                                height: 48, margin: 2, borderRadius: 6,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                                cursor: isPast ? 'not-allowed' : 'pointer',
+                                border: isSelected ? '2px solid #52C41A' : isPresale ? '1px dashed #d9d9d9' : '1px solid transparent',
+                                background: isSelected ? '#F6FFED' : isPast || isPresale ? '#FAFAFA' : '#fff',
+                                color: isPast ? '#D9D9D9' : isPresale ? '#bfbfbf' : isSelected ? '#389E0D' : '#262626',
+                                fontSize: 13, fontWeight: isSelected ? 600 : 400,
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              <span>{date.date()}</span>
+                              {isSelected && <span style={{ fontSize: 9, lineHeight: 1, color: '#52C41A' }}>已選</span>}
+                              {isPresale && (
+                                <span style={{ fontSize: 9, lineHeight: '12px', color: '#8c8c8c', border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 已選日期摘要：按月分組展示 + 折扣進度提示 */}
+                  {customDates.length > 0 ? (
+                    <div style={{ marginTop: 12, background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#389E0D' }}>
+                          已選 {customDates.length} 天{currentTier ? `，享 ${currentTier.discount / 10} 折` : ''}
+                        </span>
+                        {(() => {
+                          const nextTier = DISCOUNT_TIERS.find(t => effectiveDays < t.minDays)
+                          return nextTier ? (
+                            <span style={{ fontSize: 12, color: '#FA8C16' }}>再選 {nextTier.minDays - effectiveDays} 天可享 {nextTier.discount / 10} 折</span>
+                          ) : null
+                        })()}
+                        <div style={{ flex: 1 }} />
+                        <Button size="small" type="link" danger onClick={handleClearCustomDates} style={{ padding: 0 }}>清空</Button>
+                      </div>
+                      {customDatesByMonth.map(g => (
+                        <div key={g.month} style={{ fontSize: 12, color: '#595959', lineHeight: '20px' }}>
+                          <span style={{ fontWeight: 600 }}>{g.month}：</span>{g.days.map(d => `${d}日`).join('、')}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>尚未選擇日期，點擊日曆中的日期即可選中/取消，也可使用上方批量添加</div>
+                  )}
+                </div>
             </Card>
           </div>
 
@@ -720,7 +952,7 @@ export default function PopularSkinPicker() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>投放時段</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{startDate.format('MM-DD')} ~ {endDate.format('MM-DD')}（{buyDays}天）</span>
+                  <span style={{ color: '#262626', fontWeight: 500 }}>{periodText}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>梯度折扣</span>
@@ -777,7 +1009,7 @@ export default function PopularSkinPicker() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ color: '#595959' }}>投放時段：</span>
-                <span style={{ fontWeight: 600 }}>{startDate.format('YYYY-MM-DD')} ~ {endDate.format('YYYY-MM-DD')}（{buyDays}天）</span>
+                <span style={{ fontWeight: 600 }}>{periodTextFull}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
                 <span>訂單優惠：</span>
@@ -809,6 +1041,39 @@ export default function PopularSkinPicker() {
             <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${priceSummary.sale}</p>
           </div>
         </div>
+      </Modal>
+
+      {/* 待開售日期提醒彈窗（同盤活復蘇規範） */}
+      <Modal
+        title={
+          <Space>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>該日期尚未開售</span>
+          </Space>
+        }
+        open={!!presaleInfo}
+        onCancel={() => setPresaleInfo(null)}
+        footer={[
+          <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
+            我知道了
+          </Button>
+        ]}
+        width={420}
+      >
+        {presaleInfo && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{
+              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
+              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ fontSize: 13, color: '#595959' }}>⏰ 開售時間：</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
+            </div>
+            <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
+              每日 {PRESALE_OPEN_HOUR}:00 會放出新一天的可購買日期，請屆時再來搶購。
+            </p>
+          </div>
+        )}
       </Modal>
     </div>
   )

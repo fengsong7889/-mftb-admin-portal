@@ -153,8 +153,8 @@ const BIZ_CHANNEL_POOL = ['food', 'supermarket', 'groupBuy']
 
 /** 可购买滚动窗口天数（非盘活复苏类型：今天起 12 天） */
 const ROLLING_WINDOW_DAYS = 12
-/** 盘活复苏类型滚动窗口天数（今天起 150 天） */
-const REVIVE_WINDOW_DAYS = 150
+/** 盘活复苏类型滚动窗口天数（今天起 180 天） */
+const REVIVE_WINDOW_DAYS = 180
 
 /** 根据日期计算行号（0-based，相对今天的天数偏移，永不为负） */
 export function getRowIndexByDate(date: string): number {

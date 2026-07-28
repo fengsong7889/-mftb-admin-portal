@@ -25,9 +25,11 @@ const mockGradients = [
 // 中文星期映射
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
-/** 可售天数（含当天），超出即为待开售：盘活复苏 150 天，其他 12 天 */
-const REVIVE_SELLABLE_DAYS = 150
+/** 可售天数（含当天），超出即为待开售：盘活复苏 180 天，其他 12 天 */
+const REVIVE_SELLABLE_DAYS = 180
 const DEFAULT_SELLABLE_DAYS = 12
+/** 月份选择器每页展示数（超出用上下页按钮切换） */
+const MONTHS_PER_PAGE = 6
 /** 开售时间（火车票式，每日该时点放出新一天的可购买日期） */
 const PRESALE_OPEN_HOUR = 10
 
@@ -148,6 +150,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [currentMonth, setCurrentMonth] = useState<Dayjs>(dayjs(inventoryItem.availableStartDate))
   const [hoveredMonth, setHoveredMonth] = useState<string | null>(null)
+  const [monthPage, setMonthPage] = useState(0)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [merchantBalance, setMerchantBalance] = useState(15800)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
@@ -272,7 +275,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     }
   }, [currentTime, cartItems])
 
-  // 获取可售月份范围
+  // 获取可售月份范围（补齐至整页，每页 6 个月，补出的月份整月待开售）
   const months = useMemo(() => {
     const startDate = dayjs(inventoryItem.availableStartDate)
     const endDate = dayjs(inventoryItem.availableEndDate)
@@ -282,8 +285,16 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       result.push(current)
       current = current.add(1, 'month')
     }
+    while (result.length % MONTHS_PER_PAGE !== 0) {
+      result.push(current)
+      current = current.add(1, 'month')
+    }
     return result
   }, [inventoryItem.availableStartDate, inventoryItem.availableEndDate])
+
+  // 月份分页：每页 6 个，超出用上下页按钮切换（同无敌星星日期切换风格）
+  const monthPageCount = Math.ceil(months.length / MONTHS_PER_PAGE)
+  const visibleMonths = months.slice(monthPage * MONTHS_PER_PAGE, (monthPage + 1) * MONTHS_PER_PAGE)
 
   // 生成当前月份的日历网格
   const calendarGrid = useMemo(() => {
@@ -444,8 +455,19 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     setSelectedDates([])
   }
 
-  // 切换月份
-  const handleMonthChange = (month: Dayjs) => { setCurrentMonth(month) }
+  // 切换月份（整月待开售时弹窗提示开售时间，同待开售日期交互）
+  const handleMonthChange = (month: Dayjs) => {
+    const firstDay = month.startOf('month')
+    if (isPresaleDate(firstDay, sellableDays)) {
+      setPresaleInfo({
+        date: firstDay.format('YYYY-MM-DD'),
+        weekday: WEEKDAY_LABELS[firstDay.day()],
+        openTime: getPresaleOpenTime(firstDay, sellableDays).format('M月D日 HH:mm'),
+      })
+      return
+    }
+    setCurrentMonth(month)
+  }
 
   // 获取单元格样式
   const getCellStyle = (date: Dayjs | null) => {
@@ -560,12 +582,22 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         <div style={{ flex: 1 }}>
         {/* 月份横向选择器 */}
         <Card title={<Space><CalendarOutlined /><span>選擇月份</span></Space>} style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 20px' }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {months.map(month => {
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Button
+              size="small"
+              disabled={monthPage === 0}
+              onClick={() => setMonthPage(prev => Math.max(0, prev - 1))}
+            >
+              ◀
+            </Button>
+            <div style={{ flex: 1, display: 'flex', gap: 4 }}>
+            {visibleMonths.map(month => {
               const monthStr = month.format('YYYY-MM')
               const isSelected = currentMonth.format('YYYY-MM') === monthStr
               const isHovered = hoveredMonth === monthStr
               const hasSelectedDates = datesByMonth.some(g => g.month === monthStr)
+              // 整月待开售：月初首日即超出可售窗口，直接标记待开售（同无敌星星）
+              const monthPresale = isPresaleDate(month.startOf('month'), sellableDays)
               return (
                 <div
                   key={monthStr}
@@ -574,14 +606,21 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                   onMouseLeave={() => setHoveredMonth(null)}
                   style={{
                     flex: 1, padding: '8px 4px', borderRadius: 6, position: 'relative',
-                    border: isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                    background: isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
-                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                    border: monthPresale
+                      ? '1px dashed #d9d9d9'
+                      : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
+                    background: monthPresale
+                      ? '#fafafa'
+                      : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
+                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s', whiteSpace: 'nowrap', overflow: 'hidden',
                   }}
                 >
-                  <span style={{ fontSize: 15, fontWeight: isSelected || isHovered ? 700 : 500, color: isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                    {month.format('M月')}
+                  <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
+                    {month.year() === dayjs().year() ? month.format('M月') : month.format('YY年M月')}
                   </span>
+                  {monthPresale && (
+                    <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                  )}
                   {hasSelectedDates && (
                     <div style={{
                       position: 'absolute', top: 3, right: 3,
@@ -593,6 +632,14 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 </div>
               )
             })}
+            </div>
+            <Button
+              size="small"
+              disabled={monthPage >= monthPageCount - 1}
+              onClick={() => setMonthPage(prev => Math.min(monthPageCount - 1, prev + 1))}
+            >
+              ▶
+            </Button>
           </div>
         </Card>
 

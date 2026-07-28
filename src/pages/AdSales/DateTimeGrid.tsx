@@ -148,8 +148,8 @@ const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星
 const LOCK_DURATION_SECONDS = 60
 const LOCK_DURATION_MS = LOCK_DURATION_SECONDS * 1000
 
-/** 可售天数（含当天），超出该窗口即为待开售日期：盘活复苏 150 天，其他类型 12 天 */
-const REVIVE_SELLABLE_DAYS = 150
+/** 可售天数（含当天），超出该窗口即为待开售日期：盘活复苏 180 天，其他类型 12 天 */
+const REVIVE_SELLABLE_DAYS = 180
 const DEFAULT_SELLABLE_DAYS = 12
 /** 开售时间（每日该时点放出新一天的可购买日期，火车票式） */
 const PRESALE_OPEN_HOUR = 10
