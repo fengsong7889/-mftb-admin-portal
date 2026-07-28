@@ -154,8 +154,8 @@ const SALE_SKINS: SaleSkin[] = [
     tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayout: 'carousel',
   },
   {
-    id: 10, name: '暗夜黑金', pricePerDay: 30, borderType: 'color', borderColor: '#434343',
-    tagBg: 'linear-gradient(135deg, #434343, #8C8C8C)', desc: '高冷黑框，西餐日料質感拉滿', sold: 128, dishLayout: 'grid',
+    id: 10, name: '暗夜黑金', pricePerDay: 30, borderType: 'color', borderColor: '#8B6D3B',
+    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayout: 'grid',
   },
   {
     id: 11, name: '橘光暮色', pricePerDay: 25, borderType: 'color', borderColor: '#FA541C',
@@ -176,8 +176,6 @@ const DISCOUNT_TIERS = [
 
 /** 最長可購買天數（滾動窗口，超出即為待開售日期） */
 const MAX_BUY_DAYS = 180
-/** 人氣商家皮膚售賣不允許退款（對應銷售定價中的退款開關） */
-const REFUND_ENABLED = false
 /** 待開售日期每日放票時間（同盤活復蘇，火車票式滾動開售） */
 const PRESALE_OPEN_HOUR = 10
 /** 待開售日期的開售時間（提前 MAX_BUY_DAYS 天、於 PRESALE_OPEN_HOUR 點開售） */
@@ -213,6 +211,11 @@ const ALGORITHM_OPTIONS = [
   { label: '人氣商家-首頁版', value: 'popular_merchant_ka', brand: 'shanfeng' },
   { label: '人氣商家-外賣版', value: 'popular_merchant_delivery', brand: 'mfood' },
 ]
+/** 算法退款配置（對應銷售定價中的退款開關）：不允許退款的算法才展示警示標籤 */
+const ALGORITHM_REFUND_CONFIG: Record<string, boolean> = {
+  popular_merchant_ka: false,       // 首頁版：不允許退款
+  popular_merchant_delivery: true,  // 外賣版：允許退款
+}
 
 export default function PopularSkinPicker() {
   const navigate = useNavigate()
@@ -736,7 +739,7 @@ export default function PopularSkinPicker() {
                 tiers={DISCOUNT_TIERS.map(t => ({ threshold: t.minDays, discount: t.discount }))}
                 unitLabel="天"
                 currentCount={customDates.length}
-                refundDisabled={!REFUND_ENABLED}
+                refundDisabled={!!searchAlgorithm && ALGORITHM_REFUND_CONFIG[searchAlgorithm] === false}
               />
 
               <div>
