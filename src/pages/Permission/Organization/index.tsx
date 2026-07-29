@@ -12,6 +12,8 @@ import {
   updateDepartmentStatus,
 } from '../../../api/department'
 import type { DepartmentItem, DepartmentPayload } from '../../../api/department'
+import { fetchEmployees } from '../../../api/employee'
+import type { EmployeeItem } from '../../../api/employee'
 import './index.css'
 
 const statusOptions = [
@@ -100,6 +102,19 @@ export default function OrganizationManagement() {
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<DepartmentFormValues>()
 
+  // 员工列表（部門對接人下拉選擇）
+  const [employees, setEmployees] = useState<EmployeeItem[]>([])
+
+  /** 加载员工列表（用于部门对接人下拉） */
+  const fetchEmployeeList = useCallback(async () => {
+    try {
+      const result = await fetchEmployees({ page: 1, size: 1000 })
+      setEmployees(result.records)
+    } catch {
+      // 接口异常时员工列表置空
+    }
+  }, [])
+
   /** 加载部门列表（平铺） */
   const fetchList = useCallback(async () => {
     setLoading(true)
@@ -164,6 +179,7 @@ export default function OrganizationManagement() {
     if (selectedDeptId != null) {
       form.setFieldsValue({ parentId: selectedDeptId })
     }
+    fetchEmployeeList()
     setEditModalVisible(true)
   }
 
@@ -177,6 +193,7 @@ export default function OrganizationManagement() {
       leader: record.leader,
       sort: record.sort,
     })
+    fetchEmployeeList()
     setEditModalVisible(true)
   }
 
@@ -379,7 +396,13 @@ export default function OrganizationManagement() {
             <Input placeholder="請輸入部門名稱" allowClear />
           </Form.Item>
           <Form.Item name="leader" label="部門對接人">
-            <Input placeholder="請輸入部門對接人姓名" allowClear />
+            <Select
+              placeholder="請選擇部門對接人"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={employees.map(emp => ({ value: emp.name, label: `${emp.name}（${emp.empId}）` }))}
+            />
           </Form.Item>
           <Form.Item name="sort" label="排序" extra="數字越小越靠前">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="請輸入排序值" />
