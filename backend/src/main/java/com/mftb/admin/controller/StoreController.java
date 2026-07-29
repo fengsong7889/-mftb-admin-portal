@@ -9,6 +9,7 @@ import com.mftb.admin.dto.StoreVO;
 import com.mftb.admin.service.StoreService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,5 +65,12 @@ public class StoreController {
     @PutMapping("/{id}")
     public Result<StoreVO> update(@PathVariable Long id, @Valid @RequestBody StoreRequest request) {
         return Result.success("门店信息已更新", storeService.update(id, request));
+    }
+
+    /** 删除门店 */
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        storeService.delete(id);
+        return Result.success("门店已删除", null);
     }
 }

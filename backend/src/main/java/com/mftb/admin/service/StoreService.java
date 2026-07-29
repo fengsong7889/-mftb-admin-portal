@@ -30,4 +30,7 @@ public interface StoreService {
 
     /** 编辑门店 */
     StoreVO update(Long id, StoreRequest request);
+
+    /** 删除门店 */
+    void delete(Long id);
 }

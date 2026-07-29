@@ -142,6 +142,19 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
         return MerchantGroupVO.from(group, storeCount);
     }
 
+    @Override
+    public void delete(Long id) {
+        BizMerchantGroup group = requireGroup(id);
+        Long storeCount = storeMapper.selectCount(
+                new LambdaQueryWrapper<BizStore>().eq(BizStore::getGroupId, id));
+        if (storeCount > 0) {
+            throw new BusinessException("该集团下还有 " + storeCount + " 家门店，请先删除门店后再删除集团");
+        }
+        group.setDeleted(1);
+        group.setUpdatedBy(operatorResolver.currentOperatorName());
+        groupMapper.updateById(group);
+    }
+
     /**
      * 生成下一个集团ID: 取当前最大 JT 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除集团的编号)
      */

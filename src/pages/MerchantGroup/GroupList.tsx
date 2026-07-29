@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Button, Space, Form, DatePicker, Table, message } from 'antd'
+import { Button, Space, Form, DatePicker, Table, message, Modal } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
   ExportOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { exportToCSV } from '../../utils/exportCSV'
 import { useNavigate } from 'react-router-dom'
@@ -18,6 +19,7 @@ import {
   fetchMerchantGroups,
   fetchMerchantGroupOptions,
   fetchMerchantGroupUpdatedByOptions,
+  deleteMerchantGroup,
 } from '../../api/merchantGroup'
 import GroupEditModal from './GroupEditModal'
 
@@ -44,6 +46,10 @@ export default function GroupList() {
   // 查询条件（点击查询后生效）
   const [filters, setFilters] = useState<GroupFilters>({})
   const [searchForm] = Form.useForm<GroupSearchValues>()
+
+  // 勾选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [selectedRows, setSelectedRows] = useState<MerchantGroupItem[]>([])
 
   // 编辑弹窗
   const [modalOpen, setModalOpen] = useState(false)
@@ -106,6 +112,30 @@ export default function GroupList() {
     navigate(`/store-list?${params.toString()}`)
   }
 
+  const handleDelete = (record: MerchantGroupItem) => {
+    if (record.storeCount > 0) {
+      message.warning(`該集團下還有 ${record.storeCount} 家門店，請先刪除門店後再刪除集團`)
+      return
+    }
+    Modal.confirm({
+      title: '確認刪除',
+      content: `確定要刪除集團「${record.groupName}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteMerchantGroup(record.id)
+          message.success('集團已刪除')
+          loadData()
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '刪除失敗'
+          message.error(msg)
+        }
+      },
+    })
+  }
+
   const handleModalSuccess = () => {
     setModalOpen(false)
     setEditingRecord(null)
@@ -133,6 +163,11 @@ export default function GroupList() {
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current || 1)
     setSize(pagination.pageSize || 10)
+  }
+
+  const handleSelectChange = (keys: React.Key[], rows: MerchantGroupItem[]) => {
+    setSelectedRowKeys(keys)
+    setSelectedRows(rows)
   }
 
   const columns: TableColumnsType<MerchantGroupItem> = [
@@ -190,7 +225,7 @@ export default function GroupList() {
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 200,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
@@ -199,6 +234,9 @@ export default function GroupList() {
           </Button>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>
             編輯
+          </Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
+            刪除
           </Button>
         </Space>
       ),
@@ -269,6 +307,12 @@ export default function GroupList() {
         rowKey="id"
         loading={loading}
         onChange={handleTableChange}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: handleSelectChange,
+          columnWidth: 40,
+          fixed: true,
+        }}
         pagination={{
           current: page,
           pageSize: size,

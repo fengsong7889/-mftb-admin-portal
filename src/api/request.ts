@@ -103,4 +103,16 @@ function handleUnauthorized() {
   }
 }
 
+/**
+ * 判断错误是否为「后端不可用」类错误（网络异常 / 404 / 5xx）
+ * 用于 API 层降级到本地 Mock 数据：本地未启动后端或静态部署时自动使用虚拟数据，
+ * 后端可用时的业务错误（如参数校验失败）不会触发降级。
+ */
+export function isBackendUnavailable(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false
+  const status = error.response?.status
+  // 无响应（连接被拒/超时）、代理 404、服务端 5xx 均视为后端不可用
+  return !status || status === 404 || status >= 500
+}
+
 export default request

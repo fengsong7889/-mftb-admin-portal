@@ -1,5 +1,14 @@
-import request from './request'
+import request, { SILENT_HEADER, isBackendUnavailable } from './request'
 import type { OptionItem } from './types'
+import {
+  mockFetchStores,
+  mockFetchStoresByGroup,
+  mockFetchStoreOptions,
+  mockFetchStoreUpdatedByOptions,
+  mockCreateStore,
+  mockUpdateStore,
+  mockDeleteStore,
+} from './mock/merchantMock'
 
 /** 门店信息 */
 export interface StoreItem {
@@ -58,32 +67,75 @@ export interface StoreQueryParams {
   createdTo?: string
 }
 
-/** 分页查询门店 */
-export function fetchStores(params: StoreQueryParams) {
-  return request.get<unknown, StorePageResult>('/stores', { params })
+/** 静默请求头：后端不可用时降级到 Mock，不弹全局错误提示 */
+const SILENT = { headers: { [SILENT_HEADER]: '1' } }
+
+/** 分页查询门店（后端不可用时自动降级到本地 Mock 数据） */
+export async function fetchStores(params: StoreQueryParams) {
+  try {
+    return await request.get<unknown, StorePageResult>('/stores', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStores(params)
+    throw err
+  }
 }
 
 /** 按集团查询门店（下拉选项用） */
-export function fetchStoresByGroup(groupId: number) {
-  return request.get<unknown, StoreItem[]>(`/stores/by-group/${groupId}`)
+export async function fetchStoresByGroup(groupId: number) {
+  try {
+    return await request.get<unknown, StoreItem[]>(`/stores/by-group/${groupId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStoresByGroup(groupId)
+    throw err
+  }
 }
 
 /** 门店ID/名称搜索下拉选项（选项值为门店ID） */
-export function fetchStoreOptions(keyword: string) {
-  return request.get<unknown, OptionItem[]>('/stores/options', { params: { keyword } })
+export async function fetchStoreOptions(keyword: string) {
+  try {
+    return await request.get<unknown, OptionItem[]>('/stores/options', { params: { keyword }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStoreOptions(keyword)
+    throw err
+  }
 }
 
 /** 门店最后更新人搜索下拉选项 */
-export function fetchStoreUpdatedByOptions(keyword: string) {
-  return request.get<unknown, OptionItem[]>('/stores/updated-by-options', { params: { keyword } })
+export async function fetchStoreUpdatedByOptions(keyword: string) {
+  try {
+    return await request.get<unknown, OptionItem[]>('/stores/updated-by-options', { params: { keyword }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStoreUpdatedByOptions(keyword)
+    throw err
+  }
 }
 
 /** 新增门店 */
-export function createStore(data: StorePayload) {
-  return request.post<unknown, StoreItem>('/stores', data)
+export async function createStore(data: StorePayload) {
+  try {
+    return await request.post<unknown, StoreItem>('/stores', data, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockCreateStore(data)
+    throw err
+  }
 }
 
 /** 编辑门店 */
-export function updateStore(id: number, data: StorePayload) {
-  return request.put<unknown, StoreItem>(`/stores/${id}`, data)
+export async function updateStore(id: number, data: StorePayload) {
+  try {
+    return await request.put<unknown, StoreItem>(`/stores/${id}`, data, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockUpdateStore(id, data)
+    throw err
+  }
+}
+
+/** 删除门店 */
+export async function deleteStore(id: number) {
+  try {
+    return await request.delete<unknown, void>(`/stores/${id}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockDeleteStore(id)
+    throw err
+  }
 }

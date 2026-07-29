@@ -9,6 +9,7 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.MerchantGroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,5 +65,12 @@ public class MerchantGroupController {
     @PutMapping("/{id}")
     public Result<MerchantGroupVO> update(@PathVariable Long id, @Valid @RequestBody MerchantGroupRequest request) {
         return Result.success("集团信息已更新", merchantGroupService.update(id, request));
+    }
+
+    /** 删除集团(存在关联门店时禁止删除) */
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        merchantGroupService.delete(id);
+        return Result.success("集团已删除", null);
     }
 }

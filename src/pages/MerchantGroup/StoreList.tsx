@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Button, DatePicker, Form, Select, Table, message } from 'antd'
+import { Button, DatePicker, Form, Select, Space, Table, message, Modal } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
   ExportOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
@@ -14,7 +15,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { toDateRangeParams } from '../../utils/dateRange'
 import type { DateRangeValue } from '../../utils/dateRange'
 import type { StoreItem, StoreQueryParams } from '../../api/store'
-import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions } from '../../api/store'
+import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions, deleteStore } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS, formatBizChannel } from '../../constants/bizChannel'
 import { exportToCSV } from '../../utils/exportCSV'
@@ -61,6 +62,10 @@ export default function StoreList() {
     presetGroupCode ? { groupKeyword: presetGroupCode } : {},
   )
   const [searchForm] = Form.useForm<StoreSearchValues>()
+
+  // 勾选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [selectedRows, setSelectedRows] = useState<StoreItem[]>([])
 
   // 从集团列表跳转带入的集团，用于搜索下拉框回显
   const presetGroupOptions = presetGroupCode
@@ -125,6 +130,28 @@ export default function StoreList() {
     setModalOpen(true)
   }
 
+  const handleDelete = (record: StoreItem) => {
+    Modal.confirm({
+      title: '確認刪除',
+      content: `確定要刪除門店「${record.storeName}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteStore(record.id)
+          message.success('門店已刪除')
+          setSelectedRowKeys([])
+          setSelectedRows([])
+          loadData()
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '刪除失敗'
+          message.error(msg)
+        }
+      },
+    })
+  }
+
   const handleModalSuccess = () => {
     setModalOpen(false)
     setEditingRecord(null)
@@ -155,6 +182,11 @@ export default function StoreList() {
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current || 1)
     setSize(pagination.pageSize || 10)
+  }
+
+  const handleSelectChange = (keys: React.Key[], rows: StoreItem[]) => {
+    setSelectedRowKeys(keys)
+    setSelectedRows(rows)
   }
 
   const columns: TableColumnsType<StoreItem> = [
@@ -227,12 +259,17 @@ export default function StoreList() {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 140,
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" size="small" onClick={() => handleEdit(record)}>
-          編輯
-        </Button>
+        <Space size={4}>
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>
+            編輯
+          </Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
+            刪除
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -318,6 +355,12 @@ export default function StoreList() {
         rowKey="id"
         loading={loading}
         onChange={handleTableChange}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: handleSelectChange,
+          columnWidth: 40,
+          fixed: true,
+        }}
         pagination={{
           current: page,
           pageSize: size,

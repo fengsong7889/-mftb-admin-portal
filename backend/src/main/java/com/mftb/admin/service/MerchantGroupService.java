@@ -30,4 +30,7 @@ public interface MerchantGroupService {
 
     /** 编辑集团 */
     MerchantGroupVO update(Long id, MerchantGroupRequest request);
+
+    /** 删除集团(存在关联门店时禁止删除) */
+    void delete(Long id);
 }

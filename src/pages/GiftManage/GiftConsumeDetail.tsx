@@ -78,6 +78,10 @@ export default function GiftConsumeDetail() {
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
 
+  // 勾选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [selectedRows, setSelectedRows] = useState<GiftConsumeItem[]>([])
+
   // 搜索条件（已生效）
   const [filters, setFilters] = useState<{
     groupId?: number; storeId?: number; brand?: string; adType?: string
@@ -186,6 +190,11 @@ export default function GiftConsumeDetail() {
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current || 1)
     setSize(pagination.pageSize || 10)
+  }
+
+  const handleSelectChange = (keys: React.Key[], rows: GiftConsumeItem[]) => {
+    setSelectedRowKeys(keys)
+    setSelectedRows(rows)
   }
 
   const columns: TableColumnsType<GiftConsumeItem> = [
@@ -485,6 +494,12 @@ export default function GiftConsumeDetail() {
         rowKey="id"
         loading={loading}
         onChange={handleTableChange}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: handleSelectChange,
+          columnWidth: 40,
+          fixed: true,
+        }}
         pagination={{
           current: page,
           pageSize: size,

@@ -186,6 +186,14 @@ public class StoreServiceImpl implements StoreService {
         return StoreVO.from(store, group.getGroupCode(), group.getGroupName());
     }
 
+    @Override
+    public void delete(Long id) {
+        BizStore store = requireStore(id);
+        store.setDeleted(1);
+        store.setUpdatedBy(operatorResolver.currentOperatorName());
+        storeMapper.updateById(store);
+    }
+
     /**
      * 生成下一个门店ID: 取当前最大 MD 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除门店的编号)
      */
