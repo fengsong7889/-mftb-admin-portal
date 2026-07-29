@@ -66,6 +66,12 @@ SET @sql = (SELECT IF(COUNT(*) = 0,
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE sys_user ADD COLUMN position_en VARCHAR(128) NULL COMMENT ''职位英文名称快照'' AFTER position',
+    'SELECT 1') FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'position_en');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(COUNT(*) = 0,
     'ALTER TABLE sys_user ADD COLUMN function_roles TEXT NULL COMMENT ''绑定的功能角色ID JSON数组'' AFTER role',
     'SELECT 1') FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'function_roles');

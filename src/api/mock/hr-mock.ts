@@ -46,10 +46,10 @@ const SEED_POSITIONS: PositionItem[] = [
 ]
 
 const SEED_EMPLOYEES: EmployeeItem[] = [
-  { id: 1, username: 'admin', name: '系統管理員', empId: 'EMP001', role: 'admin', departmentId: 1, department: '集團總部', positionId: 8, position: '總監', jobLevel: 'M7', status: 1, functionRoleIds: [1], createdAt: '2025-01-01 00:00:00' },
-  { id: 2, username: 'zhangsan', name: '張三', empId: 'EMP002', role: 'guest', departmentId: 2, department: '技術部', positionId: 1, position: '高級工程師', jobLevel: 'T7', status: 1, functionRoleIds: [2], createdAt: '2025-01-15 10:30:00' },
-  { id: 3, username: 'lisi', name: '李四', empId: 'EMP003', role: 'guest', departmentId: 2, department: '技術部', positionId: 2, position: '中級工程師', jobLevel: 'T5', status: 1, functionRoleIds: [2], createdAt: '2025-02-01 14:00:00' },
-  { id: 4, username: 'wangwu', name: '王五', empId: 'EMP004', role: 'guest', departmentId: 3, department: '運營部', positionId: 6, position: '運營專員', jobLevel: 'P3', status: 1, functionRoleIds: [2], createdAt: '2025-03-10 09:00:00' },
+  { id: 1, username: 'admin', name: '系統管理員', empId: 'EMP001', role: 'admin', departmentId: 1, department: '集團總部', positionId: 8, position: '總監', sequence: 'M', jobLevel: 'M7', status: 1, functionRoleIds: [1], createdAt: '2025-01-01 00:00:00' },
+  { id: 2, username: 'zhangsan', name: '張三', empId: 'EMP002', role: 'guest', departmentId: 2, department: '技術部', positionId: 1, position: '高級工程師', sequence: 'T', jobLevel: 'T7', status: 1, functionRoleIds: [2], createdAt: '2025-01-15 10:30:00' },
+  { id: 3, username: 'lisi', name: '李四', empId: 'EMP003', role: 'guest', departmentId: 2, department: '技術部', positionId: 2, position: '中級工程師', sequence: 'T', jobLevel: 'T5', status: 1, functionRoleIds: [2], createdAt: '2025-02-01 14:00:00' },
+  { id: 4, username: 'wangwu', name: '王五', empId: 'EMP004', role: 'guest', departmentId: 3, department: '運營部', positionId: 6, position: '運營專員', sequence: 'P', jobLevel: 'P3', status: 1, functionRoleIds: [2], createdAt: '2025-03-10 09:00:00' },
   { id: 5, username: 'zhaoliu', name: '趙六', empId: 'EMP005', role: 'guest', departmentId: 4, department: '財務部', positionId: null, position: undefined, jobLevel: undefined, status: 0, functionRoleIds: [3], createdAt: '2025-04-01 16:00:00' },
 ]
 
@@ -89,6 +89,15 @@ function now(): string {
   return new Date().toISOString().replace('T', ' ').slice(0, 19)
 }
 
+/** 生成下一个工号 (MT 前缀 + 4 位自增, 与后端规则一致) */
+function nextEmpId(employees: EmployeeItem[]): string {
+  const maxSeq = employees.reduce((max, emp) => {
+    const match = /^MT(\d+)$/.exec(emp.empId ?? '')
+    return match ? Math.max(max, Number(match[1])) : max
+  }, 0)
+  return `MT${String(maxSeq + 1).padStart(4, '0')}`
+}
+
 // ============================================================
 // 员工 Mock CRUD
 // ============================================================
@@ -121,17 +130,22 @@ export function mockCreateEmployee(data: EmployeePayload): EmployeeItem {
   const positions = read<PositionItem>(KEY_POSITIONS)
   const dept = departments.find(d => d.id === data.departmentId)
   const pos = positions.find(p => p.id === data.positionId)
+  // 工号即登录账号, 由系统自动生成
+  const empId = nextEmpId(employees)
   const item: EmployeeItem = {
     id: nextId(employees),
-    username: data.username!,
+    username: empId,
     name: data.name,
-    empId: data.empId,
+    empId,
     role: 'guest',
     departmentId: data.departmentId ?? null,
     department: dept?.name,
     positionId: data.positionId ?? null,
     position: pos?.name,
+    positionEn: pos?.nameEn,
+    sequence: pos?.sequence,
     jobLevel: pos?.jobLevel,
+    rank: data.rank ?? undefined,
     status: 1,
     functionRoleIds: data.functionRoleIds ?? [],
     createdAt: now(),
@@ -152,12 +166,14 @@ export function mockUpdateEmployee(id: number, data: EmployeePayload): EmployeeI
   employees[idx] = {
     ...employees[idx],
     name: data.name,
-    empId: data.empId,
     departmentId: data.departmentId ?? null,
     department: dept?.name,
     positionId: data.positionId ?? null,
     position: pos?.name,
+    positionEn: pos?.nameEn,
+    sequence: pos?.sequence,
     jobLevel: pos?.jobLevel,
+    rank: data.rank ?? undefined,
     functionRoleIds: data.functionRoleIds ?? [],
   }
   write(KEY_EMPLOYEES, employees)

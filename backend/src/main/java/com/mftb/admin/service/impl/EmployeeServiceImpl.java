@@ -15,6 +15,7 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.EmployeeService;
 import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,9 +33,13 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final SysDepartmentMapper sysDepartmentMapper;
     private final SysPositionMapper sysPositionMapper;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     /** 内置管理员登录账号(工号), 禁止停用/删除 */
-    private static final String BUILTIN_ADMIN = "SF0001";
+    private static final String BUILTIN_ADMIN = "MT0001";
+
+    /** 工号前缀: 工号由系统自动生成, 规则 MT + 4位自增序号 */
+    private static final String EMP_ID_PREFIX = "MT";
 
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, Integer status) {
@@ -57,28 +62,22 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public EmployeeVO create(EmployeeRequest request) {
-        if (!StringUtils.hasText(request.getUsername())) {
-            throw new BusinessException("登录账号不能为空");
-        }
         if (!StringUtils.hasText(request.getPassword()) || request.getPassword().length() < 6) {
             throw new BusinessException("登录密码不能为空且长度不少于 6 位");
         }
-        // 账号唯一性校验
-        Long count = sysUserMapper.selectCount(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername()));
-        if (count > 0) {
-            throw new BusinessException("登录账号已存在");
-        }
+        // 工号由系统自动生成 (MT + 4位自增), 同时作为登录账号, 不接受前端传入
+        String empId = generateEmpId();
         SysUser user = new SysUser();
-        user.setUsername(request.getUsername().trim());
+        user.setUsername(empId);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
-        user.setEmpId(request.getEmpId());
+        user.setEmpId(empId);
         user.setAvatar("pikachu-default");
         user.setRole(StringUtils.hasText(request.getRole()) ? request.getRole() : "guest");
         user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds() == null ? List.of() : request.getFunctionRoleIds()));
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
+        user.setRank(request.getRank());
         user.setStatus(1);
         user.setDeleted(0);
         sysUserMapper.insert(user);
@@ -89,9 +88,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     public EmployeeVO update(Long id, EmployeeRequest request) {
         SysUser user = requireUser(id);
         user.setName(request.getName());
-        user.setEmpId(request.getEmpId());
+        // 工号即登录账号, 由系统生成后不允许修改
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
+        user.setRank(request.getRank());
         if (StringUtils.hasText(request.getRole()) && !BUILTIN_ADMIN.equals(user.getUsername())) {
             user.setRole(request.getRole());
         }
@@ -128,6 +128,17 @@ public class EmployeeServiceImpl implements EmployeeService {
         sysUserMapper.deleteById(id);
     }
 
+    /**
+     * 生成下一个工号: 取当前最大 MT 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号)
+     */
+    private String generateEmpId() {
+        Integer maxSeq = jdbcTemplate.queryForObject(
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(username, 3) AS UNSIGNED)), 0) FROM sys_user "
+                        + "WHERE username REGEXP '^MT[0-9]+$'",
+                Integer.class);
+        return String.format("%s%04d", EMP_ID_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+    }
+
     /** 设置员工所在部门: 校验部门存在并写入部门名称快照 */
     private void applyDepartment(SysUser user, Long departmentId) {
         if (departmentId == null) {
@@ -143,11 +154,13 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setDepartment(dept.getName());
     }
 
-    /** 设置员工职位: 校验职位存在并写入职位名称/职级快照 */
+    /** 设置员工职位: 校验职位存在并写入职位中英文名称/职级序列/职级快照 */
     private void applyPosition(SysUser user, Long positionId) {
         if (positionId == null) {
             user.setPositionId(null);
             user.setPosition(null);
+            user.setPositionEn(null);
+            user.setSequence(null);
             user.setJobLevel(null);
             return;
         }
@@ -157,6 +170,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         user.setPositionId(position.getId());
         user.setPosition(position.getName());
+        user.setPositionEn(position.getNameEn());
+        user.setSequence(position.getSequence());
         user.setJobLevel(position.getJobLevel());
     }
 

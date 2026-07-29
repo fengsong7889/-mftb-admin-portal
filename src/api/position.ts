@@ -13,6 +13,19 @@ export const POSITION_SEQUENCE_OPTIONS = Object.entries(POSITION_SEQUENCE).map((
   label,
 }))
 
+/** 职级序列标签颜色 (列表 Tag 展示) */
+export const POSITION_SEQUENCE_TAG_COLOR: Record<string, string> = {
+  M: 'blue',
+  T: 'purple',
+  P: 'green',
+}
+
+/** 职等选项 R1~R5（R1最低，R5最高） */
+export const POSITION_RANK_OPTIONS = Array.from({ length: 5 }, (_, i) => ({
+  value: `R${i + 1}`,
+  label: `R${i + 1}`,
+}))
+
 /** 职位信息 */
 export interface PositionItem {
   id: number

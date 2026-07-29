@@ -50,14 +50,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const adminPwd = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
     const trimmed = username.trim().toUpperCase()
 
-    // 内置管理员：工号 SF0001 / 环境变量密码
-    if (trimmed === 'SF0001' && adminPwd && password === adminPwd) {
+    // 内置管理员：工号 MT0001 / 环境变量密码
+    if (trimmed === 'MT0001' && adminPwd && password === adminPwd) {
       return {
         success: true,
         user: {
-          username: 'SF0001',
+          username: 'MT0001',
           name: '系統管理員',
-          empId: 'SF0001',
+          empId: 'MT0001',
           avatar: 'pikachu-default',
           role: 'admin',
           department: '集團總裁辦',

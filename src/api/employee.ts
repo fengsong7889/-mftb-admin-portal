@@ -10,21 +10,30 @@ export interface EmployeeItem {
   departmentId?: number | null
   department?: string
   positionId?: number | null
+  /** 职位名称(中文) */
   position?: string
+  /** 职位名称(英文) */
+  positionEn?: string
+  /** 职级序列 (M/T/P, 随职位带出) */
+  sequence?: string
   jobLevel?: string
+  /** 职等 (R1~R5) */
+  rank?: string
   status: number
   functionRoleIds: number[]
   createdAt?: string
 }
 
-/** 员工新增/编辑请求参数 */
+/** 员工新增/编辑请求参数（工号/登录账号由后端自动生成） */
 export interface EmployeePayload {
-  username?: string // 新增必填，编辑不可修改
+  username?: string // 后端自动生成，无需传入
   password?: string // 仅新增时使用
   name: string
-  empId: string
+  empId?: string // 后端按 MT 前缀自增生成，无需传入
   departmentId?: number | null
   positionId?: number | null
+  /** 职等 (R1~R5) */
+  rank?: string | null
   role?: string
   functionRoleIds?: number[]
 }

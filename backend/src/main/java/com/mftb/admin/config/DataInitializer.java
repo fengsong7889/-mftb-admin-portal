@@ -10,10 +10,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * 数据初始化器: 启动时自动执行字段迁移与内置账号迁移, 并将 SQL 中的占位密码重置为正确的 BCrypt 加密值
  * <p>
- * 登录账号统一为工号, 内置管理员工号 SF0001, 密码: 111222
+ * 登录账号统一为工号, 工号按 MT 前缀自增(MT0001 起), 内置管理员工号 MT0001, 密码: 111222
  */
 @Slf4j
 @Component
@@ -28,20 +30,38 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         migrateSchema();
         migrateBuiltinAccounts();
-        resetPasswordIfNeeded("SF0001", "111222");
+        migrateEmpIdToMT();
+        resetPasswordIfNeeded("MT0001", "111222");
     }
 
-    /** 内置账号迁移: 登录账号统一为工号, admin 改用工号 SF0001 登录, 移除 guest 账号 */
+    /** 内置账号迁移: 登录账号统一为工号, 移除 guest 账号 (旧库 admin 账号由 migrateEmpIdToMT 统一重编号) */
     private void migrateBuiltinAccounts() {
-        int renamed = jdbcTemplate.update(
-                "UPDATE sys_user SET username = 'SF0001' WHERE username = 'admin'");
-        if (renamed > 0) {
-            log.info("已将内置 admin 账号登录名迁移为工号 SF0001");
-        }
         int removed = jdbcTemplate.update("DELETE FROM sys_user WHERE username = 'guest'");
         if (removed > 0) {
             log.info("已移除内置 guest 账号");
         }
+    }
+
+    /**
+     * 存量工号迁移: 将所有非 MT 格式登录账号的员工(含逻辑删除记录)按 id 升序重编号为 MT0001+,
+     * 登录账号与工号同步更新; 已是 MT 格式的记录不变, 重复启动幂等
+     */
+    private void migrateEmpIdToMT() {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MT[0-9]+$' ORDER BY id", Long.class);
+        if (ids.isEmpty()) {
+            return;
+        }
+        Integer maxSeq = jdbcTemplate.queryForObject(
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(username, 3) AS UNSIGNED)), 0) FROM sys_user "
+                        + "WHERE username REGEXP '^MT[0-9]+$'",
+                Integer.class);
+        int seq = maxSeq == null ? 0 : maxSeq;
+        for (Long id : ids) {
+            String empId = String.format("MT%04d", ++seq);
+            jdbcTemplate.update("UPDATE sys_user SET username = ?, emp_id = ? WHERE id = ?", empId, empId, id);
+        }
+        log.info("已将 {} 个存量员工工号迁移为 MT 自增格式", ids.size());
     }
 
     /** 幂等字段迁移: 列不存在时自动 ALTER TABLE (免手动执行 SQL 脚本) */
@@ -66,6 +86,36 @@ public class DataInitializer implements CommandLineRunner {
                 "ALTER TABLE sys_user ADD COLUMN position_id BIGINT NULL COMMENT '职位ID' AFTER department");
         addColumnIfAbsent("sys_user", "job_level",
                 "ALTER TABLE sys_user ADD COLUMN job_level VARCHAR(32) NULL COMMENT '职级快照' AFTER position");
+        addColumnIfAbsent("sys_user", "position_en",
+                "ALTER TABLE sys_user ADD COLUMN position_en VARCHAR(128) NULL COMMENT '职位英文名称快照' AFTER position");
+        addColumnIfAbsent("sys_user", "sequence",
+                "ALTER TABLE sys_user ADD COLUMN sequence VARCHAR(8) NULL COMMENT '职级序列快照: M=管理 T=技术 P=专业' AFTER position_en");
+        addColumnIfAbsent("sys_user", "rank",
+                "ALTER TABLE sys_user ADD COLUMN `rank` VARCHAR(8) NULL COMMENT '职等 R1~R5' AFTER job_level");
+        backfillUserPositionEn();
+        backfillUserSequence();
+    }
+
+    /** 回填存量员工的职级序列快照 (仅处理空值, 可重复执行) */
+    private void backfillUserSequence() {
+        int filled = jdbcTemplate.update(
+                "UPDATE sys_user u JOIN sys_position p ON u.position_id = p.id "
+                        + "SET u.sequence = p.sequence "
+                        + "WHERE u.sequence IS NULL");
+        if (filled > 0) {
+            log.info("已回填 {} 名员工的职级序列快照", filled);
+        }
+    }
+
+    /** 回填存量员工的职位英文名称快照 (仅处理空值, 可重复执行) */
+    private void backfillUserPositionEn() {
+        int filled = jdbcTemplate.update(
+                "UPDATE sys_user u JOIN sys_position p ON u.position_id = p.id "
+                        + "SET u.position_en = p.name_en "
+                        + "WHERE u.position_en IS NULL AND p.name_en IS NOT NULL");
+        if (filled > 0) {
+            log.info("已回填 {} 名员工的职位英文名称快照", filled);
+        }
     }
 
     /** 集团人事-职位表不存在时自动创建 */

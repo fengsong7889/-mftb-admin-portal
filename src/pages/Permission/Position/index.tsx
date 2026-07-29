@@ -4,8 +4,10 @@ import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
+  POSITION_RANK_OPTIONS,
   POSITION_SEQUENCE,
   POSITION_SEQUENCE_OPTIONS,
+  POSITION_SEQUENCE_TAG_COLOR,
   createPosition,
   deletePosition,
   fetchPositions,
@@ -13,25 +15,12 @@ import {
 } from '../../../api/position'
 import type { PositionItem, PositionPayload } from '../../../api/position'
 
-/** 职级序列标签颜色 */
-const SEQUENCE_TAG_COLOR: Record<string, string> = {
-  M: 'blue',
-  T: 'purple',
-  P: 'green',
-}
-
 /** 每个序列的职级范围配置 */
 const JOB_LEVEL_CONFIG: Record<string, { start: number; end: number }> = {
   M: { start: 4, end: 12 },  // M4 ~ M12
   T: { start: 1, end: 9 },   // T1 ~ T9
   P: { start: 1, end: 9 },   // P1 ~ P9
 }
-
-/** 职等选项 R1~R5（R1最低，R5最高） */
-const RANK_OPTIONS = Array.from({ length: 5 }, (_, i) => ({
-  value: `R${i + 1}`,
-  label: `R${i + 1}`,
-}))
 
 /** 新增/编辑表单值 */
 interface PositionFormValues {
@@ -188,7 +177,7 @@ export default function PositionManagement() {
       key: 'sequence',
       width: 120,
       render: (value: string) => (
-        <Tag color={SEQUENCE_TAG_COLOR[value] || 'default'}>{POSITION_SEQUENCE[value] || value}</Tag>
+        <Tag color={POSITION_SEQUENCE_TAG_COLOR[value] || 'default'}>{POSITION_SEQUENCE[value] || value}</Tag>
       ),
     },
     { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 100 },
@@ -322,7 +311,7 @@ export default function PositionManagement() {
             rules={[{ required: true, message: '請選擇職等' }]}
             extra="R1 最低，R5 最高"
           >
-            <Select placeholder="請選擇職等" options={RANK_OPTIONS} />
+            <Select placeholder="請選擇職等" options={POSITION_RANK_OPTIONS} />
           </Form.Item>
         </Form>
       </Modal>

@@ -29,8 +29,11 @@ CREATE TABLE IF NOT EXISTS sys_user (
     department_id  BIGINT                                  COMMENT '所在部门ID (关联 sys_department.id)',
     department     VARCHAR(100)                            COMMENT '所在部门名称快照',
     position_id    BIGINT                                  COMMENT '职位ID (关联 sys_position.id)',
-    position       VARCHAR(100)                            COMMENT '职位名称快照',
+    position       VARCHAR(100)                            COMMENT '职位名称(中文)快照',
+    position_en    VARCHAR(128)                            COMMENT '职位名称(英文)快照',
+    `sequence`     VARCHAR(8)                              COMMENT '职级序列快照: M=管理 T=技术 P=专业 (随职位带出)',
     job_level      VARCHAR(32)                             COMMENT '职级快照 (如 M3/T5/P2, 随职位带出)',
+    `rank`         VARCHAR(8)                              COMMENT '职等 R1~R5',
     status         TINYINT      DEFAULT 1                  COMMENT '状态: 1=启用 0=停用',
     deleted        TINYINT      DEFAULT 0                  COMMENT '逻辑删除: 0=未删除 1=已删除',
     created_at     DATETIME     DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
@@ -98,11 +101,11 @@ CREATE TABLE IF NOT EXISTS sys_position (
 -- 五、初始数据（幂等：仅当不存在时插入）
 -- ============================================================
 
--- 内置管理员（登录账号统一为工号；密码为占位符，后端 DataInitializer 首次启动时
--- 会自动重置为 BCrypt 值: SF0001=111222）
+-- 内置管理员（登录账号统一为工号，工号按 MT 前缀自增；密码为占位符，后端 DataInitializer 首次启动时
+-- 会自动重置为 BCrypt 值: MT0001=111222）
 INSERT INTO sys_user (username, password, name, emp_id, avatar, role, department, position, status)
-SELECT 'SF0001', '$2a$10$placeholder', 'Bee', 'SF0001', 'pikachu-default', 'admin', '集团总裁办', '高级副总裁', 1
-WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'SF0001');
+SELECT 'MT0001', '$2a$10$placeholder', 'Bee', 'MT0001', 'pikachu-default', 'admin', '集团总裁办', '高级副总裁', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'MT0001');
 
 -- 初始功能角色
 INSERT INTO sys_role (name, code, description, status)

@@ -16,7 +16,7 @@ import { fetchRoles } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
-import { fetchPositions } from '../../../api/position'
+import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE, POSITION_SEQUENCE_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
 import type { PositionItem } from '../../../api/position'
 
 
@@ -27,20 +27,24 @@ const EMPLOYEE_STATUS = {
 } as const
 
 /** 内置管理员登录账号（工号，禁止停用/删除） */
-const BUILTIN_ADMIN = 'SF0001'
+const BUILTIN_ADMIN = 'MT0001'
 
 const statusOptions = [
   { value: EMPLOYEE_STATUS.ENABLED, label: '啟用' },
   { value: EMPLOYEE_STATUS.DISABLED, label: '停用' },
 ]
 
-/** 新增/编辑表单值 */
+/** 新增/编辑表单值（工号由后端自动生成，仅编辑时回显） */
 interface EmployeeFormValues {
   password?: string
   name: string
-  empId: string
+  empId?: string
   departmentId?: number
+  /** 职级序列（用于过滤职位，不随表单提交） */
+  sequence?: string
   positionId?: number
+  /** 职等 R1~R5 */
+  rank?: string
   functionRoleIds?: number[]
 }
 
@@ -100,6 +104,8 @@ export default function EmployeeManagement() {
   const [form] = Form.useForm<EmployeeFormValues>()
   // 监听所选职位，带出对应职级展示
   const watchPositionId = Form.useWatch('positionId', form)
+  // 监听所选职级序列，用于过滤职位选项
+  const watchSequence = Form.useWatch('sequence', form)
 
   // 重置密码弹窗
   const [pwdModalVisible, setPwdModalVisible] = useState(false)
@@ -166,11 +172,22 @@ export default function EmployeeManagement() {
 
   const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
 
-  /** 当前所选职位带出的职级 */
-  const selectedJobLevel = useMemo(
-    () => positions.find(p => p.id === watchPositionId)?.jobLevel,
+  /** 当前所选职位（带出职级与英文名称） */
+  const selectedPosition = useMemo(
+    () => positions.find(p => p.id === watchPositionId),
     [positions, watchPositionId],
   )
+
+  /** 按所选职级序列过滤职位选项（未选序列时展示全部） */
+  const filteredPositions = useMemo(
+    () => (watchSequence ? positions.filter(p => p.sequence === watchSequence) : positions),
+    [positions, watchSequence],
+  )
+
+  /** 切换职级序列时清空已选职位（新序列下原职位失效） */
+  const handleSequenceChange = () => {
+    form.setFieldValue('positionId', undefined)
+  }
 
   /** 查询 */
   const handleSearch = () => {
@@ -202,20 +219,23 @@ export default function EmployeeManagement() {
       name: record.name,
       empId: record.empId,
       departmentId: record.departmentId ?? undefined,
+      // 序列优先取快照，快照缺失时从职位列表反查
+      sequence: record.sequence ?? positions.find(p => p.id === record.positionId)?.sequence,
       positionId: record.positionId ?? undefined,
+      rank: record.rank ?? undefined,
       functionRoleIds: record.functionRoleIds,
     })
     setEditModalVisible(true)
   }
 
-  /** 提交新增/编辑 */
+  /** 提交新增/编辑（工号由后端自动生成，不随表单提交） */
   const handleSubmit = async () => {
     const values = await form.validateFields()
     const payload: EmployeePayload = {
       name: values.name.trim(),
-      empId: values.empId.trim(),
       departmentId: values.departmentId ?? null,
       positionId: values.positionId ?? null,
+      rank: values.rank ?? null,
       functionRoleIds: values.functionRoleIds ?? [],
     }
     setSubmitting(true)
@@ -224,13 +244,12 @@ export default function EmployeeManagement() {
         await updateEmployee(editing.id, payload)
         message.success('員工信息已更新')
       } else {
-        // 工号即登录账号
-        await createEmployee({
+        // 工号即登录账号，由后端按 MT 前缀自增生成
+        const created = await createEmployee({
           ...payload,
-          username: values.empId.trim(),
           password: values.password,
         })
-        message.success(`員工創建成功，登錄賬號：${values.empId.trim()}`)
+        message.success(`員工創建成功，工號/登錄賬號：${created.empId}`)
       }
       setEditModalVisible(false)
       fetchList()
@@ -296,8 +315,19 @@ export default function EmployeeManagement() {
     { title: '工號', dataIndex: 'empId', key: 'empId', width: 110 },
     { title: '姓名', dataIndex: 'name', key: 'name', width: 120 },
     { title: '部門', dataIndex: 'department', key: 'department', width: 120, render: (v: string) => v || '-' },
-    { title: '職位', dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
+    {
+      title: '職級序列',
+      dataIndex: 'sequence',
+      key: 'sequence',
+      width: 110,
+      render: (v: string) => (
+        v ? <Tag color={POSITION_SEQUENCE_TAG_COLOR[v] || 'default'}>{POSITION_SEQUENCE[v] || v}</Tag> : '-'
+      ),
+    },
+    { title: '職位名稱(中文)', dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
+    { title: '職位名稱(英文)', dataIndex: 'positionEn', key: 'positionEn', width: 150, render: (v: string) => v || '-' },
     { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
+    { title: '職等', dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
     {
       title: '功能角色',
       dataIndex: 'functionRoleIds',
@@ -438,10 +468,9 @@ export default function EmployeeManagement() {
           <Form.Item
             name="empId"
             label="工號"
-            extra="工號同時作為登錄賬號使用"
-            rules={[{ required: true, message: '請輸入工號' }]}
+            extra={editing ? '工號同時作為登錄賬號，不可修改' : '工號由系統自動生成（MT 開頭自增），同時作為登錄賬號'}
           >
-            <Input placeholder="例如：EMP1001，將作為登錄賬號" allowClear disabled={!!editing} />
+            <Input placeholder="保存後由系統自動生成" disabled />
           </Form.Item>
           {!editing && (
             <Form.Item
@@ -466,17 +495,34 @@ export default function EmployeeManagement() {
             />
           </Form.Item>
           <Form.Item
-            name="positionId"
-            label="職位"
-            extra={selectedJobLevel ? `對應職級：${selectedJobLevel}` : '職位在「職位管理」中維護，選擇後自動帶出對應職級'}
+            name="sequence"
+            label="職級序列"
+            extra="選擇序列後自動過濾對應職級的職位"
           >
             <Select
-              placeholder="請選擇職位"
+              placeholder="請選擇職級序列"
+              allowClear
+              options={POSITION_SEQUENCE_OPTIONS}
+              onChange={handleSequenceChange}
+            />
+          </Form.Item>
+          <Form.Item
+            name="positionId"
+            label="職位"
+            extra={selectedPosition
+              ? `對應職級：${selectedPosition.jobLevel}${selectedPosition.nameEn ? `，英文名稱：${selectedPosition.nameEn}` : ''}`
+              : '職位在「職位管理」中維護，選擇後自動帶出對應職級與英文名稱'}
+          >
+            <Select
+              placeholder={watchSequence ? '請選擇職位' : '請先選擇職級序列，或直接選擇職位'}
               allowClear
               showSearch
               optionFilterProp="label"
-              options={positions.map(p => ({ value: p.id, label: `${p.name}（${p.jobLevel}）` }))}
+              options={filteredPositions.map(p => ({ value: p.id, label: `${p.name}（${p.jobLevel}）` }))}
             />
+          </Form.Item>
+          <Form.Item name="rank" label="職等" extra="R1 最低，R5 最高">
+            <Select placeholder="請選擇職等" allowClear options={POSITION_RANK_OPTIONS} />
           </Form.Item>
           <Form.Item
             name="functionRoleIds"

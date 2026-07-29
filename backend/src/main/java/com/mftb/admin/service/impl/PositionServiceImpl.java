@@ -105,12 +105,14 @@ public class PositionServiceImpl implements PositionService {
         }
     }
 
-    /** 职位信息变更后同步员工表的职位名称/职级快照 */
+    /** 职位信息变更后同步员工表的职位中英文名称/职级序列/职级快照 */
     private void syncUserPositionSnapshot(SysPosition position) {
         List<SysUser> users = sysUserMapper.selectList(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getPositionId, position.getId()));
         for (SysUser user : users) {
             user.setPosition(position.getName());
+            user.setPositionEn(position.getNameEn());
+            user.setSequence(position.getSequence());
             user.setJobLevel(position.getJobLevel());
             sysUserMapper.updateById(user);
         }

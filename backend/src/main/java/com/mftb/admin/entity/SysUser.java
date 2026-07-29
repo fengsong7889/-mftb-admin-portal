@@ -49,11 +49,21 @@ public class SysUser {
     /** 职位ID (关联 sys_position) */
     private Long positionId;
 
-    /** 职位名称快照 */
+    /** 职位名称(中文)快照 */
     private String position;
+
+    /** 职位名称(英文)快照 */
+    private String positionEn;
+
+    /** 职级序列快照 (M=管理 T=技术 P=专业, 随职位带出) */
+    private String sequence;
 
     /** 职级快照 (如 M3 / T5 / P2, 随职位带出) */
     private String jobLevel;
+
+    /** 职等 (R1~R5, 新增/编辑员工时选择); rank 为 MySQL 8.0 保留字, 需加反引号 */
+    @TableField("`rank`")
+    private String rank;
 
     /** 状态: 1=启用 0=停用 */
     private Integer status;
