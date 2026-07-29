@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
 import { mockAlgorithmData } from './Algorithm/index'
+import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import './WeightSlider.css'
 
 /** 广告类型标签映射 */
@@ -307,7 +308,10 @@ export default function AlgorithmAdd() {
       </Card>
 
       {/* 算法参数区域 */}
-      {(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT) ? (
+      {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
+        /* 自然流量：4 個維度的商家評分規則配置 */
+        <OrganicTrafficScoreConfig readOnly={isDetailMode} />
+      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT) ? (
         <Card 
           title={
             <Space>

@@ -262,7 +262,7 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'promotion-word-library',
-        icon: <FileFilled />,
+        icon: <ReadOutlined />,
         label: '詞庫管理',
       },
     ],

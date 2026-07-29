@@ -170,6 +170,11 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 43, name: '點金廣告-美食外賣mFood版', code: 'ALG_GLD_002', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
   { id: 44, name: '點金廣告-超市百貨閃蜂版', code: 'ALG_GLD_003', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
   { id: 45, name: '點金廣告-超市百貨mFood版', code: 'ALG_GLD_004', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
+  // 自然流量 - 4条
+  { id: 46, name: '自然流量-美食外賣閃蜂版', code: 'ALG_ORG_001', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 47, name: '自然流量-美食外賣mFood版', code: 'ALG_ORG_002', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 48, name: '自然流量-超市百貨閃蜂版', code: 'ALG_ORG_003', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 49, name: '自然流量-超市百貨mFood版', code: 'ALG_ORG_004', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 0 },
 ]
 
 export default function Algorithm() {
@@ -397,7 +402,7 @@ export default function Algorithm() {
                       ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type)),
                       card => card.type,
                     ).map(card => {
-                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.GOLD_AD
+                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.ORGANIC_TRAFFIC
                         return renderAlgoCard(card, enabled, 'delivery', deliveryCardOrder.getDragProps(card.type))
                       })}
                   </div>
