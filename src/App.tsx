@@ -12,6 +12,7 @@ import './App.css'
 /* 懒加载所有页面组件，避免启动时一次性加载所有模块 */
 const Home = lazy(() => import('./pages/Home'))
 const AccountBalance = lazy(() => import('./pages/AccountBalance'))
+const RechargeAdd = lazy(() => import('./pages/AccountBalance/RechargeAdd'))
 const BatchQuery = lazy(() => import('./pages/BatchQuery'))
 const DetailQuery = lazy(() => import('./pages/DetailQuery'))
 const WriteoffReconcile = lazy(() => import('./pages/WriteoffReconcile'))
@@ -104,6 +105,7 @@ function AuthenticatedLayout() {
               <Route path="/" element={<Home />} />
               {/* 財務管理 */}
               <Route path="/account-balance" element={<AccountBalance />} />
+              <Route path="/recharge-add" element={<RechargeAdd />} />
               <Route path="/batch-query" element={<BatchQuery />} />
               <Route path="/detail-query" element={<DetailQuery />} />
               <Route path="/writeoff-reconcile" element={<WriteoffReconcile />} />

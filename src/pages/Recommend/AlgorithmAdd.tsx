@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, Form, Input, Select, Space, message, Card, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
+import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
@@ -251,136 +251,91 @@ export default function AlgorithmAdd() {
         </div>
       </div>
 
-      {/* 算法选择区域 */}
-      <Card 
-        title={
-          <Space>
-            <AppstoreOutlined style={{ fontSize: 16, color: '#1890ff' }} />
-            <span style={{ fontSize: 15, fontWeight: 500 }}>算法選擇</span>
-          </Space>
-        }
-        style={{ 
-          marginTop: 16,
-          backgroundColor: '#fafbfc',
-          border: '1px solid #e8eaed',
-          borderRadius: 8,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-        }}
-        headStyle={{
-          backgroundColor: '#f0f5ff',
-          borderBottom: '1px solid #d6e4ff',
-          borderRadius: '8px 8px 0 0'
+      <Form
+        form={form}
+        layout="vertical"
+        disabled={isDetailMode}
+        initialValues={{
+          presaleMode: 'rolling',
+          continuousPurchase: 'notSupport',
+          merchantLimit: 'unlimited',
+          regionLimit: 'limited',
+          merchantExposureStrategy: 'random',
         }}
       >
-        <Form
-          form={form}
-          layout="horizontal"
-          disabled={isDetailMode}
-        >
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <Form.Item
-              label="算法名稱"
-              name="name"
-              rules={[{ required: true, message: '請輸入算法名稱' }]}
-              style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
-            >
-              <Input placeholder="請輸入算法名稱" />
-            </Form.Item>
-
-            <Form.Item
-              label="所屬品牌"
-              name="brand"
-              rules={[{ required: true, message: '請選擇所屬品牌' }]}
-              style={{ flex: 1, marginBottom: 0 }}
-              labelCol={{ span: 6 }}
-              wrapperCol={{ span: 18 }}
-            >
-              <Select
-                placeholder="請選擇所屬品牌"
-                options={APP_OPTIONS}
-                disabled={isEditMode || isDetailMode}
-              />
-            </Form.Item>
+      {/* 算法选择区域 */}
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-        </Form>
-      </Card>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>算法選擇</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          <Form.Item
+            label="算法名稱"
+            name="name"
+            rules={[{ required: true, message: '請輸入算法名稱' }]}
+            style={{ marginBottom: 0 }}
+          >
+            <Input placeholder="請輸入算法名稱" />
+          </Form.Item>
+
+          <Form.Item
+            label="所屬品牌"
+            name="brand"
+            rules={[{ required: true, message: '請選擇所屬品牌' }]}
+            style={{ marginBottom: 0 }}
+          >
+            <Select
+              placeholder="請選擇所屬品牌"
+              options={APP_OPTIONS}
+              disabled={isEditMode || isDetailMode}
+            />
+          </Form.Item>
+        </div>
+      </div>
 
       {/* 算法参数区域 */}
       {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
         /* 自然流量：4 個維度的商家評分規則配置 */
         <OrganicTrafficScoreConfig readOnly={isDetailMode} />
       ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT) ? (
-        <Card 
-          title={
-            <Space>
-              <SettingOutlined style={{ fontSize: 16, color: '#E8720C' }} />
-              <span style={{ fontSize: 15, fontWeight: 500 }}>算法參數</span>
-            </Space>
-          }
-          extra={
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-              配置算法運行參數
-            </span>
-          }
-          style={{ 
-            marginTop: 16,
-            backgroundColor: '#fafbfc',
-            border: '1px solid #e8eaed',
-            borderRadius: 8,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-          }}
-          headStyle={{
-            backgroundColor: '#FFF7E6',
-            borderBottom: '1px solid #FFD591',
-            borderRadius: '8px 8px 0 0'
-          }}
-        >
-        <Form
-          form={form}
-          layout="horizontal"
-          colon={false}
-          disabled={isDetailMode}
-          initialValues={{
-            presaleMode: 'rolling',
-            continuousPurchase: 'notSupport',
-            merchantLimit: 'unlimited',
-            regionLimit: 'limited',
-            merchantExposureStrategy: 'random',
-          }}
-        >
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>算法參數</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>參數配置</Tag>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>配置算法運行參數</span>
+          </div>
+
 
           {/* 人气商家：仅显示商家状态计算定时器 */}
           {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? (
-            <Form.Item
-              label="定時器"
-              style={{ flex: 1, marginBottom: 16 }}
-              labelCol={{ flex: '150px' }}
-              wrapperCol={{ flex: 1 }}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>定時器:</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>每</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>每</span>
                 <Form.Item name="merchantStatusTimer" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
                   <InputNumber
                     min={1}
                     max={60}
                     placeholder="分鐘"
-                    style={{ width: 60, borderRadius: 8, fontSize: 14 }}
+                    style={{ width: 70 }}
                   />
                 </Form.Item>
-                <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>分鐘計算切換大小圖模式</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘計算切換大小圖模式</span>
               </div>
-            </Form.Item>
+            </div>
           ) : (
             <>
           {/* 商家状态计算 */}
-          <Form.Item
-            label="商家狀態計算"
-            style={{ marginBottom: 16 }}
-            labelCol={{ flex: '150px' }}
-            wrapperCol={{ flex: 1 }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>商家狀態計算:</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <Form.Item name="statusOpen" noStyle valuePropName="checked" initialValue={true}>
                 <Checkbox disabled>營業中</Checkbox>
@@ -395,38 +350,30 @@ export default function AlgorithmAdd() {
                 <Checkbox>休息打烊<span style={{ fontSize: 12, color: '#ff4d4f' }}>（需手動恢復，開啟已打烊會影響用戶體驗，請慎重）</span></Checkbox>
               </Form.Item>
             </div>
-          </Form.Item>
+          </div>
 
           {/* 定时器 */}
-          <Form.Item
-            label="定時器"
-            style={{ flex: 1, marginBottom: 16 }}
-            labelCol={{ flex: '150px' }}
-            wrapperCol={{ flex: 1 }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>定時器:</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>每</span>
+              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>每</span>
               <Form.Item name="consistencyCheckInterval" noStyle rules={[{ required: true, message: '請輸入' }]}>
                 <InputNumber
                   min={1}
                   max={1440}
                   placeholder="分鐘"
-                  style={{ width: 60, borderRadius: 8, fontSize: 14 }}
+                  style={{ width: 70 }}
                 />
               </Form.Item>
-              <span style={{ fontSize: 14, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>分鐘校驗數據一致性</span>
+              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘校驗數據一致性</span>
             </div>
-          </Form.Item>
+          </div>
             </>
           )}
 
           {/* 波浪計算（僅新店廣告） */}
           {selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
-            <Form.Item
-              style={{ marginBottom: 16 }}
-              labelCol={{ flex: '150px' }}
-              wrapperCol={{ flex: 1 }}
-            >
+            <div style={{ marginBottom: 16 }}>
               {/* 策略类型模块区域 */}
               <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fafafa', padding: '16px 20px' }}>
                 <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600, color: '#262626', paddingBottom: 12, borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
@@ -483,17 +430,13 @@ export default function AlgorithmAdd() {
                   勾選各節點對應的配送範圍；點擊「清空全部」可一鍵清除所有勾選。
                 </div>
               </div>
-            </Form.Item>
+            </div>
           )}
 
           {/* 配送範圍計算（僅盤活復蘇） - 4 個固定參數 */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
-            <Form.Item
-              label="配送範圍計算"
-              style={{ marginBottom: 16 }}
-              labelCol={{ flex: '150px' }}
-              wrapperCol={{ flex: 1 }}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>配送範圍計算:</span>
               <Checkbox.Group
                 options={[
                   { label: '短程', value: 'short' },
@@ -505,7 +448,7 @@ export default function AlgorithmAdd() {
                 disabled={isDetailMode}
                 onChange={(vals) => setReviveDeliveryRange(vals as string[])}
               />
-            </Form.Item>
+            </div>
           )}
 
           {/* 區域商家展示限制（盤活復蘇 / 無敵星星） */}
@@ -838,22 +781,18 @@ export default function AlgorithmAdd() {
 
           {/* ===== 獨家商家：計算訂單類型（獨立模塊） ===== */}
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
-            <Form.Item
-              label="計算訂單類型"
-              style={{ marginBottom: 16 }}
-              labelCol={{ flex: '150px' }}
-              wrapperCol={{ flex: 1 }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>計算訂單類型:</span>
                 <Form.Item name="orderTypeDelivery" noStyle valuePropName="checked">
                   <Checkbox disabled={isDetailMode}>配送訂單</Checkbox>
                 </Form.Item>
                 <Form.Item name="orderTypePickup" noStyle valuePropName="checked">
                   <Checkbox disabled={isDetailMode}>自取訂單</Checkbox>
                 </Form.Item>
-              </div>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
-                請選擇參與成交量統計的訂單履約方式，以保障商家訂單成交量統計的準確性
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                  請選擇參與成交量統計的訂單履約方式，以保障商家訂單成交量統計的準確性
+                </span>
               </div>
               {/* 店鋪等級保障單量配置（樣式與品牌商家店鋪等級配置保持一致） */}
               <div style={{ marginTop: 12, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
@@ -892,7 +831,7 @@ export default function AlgorithmAdd() {
                   ))}
                 </div>
               </div>
-            </Form.Item>
+            </div>
           )}
 
           {/* ===== 獨家商家：算法策略（獨立模塊，與盤活復蘇/無敵星星互不影響） ===== */}
@@ -951,12 +890,7 @@ export default function AlgorithmAdd() {
 
           {/* ===== 品牌商家(KA)：流量曝光保障（獨立模塊，互不影響） ===== */}
           {selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT && (
-            <Form.Item
-              label="流量曝光保障"
-              style={{ marginBottom: 16 }}
-              labelCol={{ flex: '150px' }}
-              wrapperCol={{ flex: 1 }}
-            >
+            <div style={{ marginBottom: 16 }}>
               {/* 店鋪等級保障流量配置 */}
               <div style={{ padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
                 {/* 標題區：明確提示這是店鋪等級配置 */}
@@ -1009,7 +943,7 @@ export default function AlgorithmAdd() {
                   ))}
                 </div>
               </div>
-            </Form.Item>
+            </div>
           )}
 
           {/* ===== 品牌商家(KA)：算法策略（獨立模塊，複製自獨家商家，互不影響） ===== */}
@@ -1162,18 +1096,10 @@ export default function AlgorithmAdd() {
               </div>
             </div>
           )}
-        </Form>
-        </Card>
+        </div>
       ) : selectedAlgorithmType ? (
         /* 其它算法类型：显示提示 */
-        <Card 
-          style={{ 
-            marginTop: 16,
-            backgroundColor: '#fffbe6',
-            border: '1px solid #ffe58f',
-            borderRadius: 12,
-          }}
-        >
+        <div style={{ border: '1px solid #ffe58f', borderRadius: 8, background: '#fffbe6', padding: '20px 24px', marginBottom: 16 }}>
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 20px',
@@ -1187,17 +1113,10 @@ export default function AlgorithmAdd() {
               當前廣告類型暫未開放參數配置，請聯繫管理員
             </div>
           </div>
-        </Card>
+        </div>
       ) : (
         /* 未选择算法类型：显示提示 */
-        <Card 
-          style={{ 
-            marginTop: 16,
-            backgroundColor: '#f0f5ff',
-            border: '1px solid #d6e4ff',
-            borderRadius: 12,
-          }}
-        >
+        <div style={{ border: '1px solid #d6e4ff', borderRadius: 8, background: '#f0f5ff', padding: '20px 24px', marginBottom: 16 }}>
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 20px',
@@ -1211,18 +1130,18 @@ export default function AlgorithmAdd() {
               選擇廣告類型後，將顯示對應的參數配置項
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* 底部保存按钮（详情模式下隐藏） */}
+      </Form>
+
+      {/* 底部操作按鈕（取消/保存） */}
       {selectedAlgorithmType && !isDetailMode && (
         <div className="form-footer">
-          <Button onClick={handleBack}>
-            取消
-          </Button>
-          <Button 
-            type="primary" 
-            icon={<SaveOutlined />} 
+          <Button onClick={handleBack}>取消</Button>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
             onClick={handleSubmit}
           >
             保存

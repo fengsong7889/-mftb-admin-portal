@@ -531,6 +531,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
+    // 充值頁面：高亮「賬戶餘額」
+    : location.pathname === '/recharge-add' ? 'account-balance'
     // 訂單列表 / 訂單詳情：按來源高亮（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）
     : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
       ? (new URLSearchParams(location.search).get('from') === 'ad-sales' ? 'ad-sales' : 'promotion-sales-config')

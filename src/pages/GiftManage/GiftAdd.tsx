@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Button, Form, Input, Select, Space, Card, InputNumber, Upload, Radio, message } from 'antd'
+import { Button, Form, Input, Select, Tag, InputNumber, Upload, Radio, message } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
@@ -146,6 +146,7 @@ export default function GiftAdd() {
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}>返回</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -168,237 +169,173 @@ export default function GiftAdd() {
         </div>
       </div>
 
-      <Form form={form} layout="horizontal">
+      <Form form={form} layout="vertical">
       {/* ====== 集團與門店選擇 ====== */}
-      <Card
-        title={
-          <Space>
-            <ShopOutlined style={{ fontSize: 16, color: '#1890ff' }} />
-            <span style={{ fontSize: 15, fontWeight: 500 }}>集團與門店選擇</span>
-          </Space>
-        }
-        style={{
-          marginTop: 16,
-          backgroundColor: '#fafbfc',
-          border: '1px solid #e8eaed',
-          borderRadius: 8,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}
-        headStyle={{
-          backgroundColor: '#f0f5ff',
-          borderBottom: '1px solid #d6e4ff',
-          borderRadius: '8px 8px 0 0',
-        }}
-      >
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-              <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#FF4D4F' }}>*</span> 集團ID/名稱
-              </span>
-              <Form.Item
-                name="groupId"
-                rules={[{ required: true, message: '請選擇集團' }]}
-                style={{ marginBottom: 0, flex: 1 }}
-              >
-                {isGiftMode ? (
-                  <Select
-                    disabled
-                    showSearch
-                    optionFilterProp="label"
-                    options={groups.map(g => ({
-                      label: `${g.groupCode} - ${g.groupName}`,
-                      value: g.id,
-                    }))}
-                  />
-                ) : (
-                  <Select
-                    showSearch
-                    allowClear
-                    placeholder="支持ID和名稱搜索查詢"
-                    optionFilterProp="label"
-                    onChange={(v) => setSelectedGroupId(v)}
-                    options={groups.map(g => ({
-                      label: `${g.groupCode} - ${g.groupName}`,
-                      value: g.id,
-                    }))}
-                  />
-                )}
-              </Form.Item>
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-              <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#FF4D4F' }}>*</span> 門店ID/名稱
-              </span>
-              <Form.Item
-                name="storeId"
-                rules={[{ required: true, message: '請選擇門店' }]}
-                style={{ marginBottom: 0, flex: 1 }}
-              >
-                {isGiftMode ? (
-                  <Select
-                    disabled
-                    showSearch
-                    optionFilterProp="label"
-                    options={stores.map(s => ({
-                      label: `${s.storeCode} - ${s.storeName}`,
-                      value: s.id,
-                    }))}
-                  />
-                ) : (
-                  <Select
-                    showSearch
-                    allowClear
-                    placeholder="請先選擇集團"
-                    optionFilterProp="label"
-                    disabled={!selectedGroupId}
-                    options={stores.map(s => ({
-                      label: `${s.storeCode} - ${s.storeName}`,
-                      value: s.id,
-                    }))}
-                  />
-                )}
-              </Form.Item>
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-              <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#FF4D4F' }}>*</span> 所屬品牌
-              </span>
-              <Form.Item
-                name="brand"
-                rules={[{ required: true, message: '請選擇所屬品牌' }]}
-                style={{ marginBottom: 0, flex: 1 }}
-              >
-                <Radio.Group disabled={isGiftMode}>
-                  <Radio value="flashBee">閃蜂</Radio>
-                  <Radio value="mFood">mFood</Radio>
-                </Radio.Group>
-              </Form.Item>
-            </div>
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-      </Card>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>集團與門店選擇</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
+          <Form.Item
+            label="集團ID/名稱"
+            name="groupId"
+            rules={[{ required: true, message: '請選擇集團' }]}
+          >
+            {isGiftMode ? (
+              <Select
+                disabled
+                showSearch
+                optionFilterProp="label"
+                options={groups.map(g => ({
+                  label: `${g.groupCode} - ${g.groupName}`,
+                  value: g.id,
+                }))}
+              />
+            ) : (
+              <Select
+                showSearch
+                allowClear
+                placeholder="支持ID和名稱搜索查詢"
+                optionFilterProp="label"
+                onChange={(v) => setSelectedGroupId(v)}
+                options={groups.map(g => ({
+                  label: `${g.groupCode} - ${g.groupName}`,
+                  value: g.id,
+                }))}
+              />
+            )}
+          </Form.Item>
+
+          <Form.Item
+            label="門店ID/名稱"
+            name="storeId"
+            rules={[{ required: true, message: '請選擇門店' }]}
+          >
+            {isGiftMode ? (
+              <Select
+                disabled
+                showSearch
+                optionFilterProp="label"
+                options={stores.map(s => ({
+                  label: `${s.storeCode} - ${s.storeName}`,
+                  value: s.id,
+                }))}
+              />
+            ) : (
+              <Select
+                showSearch
+                allowClear
+                placeholder="請先選擇集團"
+                optionFilterProp="label"
+                disabled={!selectedGroupId}
+                options={stores.map(s => ({
+                  label: `${s.storeCode} - ${s.storeName}`,
+                  value: s.id,
+                }))}
+              />
+            )}
+          </Form.Item>
+
+          <Form.Item
+            label="所屬品牌"
+            name="brand"
+            rules={[{ required: true, message: '請選擇所屬品牌' }]}
+          >
+            <Radio.Group disabled={isGiftMode}>
+              <Radio value="flashBee">閃蜂</Radio>
+              <Radio value="mFood">mFood</Radio>
+            </Radio.Group>
+          </Form.Item>
+        </div>
+      </div>
 
       {/* ====== 贈送配置 ====== */}
-      <Card
-        title={
-          <Space>
-            <ClockCircleOutlined style={{ fontSize: 16, color: '#E8720C' }} />
-            <span style={{ fontSize: 15, fontWeight: 500 }}>贈送配置</span>
-          </Space>
-        }
-        extra={
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ClockCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>贈送配置</span>
+          <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>需審批</Tag>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <span style={{ fontSize: 12, color: '#8C6D1F' }}>
             📋 提交後將進入審批中心，審核通過後系統自動為商戶增加對應廣告天數。
           </span>
-        }
-        style={{
-          marginTop: 16,
-          backgroundColor: '#fafbfc',
-          border: '1px solid #e8eaed',
-          borderRadius: 8,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}
-        headStyle={{
-          backgroundColor: '#FFF7E6',
-          borderBottom: '1px solid #FFD591',
-          borderRadius: '8px 8px 0 0',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-            <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap' }}>
-              <span style={{ color: '#FF4D4F' }}>*</span> 廣告類型
-            </span>
-            <Form.Item
-              name="adType"
-              rules={[{ required: true, message: '請選擇廣告類型' }]}
-              style={{ marginBottom: 0, flex: 1 }}
-            >
-              <Select
-                placeholder="請選擇廣告類型"
-                options={adTypeOptions}
-                disabled={isGiftMode}
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-            <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap' }}>
-              <span style={{ color: '#FF4D4F' }}>*</span> 贈送天數
-            </span>
-            <Form.Item
-              name="giftDays"
-              rules={[{ required: true, message: '請輸入贈送天數' }]}
-              style={{ marginBottom: 0, flex: 1 }}
-            >
-              <InputNumber
-                placeholder="請輸入贈送天數"
-                min={1}
-                max={365}
-                style={{ width: '100%' }}
-                addonAfter="天"
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-            <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap' }}>
-              <span style={{ color: '#FF4D4F' }}>*</span> 有效期
-            </span>
-            <Form.Item
-              name="validDays"
-              rules={[{ required: true, message: '請輸入有效期天數' }]}
-              style={{ marginBottom: 0, flex: 1 }}
-            >
-              <InputNumber
-                placeholder="請輸入有效期天數"
-                min={1}
-                max={730}
-                style={{ width: '100%' }}
-                addonAfter="天"
-              />
-            </Form.Item>
-          </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: 16 }}>
-          <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', lineHeight: '32px' }}>
-            <span style={{ color: '#FF4D4F' }}>*</span> 贈送原因
-          </span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
           <Form.Item
-            name="reason"
-            rules={[{ required: true, message: '請輸入贈送原因' }]}
-            style={{ marginBottom: 0, flex: 1 }}
+            label="廣告類型"
+            name="adType"
+            rules={[{ required: true, message: '請選擇廣告類型' }]}
           >
-            <TextArea
-              placeholder="請填寫贈送原因，便於相關審核人審閱，時限制500字"
-              rows={5}
-              maxLength={500}
-              showCount
+            <Select
+              placeholder="請選擇廣告類型"
+              options={adTypeOptions}
+              disabled={isGiftMode}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="贈送天數"
+            name="giftDays"
+            rules={[{ required: true, message: '請輸入贈送天數' }]}
+          >
+            <InputNumber
+              placeholder="請輸入贈送天數"
+              min={1}
+              max={365}
+              style={{ width: '100%' }}
+              addonAfter="天"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="有效期"
+            name="validDays"
+            rules={[{ required: true, message: '請輸入有效期天數' }]}
+          >
+            <InputNumber
+              placeholder="請輸入有效期天數"
+              min={1}
+              max={730}
+              style={{ width: '100%' }}
+              addonAfter="天"
             />
           </Form.Item>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: 16 }}>
-          <span style={{ flexShrink: 0, marginRight: 8, fontSize: 14, fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', lineHeight: '32px' }}>
-            <span style={{ color: '#FF4D4F' }}>*</span> 相關憑證
-          </span>
-          <Form.Item
-            name="certificate"
-            required
-            style={{ marginBottom: 0, flex: 1 }}
-            rules={[{
-              validator: (_, value) => {
-                const fileList = form.getFieldValue('certificate')
-                if (!fileList || (Array.isArray(fileList) && fileList.length === 0)) {
-                  return Promise.reject(new Error('請上傳相關憑證'))
-                }
-                return Promise.resolve()
+        <Form.Item
+          label="贈送原因"
+          name="reason"
+          rules={[{ required: true, message: '請輸入贈送原因' }]}
+        >
+          <TextArea
+            placeholder="請填寫贈送原因，便於相關審核人審閱，時限制500字"
+            rows={5}
+            maxLength={500}
+            showCount
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="相關憑證"
+          name="certificate"
+          required
+          rules={[{
+            validator: (_, value) => {
+              const fileList = form.getFieldValue('certificate')
+              if (!fileList || (Array.isArray(fileList) && fileList.length === 0)) {
+                return Promise.reject(new Error('請上傳相關憑證'))
               }
-            }]}
-          >
-            <Upload
+              return Promise.resolve()
+            }
+          }]}
+        >
+          <Upload
             beforeUpload={() => false}
             maxCount={5}
             accept=".png,.jpg,.webp,.jpeg,.pdf"
@@ -413,19 +350,16 @@ export default function GiftAdd() {
               <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>上傳憑證</div>
             </div>
           </Upload>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
-            支持 png、jpg、webp、jpeg、pdf；最大 10MB；最多上傳 5 張
-          </div>
-          </Form.Item>
+        </Form.Item>
+        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: -16 }}>
+          支持 png、jpg、webp、jpeg、pdf；最大 10MB；最多上傳 5 張
         </div>
-      </Card>
+      </div>
       </Form>
 
-      {/* ====== 底部操作欄 ====== */}
+      {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
-        <Button onClick={handleBack}>
-          取消
-        </Button>
+        <Button onClick={handleBack}>取消</Button>
         <Button
           type="primary"
           icon={<SendOutlined />}

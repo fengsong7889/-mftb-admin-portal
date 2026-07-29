@@ -18,6 +18,7 @@ const statusOptions = [
   { label: '全部', value: 'all' },
   { label: '未結清', value: 'unsettled' },
   { label: '已結清', value: 'settled' },
+  { label: '已轉結', value: 'transferred' },
 ]
 
 /** 业务频道选项 */
@@ -161,7 +162,9 @@ export default function DebtReconcile() {
       render: (v: string) => (
         v === 'settled'
           ? <Tag color="green">已結清</Tag>
-          : <Tag color="red">未結清</Tag>
+          : v === 'transferred'
+            ? <Tag color="blue">已轉結</Tag>
+            : <Tag color="red">未結清</Tag>
       ),
     },
     {

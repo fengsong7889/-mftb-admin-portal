@@ -23,9 +23,11 @@ const channelOptions = [
 const tradeTypeOptions = [
   { label: '全部', value: 'all' },
   { label: '充值', value: 'recharge' },
-  { label: '轉賬', value: 'transfer' },
   { label: '扣款', value: 'deduct' },
-  { label: '合併', value: 'merge' },
+  { label: '轉出', value: 'transferOut' },
+  { label: '轉入', value: 'transferIn' },
+  { label: '退款', value: 'refund' },
+  { label: '消費', value: 'consume' },
 ]
 
 /** 明细记录类型 */
@@ -56,17 +58,21 @@ interface DetailRecord {
 /** 交易类型映射 */
 const tradeTypeMap: Record<string, string> = {
   recharge: '充值',
-  transfer: '轉賬',
   deduct: '扣款',
-  merge: '合併',
+  transferOut: '轉出',
+  transferIn: '轉入',
+  refund: '退款',
+  consume: '消費',
 }
 
 /** 交易类型颜色 */
 const tradeTypeColor: Record<string, string> = {
   recharge: 'blue',
-  transfer: 'green',
   deduct: 'orange',
-  merge: 'purple',
+  transferOut: 'green',
+  transferIn: 'cyan',
+  refund: 'purple',
+  consume: 'red',
 }
 
 /** 变动原因列表 */
@@ -79,7 +85,7 @@ const storeIds = ['S001', 'S002', 'S001', 'S003', 'S001', 'S002', 'S004', 'S001'
 const storeNames = ['廣州酒家天河店', '廣州酒家番禺店', '海底撈氹仔店', '廣州酒家澳門店', '星巴克大三巴店', '海底撈澳門店', '廣州酒家高仕德店', '星巴克澳門店', '海底撈珠海店', '廣州酒家威尼斯店', '廣州酒家大學店', '海底撈高仕德店', '廣州酒家氹仔店']
 const brands = ['mFood', 'mFood', 'flashBee', 'mFood', 'mFood', 'flashBee', 'mFood', 'mFood', 'flashBee', 'mFood', 'mFood', 'flashBee', 'mFood']
 const channels = ['外賣', '外賣', '堂食', '外賣', '外賣', '堂食', '外賣', '外賣', '堂食', '外賣', '外賣', '堂食', '外賣']
-const tradeTypes = ['recharge', 'recharge', 'deduct', 'recharge', 'transfer', 'deduct', 'recharge', 'transfer', 'deduct', 'recharge', 'recharge', 'deduct', 'merge']
+const tradeTypes = ['recharge', 'recharge', 'deduct', 'recharge', 'transferOut', 'consume', 'recharge', 'transferIn', 'deduct', 'recharge', 'refund', 'consume', 'recharge']
 const virtualChanges = [1921, 1500, -19992, 2800, 5000, -3200, 1800, 6000, -1500, 3500, 2200, -800, 4500]
 const actualChanges = [1000, 800, -992, 1500, 3000, -1600, 900, 3500, -800, 2000, 1200, -400, 2500]
 const virtualBalances = [90000, 91500, 71508, 74308, 79308, 76108, 77908, 83908, 82408, 85908, 88108, 87308, 91808]

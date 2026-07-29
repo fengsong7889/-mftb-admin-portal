@@ -278,6 +278,9 @@ export default function BatchQuery() {
           <Form.Item label="批次類型">
             <Select placeholder="請選擇" options={batchTypeOptions} style={{ width: 120 }} />
           </Form.Item>
+          <Form.Item label="申請人">
+            <Input placeholder="請輸入申請人姓名/工號" allowClear />
+          </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />}>查詢</Button>

@@ -11,7 +11,6 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { useAuth } from '../../contexts/AuthContext'
-import RechargeModal from './RechargeModal'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 /** 账户状态选项 */
@@ -65,13 +64,10 @@ export default function AccountBalance() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [rechargeOpen, setRechargeOpen] = useState(false)
-  const [rechargeRecord, setRechargeRecord] = useState<AccountRecord | null>(null)
 
-  /** 打开充值弹窗 */
+  /** 跳轉充值頁面 */
   const openRecharge = (record: AccountRecord) => {
-    setRechargeRecord(record)
-    setRechargeOpen(true)
+    navigate(`/recharge-add?groupId=${record.groupId}&groupName=${encodeURIComponent(record.groupName)}&brand=${record.brand}`)
   }
 
   /** 操作按钮 - 正常状态 */
@@ -262,13 +258,6 @@ export default function AccountBalance() {
           scroll={{ x: 1200 }}
         />
       </div>
-
-      {/* 充值弹窗 */}
-      <RechargeModal
-        open={rechargeOpen}
-        onClose={() => setRechargeOpen(false)}
-        record={rechargeRecord ? { groupId: rechargeRecord.groupId, groupName: rechargeRecord.groupName, brand: rechargeRecord.brand } : null}
-      />
     </div>
   )
 }

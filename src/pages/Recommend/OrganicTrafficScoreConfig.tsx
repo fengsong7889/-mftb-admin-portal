@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Card, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Radio, Tabs, Segmented } from 'antd'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Radio, Tabs, Segmented } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { ServiceStatus } from './constants'
@@ -371,32 +371,19 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   }
 
   return (
-    <Card
-      title={
-        <Space size={12}>
-          <Space size={8}>
-            <SettingOutlined style={{ fontSize: 16, color: '#E8720C' }} />
-            <span style={{ fontSize: 15, fontWeight: 500 }}>算法參數 · 評分維度</span>
-          </Space>
-          <Button size="small" icon={<QuestionCircleOutlined />} onClick={() => setRuleModalOpen(true)}>
-            自然流量排名規則說明
-          </Button>
-        </Space>
-      }
-      extra={<span style={{ fontSize: 12, color: '#8c8c8c' }}>自然流量按綜合得分高低排名</span>}
-      style={{
-        marginTop: 16,
-        backgroundColor: '#fafbfc',
-        border: '1px solid #e8eaed',
-        borderRadius: 8,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-      }}
-      headStyle={{
-        backgroundColor: '#FFF7E6',
-        borderBottom: '1px solid #FFD591',
-        borderRadius: '8px 8px 0 0',
-      }}
-    >
+    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+        </div>
+        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>算法參數</span>
+        <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>評分維度</Tag>
+        <Button size="small" icon={<QuestionCircleOutlined />} onClick={() => setRuleModalOpen(true)}>
+          自然流量排名規則說明
+        </Button>
+        <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        <span style={{ fontSize: 12, color: '#8c8c8c' }}>自然流量按綜合得分高低排名</span>
+      </div>
       {/* 4 個維度權重統計卡（帶計數動畫與 hover 動效） */}
       <div key={weightTotal} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
         {DIMENSION_ORDER.map(dimension => {
@@ -607,6 +594,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </div>
   )
 }
