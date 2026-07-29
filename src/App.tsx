@@ -58,6 +58,7 @@ const PromotionSlotConfig = lazy(() => import('./pages/PromotionSlotConfig'))
 const PromotionSlotConfigAdd = lazy(() => import('./pages/PromotionSlotConfigAdd'))
 const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
 const AdSales = lazy(() => import('./pages/AdSales'))
+const PromotionWordLibrary = lazy(() => import('./pages/PromotionWordLibrary'))
 const PromotionOrderManage = lazy(() => import('./pages/PromotionOrderManage'))
 const PromotionOrderManageStandalone = lazy(() => import('./pages/PromotionOrderManageStandalone'))
 const OrderDetail = lazy(() => import('./pages/OrderDetail'))
@@ -155,6 +156,7 @@ function AuthenticatedLayout() {
               <Route path="/promotion-waterfall-add" element={<PromotionWaterfallAdd />} />
               <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
               <Route path="/ad-sales" element={<AdSales />} />
+              <Route path="/promotion-word-library" element={<PromotionWordLibrary />} />
               <Route path="/promotion-order-manage" element={<PromotionOrderManageStandalone />} />
               <Route path="/order-detail" element={<OrderDetail />} />
               <Route path="/merchant-order-manage" element={<PromotionOrderManage />} />

@@ -5,8 +5,12 @@ export interface GiftRecordItem {
   id: number
   giftId: string
   groupId: number
+  /** 集团业务编号（如 JT000001，实时关联集团表） */
+  groupCode?: string
   groupName: string
   storeId: number
+  /** 门店业务编号（如 MD00001，实时关联门店表） */
+  storeCode?: string
   storeName: string
   brand: string
   adType: string
@@ -56,8 +60,12 @@ export interface GiftConsumeItem {
   giftRecordId: number
   giftId: string
   groupId: number
+  /** 集团业务编号（如 JT000001，实时关联集团表） */
+  groupCode?: string
   groupName: string
   storeId: number
+  /** 门店业务编号（如 MD00001，实时关联门店表） */
+  storeCode?: string
   storeName: string
   brand: string
   adType: string

@@ -185,7 +185,7 @@ export default function GiftDetail() {
       width: 160,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupId}</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupCode || record.groupId}</span>
           <span>{record.groupName}</span>
         </Space>
       ),
@@ -196,7 +196,7 @@ export default function GiftDetail() {
       width: 160,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeId}</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeCode || record.storeId}</span>
           <span>{record.storeName}</span>
         </Space>
       ),

@@ -5,7 +5,9 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
+  ExportOutlined,
 } from '@ant-design/icons'
+import { exportToCSV } from '../../utils/exportCSV'
 import { useNavigate } from 'react-router-dom'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -108,6 +110,24 @@ export default function GroupList() {
     setModalOpen(false)
     setEditingRecord(null)
     loadData()
+  }
+
+  const handleExport = () => {
+    if (!dataSource.length) {
+      message.warning('暫無數據可導出')
+      return
+    }
+    const exportColumns = [
+      { title: '集團ID', dataIndex: 'groupCode' },
+      { title: '集團名稱', dataIndex: 'groupName' },
+      { title: '門店數量', dataIndex: 'storeCount', render: (v: number) => `${v} 家` },
+      { title: '登錄主賬號', dataIndex: 'loginAccount' },
+      { title: '最後更新人', dataIndex: 'updatedBy' },
+      { title: '最後更新時間', dataIndex: 'updatedAt' },
+      { title: '創建時間', dataIndex: 'createdAt' },
+    ]
+    exportToCSV(`集團管理_${new Date().toISOString().slice(0, 10)}`, exportColumns, dataSource)
+    message.success('導出成功')
   }
 
   const handleTableChange = (pagination: TablePaginationConfig) => {
@@ -227,8 +247,13 @@ export default function GroupList() {
         </Form>
       </div>
 
-      {/* 操作區：僅新增 + 設置，放右側 */}
+      {/* 操作區 */}
       <div className="action-section">
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
+            導出
+          </Button>
+        </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             新增

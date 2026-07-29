@@ -29,6 +29,7 @@ public class BizDataInitializer implements CommandLineRunner {
         createGiftConsumeTableIfAbsent();
         migrateLegacyGroupCodes();
         migrateLegacyStoreCodes();
+        migrateLegacyBizChannels();
         seedMerchantGroups();
         seedStores();
         seedGiftRecords();
@@ -65,6 +66,23 @@ public class BizDataInitializer implements CommandLineRunner {
                     String.format("MD%05d", ++seq), id);
         }
         log.info("已将 {} 条存量门店ID迁移为 MD 自增序列", ids.size());
+    }
+
+    /** 存量业务频道迁移: 中文文本值改为全局统一枚举码 (1=美食外卖 2=超市百货 3=团购到店) */
+    private void migrateLegacyBizChannels() {
+        int updated = 0;
+        updated += jdbcTemplate.update(
+                "UPDATE biz_store SET biz_channel = REPLACE(biz_channel, '美食外賣', '1') "
+                        + "WHERE biz_channel LIKE '%美食外賣%'");
+        updated += jdbcTemplate.update(
+                "UPDATE biz_store SET biz_channel = REPLACE(biz_channel, '超市百貨', '2') "
+                        + "WHERE biz_channel LIKE '%超市百貨%'");
+        updated += jdbcTemplate.update(
+                "UPDATE biz_store SET biz_channel = REPLACE(biz_channel, '團購到店', '3') "
+                        + "WHERE biz_channel LIKE '%團購到店%'");
+        if (updated > 0) {
+            log.info("已将 {} 条存量门店业务频道迁移为统一枚举码", updated);
+        }
     }
 
     /** 取指定前缀编号的当前最大序号 (前缀固定 2 位) */

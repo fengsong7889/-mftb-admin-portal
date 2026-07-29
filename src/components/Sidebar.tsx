@@ -46,6 +46,7 @@ import {
   BulbOutlined,
   LockOutlined,
   FileTextOutlined,
+  FileFilled,
   StarOutlined,
   ProfileOutlined,
   BranchesOutlined,
@@ -108,6 +109,8 @@ const keyToPath: Record<string, string> = {
   'role-management': '/role-management',
   'function-permission': '/function-permission',
   'data-permission': '/data-permission',
+  // 商家推广工具 - 词库管理
+  'promotion-word-library': '/promotion-word-library',
   // 系統設置
   // 注意:以下菜单项暂未实现对应页面
   // 'menu-management': '/menu-management',
@@ -195,7 +198,7 @@ const menuItems: MenuItem[] = [
   },
   {
     key: 'merchant_group',
-    icon: <TeamOutlined />,
+    icon: <ShopOutlined />,
     label: '商戶集團管理',
     children: [
       {
@@ -256,6 +259,11 @@ const menuItems: MenuItem[] = [
         key: 'ad-sales',
         icon: <ShoppingFilled />,
         label: '廣告銷售',
+      },
+      {
+        key: 'promotion-word-library',
+        icon: <FileFilled />,
+        label: '詞庫管理',
       },
     ],
   },

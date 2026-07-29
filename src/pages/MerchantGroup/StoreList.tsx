@@ -5,9 +5,9 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
-  ArrowLeftOutlined,
+  ExportOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -16,6 +16,8 @@ import type { DateRangeValue } from '../../utils/dateRange'
 import type { StoreItem, StoreQueryParams } from '../../api/store'
 import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
+import { BIZ_CHANNEL_OPTIONS, formatBizChannel } from '../../constants/bizChannel'
+import { exportToCSV } from '../../utils/exportCSV'
 import StoreEditModal from './StoreEditModal'
 
 const { RangePicker } = DatePicker
@@ -24,13 +26,6 @@ const { RangePicker } = DatePicker
 const BRAND_OPTIONS = [
   { label: '闪蜂 (flashBee)', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
-]
-
-/** 业务频道选项 */
-const BIZ_CHANNEL_OPTIONS = [
-  { label: '美食外賣', value: '美食外賣' },
-  { label: '超市百貨', value: '超市百貨' },
-  { label: '團購到店', value: '團購到店' },
 ]
 
 /** 搜索表单值 */
@@ -48,7 +43,6 @@ interface StoreSearchValues {
 type StoreFilters = Omit<StoreQueryParams, 'page' | 'size'>
 
 export default function StoreList() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   // 从集团管理跳转过来时带集团信息（groupId 用于新增时预选集团）
@@ -137,13 +131,30 @@ export default function StoreList() {
     loadData()
   }
 
+  const handleExport = () => {
+    if (!dataSource.length) {
+      message.warning('暫無數據可導出')
+      return
+    }
+    const exportColumns = [
+      { title: '所屬集團ID', dataIndex: 'groupCode' },
+      { title: '所屬集團名稱', dataIndex: 'groupName' },
+      { title: '門店ID', dataIndex: 'storeCode' },
+      { title: '門店名稱', dataIndex: 'storeName' },
+      { title: '所屬品牌', dataIndex: 'brand' },
+      { title: '業務頻道', dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
+      { title: '登錄主賬號', dataIndex: 'loginAccount' },
+      { title: '最後更新人', dataIndex: 'updatedBy' },
+      { title: '最後更新時間', dataIndex: 'updatedAt' },
+      { title: '創建時間', dataIndex: 'createdAt' },
+    ]
+    exportToCSV(`門店管理_${new Date().toISOString().slice(0, 10)}`, exportColumns, dataSource)
+    message.success('導出成功')
+  }
+
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current || 1)
     setSize(pagination.pageSize || 10)
-  }
-
-  const handleBack = () => {
-    navigate('/merchant-group-list')
   }
 
   const columns: TableColumnsType<StoreItem> = [
@@ -183,7 +194,7 @@ export default function StoreList() {
       dataIndex: 'bizChannel',
       key: 'bizChannel',
       width: 140,
-      render: (val: string) => val || '-',
+      render: (val: string) => formatBizChannel(val),
     },
     {
       title: '登錄主賬號',
@@ -285,22 +296,13 @@ export default function StoreList() {
         </Form>
       </div>
 
-      {/* 操作區：左側返回與當前集團，右側僅新增 + 設置 */}
+      {/* 操作區 */}
       <div className="action-section">
-        {(presetGroupId || presetGroupName) && (
-          <div className="action-section-left">
-            {presetGroupId && (
-              <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
-                返回集團列表
-              </Button>
-            )}
-            {presetGroupName && (
-              <span style={{ color: '#595959' }}>
-                當前集團：<strong>{presetGroupName}</strong>
-              </span>
-            )}
-          </div>
-        )}
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
+            導出
+          </Button>
+        </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             新增

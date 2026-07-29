@@ -107,7 +107,9 @@ export default function GiftDetailView() {
 
   const [loading, setLoading] = useState(true)
   const [merchantInfo, setMerchantInfo] = useState<{
-    groupId: number; groupName: string; storeId: number; storeName: string; brand: string; adType: string
+    groupId: number; groupCode?: string; groupName: string
+    storeId: number; storeCode?: string; storeName: string
+    brand: string; adType: string
   } | null>(null)
   const [records, setRecords] = useState<GiftRecord[]>([])
 
@@ -134,8 +136,10 @@ export default function GiftDetailView() {
       const detail = await fetchGiftRecordDetail(Number(recordId))
       setMerchantInfo({
         groupId: detail.groupId,
+        groupCode: detail.groupCode,
         groupName: detail.groupName,
         storeId: detail.storeId,
+        storeCode: detail.storeCode,
         storeName: detail.storeName,
         brand: detail.brand,
         adType: detail.adType,
@@ -314,7 +318,7 @@ export default function GiftDetailView() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>集團ID</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchantInfo.groupId}</div>
+            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchantInfo.groupCode || merchantInfo.groupId}</div>
           </div>
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>集團名稱</div>
@@ -323,7 +327,7 @@ export default function GiftDetailView() {
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>門店ID/名稱</div>
             <div style={{ fontSize: 14, color: '#262626' }}>
-              <span style={{ color: '#8C8C8C', fontSize: 12 }}>{merchantInfo.storeId}</span>
+              <span style={{ color: '#8C8C8C', fontSize: 12 }}>{merchantInfo.storeCode || merchantInfo.storeId}</span>
               <span style={{ marginLeft: 8 }}>{merchantInfo.storeName}</span>
             </div>
           </div>

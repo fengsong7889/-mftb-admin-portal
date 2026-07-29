@@ -4,18 +4,12 @@ import type { StoreItem, StorePayload } from '../../api/store'
 import { createStore, updateStore } from '../../api/store'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
 import { fetchAllMerchantGroups } from '../../api/merchantGroup'
+import { BIZ_CHANNEL_OPTIONS } from '../../constants/bizChannel'
 
 /** 品牌选项 */
 const BRAND_OPTIONS = [
   { label: '闪蜂 (flashBee)', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
-]
-
-/** 业务频道选项 */
-const BIZ_CHANNEL_OPTIONS = [
-  { label: '美食外賣', value: '美食外賣' },
-  { label: '超市百貨', value: '超市百貨' },
-  { label: '團購到店', value: '團購到店' },
 ]
 
 interface StoreEditModalProps {

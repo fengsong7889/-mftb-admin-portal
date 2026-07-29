@@ -16,8 +16,12 @@ public class GiftConsumeVO {
     private Long giftRecordId;
     private String giftId;
     private Long groupId;
+    /** 集团业务编号（实时关联集团表，如 JT000001） */
+    private String groupCode;
     private String groupName;
     private Long storeId;
+    /** 门店业务编号（实时关联门店表，如 MD00001） */
+    private String storeCode;
     private String storeName;
     private String brand;
     private String adType;

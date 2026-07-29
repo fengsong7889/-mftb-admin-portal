@@ -27,7 +27,13 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 赠送管理服务实现
@@ -55,6 +61,7 @@ public class GiftServiceImpl implements GiftService {
         List<GiftRecordVO> records = pageResult.getRecords().stream()
                 .map(GiftRecordVO::from)
                 .toList();
+        enrichRecordGroupStore(records);
         return new PageResult<>(records, pageResult.getTotal());
     }
 
@@ -88,14 +95,18 @@ public class GiftServiceImpl implements GiftService {
         record.setUpdatedBy(operatorResolver.currentOperatorName());
         record.setDeleted(0);
         giftRecordMapper.insert(record);
-        return GiftRecordVO.from(record);
+        GiftRecordVO vo = GiftRecordVO.from(record);
+        enrichRecordGroupStore(List.of(vo));
+        return vo;
     }
 
     @Override
     public GiftRecordVO getRecordDetail(Long id) {
         BizGiftRecord record = giftRecordMapper.selectById(id);
         if (record == null) throw new BusinessException("赠送记录不存在");
-        return GiftRecordVO.from(record);
+        GiftRecordVO vo = GiftRecordVO.from(record);
+        enrichRecordGroupStore(List.of(vo));
+        return vo;
     }
 
     @Override
@@ -156,7 +167,68 @@ public class GiftServiceImpl implements GiftService {
         List<GiftConsumeVO> records = pageResult.getRecords().stream()
                 .map(GiftConsumeVO::from)
                 .toList();
+        enrichConsumeGroupStore(records);
         return new PageResult<>(records, pageResult.getTotal());
+    }
+
+    /** 列表补充真实集团/门店数据: 业务编号 + 最新名称 (已删除的保留快照名称) */
+    private void enrichRecordGroupStore(List<GiftRecordVO> records) {
+        Map<Long, BizMerchantGroup> groupMap = groupMapByIds(
+                records.stream().map(GiftRecordVO::getGroupId).collect(Collectors.toSet()));
+        Map<Long, BizStore> storeMap = storeMapByIds(
+                records.stream().map(GiftRecordVO::getStoreId).collect(Collectors.toSet()));
+        for (GiftRecordVO vo : records) {
+            BizMerchantGroup group = groupMap.get(vo.getGroupId());
+            if (group != null) {
+                vo.setGroupCode(group.getGroupCode());
+                vo.setGroupName(group.getGroupName());
+            }
+            BizStore store = storeMap.get(vo.getStoreId());
+            if (store != null) {
+                vo.setStoreCode(store.getStoreCode());
+                vo.setStoreName(store.getStoreName());
+            }
+        }
+    }
+
+    /** 消费流水补充真实集团/门店数据 */
+    private void enrichConsumeGroupStore(List<GiftConsumeVO> records) {
+        Map<Long, BizMerchantGroup> groupMap = groupMapByIds(
+                records.stream().map(GiftConsumeVO::getGroupId).collect(Collectors.toSet()));
+        Map<Long, BizStore> storeMap = storeMapByIds(
+                records.stream().map(GiftConsumeVO::getStoreId).collect(Collectors.toSet()));
+        for (GiftConsumeVO vo : records) {
+            BizMerchantGroup group = groupMap.get(vo.getGroupId());
+            if (group != null) {
+                vo.setGroupCode(group.getGroupCode());
+                vo.setGroupName(group.getGroupName());
+            }
+            BizStore store = storeMap.get(vo.getStoreId());
+            if (store != null) {
+                vo.setStoreCode(store.getStoreCode());
+                vo.setStoreName(store.getStoreName());
+            }
+        }
+    }
+
+    private Map<Long, BizMerchantGroup> groupMapByIds(Collection<Long> ids) {
+        Set<Long> validIds = new HashSet<>();
+        for (Long id : ids) {
+            if (id != null) validIds.add(id);
+        }
+        if (validIds.isEmpty()) return Map.of();
+        return groupMapper.selectBatchIds(validIds).stream()
+                .collect(Collectors.toMap(BizMerchantGroup::getId, Function.identity()));
+    }
+
+    private Map<Long, BizStore> storeMapByIds(Collection<Long> ids) {
+        Set<Long> validIds = new HashSet<>();
+        for (Long id : ids) {
+            if (id != null) validIds.add(id);
+        }
+        if (validIds.isEmpty()) return Map.of();
+        return storeMapper.selectBatchIds(validIds).stream()
+                .collect(Collectors.toMap(BizStore::getId, Function.identity()));
     }
 
     /** 生成赠送ID: 格式 YYMM-序号 */
