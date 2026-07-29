@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
   DEPT_STATUS,
@@ -134,6 +134,42 @@ export default function OrganizationManagement() {
 
   /** 左侧组织架构树数据 */
   const treeData = useMemo(() => buildTreeData(departments), [departments])
+
+  /** 树节点元数据：层级（决定图标）+ 在编人数（徽章） */
+  const deptMetaMap = useMemo(() => {
+    const byId = new Map(departments.map(dept => [dept.id, dept]))
+    const map = new Map<number, { level: number; count?: number }>()
+    departments.forEach(dept => {
+      let level = 0
+      let parentId = dept.parentId
+      while (parentId != null && byId.has(parentId)) {
+        level += 1
+        parentId = byId.get(parentId)!.parentId
+      }
+      map.set(dept.id, { level, count: dept.userCount })
+    })
+    return map
+  }, [departments])
+
+  /** 树节点渲染：层级图标 + 单行省略名称 + 人数徽章 */
+  const renderTreeTitle = (node: TreeDataNode) => {
+    const meta = deptMetaMap.get(node.key as number)
+    const name = String(node.title)
+    const icon = meta?.level === 0
+      ? <ApartmentOutlined className="org-tree-node-icon org-tree-node-icon-root" />
+      : meta?.level === 1
+        ? <FolderOutlined className="org-tree-node-icon org-tree-node-icon-branch" />
+        : <TeamOutlined className="org-tree-node-icon org-tree-node-icon-leaf" />
+    return (
+      <span className="org-tree-node" title={name}>
+        {icon}
+        <span className="org-tree-node-name">{name}</span>
+        {meta?.count != null && meta.count > 0 && (
+          <span className="org-tree-node-count">{meta.count}</span>
+        )}
+      </span>
+    )
+  }
 
   /** 表格数据：按树选中节点 + 搜索条件过滤 */
   const tableData = useMemo(() => {
@@ -307,10 +343,15 @@ export default function OrganizationManagement() {
       <div className="org-container">
       {/* 左侧组织架构树 */}
       <div className="org-tree-panel">
-        <h3 className="org-tree-panel-title">組織架構</h3>
+        <h3 className="org-tree-panel-title">
+          <ApartmentOutlined className="org-tree-panel-title-icon" />
+          組織架構
+        </h3>
         <Tree
           treeData={treeData}
           defaultExpandAll
+          blockNode
+          titleRender={renderTreeTitle}
           selectedKeys={selectedDeptId != null ? [selectedDeptId] : []}
           onSelect={(keys) => setSelectedDeptId(keys.length > 0 ? Number(keys[0]) : undefined)}
         />
