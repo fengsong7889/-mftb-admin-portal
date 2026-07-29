@@ -49,7 +49,7 @@ public class DataInitializer implements CommandLineRunner {
         addColumnIfAbsent("sys_position", "name_en",
                 "ALTER TABLE sys_position ADD COLUMN name_en VARCHAR(128) NULL COMMENT '职位英文名称' AFTER name");
         addColumnIfAbsent("sys_position", "rank",
-                "ALTER TABLE sys_position ADD COLUMN rank VARCHAR(8) NULL COMMENT '职等 R1~R5' AFTER job_level");
+                "ALTER TABLE sys_position ADD COLUMN `rank` VARCHAR(8) NULL COMMENT '职等 R1~R5' AFTER job_level");
         addColumnIfAbsent("sys_user", "position_id",
                 "ALTER TABLE sys_user ADD COLUMN position_id BIGINT NULL COMMENT '职位ID' AFTER department");
         addColumnIfAbsent("sys_user", "job_level",
@@ -72,7 +72,7 @@ public class DataInitializer implements CommandLineRunner {
                         + "name_en VARCHAR(128) NULL COMMENT '职位英文名称', "
                         + "sequence VARCHAR(8) NOT NULL COMMENT '职级序列: M=管理 T=技术 P=专业', "
                         + "job_level VARCHAR(32) NOT NULL COMMENT '职级', "
-                        + "rank VARCHAR(8) NULL COMMENT '职等 R1~R5', "
+                        + "`rank` VARCHAR(8) NULL COMMENT '职等 R1~R5', "
                         + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
                         + "deleted INT DEFAULT 0 COMMENT '逻辑删除', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "

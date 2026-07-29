@@ -31,7 +31,8 @@ public class SysPosition {
     /** 职级 (如 M3 / T5 / P2) */
     private String jobLevel;
 
-    /** 职等 (R1~R5, R1最低 R5最高) */
+    /** 职等 (R1~R5, R1最低 R5最高); rank 为 MySQL 8.0 保留字, 需加反引号 */
+    @TableField("`rank`")
     private String rank;
 
     /** 最后更新人 */
