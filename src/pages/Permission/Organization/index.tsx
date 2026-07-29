@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
   DEPT_STATUS,
   createDepartment,
@@ -278,8 +279,15 @@ export default function OrganizationManagement() {
     },
   ]
 
+  /** 列字段配置 */
+  const columnMeta = columns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent, applyConfig } = useColumnConfig('organization-management', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+
   return (
-    <div className="org-container">
+    <div className="content-area">
+      <div className="org-container">
       {/* 左侧组织架构树 */}
       <div className="org-tree-panel">
         <h3 className="org-tree-panel-title">組織架構</h3>
@@ -324,11 +332,12 @@ export default function OrganizationManagement() {
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               新增
             </Button>
+            {configComponent}
           </div>
         </div>
 
         <Table
-          columns={columns}
+          columns={applyConfig(columns)}
           dataSource={tableData}
           rowKey="id"
           loading={loading}
@@ -377,6 +386,7 @@ export default function OrganizationManagement() {
           </Form.Item>
         </Form>
       </Modal>
+      </div>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import './index.css'
 
 /** 角色状态：启用 */
@@ -338,6 +339,16 @@ export default function DataPermission() {
     { title: '註冊地址', dataIndex: 'address', key: 'address' },
   ]
 
+  /** 列字段配置 */
+  const roleColumnMeta = roleColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent: roleConfigComponent, applyConfig: roleApplyConfig } = useColumnConfig('data-permission-role', roleColumnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+  const deptColumnMeta = deptColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent: deptConfigComponent, applyConfig: deptApplyConfig } = useColumnConfig('data-permission-dept', deptColumnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+
   /** 授权列表（角色/部门 Tab 内容） */
   const renderTabContent = (type: DataTargetType) => (
     <div>
@@ -346,10 +357,11 @@ export default function DataPermission() {
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             新增
           </Button>
+          {type === DATA_TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
         </div>
       </div>
       <Table
-        columns={type === DATA_TARGET_TYPE.ROLE ? roleColumns : deptColumns}
+        columns={type === DATA_TARGET_TYPE.ROLE ? roleApplyConfig(roleColumns) : deptApplyConfig(deptColumns)}
         dataSource={type === DATA_TARGET_TYPE.ROLE ? roleRows : deptRows}
         rowKey="id"
         loading={loading}
@@ -373,7 +385,7 @@ export default function DataPermission() {
     : undefined
 
   return (
-    <div>
+    <div className="content-area">
       <Tabs
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as DataTargetType)}

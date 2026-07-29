@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
   POSITION_SEQUENCE,
   POSITION_SEQUENCE_OPTIONS,
@@ -32,6 +33,10 @@ interface PositionFormValues {
 export default function PositionManagement() {
   const [dataSource, setDataSource] = useState<PositionItem[]>([])
   const [loading, setLoading] = useState(false)
+  // 查询条件（点击查询后生效）
+  const [keyword, setKeyword] = useState<string>()
+  const [filterSequence, setFilterSequence] = useState<string>()
+  const [searchForm] = Form.useForm()
 
   // 新增/编辑弹窗
   const [editModalVisible, setEditModalVisible] = useState(false)
@@ -56,6 +61,33 @@ export default function PositionManagement() {
   useEffect(() => {
     fetchList()
   }, [fetchList])
+
+  /** 表格数据：按搜索条件过滤 */
+  const tableData = useMemo(() => {
+    let list = dataSource
+    if (keyword) {
+      const kw = keyword.toLowerCase()
+      list = list.filter(item => item.name.toLowerCase().includes(kw))
+    }
+    if (filterSequence) {
+      list = list.filter(item => item.sequence === filterSequence)
+    }
+    return list
+  }, [dataSource, keyword, filterSequence])
+
+  /** 查询 */
+  const handleSearch = () => {
+    const values = searchForm.getFieldsValue()
+    setKeyword(values.keyword?.trim() || undefined)
+    setFilterSequence(values.sequence)
+  }
+
+  /** 重置 */
+  const handleReset = () => {
+    searchForm.resetFields()
+    setKeyword(undefined)
+    setFilterSequence(undefined)
+  }
 
   /** 根据所选序列生成职级选项（如 M1~M9） */
   const jobLevelOptions = useMemo(() => {
@@ -172,20 +204,53 @@ export default function PositionManagement() {
     },
   ]
 
+  /** 列字段配置 */
+  const columnMeta = columns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent, applyConfig } = useColumnConfig('position-management', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+
   return (
-    <div>
+    <div className="content-area">
+      {/* 搜索区 */}
+      <div className="search-section">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="職位名稱" name="keyword">
+            <Input placeholder="請輸入職位名稱" allowClear onPressEnter={handleSearch} />
+          </Form.Item>
+          <Form.Item label="職級序列" name="sequence">
+            <Select
+              placeholder="全部"
+              allowClear
+              options={POSITION_SEQUENCE_OPTIONS}
+            />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions">
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+                查詢
+              </Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>
+                重置
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </div>
+
       {/* 操作区：仅新增，放右侧 */}
       <div className="action-section">
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             新增
           </Button>
+          {configComponent}
         </div>
       </div>
 
       <Table
-        columns={columns}
-        dataSource={dataSource}
+        columns={applyConfig(columns)}
+        dataSource={tableData}
         rowKey="id"
         loading={loading}
         pagination={{

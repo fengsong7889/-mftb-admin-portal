@@ -9,6 +9,7 @@ import { fetchRoles, updateRolePermissions } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments, updateDepartmentPermissions } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import './index.css'
 
 /** 授权对象类型（Tab） */
@@ -336,6 +337,16 @@ export default function FunctionPermission() {
     { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
+  /** 列字段配置 */
+  const roleColumnMeta = roleColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent: roleConfigComponent, applyConfig: roleApplyConfig } = useColumnConfig('function-permission-role', roleColumnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+  const deptColumnMeta = deptColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent: deptConfigComponent, applyConfig: deptApplyConfig } = useColumnConfig('function-permission-dept', deptColumnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+
   /** 授权列表（角色/部门 Tab 内容） */
   const renderTabContent = (type: TargetType) => (
     <div>
@@ -344,11 +355,12 @@ export default function FunctionPermission() {
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             新增
           </Button>
+          {type === TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
         </div>
       </div>
       {type === TARGET_TYPE.ROLE ? (
         <Table
-          columns={roleColumns}
+          columns={roleApplyConfig(roleColumns)}
           dataSource={roleRows}
           rowKey="id"
           loading={loading}
@@ -361,7 +373,7 @@ export default function FunctionPermission() {
         />
       ) : (
         <Table
-          columns={deptColumns}
+          columns={deptApplyConfig(deptColumns)}
           dataSource={deptRows}
           rowKey="id"
           loading={loading}
@@ -384,7 +396,7 @@ export default function FunctionPermission() {
     : undefined
 
   return (
-    <div>
+    <div className="content-area">
       <Tabs
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as TargetType)}

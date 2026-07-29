@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
   createEmployee,
   deleteEmployee,
@@ -359,8 +360,14 @@ export default function EmployeeManagement() {
     },
   ]
 
+  /** 列字段配置 */
+  const columnMeta = columns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { configComponent, applyConfig } = useColumnConfig('employee-management', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+
   return (
-    <div>
+    <div className="content-area">
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
@@ -389,11 +396,12 @@ export default function EmployeeManagement() {
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             新增
           </Button>
+          {configComponent}
         </div>
       </div>
 
       <Table
-        columns={columns}
+        columns={applyConfig(columns)}
         dataSource={dataSource}
         rowKey="id"
         loading={loading}
