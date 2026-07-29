@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS } from '../pages/Permission/types'
-import { login as loginApi, logout as logoutApi, TOKEN_KEY } from '../api'
+import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY } from '../api'
 
 export interface UserInfo {
   username: string
@@ -11,6 +11,8 @@ export interface UserInfo {
   role: 'admin' | 'guest' // 用户角色
   department?: string // 所在部门
   position?: string // 职位
+  positionEn?: string // 职位英文名称
+  jobLevel?: string // 职级 (如 M10/T5)
   functionRoles?: string[] // 绑定的功能角色ID数组
   permissions?: MenuPermission[] // 后端登录时下发的合并菜单权限
   dataPermissions?: {
@@ -43,6 +45,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
 
   /**
+   * 启动时后台静默刷新当前登录人信息：
+   * 人事资料（部门/职位/职级等）变更后，无需重新登录即可展示最新数据；
+   * Mock 登录（无后端）或接口失败时静默跳过，保留本地快照。
+   */
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token || token === 'mock-token') return
+    getUserInfo()
+      .then((info) => {
+        setUser((prev) => {
+          const refreshed: UserInfo = {
+            username: info.username,
+            name: info.name,
+            empId: info.empId,
+            // 头像优先保留本地选择（更换头像仅存本地）
+            avatar: prev?.avatar || info.avatar || 'pikachu-default',
+            role: info.role === 'admin' ? 'admin' : 'guest',
+            department: info.department,
+            position: info.position,
+            positionEn: info.positionEn,
+            jobLevel: info.jobLevel,
+            functionRoles: info.functionRoleIds?.map(String),
+            permissions: info.permissions,
+          }
+          localStorage.setItem('user_info', JSON.stringify(refreshed))
+          return refreshed
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  /**
    * 前端 Mock 登录：当后端不可用时（如部署在 GitHub Pages 纯-static 环境），
    * 使用环境变量中的凭据进行本地登录，保证演示环境可用。
    */
@@ -62,6 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: 'admin',
           department: '集團總裁辦',
           position: '高級副總裁',
+          positionEn: 'SVP',
+          jobLevel: 'M10',
         },
       }
     }
@@ -82,6 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: backendUser.role === 'admin' ? 'admin' : 'guest',
         department: backendUser.department,
         position: backendUser.position,
+        positionEn: backendUser.positionEn,
+        jobLevel: backendUser.jobLevel,
         functionRoles: backendUser.functionRoleIds?.map(String),
         permissions: backendUser.permissions,
       }

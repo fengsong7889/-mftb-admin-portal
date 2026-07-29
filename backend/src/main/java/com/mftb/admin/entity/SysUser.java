@@ -68,6 +68,9 @@ public class SysUser {
     /** 状态: 1=启用 0=停用 */
     private Integer status;
 
+    /** 最后更新人 */
+    private String updatedBy;
+
     /** 逻辑删除 */
     @TableLogic
     private Integer deleted;

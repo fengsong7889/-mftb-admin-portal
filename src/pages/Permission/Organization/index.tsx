@@ -102,6 +102,9 @@ export default function OrganizationManagement() {
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<DepartmentFormValues>()
 
+  // 树展开节点（受控：数据加载后默认仅展开根节点）
+  const [expandedKeys, setExpandedKeys] = useState<number[]>([])
+
   // 员工列表（部門對接人下拉選擇）
   const [employees, setEmployees] = useState<EmployeeItem[]>([])
 
@@ -134,6 +137,13 @@ export default function OrganizationManagement() {
 
   /** 左侧组织架构树数据 */
   const treeData = useMemo(() => buildTreeData(departments), [departments])
+
+  /** 数据加载完成后，默认仅展开根节点（MFTB集团），其它部门折叠 */
+  useEffect(() => {
+    if (treeData.length > 0 && expandedKeys.length === 0) {
+      setExpandedKeys(treeData.map(node => node.key))
+    }
+  }, [treeData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 树节点元数据：层级（决定图标）+ 在编人数（徽章） */
   const deptMetaMap = useMemo(() => {
@@ -349,7 +359,8 @@ export default function OrganizationManagement() {
         </h3>
         <Tree
           treeData={treeData}
-          defaultExpandAll
+          expandedKeys={expandedKeys}
+          onExpand={(keys) => setExpandedKeys(keys as number[])}
           blockNode
           titleRender={renderTreeTitle}
           selectedKeys={selectedDeptId != null ? [selectedDeptId] : []}

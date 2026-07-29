@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Tag, Image, Empty, Input, Select, DatePicker, Pagination, Modal, InputNumber, message } from 'antd'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { Button, Tag, Image, Empty, Input, Select, DatePicker, Pagination, Modal, InputNumber, message, Spin } from 'antd'
 import {
   ArrowLeftOutlined,
   ShopOutlined,
@@ -16,10 +16,12 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
+import type { GiftRecordItem } from '../../api/gift'
+import { fetchGiftRecords, fetchGiftRecordDetail, deductGiftDays } from '../../api/gift'
 
 const { RangePicker } = DatePicker
 
-/* ---- 數字動畫 Hook（與訂單詳情推廣數據卡片一致） ---- */
+/* ---- 數字動畫 Hook ---- */
 function useCountUp(target: number, duration = 1200) {
   const [value, setValue] = useState(0)
   const rafRef = useRef<number>(0)
@@ -40,12 +42,10 @@ function useCountUp(target: number, duration = 1200) {
   return value
 }
 
-/* ---- 動畫數字組件 ---- */
 function AnimatedNumber({ value }: { value: number }) {
   const animated = useCountUp(value)
   return <>{animated.toLocaleString()}</>
 }
-
 
 const adTypeMap: Record<string, string> = {
   new_store: '新店廣告',
@@ -63,20 +63,16 @@ const adTypeColorMap: Record<string, string> = {
   ka: '#1890FF',
 }
 
-/** 空圖占位（憑證加載失敗降級） */
 const IMG_FALLBACK =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjVmNWY1Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNiZmJmYmYiIGZvbnQtc2l6ZT0iMTIiPuWHreivgTwvdGV4dD48L3N2Zz4='
 
-/** 單筆贈送記錄 */
+/** 将 API GiftRecordItem 映射为页面内部记录结构 */
 interface GiftRecord {
   key: string
-  /** 贈送ID（用於消費明細菜單關聯） */
   giftId: string
-  /** 審批流程編號 */
   approvalNo: string
   giftDate: string
   giftDays: number
-  /** 剩餘可用天數 */
   remainingDays: number
   validDays: number
   expireDate: string
@@ -84,168 +80,88 @@ interface GiftRecord {
   credentials: string[]
 }
 
-/** Mock 商家數據：一個詳情僅一個廣告類型，包含多筆贈送記錄 */
-const mockMerchantMap: Record<string, {
-  groupId: string
-  groupName: string
-  storeId: string
-  storeName: string
-  brand: string
-  adType: string
-  records: GiftRecord[]
-}> = {
-  '1': {
-    groupId: 'G001',
-    groupName: '美味餐廳集團',
-    storeId: 'S1001',
-    storeName: '澳門總店',
-    brand: '2',
-    adType: 'new_store',
-    records: [
-      {
-        key: '1-1',
-        giftId: '2401-001',
-        approvalNo: 'SP202401150001',
-        giftDate: '2024-01-15',
-        giftDays: 15,
-        remainingDays: 8,
-        validDays: 180,
-        expireDate: '2024-07-15',
-        reason: '新集團入駐扶持計劃：為幫助新入駐的美味餐廳集團快速起步，經業務主管與運營主管聯合評估，決定給予首批新店廣告推廣天數扶持。該集團旗下門店在澳門地區具備較強的品牌影響力，預計可帶動平台整體訂單量增長，故予以重點扶持，助力其在平台冷啟動階段獲得足夠的曝光資源。',
-        credentials: [
-          'https://zos.alipayobjects.com/rmsportal/HDJoMRJAbsFCOzO/f.png',
-          'https://gw.alipayobjects.com/zos/antfincdn/LlvErxo8H9/photo-1503185912284-5271ff81b9a8.webp',
-        ],
-      },
-      {
-        key: '1-2',
-        giftId: '2403-001',
-        approvalNo: 'SP202403010002',
-        giftDate: '2024-03-01',
-        giftDays: 15,
-        remainingDays: 0,
-        validDays: 90,
-        expireDate: '2024-05-30',
-        reason: '春季大促活動額外支持，配合平台三月大促為商家追加新店廣告推廣資源。',
-        credentials: [
-          'https://gw.alipayobjects.com/zos/antfincdn/cV16ZqzMjW/photo-1473091540282-9b846e7965e3.webp',
-        ],
-      },
-      {
-        key: '1-3',
-        giftId: '2405-001',
-        approvalNo: 'SP202405100003',
-        giftDate: '2024-05-10',
-        giftDays: 10,
-        remainingDays: 10,
-        validDays: 60,
-        expireDate: '2024-07-09',
-        reason: '商家經營週年慶回饋。',
-        credentials: [],
-      },
-    ],
-  },
-  '2': {
-    groupId: 'G002',
-    groupName: '生鮮超市集團',
-    storeId: 'S1002',
-    storeName: '氹仔分店',
-    brand: '1',
-    adType: 'revival',
-    records: [
-      {
-        key: '2-1',
-        giftId: '2310-001',
-        approvalNo: 'SP202310010001',
-        giftDate: '2023-10-01',
-        giftDays: 30,
-        remainingDays: 12,
-        validDays: 180,
-        expireDate: '2024-04-01',
-        reason: '集團盤活復蘇計劃：針對近期經營數據下滑的生鮮超市集團，啟動盤活復蘇專項扶持，通過贈送盤活復蘇廣告推廣天數，幫助商家重新獲得平台流量，恢復經營活力。',
-        credentials: [
-          'https://gw.alipayobjects.com/zos/antfincdn/LlvErxo8H9/photo-1503185912284-5271ff81b9a8.webp',
-        ],
-      },
-      {
-        key: '2-2',
-        giftId: '2401-002',
-        approvalNo: 'SP202401100002',
-        giftDate: '2024-01-10',
-        giftDays: 30,
-        remainingDays: 0,
-        validDays: 120,
-        expireDate: '2024-05-10',
-        reason: '盤活復蘇二期支持，延續扶持政策。',
-        credentials: [],
-      },
-    ],
-  },
-  '3': {
-    groupId: 'G003',
-    groupName: '時尚百貨集團',
-    storeId: 'S1003',
-    storeName: '新馬路店',
-    brand: '2',
-    adType: 'exclusive',
-    records: [
-      {
-        key: '3-1',
-        giftId: '2401-003',
-        approvalNo: 'SP202401010001',
-        giftDate: '2024-01-01',
-        giftDays: 45,
-        remainingDays: 45,
-        validDays: 365,
-        expireDate: '2024-12-31',
-        reason: '獨家商家簽約扶持：時尚百貨集團與平台達成年度獨家合作協議，作為簽約權益之一，平台為其提供獨家商家廣告推廣天數扶持，保障其在合作期內的優先曝光權益。',
-        credentials: [
-          'https://zos.alipayobjects.com/rmsportal/HDJoMRJAbsFCOzO/f.png',
-          'https://gw.alipayobjects.com/zos/antfincdn/cV16ZqzMjW/photo-1473091540282-9b846e7965e3.webp',
-          'https://gw.alipayobjects.com/zos/antfincdn/LlvErxo8H9/photo-1503185912284-5271ff81b9a8.webp',
-        ],
-      },
-    ],
-  },
+function mapToRecord(item: GiftRecordItem): GiftRecord {
+  return {
+    key: String(item.id),
+    giftId: item.giftId,
+    approvalNo: item.approvalNo || '',
+    giftDate: item.giftDate || '',
+    giftDays: item.totalDays,
+    remainingDays: item.remainingDays,
+    validDays: item.validDays,
+    expireDate: item.expireDate || '',
+    reason: item.reason,
+    credentials: item.credentials || [],
+  }
 }
 
 const PAGE_SIZE = 5
 
-/** 贈送狀態：可用 / 已用完 */
 type GiftStatus = 'valid' | 'exhausted'
 const getStatus = (r: GiftRecord): GiftStatus => (r.remainingDays > 0 ? 'valid' : 'exhausted')
 
 export default function GiftDetailView() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const recordKey = searchParams.get('key') || '1'
-  const merchant = mockMerchantMap[recordKey] || mockMerchantMap['1']
-  const adColor = adTypeColorMap[merchant.adType] || '#E8720C'
+  const recordId = searchParams.get('id')
 
-  /** 贈送記錄置於狀態中，扣除天數後即時更新 */
-  const [records, setRecords] = useState<GiftRecord[]>(merchant.records)
+  const [loading, setLoading] = useState(true)
+  const [merchantInfo, setMerchantInfo] = useState<{
+    groupId: number; groupName: string; storeId: number; storeName: string; brand: string; adType: string
+  } | null>(null)
+  const [records, setRecords] = useState<GiftRecord[]>([])
 
   /** 篩選條件 */
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | GiftStatus>('all')
   const [dateRange, setDateRange] = useState<[string, string] | null>(null)
-  /** 已生效的篩選條件（點擊查詢後才應用） */
   const [applied, setApplied] = useState<{ keyword: string; status: 'all' | GiftStatus; dateRange: [string, string] | null }>({
-    keyword: '',
-    status: 'all',
-    dateRange: null,
+    keyword: '', status: 'all', dateRange: null,
   })
   const [page, setPage] = useState(1)
 
-  /** 展開明細的卡片 key 集合（默認收起，節省空間） */
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
-
-  /** 扣除天數彈窗 */
   const [deductTarget, setDeductTarget] = useState<GiftRecord | null>(null)
   const [deductDays, setDeductDays] = useState<number>(1)
   const [deductReason, setDeductReason] = useState('')
 
-  /** 統計概覽（基於全部記錄，不受篩選影響） */
+  // 加载数据：先获取详情记录，再查询同集团/门店/广告类型的所有记录
+  const loadData = useCallback(async () => {
+    if (!recordId) { setLoading(false); return }
+    setLoading(true)
+    try {
+      // 获取当前记录详情
+      const detail = await fetchGiftRecordDetail(Number(recordId))
+      setMerchantInfo({
+        groupId: detail.groupId,
+        groupName: detail.groupName,
+        storeId: detail.storeId,
+        storeName: detail.storeName,
+        brand: detail.brand,
+        adType: detail.adType,
+      })
+
+      // 查询同集团下同广告类型的所有记录
+      const listRes = await fetchGiftRecords({
+        page: 1, size: 100,
+        groupId: detail.groupId,
+        storeId: detail.storeId,
+        adType: detail.adType,
+      })
+      setRecords((listRes.records || []).map(mapToRecord))
+    } catch {
+      message.error('加載詳情失敗')
+    } finally {
+      setLoading(false)
+    }
+  }, [recordId])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const adColor = adTypeColorMap[merchantInfo?.adType || ''] || '#E8720C'
+
   const stats = useMemo(() => {
     const totalGift = records.reduce((s, r) => s + r.giftDays, 0)
     const remaining = records.reduce((s, r) => s + r.remainingDays, 0)
@@ -255,7 +171,6 @@ export default function GiftDetailView() {
     return { totalGift, remaining, consumed, count: records.length, validCount, exhaustedCount }
   }, [records])
 
-  /** 篩選後的記錄 */
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
       if (applied.keyword) {
@@ -271,7 +186,6 @@ export default function GiftDetailView() {
     })
   }, [records, applied])
 
-  /** 分頁後的記錄 */
   const pagedRecords = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
     return filteredRecords.slice(start, start + PAGE_SIZE)
@@ -305,22 +219,29 @@ export default function GiftDetailView() {
     setDeductReason('')
   }
 
-  const handleDeductConfirm = () => {
+  const handleDeductConfirm = async () => {
     if (!deductTarget) return
     if (deductDays < 1 || deductDays > deductTarget.remainingDays) {
       message.error('扣除天數需在 1 ~ 剩餘天數之間')
       return
     }
-    setRecords(prev =>
-      prev.map(r =>
-        r.key === deductTarget.key ? { ...r, remainingDays: r.remainingDays - deductDays } : r,
-      ),
-    )
-    message.success(`已扣除 ${deductDays} 天（贈送ID：${deductTarget.giftId}）`)
-    setDeductTarget(null)
+    try {
+      // 通过 giftId 找到对应的原始记录 ID
+      const originalRecord = records.find(r => r.key === deductTarget.key)
+      if (!originalRecord) return
+
+      await deductGiftDays(Number(originalRecord.key), {
+        deductDays,
+        reason: deductReason,
+      })
+      message.success(`已扣除 ${deductDays} 天（贈送ID：${deductTarget.giftId}）`)
+      setDeductTarget(null)
+      loadData() // 重新加载数据
+    } catch {
+      message.error('扣除失敗，請重試')
+    }
   }
 
-  /** 統計卡片配置 */
   const statCards = [
     { label: '累計贈送', value: stats.totalGift, unit: '天', color: '#1890FF', bg: '#E6F4FF' },
     { label: '已消耗', value: stats.consumed, unit: '天', color: '#FF7A45', bg: '#FFF2E8' },
@@ -328,74 +249,64 @@ export default function GiftDetailView() {
     { label: '贈送筆數', value: stats.count, unit: `筆 · 有效 ${stats.validCount} / 用完 ${stats.exhaustedCount}`, color: '#722ED1', bg: '#F9F0FF' },
   ]
 
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" tip="加載中..." />
+      </div>
+    )
+  }
+
+  if (!merchantInfo) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Empty description="未找到贈送記錄" />
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* 頁面標題 */}
       <div style={{
-        position: 'relative',
-        background: '#fff',
-        marginBottom: 16,
-        borderRadius: 12,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
           height: 3,
           background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
           backgroundSize: '200% 100%',
         }} />
-        <div style={{
-          padding: '16px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
+        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button
               type="primary"
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate('/gift-detail')}
               style={{
-                backgroundColor: '#E8720C',
-                borderColor: '#E8720C',
-                borderRadius: 8,
-                height: 36,
-                padding: '0 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
+                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                borderRadius: 8, height: 36, padding: '0 16px',
+                display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
               返回
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>贈送明細</h2>
-            </div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>贈送明細</h2>
           </div>
         </div>
       </div>
 
       {/* 商家基本信息 */}
       <div style={{
-        background: '#fff',
-        borderRadius: 8,
-        padding: '20px 24px',
-        marginBottom: 16,
+        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <h3 style={{
-          margin: '0 0 16px',
-          fontSize: 16,
-          fontWeight: 600,
-          color: '#262626',
-          borderBottom: '1px dashed rgba(0,0,0,0.08)',
-          paddingBottom: 12,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
+          margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#262626',
+          borderBottom: '1px dashed rgba(0,0,0,0.08)', paddingBottom: 12,
+          display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <ShopOutlined style={{ color: '#E8720C' }} />
           商家基本信息
@@ -403,41 +314,34 @@ export default function GiftDetailView() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>集團ID</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchant.groupId}</div>
+            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchantInfo.groupId}</div>
           </div>
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>集團名稱</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchant.groupName}</div>
+            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchantInfo.groupName}</div>
           </div>
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>門店ID/名稱</div>
             <div style={{ fontSize: 14, color: '#262626' }}>
-              <span style={{ color: '#8C8C8C', fontSize: 12 }}>{merchant.storeId}</span>
-              <span style={{ marginLeft: 8 }}>{merchant.storeName}</span>
+              <span style={{ color: '#8C8C8C', fontSize: 12 }}>{merchantInfo.storeId}</span>
+              <span style={{ marginLeft: 8 }}>{merchantInfo.storeName}</span>
             </div>
           </div>
           <div>
             <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>所屬品牌</div>
-            <div><BrandTag value={merchant.brand} /></div>
+            <div><BrandTag value={merchantInfo.brand} /></div>
           </div>
         </div>
       </div>
 
       {/* 統計概覽 */}
       <div style={{
-        background: '#fff',
-        borderRadius: 8,
-        padding: '20px 24px',
-        marginBottom: 16,
+        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          marginBottom: 16,
-          paddingBottom: 12,
-          borderBottom: '1px dashed rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+          paddingBottom: 12, borderBottom: '1px dashed rgba(0,0,0,0.08)',
         }}>
           <div style={{ width: 6, height: 20, borderRadius: 3, background: adColor }} />
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -445,14 +349,10 @@ export default function GiftDetailView() {
             贈送概覽
           </h3>
           <Tag style={{
-            background: `${adColor}15`,
-            color: adColor,
-            border: `1px solid ${adColor}40`,
-            fontSize: 13,
-            padding: '2px 12px',
-            margin: 0,
+            background: `${adColor}15`, color: adColor,
+            border: `1px solid ${adColor}40`, fontSize: 13, padding: '2px 12px', margin: 0,
           }}>
-            {adTypeMap[merchant.adType] || merchant.adType}
+            {adTypeMap[merchantInfo.adType] || merchantInfo.adType}
           </Tag>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
@@ -460,20 +360,8 @@ export default function GiftDetailView() {
             <div
               key={c.label}
               style={{
-                background: c.bg,
-                borderRadius: 10,
-                padding: '16px 20px',
-                border: `1px solid ${c.color}22`,
-                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'default',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'none'
+                background: c.bg, borderRadius: 10, padding: '16px 20px',
+                border: `1px solid ${c.color}22`, cursor: 'default',
               }}
             >
               <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 8 }}>{c.label}</div>
@@ -488,23 +376,15 @@ export default function GiftDetailView() {
         </div>
       </div>
 
-      {/* 贈送記錄（篩選 + 分頁） */}
+      {/* 贈送記錄 */}
       <div style={{
-        background: '#fff',
-        borderRadius: 8,
-        padding: '20px 24px',
-        marginBottom: 16,
+        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         {/* 篩選欄 */}
         <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: 12,
-          marginBottom: 20,
-          paddingBottom: 16,
-          borderBottom: '1px dashed rgba(0,0,0,0.08)',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
+          marginBottom: 20, paddingBottom: 16, borderBottom: '1px dashed rgba(0,0,0,0.08)',
         }}>
           <Input
             allowClear
@@ -553,33 +433,18 @@ export default function GiftDetailView() {
               return (
                 <div
                   key={record.key}
-                  style={{
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    background: '#FCFCFC',
-                  }}
+                  style={{ border: '1px solid #f0f0f0', borderRadius: 10, overflow: 'hidden', background: '#FCFCFC' }}
                 >
                   {/* 卡片頭部 */}
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 20,
-                    padding: '14px 20px',
-                    background: '#fff',
+                    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 20,
+                    padding: '14px 20px', background: '#fff',
                     borderBottom: expanded ? '1px solid #f0f0f0' : 'none',
                   }}>
-                    {/* 贈送ID（替代序號，中性樣式） */}
                     <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '4px 12px',
-                      borderRadius: 6,
-                      background: '#FAFAFA',
-                      border: '1px solid #E8E8E8',
-                      flexShrink: 0,
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '4px 12px', borderRadius: 6,
+                      background: '#FAFAFA', border: '1px solid #E8E8E8', flexShrink: 0,
                     }}>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>贈送ID</span>
                       <span style={{ fontSize: 14, color: '#262626', fontWeight: 700, fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{record.giftId}</span>
@@ -593,7 +458,6 @@ export default function GiftDetailView() {
                       <span style={{ fontSize: 15, color: '#262626', fontWeight: 600 }}>{record.giftDays}</span>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>天</span>
                     </div>
-                    {/* 剩餘天數（唯一重點高亮） */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>剩餘天數</span>
                       <span style={{ fontSize: 16, color: noRemaining ? '#8C8C8C' : '#52C41A', fontWeight: 700 }}>{record.remainingDays}</span>
@@ -607,35 +471,28 @@ export default function GiftDetailView() {
                       <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{record.validDays} 天</span>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>（至 {record.expireDate}）</span>
                     </div>
-                    {/* 審批編號（放在最後） */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>審批編號</span>
                       <span style={{ fontSize: 13, color: '#595959', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{record.approvalNo}</span>
                     </div>
 
-                    {/* 右側操作按鈕 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
                       <Button
-                        type="link"
-                        danger
-                        icon={<MinusCircleOutlined />}
-                        disabled={noRemaining}
-                        onClick={() => openDeduct(record)}
+                        type="link" danger icon={<MinusCircleOutlined />}
+                        disabled={noRemaining} onClick={() => openDeduct(record)}
                         style={{ padding: '4px 8px', borderRadius: 4, fontSize: 13, fontWeight: 500 }}
                       >
                         扣除天數
                       </Button>
                       <Button
-                        type="link"
-                        icon={<EyeOutlined />}
+                        type="link" icon={<EyeOutlined />}
                         onClick={() => navigate(`/gift-consume-detail?giftId=${record.giftId}`)}
                         style={{ color: '#E8720C', padding: '4px 8px', borderRadius: 4, fontSize: 13, fontWeight: 500 }}
                       >
                         查看明細
                       </Button>
                       <Button
-                        type="text"
-                        icon={expanded ? <UpOutlined /> : <DownOutlined />}
+                        type="text" icon={expanded ? <UpOutlined /> : <DownOutlined />}
                         onClick={() => toggleExpand(record.key)}
                         style={{ color: '#8C8C8C', padding: '4px 8px', borderRadius: 4, fontSize: 13 }}
                       >
@@ -644,31 +501,21 @@ export default function GiftDetailView() {
                     </div>
                   </div>
 
-                  {/* 卡片內容：贈送原因 + 憑證（默認收起） */}
+                  {/* 卡片內容 */}
                   {expanded && (
                     <div style={{ padding: '16px 20px' }}>
                       <div style={{ marginBottom: record.credentials.length > 0 ? 16 : 0 }}>
                         <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontSize: 12,
-                          color: '#8C8C8C',
-                          marginBottom: 8,
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          fontSize: 12, color: '#8C8C8C', marginBottom: 8,
                         }}>
                           <FileTextOutlined />
                           贈送原因
                         </div>
                         <div style={{
-                          fontSize: 13,
-                          color: '#262626',
-                          lineHeight: 1.8,
-                          padding: '12px 16px',
-                          background: '#fff',
-                          borderRadius: 8,
-                          border: '1px solid #f0f0f0',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
+                          fontSize: 13, color: '#262626', lineHeight: 1.8,
+                          padding: '12px 16px', background: '#fff', borderRadius: 8,
+                          border: '1px solid #f0f0f0', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                         }}>
                           {record.reason || '—'}
                         </div>
@@ -677,12 +524,8 @@ export default function GiftDetailView() {
                       {record.credentials.length > 0 && (
                         <div>
                           <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            fontSize: 12,
-                            color: '#8C8C8C',
-                            marginBottom: 8,
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            fontSize: 12, color: '#8C8C8C', marginBottom: 8,
                           }}>
                             <PaperClipOutlined />
                             相關憑證（{record.credentials.length}）
@@ -695,11 +538,7 @@ export default function GiftDetailView() {
                                   src={url}
                                   width={88}
                                   height={88}
-                                  style={{
-                                    objectFit: 'cover',
-                                    borderRadius: 8,
-                                    border: '1px solid #e8e8e8',
-                                  }}
+                                  style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8' }}
                                   fallback={IMG_FALLBACK}
                                 />
                               ))}
@@ -715,7 +554,6 @@ export default function GiftDetailView() {
           </div>
         )}
 
-        {/* 分頁 */}
         {filteredRecords.length > PAGE_SIZE && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
             <Pagination
@@ -731,17 +569,12 @@ export default function GiftDetailView() {
 
       {/* 底部操作欄 */}
       <div className="form-footer" style={{
-        display: 'flex',
-        justifyContent: 'center',
-        padding: '16px 24px',
-        background: '#fff',
-        borderTop: '1px solid #f0f0f0',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.04)',
-        borderRadius: '0 0 8px 8px',
+        display: 'flex', justifyContent: 'center', padding: '16px 24px',
+        background: '#fff', borderTop: '1px solid #f0f0f0',
+        boxShadow: '0 -2px 8px rgba(0,0,0,0.04)', borderRadius: '0 0 8px 8px',
       }}>
         <Button
-          size="large"
-          icon={<ArrowLeftOutlined />}
+          size="large" icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/gift-detail')}
           style={{ height: 38, minWidth: 96, borderRadius: 8 }}
         >

@@ -65,6 +65,9 @@ type MenuItem = Required<MenuProps>['items'][number]
 const keyToPath: Record<string, string> = {
   // 首頁
   'home': '/',
+  // 商戶集團管理
+  'merchant-group-list': '/merchant-group-list',
+  'store-list': '/store-list',
   // 财务管理 - 推广金管理
   'account-balance': '/account-balance',
   'batch-query': '/batch-query',
@@ -189,6 +192,23 @@ const menuItems: MenuItem[] = [
     key: 'home',
     icon: <HomeOutlined />,
     label: '首頁',
+  },
+  {
+    key: 'merchant_group',
+    icon: <TeamOutlined />,
+    label: '商戶集團管理',
+    children: [
+      {
+        key: 'merchant-group-list',
+        icon: <ShopOutlined />,
+        label: '集團管理',
+      },
+      {
+        key: 'store-list',
+        icon: <ShopOutlined />,
+        label: '門店管理',
+      },
+    ],
   },
   {
     key: 'merchant_promotion',

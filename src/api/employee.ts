@@ -22,6 +22,10 @@ export interface EmployeeItem {
   status: number
   functionRoleIds: number[]
   createdAt?: string
+  /** 最后更新人 */
+  updatedBy?: string
+  /** 最后更新时间 */
+  updatedAt?: string
 }
 
 /** 员工新增/编辑请求参数（工号/登录账号由后端自动生成） */

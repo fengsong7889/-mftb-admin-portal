@@ -18,6 +18,10 @@ export interface UserInfo {
   role: string
   department?: string
   position?: string
+  /** 职位英文名称 */
+  positionEn?: string
+  /** 职级 (如 M10/T5) */
+  jobLevel?: string
   functionRoleIds?: number[] // 绑定的功能角色ID
   permissions?: MenuPermission[] // 登录时下发的合并菜单权限
 }
@@ -43,5 +47,8 @@ export function logout() {
 
 /** 获取当前登录用户信息 */
 export function getUserInfo() {
-  return request.get<unknown, UserInfo>('/auth/info')
+  // 带静默标记：用于启动时后台刷新用户信息，后端不可用时不弹全局错误提示
+  return request.get<unknown, UserInfo>('/auth/info', {
+    headers: { [SILENT_HEADER]: '1' },
+  })
 }

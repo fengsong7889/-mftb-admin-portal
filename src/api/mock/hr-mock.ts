@@ -149,6 +149,8 @@ export function mockCreateEmployee(data: EmployeePayload): EmployeeItem {
     status: 1,
     functionRoleIds: data.functionRoleIds ?? [],
     createdAt: now(),
+    updatedBy: '系統管理員',
+    updatedAt: now(),
   }
   employees.push(item)
   write(KEY_EMPLOYEES, employees)
@@ -175,6 +177,8 @@ export function mockUpdateEmployee(id: number, data: EmployeePayload): EmployeeI
     jobLevel: pos?.jobLevel,
     rank: data.rank ?? undefined,
     functionRoleIds: data.functionRoleIds ?? [],
+    updatedBy: '系統管理員',
+    updatedAt: now(),
   }
   write(KEY_EMPLOYEES, employees)
   return employees[idx]

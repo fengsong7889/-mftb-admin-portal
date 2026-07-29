@@ -43,6 +43,19 @@ public final class JsonUtils {
         }
     }
 
+    /** 解析字符串 JSON数组, 解析失败返回空列表 */
+    public static List<String> parseStringList(String json) {
+        if (json == null || json.isBlank()) {
+            return new ArrayList<>();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<String>>() {
+            });
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
     /** 序列化为 JSON 字符串 */
     public static String toJson(Object obj) {
         try {

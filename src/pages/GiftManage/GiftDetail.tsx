@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button, Space, Input, Select, Table, Modal, Form, InputNumber, message } from 'antd'
-import type { TableColumnsType } from 'antd'
+import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
@@ -11,11 +11,16 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-
+import type { GiftRecordItem } from '../../api/gift'
+import { fetchGiftRecords, deductGiftDays } from '../../api/gift'
+import type { MerchantGroupItem } from '../../api/merchantGroup'
+import { fetchAllMerchantGroups } from '../../api/merchantGroup'
+import type { StoreItem } from '../../api/store'
+import { fetchStoresByGroup } from '../../api/store'
 
 /** 廣告類型 */
 const adTypeOptions = [
-  { label: '全部', value: 'all' },
+  { label: '全部', value: '' },
   { label: '新店廣告', value: 'new_store' },
   { label: '盤活復蘇', value: 'revival' },
   { label: '獨家商家', value: 'exclusive' },
@@ -31,208 +36,149 @@ const adTypeMap: Record<string, string> = {
   ka: '人氣商家',
 }
 
-
-interface GiftDetailRecord {
-  key: string
-  groupId: string
-  groupName: string
-  storeId: string
-  storeName: string
-  brand: string
-  adType: string
-  totalDays: number
-  validDays: number
-  usedDays: number
-  remainingDays: number
-  giftTime: string
-  expireTime: string
-  status: string
-  reason: string
-  applicant?: string
-  applyTime?: string
-}
-
-/** Mock 數據 */
-const mockData: GiftDetailRecord[] = [
-  {
-    key: '1',
-    groupId: 'G001',
-    groupName: '美味餐廳集團',
-    storeId: 'S1001',
-    storeName: '澳門總店',
-    brand: '2',
-    adType: 'new_store',
-    totalDays: 30,
-    validDays: 180,
-    usedDays: 12,
-    remainingDays: 18,
-    giftTime: '2024-01-15',
-    expireTime: '2024-07-15',
-    status: 'active',
-    reason: '新集團入駐扶持',
-    applicant: '張三',
-    applyTime: '2024-01-15 10:30:00',
-  },
-  {
-    key: '2',
-    groupId: 'G002',
-    groupName: '生鮮超市集團',
-    storeId: 'S1002',
-    storeName: '氹仔分店',
-    brand: '1',
-    adType: 'gold',
-    totalDays: 60,
-    validDays: 180,
-    usedDays: 60,
-    remainingDays: 0,
-    giftTime: '2023-10-01',
-    expireTime: '2024-04-01',
-    status: 'deducted',
-    reason: '集團盤活復蘇計劃',
-    applicant: '李四',
-    applyTime: '2023-10-01 14:20:00',
-  },
-  {
-    key: '3',
-    groupId: 'G003',
-    groupName: '時尚百貨集團',
-    storeId: 'S1003',
-    storeName: '新馬路店',
-    brand: '2',
-    adType: 'exclusive',
-    totalDays: 90,
-    validDays: 365,
-    usedDays: 45,
-    remainingDays: 45,
-    giftTime: '2024-01-01',
-    expireTime: '2024-12-31',
-    status: 'active',
-    reason: '大促活動支持',
-    applicant: '王五',
-    applyTime: '2024-01-01 09:15:00',
-  },
-  {
-    key: '4',
-    groupId: 'G004',
-    groupName: '速遞物流集團',
-    storeId: 'S1004',
-    storeName: '黑沙環店',
-    brand: '1',
-    adType: 'new_store',
-    totalDays: 15,
-    validDays: 90,
-    usedDays: 0,
-    remainingDays: 15,
-    giftTime: '2023-06-01',
-    expireTime: '2023-12-01',
-    status: 'expired',
-    reason: '合作夥伴獎勵',
-    applicant: '趙六',
-    applyTime: '2023-06-01 11:00:00',
-  },
-  {
-    key: '5',
-    groupId: 'G005',
-    groupName: '甜品屋集團',
-    storeId: 'S1005',
-    storeName: '官也街老店',
-    brand: '2',
-    adType: 'new_store',
-    totalDays: 7,
-    validDays: 30,
-    usedDays: 0,
-    remainingDays: 0,
-    giftTime: '-',
-    expireTime: '-',
-    status: 'pending',
-    reason: '新集團開業扶持',
-    applicant: '關羽',
-    applyTime: '2024-01-20 16:30:00',
-  },
-  {
-    key: '6',
-    groupId: 'G006',
-    groupName: '火鍋城集團',
-    storeId: 'S1006',
-    storeName: '珠海旗艦店',
-    brand: '1',
-    adType: 'ka',
-    totalDays: 14,
-    validDays: 60,
-    usedDays: 0,
-    remainingDays: 0,
-    giftTime: '-',
-    expireTime: '-',
-    status: 'rejected',
-    reason: '集團盤活復蘇計劃',
-    applicant: '張飛',
-    applyTime: '2024-01-18 09:45:00',
-  },
-]
-
 export default function GiftDetail() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [deductModalVisible, setDeductModalVisible] = useState(false)
-  const [currentRecord, setCurrentRecord] = useState<GiftDetailRecord | null>(null)
+  const [currentRecord, setCurrentRecord] = useState<GiftRecordItem | null>(null)
   const [deductForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
-  const [dataSource] = useState<GiftDetailRecord[]>(mockData)
+  const [dataSource, setDataSource] = useState<GiftRecordItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [size, setSize] = useState(10)
+
+  // 搜索条件（已生效）
+  const [groupId, setGroupId] = useState<number | undefined>()
+  const [storeId, setStoreId] = useState<number | undefined>()
+  const [brand, setBrand] = useState('')
+  const [adType, setAdType] = useState('')
+
+  // 搜索条件（表单暂存）
+  const [searchGroupId, setSearchGroupId] = useState<number | undefined>()
+  const [searchStoreId, setSearchStoreId] = useState<number | undefined>()
+  const [searchBrand, setSearchBrand] = useState('')
+  const [searchAdType, setSearchAdType] = useState('')
+
+  // 集团/门店下拉
+  const [groups, setGroups] = useState<MerchantGroupItem[]>([])
+  const [stores, setStores] = useState<StoreItem[]>([])
+
+  // 加载集团下拉
+  useEffect(() => {
+    fetchAllMerchantGroups()
+      .then(setGroups)
+      .catch(() => {})
+  }, [])
+
+  // 当搜索集团变化时加载门店下拉
+  useEffect(() => {
+    if (searchGroupId) {
+      fetchStoresByGroup(searchGroupId)
+        .then(setStores)
+        .catch(() => setStores([]))
+    } else {
+      setStores([])
+    }
+    setSearchStoreId(undefined)
+  }, [searchGroupId])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetchGiftRecords({
+        page, size,
+        groupId: groupId || undefined,
+        storeId: storeId || undefined,
+        brand: brand || undefined,
+        adType: adType || undefined,
+      })
+      setDataSource(res.records || [])
+      setTotal(res.total || 0)
+    } catch {
+      message.error('查詢失敗')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, size, groupId, storeId, brand, adType])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleSearch = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      message.success('查詢完成')
-    }, 500)
+    setGroupId(searchGroupId)
+    setStoreId(searchStoreId)
+    setBrand(searchBrand)
+    setAdType(searchAdType)
+    setPage(1)
   }
 
   const handleReset = () => {
     form.resetFields()
+    setSearchGroupId(undefined)
+    setSearchStoreId(undefined)
+    setSearchBrand('')
+    setSearchAdType('')
+    setGroupId(undefined)
+    setStoreId(undefined)
+    setBrand('')
+    setAdType('')
+    setPage(1)
   }
 
   const handleExport = () => {
     message.success('導出功能開發中...')
   }
 
-  const handleViewDetail = (record: GiftDetailRecord) => {
-    navigate(`/gift-detail-view?key=${record.key}`)
+  const handleViewDetail = (record: GiftRecordItem) => {
+    navigate(`/gift-detail-view?id=${record.id}`)
   }
 
   const handleAdd = () => {
     navigate('/gift-add')
   }
 
-  const handleGift = (record: GiftDetailRecord) => {
+  const handleGift = (record: GiftRecordItem) => {
     const params = new URLSearchParams({
       mode: 'gift',
-      group: `${record.groupId} - ${record.groupName}`,
-      store: `${record.storeId} - ${record.storeName}`,
+      group: `${record.groupId}`,
+      store: `${record.storeId}`,
       brand: record.brand,
       adType: record.adType,
     })
     navigate(`/gift-add?${params.toString()}`)
   }
 
-  const handleDeduct = (record: GiftDetailRecord) => {
+  const handleDeduct = (record: GiftRecordItem) => {
     setCurrentRecord(record)
     deductForm.resetFields()
     setDeductModalVisible(true)
   }
 
   const handleDeductOk = async () => {
+    if (!currentRecord) return
     try {
-      await deductForm.validateFields()
-      const values = deductForm.getFieldsValue()
-      console.log('扣除操作:', { record: currentRecord, ...values })
+      const values = await deductForm.validateFields()
+      await deductGiftDays(currentRecord.id, {
+        deductDays: values.deductDays,
+        reason: values.reason,
+      })
       message.success('扣除成功')
       setDeductModalVisible(false)
-    } catch (error) {
-      console.error('表單驗證失敗:', error)
+      loadData()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('扣除失敗，請重試')
     }
   }
 
-  const columns: TableColumnsType<GiftDetailRecord> = [
+  const handleTableChange = (pagination: TablePaginationConfig) => {
+    setPage(pagination.current || 1)
+    setSize(pagination.pageSize || 10)
+  }
+
+  const columns: TableColumnsType<GiftRecordItem> = [
     {
       title: '集團ID/集團名稱',
       key: 'groupInfo',
@@ -269,7 +215,6 @@ export default function GiftDetail() {
       width: 110,
       render: (adType: string) => adTypeMap[adType] || adType,
     },
-
     {
       title: '剩餘天數',
       dataIndex: 'remainingDays',
@@ -281,7 +226,6 @@ export default function GiftDetail() {
         </span>
       ),
     },
-
     {
       title: '操作',
       key: 'action',
@@ -326,14 +270,12 @@ export default function GiftDetail() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={[
-                { label: 'G001 - 美味餐廳集團', value: 'G001' },
-                { label: 'G002 - 生鮮超市集團', value: 'G002' },
-                { label: 'G003 - 時尚百貨集團', value: 'G003' },
-                { label: 'G004 - 速遞物流集團', value: 'G004' },
-                { label: 'G005 - 甜品屋集團', value: 'G005' },
-                { label: 'G006 - 火鍋城集團', value: 'G006' },
-              ]}
+              value={searchGroupId}
+              onChange={setSearchGroupId}
+              options={groups.map(g => ({
+                label: `${g.groupCode} - ${g.groupName}`,
+                value: g.id,
+              }))}
               style={{ width: '100%' }}
             />
           </Form.Item>
@@ -343,22 +285,35 @@ export default function GiftDetail() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={[
-                { label: 'S1001 - 澳門總店', value: 'S1001' },
-                { label: 'S1002 - 氹仔分店', value: 'S1002' },
-                { label: 'S1003 - 新馬路店', value: 'S1003' },
-                { label: 'S1004 - 黑沙環店', value: 'S1004' },
-                { label: 'S1005 - 官也街老店', value: 'S1005' },
-                { label: 'S1006 - 珠海旗艦店', value: 'S1006' },
-              ]}
+              value={searchStoreId}
+              onChange={setSearchStoreId}
+              disabled={!searchGroupId}
+              options={stores.map(s => ({
+                label: `${s.storeCode} - ${s.storeName}`,
+                value: s.id,
+              }))}
               style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item name="brand" label="所屬品牌">
-            <Select placeholder="全部" allowClear options={brandOptions} style={{ width: '100%' }} />
+            <Select
+              placeholder="全部"
+              allowClear
+              options={brandOptions}
+              value={searchBrand || undefined}
+              onChange={(v) => setSearchBrand(v || '')}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="adType" label="廣告類型">
-            <Select placeholder="全部" allowClear options={adTypeOptions} style={{ width: '100%' }} />
+            <Select
+              placeholder="全部"
+              allowClear
+              options={adTypeOptions}
+              value={searchAdType || undefined}
+              onChange={(v) => setSearchAdType(v || '')}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
 
           <Form.Item className="search-actions">
@@ -393,17 +348,21 @@ export default function GiftDetail() {
       <Table
         columns={configuredColumns}
         dataSource={dataSource}
+        rowKey="id"
         loading={loading}
+        onChange={handleTableChange}
         pagination={{
+          current: page,
+          pageSize: size,
+          total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 條`,
-          pageSize: 10,
+          showTotal: (t) => `共 ${t} 條`,
         }}
         scroll={{ x: 1500 }}
       />
 
-      {/* 扣除彈窗（保留，扣除操作仍在列表頁進行） */}
+      {/* 扣除彈窗 */}
       <Modal
         title="扣除贈送天數"
         open={deductModalVisible}

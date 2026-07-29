@@ -33,6 +33,10 @@ public class EmployeeVO {
     private Integer status;
     private List<Long> functionRoleIds;
     private LocalDateTime createdAt;
+    /** 最后更新人 */
+    private String updatedBy;
+    /** 最后更新时间 */
+    private LocalDateTime updatedAt;
 
     public static EmployeeVO from(SysUser user, List<Long> functionRoleIds) {
         EmployeeVO vo = new EmployeeVO();
@@ -52,6 +56,8 @@ public class EmployeeVO {
         vo.setStatus(user.getStatus());
         vo.setFunctionRoleIds(functionRoleIds);
         vo.setCreatedAt(user.getCreatedAt());
+        vo.setUpdatedBy(user.getUpdatedBy());
+        vo.setUpdatedAt(user.getUpdatedAt());
         return vo;
     }
 }

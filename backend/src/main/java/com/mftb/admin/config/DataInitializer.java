@@ -92,6 +92,8 @@ public class DataInitializer implements CommandLineRunner {
                 "ALTER TABLE sys_user ADD COLUMN sequence VARCHAR(8) NULL COMMENT '职级序列快照: M=管理 T=技术 P=专业' AFTER position_en");
         addColumnIfAbsent("sys_user", "rank",
                 "ALTER TABLE sys_user ADD COLUMN `rank` VARCHAR(8) NULL COMMENT '职等 R1~R5' AFTER job_level");
+        addColumnIfAbsent("sys_user", "updated_by",
+                "ALTER TABLE sys_user ADD COLUMN updated_by VARCHAR(64) NULL COMMENT '最后更新人' AFTER status");
         backfillUserPositionEn();
         backfillUserSequence();
     }

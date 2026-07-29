@@ -14,6 +14,7 @@ import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.EmployeeService;
 import com.mftb.admin.util.JsonUtils;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,6 +35,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final SysPositionMapper sysPositionMapper;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final OperatorResolver operatorResolver;
 
     /** 内置管理员登录账号(工号), 禁止停用/删除 */
     private static final String BUILTIN_ADMIN = "MT0001";
@@ -80,6 +82,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setRank(request.getRank());
         user.setStatus(1);
         user.setDeleted(0);
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.insert(user);
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
     }
@@ -98,6 +101,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (request.getFunctionRoleIds() != null) {
             user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds()));
         }
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
     }
@@ -106,6 +110,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public void resetPassword(Long id, String password) {
         SysUser user = requireUser(id);
         user.setPassword(passwordEncoder.encode(password));
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
     }
 
@@ -116,6 +121,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             throw new BusinessException("内置管理员账号不允许停用");
         }
         user.setStatus(status);
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
     }
 

@@ -61,6 +61,9 @@ const AdSales = lazy(() => import('./pages/AdSales'))
 const PromotionOrderManage = lazy(() => import('./pages/PromotionOrderManage'))
 const PromotionOrderManageStandalone = lazy(() => import('./pages/PromotionOrderManageStandalone'))
 const OrderDetail = lazy(() => import('./pages/OrderDetail'))
+// 商戶集團管理
+const GroupList = lazy(() => import('./pages/MerchantGroup/GroupList'))
+const StoreList = lazy(() => import('./pages/MerchantGroup/StoreList'))
 // 赠送管理
 const GiftDetail = lazy(() => import('./pages/GiftManage/GiftDetail'))
 const GiftAdd = lazy(() => import('./pages/GiftManage/GiftAdd'))
@@ -137,6 +140,9 @@ function AuthenticatedLayout() {
               <Route path="/role-management" element={<RoleManagement />} />
               <Route path="/function-permission" element={<FunctionPermission />} />
               <Route path="/data-permission" element={<DataPermission />} />
+              {/* 商戶集團管理 */}
+              <Route path="/merchant-group-list" element={<GroupList />} />
+              <Route path="/store-list" element={<StoreList />} />
               {/* 商家推广工具 */}
               <Route path="/promotion-dashboard" element={<PromotionDashboard />} />
               <Route path="/promotion-algorithm" element={<PromotionAlgorithm />} />

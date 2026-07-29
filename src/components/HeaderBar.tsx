@@ -215,13 +215,20 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
                 <Avatar size={32} icon={<UserOutlined />} className="header-avatar" />
               )}
               <div className="header-user-text">
-                <span className="header-user-name">{user?.name}</span>
-                {user?.department && user?.position && (
+                {/* 第一行: 姓名（工號）-職級 */}
+                <span className="header-user-name">
+                  {user?.name}（{user?.empId}）{user?.jobLevel ? `-${user.jobLevel}` : ''}
+                </span>
+                {/* 第二行: 職位名稱中文（職位名稱英文） */}
+                {user?.position && (
                   <span className="header-user-department">
-                    {user.department} - {user.position}
+                    {user.position}{user.positionEn ? `（${user.positionEn}）` : ''}
                   </span>
                 )}
-                <span className="header-user-id">ID: {user?.empId}</span>
+                {/* 第三行: 部門名稱 */}
+                {user?.department && (
+                  <span className="header-user-id">{user.department}</span>
+                )}
               </div>
             </div>
           </Dropdown>

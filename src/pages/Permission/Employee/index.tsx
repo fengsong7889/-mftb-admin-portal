@@ -315,6 +315,8 @@ export default function EmployeeManagement() {
     { title: '工號', dataIndex: 'empId', key: 'empId', width: 110 },
     { title: '姓名', dataIndex: 'name', key: 'name', width: 120 },
     { title: '部門', dataIndex: 'department', key: 'department', width: 120, render: (v: string) => v || '-' },
+    { title: '職位名稱(中文)', dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
+    { title: '職位名稱(英文)', dataIndex: 'positionEn', key: 'positionEn', width: 150, render: (v: string) => v || '-' },
     {
       title: '職級序列',
       dataIndex: 'sequence',
@@ -324,8 +326,6 @@ export default function EmployeeManagement() {
         v ? <Tag color={POSITION_SEQUENCE_TAG_COLOR[v] || 'default'}>{POSITION_SEQUENCE[v] || v}</Tag> : '-'
       ),
     },
-    { title: '職位名稱(中文)', dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
-    { title: '職位名稱(英文)', dataIndex: 'positionEn', key: 'positionEn', width: 150, render: (v: string) => v || '-' },
     { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
     { title: '職等', dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
     {
@@ -346,9 +346,16 @@ export default function EmployeeManagement() {
       ),
     },
     {
-      title: '創建時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      title: '最後更新人',
+      dataIndex: 'updatedBy',
+      key: 'updatedBy',
+      width: 110,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '最後更新時間',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },

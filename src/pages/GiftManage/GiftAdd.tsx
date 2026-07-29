@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 import { Button, Form, Input, Select, Space, Card, InputNumber, Upload, Radio, message } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import type { MerchantGroupItem } from '../../api/merchantGroup'
+import { fetchAllMerchantGroups } from '../../api/merchantGroup'
+import type { StoreItem } from '../../api/store'
+import { fetchStoresByGroup } from '../../api/store'
+import { createGiftRecord } from '../../api/gift'
 
 const { TextArea } = Input
 
@@ -11,46 +16,65 @@ const adTypeOptions = [
   { label: '盤活復蘇', value: 'revival' },
 ]
 
-/** 集團選項 */
-const groupOptions = [
-  { label: 'G001 - 美味餐廳集團', value: 'G001 - 美味餐廳集團' },
-  { label: 'G002 - 生鮮超市集團', value: 'G002 - 生鮮超市集團' },
-  { label: 'G003 - 時尚百貨集團', value: 'G003 - 時尚百貨集團' },
-  { label: 'G004 - 速遞物流集團', value: 'G004 - 速遞物流集團' },
-  { label: 'G005 - 甜品屋集團', value: 'G005 - 甜品屋集團' },
-  { label: 'G006 - 火鍋城集團', value: 'G006 - 火鍋城集團' },
-]
-
-/** 門店選項 */
-const storeOptions = [
-  { label: 'S1001 - 澳門總店', value: 'S1001 - 澳門總店' },
-  { label: 'S1002 - 氹仔分店', value: 'S1002 - 氹仔分店' },
-  { label: 'S1003 - 新馬路店', value: 'S1003 - 新馬路店' },
-  { label: 'S1004 - 黑沙環店', value: 'S1004 - 黑沙環店' },
-  { label: 'S1005 - 官也街老店', value: 'S1005 - 官也街老店' },
-  { label: 'S1006 - 珠海旗艦店', value: 'S1006 - 珠海旗艦店' },
-]
-
 export default function GiftAdd() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
   const [successVisible, setSuccessVisible] = useState(false)
   const [countdown, setCountdown] = useState(5)
+  const [submitting, setSubmitting] = useState(false)
+
+  // 集团/门店数据
+  const [groups, setGroups] = useState<MerchantGroupItem[]>([])
+  const [stores, setStores] = useState<StoreItem[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState<number | undefined>()
 
   // 從 URL 參數判斷是否為贈送模式
   const isGiftMode = searchParams.get('mode') === 'gift'
+  const presetGroupId = searchParams.get('group')
+  const presetStoreId = searchParams.get('store')
 
+  // 加载集团下拉
   useEffect(() => {
-    if (isGiftMode) {
-      form.setFieldsValue({
-        groupDisplay: searchParams.get('group') || '',
-        storeDisplay: searchParams.get('store') || '',
-        brand: searchParams.get('brand') === '1' ? 'flashBee' : searchParams.get('brand') === '2' ? 'mFood' : '',
-        adType: searchParams.get('adType') || '',
-      })
+    fetchAllMerchantGroups()
+      .then(setGroups)
+      .catch(() => message.error('加載集團列表失敗'))
+  }, [])
+
+  // 贈送模式：预选集团和门店
+  useEffect(() => {
+    if (isGiftMode && presetGroupId) {
+      const gid = Number(presetGroupId)
+      setSelectedGroupId(gid)
+      form.setFieldsValue({ groupId: gid })
+
+      // 加载该集团下的门店
+      fetchStoresByGroup(gid)
+        .then((storeList) => {
+          setStores(storeList)
+          if (presetStoreId) {
+            form.setFieldsValue({ storeId: Number(presetStoreId) })
+          }
+        })
+        .catch(() => setStores([]))
+
+      // 设置品牌和广告类型
+      const brandParam = searchParams.get('brand')
+      const adTypeParam = searchParams.get('adType')
+      if (brandParam) form.setFieldsValue({ brand: brandParam })
+      if (adTypeParam) form.setFieldsValue({ adType: adTypeParam })
     }
-  }, [isGiftMode, searchParams, form])
+  }, [isGiftMode, presetGroupId, presetStoreId, searchParams, form])
+
+  // 集团选择变化时加载门店
+  useEffect(() => {
+    if (selectedGroupId && !isGiftMode) {
+      fetchStoresByGroup(selectedGroupId)
+        .then(setStores)
+        .catch(() => setStores([]))
+      form.setFieldsValue({ storeId: undefined })
+    }
+  }, [selectedGroupId, isGiftMode, form])
 
   // 倒計時邏輯
   useEffect(() => {
@@ -70,12 +94,30 @@ export default function GiftAdd() {
 
   const handleSubmit = async () => {
     try {
-      await form.validateFields()
-      const values = form.getFieldsValue()
-      console.log('提交贈送申請:', values)
+      const values = await form.validateFields()
+      setSubmitting(true)
+
+      // 处理凭证文件（目前仅前端占位，实际上传需要文件上传服务）
+      const certificateFiles = form.getFieldValue('certificate') || []
+      const credentials = certificateFiles.map((f: { name?: string }) => f.name || '').filter(Boolean)
+
+      await createGiftRecord({
+        groupId: values.groupId,
+        storeId: values.storeId,
+        brand: values.brand,
+        adType: values.adType,
+        giftDays: values.giftDays,
+        validDays: values.validDays,
+        reason: values.reason,
+        credentials,
+      })
+
       setSuccessVisible(true)
-    } catch (error) {
-      console.error('表單驗證失敗:', error)
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error('提交失敗，請重試')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -154,19 +196,31 @@ export default function GiftAdd() {
                 <span style={{ color: '#FF4D4F' }}>*</span> 集團ID/名稱
               </span>
               <Form.Item
-                name="groupDisplay"
-                rules={[{ required: true, message: '請選擇集團ID/名稱' }]}
+                name="groupId"
+                rules={[{ required: true, message: '請選擇集團' }]}
                 style={{ marginBottom: 0, flex: 1 }}
               >
                 {isGiftMode ? (
-                  <Input disabled />
+                  <Select
+                    disabled
+                    showSearch
+                    optionFilterProp="label"
+                    options={groups.map(g => ({
+                      label: `${g.groupCode} - ${g.groupName}`,
+                      value: g.id,
+                    }))}
+                  />
                 ) : (
                   <Select
                     showSearch
                     allowClear
                     placeholder="支持ID和名稱搜索查詢"
                     optionFilterProp="label"
-                    options={groupOptions}
+                    onChange={(v) => setSelectedGroupId(v)}
+                    options={groups.map(g => ({
+                      label: `${g.groupCode} - ${g.groupName}`,
+                      value: g.id,
+                    }))}
                   />
                 )}
               </Form.Item>
@@ -177,19 +231,31 @@ export default function GiftAdd() {
                 <span style={{ color: '#FF4D4F' }}>*</span> 門店ID/名稱
               </span>
               <Form.Item
-                name="storeDisplay"
-                rules={[{ required: true, message: '請選擇門店ID/名稱' }]}
+                name="storeId"
+                rules={[{ required: true, message: '請選擇門店' }]}
                 style={{ marginBottom: 0, flex: 1 }}
               >
                 {isGiftMode ? (
-                  <Input disabled />
+                  <Select
+                    disabled
+                    showSearch
+                    optionFilterProp="label"
+                    options={stores.map(s => ({
+                      label: `${s.storeCode} - ${s.storeName}`,
+                      value: s.id,
+                    }))}
+                  />
                 ) : (
                   <Select
                     showSearch
                     allowClear
-                    placeholder="支持ID和名稱搜索查詢"
+                    placeholder="請先選擇集團"
                     optionFilterProp="label"
-                    options={storeOptions}
+                    disabled={!selectedGroupId}
+                    options={stores.map(s => ({
+                      label: `${s.storeCode} - ${s.storeName}`,
+                      value: s.id,
+                    }))}
                   />
                 )}
               </Form.Item>
@@ -364,6 +430,7 @@ export default function GiftAdd() {
           type="primary"
           icon={<SendOutlined />}
           onClick={handleSubmit}
+          loading={submitting}
         >
           提交申請
         </Button>

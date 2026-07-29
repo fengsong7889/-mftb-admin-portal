@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     job_level      VARCHAR(32)                             COMMENT '职级快照 (如 M3/T5/P2, 随职位带出)',
     `rank`         VARCHAR(8)                              COMMENT '职等 R1~R5',
     status         TINYINT      DEFAULT 1                  COMMENT '状态: 1=启用 0=停用',
+    updated_by     VARCHAR(64)                             COMMENT '最后更新人',
     deleted        TINYINT      DEFAULT 0                  COMMENT '逻辑删除: 0=未删除 1=已删除',
     created_at     DATETIME     DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
     updated_at     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button, Space, Input, Select, Table, Form, message, Tag, DatePicker, Tooltip } from 'antd'
-import type { TableColumnsType } from 'antd'
+import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
@@ -10,12 +10,19 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import type { GiftConsumeItem } from '../../api/gift'
+import { fetchGiftConsume } from '../../api/gift'
+import type { MerchantGroupItem } from '../../api/merchantGroup'
+import { fetchAllMerchantGroups } from '../../api/merchantGroup'
+import type { StoreItem } from '../../api/store'
+import { fetchStoresByGroup } from '../../api/store'
+import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
 
 /** 廣告類型 */
 const adTypeOptions = [
-  { label: '全部', value: 'all' },
+  { label: '全部', value: '' },
   { label: '新店廣告', value: 'new_store' },
   { label: '盤活復蘇', value: 'revival' },
   { label: '獨家商家', value: 'exclusive' },
@@ -39,9 +46,9 @@ const adTypeColorMap: Record<string, string> = {
   ka: '#1890FF',
 }
 
-/** 交易類型：購買廣告花費 / 廣告退款返回 / 業務手動扣除 / 到期未用自動過期 */
+/** 交易類型 */
 const tradeTypeOptions = [
-  { label: '全部', value: 'all' },
+  { label: '全部', value: '' },
   { label: '購買廣告', value: 'ad_purchase' },
   { label: '廣告退款', value: 'ad_refund' },
   { label: '手動扣除', value: 'manual_deduct' },
@@ -62,170 +69,126 @@ const tradeTypeColorMap: Record<string, string> = {
   auto_expire: 'default',
 }
 
-interface GiftConsumeRecord {
-  key: string
-  groupId: string
-  groupName: string
-  storeId: string
-  storeName: string
-  brand: string
-  adType: string
-  tradeType: string
-  balanceChange: number
-  changeDate: string
-  algorithmId: string
-  algorithmName: string
-  giftId: string
-  orderNo: string
-  remainingDays: number
-  /** 備註：主要展示推廣贈送菜單扣除天數時填寫的扣除原因 */
-  remark: string
-}
-
-/** Mock 數據 */
-/** Mock 數據：退款為正數（增加余額），其餘為負數（減少余額） */
-const mockData: GiftConsumeRecord[] = [
-  {
-    key: '1',
-    groupId: 'G001',
-    groupName: '美味餐廳集團',
-    storeId: 'S1001',
-    storeName: '澳門總店',
-    brand: '2',
-    adType: 'new_store',
-    tradeType: 'ad_purchase',
-    balanceChange: -5,
-    changeDate: '2024-02-10',
-    algorithmId: 'A001',
-    algorithmName: '新店廣告-外賣版',
-    giftId: '2401-001',
-    orderNo: 'AD202402100001',
-    remainingDays: 25,
-    remark: '',
-  },
-  {
-    key: '2',
-    groupId: 'G001',
-    groupName: '美味餐廳集團',
-    storeId: 'S1001',
-    storeName: '澳門總店',
-    brand: '2',
-    adType: 'new_store',
-    tradeType: 'ad_refund',
-    balanceChange: 3,
-    changeDate: '2024-02-15',
-    algorithmId: 'A001',
-    algorithmName: '新店廣告-首頁版',
-    giftId: '2401-001',
-    orderNo: 'AD202402150002',
-    remainingDays: 28,
-    remark: '',
-  },
-  {
-    key: '3',
-    groupId: 'G002',
-    groupName: '生鮮超市集團',
-    storeId: 'S1002',
-    storeName: '氹仔分店',
-    brand: '1',
-    adType: 'revival',
-    tradeType: 'ad_purchase',
-    balanceChange: -10,
-    changeDate: '2023-11-05',
-    algorithmId: 'A002',
-    algorithmName: '盤活復蘇-團購版',
-    giftId: '2310-001',
-    orderNo: 'AD202311050001',
-    remainingDays: 20,
-    remark: '',
-  },
-  {
-    key: '4',
-    groupId: 'G003',
-    groupName: '時尚百貨集團',
-    storeId: 'S1003',
-    storeName: '新馬路店',
-    brand: '2',
-    adType: 'exclusive',
-    tradeType: 'manual_deduct',
-    balanceChange: -8,
-    changeDate: '2024-01-20',
-    algorithmId: 'A003',
-    algorithmName: '獨家商家-超市版',
-    giftId: '2401-003',
-    orderNo: '—',
-    remainingDays: 37,
-    remark: '商家違規進行虛假宣傳，經運營主管審核手動扣除贈送天數作為惩罰。',
-  },
-  {
-    key: '5',
-    groupId: 'G004',
-    groupName: '速遞物流集團',
-    storeId: 'S1004',
-    storeName: '黑沙環店',
-    brand: '1',
-    adType: 'gold',
-    tradeType: 'auto_expire',
-    balanceChange: -7,
-    changeDate: '2024-03-01',
-    algorithmId: 'A004',
-    algorithmName: '金牌商家-全渠道',
-    giftId: '2306-001',
-    orderNo: '—',
-    remainingDays: 8,
-    remark: '贈送天數有效期到期，系統自動收回剩餘天數。',
-  },
-  {
-    key: '6',
-    groupId: 'G005',
-    groupName: '甜品屋集團',
-    storeId: 'S1005',
-    storeName: '官也街老店',
-    brand: '2',
-    adType: 'ka',
-    tradeType: 'ad_refund',
-    balanceChange: 4,
-    changeDate: '2024-02-28',
-    algorithmId: 'A005',
-    algorithmName: '人氣商家-首頁版',
-    giftId: '2401-004',
-    orderNo: 'AD202402280001',
-    remainingDays: 14,
-    remark: '',
-  },
-]
-
 export default function GiftConsumeDetail() {
   const [form] = Form.useForm()
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
-  const [dataSource] = useState<GiftConsumeRecord[]>(mockData)
+  const [dataSource, setDataSource] = useState<GiftConsumeItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [size, setSize] = useState(10)
 
-  /** 从贈送明細頁點擊「查看明細」進入時，自動帶入贈送ID 並預填搜索條件 */
+  // 搜索条件（已生效）
+  const [filters, setFilters] = useState<{
+    groupId?: number; storeId?: number; brand?: string; adType?: string
+    tradeType?: string; giftId?: string; orderNo?: string
+    algorithmId?: string; startDate?: string; endDate?: string
+  }>({})
+
+  // 搜索条件（表单暂存）
+  const [searchGroupId, setSearchGroupId] = useState<number | undefined>()
+  const [searchStoreId, setSearchStoreId] = useState<number | undefined>()
+  const [searchBrand, setSearchBrand] = useState('')
+  const [searchAdType, setSearchAdType] = useState('')
+  const [searchTradeType, setSearchTradeType] = useState('')
+  const [searchGiftId, setSearchGiftId] = useState('')
+  const [searchOrderNo, setSearchOrderNo] = useState('')
+  const [searchAlgorithmId, setSearchAlgorithmId] = useState('')
+  const [searchDateRange, setSearchDateRange] = useState<[string, string] | null>(null)
+
+  // 集团/门店下拉
+  const [groups, setGroups] = useState<MerchantGroupItem[]>([])
+  const [stores, setStores] = useState<StoreItem[]>([])
+
+  // 加载集团下拉
+  useEffect(() => {
+    fetchAllMerchantGroups()
+      .then(setGroups)
+      .catch(() => {})
+  }, [])
+
+  // 当搜索集团变化时加载门店下拉
+  useEffect(() => {
+    if (searchGroupId) {
+      fetchStoresByGroup(searchGroupId)
+        .then(setStores)
+        .catch(() => setStores([]))
+    } else {
+      setStores([])
+    }
+    setSearchStoreId(undefined)
+  }, [searchGroupId])
+
+  /** 从贈送明細頁點擊「查看明細」進入時，自動帶入贈送ID */
   useEffect(() => {
     const giftId = searchParams.get('giftId')
     if (giftId) {
-      form.setFieldsValue({ giftId })
+      setSearchGiftId(giftId)
+      setFilters(prev => ({ ...prev, giftId }))
     }
-  }, [searchParams, form])
+  }, [searchParams])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetchGiftConsume({
+        page, size,
+        ...filters,
+      })
+      setDataSource(res.records || [])
+      setTotal(res.total || 0)
+    } catch {
+      message.error('查詢失敗')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, size, filters])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleSearch = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      message.success('查詢完成')
-    }, 500)
+    setFilters({
+      groupId: searchGroupId,
+      storeId: searchStoreId,
+      brand: searchBrand || undefined,
+      adType: searchAdType || undefined,
+      tradeType: searchTradeType || undefined,
+      giftId: searchGiftId || undefined,
+      orderNo: searchOrderNo || undefined,
+      algorithmId: searchAlgorithmId || undefined,
+      startDate: searchDateRange?.[0],
+      endDate: searchDateRange?.[1],
+    })
+    setPage(1)
   }
 
   const handleReset = () => {
     form.resetFields()
+    setSearchGroupId(undefined)
+    setSearchStoreId(undefined)
+    setSearchBrand('')
+    setSearchAdType('')
+    setSearchTradeType('')
+    setSearchGiftId('')
+    setSearchOrderNo('')
+    setSearchAlgorithmId('')
+    setSearchDateRange(null)
+    setFilters({})
+    setPage(1)
   }
 
   const handleExport = () => {
     message.success('導出功能開發中...')
   }
 
-  const columns: TableColumnsType<GiftConsumeRecord> = [
+  const handleTableChange = (pagination: TablePaginationConfig) => {
+    setPage(pagination.current || 1)
+    setSize(pagination.pageSize || 10)
+  }
+
+  const columns: TableColumnsType<GiftConsumeItem> = [
     {
       title: '集團ID/集團名稱',
       key: 'groupInfo',
@@ -394,13 +357,12 @@ export default function GiftConsumeDetail() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={[
-                { label: 'G001 - 美味餐廳集團', value: 'G001' },
-                { label: 'G002 - 生鮮超市集團', value: 'G002' },
-                { label: 'G003 - 時尚百貨集團', value: 'G003' },
-                { label: 'G004 - 速遞物流集團', value: 'G004' },
-                { label: 'G005 - 甜品屋集團', value: 'G005' },
-              ]}
+              value={searchGroupId}
+              onChange={setSearchGroupId}
+              options={groups.map(g => ({
+                label: `${g.groupCode} - ${g.groupName}`,
+                value: g.id,
+              }))}
               style={{ width: '100%' }}
             />
           </Form.Item>
@@ -410,49 +372,85 @@ export default function GiftConsumeDetail() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={[
-                { label: 'S1001 - 澳門總店', value: 'S1001' },
-                { label: 'S1002 - 氹仔分店', value: 'S1002' },
-                { label: 'S1003 - 新馬路店', value: 'S1003' },
-                { label: 'S1004 - 黑沙環店', value: 'S1004' },
-                { label: 'S1005 - 官也街老店', value: 'S1005' },
-              ]}
+              value={searchStoreId}
+              onChange={setSearchStoreId}
+              disabled={!searchGroupId}
+              options={stores.map(s => ({
+                label: `${s.storeCode} - ${s.storeName}`,
+                value: s.id,
+              }))}
               style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item name="brand" label="所屬品牌">
-            <Select placeholder="全部" allowClear options={brandOptions} style={{ width: '100%' }} />
+            <Select
+              placeholder="全部"
+              allowClear
+              options={brandOptions}
+              value={searchBrand || undefined}
+              onChange={(v) => setSearchBrand(v || '')}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="adType" label="廣告類型">
-            <Select placeholder="全部" allowClear options={adTypeOptions} style={{ width: '100%' }} />
+            <Select
+              placeholder="全部"
+              allowClear
+              options={adTypeOptions}
+              value={searchAdType || undefined}
+              onChange={(v) => setSearchAdType(v || '')}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="tradeType" label="交易類型">
-            <Select placeholder="全部" allowClear options={tradeTypeOptions} style={{ width: '100%' }} />
+            <Select
+              placeholder="全部"
+              allowClear
+              options={tradeTypeOptions}
+              value={searchTradeType || undefined}
+              onChange={(v) => setSearchTradeType(v || '')}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="algorithmInfo" label="廣告算法ID/名稱">
-            <Select
-              placeholder="支持ID和名稱搜索查詢"
+            <Input
+              placeholder="輸入算法ID或名稱搜索"
               allowClear
-              showSearch
-              optionFilterProp="label"
-              options={[
-                { label: 'A001 - 新店廣告-外賣版', value: 'A001' },
-                { label: 'A002 - 盤活復蘇-團購版', value: 'A002' },
-                { label: 'A003 - 獨家商家-超市版', value: 'A003' },
-                { label: 'A004 - 金牌商家-全渠道', value: 'A004' },
-                { label: 'A005 - 人氣商家-首頁版', value: 'A005' },
-              ]}
+              value={searchAlgorithmId}
+              onChange={(e) => setSearchAlgorithmId(e.target.value)}
               style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item name="giftId" label="贈送ID">
-            <Input placeholder="請輸入贈送ID" allowClear style={{ width: '100%' }} />
+            <Input
+              placeholder="請輸入贈送ID"
+              allowClear
+              value={searchGiftId}
+              onChange={(e) => setSearchGiftId(e.target.value)}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="orderNo" label="關聯訂單號">
-            <Input placeholder="請輸入訂單號" allowClear style={{ width: '100%' }} />
+            <Input
+              placeholder="請輸入訂單號"
+              allowClear
+              value={searchOrderNo}
+              onChange={(e) => setSearchOrderNo(e.target.value)}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item name="changeDate" label="變動日期">
-            <RangePicker style={{ width: '100%' }} />
+            <RangePicker
+              style={{ width: '100%' }}
+              value={searchDateRange ? [dayjs(searchDateRange[0]), dayjs(searchDateRange[1])] : null}
+              onChange={(_, strings) => {
+                if (strings && strings[0] && strings[1]) {
+                  setSearchDateRange([strings[0], strings[1]])
+                } else {
+                  setSearchDateRange(null)
+                }
+              }}
+            />
           </Form.Item>
 
           <Form.Item className="search-actions">
@@ -484,12 +482,16 @@ export default function GiftConsumeDetail() {
       <Table
         columns={configuredColumns}
         dataSource={dataSource}
+        rowKey="id"
         loading={loading}
+        onChange={handleTableChange}
         pagination={{
+          current: page,
+          pageSize: size,
+          total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 條`,
-          pageSize: 10,
+          showTotal: (t) => `共 ${t} 條`,
         }}
         scroll={{ x: 1500 }}
       />
