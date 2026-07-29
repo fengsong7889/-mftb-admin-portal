@@ -48,40 +48,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const mockLogin = (username: string, password: string): { success: boolean; message?: string; user?: UserInfo } => {
     const adminPwd = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
-    const guestPwd = import.meta.env.VITE_GUEST_PASSWORD as string | undefined
-    const trimmed = username.trim().toLowerCase()
+    const trimmed = username.trim().toUpperCase()
 
-    // 管理员账号：admin / 环境变量密码
-    if (trimmed === 'admin' && adminPwd && password === adminPwd) {
+    // 内置管理员：工号 SF0001 / 环境变量密码
+    if (trimmed === 'SF0001' && adminPwd && password === adminPwd) {
       return {
         success: true,
         user: {
-          username: 'admin',
+          username: 'SF0001',
           name: '系統管理員',
-          empId: 'EMP001',
+          empId: 'SF0001',
           avatar: 'pikachu-default',
           role: 'admin',
-          department: '技術部',
-          position: '系統管理員',
+          department: '集團總裁辦',
+          position: '高級副總裁',
         },
       }
     }
-    // 访客账号：guest / 环境变量密码
-    if (trimmed === 'guest' && guestPwd && password === guestPwd) {
-      return {
-        success: true,
-        user: {
-          username: 'guest',
-          name: '訪客用户',
-          empId: 'EMP999',
-          avatar: 'pikachu-default',
-          role: 'guest',
-          department: '運營部',
-          position: '訪客',
-        },
-      }
-    }
-    return { success: false, message: '賬號或密碼錯誤（Mock 模式：admin / VITE_ADMIN_PASSWORD；guest / VITE_GUEST_PASSWORD）' }
+    return { success: false, message: '工號或密碼錯誤' }
   }
 
   const login = useCallback(async (username: string, password: string) => {

@@ -184,7 +184,7 @@ export default function Login() {
   const handleCaptchaClick = useCallback(() => {
     if (captchaStage !== 'checkbox') return
     if (!username.trim()) {
-      setUsernameError('請先輸入賬號')
+      setUsernameError('請先輸入工號')
       return
     }
     setUsernameError('')
@@ -230,7 +230,7 @@ export default function Login() {
   /** 登录 */
   const handleLogin = () => {
     let hasError = false
-    if (!username.trim()) { setUsernameError('請輸入賬號'); hasError = true }
+    if (!username.trim()) { setUsernameError('請輸入工號'); hasError = true }
     else { setUsernameError('') }
 
     if (captchaStage !== 'success') return
@@ -264,7 +264,7 @@ export default function Login() {
   // 按钮 tooltip 提示
   const getBtnTooltip = () => {
     if (canLogin) return ''
-    if (!username.trim()) return '請輸入賬號'
+    if (!username.trim()) return '請輸入工號'
     if (captchaStage !== 'success') return '請先完成驗證'
     if (!password.trim()) return '請輸入密碼'
     return ''
@@ -321,10 +321,10 @@ export default function Login() {
               <div className="login-form-v2">
                 {/* 账号输入 */}
                 <div className="login-field-v2">
-                  <label>登錄賬號</label>
+                  <label>登錄工號</label>
                   <Input
                     size="large"
-                    placeholder="請輸入賬號 (admin 或 guest)"
+                    placeholder="請輸入工號"
                     prefix={<UserOutlined style={{ color: '#5a5080' }} />}
                     value={username}
                     onChange={e => { setUsername(e.target.value); setUsernameError('') }}

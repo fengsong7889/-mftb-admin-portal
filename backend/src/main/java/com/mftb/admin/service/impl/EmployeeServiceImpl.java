@@ -33,8 +33,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final SysPositionMapper sysPositionMapper;
     private final PasswordEncoder passwordEncoder;
 
-    /** 内置管理员账号, 禁止停用/删除 */
-    private static final String BUILTIN_ADMIN = "admin";
+    /** 内置管理员登录账号(工号), 禁止停用/删除 */
+    private static final String BUILTIN_ADMIN = "SF0001";
 
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, Integer status) {

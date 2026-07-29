@@ -26,8 +26,8 @@ const EMPLOYEE_STATUS = {
   DISABLED: 0,
 } as const
 
-/** 内置管理员账号（禁止停用/删除） */
-const BUILTIN_ADMIN = 'admin'
+/** 内置管理员登录账号（工号，禁止停用/删除） */
+const BUILTIN_ADMIN = 'SF0001'
 
 const statusOptions = [
   { value: EMPLOYEE_STATUS.ENABLED, label: '啟用' },

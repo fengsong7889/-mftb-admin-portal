@@ -15,13 +15,13 @@ vi.mock('../api', async () => {
 
 const mockedLogin = vi.mocked(api.login)
 
-/** 构造后端登录成功响应 */
+/** 构造后端登录成功响应 (登录账号统一为工号) */
 function mockLoginSuccess(role: 'admin' | 'guest') {
   mockedLogin.mockResolvedValueOnce({
     token: 'mock-jwt-token',
     userInfo: {
       id: role === 'admin' ? 1 : 2,
-      username: role,
+      username: role === 'admin' ? 'SF0001' : 'G0001',
       name: role === 'admin' ? 'Bee' : '訪客',
       empId: role === 'admin' ? 'SF0001' : 'G0001',
       avatar: 'pikachu-default',
@@ -42,26 +42,26 @@ describe('AuthContext', () => {
     vi.clearAllMocks()
   })
 
-  it('admin 账号登录成功', async () => {
+  it('admin 工号登录成功', async () => {
     mockLoginSuccess('admin')
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      const res = await result.current.login('admin', '111222')
+      const res = await result.current.login('SF0001', '111222')
       expect(res.success).toBe(true)
     })
 
     expect(result.current.isAuthenticated).toBe(true)
-    expect(result.current.user?.username).toBe('admin')
+    expect(result.current.user?.username).toBe('SF0001')
     expect(result.current.user?.role).toBe('admin')
   })
 
-  it('guest 账号登录成功', async () => {
+  it('guest 角色工号登录成功', async () => {
     mockLoginSuccess('guest')
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      const res = await result.current.login('guest', '123456')
+      const res = await result.current.login('G0001', '123456')
       expect(res.success).toBe(true)
     })
 
@@ -74,10 +74,10 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      const res = await result.current.login('admin', 'wrong')
+      const res = await result.current.login('SF0001', 'wrong')
       expect(res.success).toBe(false)
       // 后端不可用时降级到 Mock 登录，Mock 登录失败后返回繁体中文提示
-      expect(res.message).toContain('賬號或密碼錯誤')
+      expect(res.message).toContain('工號或密碼錯誤')
     })
 
     expect(result.current.isAuthenticated).toBe(false)
@@ -88,7 +88,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      await result.current.login('admin', '111222')
+      await result.current.login('SF0001', '111222')
     })
 
     expect(result.current.hasPermission('edit')).toBe(true)
@@ -101,7 +101,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      await result.current.login('guest', '123456')
+      await result.current.login('G0001', '123456')
     })
 
     expect(result.current.hasPermission('view')).toBe(true)
@@ -114,7 +114,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      await result.current.login('admin', '111222')
+      await result.current.login('SF0001', '111222')
     })
     expect(result.current.isAuthenticated).toBe(true)
 

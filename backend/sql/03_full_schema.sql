@@ -98,15 +98,11 @@ CREATE TABLE IF NOT EXISTS sys_position (
 -- 五、初始数据（幂等：仅当不存在时插入）
 -- ============================================================
 
--- 内置账号（密码为占位符，后端 DataInitializer 首次启动时
--- 会自动重置为 BCrypt 值: admin=111222, guest=123456）
+-- 内置管理员（登录账号统一为工号；密码为占位符，后端 DataInitializer 首次启动时
+-- 会自动重置为 BCrypt 值: SF0001=111222）
 INSERT INTO sys_user (username, password, name, emp_id, avatar, role, department, position, status)
-SELECT 'admin', '$2a$10$placeholder', 'Bee', 'SF0001', 'pikachu-default', 'admin', '集团总裁办', '高级副总裁', 1
-WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'admin');
-
-INSERT INTO sys_user (username, password, name, emp_id, avatar, role, status)
-SELECT 'guest', '$2a$10$placeholder', '訪客', 'G0001', 'pikachu-default', 'guest', 1
-WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'guest');
+SELECT 'SF0001', '$2a$10$placeholder', 'Bee', 'SF0001', 'pikachu-default', 'admin', '集团总裁办', '高级副总裁', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'SF0001');
 
 -- 初始功能角色
 INSERT INTO sys_role (name, code, description, status)

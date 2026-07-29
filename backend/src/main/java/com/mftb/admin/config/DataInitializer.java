@@ -11,10 +11,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 /**
- * 数据初始化器: 启动时自动执行字段迁移, 并将 SQL 中的占位密码重置为正确的 BCrypt 加密值
+ * 数据初始化器: 启动时自动执行字段迁移与内置账号迁移, 并将 SQL 中的占位密码重置为正确的 BCrypt 加密值
  * <p>
- * admin 密码: 111222
- * guest 密码: 123456
+ * 登录账号统一为工号, 内置管理员工号 SF0001, 密码: 111222
  */
 @Slf4j
 @Component
@@ -28,8 +27,21 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         migrateSchema();
-        resetPasswordIfNeeded("admin", "111222");
-        resetPasswordIfNeeded("guest", "123456");
+        migrateBuiltinAccounts();
+        resetPasswordIfNeeded("SF0001", "111222");
+    }
+
+    /** 内置账号迁移: 登录账号统一为工号, admin 改用工号 SF0001 登录, 移除 guest 账号 */
+    private void migrateBuiltinAccounts() {
+        int renamed = jdbcTemplate.update(
+                "UPDATE sys_user SET username = 'SF0001' WHERE username = 'admin'");
+        if (renamed > 0) {
+            log.info("已将内置 admin 账号登录名迁移为工号 SF0001");
+        }
+        int removed = jdbcTemplate.update("DELETE FROM sys_user WHERE username = 'guest'");
+        if (removed > 0) {
+            log.info("已移除内置 guest 账号");
+        }
     }
 
     /** 幂等字段迁移: 列不存在时自动 ALTER TABLE (免手动执行 SQL 脚本) */
