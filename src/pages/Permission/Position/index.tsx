@@ -20,8 +20,12 @@ const SEQUENCE_TAG_COLOR: Record<string, string> = {
   P: 'green',
 }
 
-/** 每个序列的职级等级数（如 M1~M9） */
-const JOB_LEVEL_MAX = 9
+/** 每个序列的职级范围配置 */
+const JOB_LEVEL_CONFIG: Record<string, { start: number; end: number }> = {
+  M: { start: 4, end: 12 },  // M4 ~ M12
+  T: { start: 1, end: 9 },   // T1 ~ T9
+  P: { start: 1, end: 9 },   // P1 ~ P9
+}
 
 /** 职等选项 R1~R5（R1最低，R5最高） */
 const RANK_OPTIONS = Array.from({ length: 5 }, (_, i) => ({
@@ -97,13 +101,16 @@ export default function PositionManagement() {
     setFilterSequence(undefined)
   }
 
-  /** 根据所选序列生成职级选项（如 M1~M9） */
+  /** 根据所选序列生成职级选项 */
   const jobLevelOptions = useMemo(() => {
     if (!sequence) return []
-    return Array.from({ length: JOB_LEVEL_MAX }, (_, i) => {
-      const level = `${sequence}${i + 1}`
-      return { value: level, label: level }
-    })
+    const config = JOB_LEVEL_CONFIG[sequence] || { start: 1, end: 9 }
+    const options = []
+    for (let i = config.start; i <= config.end; i++) {
+      const level = `${sequence}${i}`
+      options.push({ value: level, label: level })
+    }
+    return options
   }, [sequence])
 
   /** 新增职位 */
@@ -173,8 +180,8 @@ export default function PositionManagement() {
 
   const columns: TableColumnsType<PositionItem> = [
     { title: '職位ID', dataIndex: 'id', key: 'id', width: 90 },
-    { title: '職位名稱', dataIndex: 'name', key: 'name', width: 160 },
-    { title: '職位名稱英文', dataIndex: 'nameEn', key: 'nameEn', width: 160, render: (v: string) => v || '-' },
+    { title: '職位名稱(中文)', dataIndex: 'name', key: 'name', width: 160 },
+    { title: '職位名稱(英文)', dataIndex: 'nameEn', key: 'nameEn', width: 160, render: (v: string) => v || '-' },
     {
       title: '職級序列',
       dataIndex: 'sequence',
@@ -230,7 +237,7 @@ export default function PositionManagement() {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="職位名稱" name="keyword">
+          <Form.Item label="職位名稱(中文)" name="keyword">
             <Input placeholder="請輸入職位名稱" allowClear onPressEnter={handleSearch} />
           </Form.Item>
           <Form.Item label="職級序列" name="sequence">
@@ -288,10 +295,10 @@ export default function PositionManagement() {
         destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="職位名稱" rules={[{ required: true, message: '請輸入職位名稱' }]}>
+          <Form.Item name="name" label="職位名稱(中文)" rules={[{ required: true, message: '請輸入職位名稱' }]}>
             <Input placeholder="例如：後端開發工程師" allowClear maxLength={50} />
           </Form.Item>
-          <Form.Item name="nameEn" label="職位名稱英文">
+          <Form.Item name="nameEn" label="職位名稱(英文)">
             <Input placeholder="例如：Backend Engineer" allowClear maxLength={100} />
           </Form.Item>
           <Form.Item name="sequence" label="職級序列" rules={[{ required: true, message: '請選擇職級序列' }]}>
