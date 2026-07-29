@@ -17,17 +17,7 @@ import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchPositions } from '../../../api/position'
 import type { PositionItem } from '../../../api/position'
-import {
-  mockFetchEmployees,
-  mockCreateEmployee,
-  mockUpdateEmployee,
-  mockResetPassword,
-  mockUpdateEmployeeStatus,
-  mockDeleteEmployee,
-  mockFetchRoles,
-  mockFetchDepartments,
-  mockFetchPositions,
-} from '../../../api/mock/hr-mock'
+
 
 /** 员工状态枚举 */
 const EMPLOYEE_STATUS = {
@@ -122,11 +112,6 @@ export default function EmployeeManagement() {
       const result = await fetchEmployees({ page, size: pageSize, keyword, status })
       setDataSource(result.records)
       setTotal(result.total)
-    } catch {
-      // 后端不可用时降级到 Mock 数据
-      const result = mockFetchEmployees({ page, size: pageSize, keyword, status })
-      setDataSource(result.records)
-      setTotal(result.total)
     } finally {
       setLoading(false)
     }
@@ -142,7 +127,7 @@ export default function EmployeeManagement() {
       const list = await fetchRoles()
       setRoles(list)
     } catch {
-      setRoles(mockFetchRoles())
+      // 接口异常时角色列表置空
     }
   }, [])
 
@@ -156,7 +141,7 @@ export default function EmployeeManagement() {
       const list = await fetchDepartments()
       setDepartments(list)
     } catch {
-      setDepartments(mockFetchDepartments())
+      // 接口异常时部门列表置空
     }
   }, [])
 
@@ -170,7 +155,7 @@ export default function EmployeeManagement() {
       const list = await fetchPositions()
       setPositions(list)
     } catch {
-      setPositions(mockFetchPositions())
+      // 接口异常时职位列表置空
     }
   }, [])
 
@@ -249,18 +234,6 @@ export default function EmployeeManagement() {
       setEditModalVisible(false)
       fetchList()
       fetchRoleList()
-    } catch {
-      // 后端不可用时降级到 Mock
-      if (editing) {
-        mockUpdateEmployee(editing.id, payload)
-        message.success('員工信息已更新（Mock 模式）')
-      } else {
-        mockCreateEmployee({ ...payload, username: values.empId.trim(), password: values.password })
-        message.success(`員工創建成功（Mock 模式），登錄賬號：${values.empId.trim()}`)
-      }
-      setEditModalVisible(false)
-      fetchList()
-      fetchRoleList()
     } finally {
       setSubmitting(false)
     }
@@ -282,10 +255,6 @@ export default function EmployeeManagement() {
       await resetEmployeePassword(pwdTarget.id, values.password)
       message.success('密碼已重置')
       setPwdModalVisible(false)
-    } catch {
-      mockResetPassword(pwdTarget.id)
-      message.success('密碼已重置（Mock 模式）')
-      setPwdModalVisible(false)
     } finally {
       setSubmitting(false)
     }
@@ -294,30 +263,17 @@ export default function EmployeeManagement() {
   /** 启用/停用 */
   const handleToggleStatus = async (record: EmployeeItem) => {
     const next = record.status === EMPLOYEE_STATUS.ENABLED ? EMPLOYEE_STATUS.DISABLED : EMPLOYEE_STATUS.ENABLED
-    try {
-      await updateEmployeeStatus(record.id, next)
-      message.success(next === EMPLOYEE_STATUS.ENABLED ? '已啟用' : '已停用')
-      fetchList()
-    } catch {
-      mockUpdateEmployeeStatus(record.id, next)
-      message.success((next === EMPLOYEE_STATUS.ENABLED ? '已啟用' : '已停用') + '（Mock 模式）')
-      fetchList()
-    }
+    await updateEmployeeStatus(record.id, next)
+    message.success(next === EMPLOYEE_STATUS.ENABLED ? '已啟用' : '已停用')
+    fetchList()
   }
 
   /** 删除 */
   const handleDelete = async (record: EmployeeItem) => {
-    try {
-      await deleteEmployee(record.id)
-      message.success('員工已刪除')
-      fetchList()
-      fetchRoleList()
-    } catch {
-      mockDeleteEmployee(record.id)
-      message.success('員工已刪除（Mock 模式）')
-      fetchList()
-      fetchRoleList()
-    }
+    await deleteEmployee(record.id)
+    message.success('員工已刪除')
+    fetchList()
+    fetchRoleList()
   }
 
   /** 根据角色ID渲染角色名称标签 */
@@ -338,7 +294,6 @@ export default function EmployeeManagement() {
   const columns: TableColumnsType<EmployeeItem> = [
     { title: '工號', dataIndex: 'empId', key: 'empId', width: 110 },
     { title: '姓名', dataIndex: 'name', key: 'name', width: 120 },
-    { title: '登錄賬號', dataIndex: 'username', key: 'username', width: 130 },
     { title: '部門', dataIndex: 'department', key: 'department', width: 120, render: (v: string) => v || '-' },
     { title: '職位', dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
     { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
