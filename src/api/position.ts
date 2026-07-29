@@ -17,8 +17,10 @@ export const POSITION_SEQUENCE_OPTIONS = Object.entries(POSITION_SEQUENCE).map((
 export interface PositionItem {
   id: number
   name: string
+  nameEn?: string
   sequence: string
   jobLevel: string
+  rank?: string
   updatedBy?: string
   updatedAt?: string
 }
@@ -26,8 +28,10 @@ export interface PositionItem {
 /** 职位新增/编辑请求参数 */
 export interface PositionPayload {
   name: string
+  nameEn?: string
   sequence: string
   jobLevel: string
+  rank?: string
 }
 
 /** 查询全部职位 */

@@ -46,8 +46,10 @@ public class PositionServiceImpl implements PositionService {
         requireNameUnique(request.getName(), null);
         SysPosition position = new SysPosition();
         position.setName(request.getName().trim());
+        position.setNameEn(request.getNameEn() != null ? request.getNameEn().trim() : null);
         position.setSequence(request.getSequence());
         position.setJobLevel(request.getJobLevel().trim());
+        position.setRank(request.getRank() != null ? request.getRank().trim() : null);
         position.setDeleted(0);
         position.setUpdatedBy(operatorResolver.currentOperatorName());
         sysPositionMapper.insert(position);
@@ -61,8 +63,10 @@ public class PositionServiceImpl implements PositionService {
         SysPosition position = requirePosition(id);
         requireNameUnique(request.getName(), id);
         position.setName(request.getName().trim());
+        position.setNameEn(request.getNameEn() != null ? request.getNameEn().trim() : null);
         position.setSequence(request.getSequence());
         position.setJobLevel(request.getJobLevel().trim());
+        position.setRank(request.getRank() != null ? request.getRank().trim() : null);
         position.setUpdatedBy(operatorResolver.currentOperatorName());
         sysPositionMapper.updateById(position);
         // 同步该职位下员工的职位名称/职级快照

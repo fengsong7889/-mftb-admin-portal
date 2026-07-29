@@ -13,10 +13,13 @@ public class PositionVO {
 
     private Long id;
     private String name;
+    private String nameEn;
     /** 职级序列: M=管理 T=技术 P=专业 */
     private String sequence;
     /** 职级 (如 M3 / T5 / P2) */
     private String jobLevel;
+    /** 职等 (R1~R5) */
+    private String rank;
     /** 最后更新人 */
     private String updatedBy;
     /** 最后更新时间 */
@@ -26,8 +29,10 @@ public class PositionVO {
         PositionVO vo = new PositionVO();
         vo.setId(position.getId());
         vo.setName(position.getName());
+        vo.setNameEn(position.getNameEn());
         vo.setSequence(position.getSequence());
         vo.setJobLevel(position.getJobLevel());
+        vo.setRank(position.getRank());
         vo.setUpdatedBy(position.getUpdatedBy());
         vo.setUpdatedAt(position.getUpdatedAt());
         return vo;

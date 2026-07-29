@@ -84,8 +84,10 @@ CREATE TABLE IF NOT EXISTS sys_department (
 CREATE TABLE IF NOT EXISTS sys_position (
     id          BIGINT       PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     name        VARCHAR(128) NOT NULL                   COMMENT '职位名称',
+    name_en     VARCHAR(128) NULL                       COMMENT '职位英文名称',
     `sequence`  VARCHAR(8)   NOT NULL                   COMMENT '职级序列: M=管理 T=技术 P=专业',
-    job_level   VARCHAR(32)  NOT NULL                   COMMENT '职级 (如 M3/T5/P2)',
+    job_level   VARCHAR(32) NOT NULL                   COMMENT '职级 (如 M3/T5/P2)',
+    `rank`      VARCHAR(8)  NULL                       COMMENT '职等 R1~R5',
     updated_by  VARCHAR(64)                             COMMENT '最后更新人',
     deleted     TINYINT      DEFAULT 0                  COMMENT '逻辑删除',
     created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',

@@ -12,6 +12,9 @@ public class PositionRequest {
     @NotBlank(message = "职位名称不能为空")
     private String name;
 
+    /** 职位英文名称 */
+    private String nameEn;
+
     /** 职级序列: M=管理 T=技术 P=专业 */
     @NotBlank(message = "职级序列不能为空")
     private String sequence;
@@ -19,4 +22,8 @@ public class PositionRequest {
     /** 职级 (如 M3 / T5 / P2) */
     @NotBlank(message = "职级不能为空")
     private String jobLevel;
+
+    /** 职等 (R1~R5, R1最低 R5最高) */
+    @NotBlank(message = "职等不能为空")
+    private String rank;
 }

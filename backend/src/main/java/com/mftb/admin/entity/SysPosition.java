@@ -22,11 +22,17 @@ public class SysPosition {
     /** 职位名称 */
     private String name;
 
+    /** 职位英文名称 */
+    private String nameEn;
+
     /** 职级序列: M=管理 T=技术 P=专业 */
     private String sequence;
 
     /** 职级 (如 M3 / T5 / P2) */
     private String jobLevel;
+
+    /** 职等 (R1~R5, R1最低 R5最高) */
+    private String rank;
 
     /** 最后更新人 */
     private String updatedBy;

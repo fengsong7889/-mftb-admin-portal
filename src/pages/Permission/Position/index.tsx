@@ -23,11 +23,19 @@ const SEQUENCE_TAG_COLOR: Record<string, string> = {
 /** 每个序列的职级等级数（如 M1~M9） */
 const JOB_LEVEL_MAX = 9
 
+/** 职等选项 R1~R5（R1最低，R5最高） */
+const RANK_OPTIONS = Array.from({ length: 5 }, (_, i) => ({
+  value: `R${i + 1}`,
+  label: `R${i + 1}`,
+}))
+
 /** 新增/编辑表单值 */
 interface PositionFormValues {
   name: string
+  nameEn?: string
   sequence: string
   jobLevel: string
+  rank?: string
 }
 
 export default function PositionManagement() {
@@ -110,15 +118,18 @@ export default function PositionManagement() {
     setEditing(record)
     form.setFieldsValue({
       name: record.name,
+      nameEn: record.nameEn,
       sequence: record.sequence,
       jobLevel: record.jobLevel,
+      rank: record.rank,
     })
     setEditModalVisible(true)
   }
 
-  /** 切换职级序列时重置职级（新序列下原职级失效） */
+  /** 切换职级序列时重置职级和职等（新序列下原职级失效） */
   const handleSequenceChange = () => {
     form.setFieldValue('jobLevel', undefined)
+    form.setFieldValue('rank', undefined)
   }
 
   /** 提交新增/编辑 */
@@ -126,8 +137,10 @@ export default function PositionManagement() {
     const values = await form.validateFields()
     const payload: PositionPayload = {
       name: values.name.trim(),
+      nameEn: values.nameEn?.trim(),
       sequence: values.sequence,
       jobLevel: values.jobLevel,
+      rank: values.rank,
     }
     setSubmitting(true)
     try {
@@ -161,6 +174,7 @@ export default function PositionManagement() {
   const columns: TableColumnsType<PositionItem> = [
     { title: '職位ID', dataIndex: 'id', key: 'id', width: 90 },
     { title: '職位名稱', dataIndex: 'name', key: 'name', width: 160 },
+    { title: '職位名稱英文', dataIndex: 'nameEn', key: 'nameEn', width: 160, render: (v: string) => v || '-' },
     {
       title: '職級序列',
       dataIndex: 'sequence',
@@ -171,6 +185,7 @@ export default function PositionManagement() {
       ),
     },
     { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 100 },
+    { title: '職等', dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
     { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
       title: '最後更新時間',
@@ -276,6 +291,9 @@ export default function PositionManagement() {
           <Form.Item name="name" label="職位名稱" rules={[{ required: true, message: '請輸入職位名稱' }]}>
             <Input placeholder="例如：後端開發工程師" allowClear maxLength={50} />
           </Form.Item>
+          <Form.Item name="nameEn" label="職位名稱英文">
+            <Input placeholder="例如：Backend Engineer" allowClear maxLength={100} />
+          </Form.Item>
           <Form.Item name="sequence" label="職級序列" rules={[{ required: true, message: '請選擇職級序列' }]}>
             <Select
               placeholder="請選擇職級序列"
@@ -290,6 +308,14 @@ export default function PositionManagement() {
             extra="先選擇職級序列，再選擇對應職級"
           >
             <Select placeholder="請選擇職級" options={jobLevelOptions} disabled={!sequence} />
+          </Form.Item>
+          <Form.Item
+            name="rank"
+            label="職等"
+            rules={[{ required: true, message: '請選擇職等' }]}
+            extra="R1 最低，R5 最高"
+          >
+            <Select placeholder="請選擇職等" options={RANK_OPTIONS} />
           </Form.Item>
         </Form>
       </Modal>
