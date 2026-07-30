@@ -64,14 +64,14 @@ export function fetchFinAccounts(params: FinAccountQuery) {
   return request.get<unknown, FinPageResult<FinAccount>>('/fin/accounts', { params, ...SILENT })
 }
 
-/** 凍結賬戶 */
-export function freezeFinAccount(groupId: string) {
-  return request.put<unknown, void>(`/fin/accounts/${groupId}/freeze`, null, SILENT)
+/** 凍結賬戶（賬戶按集團+品牌隔離） */
+export function freezeFinAccount(groupId: string, brand: string) {
+  return request.put<unknown, void>(`/fin/accounts/${groupId}/freeze`, null, { params: { brand }, ...SILENT })
 }
 
-/** 解凍賬戶 */
-export function unfreezeFinAccount(groupId: string) {
-  return request.put<unknown, void>(`/fin/accounts/${groupId}/unfreeze`, null, SILENT)
+/** 解凍賬戶（賬戶按集團+品牌隔離） */
+export function unfreezeFinAccount(groupId: string, brand: string) {
+  return request.put<unknown, void>(`/fin/accounts/${groupId}/unfreeze`, null, { params: { brand }, ...SILENT })
 }
 
 /* ==================== 審批流程 ==================== */

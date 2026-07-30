@@ -39,12 +39,12 @@ const SEED_GROUPS: MockGroup[] = [
 ]
 
 const SEED_STORES: StoreItem[] = [
-  { id: 1, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', bizChannel: '1', loginAccount: 'hh_store01', updatedBy: '系統管理員', createdAt: '2025-01-08 10:30:00', updatedAt: '2025-06-20 10:00:00' },
-  { id: 2, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', bizChannel: '1,3', loginAccount: 'hh_store02', updatedBy: '張三', createdAt: '2025-01-15 09:00:00', updatedAt: '2025-06-25 15:20:00' },
-  { id: 3, groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeCode: 'MD00003', storeName: '珠海百貨·拱北店', brand: 'flashBee', bizChannel: '2', loginAccount: 'zh_store01', updatedBy: '李四', createdAt: '2025-02-18 14:00:00', updatedAt: '2025-07-02 09:30:00' },
-  { id: 4, groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeCode: 'MD00004', storeName: '珠海百貨·香洲店', brand: 'flashBee,mFood', bizChannel: '2,3', loginAccount: 'zh_store02', updatedBy: '系統管理員', createdAt: '2025-02-25 11:10:00', updatedAt: '2025-07-08 13:50:00' },
-  { id: 5, groupId: 3, groupCode: 'JT000003', groupName: '氹仔美食廣場集團', storeCode: 'MD00005', storeName: '美食廣場·官也街店', brand: 'mFood', bizChannel: '1', loginAccount: 'tp_store01', updatedBy: '王五', createdAt: '2025-03-10 10:00:00', updatedAt: '2025-07-12 10:40:00' },
-  { id: 6, groupId: 4, groupCode: 'JT000004', groupName: '大灣區茶飲集團', storeCode: 'MD00006', storeName: '灣區茶飲·澳門旗艦店', brand: 'flashBee', bizChannel: '1,2', loginAccount: 'tea_store01', updatedBy: '系統管理員', createdAt: '2025-04-28 16:00:00', updatedAt: '2025-07-16 09:00:00' },
+  { id: 1, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', bizType: '1', bizChannel: '1', loginAccount: 'hh_store01', updatedBy: '系統管理員', createdAt: '2025-01-08 10:30:00', updatedAt: '2025-06-20 10:00:00' },
+  { id: 2, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', bizType: '1', bizChannel: '1,3', loginAccount: 'hh_store02', updatedBy: '張三', createdAt: '2025-01-15 09:00:00', updatedAt: '2025-06-25 15:20:00' },
+  { id: 3, groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeCode: 'MD00003', storeName: '珠海百貨·拱北店', brand: 'flashBee', bizType: '2', bizChannel: '2', loginAccount: 'zh_store01', updatedBy: '李四', createdAt: '2025-02-18 14:00:00', updatedAt: '2025-07-02 09:30:00' },
+  { id: 4, groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeCode: 'MD00004', storeName: '珠海百貨·香洲店', brand: 'flashBee', bizType: '2', bizChannel: '2,3', loginAccount: 'zh_store02', updatedBy: '系統管理員', createdAt: '2025-02-25 11:10:00', updatedAt: '2025-07-08 13:50:00' },
+  { id: 5, groupId: 3, groupCode: 'JT000003', groupName: '氹仔美食廣場集團', storeCode: 'MD00005', storeName: '美食廣場·官也街店', brand: 'mFood', bizType: '1', bizChannel: '1', loginAccount: 'tp_store01', updatedBy: '王五', createdAt: '2025-03-10 10:00:00', updatedAt: '2025-07-12 10:40:00' },
+  { id: 6, groupId: 4, groupCode: 'JT000004', groupName: '大灣區茶飲集團', storeCode: 'MD00006', storeName: '灣區茶飲·澳門旗艦店', brand: 'flashBee', bizType: '1', bizChannel: '1,2', loginAccount: 'tea_store01', updatedBy: '系統管理員', createdAt: '2025-04-28 16:00:00', updatedAt: '2025-07-16 09:00:00' },
 ]
 
 function initMockData() {

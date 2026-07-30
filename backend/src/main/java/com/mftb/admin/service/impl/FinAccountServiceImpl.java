@@ -39,30 +39,21 @@ public class FinAccountServiceImpl implements FinAccountService {
 
     @Override
     public PageResult<FinAccountVO> page(FinAccountQuery query) {
-        LambdaQueryWrapper<FinAccount> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(query.getGroupId())) {
-            wrapper.like(FinAccount::getGroupCode, query.getGroupId());
-        }
-        if (StringUtils.hasText(query.getGroupName())) {
-            wrapper.like(FinAccount::getGroupName, query.getGroupName());
-        }
-        if (StringUtils.hasText(query.getBrand())) {
-            wrapper.eq(FinAccount::getBrand, query.getBrand());
-        }
-        if (StringUtils.hasText(query.getStatus())) {
-            wrapper.eq(FinAccount::getStatus, query.getStatus());
-        }
-        wrapper.orderByDesc(FinAccount::getUpdatedAt).orderByDesc(FinAccount::getId);
-
-        Page<FinAccount> result = accountMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
-        List<FinAccountVO> records = result.getRecords().stream().map(FinAccountVO::from).toList();
-        return new PageResult<>(records, result.getTotal());
+        // 以集团管理数据为源按「集团×品牌」派生：集团有对应品牌门店才展示，未开户显示零余额
+        long total = accountMapper.countDerived(query.getGroupId(), query.getGroupName(),
+                query.getBrand(), query.getStatus());
+        long offset = (long) (query.getPage() - 1) * query.getSize();
+        List<FinAccountVO> records = total == 0 ? List.of()
+                : accountMapper.selectDerivedPage(query.getGroupId(), query.getGroupName(),
+                        query.getBrand(), query.getStatus(), offset, query.getSize());
+        return new PageResult<>(records, total);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void freeze(String groupId) {
-        FinAccount account = requireAccount(groupId);
+    public void freeze(String groupId, String brand) {
+        // 尚未开户的集团×品牌组合先零余额建户再冻结
+        FinAccount account = getOrCreate(groupId, null, brand);
         if (STATUS_MERGE_FROZEN.equals(account.getStatus())) {
             throw new BusinessException("该账户处于合并冻结中，请先处理合并流程");
         }
@@ -76,8 +67,12 @@ public class FinAccountServiceImpl implements FinAccountService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void unfreeze(String groupId) {
-        FinAccount account = requireAccount(groupId);
+    public void unfreeze(String groupId, String brand) {
+        FinAccount account = findByGroupBrand(groupId, brand);
+        if (account == null) {
+            // 未开户即默认正常状态，无需解冻
+            return;
+        }
         if (STATUS_MERGE_FROZEN.equals(account.getStatus())) {
             throw new BusinessException("合并冻结账户需通过商户合并流程解冻");
         }
@@ -92,7 +87,7 @@ public class FinAccountServiceImpl implements FinAccountService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public FinAccount getOrCreate(String groupId, String groupName, String brand) {
-        FinAccount account = findByGroupCode(groupId);
+        FinAccount account = findByGroupBrand(groupId, brand);
         if (account != null) {
             return account;
         }
@@ -109,29 +104,29 @@ public class FinAccountServiceImpl implements FinAccountService {
     }
 
     @Override
-    public FinAccount find(String groupId) {
-        return findByGroupCode(groupId);
+    public FinAccount find(String groupId, String brand) {
+        return findByGroupBrand(groupId, brand);
     }
 
     @Override
-    public FinAccount requireUsable(String groupId) {
-        FinAccount account = requireAccount(groupId);
+    public FinAccount requireUsable(String groupId, String brand) {
+        FinAccount account = requireAccount(groupId, brand);
         if (STATUS_FROZEN.equals(account.getStatus())) {
-            throw new BusinessException("集团 " + groupId + " 账户已冻结，无法发起资金操作");
+            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已冻结，无法发起资金操作");
         }
         if (STATUS_MERGE_FROZEN.equals(account.getStatus())) {
-            throw new BusinessException("集团 " + groupId + " 账户处于合并冻结中，无法发起资金操作");
+            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户处于合并冻结中，无法发起资金操作");
         }
         if (STATUS_CANCELLED.equals(account.getStatus())) {
-            throw new BusinessException("集团 " + groupId + " 账户已注销，无法发起资金操作");
+            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已注销，无法发起资金操作");
         }
         return account;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void changeBalance(String groupId, BigDecimal virtualDelta, BigDecimal actualDelta) {
-        FinAccount account = requireAccount(groupId);
+    public void changeBalance(String groupId, String brand, BigDecimal virtualDelta, BigDecimal actualDelta) {
+        FinAccount account = requireAccount(groupId, brand);
         if (virtualDelta != null) {
             account.setVirtualBalance(nonNull(account.getVirtualBalance()).add(virtualDelta));
         }
@@ -144,26 +139,33 @@ public class FinAccountServiceImpl implements FinAccountService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(String groupId, String status) {
-        FinAccount account = requireAccount(groupId);
+    public void updateStatus(String groupId, String brand, String status) {
+        FinAccount account = requireAccount(groupId, brand);
         account.setStatus(status);
         account.setUpdatedBy(operatorResolver.currentOperatorName());
         accountMapper.updateById(account);
     }
 
-    /** 按集团ID查询账户 */
-    private FinAccount findByGroupCode(String groupId) {
+    /** 按集团ID+品牌查询账户 */
+    private FinAccount findByGroupBrand(String groupId, String brand) {
         return accountMapper.selectOne(
-                new LambdaQueryWrapper<FinAccount>().eq(FinAccount::getGroupCode, groupId));
+                new LambdaQueryWrapper<FinAccount>()
+                        .eq(FinAccount::getGroupCode, groupId)
+                        .eq(FinAccount::getBrand, brand));
     }
 
-    /** 按集团ID查询账户，不存在时抛异常 */
-    private FinAccount requireAccount(String groupId) {
-        FinAccount account = findByGroupCode(groupId);
+    /** 按集团ID+品牌查询账户，不存在时抛异常 */
+    private FinAccount requireAccount(String groupId, String brand) {
+        FinAccount account = findByGroupBrand(groupId, brand);
         if (account == null) {
-            throw new BusinessException("集团 " + groupId + " 尚未开通推广金账户");
+            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 尚未开通推广金账户");
         }
         return account;
+    }
+
+    /** 品牌展示名（flashBee=闪蜂） */
+    private static String brandLabel(String brand) {
+        return "flashBee".equals(brand) ? "闪蜂" : String.valueOf(brand);
     }
 
     /** 从集团档案补齐集团名称 */

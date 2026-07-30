@@ -19,6 +19,7 @@ export interface StoreItem {
   storeCode: string
   storeName: string
   brand?: string
+  bizType?: string
   bizChannel?: string
   loginAccount?: string
   updatedBy?: string
@@ -37,6 +38,7 @@ export interface StorePayload {
   groupId: number
   storeName: string
   brand?: string
+  bizType?: string
   bizChannel?: string
   loginAccount?: string
 }

@@ -8,8 +8,14 @@ import { BIZ_CHANNEL_OPTIONS } from '../../constants/bizChannel'
 
 /** 品牌选项 */
 const BRAND_OPTIONS = [
-  { label: '闪蜂 (flashBee)', value: 'flashBee' },
+  { label: '闪蜂', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
+]
+
+/** 业务类型选项 */
+const BIZ_TYPE_OPTIONS = [
+  { label: '外賣', value: '1' },
+  { label: '團購', value: '2' },
 ]
 
 interface StoreEditModalProps {
@@ -48,8 +54,9 @@ export default function StoreEditModal({
           storeName: editingRecord.storeName,
           loginAccount: editingRecord.loginAccount,
         })
-        // 多选字段单独设置（string -> string[]）
-        form.setFieldValue('brand', editingRecord.brand ? editingRecord.brand.split(',').map(s => s.trim()).filter(Boolean) : [])
+        // 品牌為單選，直接設置字符串值；業務頻道仍為多選
+        form.setFieldValue('brand', editingRecord.brand ? editingRecord.brand.trim() : undefined)
+        form.setFieldValue('bizType', editingRecord.bizType ? editingRecord.bizType.trim() : undefined)
         form.setFieldValue('bizChannel', editingRecord.bizChannel ? editingRecord.bizChannel.split(',').map(s => s.trim()).filter(Boolean) : [])
       } else {
         form.resetFields()
@@ -63,10 +70,9 @@ export default function StoreEditModal({
   const handleOk = async () => {
     try {
       const values = await form.validateFields()
-      // 多选转逗号分隔字符串
       const payload = {
         ...values,
-        brand: Array.isArray(values.brand) ? values.brand.join(',') : values.brand,
+        brand: values.brand,
         bizChannel: Array.isArray(values.bizChannel) ? values.bizChannel.join(',') : values.bizChannel,
       }
       if (isEdit && editingRecord) {
@@ -126,12 +132,18 @@ export default function StoreEditModal({
         >
           <Input placeholder="請輸入門店名稱" />
         </Form.Item>
-        <Form.Item name="brand" label="所屬品牌">
+        <Form.Item name="brand" label="所屬品牌" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
           <Select
-            placeholder="請選擇品牌（可多選）"
-            mode="multiple"
+            placeholder="請選擇品牌"
             allowClear
             options={BRAND_OPTIONS}
+          />
+        </Form.Item>
+        <Form.Item name="bizType" label="業務類型" rules={[{ required: true, message: '請選擇業務類型' }]}>
+          <Select
+            placeholder="請選擇業務類型"
+            allowClear
+            options={BIZ_TYPE_OPTIONS}
           />
         </Form.Item>
         <Form.Item name="bizChannel" label="業務頻道">

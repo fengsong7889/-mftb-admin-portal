@@ -165,7 +165,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             }
         }
 
-        applyDeltas(deltas);
+        applyDeltas(deltas, approval.getBrand());
     }
 
     /* ==================== 转账 ==================== */
@@ -183,7 +183,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         BigDecimal amount = FinExtras.amount(extra, "transferAmount");
         String remark = FinExtras.textOrDash(extra, "remark");
 
-        FinAccount fromAccount = accountService.find(fromGroup);
+        FinAccount fromAccount = accountService.find(fromGroup, approval.getBrand());
         if (fromAccount == null || FinExtras.nonNull(fromAccount.getVirtualBalance()).compareTo(amount) < 0) {
             throw new BusinessException("转出集团推广金余额不足，无法完成转账");
         }
@@ -229,7 +229,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         inRow.setRemark(remark);
         saveDetail(inRow, deltas);
 
-        applyDeltas(deltas);
+        applyDeltas(deltas, approval.getBrand());
     }
 
     /* ==================== 扣款 ==================== */
@@ -243,7 +243,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         BigDecimal amount = FinExtras.amount(extra, "deductAmount");
         String remark = FinExtras.textOrDash(extra, "remark");
 
-        FinAccount account = accountService.find(approval.getGroupCode());
+        FinAccount account = accountService.find(approval.getGroupCode(), approval.getBrand());
         if (account == null || FinExtras.nonNull(account.getVirtualBalance()).compareTo(amount) < 0) {
             throw new BusinessException("集团推广金余额不足，无法完成扣款");
         }
@@ -281,7 +281,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             saveDetail(row, deltas);
         }
 
-        applyDeltas(deltas);
+        applyDeltas(deltas, approval.getBrand());
     }
 
     /**
@@ -346,7 +346,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         String remark = FinExtras.textOrDash(extra, "remark");
         List<Map<String, Object>> repayStores = FinExtras.rows(extra, "repayStores");
 
-        FinAccount source = accountService.find(sourceGroup);
+        FinAccount source = accountService.find(sourceGroup, approval.getBrand());
         BigDecimal sourceVirtual = source == null ? BigDecimal.ZERO : FinExtras.nonNull(source.getVirtualBalance());
         BigDecimal sourceActual = source == null ? BigDecimal.ZERO : FinExtras.nonNull(source.getActualBalance());
 
@@ -454,11 +454,11 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         // 4. 注销集团原未结清欠款单转结，追加「轉移結算」还款记录
         transferSourceDebts(sourceGroup, targetGroupName, newBillNos, loanDate, tradeTime);
 
-        applyDeltas(deltas);
+        applyDeltas(deltas, approval.getBrand());
 
         // 5. 账户状态：注销方注销、存续方解除合并冻结
-        accountService.updateStatus(sourceGroup, FinAccountServiceImpl.STATUS_CANCELLED);
-        accountService.updateStatus(targetGroup, FinAccountServiceImpl.STATUS_NORMAL);
+        accountService.updateStatus(sourceGroup, approval.getBrand(), FinAccountServiceImpl.STATUS_CANCELLED);
+        accountService.updateStatus(targetGroup, approval.getBrand(), FinAccountServiceImpl.STATUS_NORMAL);
     }
 
     /** 注销集团未结清欠款单标记已转结并追加转移结算还款记录 */
@@ -591,10 +591,10 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
                 .add(detail.getVirtualChange(), detail.getActualChange());
     }
 
-    /** 将累计的余额变动写入账户 */
-    private void applyDeltas(Map<String, BalanceDelta> deltas) {
+    /** 将累计的余额变动写入账户（同一审批单内所有明细归属同一品牌） */
+    private void applyDeltas(Map<String, BalanceDelta> deltas, String brand) {
         deltas.forEach((groupCode, delta) ->
-                accountService.changeBalance(groupCode, delta.virtual, delta.actual));
+                accountService.changeBalance(groupCode, brand, delta.virtual, delta.actual));
     }
 
     /** 扣款拆分片段 */

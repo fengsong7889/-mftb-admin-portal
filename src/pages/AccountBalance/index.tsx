@@ -143,7 +143,7 @@ export default function AccountBalance() {
       okButtonProps: { danger: true },
       onOk: async () => {
         await withFinanceFallback(
-          () => freezeFinAccount(record.groupId),
+          () => freezeFinAccount(record.groupId, record.brand),
           () => mockUpdateAccountStatus(record.groupId, 'frozen'),
         )
         message.success(`已凍結「${record.groupName}」賬戶`)
@@ -161,7 +161,7 @@ export default function AccountBalance() {
       cancelText: '取消',
       onOk: async () => {
         await withFinanceFallback(
-          () => unfreezeFinAccount(record.groupId),
+          () => unfreezeFinAccount(record.groupId, record.brand),
           () => mockUpdateAccountStatus(record.groupId, 'normal'),
         )
         message.success(`已解凍「${record.groupName}」賬戶`)

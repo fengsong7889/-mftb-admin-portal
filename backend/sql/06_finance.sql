@@ -24,9 +24,12 @@ CREATE TABLE IF NOT EXISTS biz_fin_account (
     deleted         TINYINT       DEFAULT 0                  COMMENT '逻辑删除: 0=未删除 1=已删除',
     created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
     updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    UNIQUE KEY uk_fin_account_group (group_code),
+    UNIQUE KEY uk_fin_account_group_brand (group_code, brand),
     KEY idx_fin_account_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推广金账户表';
+-- 已有环境升级（旧版唯一键为 group_code 单列）：
+-- ALTER TABLE biz_fin_account DROP INDEX uk_fin_account_group,
+--   ADD UNIQUE KEY uk_fin_account_group_brand (group_code, brand);
 
 -- ============================================================
 -- 二、财务审批流程表

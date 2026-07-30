@@ -140,12 +140,12 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (FinExtras.nonNull(request.getVirtualAmount()).compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("虚拟账户充值金额必须大于 0");
         }
-        // 首次充值自动建户，已冻结/已注销账户不允许充值
-        FinAccount account = accountService.find(request.getGroupId());
+        // 首次充值自动建户，已冻结/已注销账户不允许充值（账户按集团+品牌隔离）
+        FinAccount account = accountService.find(request.getGroupId(), request.getBrand());
         if (account == null) {
             accountService.getOrCreate(request.getGroupId(), request.getGroupName(), request.getBrand());
         } else {
-            accountService.requireUsable(request.getGroupId());
+            accountService.requireUsable(request.getGroupId(), request.getBrand());
         }
 
         Map<String, Object> extra = new LinkedHashMap<>();
@@ -181,7 +181,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("转账金额必须大于 0");
         }
-        FinAccount from = accountService.requireUsable(request.getFromGroupId());
+        FinAccount from = accountService.requireUsable(request.getFromGroupId(), request.getBrand());
         if (FinExtras.nonNull(from.getVirtualBalance()).compareTo(amount) < 0) {
             throw new BusinessException("转账金额超出转出集团推广金余额");
         }
@@ -207,7 +207,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("扣款金额必须大于 0");
         }
-        FinAccount account = accountService.requireUsable(request.getGroupId());
+        FinAccount account = accountService.requireUsable(request.getGroupId(), request.getBrand());
         if (FinExtras.nonNull(account.getVirtualBalance()).compareTo(amount) < 0) {
             throw new BusinessException("扣款金额超出集团推广金余额");
         }
@@ -240,8 +240,8 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (request.getSourceGroupId().equals(request.getTargetGroupId())) {
             throw new BusinessException("注销集团与存续集团不能相同");
         }
-        FinAccount source = accountService.requireUsable(request.getSourceGroupId());
-        FinAccount target = accountService.requireUsable(request.getTargetGroupId());
+        FinAccount source = accountService.requireUsable(request.getSourceGroupId(), request.getBrand());
+        FinAccount target = accountService.requireUsable(request.getTargetGroupId(), request.getBrand());
 
         // 欠款偿还金额必须恰好等于注销集团待还欠款总额
         BigDecimal debtTotal = unsettledDebtTotal(request.getSourceGroupId());
@@ -270,8 +270,8 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         String flowNo = createApproval("merge", request.getSourceGroupId(), request.getSourceGroupName(),
                 request.getBrand(), extra);
         // 合并申请提交即冻结双方账户，避免审批期间余额变动
-        accountService.updateStatus(source.getGroupCode(), FinAccountServiceImpl.STATUS_MERGE_FROZEN);
-        accountService.updateStatus(target.getGroupCode(), FinAccountServiceImpl.STATUS_MERGE_FROZEN);
+        accountService.updateStatus(source.getGroupCode(), request.getBrand(), FinAccountServiceImpl.STATUS_MERGE_FROZEN);
+        accountService.updateStatus(target.getGroupCode(), request.getBrand(), FinAccountServiceImpl.STATUS_MERGE_FROZEN);
         return flowNo;
     }
 
@@ -394,18 +394,18 @@ public class FinApprovalServiceImpl implements FinApprovalService {
             return;
         }
         Map<String, Object> extra = JsonUtils.parseMap(approval.getExtra());
-        restoreAccount(approval.getGroupCode());
-        restoreAccount(FinExtras.text(extra, "targetGroupId"));
+        restoreAccount(approval.getGroupCode(), approval.getBrand());
+        restoreAccount(FinExtras.text(extra, "targetGroupId"), approval.getBrand());
     }
 
     /** 合并冻结账户恢复正常状态 */
-    private void restoreAccount(String groupCode) {
+    private void restoreAccount(String groupCode, String brand) {
         if (groupCode == null) {
             return;
         }
-        FinAccount account = accountService.find(groupCode);
+        FinAccount account = accountService.find(groupCode, brand);
         if (account != null && FinAccountServiceImpl.STATUS_MERGE_FROZEN.equals(account.getStatus())) {
-            accountService.updateStatus(groupCode, FinAccountServiceImpl.STATUS_NORMAL);
+            accountService.updateStatus(groupCode, brand, FinAccountServiceImpl.STATUS_NORMAL);
         }
     }
 

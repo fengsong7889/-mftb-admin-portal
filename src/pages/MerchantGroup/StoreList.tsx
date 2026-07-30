@@ -25,7 +25,7 @@ const { RangePicker } = DatePicker
 
 /** 品牌选项 */
 const BRAND_OPTIONS = [
-  { label: '闪蜂 (flashBee)', value: 'flashBee' },
+  { label: '闪蜂', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
 ]
 
