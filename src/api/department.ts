@@ -28,7 +28,6 @@ export interface DepartmentItem {
 
 /** 部门新增/编辑请求参数 */
 export interface DepartmentPayload {
-  code: string
   name: string
   parentId?: number | null
   leader?: string

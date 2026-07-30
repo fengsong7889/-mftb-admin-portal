@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class DepartmentRequest {
 
-    @NotBlank(message = "部门编码不能为空")
+    /** 部门编码 (由系统自动生成 MT+5位自增, 前端无需传入) */
     private String code;
 
     @NotBlank(message = "部门名称不能为空")

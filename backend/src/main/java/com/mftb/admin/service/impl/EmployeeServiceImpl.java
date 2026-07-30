@@ -38,10 +38,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final OperatorResolver operatorResolver;
 
     /** 内置管理员登录账号(工号), 禁止停用/删除 */
-    private static final String BUILTIN_ADMIN = "MT0001";
+    private static final String BUILTIN_ADMIN = "MF00001";
 
-    /** 工号前缀: 工号由系统自动生成, 规则 MT + 4位自增序号 */
-    private static final String EMP_ID_PREFIX = "MT";
+    /** 工号前缀: 工号由系统自动生成, 规则 MF + 5位自增序号 */
+    private static final String EMP_ID_PREFIX = "MF";
 
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, Integer status) {
@@ -79,7 +79,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds() == null ? List.of() : request.getFunctionRoleIds()));
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
-        user.setRank(request.getRank());
+        // 职等由 applyPosition 从职位配置自动带出，不再接受前端传入
         user.setStatus(1);
         user.setDeleted(0);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -94,7 +94,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         // 工号即登录账号, 由系统生成后不允许修改
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
-        user.setRank(request.getRank());
+        // 职等由 applyPosition 从职位配置自动带出，不再接受前端传入
         if (StringUtils.hasText(request.getRole()) && !BUILTIN_ADMIN.equals(user.getUsername())) {
             user.setRole(request.getRole());
         }
@@ -135,14 +135,14 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     /**
-     * 生成下一个工号: 取当前最大 MT 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号)
+     * 生成下一个工号: 取当前最大 MF 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号)
      */
     private String generateEmpId() {
         Integer maxSeq = jdbcTemplate.queryForObject(
                 "SELECT IFNULL(MAX(CAST(SUBSTRING(username, 3) AS UNSIGNED)), 0) FROM sys_user "
-                        + "WHERE username REGEXP '^MT[0-9]+$'",
+                        + "WHERE username REGEXP '^MF[0-9]+$'",
                 Integer.class);
-        return String.format("%s%04d", EMP_ID_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+        return String.format("%s%05d", EMP_ID_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
     /** 设置员工所在部门: 校验部门存在并写入部门名称快照 */
@@ -160,7 +160,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setDepartment(dept.getName());
     }
 
-    /** 设置员工职位: 校验职位存在并写入职位中英文名称/职级序列/职级快照 */
+    /** 设置员工职位: 校验职位存在并写入职位中英文名称/职级序列/职级快照/职等快照 */
     private void applyPosition(SysUser user, Long positionId) {
         if (positionId == null) {
             user.setPositionId(null);
@@ -168,6 +168,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             user.setPositionEn(null);
             user.setSequence(null);
             user.setJobLevel(null);
+            user.setRank(null);
             return;
         }
         SysPosition position = sysPositionMapper.selectById(positionId);
@@ -179,6 +180,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setPositionEn(position.getNameEn());
         user.setSequence(position.getSequence());
         user.setJobLevel(position.getJobLevel());
+        // 职等强制跟随职位配置的职等，不允许员工单独设置不同的职等
+        user.setRank(position.getRank());
     }
 
     private SysUser requireUser(Long id) {

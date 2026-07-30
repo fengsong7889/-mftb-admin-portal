@@ -24,7 +24,6 @@ const statusOptions = [
 /** 新增/编辑表单值 */
 interface DepartmentFormValues {
   parentId?: number
-  code: string
   name: string
   leader?: string
   sort?: number
@@ -234,7 +233,6 @@ export default function OrganizationManagement() {
     setEditing(record)
     form.setFieldsValue({
       parentId: record.parentId ?? undefined,
-      code: record.code,
       name: record.name,
       leader: record.leader,
       sort: record.sort,
@@ -247,7 +245,6 @@ export default function OrganizationManagement() {
   const handleSubmit = async () => {
     const values = await form.validateFields()
     const payload: DepartmentPayload = {
-      code: values.code.trim(),
       name: values.name.trim(),
       parentId: values.parentId ?? null,
       leader: values.leader?.trim(),
@@ -440,9 +437,6 @@ export default function OrganizationManagement() {
               showSearch
               treeNodeFilterProp="title"
             />
-          </Form.Item>
-          <Form.Item name="code" label="部門編碼" rules={[{ required: true, message: '請輸入部門編碼' }]}>
-            <Input placeholder="例如：D0001" allowClear />
           </Form.Item>
           <Form.Item name="name" label="部門名稱" rules={[{ required: true, message: '請輸入部門名稱' }]}>
             <Input placeholder="請輸入部門名稱" allowClear />

@@ -89,13 +89,13 @@ function now(): string {
   return new Date().toISOString().replace('T', ' ').slice(0, 19)
 }
 
-/** 生成下一个工号 (MT 前缀 + 4 位自增, 与后端规则一致) */
+/** 生成下一个工号 (MF 前缀 + 5 位自增, 与后端规则一致) */
 function nextEmpId(employees: EmployeeItem[]): string {
   const maxSeq = employees.reduce((max, emp) => {
-    const match = /^MT(\d+)$/.exec(emp.empId ?? '')
+    const match = /^MF(\d+)$/.exec(emp.empId ?? '')
     return match ? Math.max(max, Number(match[1])) : max
   }, 0)
-  return `MT${String(maxSeq + 1).padStart(4, '0')}`
+  return `MF${String(maxSeq + 1).padStart(5, '0')}`
 }
 
 // ============================================================

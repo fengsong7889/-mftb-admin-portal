@@ -27,7 +27,7 @@ const EMPLOYEE_STATUS = {
 } as const
 
 /** 内置管理员登录账号（工号，禁止停用/删除） */
-const BUILTIN_ADMIN = 'MT0001'
+const BUILTIN_ADMIN = 'MF00001'
 
 const statusOptions = [
   { value: EMPLOYEE_STATUS.ENABLED, label: '啟用' },
@@ -184,9 +184,26 @@ export default function EmployeeManagement() {
     [positions, watchSequence],
   )
 
-  /** 切换职级序列时清空已选职位（新序列下原职位失效） */
+  /** 职等选项：仅展示职位管理中已配置的职等，未配置的不显示 */
+  const availableRankOptions = useMemo(() => {
+    const configuredRanks = new Set(positions.map(p => p.rank).filter(Boolean))
+    return POSITION_RANK_OPTIONS.filter(opt => configuredRanks.has(opt.value))
+  }, [positions])
+
+  /** 切换职级序列时清空已选职位和职等（新序列下原职位失效） */
   const handleSequenceChange = () => {
     form.setFieldValue('positionId', undefined)
+    form.setFieldValue('rank', undefined)
+  }
+
+  /** 切换职位时自动带出该职位配置的职等 */
+  const handlePositionChange = (positionId: number | undefined) => {
+    if (positionId != null) {
+      const pos = positions.find(p => p.id === positionId)
+      form.setFieldValue('rank', pos?.rank ?? undefined)
+    } else {
+      form.setFieldValue('rank', undefined)
+    }
   }
 
   /** 查询 */
@@ -244,7 +261,7 @@ export default function EmployeeManagement() {
         await updateEmployee(editing.id, payload)
         message.success('員工信息已更新')
       } else {
-        // 工号即登录账号，由后端按 MT 前缀自增生成
+        // 工号即登录账号，由后端按 MF 前缀自增生成
         const created = await createEmployee({
           ...payload,
           password: values.password,
@@ -475,7 +492,7 @@ export default function EmployeeManagement() {
           <Form.Item
             name="empId"
             label="工號"
-            extra={editing ? '工號同時作為登錄賬號，不可修改' : '工號由系統自動生成（MT 開頭自增），同時作為登錄賬號'}
+            extra={editing ? '工號同時作為登錄賬號，不可修改' : '工號由系統自動生成（MF 開頭自增），同時作為登錄賬號'}
           >
             <Input placeholder="保存後由系統自動生成" disabled />
           </Form.Item>
@@ -517,8 +534,8 @@ export default function EmployeeManagement() {
             name="positionId"
             label="職位"
             extra={selectedPosition
-              ? `對應職級：${selectedPosition.jobLevel}${selectedPosition.nameEn ? `，英文名稱：${selectedPosition.nameEn}` : ''}`
-              : '職位在「職位管理」中維護，選擇後自動帶出對應職級與英文名稱'}
+              ? `對應職級：${selectedPosition.jobLevel}${selectedPosition.rank ? `，職等：${selectedPosition.rank}` : ''}${selectedPosition.nameEn ? `，英文名稱：${selectedPosition.nameEn}` : ''}`
+              : '職位在「職位管理」中維護，選擇後自動帶出對應職級、職等與英文名稱'}
           >
             <Select
               placeholder={watchSequence ? '請選擇職位' : '請先選擇職級序列，或直接選擇職位'}
@@ -526,10 +543,11 @@ export default function EmployeeManagement() {
               showSearch
               optionFilterProp="label"
               options={filteredPositions.map(p => ({ value: p.id, label: `${p.name}（${p.jobLevel}）` }))}
+              onChange={handlePositionChange}
             />
           </Form.Item>
-          <Form.Item name="rank" label="職等" extra="R1 最低，R5 最高">
-            <Select placeholder="請選擇職等" allowClear options={POSITION_RANK_OPTIONS} />
+          <Form.Item name="rank" label="職等" extra={watchPositionId ? '職等由所選職位自動帶出，不可手動修改' : '僅展示職位管理中已配置的職等'}>
+            <Select placeholder={watchPositionId ? '由職位自動帶出' : '請先選擇職位'} disabled={!watchPositionId} allowClear={!watchPositionId} options={availableRankOptions} />
           </Form.Item>
           <Form.Item
             name="functionRoleIds"

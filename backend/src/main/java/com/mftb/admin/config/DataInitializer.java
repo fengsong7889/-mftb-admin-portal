@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * 数据初始化器: 启动时自动执行字段迁移与内置账号迁移, 并将 SQL 中的占位密码重置为正确的 BCrypt 加密值
  * <p>
- * 登录账号统一为工号, 工号按 MT 前缀自增(MT0001 起), 内置管理员工号 MT0001, 密码: 111222
+ * 登录账号统一为工号, 工号按 MF 前缀自增(MF00001 起), 内置管理员工号 MF00001, 密码: 111222
  */
 @Slf4j
 @Component
@@ -30,11 +30,12 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         migrateSchema();
         migrateBuiltinAccounts();
-        migrateEmpIdToMT();
-        resetPasswordIfNeeded("MT0001", "111222");
+        migrateEmpIdToMF();
+        migrateDeptCodeToMT();
+        resetPasswordIfNeeded("MF00001", "111222");
     }
 
-    /** 内置账号迁移: 登录账号统一为工号, 移除 guest 账号 (旧库 admin 账号由 migrateEmpIdToMT 统一重编号) */
+    /** 内置账号迁移: 登录账号统一为工号, 移除 guest 账号 (旧库 admin 账号由 migrateEmpIdToMF 统一重编号) */
     private void migrateBuiltinAccounts() {
         int removed = jdbcTemplate.update("DELETE FROM sys_user WHERE username = 'guest'");
         if (removed > 0) {
@@ -43,25 +44,47 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 存量工号迁移: 将所有非 MT 格式登录账号的员工(含逻辑删除记录)按 id 升序重编号为 MT0001+,
-     * 登录账号与工号同步更新; 已是 MT 格式的记录不变, 重复启动幂等
+     * 存量工号迁移: 将所有非 MF 格式登录账号的员工(含逻辑删除记录)按 id 升序重编号为 MF00001+,
+     * 登录账号与工号同步更新; 已是 MF 格式的记录不变, 重复启动幂等
      */
-    private void migrateEmpIdToMT() {
+    private void migrateEmpIdToMF() {
         List<Long> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MT[0-9]+$' ORDER BY id", Long.class);
+                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MF[0-9]+$' ORDER BY id", Long.class);
         if (ids.isEmpty()) {
             return;
         }
         Integer maxSeq = jdbcTemplate.queryForObject(
                 "SELECT IFNULL(MAX(CAST(SUBSTRING(username, 3) AS UNSIGNED)), 0) FROM sys_user "
-                        + "WHERE username REGEXP '^MT[0-9]+$'",
+                        + "WHERE username REGEXP '^MF[0-9]+$'",
                 Integer.class);
         int seq = maxSeq == null ? 0 : maxSeq;
         for (Long id : ids) {
-            String empId = String.format("MT%04d", ++seq);
+            String empId = String.format("MF%05d", ++seq);
             jdbcTemplate.update("UPDATE sys_user SET username = ?, emp_id = ? WHERE id = ?", empId, empId, id);
         }
-        log.info("已将 {} 个存量员工工号迁移为 MT 自增格式", ids.size());
+        log.info("已将 {} 个存量员工工号迁移为 MF 自增格式", ids.size());
+    }
+
+    /**
+     * 存量部门编码迁移: 将所有非 MT 格式编码的部门(含逻辑删除记录)按 id 升序重编号为 MT00001+;
+     * 已是 MT 格式的记录不变, 重复启动幂等
+     */
+    private void migrateDeptCodeToMT() {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_department WHERE code NOT REGEXP '^MT[0-9]+$' ORDER BY id", Long.class);
+        if (ids.isEmpty()) {
+            return;
+        }
+        Integer maxSeq = jdbcTemplate.queryForObject(
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(code, 3) AS UNSIGNED)), 0) FROM sys_department "
+                        + "WHERE code REGEXP '^MT[0-9]+$'",
+                Integer.class);
+        int seq = maxSeq == null ? 0 : maxSeq;
+        for (Long id : ids) {
+            String code = String.format("MT%05d", ++seq);
+            jdbcTemplate.update("UPDATE sys_department SET code = ? WHERE id = ?", code, id);
+        }
+        log.info("已将 {} 个存量部门编码迁移为 MT 自增格式", ids.size());
     }
 
     /** 幂等字段迁移: 列不存在时自动 ALTER TABLE (免手动执行 SQL 脚本) */

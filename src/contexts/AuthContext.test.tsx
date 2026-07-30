@@ -21,9 +21,9 @@ function mockLoginSuccess(role: 'admin' | 'guest') {
     token: 'mock-jwt-token',
     userInfo: {
       id: role === 'admin' ? 1 : 2,
-      username: role === 'admin' ? 'MT0001' : 'MT0002',
+      username: role === 'admin' ? 'MF00001' : 'MF00002',
       name: role === 'admin' ? 'Bee' : '訪客',
-      empId: role === 'admin' ? 'MT0001' : 'MT0002',
+      empId: role === 'admin' ? 'MF00001' : 'MF00002',
       avatar: 'pikachu-default',
       role,
       department: role === 'admin' ? '集团总裁办' : undefined,
@@ -47,12 +47,12 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      const res = await result.current.login('MT0001', '111222')
+      const res = await result.current.login('MF00001', '111222')
       expect(res.success).toBe(true)
     })
 
     expect(result.current.isAuthenticated).toBe(true)
-    expect(result.current.user?.username).toBe('MT0001')
+    expect(result.current.user?.username).toBe('MF00001')
     expect(result.current.user?.role).toBe('admin')
   })
 
@@ -61,7 +61,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      const res = await result.current.login('MT0002', '123456')
+      const res = await result.current.login('MF00002', '123456')
       expect(res.success).toBe(true)
     })
 
@@ -74,7 +74,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      const res = await result.current.login('MT0001', 'wrong')
+      const res = await result.current.login('MF00001', 'wrong')
       expect(res.success).toBe(false)
       // 后端不可用时降级到 Mock 登录，Mock 登录失败后返回繁体中文提示
       expect(res.message).toContain('工號或密碼錯誤')
@@ -88,7 +88,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      await result.current.login('MT0001', '111222')
+      await result.current.login('MF00001', '111222')
     })
 
     expect(result.current.hasPermission('edit')).toBe(true)
@@ -101,7 +101,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      await result.current.login('MT0002', '123456')
+      await result.current.login('MF00002', '123456')
     })
 
     expect(result.current.hasPermission('view')).toBe(true)
@@ -114,7 +114,7 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
-      await result.current.login('MT0001', '111222')
+      await result.current.login('MF00001', '111222')
     })
     expect(result.current.isAuthenticated).toBe(true)
 

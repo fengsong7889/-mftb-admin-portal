@@ -13,6 +13,7 @@ import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -32,6 +33,10 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final SysDepartmentMapper sysDepartmentMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
+    private final JdbcTemplate jdbcTemplate;
+
+    /** 部门编码前缀: MT + 5位自增序号 */
+    private static final String DEPT_CODE_PREFIX = "MT";
 
     @Override
     public List<DepartmentVO> list() {
@@ -56,12 +61,13 @@ public class DepartmentServiceImpl implements DepartmentService {
 
     @Override
     public DepartmentVO create(DepartmentRequest request) {
-        requireCodeUnique(request.getCode(), null);
+        // 部门编码由系统自动生成 (MT + 5位自增), 不接受前端传入
+        String code = generateDeptCode();
         if (request.getParentId() != null) {
             requireDept(request.getParentId());
         }
         SysDepartment dept = new SysDepartment();
-        dept.setCode(request.getCode().trim());
+        dept.setCode(code);
         dept.setName(request.getName().trim());
         dept.setParentId(request.getParentId());
         dept.setLeader(request.getLeader());
@@ -77,7 +83,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     @Override
     public DepartmentVO update(Long id, DepartmentRequest request) {
         SysDepartment dept = requireDept(id);
-        requireCodeUnique(request.getCode(), id);
+        // 部门编码由系统生成, 不可修改
         // 上级部门不能选择自身或其下级 (防止形成环)
         if (request.getParentId() != null) {
             Long cursor = request.getParentId();
@@ -89,7 +95,6 @@ public class DepartmentServiceImpl implements DepartmentService {
                 cursor = parent == null ? null : parent.getParentId();
             }
         }
-        dept.setCode(request.getCode().trim());
         dept.setName(request.getName().trim());
         dept.setParentId(request.getParentId());
         dept.setLeader(request.getLeader());
@@ -151,20 +156,15 @@ public class DepartmentServiceImpl implements DepartmentService {
         return JsonUtils.parsePermissions(dept.getPermissions());
     }
 
-    /** 部门编码唯一性校验 (excludeId 为编辑时排除自身) */
-    private void requireCodeUnique(String code, Long excludeId) {
-        if (!StringUtils.hasText(code)) {
-            throw new BusinessException("部门编码不能为空");
-        }
-        LambdaQueryWrapper<SysDepartment> wrapper =
-                new LambdaQueryWrapper<SysDepartment>().eq(SysDepartment::getCode, code.trim());
-        if (excludeId != null) {
-            wrapper.ne(SysDepartment::getId, excludeId);
-        }
-        Long count = sysDepartmentMapper.selectCount(wrapper);
-        if (count != null && count > 0) {
-            throw new BusinessException("部门编码已存在");
-        }
+    /**
+     * 生成下一个部门编码: 取当前最大 MT 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除部门的编码)
+     */
+    private String generateDeptCode() {
+        Integer maxSeq = jdbcTemplate.queryForObject(
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(code, 3) AS UNSIGNED)), 0) FROM sys_department "
+                        + "WHERE code REGEXP '^MT[0-9]+$'",
+                Integer.class);
+        return String.format("%s%05d", DEPT_CODE_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
     /** 部门名称变更后同步员工表的部门名称快照 */
