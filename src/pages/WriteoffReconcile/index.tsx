@@ -1,5 +1,5 @@
-import { useState , useMemo } from 'react'
-import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Button, Input, Select, DatePicker, Table, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
@@ -7,116 +7,168 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
 
-/** 商家明细记录类型 */
+/**
+ * 充消對賬日報行（每個集團每日一行）
+ * 口徑與明細查詢交易類型對齊：充值 / 扣款 / 消費 / 轉入 / 轉出
+ * 勾稽關係：期末餘額 = 期初餘額 + 交易淨額
+ */
 interface ReconcileRecord {
   key: string
   index: number
   date: string
-  merchantId: string
-  merchantName: string
+  groupId: string
+  groupName: string
   brand: string
-  initVirtualBalance: number
-  initActualBalance: number
+  initVirtual: number
+  initActual: number
   virtualRecharge: number
   actualRecharge: number
   bankReceipt: number
   revenuePayment: number
-  virtualActualConsumption: number
-  virtualConsumption: number
-  virtualRefund: number
-  actualActualConsumption: number
-  actualConsumption: number
-  actualRefund: number
+  consumeTotal: number
+  deductVirtual: number
+  deductActual: number
   virtualTransferIn: number
   actualTransferIn: number
   virtualTransferOut: number
   actualTransferOut: number
-  virtualNetAmount: number
-  actualNetAmount: number
+  virtualNet: number
+  actualNet: number
+  endVirtual: number
+  endActual: number
 }
 
-/** 模拟数据 */
-const merchantNames = ['廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂', '廣州酒家', '2閃蜂']
-const brands = ['1mFood', '1mFood', '1mFood', '2閃蜂', '1mFood', '1mFood', '1mFood', '2閃蜂', '1mFood', '1mFood', '1mFood', '1mFood']
+/** 保留兩位小數 */
+const r2 = (n: number) => Math.round(n * 100) / 100
 
-const mockData: ReconcileRecord[] = Array.from({ length: 12 }, (_, i) => {
-  // 基础数据
-  const initVirtualBalance = 355645.01
-  const initActualBalance = 155645.01
-  
-  // 1. 充值统计
-  const virtualRecharge = 1000.21  // 虚拟账户充值总额
-  const bankReceipt = 800  // 银行收款
-  const revenuePayment = 100.21  // 营业额支付
-  const actualRecharge = bankReceipt + revenuePayment  // 实收账户充值总额 = 银行收款 + 营业额支付 = 900.21
-  
-  // 2. 消费统计
-  const virtualConsumption = 600  // 虚拟账户消费
-  const virtualRefund = 300  // 虚拟账户退款
-  const virtualActualConsumption = virtualConsumption + virtualRefund  // 虚拟账户实际消费 = 消费 + 退款 = 900
-  
-  const actualConsumption = 400  // 实收账户消费
-  const actualRefund = 200  // 实收账户退款
-  const actualActualConsumption = actualConsumption + actualRefund  // 实收账户实际消费 = 消费 + 退款 = 600
-  
-  // 3. 转入转出统计
-  const virtualTransferIn = 600  // 虚拟账户转入总额
-  const actualTransferIn = 100  // 实收账户转入总额
-  const virtualTransferOut = 500  // 虚拟账户转出总额
-  const actualTransferOut = 50  // 实收账户转出总额
-  
-  // 4. 交易净额统计
-  // 虚拟账户交易净额 = 充值总额 - 实际消费总额 - 转出总额 + 转入总额
-  const virtualNetAmount = virtualRecharge - virtualActualConsumption - virtualTransferOut + virtualTransferIn  // 1000.21 - 900 - 500 + 600 = 200.21
-  
-  // 实收账户交易净额 = 充值总额 - 实际消费总额 - 转出总额 + 转入总额
-  const actualNetAmount = actualRecharge - actualActualConsumption - actualTransferOut + actualTransferIn  // 900.21 - 600 - 50 + 100 = 350.21
-  
-  return {
-    key: String(i + 1),
-    index: i + 1,
-    date: '2026/05/06',
-    merchantId: '123456',
-    merchantName: merchantNames[i],
-    brand: brands[i],
-    initVirtualBalance,
-    initActualBalance,
-    virtualRecharge,
-    actualRecharge,
-    bankReceipt,
-    revenuePayment,
-    virtualActualConsumption,
-    virtualConsumption,
-    virtualRefund,
-    actualActualConsumption,
-    actualConsumption,
-    actualRefund,
-    virtualTransferIn,
-    actualTransferIn,
-    virtualTransferOut,
-    actualTransferOut,
-    virtualNetAmount,
-    actualNetAmount,
-  }
-})
-
-/** 格式化金额 */
+/** 格式化金額（千分位 + 兩位小數） */
 const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/** 变动金额单元格 */
-const NetAmountCell = ({ val }: { val: number }) => {
-  const color = val >= 0 ? '#2E7D32' : '#E53935'
-  return <span style={{ color, fontWeight: 600 }}>{val >= 0 ? '' : ''}{fmtAmt(val)}</span>
+/** Mock 集團（期初餘額為週期首日期初） */
+const mockGroups = [
+  { groupId: '100001', groupName: '廣州酒家', brand: 'mFood', initVirtual: 355645.01, initActual: 155645.01 },
+  { groupId: '100002', groupName: '海底撈', brand: 'flashBee', initVirtual: 208000.00, initActual: 96000.00 },
+  { groupId: '100003', groupName: '星巴克', brand: 'mFood', initVirtual: 132500.50, initActual: 60200.50 },
+]
+
+const mockDates = ['2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28']
+
+/**
+ * 生成勾稽自洽的 Mock 日報數據：
+ * - 同一集團相鄰日期首尾相接（今日期初 = 昨日期末）
+ * - 實收充值總額 = 銀行收款 + 營業額支付
+ * - 交易淨額 = 充值 - 消費 - 扣款 + 轉入 - 轉出
+ */
+const mockData: ReconcileRecord[] = (() => {
+  const rows: ReconcileRecord[] = []
+  mockGroups.forEach((g, gi) => {
+    let startVirtual = g.initVirtual
+    let startActual = g.initActual
+    mockDates.forEach((date, di) => {
+      const bankReceipt = r2((gi + 1) * 2000 + di * 500)
+      const revenuePayment = r2((gi + 1) * 800 + di * 100 + 0.21)
+      const actualRecharge = r2(bankReceipt + revenuePayment)
+      const virtualRecharge = r2(actualRecharge * 1.2)
+      const consumeTotal = r2((gi + 1) * 1500 + di * 300)
+      const deductVirtual = r2((gi + 1) * 600 + di * 200)
+      // 營業額支付部分當日經門店營業額扣回（影響實收賬戶）
+      const deductActual = revenuePayment
+      const virtualTransferIn = gi === 1 && di === 2 ? 24000 : 0
+      const virtualTransferOut = gi === 0 && di === 2 ? 24000 : 0
+      const actualTransferIn = 0
+      const actualTransferOut = 0
+      const virtualNet = r2(virtualRecharge - consumeTotal - deductVirtual + virtualTransferIn - virtualTransferOut)
+      const actualNet = r2(actualRecharge - deductActual + actualTransferIn - actualTransferOut)
+      const endVirtual = r2(startVirtual + virtualNet)
+      const endActual = r2(startActual + actualNet)
+      rows.push({
+        key: `${g.groupId}_${date}`,
+        index: 0,
+        date,
+        groupId: g.groupId,
+        groupName: g.groupName,
+        brand: g.brand,
+        initVirtual: startVirtual,
+        initActual: startActual,
+        virtualRecharge,
+        actualRecharge,
+        bankReceipt,
+        revenuePayment,
+        consumeTotal,
+        deductVirtual,
+        deductActual,
+        virtualTransferIn,
+        actualTransferIn,
+        virtualTransferOut,
+        actualTransferOut,
+        virtualNet,
+        actualNet,
+        endVirtual,
+        endActual,
+      })
+      startVirtual = endVirtual
+      startActual = endActual
+    })
+  })
+  // 按日期倒序、集團正序展示
+  return rows
+    .sort((a, b) => b.date.localeCompare(a.date) || a.groupId.localeCompare(b.groupId))
+    .map((r, i) => ({ ...r, index: i + 1 }))
+})()
+
+/* ---- 數字加載動畫（遵循數據指標統計卡標準，支持兩位小數） ---- */
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+  useEffect(() => {
+    const start = performance.now()
+    const animate = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
+      setValue(r2(target * eased))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate)
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+  return value
 }
 
-/** 概览卡片组件 */
+function AnimatedAmount({ value }: { value: number }) {
+  const animated = useCountUp(value)
+  return <>{fmtAmt(animated)}</>
+}
+
+/** 交易淨額單元格（+藍 / -紅，與明細查詢金額口徑一致） */
+const NetAmountCell = ({ val }: { val: number }) => (
+  <span style={{ color: val >= 0 ? '#1976D2' : '#FF4D4F', fontWeight: 600 }}>
+    {val >= 0 ? '+' : '-'}{fmtAmt(Math.abs(val))}
+  </span>
+)
+
+/** 概覽卡片組件（含 hover 上浮動效） */
 function SummaryCard({ title, icon, children, bgColor }: { title: string; icon: string; children: React.ReactNode; bgColor: string }) {
   return (
-    <div className="reconcile-summary-card" style={{ background: bgColor }}>
+    <div
+      className="reconcile-summary-card"
+      style={{ background: bgColor, transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-4px)'
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)'
+      }}
+    >
       <div className="reconcile-card-title">
         <span className="reconcile-card-icon">{icon}</span>
         {title}
@@ -126,18 +178,18 @@ function SummaryCard({ title, icon, children, bgColor }: { title: string; icon: 
   )
 }
 
-/** 指标卡片 */
+/** 指標項 */
 function MetricItem({ label, value, color, subLabel, subValue, subColor }: {
-  label: string; value: string; color: string; subLabel?: string; subValue?: string; subColor?: string
+  label: string; value: number; color: string; subLabel?: string; subValue?: number; subColor?: string
 }) {
   return (
     <div className="reconcile-metric">
       <div className="reconcile-metric-label">{label}</div>
-      <div className="reconcile-metric-value" style={{ color }}>{value}</div>
-      {subLabel && (
+      <div className="reconcile-metric-value" style={{ color }}><AnimatedAmount value={value} /></div>
+      {subLabel && subValue !== undefined && (
         <div className="reconcile-metric-sub">
           <span className="reconcile-metric-sub-label">{subLabel}</span>
-          <span className="reconcile-metric-sub-value" style={{ color: subColor || color }}>{subValue}</span>
+          <span className="reconcile-metric-sub-value" style={{ color: subColor || color }}><AnimatedAmount value={subValue} /></span>
         </div>
       )}
     </div>
@@ -146,100 +198,137 @@ function MetricItem({ label, value, color, subLabel, subValue, subColor }: {
 
 export default function WriteoffReconcile() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  /** 列配置元数据 */
+
+  /** 週期總賬彙總（由日報數據聚合，財務對賬總覽） */
+  const summary = useMemo(() => {
+    const sum = (pick: (r: ReconcileRecord) => number) => r2(mockData.reduce((acc, r) => acc + pick(r), 0))
+    // 期初 = 各集團週期首日期初；期末 = 各集團週期末日期末
+    let initVirtual = 0, initActual = 0, endVirtual = 0, endActual = 0
+    mockGroups.forEach(g => {
+      const groupRows = mockData.filter(r => r.groupId === g.groupId).sort((a, b) => a.date.localeCompare(b.date))
+      if (groupRows.length === 0) return
+      initVirtual = r2(initVirtual + groupRows[0].initVirtual)
+      initActual = r2(initActual + groupRows[0].initActual)
+      endVirtual = r2(endVirtual + groupRows[groupRows.length - 1].endVirtual)
+      endActual = r2(endActual + groupRows[groupRows.length - 1].endActual)
+    })
+    return {
+      initVirtual,
+      initActual,
+      endVirtual,
+      endActual,
+      virtualRecharge: sum(r => r.virtualRecharge),
+      actualRecharge: sum(r => r.actualRecharge),
+      bankReceipt: sum(r => r.bankReceipt),
+      revenuePayment: sum(r => r.revenuePayment),
+      consumeTotal: sum(r => r.consumeTotal),
+      deductVirtual: sum(r => r.deductVirtual),
+      deductActual: sum(r => r.deductActual),
+      virtualTransferIn: sum(r => r.virtualTransferIn),
+      actualTransferIn: sum(r => r.actualTransferIn),
+      virtualTransferOut: sum(r => r.virtualTransferOut),
+      actualTransferOut: sum(r => r.actualTransferOut),
+      virtualNet: sum(r => r.virtualNet),
+      actualNet: sum(r => r.actualNet),
+    }
+  }, [])
+
+  /** 列配置元數據 */
   const columnMeta = useMemo(() => [
     { key: 'date', title: '統計日期' },
-    { key: 'merchantId', title: '商戶ID' },
-    { key: 'merchantName', title: '商戶名稱' },
+    { key: 'groupId', title: '集團ID' },
+    { key: 'groupName', title: '集團名稱' },
     { key: 'brand', title: '所屬品牌' },
-    { key: 'initVirtualBalance', title: '期初虛擬賬戶餘額' },
-    { key: 'initActualBalance', title: '期初實收賬戶餘額' },
-    { key: 'virtualRecharge', title: '虛擬賬戶充值餘額' },
-    { key: 'actualRecharge', title: '實收賬戶充值餘額' },
+    { key: 'initVirtual', title: '期初虛擬賬戶餘額' },
+    { key: 'initActual', title: '期初實收賬戶餘額' },
+    { key: 'virtualRecharge', title: '虛擬賬戶充值總額' },
+    { key: 'actualRecharge', title: '實收賬戶充值總額' },
     { key: 'bankReceipt', title: '銀行收款' },
     { key: 'revenuePayment', title: '營業額支付' },
-    { key: 'virtualActualConsumption', title: '虛擬賬戶實際消費' },
-    { key: 'virtualConsumption', title: '虛擬賬戶消費' },
-    { key: 'virtualRefund', title: '虛擬賬戶退款' },
-    { key: 'actualActualConsumption', title: '實收賬戶實際消費' },
-    { key: 'actualConsumption', title: '實收賬戶消費' },
-    { key: 'actualRefund', title: '實收賬戶退款' },
-    { key: 'virtualTransferIn', title: '虛擬賬戶轉入金額' },
-    { key: 'actualTransferIn', title: '實收賬戶轉入金額' },
-    { key: 'virtualTransferOut', title: '虛擬賬戶轉出金額' },
-    { key: 'actualTransferOut', title: '實收賬戶轉出金額' },
-    { key: 'virtualNetAmount', title: '虛擬賬戶交易淨額' },
-    { key: 'actualNetAmount', title: '實收賬戶交易淨額' },
+    { key: 'consumeTotal', title: '消費總額' },
+    { key: 'deductVirtual', title: '扣款總額' },
+    { key: 'deductActual', title: '扣款實收變動' },
+    { key: 'virtualTransferIn', title: '虛擬賬戶轉入總額' },
+    { key: 'actualTransferIn', title: '實收賬戶轉入總額' },
+    { key: 'virtualTransferOut', title: '虛擬賬戶轉出總額' },
+    { key: 'actualTransferOut', title: '實收賬戶轉出總額' },
+    { key: 'virtualNet', title: '虛擬賬戶交易淨額' },
+    { key: 'actualNet', title: '實收賬戶交易淨額' },
+    { key: 'endVirtual', title: '期末虛擬賬戶餘額' },
+    { key: 'endActual', title: '期末實收賬戶餘額' },
   ], [])
 
   const { configComponent, applyConfig } = useColumnConfig('writeoff-reconcile', columnMeta)
 
-  
-
   const columns: TableColumnsType<ReconcileRecord> = [
-    { title: '統計日期', dataIndex: 'date', key: 'date', width: 120, fixed: 'left' },
-    { title: '商戶ID', dataIndex: 'merchantId', key: 'merchantId', width: 100, fixed: 'left' },
-    { title: '商戶名稱', dataIndex: 'merchantName', key: 'merchantName', width: 120, fixed: 'left' },
-    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => (
-      <Tag style={{ 
-        margin: 0,
-        padding: '2px 10px',
-        border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-        color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-        background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-        borderRadius: 4,
-        fontWeight: 500
-      }}>
-        {v === '1mFood' || v === 'mFood' ? 'mFood' : v === 'flashBee' ? '閃蜂' : v}
-      </Tag>
-    ) },
+    { title: '統計日期', dataIndex: 'date', key: 'date', width: 110, fixed: 'left' },
+    { title: '集團ID', dataIndex: 'groupId', key: 'groupId', width: 90, fixed: 'left' },
+    { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 110, fixed: 'left' },
     {
-      title: '期初虛擬賬戶餘額', dataIndex: 'initVirtualBalance', key: 'initVirtualBalance', width: 160, align: 'right',
+      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      render: (v: string) => <BrandTag value={v} />,
+    },
+    {
+      title: '期初虛擬賬戶餘額', dataIndex: 'initVirtual', key: 'initVirtual', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 500 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '期初實收賬戶餘額', dataIndex: 'initActualBalance', key: 'initActualBalance', width: 160, align: 'right',
+      title: '期初實收賬戶餘額', dataIndex: 'initActual', key: 'initActual', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 500 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶充值餘額', dataIndex: 'virtualRecharge', key: 'virtualRecharge', width: 160, align: 'right',
+      title: '虛擬賬戶充值總額', dataIndex: 'virtualRecharge', key: 'virtualRecharge', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '實收賬戶充值餘額', dataIndex: 'actualRecharge', key: 'actualRecharge', width: 160, align: 'right',
+      title: '實收賬戶充值總額', dataIndex: 'actualRecharge', key: 'actualRecharge', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C' }}>{fmtAmt(v)}</span>,
     },
-    { title: '銀行收款', dataIndex: 'bankReceipt', key: 'bankReceipt', width: 100, align: 'right', render: (v: number) => fmtAmt(v) },
+    { title: '銀行收款', dataIndex: 'bankReceipt', key: 'bankReceipt', width: 110, align: 'right', render: (v: number) => fmtAmt(v) },
     { title: '營業額支付', dataIndex: 'revenuePayment', key: 'revenuePayment', width: 110, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '虛擬賬戶實際消費', dataIndex: 'virtualActualConsumption', key: 'virtualActualConsumption', width: 150, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '虛擬賬戶消費', dataIndex: 'virtualConsumption', key: 'virtualConsumption', width: 130, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '虛擬賬戶退款', dataIndex: 'virtualRefund', key: 'virtualRefund', width: 130, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '實收賬戶實際消費', dataIndex: 'actualActualConsumption', key: 'actualActualConsumption', width: 150, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '實收賬戶消費', dataIndex: 'actualConsumption', key: 'actualConsumption', width: 130, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '實收賬戶退款', dataIndex: 'actualRefund', key: 'actualRefund', width: 130, align: 'right', render: (v: number) => fmtAmt(v) },
     {
-      title: '虛擬賬戶轉入金額', dataIndex: 'virtualTransferIn', key: 'virtualTransferIn', width: 150, align: 'right',
+      title: '消費總額', dataIndex: 'consumeTotal', key: 'consumeTotal', width: 120, align: 'right',
+      render: (v: number) => <span style={{ color: '#FF4D4F' }}>{fmtAmt(v)}</span>,
+    },
+    {
+      title: '扣款總額', dataIndex: 'deductVirtual', key: 'deductVirtual', width: 120, align: 'right',
+      render: (v: number) => <span style={{ color: '#FF4D4F' }}>{fmtAmt(v)}</span>,
+    },
+    {
+      title: '扣款實收變動', dataIndex: 'deductActual', key: 'deductActual', width: 130, align: 'right',
+      render: (v: number) => <span style={{ color: '#FF4D4F' }}>{fmtAmt(v)}</span>,
+    },
+    {
+      title: '虛擬賬戶轉入總額', dataIndex: 'virtualTransferIn', key: 'virtualTransferIn', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '實收賬戶轉入金額', dataIndex: 'actualTransferIn', key: 'actualTransferIn', width: 150, align: 'right',
+      title: '實收賬戶轉入總額', dataIndex: 'actualTransferIn', key: 'actualTransferIn', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶轉出金額', dataIndex: 'virtualTransferOut', key: 'virtualTransferOut', width: 150, align: 'right',
+      title: '虛擬賬戶轉出總額', dataIndex: 'virtualTransferOut', key: 'virtualTransferOut', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '實收賬戶轉出金額', dataIndex: 'actualTransferOut', key: 'actualTransferOut', width: 150, align: 'right',
+      title: '實收賬戶轉出總額', dataIndex: 'actualTransferOut', key: 'actualTransferOut', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶交易淨額', dataIndex: 'virtualNetAmount', key: 'virtualNetAmount', width: 150, align: 'right',
+      title: '虛擬賬戶交易淨額', dataIndex: 'virtualNet', key: 'virtualNet', width: 160, align: 'right',
       render: (v: number) => <NetAmountCell val={v} />,
     },
     {
-      title: '實收賬戶交易淨額', dataIndex: 'actualNetAmount', key: 'actualNetAmount', width: 150, align: 'right',
+      title: '實收賬戶交易淨額', dataIndex: 'actualNet', key: 'actualNet', width: 160, align: 'right',
       render: (v: number) => <NetAmountCell val={v} />,
+    },
+    {
+      title: '期末虛擬賬戶餘額', dataIndex: 'endVirtual', key: 'endVirtual', width: 160, align: 'right',
+      render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 600 }}>{fmtAmt(v)}</span>,
+    },
+    {
+      title: '期末實收賬戶餘額', dataIndex: 'endActual', key: 'endActual', width: 160, align: 'right',
+      render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{fmtAmt(v)}</span>,
     },
   ]
 
@@ -254,14 +343,14 @@ export default function WriteoffReconcile() {
           <Form.Item label="集團名稱">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
+          <Form.Item label="所屬品牌">
+            <Select placeholder="全部" options={brandOptions} allowClear />
+          </Form.Item>
           <Form.Item label="統計週期">
             <RangePicker
               format="YYYY-MM-DD"
               placeholder={['開始日期', '結束日期']}
             />
-          </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="請選擇" options={brandOptions} style={{ width: 140 }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -272,7 +361,7 @@ export default function WriteoffReconcile() {
         </Form>
       </div>
 
-      {/* 概览统计区域 */}
+      {/* 週期總賬概覽 */}
       <div className="reconcile-overview">
         {/* 期初 / 期末 结余 */}
         <div className="reconcile-balance-row">
@@ -280,14 +369,11 @@ export default function WriteoffReconcile() {
             <div className="reconcile-balance-grid">
               <div className="reconcile-balance-item">
                 <div className="reconcile-balance-label">期初虛擬賬戶餘額</div>
-                <div className="reconcile-balance-value" style={{ color: '#1565C0' }}>19,000,000.21</div>
+                <div className="reconcile-balance-value" style={{ color: '#1565C0' }}><AnimatedAmount value={summary.initVirtual} /></div>
               </div>
               <div className="reconcile-balance-item">
                 <div className="reconcile-balance-label">期初實收賬戶餘額</div>
-                <div className="reconcile-balance-value" style={{ color: '#E8720C' }}>19,000,000.21</div>
-              </div>
-              <div className="reconcile-balance-ratio">
-                <Tag color="pink">比例 1:1</Tag>
+                <div className="reconcile-balance-value" style={{ color: '#E8720C' }}><AnimatedAmount value={summary.initActual} /></div>
               </div>
             </div>
           </SummaryCard>
@@ -296,14 +382,11 @@ export default function WriteoffReconcile() {
             <div className="reconcile-balance-grid">
               <div className="reconcile-balance-item">
                 <div className="reconcile-balance-label">期末虛擬賬戶餘額</div>
-                <div className="reconcile-balance-value" style={{ color: '#1565C0' }}>19,000,000.21</div>
+                <div className="reconcile-balance-value" style={{ color: '#1565C0' }}><AnimatedAmount value={summary.endVirtual} /></div>
               </div>
               <div className="reconcile-balance-item">
                 <div className="reconcile-balance-label">期末實收賬戶餘額</div>
-                <div className="reconcile-balance-value" style={{ color: '#E8720C' }}>19,000,000.21</div>
-              </div>
-              <div className="reconcile-balance-ratio">
-                <Tag color="pink">比例 1:1</Tag>
+                <div className="reconcile-balance-value" style={{ color: '#E8720C' }}><AnimatedAmount value={summary.endActual} /></div>
               </div>
             </div>
           </SummaryCard>
@@ -311,30 +394,29 @@ export default function WriteoffReconcile() {
 
         {/* 统计明细卡片 */}
         <div className="reconcile-stats-row">
-          <SummaryCard title="充值統計" icon="📄" bgColor="#F8FAFF">
-            <MetricItem label="虛擬賬戶充值總額" value="19,000,000.21" color="#1565C0"
-              subLabel="實收賬戶充值總額" subValue="19,000,000.21" subColor="#E8720C" />
-            <MetricItem label="銀行收款" value="800.00" color="#1565C0"
-              subLabel="營業額支付" subValue="100.21" subColor="#E8720C" />
+          <SummaryCard title="充值統計" icon="💰" bgColor="#F8FAFF">
+            <MetricItem label="虛擬賬戶充值總額" value={summary.virtualRecharge} color="#1565C0"
+              subLabel="實收賬戶充值總額" subValue={summary.actualRecharge} subColor="#E8720C" />
+            <MetricItem label="銀行收款" value={summary.bankReceipt} color="#1565C0"
+              subLabel="營業額支付" subValue={summary.revenuePayment} subColor="#E8720C" />
           </SummaryCard>
 
-          <SummaryCard title="消費統計" icon="📄" bgColor="#FFF8F0">
-            <MetricItem label="虛擬賬戶實際消費" value="19,000,000.21" color="#E8720C"
-              subLabel="虛擬賬戶消費" subValue="19,000,000.21" subColor="#E53935" />
-            <MetricItem label="實收賬戶實際消費" value="19,000,000.21" color="#E8720C"
-              subLabel="實收賬戶消費" subValue="19,000,000.21" subColor="#E53935" />
+          <SummaryCard title="消費扣款統計" icon="📉" bgColor="#FFF8F0">
+            <MetricItem label="消費總額" value={summary.consumeTotal} color="#E53935"
+              subLabel="扣款總額" subValue={summary.deductVirtual} subColor="#E53935" />
+            <MetricItem label="扣款實收變動" value={summary.deductActual} color="#E8720C" />
           </SummaryCard>
 
-          <SummaryCard title="轉入轉出" icon="📄" bgColor="#F3F0FF">
-            <MetricItem label="虛擬賬戶轉入金額" value="19,000,000.21" color="#7B1FA2"
-              subLabel="虛擬賬戶轉出金額" subValue="19,000,000.21" subColor="#7B1FA2" />
-            <MetricItem label="實收賬戶轉入金額" value="19,000,000.21" color="#7B1FA2"
-              subLabel="實收賬戶轉出金額" subValue="19,000,000.21" subColor="#7B1FA2" />
+          <SummaryCard title="轉入轉出" icon="🔁" bgColor="#F3F0FF">
+            <MetricItem label="虛擬賬戶轉入總額" value={summary.virtualTransferIn} color="#7B1FA2"
+              subLabel="虛擬賬戶轉出總額" subValue={summary.virtualTransferOut} subColor="#7B1FA2" />
+            <MetricItem label="實收賬戶轉入總額" value={summary.actualTransferIn} color="#7B1FA2"
+              subLabel="實收賬戶轉出總額" subValue={summary.actualTransferOut} subColor="#7B1FA2" />
           </SummaryCard>
 
-          <SummaryCard title="交易淨額" icon="📄" bgColor="#F0FFF4">
-            <MetricItem label="虛擬賬戶交易淨額" value="19,000,000.21" color="#2E7D32"
-              subLabel="實收賬戶交易淨額" subValue="19,000,000.21" subColor="#2E7D32" />
+          <SummaryCard title="交易淨額" icon="🧮" bgColor="#F0FFF4">
+            <MetricItem label="虛擬賬戶交易淨額" value={summary.virtualNet} color="#2E7D32"
+              subLabel="實收賬戶交易淨額" subValue={summary.actualNet} subColor="#2E7D32" />
           </SummaryCard>
         </div>
       </div>
@@ -351,7 +433,7 @@ export default function WriteoffReconcile() {
         </div>
       </div>
 
-      {/* 商家明细列表 */}
+      {/* 每日账户变动列表 */}
       <div className="table-section">
         <Table<ReconcileRecord>
           rowSelection={{
@@ -362,7 +444,6 @@ export default function WriteoffReconcile() {
           dataSource={mockData}
           pagination={{
             total: mockData.length,
-            pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
@@ -371,7 +452,7 @@ export default function WriteoffReconcile() {
           }}
           size="small"
           bordered={false}
-          scroll={{ x: 3400 }}
+          scroll={{ x: 3000 }}
           className="writeoff-reconcile-table"
         />
       </div>

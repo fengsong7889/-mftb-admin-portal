@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag } from 'antd'
+import { useState, useEffect, useMemo } from 'react'
+import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch } from 'antd'
 import {
   ArrowLeftOutlined,
-  SaveOutlined,
+  SendOutlined,
   UploadOutlined,
   FileImageOutlined,
   FilePdfOutlined,
@@ -10,8 +10,13 @@ import {
   DollarOutlined,
   FileProtectOutlined,
   EditOutlined,
+  QuestionCircleOutlined,
+  PlusOutlined,
+  ShopOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import BrandTag from '../../components/BrandTag'
+import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
 
 /** 集團选项 */
 const groupOptions = [
@@ -33,6 +38,31 @@ const actualPayOptions = [
   { label: '混合支付', value: 'mixed' },
   { label: '營業額支付', value: 'revenue' },
 ]
+
+/** 業務類型 → 可選業務頻道 */
+const businessChannelMap: Record<string, { label: string; value: string }[]> = {
+  delivery: [
+    { label: '美食外賣', value: 'foodTakeout' },
+    { label: '超市百貨', value: 'supermarket' },
+  ],
+  store: [
+    { label: '團購到店', value: 'groupBuyStore' },
+  ],
+}
+
+/** 扣款門店選項 */
+const deductStoreOptions = [
+  { label: '廣州酒店天河廣場1號店(1234567890)', value: '1234567890' },
+  { label: '廣州酒店越秀領展2號店(2345678910)', value: '2345678910' },
+  { label: '廣州酒店琶洲保利3號店(3456789012)', value: '3456789012' },
+]
+
+/** 扣款門店行 */
+interface DeductStoreRow {
+  storeId: string
+  storeLabel: string
+  amount: number
+}
 
 /** 数字金额转中文大写 */
 function amountToChinese(num: number): string {
@@ -75,19 +105,101 @@ export default function RechargeAdd() {
   const brandParam = searchParams.get('brand') || ''
 
   const [form] = Form.useForm()
+  const [businessType, setBusinessType] = useState('delivery')
   const [isActual, setIsActual] = useState(true)
+  const [payMethod, setPayMethod] = useState('corporate')
   const [virtualAmount, setVirtualAmount] = useState<number>(0)
   const [bankAmount, setBankAmount] = useState<number>(0)
+  const [revenueAmount, setRevenueAmount] = useState<number>(0)
+  const [deductRows, setDeductRows] = useState<DeductStoreRow[]>([])
+  const [pendingStoreId, setPendingStoreId] = useState<string | undefined>(undefined)
+  const [pendingAmount, setPendingAmount] = useState<number | undefined>(undefined)
+  const [showAddRow, setShowAddRow] = useState(false)
   const [contractFiles, setContractFiles] = useState<any[]>([])
   const [paymentFiles, setPaymentFiles] = useState<any[]>([])
+  const [successVisible, setSuccessVisible] = useState(false)
+  const [countdown, setCountdown] = useState(5)
 
-  /** 提交 */
+  /** 實收賬戶充值合計 */
+  const actualTotal = useMemo(() => {
+    let total = 0
+    if (payMethod === 'corporate' || payMethod === 'mixed') total += bankAmount
+    if (payMethod === 'mixed' || payMethod === 'revenue') total += revenueAmount
+    return total
+  }, [payMethod, bankAmount, revenueAmount])
+
+  /** 優惠金額 = 虛擬賬戶充值金額 - 實收賬戶充值金額 */
+  const discountAmount = useMemo(() => {
+    const diff = virtualAmount - actualTotal
+    return diff > 0 ? diff : 0
+  }, [virtualAmount, actualTotal])
+
+  // 提交成功彈窗倒計時
+  useEffect(() => {
+    if (!successVisible) return
+    if (countdown <= 0) {
+      setSuccessVisible(false)
+      navigate('/account-balance')
+      return
+    }
+    const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [successVisible, countdown, navigate])
+
+  /** 新增扣款門店行 */
+  const handleAddDeductRow = () => {
+    if (!pendingStoreId) {
+      message.warning('請選擇扣款門店')
+      return
+    }
+    if (!pendingAmount || pendingAmount <= 0) {
+      message.warning('請輸入扣款金額')
+      return
+    }
+    if (deductRows.some(r => r.storeId === pendingStoreId)) {
+      message.warning('該門店已添加')
+      return
+    }
+    const opt = deductStoreOptions.find(o => o.value === pendingStoreId)
+    setDeductRows([...deductRows, { storeId: pendingStoreId, storeLabel: opt?.label || pendingStoreId, amount: pendingAmount }])
+    setPendingStoreId(undefined)
+    setPendingAmount(undefined)
+  }
+
+  /** 刪除扣款門店行 */
+  const handleRemoveDeductRow = (storeId: string) => {
+    setDeductRows(deductRows.filter(r => r.storeId !== storeId))
+  }
+
+  /** 清空待添加行 */
+  const handleClearPendingRow = () => {
+    setPendingStoreId(undefined)
+    setPendingAmount(undefined)
+  }
+
+  /** 提交申請 */
   const handleSubmit = async () => {
     try {
       await form.validateFields()
       if (!virtualAmount || virtualAmount <= 0) {
         message.warning('請填寫虛擬賬戶充值金額')
         return
+      }
+      if (isActual) {
+        if ((payMethod === 'corporate' || payMethod === 'mixed') && (!bankAmount || bankAmount <= 0)) {
+          message.warning('請填寫銀行轉賬金額')
+          return
+        }
+        if (payMethod === 'mixed' || payMethod === 'revenue') {
+          if (!revenueAmount || revenueAmount <= 0) {
+            message.warning('請填寫營業額扣款金額')
+            return
+          }
+          if (deductRows.length === 0) {
+            message.warning('請添加扣款門店')
+            return
+          }
+        }
       }
       if (contractFiles.length === 0) {
         message.warning('請上傳合同憑證')
@@ -97,8 +209,45 @@ export default function RechargeAdd() {
         message.warning('請上傳付款憑證')
         return
       }
-      message.success('充值申請提交成功，等待審批！')
-      navigate('/account-balance')
+      // 提交審批記錄
+      const group = groupOptions.find(g => g.value === groupIdParam)
+      addApprovalRecord({
+        key: `custom_${Date.now()}`,
+        groupId: groupIdParam,
+        groupName: group?.name || groupNameParam || '',
+        brand: brandParam || 'flashBee',
+        flowNo: generateFlowNo('recharge'),
+        approvalType: 'recharge',
+        applicant: '朱棣(002)',
+        applyTime: formatNow(),
+        bizApprover: '朱元璋(001)',
+        bizApproveTime: '--',
+        bizApproveStatus: 'pending',
+        opsApprover: '--',
+        opsApproveTime: '--',
+        opsApproveStatus: 'pending',
+        finApprover: '--',
+        finApproveTime: '--',
+        finApproveStatus: 'pending',
+        flowStatus: 'pending',
+        rejectReason: '',
+        extra: {
+          businessType,
+          businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.label || '--',
+          isActual,
+          payMethod,
+          virtualAmount,
+          actualTotal,
+          discountAmount,
+          bankAmount: isActual && (payMethod === 'corporate' || payMethod === 'mixed') ? bankAmount : 0,
+          revenueAmount: isActual && (payMethod === 'mixed' || payMethod === 'revenue') ? revenueAmount : 0,
+          deductStores: deductRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, amount: r.amount })),
+          bd: form.getFieldValue('bd') || '--',
+          remark: form.getFieldValue('remark') || '',
+        },
+      })
+      setCountdown(5)
+      setSuccessVisible(true)
     } catch {
       // 表单校验未通过
     }
@@ -156,8 +305,11 @@ export default function RechargeAdd() {
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa',
             transition: 'all 0.3s',
-          }}>
-            <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: '#bfbfbf' }} />
+          }}
+            onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
+            onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
+          >
+            <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
             <span>上傳</span>
           </div>
         </Upload>
@@ -206,9 +358,8 @@ export default function RechargeAdd() {
           groupName: groupNameParam || undefined,
           brand: brandParam || 'mFood',
           businessType: 'delivery',
-          businessChannel: 'takeout',
+          businessChannel: 'foodTakeout',
           isActual: true,
-          actualPayMethod: 'corporate',
         }}
       >
         {/* 基础信息 */}
@@ -220,42 +371,36 @@ export default function RechargeAdd() {
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基礎信息</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="集團ID" name="groupId" rules={[{ required: true, message: '請選擇集團ID' }]}>
-              <Select
-                placeholder="請輸入或選擇集團ID"
-                options={groupOptions}
-                showSearch
-                onChange={(val) => {
-                  const opt = groupOptions.find(o => o.value === val)
-                  if (opt) form.setFieldsValue({ groupName: opt.name })
-                }}
-              />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
+            <Form.Item label="集團" name="groupId" rules={[{ required: true, message: '請選擇集團' }]}>
+              <Input disabled addonAfter={groupNameParam || '選擇集團後展示'} />
             </Form.Item>
-            <Form.Item label="集團名稱" name="groupName">
-              <Input disabled placeholder="選擇集團ID後自動填充" />
+            <Form.Item label="所屬品牌">
+              <BrandTag value={brandParam || 'mFood'} />
+            </Form.Item>
+            <Form.Item label="賬戶狀態">
+              <Tag color="green">正常</Tag>
             </Form.Item>
           </div>
 
-          <Form.Item label="所屬品牌" name="brand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
-            <Radio.Group>
-              <Radio value="mFood">1mFood</Radio>
-              <Radio value="flashBee">2閃蜂</Radio>
-              <Radio value="other">3其它</Radio>
-            </Radio.Group>
-          </Form.Item>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
             <Form.Item label="業務類型" name="businessType" rules={[{ required: true, message: '請選擇業務類型' }]}>
-              <Radio.Group>
+              <Radio.Group
+                onChange={(e) => {
+                  const type = e.target.value
+                  setBusinessType(type)
+                  form.setFieldsValue({ businessChannel: businessChannelMap[type][0].value })
+                }}
+              >
                 <Radio value="delivery">到家</Radio>
                 <Radio value="store">到店</Radio>
               </Radio.Group>
             </Form.Item>
             <Form.Item label="業務頻道" name="businessChannel" rules={[{ required: true, message: '請選擇業務頻道' }]}>
               <Radio.Group>
-                <Radio value="takeout">外賣</Radio>
-                <Radio value="dineIn">堂食</Radio>
+                {businessChannelMap[businessType].map(opt => (
+                  <Radio key={opt.value} value={opt.value}>{opt.label}</Radio>
+                ))}
               </Radio.Group>
             </Form.Item>
           </div>
@@ -271,91 +416,288 @@ export default function RechargeAdd() {
             <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>金額配置</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <Form.Item
-            label={
-              <span>
-                虛擬賬戶充值
-                <span style={{ fontSize: 12, color: '#E53935', marginLeft: 4 }}>*</span>
-              </span>
-            }
-            style={{ marginBottom: 16 }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+
+          {/* 虛擬賬戶充值 + 歸屬BD 並排 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px', marginBottom: 16 }}>
+            <Form.Item
+              label={
+                <span>
+                  虛擬賬戶充值
+                  <span style={{ fontSize: 12, color: '#E53935', marginLeft: 4 }}>*</span>
+                  <span style={{ fontSize: 11, color: '#E53935', fontWeight: 400, marginLeft: 8 }}>記錄該筆充值業績歸屬BD，沒有實收，則不會計算績效！</span>
+                </span>
+              }
+              required
+              style={{ marginBottom: 0 }}
+            >
               <InputNumber
                 placeholder="請輸入充值金額"
                 min={0}
                 precision={2}
                 value={virtualAmount || undefined}
                 onChange={(v) => setVirtualAmount(v || 0)}
-                style={{ width: 280 }}
+                style={{ width: '100%' }}
+                addonAfter="MOP"
                 formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                 parser={(v) => Number(v?.replace(/,/g, '') || 0)}
               />
               {virtualAmount > 0 && (
-                <span style={{ color: '#E8720C', fontSize: 13, fontWeight: 500 }}>{amountToChinese(virtualAmount)}</span>
+                <span style={{ color: '#E8720C', fontSize: 12, fontWeight: 500, marginTop: 4, display: 'block' }}>{amountToChinese(virtualAmount)}</span>
               )}
-            </div>
-            {!virtualAmount && <div style={{ color: '#E53935', fontSize: 12, marginTop: 4 }}>必填字段不可為空</div>}
-          </Form.Item>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="歸屬BD" name="bd">
+            </Form.Item>
+            <Form.Item label="歸屬BD" name="bd" style={{ marginBottom: 0 }}>
               <Select placeholder="請選擇BD" options={bdOptions} allowClear />
             </Form.Item>
-            <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
-              <span style={{ fontSize: 12, color: '#E53935' }}>
-                記錄該筆充值業績歸屬BD，沒有實收，則不會計算績效！
-              </span>
-            </div>
           </div>
 
-          <Form.Item label="是否實收" name="isActual" rules={[{ required: true }]}>
-            <Radio.Group onChange={(e) => setIsActual(e.target.value)}>
-              <Radio value={true}>是</Radio>
-              <Radio value={false}>否</Radio>
-            </Radio.Group>
-          </Form.Item>
-          <div style={{
-            padding: '10px 14px', background: '#fff2f0', border: '1px solid #ffccc7',
-            borderRadius: 6, marginBottom: 16, fontSize: 12, color: '#595959', lineHeight: 1.8,
-          }}>
-            <span style={{ color: '#E53935', fontWeight: 500 }}>說明：</span>
-            選擇【是】：將根據「實收賬戶充值」所填寫的金額向商家收取對應金額。<br />
-            選擇【否】：無需向商家收費，該筆金額直接充值到商家虛擬賬戶。
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <span style={{ fontSize: 14, color: '#262626' }}>
+              是否實收
+              <Tooltip title={
+                <div style={{ fontSize: 12, lineHeight: 1.8 }}>
+                  <div>開啟：將根據「實收賬戶充值」所填寫的金額向商家收取對應金額。</div>
+                  <div>關閉：無需向商家收費，該筆金額直接充值到商家虛擬賬戶。</div>
+                </div>
+              }>
+                <QuestionCircleOutlined style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 6, cursor: 'help' }} />
+              </Tooltip>
+            </span>
+            <Switch
+              checked={isActual}
+              checkedChildren="是"
+              unCheckedChildren="否"
+              onChange={(checked) => setIsActual(checked)}
+            />
           </div>
 
           {isActual && (
-            <div style={{ padding: 16, background: '#fafafa', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
-              <Form.Item label="實收賬戶充值" name="actualPayMethod" rules={[{ required: true, message: '請選擇充值方式' }]} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <Select placeholder="請選擇" options={actualPayOptions} style={{ width: 200 }} />
-                  <span style={{ color: '#8c8c8c', fontSize: 13 }}>優惠金額</span>
-                  <span style={{ color: '#52c41a', fontWeight: 600, fontSize: 15 }}>¥ 10,000</span>
-                </div>
-              </Form.Item>
-
-              <Form.Item
-                label="銀行轉賬"
-                required
-                style={{ marginBottom: 0 }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <InputNumber
-                    placeholder="請輸入銀行轉賬金額"
-                    min={0}
-                    precision={2}
-                    value={bankAmount || undefined}
-                    onChange={(v) => setBankAmount(v || 0)}
-                    style={{ width: 280 }}
-                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(v) => Number(v?.replace(/,/g, '') || 0)}
+            <>
+              {/* 實收賬戶充值 */}
+              <div style={{
+                borderRadius: 8, padding: '16px 20px', marginBottom: 16,
+                background: '#FAFAFA', border: '1px solid #f0f0f0',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>實收賬戶充值</span>
+                  <Select
+                    options={actualPayOptions}
+                    value={payMethod}
+                    onChange={setPayMethod}
+                    style={{ width: 180 }}
                   />
-                  {bankAmount > 0 && (
-                    <span style={{ color: '#E8720C', fontSize: 13, fontWeight: 500 }}>{amountToChinese(bankAmount)}</span>
+                  {(payMethod === 'mixed' || payMethod === 'revenue') && (
+                    <span style={{ fontSize: 12, color: '#E53935' }}>
+                      審批通過，系統會自動充值該筆金額，但不會自動扣款商家營業額，會生成欠款單，後續由人工操作扣款
+                    </span>
                   )}
                 </div>
-              </Form.Item>
-            </div>
+
+                {/* 混合支付：銀行轉賬 + 營業額扣款 並排 */}
+                {payMethod === 'mixed' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
+                        銀行轉賬 <span style={{ color: '#E53935' }}>*</span>
+                      </div>
+                      <InputNumber
+                        placeholder="請輸入銀行轉賬金額"
+                        min={0}
+                        precision={2}
+                        value={bankAmount || undefined}
+                        onChange={(v) => setBankAmount(v || 0)}
+                        style={{ width: '100%' }}
+                        addonAfter="MOP"
+                        formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={(v) => Number(v?.replace(/,/g, '') || 0)}
+                      />
+                      {bankAmount > 0 && (
+                        <span style={{ color: '#1890ff', fontSize: 12, fontWeight: 500, marginTop: 4, display: 'block' }}>{amountToChinese(bankAmount)}</span>
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
+                        營業額扣款 <span style={{ color: '#E53935' }}>*</span>
+                      </div>
+                      <InputNumber
+                        placeholder="請輸入營業額扣款金額"
+                        min={0}
+                        precision={2}
+                        value={revenueAmount || undefined}
+                        onChange={(v) => setRevenueAmount(v || 0)}
+                        style={{ width: '100%' }}
+                        addonAfter="MOP"
+                        formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={(v) => Number(v?.replace(/,/g, '') || 0)}
+                      />
+                      {revenueAmount > 0 && (
+                        <span style={{ color: '#722ed1', fontSize: 12, fontWeight: 500, marginTop: 4, display: 'block' }}>{amountToChinese(revenueAmount)}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 對公轉賬：僅銀行轉賬 */}
+                {payMethod === 'corporate' && (
+                  <div style={{ marginBottom: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
+                      銀行轉賬 <span style={{ color: '#E53935' }}>*</span>
+                    </div>
+                    <InputNumber
+                      placeholder="請輸入銀行轉賬金額"
+                      min={0}
+                      precision={2}
+                      value={bankAmount || undefined}
+                      onChange={(v) => setBankAmount(v || 0)}
+                      style={{ width: 280 }}
+                      addonAfter="MOP"
+                      formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={(v) => Number(v?.replace(/,/g, '') || 0)}
+                    />
+                    {bankAmount > 0 && (
+                      <span style={{ color: '#1890ff', fontSize: 12, fontWeight: 500, marginTop: 4, display: 'block' }}>{amountToChinese(bankAmount)}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* 營業額支付：僅營業額扣款 */}
+                {payMethod === 'revenue' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
+                      營業額扣款 <span style={{ color: '#E53935' }}>*</span>
+                    </div>
+                    <InputNumber
+                      placeholder="請輸入營業額扣款金額"
+                      min={0}
+                      precision={2}
+                      value={revenueAmount || undefined}
+                      onChange={(v) => setRevenueAmount(v || 0)}
+                      style={{ width: 280 }}
+                      addonAfter="MOP"
+                      formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={(v) => Number(v?.replace(/,/g, '') || 0)}
+                    />
+                    {revenueAmount > 0 && (
+                      <span style={{ color: '#722ed1', fontSize: 12, fontWeight: 500, marginTop: 4, display: 'block' }}>{amountToChinese(revenueAmount)}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* 優惠金額展示 */}
+                {discountAmount > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                    padding: '10px 20px', marginBottom: 16, borderRadius: 8,
+                    background: 'linear-gradient(135deg, #f6ffed, #e8f5e9)',
+                    border: '1px solid #52c41a22',
+                  }}>
+                    <span style={{ fontSize: 13, color: '#595959' }}>優惠金額</span>
+                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                      虛擬賬戶充值 MOP {virtualAmount.toLocaleString()} - 實收賬戶充值 MOP {actualTotal.toLocaleString()} =
+                    </span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#52C41A' }}>MOP {discountAmount.toLocaleString()}</span>
+                  </div>
+                )}
+                
+                {/* 扣款門店（混合支付 & 營業額支付） */}
+                {(payMethod === 'mixed' || payMethod === 'revenue') && (
+                  <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+
+                    {/* 扣款門店 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+                      </div>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>扣款門店</span>
+                      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+                      <Button type="primary" size="small" icon={<PlusOutlined />}
+                        style={{ borderRadius: 6 }}
+                        onClick={() => setShowAddRow(true)}
+                      >添加門店</Button>
+                    </div>
+                    <Table
+                      rowKey="storeId"
+                      dataSource={[...deductRows, ...(showAddRow ? [{ storeId: '__pending__', storeLabel: '', amount: 0 }] : [])]}
+                      pagination={false}
+                      bordered
+                      size="small"
+                      columns={[
+                        {
+                          title: '門店ID/名稱',
+                          dataIndex: 'storeLabel',
+                          width: 240,
+                          render: (val: string, record: DeductStoreRow) => {
+                            if (record.storeId === '__pending__') {
+                              return (
+                                <Select
+                                  placeholder="輸入門店名稱或ID查詢"
+                                  options={deductStoreOptions}
+                                  value={pendingStoreId}
+                                  onChange={(v) => {
+                                    setPendingStoreId(v)
+                                    if (v && pendingAmount && pendingAmount > 0) {
+                                      setTimeout(() => { handleAddDeductRow(); setShowAddRow(false) }, 100)
+                                    }
+                                  }}
+                                  showSearch
+                                  allowClear
+                                  style={{ width: '100%' }}
+                                  filterOption={(input, option) => (option?.label ?? '').includes(input)}
+                                />
+                              )
+                            }
+                            return <span style={{ fontSize: 13 }}>{val}</span>
+                          },
+                        },
+                        {
+                          title: '扣款金額',
+                          dataIndex: 'amount',
+                          width: 180,
+                          align: 'center',
+                          render: (val: number, record: DeductStoreRow) => {
+                            if (record.storeId === '__pending__') {
+                              return (
+                                <InputNumber
+                                  placeholder="請輸入扣款金額"
+                                  min={0}
+                                  precision={2}
+                                  value={pendingAmount}
+                                  onChange={(v) => {
+                                    setPendingAmount(v ?? undefined)
+                                    if (pendingStoreId && v && v > 0) {
+                                      setTimeout(() => { handleAddDeductRow(); setShowAddRow(false) }, 100)
+                                    }
+                                  }}
+                                  style={{ width: '100%' }}
+                                  addonAfter="MOP"
+                                />
+                              )
+                            }
+                            return (
+                              <span style={{ color: '#E8720C', fontWeight: 600, fontSize: 13 }}>{val.toLocaleString()} MOP</span>
+                            )
+                          },
+                        },
+                        {
+                          title: '操作',
+                          width: 80,
+                          align: 'center',
+                          render: (_: unknown, record: DeductStoreRow) => (
+                            <Button type="link" danger size="small" onClick={() => {
+                              if (record.storeId === '__pending__') {
+                                handleClearPendingRow()
+                                setShowAddRow(false)
+                              } else {
+                                handleRemoveDeductRow(record.storeId)
+                              }
+                            }}>刪除</Button>
+                          ),
+                        },
+                      ]}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 
@@ -406,13 +748,53 @@ export default function RechargeAdd() {
         </div>
       </Form>
 
-      {/* 底部操作按鈕（取消/確認） */}
+      {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
         <Button onClick={() => navigate('/account-balance')}>取消</Button>
-        <Button type="primary" icon={<SaveOutlined />} onClick={handleSubmit}>
-          確認
+        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit}>
+          提交申請
         </Button>
       </div>
+
+      {/* ====== 提交成功彈窗 ====== */}
+      {successVisible && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 12, padding: '32px 28px',
+            width: 400, textAlign: 'center',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{
+              width: 64, height: 64, margin: '0 auto 20px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #52C41A, #73D13D)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(82,196,26,0.3)',
+            }}>
+              <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+              提交成功
+            </h3>
+            <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+            </p>
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => navigate('/account-balance')}
+              style={{ minWidth: 120, height: 40, borderRadius: 8 }}
+            >
+              返回列表{countdown > 0 && ` (${countdown}s)`}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

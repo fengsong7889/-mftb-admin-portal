@@ -1,4 +1,4 @@
-import { useState , useMemo } from 'react'
+import { useState , useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message } from 'antd'
 import type { TableColumnsType } from 'antd'
@@ -11,6 +11,7 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { getApprovalRecords, type ApprovalRecord as CustomApprovalRecord } from '../../utils/approvalStore'
 
 const { RangePicker } = DatePicker
 
@@ -82,17 +83,17 @@ interface ApprovalRecord {
 const mockData: ApprovalRecord[] = [
   { key: '13', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'ZS202607170000', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 10:00:00', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '14', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'ZS202607170001', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 11:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-07-17 12:20:00', bizApproveStatus: 'approved', opsApprover: '劉邦(000)', opsApproveTime: '2026-07-17 14:30:00', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '1', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'CZ202601160000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
+  { key: '1', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'CZ202601160000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '2', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'KK202601160000', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '混合支付營業額佔比太高' },
   { key: '3', groupId: '1003', groupName: '海底撈', brand: 'flashBee', flowNo: 'ZZ202601160000', approvalType: 'transfer', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'rejected', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '營收不足以抵扣該營業額支付' },
   { key: '4', groupId: '1004', groupName: '麥當勞', brand: 'mFood', flowNo: 'HB202601160000', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '5', groupId: '1005', groupName: '星巴克', brand: 'flashBee', flowNo: 'CZ202601160001', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
+  { key: '5', groupId: '1005', groupName: '星巴克', brand: 'flashBee', flowNo: 'CZ202601160001', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '6', groupId: '1006', groupName: '肯德基', brand: 'mFood', flowNo: 'KK202601160001', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '7', groupId: '1007', groupName: '必勝客', brand: 'flashBee', flowNo: 'ZZ202601160001', approvalType: 'transfer', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
-  { key: '8', groupId: '1008', groupName: '漢堡王', brand: 'mFood', flowNo: 'CZ202601160002', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '不符合推廣金使用規範' },
+  { key: '8', groupId: '1008', groupName: '漢堡王', brand: 'mFood', flowNo: 'CZ202601160002', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '9', groupId: '1009', groupName: '必勝客旗艦店', brand: 'flashBee', flowNo: 'HB202601160001', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'cancelled', rejectReason: '' },
   { key: '10', groupId: '1010', groupName: '喜茶', brand: 'mFood', flowNo: 'KK202601160002', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '11', groupId: '1011', groupName: '奈雪的茶', brand: 'flashBee', flowNo: 'CZ202601170000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-17 10:20:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-17 11:30:00', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-17 14:15:00', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-17 16:45:00', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
+  { key: '11', groupId: '1011', groupName: '奈雪的茶', brand: 'flashBee', flowNo: 'CZ202601170000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-17 10:20:00', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '12', groupId: '1012', groupName: '真功夫', brand: 'mFood', flowNo: 'HB202601180000', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-18 08:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-18 09:45:00', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-18 11:20:00', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '品牌合併不符合規範' },
 ]
 
@@ -103,13 +104,23 @@ export default function ApprovalCenter() {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [approveRecord, setApproveRecord] = useState<ApprovalRecord | null>(null)
   const [form] = Form.useForm()
+  const [customRecords, setCustomRecords] = useState<ApprovalRecord[]>([])
+
+  /** 加載自定義審批記錄 */
+  useEffect(() => {
+    const records = getApprovalRecords() as ApprovalRecord[]
+    setCustomRecords(records)
+  }, [])
+
+  /** 合併 Mock 數據 + 自定義記錄（新記錄在前） */
+  const allData = useMemo(() => [...customRecords, ...mockData], [customRecords])
 
   const handleDetail = (record: ApprovalRecord) => {
-    navigate(`/approval-detail?type=${record.approvalType}`)
+    navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
   }
 
   const handleApprove = (record: ApprovalRecord) => {
-    navigate(`/approval-detail?type=${record.approvalType}`)
+    navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
   }
 
   const handleCancel = (record: ApprovalRecord) => {
@@ -340,10 +351,10 @@ export default function ApprovalCenter() {
       <div className="table-section approval-table">
         <Table<ApprovalRecord>
           columns={applyConfig(columns)}
-          dataSource={mockData}
+          dataSource={allData}
           rowSelection={{}}
           pagination={{
-            total: mockData.length,
+            total: allData.length,
             pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,

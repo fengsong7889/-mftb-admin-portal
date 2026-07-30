@@ -1,4 +1,5 @@
 import { useState , useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button, Input, Select, Table, Tag, Form, DatePicker } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -9,10 +10,11 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { getBatchRecords } from '../../utils/approvalStore'
 
 const { RangePicker } = DatePicker
 
-/** 批次类型选项 */
+/** 批次类型选项（僅充值/轉賬/合併生成批次，扣款不生成批次） */
 const batchTypeOptions = [
   { label: '全部', value: 'all' },
   { label: '充值', value: 'recharge' },
@@ -37,11 +39,11 @@ interface BatchRecord {
   batchType: string
   batchNo: string
   flowNo: string
-  rechargeTime: string
+  tradeTime: string
   isActual: string
-  virtualAmount: number
-  actualAmount: number
-  discountAmount: number
+  virtualAmount: number | null
+  actualAmount: number | null
+  discountAmount: number | null
   applicant: string
   bd: string
   remark: string
@@ -56,40 +58,87 @@ const batchTypeMap: Record<string, string> = {
   merge: '合併',
 }
 
-/** 模拟数据 */
-const groupNames = ['廣州酒家', '海底撈', '星巴克', '麥當勞', '肯德基', '必勝客', '喜茶', '奈雪的茶', '真功夫', '大吉鴨', '太二酸菜魚', '瑞幸咖啡']
-const batchTypes = ['recharge', 'recharge', 'transfer', 'recharge', 'merge', 'recharge', 'transfer', 'recharge', 'merge', 'recharge', 'recharge', 'transfer']
-const actualFlags = ['是', '是', '否', '是', '--', '--', '--', '--', '--', '是', '是', '--']
-const remarks = ['新店首充，獎勵多', '月度充值獎勵', '不綁定BD', '節日活動充值', '--', '--', '跨店轉賬充值', '--', '不綁定BD', '日常充值', '促銷充值活動', '--']
-const virtualAmounts = [28000, 26000, 24000, 22000, 20000, 28000, 26000, 24000, 22000, 20000, 28000, 26000]
-const actualAmounts = [20000, 22000, 16000, 18000, 14000, 20000, 22000, 16000, 18000, 14000, 20000, 22000]
+/** 模拟数据（覆蓋充值/轉賬/合併三類，非充值類型實收與優惠為空） */
+const flowPrefixMap: Record<string, string> = { recharge: 'CZ', transfer: 'ZZ', merge: 'HB' }
 
-const mockData: BatchRecord[] = Array.from({ length: 12 }, (_, i) => ({
+interface MockRowSeed {
+  groupName: string
+  batchType: string
+  seq: number
+  isActual: string
+  virtualAmount: number
+  actualAmount: number | null
+  discountAmount: number | null
+  bd: string
+  remark: string
+}
+
+const mockSeeds: MockRowSeed[] = [
+  { groupName: '廣州酒家', batchType: 'recharge', seq: 1, isActual: '是', virtualAmount: 28000, actualAmount: 20000, discountAmount: 8000, bd: '關山月(001)', remark: '新店首充，獎勵多' },
+  { groupName: '海底撈', batchType: 'transfer', seq: 2, isActual: '--', virtualAmount: -24000, actualAmount: null, discountAmount: null, bd: '--', remark: '集團間餘額調撥（轉出）' },
+  { groupName: '星巴克', batchType: 'recharge', seq: 3, isActual: '是', virtualAmount: 24000, actualAmount: 18000, discountAmount: 6000, bd: '關山月(001)', remark: '節日活動充值' },
+  { groupName: '麥當勞', batchType: 'recharge', seq: 4, isActual: '否', virtualAmount: 22000, actualAmount: null, discountAmount: 6000, bd: '--', remark: '不綁定BD' },
+  { groupName: '肯德基', batchType: 'merge', seq: 5, isActual: '--', virtualAmount: -20000, actualAmount: null, discountAmount: null, bd: '--', remark: '集團合併，資產轉移（註銷）' },
+  { groupName: '必勝客', batchType: 'transfer', seq: 2, isActual: '--', virtualAmount: 24000, actualAmount: null, discountAmount: null, bd: '--', remark: '集團間餘額調撥（轉入）' },
+  { groupName: '喜茶', batchType: 'recharge', seq: 6, isActual: '是', virtualAmount: 26000, actualAmount: 20000, discountAmount: 6000, bd: '關山月(001)', remark: '月度充值獎勵' },
+  { groupName: '奈雪的茶', batchType: 'transfer', seq: 7, isActual: '--', virtualAmount: -30000, actualAmount: null, discountAmount: null, bd: '--', remark: '集團間餘額調撥（轉出）' },
+  { groupName: '真功夫', batchType: 'merge', seq: 5, isActual: '--', virtualAmount: 20000, actualAmount: null, discountAmount: null, bd: '--', remark: '集團合併，資產轉移（存續）' },
+  { groupName: '大吉鴨', batchType: 'recharge', seq: 8, isActual: '是', virtualAmount: 20000, actualAmount: 14000, discountAmount: 6000, bd: '關山月(001)', remark: '日常充值' },
+  { groupName: '太二酸菜魚', batchType: 'transfer', seq: 7, isActual: '--', virtualAmount: 30000, actualAmount: null, discountAmount: null, bd: '--', remark: '集團間餘額調撥（轉入）' },
+  { groupName: '瑞幸咖啡', batchType: 'recharge', seq: 10, isActual: '是', virtualAmount: 28000, actualAmount: 20000, discountAmount: 8000, bd: '關山月(001)', remark: '促銷充值活動' },
+]
+
+const mockData: BatchRecord[] = mockSeeds.map((s, i) => ({
   key: String(i + 1),
   index: i + 1,
   groupId: i % 2 === 0 ? '100001' : '100002',
-  groupName: groupNames[i],
+  groupName: s.groupName,
   brand: i % 3 === 0 ? 'flashBee' : 'mFood',
-  batchType: batchTypes[i],
-  batchNo: 'PC202612281',
-  flowNo: '202601',
-  rechargeTime: '2026-02-28 18:20:21',
-  isActual: actualFlags[i],
-  virtualAmount: virtualAmounts[i],
-  actualAmount: actualAmounts[i],
-  discountAmount: 8000,
-  applicant: '藥殘(0001)',
-  bd: i % 3 === 0 ? '--' : '關山月(001)',
-  remark: remarks[i],
+  batchType: s.batchType,
+  batchNo: `PC20260228${String(s.seq).padStart(4, '0')}`,
+  flowNo: `${flowPrefixMap[s.batchType]}20260228${String(s.seq).padStart(4, '0')}`,
+  tradeTime: '2026-02-28 18:20:21',
+  isActual: s.isActual,
+  virtualAmount: s.virtualAmount,
+  actualAmount: s.actualAmount,
+  discountAmount: s.discountAmount,
+  applicant: '朱棣(002)',
+  bd: s.bd,
+  remark: s.remark,
 }))
 
-/** 格式化金额（带正号） */
-const formatAmount = (val: number, prefix = '+') => {
-  return `${prefix}${val.toLocaleString()}`
+/** 格式化金额：正數帶+號、負數帶-號，空值顯示 -- */
+const formatAmount = (val: number | null | undefined) => {
+  if (val === null || val === undefined) return null
+  return `${val >= 0 ? '+' : '-'}${Math.abs(val).toLocaleString()}`
 }
 
 export default function BatchQuery() {
+  const navigate = useNavigate()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  /** 真實批次記錄（審批全部通過後寫入）+ Mock 數據 */
+  const allData = useMemo<BatchRecord[]>(() => {
+    const stored = getBatchRecords().map(r => ({
+      key: r.key,
+      groupId: r.groupId,
+      groupName: r.groupName,
+      brand: r.brand,
+      batchType: r.batchType,
+      batchNo: r.batchNo,
+      flowNo: r.flowNo,
+      tradeTime: r.tradeTime,
+      isActual: r.isActual,
+      virtualAmount: r.virtualAmount,
+      actualAmount: r.actualAmount,
+      discountAmount: r.discountAmount,
+      applicant: r.applicant,
+      bd: r.bd,
+      remark: r.remark,
+    }))
+    return [...stored, ...mockData].map((r, i) => ({ ...r, index: i + 1 }))
+  }, [])
+
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'index', title: '序號' },
@@ -99,7 +148,7 @@ export default function BatchQuery() {
     { key: 'batchType', title: '批次類型' },
     { key: 'batchNo', title: '批次號' },
     { key: 'flowNo', title: '流程編號' },
-    { key: 'rechargeTime', title: '充值時間' },
+    { key: 'tradeTime', title: '交易時間' },
     { key: 'isActual', title: '實收標記' },
     { key: 'virtualAmount', title: '虛擬金額' },
     { key: 'actualAmount', title: '實收金額' },
@@ -169,9 +218,9 @@ export default function BatchQuery() {
       width: 100,
     },
     {
-      title: '充值時間',
-      dataIndex: 'rechargeTime',
-      key: 'rechargeTime',
+      title: '交易時間',
+      dataIndex: 'tradeTime',
+      key: 'tradeTime',
       width: 180,
     },
     {
@@ -187,24 +236,32 @@ export default function BatchQuery() {
       },
     },
     {
-      title: '虛擬賬戶充值金額',
+      title: '虛擬賬戶變動金額',
       dataIndex: 'virtualAmount',
       key: 'virtualAmount',
       width: 160,
       align: 'right',
-      render: (val: number) => (
-        <span style={{ color: '#E8720C', fontWeight: 500 }}>{formatAmount(val)}</span>
-      ),
+      render: (val: number | null) => {
+        const text = formatAmount(val)
+        if (text === null) return <span style={{ color: '#999' }}>--</span>
+        return (
+          <span style={{ color: (val as number) < 0 ? '#FF4D4F' : '#E8720C', fontWeight: 500 }}>{text}</span>
+        )
+      },
     },
     {
-      title: '實收賬戶充值金額',
+      title: '實收賬戶變動金額',
       dataIndex: 'actualAmount',
       key: 'actualAmount',
       width: 160,
       align: 'right',
-      render: (val: number) => (
-        <span style={{ color: '#1976D2', fontWeight: 500 }}>{formatAmount(val)}</span>
-      ),
+      render: (val: number | null) => {
+        const text = formatAmount(val)
+        if (text === null) return <span style={{ color: '#999' }}>--</span>
+        return (
+          <span style={{ color: (val as number) < 0 ? '#FF4D4F' : '#1976D2', fontWeight: 500 }}>{text}</span>
+        )
+      },
     },
     {
       title: '優惠金額',
@@ -212,7 +269,10 @@ export default function BatchQuery() {
       key: 'discountAmount',
       width: 100,
       align: 'right',
-      render: (val: number) => <span style={{ fontWeight: 500 }}>{val.toLocaleString()}</span>,
+      render: (val: number | null) =>
+        val === null || val === undefined
+          ? <span style={{ color: '#999' }}>--</span>
+          : <span style={{ fontWeight: 500 }}>{val.toLocaleString()}</span>,
     },
     {
       title: '申請人',
@@ -241,7 +301,9 @@ export default function BatchQuery() {
       key: 'action',
       width: 80,
       fixed: 'right',
-      render: () => <a>明細</a>,
+      render: (_, record) => (
+        <a onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}`)}>明細</a>
+      ),
     },
   ]
 
@@ -265,7 +327,7 @@ export default function BatchQuery() {
           <Form.Item label="流程編號">
             <Input placeholder="請輸入流程編號" allowClear />
           </Form.Item>
-          <Form.Item label="充值時間">
+          <Form.Item label="交易時間">
             <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm:ss"
@@ -310,9 +372,9 @@ export default function BatchQuery() {
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={mockData}
+          dataSource={allData}
           pagination={{
-            total: mockData.length,
+            total: allData.length,
             pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,

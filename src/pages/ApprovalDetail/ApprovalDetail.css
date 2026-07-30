@@ -121,6 +121,11 @@
   color: #52c41a;
 }
 
+.approval-section-title--orange {
+  border-left-color: #E8720C;
+  color: #E8720C;
+}
+
 /* 信息网格 */
 .approval-info-grid {
   display: grid;
@@ -160,6 +165,18 @@
 
 .approval-amount--green {
   color: #52c41a;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.approval-amount--blue {
+  color: #1890ff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.approval-amount--purple {
+  color: #722ed1;
   font-size: 18px;
   font-weight: 700;
 }

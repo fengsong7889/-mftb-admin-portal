@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Tag, Input, Modal } from 'antd'
+import { Button, Tag, Input, Modal, Table, message } from 'antd'
 import {
   ArrowLeftOutlined,
   CheckOutlined,
@@ -12,6 +12,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons'
 import './ApprovalDetail.css'
+import { approveCurrentNode, rejectCurrentNode } from '../../utils/approvalStore'
 
 /** 审批历史记录 */
 interface ApprovalTimelineItem {
@@ -34,31 +35,47 @@ interface ApprovalDetailData {
   // 充值
   settlementMethod?: string
   businessType?: string
+  businessChannel?: string
   rechargeAmount?: number
   bankTransfer?: number
+  revenueDeduction?: number
   bdPerson?: string
   discountAmount?: number
+  actualTotal?: number
+  isActual?: boolean
+  payMethod?: 'corporate' | 'mixed' | 'revenue'
+  deductStores?: { storeId: string; storeName: string; amount: number }[]
   // 扣款
+  deductMethodType?: 'consume' | 'batch' | 'account'
   deductMethod?: string
   deductAmount?: number
+  virtualBalance?: number
+  consumeChannel?: string
+  consumeStore?: string
+  consumeType?: string
+  batchNo?: string
+  batchDeductible?: number
+  batchSettlement?: string
   // 转账
   fromGroupId?: string
   fromGroupName?: string
   fromBrand?: string
-  fromAmount?: number
+  fromVirtualBalance?: number
   toGroupId?: string
   toGroupName?: string
   toBrand?: string
-  toAmount?: number
+  transferAmount?: number
   // 合并
+  sourceBrand?: string
   mergeGroupId?: string
   mergeGroupName?: string
   mergeBrand?: string
-  mergeAmount?: number
+  mergeVirtualBalance?: number
+  mergeDebtAmount?: number
   mergeToGroupId?: string
   mergeToGroupName?: string
   mergeToBrand?: string
-  mergeToAmount?: number
+  repayStores?: { storeId: string; storeName: string; bd: string; amount: number }[]
   debtNote?: string
   repaymentStores?: { store: string; channel: string; amount: number; bd: string }[]
   // 推广赠送
@@ -80,121 +97,208 @@ interface ApprovalDetailData {
 
 /** 模拟数据 */
 const mockDetails: Record<string, ApprovalDetailData> = {
-  recharge: {
+  // 充值 — 對公轉賬
+  'CZ202601160000': {
     approvalType: 'recharge',
     applicant: '朱棣(002)',
-    applyDate: '2026-06-01 09:16:21',
-    flowNo: 'CZ20260601000000',
+    applyDate: '2026-01-16 09:16:21',
+    flowNo: 'CZ202601160000',
     flowStatus: '審核中',
-    brand: '2閃蜂',
-    groupId: '100000000000',
-    groupName: '廣州酒家',
-    settlementMethod: '對公轉賬',
-    businessType: '外賣',
-    rechargeAmount: 100000,
-    bankTransfer: 90000,
+    brand: '閃蜂',
+    groupId: '20261298121911',
+    groupName: '亞述集團',
+    isActual: true,
+    payMethod: 'corporate' as const,
+    businessType: '外賣到家',
+    businessChannel: '美食外賣',
     bdPerson: '關山月(001)',
-    discountAmount: 1000,
+    rechargeAmount: 100000,
+    actualTotal: 100000,
+    bankTransfer: 100000,
+    discountAmount: 0,
+    settlementMethod: '對公轉賬',
+    documents: [
+      { type: 'image' }, { type: 'image' },
+      { type: 'pdf', name: '銀行轉賬憑證.pdf' },
+      { type: 'view' },
+    ],
+    notes: '已通過銀行對公轉賬完成匯款，請審批。',
+    hasRevoke: true,
+    timeline: [
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+    ],
+  },
+  // 充值 — 混合支付
+  'CZ202601160001': {
+    approvalType: 'recharge',
+    applicant: '朱棣(002)',
+    applyDate: '2026-01-16 09:16:21',
+    flowNo: 'CZ202601160001',
+    flowStatus: '審核中',
+    brand: '閃蜂',
+    groupId: '20261298121911',
+    groupName: '亞述集團',
+    isActual: true,
+    payMethod: 'mixed' as const,
+    businessType: '外賣到家',
+    businessChannel: '美食外賣',
+    bdPerson: '關山月(001)',
+    rechargeAmount: 100000,
+    actualTotal: 85000,
+    bankTransfer: 50000,
+    revenueDeduction: 35000,
+    discountAmount: 15000,
+    deductStores: [
+      { storeId: '1234567890', storeName: '廣州酒店天河廣場1號店', amount: 20000 },
+      { storeId: '2345678910', storeName: '廣州酒店越秀領展2號店', amount: 15000 },
+    ],
+    settlementMethod: '混合支付',
     documents: [
       { type: 'image' }, { type: 'image' }, { type: 'image' },
       { type: 'pdf', name: '合同文件1.pdf' }, { type: 'pdf', name: '合同文件2.pdf' },
       { type: 'view' },
     ],
     notes: '請領導迅速審批，老闆等著推廣金到賬，消費一波，謝謝！',
-    hasRevoke: false,
+    hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '2026-01-18 10:18:26', approver: '贏政(999)', status: 'rejected', comment: '下次一定要拍攝清晰，紙質合同請保留好，避免後續出現糾紛。', rejectReason: '相關證明一定要清晰，快速可查……' },
-      { node: '運營主管審批', time: '2026-01-17 10:18:26', approver: '劉邦(000)', status: 'approved', comment: '相關證明一定要清晰，快速可查，後續如還需要依賴紙質合同快速核對問題，有多少時間和精力，能確保100%找到嗎，保障O風險，駁回重新提交。' },
-      { node: '業務主管審批', time: '2026-01-16 09:19:21', approver: '朱元璋(001)', status: 'approved', comment: '合同拍攝不是很清晰，但我已經線下核對無誤，本次先審核通過，請下一節點審批人通過。' },
-      { node: '流程創建', time: '2026-01-16 09:19:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+    ],
+  },
+  // 充值 — 營業額支付
+  'CZ202601160002': {
+    approvalType: 'recharge',
+    applicant: '朱棣(002)',
+    applyDate: '2026-01-16 09:16:21',
+    flowNo: 'CZ202601160002',
+    flowStatus: '審核中',
+    brand: 'mFood',
+    groupId: '20261298121912',
+    groupName: '漢堡王',
+    isActual: true,
+    payMethod: 'revenue' as const,
+    businessType: '團購到店',
+    businessChannel: '團購到店',
+    bdPerson: '浩源(002)',
+    rechargeAmount: 80000,
+    actualTotal: 80000,
+    revenueDeduction: 80000,
+    discountAmount: 0,
+    deductStores: [
+      { storeId: '3456789012', storeName: '漢堡王澳門官也街店', amount: 40000 },
+      { storeId: '4567890123', storeName: '漢堡王澳門議事亭店', amount: 25000 },
+      { storeId: '5678901234', storeName: '漢堡王珠海拱北店', amount: 15000 },
+    ],
+    settlementMethod: '營業額支付',
+    documents: [
+      { type: 'image' }, { type: 'image' },
+      { type: 'pdf', name: '營業額扣款協議.pdf' },
+      { type: 'view' },
+    ],
+    notes: '商家委託進行營業額扣款充值，請審批。',
+    hasRevoke: true,
+    timeline: [
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
   deduct: {
     approvalType: 'deduct',
     applicant: '朱棟(002)',
-    applyDate: '2026-06-01 09:16:21',
-    flowNo: 'KK20260601000000',
+    applyDate: '2026-01-16 09:16:21',
+    flowNo: 'KK202601160000',
     flowStatus: '審核中',
-    brand: '1mFood',
-    groupId: '100000000000',
-    groupName: '廣州酒家',
-    deductMethod: '賬戶扣款',
-    deductAmount: -100021.21,
+    brand: 'mFood',
+    groupId: '20261298121911',
+    groupName: '亞述集團',
+    virtualBalance: 128560.50,
+    deductMethodType: 'consume' as const,
+    deductMethod: '消費扣款',
+    deductAmount: 30000,
+    consumeChannel: '美食外賣',
+    consumeStore: '廣州酒店天河廣場1號店(1234567890)',
+    consumeType: '基礎套餐',
     documents: [
-      { type: 'image' }, { type: 'image' }, { type: 'image' },
-      { type: 'pdf', name: '扣款協議.pdf' },
-      { type: 'view' },
+      { type: 'image' }, { type: 'image' },
+      { type: 'pdf', name: '扣款憑證.pdf' },
     ],
-    notes: '商家需要再巴士進行打廣告，委託我們進行操作，與商家達成協議，扣取推廣金100021.21元；',
+    notes: '商家需要在巴士進行打廣告，委託我們進行操作，與商家達成協議，扣取推廣金30,000元。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '2026-01-18 10:18:26', approver: '贏政(999)', status: 'rejected', comment: '下次一定要拍攝清晰，紙質合同請保留好，避免後續出現糾紛。' },
-      { node: '運營主管審批', time: '2026-01-17 10:18:26', approver: '劉邦(000)', status: 'approved', comment: '相關證明一定要清晰，快速可查，後續如還需要依賴紙質合同快速核對問題，有多少時間和精力，能確保100%找到嗎，保障O風險，駁回重新提交。' },
-      { node: '業務主管審批', time: '2026-01-16 09:19:21', approver: '朱元璋(001)', status: 'approved', comment: '合同拍攝不是很清晰，但我已經線下核對無誤，本次先審核通過，請下一節點審批人通過。' },
-      { node: '流程創建', time: '2026-01-16 09:19:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
     ],
   },
   transfer: {
     approvalType: 'transfer',
     applicant: '朱棟(002)',
-    applyDate: '2026-06-01 09:16:21',
-    flowNo: 'ZZ20260601000000',
+    applyDate: '2026-01-16 09:16:21',
+    flowNo: 'ZZ202601160000',
     flowStatus: '審核中',
-    brand: '1mFood',
-    fromGroupId: '100000000000',
-    fromGroupName: '廣州酒家',
-    fromBrand: '1mFood',
-    fromAmount: -100021.21,
-    toGroupId: '100000000000',
-    toGroupName: '北京烤鴨',
-    toBrand: '1mFood',
-    toAmount: 100021.21,
+    brand: 'mFood',
+    fromGroupId: '20261298121911',
+    fromGroupName: '亞述集團',
+    fromBrand: 'mFood',
+    fromVirtualBalance: 128560.50,
+    toGroupId: '20261298121912',
+    toGroupName: '廣州酒家',
+    toBrand: 'mFood',
+    transferAmount: 50000,
     documents: [
-      { type: 'image' }, { type: 'image' }, { type: 'image' }, { type: 'image' },
+      { type: 'image' }, { type: 'image' }, { type: 'image' },
       { type: 'pdf', name: '轉賬協議.pdf' },
       { type: 'view' },
     ],
-    notes: '商戶A和商戶B已完成合併協議簽訂，現在申請將商戶A賬戶推廣金餘額全部轉入商戶B。',
+    notes: '商戶A和商戶B已完成合併協議簽訂，現在申請將商戶A賬戶推廣金餘額轉入商戶B。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '2026-01-18 10:18:26', approver: '贏政(999)', status: 'rejected', comment: '下次一定要拍攝清晰，紙質合同請保留好，避免後續出現糾紛。' },
-      { node: '運營主管審批', time: '2026-01-17 10:18:26', approver: '劉邦(000)', status: 'approved', comment: '相關證明一定要清晰，快速可查，後續如還需要依賴紙質合同快速核對問題，有多少時間和精力，能確保100%找到嗎，保障O風險，駁回重新提交。' },
-      { node: '業務主管審批', time: '2026-01-16 09:19:21', approver: '朱元璋(001)', status: 'approved', comment: '合同拍攝不是很清晰，但我已經線下核對無誤，本次先審核通過，請下一節點審批人通過。' },
-      { node: '流程創建', time: '2026-01-16 09:19:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
     ],
   },
   merge: {
     approvalType: 'merge',
     applicant: '朱棣(002)',
-    applyDate: '2026-06-01 09:16:21',
-    flowNo: 'HB20260601000000',
+    applyDate: '2026-01-16 09:16:21',
+    flowNo: 'HB202601160000',
     flowStatus: '審核中',
-    brand: '1mFood',
-    mergeGroupId: '100000000000',
-    mergeGroupName: '廣州酒家',
-    mergeBrand: '1mFood',
-    mergeAmount: -100021.21,
-    mergeToGroupId: '100000000000',
-    mergeToGroupName: '北京烤鴨',
-    mergeToBrand: '1mFood',
-    mergeToAmount: 100021.21,
-    debtNote: '欠款賬單 (被合併集團的欠款單遷移至當前集團門店退款)',
-    repaymentStores: [
-      { store: '廣州酒店天河店(123)', channel: '外賣', amount: 3000, bd: '古月(001)' },
-      { store: '廣州酒店天河店(123)', channel: '團購', amount: 2000, bd: '浩源(002)' },
+    brand: 'mFood',
+    sourceBrand: 'mFood',
+    mergeGroupId: '20261298121911',
+    mergeGroupName: '亞述集團',
+    mergeBrand: 'mFood',
+    mergeVirtualBalance: 128560.50,
+    mergeDebtAmount: 15800.00,
+    mergeToGroupId: '20261298121912',
+    mergeToGroupName: '廣州酒家',
+    mergeToBrand: 'mFood',
+    repayStores: [
+      { storeId: '1234567890', storeName: '廣州酒店天河廣場1號店(1234567890)', bd: '關山月(001)', amount: 8000 },
+      { storeId: '2345678910', storeName: '廣州酒店越秀領展2號店(2345678910)', bd: '古月(002)', amount: 5000 },
+      { storeId: '3456789012', storeName: '廣州酒店琶洲保利3號店(3456789012)', bd: '浩遠(003)', amount: 2800 },
     ],
     documents: [
-      { type: 'image' }, { type: 'image' }, { type: 'image' }, { type: 'image' },
+      { type: 'image' }, { type: 'image' }, { type: 'image' },
       { type: 'pdf', name: '合併協議.pdf' },
-      { type: 'view' },
     ],
-    notes: '商戶A和商戶B已完成合併協議簽訂，現在申請將商戶A賬戶推廣金餘額全部轉入商戶B。',
+    notes: '亞述集團和廣州酒家已完成合併協議簽訂，現在申請將亞述集團賬戶推廣金餘額全部轉入廣州酒家。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '2026-01-18 10:18:26', approver: '贏政(999)', status: 'rejected', comment: '下次一定要拍攝清晰，紙質合同請保留好，避免後續出現糾紛。' },
-      { node: '運營主管審批', time: '2026-01-17 10:18:26', approver: '劉邦(000)', status: 'approved', comment: '相關證明一定要清晰，快速可查，後續如還需要依賴紙質合同快速核對問題，有多少時間和精力，能確保100%找到嗎，保障O風險，駁回重新提交。' },
-      { node: '業務主管審批', time: '2026-01-16 09:19:21', approver: '朱元璋(001)', status: 'approved', comment: '合同拍攝不是很清晰，但我已經線下核對無誤，本次先審核通過，請下一節點審批人通過。' },
-      { node: '流程創建', time: '2026-01-16 09:19:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
   gift: {
@@ -237,7 +341,8 @@ export default function ApprovalDetail() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const type = searchParams.get('type') || 'recharge'
-  const data = mockDetails[type] || mockDetails.recharge
+  const flowNo = searchParams.get('flowNo') || ''
+  const data = mockDetails[flowNo] || mockDetails[type] || mockDetails['CZ202601160000']
 
   const [approvalComment, setApprovalComment] = useState('')
   const [showRevokeModal, setShowRevokeModal] = useState(false)
@@ -251,7 +356,17 @@ export default function ApprovalDetail() {
       okText: '確定',
       cancelText: '取消',
       onOk: () => {
-        console.log('Approved with comment:', approvalComment)
+        // 真實提交的流程：三級逐級推進（業務→運營→財務）
+        const result = approveCurrentNode(flowNo)
+        if (result) {
+          if (result.finished) {
+            message.success(`${result.nodeName}通過，流程全部節點審批完成，數據已寫入批次查詢`)
+          } else {
+            message.success(`${result.nodeName}通過，流程進入「${result.nextNode}」節點`)
+          }
+        } else {
+          message.success('審批通過成功')
+        }
         navigate('/approval-center')
       },
     })
@@ -265,7 +380,13 @@ export default function ApprovalDetail() {
     if (!rejectReason.trim()) {
       return
     }
-    console.log('Rejected with reason:', rejectReason)
+    // 真實提交的流程：駁回當前節點，流程結束
+    const rejectedNode = rejectCurrentNode(flowNo, rejectReason)
+    if (rejectedNode) {
+      message.success(`已在「${rejectedNode}」節點駁回，流程已結束`)
+    } else {
+      message.success('審批駁回成功')
+    }
     setShowRejectModal(false)
     navigate('/approval-center')
   }
@@ -345,11 +466,15 @@ export default function ApprovalDetail() {
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {typeTitleMap[type]}-{data.brand}-{data.applyDate.split(' ')[0]}
+                {typeTitleMap[type]}
               </h2>
+              <Tag color="blue">{data.brand}</Tag>
+              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
+              <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            <Button onClick={() => navigate('/approval-center')}>返回</Button>
             {data.hasRevoke && (
               <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
             )}
@@ -390,83 +515,227 @@ export default function ApprovalDetail() {
 
           {/* 充值类型 */}
           {type === 'recharge' && (
-            <div className="approval-section">
-              <div className="approval-section-title approval-section-title--purple">審核資訊</div>
-              <div className="approval-info-grid">
-                <div className="approval-info-item">
-                  <span className="approval-info-label">集團ID</span>
-                  <span className="approval-info-value">{data.groupId}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">集團名稱</span>
-                  <span className="approval-info-value">{data.groupName}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">所屬品牌</span>
-                  <span className="approval-info-value">{data.brand}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">結算方式</span>
-                  <span className="approval-info-value">{data.settlementMethod}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">業務類型</span>
-                  <span className="approval-info-value">{data.businessType}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">歸屬BD</span>
-                  <span className="approval-info-value">{data.bdPerson}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">充值金額</span>
-                  <span className="approval-info-value approval-amount--orange">{data.rechargeAmount?.toLocaleString()}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">銀行轉賬</span>
-                  <span className="approval-info-value approval-amount--orange">{data.bankTransfer?.toLocaleString()}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">優惠金額</span>
-                  <span className="approval-info-value approval-amount--green">{data.discountAmount?.toLocaleString()}</span>
+            <>
+              {/* 充值帳戶資訊 */}
+              <div className="approval-section">
+                <div className="approval-section-title approval-section-title--purple">充值帳戶資訊</div>
+                <div className="approval-info-grid">
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-value">{data.groupId}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-value">{data.groupName}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-value">{data.brand}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">業務類型</span>
+                    <span className="approval-info-value">{data.businessType}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">業務頻道</span>
+                    <span className="approval-info-value">{data.businessChannel}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">歸屬BD</span>
+                    <span className="approval-info-value">{data.bdPerson}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* 充值金額明細 */}
+              <div className="approval-section">
+                <div className="approval-section-title approval-section-title--orange">充值金額明細</div>
+                <div className="approval-info-grid">
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">是否實收</span>
+                    <span className="approval-info-value">{data.isActual ? '是' : '否'}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">虛擬賬戶充值</span>
+                    <span className="approval-info-value approval-amount--orange">MOP {data.rechargeAmount?.toLocaleString()}</span>
+                  </div>
+                  {/* 僅實收時展示結算方式及明細 */}
+                  {data.isActual && (
+                    <>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">結算方式</span>
+                        <span className="approval-info-value">{data.settlementMethod}</span>
+                      </div>
+                      {/* 對公轉賬：僅銀行轉賬 */}
+                      {data.payMethod === 'corporate' && (
+                        <div className="approval-info-item">
+                          <span className="approval-info-label">銀行轉賬</span>
+                          <span className="approval-info-value approval-amount--blue">MOP {data.bankTransfer?.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {/* 混合支付：銀行轉賬 + 營業額扣款 */}
+                      {data.payMethod === 'mixed' && (
+                        <>
+                          <div className="approval-info-item">
+                            <span className="approval-info-label">銀行轉賬</span>
+                            <span className="approval-info-value approval-amount--blue">MOP {data.bankTransfer?.toLocaleString()}</span>
+                          </div>
+                          <div className="approval-info-item">
+                            <span className="approval-info-label">營業額扣款</span>
+                            <span className="approval-info-value approval-amount--purple">MOP {data.revenueDeduction?.toLocaleString()}</span>
+                          </div>
+                          <div className="approval-info-item">
+                            <span className="approval-info-label">實收賬戶充值合計</span>
+                            <span className="approval-info-value approval-amount--orange">MOP {data.actualTotal?.toLocaleString()}</span>
+                          </div>
+                        </>
+                      )}
+                      {/* 營業額支付：僅營業額扣款 */}
+                      {data.payMethod === 'revenue' && (
+                        <>
+                          <div className="approval-info-item">
+                            <span className="approval-info-label">營業額扣款</span>
+                            <span className="approval-info-value approval-amount--purple">MOP {data.revenueDeduction?.toLocaleString()}</span>
+                          </div>
+                          <div className="approval-info-item">
+                            <span className="approval-info-label">實收賬戶充值合計</span>
+                            <span className="approval-info-value approval-amount--orange">MOP {data.actualTotal?.toLocaleString()}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">優惠金額</span>
+                        <span className="approval-info-value approval-amount--green">MOP {(data.discountAmount ?? 0).toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 扣款門店（僅實收 & 混合支付/營業額支付時展示） */}
+              {data.isActual && (data.payMethod === 'mixed' || data.payMethod === 'revenue') && data.deductStores && data.deductStores.length > 0 && (
+                <div className="approval-section">
+                  <div className="approval-section-title">扣款門店</div>
+                  <table className="approval-repayment-table">
+                    <thead>
+                      <tr>
+                        <th>門店ID</th>
+                        <th>門店名稱</th>
+                        <th>扣款金額</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.deductStores.map((store, i) => (
+                        <tr key={i}>
+                          <td>{store.storeId}</td>
+                          <td>{store.storeName}</td>
+                          <td>
+                            <span style={{
+                              display: 'inline-block', padding: '2px 10px', borderRadius: 4,
+                              background: '#fff7e6', color: '#E8720C', fontWeight: 600, fontSize: 13,
+                              border: '1px solid #ffd591',
+                            }}>MOP {store.amount.toLocaleString()}</span>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr style={{ fontWeight: 600, background: '#fafafa' }}>
+                        <td colSpan={2} style={{ textAlign: 'right' }}>合計</td>
+                        <td>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 10px', borderRadius: 4,
+                            background: '#E8720C', color: '#fff', fontWeight: 700, fontSize: 13,
+                          }}>MOP {data.deductStores.reduce((s, r) => s + r.amount, 0).toLocaleString()}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
 
           {/* 扣款类型 */}
           {type === 'deduct' && (
-            <div className="approval-section">
-              <div className="approval-section-title approval-section-title--purple">扣款商戶</div>
-              <div className="approval-info-grid">
-                <div className="approval-info-item">
-                  <span className="approval-info-label">集團ID</span>
-                  <span className="approval-info-value">{data.groupId}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">集團名稱</span>
-                  <span className="approval-info-value">{data.groupName}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">所屬品牌</span>
-                  <span className="approval-info-value">{data.brand}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">扣款方式</span>
-                  <span className="approval-info-value">{data.deductMethod}</span>
-                </div>
-                <div className="approval-info-item">
-                  <span className="approval-info-label">扣款金額</span>
-                  <span className="approval-info-value approval-amount--red">{data.deductAmount?.toLocaleString()}</span>
+            <>
+              {/* 基础信息 */}
+              <div className="approval-section">
+                <div className="approval-section-title approval-section-title--purple">基礎信息</div>
+                <div className="approval-info-grid">
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-value">{data.groupId}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-value">{data.groupName}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-value">{data.brand}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">虛擬賬戶餘額</span>
+                    <span className="approval-info-value approval-amount--blue">MOP {data.virtualBalance?.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+              {/* 扣款方式 */}
+              <div className="approval-section">
+                <div className="approval-section-title approval-section-title--orange">扣款方式</div>
+                <div className="approval-info-grid">
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">扣款方式</span>
+                    <span className="approval-info-value"><Tag color="orange">{data.deductMethod}</Tag></span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">扣款金額</span>
+                    <span className="approval-info-value approval-amount--red">MOP {data.deductAmount?.toLocaleString()}</span>
+                  </div>
+                  {/* 消费扣款特有字段 */}
+                  {data.deductMethodType === 'consume' && (
+                    <>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">業務頻道</span>
+                        <span className="approval-info-value">{data.consumeChannel}</span>
+                      </div>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">門店名稱</span>
+                        <span className="approval-info-value">{data.consumeStore}</span>
+                      </div>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">消費類型</span>
+                        <span className="approval-info-value">{data.consumeType}</span>
+                      </div>
+                    </>
+                  )}
+                  {/* 充值批次扣款特有字段 */}
+                  {data.deductMethodType === 'batch' && (
+                    <>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">批次號</span>
+                        <span className="approval-info-value"><Tag color="blue">{data.batchNo}</Tag></span>
+                      </div>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">可扣金額</span>
+                        <span className="approval-info-value approval-amount--blue">MOP {data.batchDeductible?.toLocaleString()}</span>
+                      </div>
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">結算方式</span>
+                        <span className="approval-info-value">{data.batchSettlement}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
           {/* 转账类型 */}
           {type === 'transfer' && (
             <>
+              {/* 转出集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--purple">轉出商戶</div>
+                <div className="approval-section-title approval-section-title--purple">轉出集團</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">集團ID</span>
@@ -481,13 +750,14 @@ export default function ApprovalDetail() {
                     <span className="approval-info-value">{data.fromBrand}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">轉出金額</span>
-                    <span className="approval-info-value approval-amount--red">{data.fromAmount?.toLocaleString()}</span>
+                    <span className="approval-info-label">虛擬賬戶餘額</span>
+                    <span className="approval-info-value approval-amount--blue">MOP {data.fromVirtualBalance?.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
+              {/* 转入集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--green">轉入商戶</div>
+                <div className="approval-section-title approval-section-title--green">轉入集團</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">集團ID</span>
@@ -501,9 +771,23 @@ export default function ApprovalDetail() {
                     <span className="approval-info-label">所屬品牌</span>
                     <span className="approval-info-value">{data.toBrand}</span>
                   </div>
+                </div>
+              </div>
+              {/* 转账金额 */}
+              <div className="approval-section">
+                <div className="approval-section-title approval-section-title--orange">轉賬金額</div>
+                <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">轉入金額</span>
-                    <span className="approval-info-value approval-amount--orange">+{data.toAmount?.toLocaleString()}</span>
+                    <span className="approval-info-label">轉賬金額</span>
+                    <span className="approval-info-value approval-amount--orange">MOP {data.transferAmount?.toLocaleString()}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">轉出集團扣除</span>
+                    <span className="approval-info-value approval-amount--red">-MOP {data.transferAmount?.toLocaleString()}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">轉入集團增加</span>
+                    <span className="approval-info-value approval-amount--green">+MOP {data.transferAmount?.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -513,8 +797,9 @@ export default function ApprovalDetail() {
           {/* 合并类型 */}
           {type === 'merge' && (
             <>
+              {/* 合并集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--purple">被合併集團資訊</div>
+                <div className="approval-section-title approval-section-title--purple">註銷集團 <Tag color="red" style={{ fontSize: 11, marginLeft: 4 }}>即將關閉</Tag></div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">集團ID</span>
@@ -529,13 +814,18 @@ export default function ApprovalDetail() {
                     <span className="approval-info-value">{data.mergeBrand}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">合併金額</span>
-                    <span className="approval-info-value approval-amount--red">{data.mergeAmount?.toLocaleString()}</span>
+                    <span className="approval-info-label">虛擬賬戶餘額</span>
+                    <span className="approval-info-value approval-amount--blue">MOP {data.mergeVirtualBalance?.toLocaleString()}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">欠款金額</span>
+                    <span className="approval-info-value approval-amount--red">MOP {data.mergeDebtAmount?.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
+              {/* 被合并集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--green">合併至以下集團</div>
+                <div className="approval-section-title approval-section-title--green">存續集團 <Tag color="green" style={{ fontSize: 11, marginLeft: 4 }}>接收資產</Tag></div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">集團ID</span>
@@ -549,42 +839,75 @@ export default function ApprovalDetail() {
                     <span className="approval-info-label">所屬品牌</span>
                     <span className="approval-info-value">{data.mergeToBrand}</span>
                   </div>
-                  <div className="approval-info-item">
-                    <span className="approval-info-label">供入金額</span>
-                    <span className="approval-info-value approval-amount--orange">+{data.mergeToAmount?.toLocaleString()}</span>
-                  </div>
                 </div>
               </div>
-              {/* 欠款賬單 */}
-              <div className="approval-section">
-                <div className="approval-section-title">欠款賬單</div>
-                <div className="approval-debt-note">{data.debtNote}</div>
-                {data.repaymentStores && data.repaymentStores.length > 0 && (
-                  <div className="approval-repayment-title">還款門店選擇</div>
-                )}
-                {data.repaymentStores && (
-                  <table className="approval-repayment-table">
-                    <thead>
-                      <tr>
-                        <th>還款門店</th>
-                        <th>業務頻道</th>
-                        <th>還款金額</th>
-                        <th>選擇BD</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.repaymentStores.map((store, i) => (
-                        <tr key={i}>
-                          <td>{store.store}</td>
-                          <td>{store.channel}</td>
-                          <td className="approval-amount--orange">{store.amount.toLocaleString()}</td>
-                          <td>{store.bd}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              {/* 欠款偿还 */}
+              {data.repayStores && data.repayStores.length > 0 && (
+                <div className="approval-section">
+                  <div className="approval-section-title" style={{ borderLeftColor: '#ff4d4f', color: '#ff4d4f' }}>欠款償還</div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+                    註銷集團存在欠款 MOP {data.mergeDebtAmount?.toLocaleString()}，分配至存續集團下門店進行償還
+                  </div>
+                  <Table
+                    size="small"
+                    bordered
+                    pagination={false}
+                    dataSource={data.repayStores}
+                    rowKey="storeId"
+                    columns={[
+                      {
+                        title: '門店ID/名稱', dataIndex: 'storeName', width: 280,
+                        render: (val: string) => <span>{val}</span>,
+                      },
+                      {
+                        title: '歸屬BD', dataIndex: 'bd', width: 120, align: 'center' as const,
+                        render: (val: string) => <Tag color="blue">{val}</Tag>,
+                      },
+                      {
+                        title: '償還金額', dataIndex: 'amount', width: 160, align: 'center' as const,
+                        render: (val: number) => (
+                          <span style={{
+                            padding: '2px 10px', borderRadius: 4,
+                            background: '#fff7e6', color: '#E8720C', fontWeight: 600, fontSize: 13,
+                            border: '1px solid #ffd591',
+                          }}>
+                            MOP {val.toLocaleString()}
+                          </span>
+                        ),
+                      },
+                    ]}
+                    summary={() => {
+                      const total = data.repayStores!.reduce((sum, s) => sum + s.amount, 0)
+                      return (
+                        <Table.Summary fixed>
+                          <Table.Summary.Row>
+                            <Table.Summary.Cell index={0} colSpan={2} align="center">
+                              <strong>已分配合計</strong>
+                            </Table.Summary.Cell>
+                            <Table.Summary.Cell index={1} align="center">
+                              <span style={{
+                                padding: '2px 10px', borderRadius: 4,
+                                background: '#E8720C', color: '#fff', fontWeight: 700, fontSize: 13,
+                              }}>
+                                MOP {total.toLocaleString()}
+                              </span>
+                            </Table.Summary.Cell>
+                          </Table.Summary.Row>
+                        </Table.Summary>
+                      )
+                    }}
+                  />
+                  {data.repayStores && (
+                    <div style={{ marginTop: 8, fontSize: 12, textAlign: 'right' }}>
+                      {data.repayStores.reduce((sum, r) => sum + r.amount, 0) < (data.mergeDebtAmount || 0) && (
+                        <span style={{ color: '#ff4d4f' }}>
+                          尚有 MOP {(data.mergeDebtAmount! - data.repayStores.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()} 未分配
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 

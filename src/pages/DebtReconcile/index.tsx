@@ -1,5 +1,5 @@
-import { useState , useMemo } from 'react'
-import { Button, Space, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -9,89 +9,180 @@ import {
   ImportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import BrandTag from '../../components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions, isShanfeng } from '../../constants/brand'
+import type { DebtStoreRecord } from '../../utils/approvalStore'
+import { getAllDebtBills } from './mockBills'
 
 const { RangePicker } = DatePicker
 
-/** 账单状态选项 */
+/** 賬單狀態選項 */
 const statusOptions = [
-  { label: '全部', value: 'all' },
   { label: '未結清', value: 'unsettled' },
   { label: '已結清', value: 'settled' },
   { label: '已轉結', value: 'transferred' },
 ]
 
-/** 业务频道选项 */
-const channelOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'Supermarket', value: 'supermarket' },
-  { label: 'Foreign Trade', value: 'foreignTrade' },
-  { label: 'Group Purchase', value: 'groupPurchase' },
+/** 賬單來源選項 */
+const sourceOptions = [
+  { label: '充值營業額扣款', value: 'recharge' },
+  { label: '合併欠款轉入', value: 'merge' },
 ]
 
-/** 欠款记录类型 */
-interface DebtRecord {
-  key: string
-  index: number
-  groupId: string
-  groupName: string
-  storeId: string
-  storeName: string
-  brand: string
-  channel: string
-  bd: string
-  loanDate: string
-  billNo: string
-  batchNo: string
-  approvalFlow: string
-  debtTotal: number
-  paidAmount: number
-  remainAmount: number
-  status: string
+/** 業務頻道選項（全局統一枚舉） */
+const channelOptions = [
+  { label: '美食外賣', value: '美食外賣' },
+  { label: '超市百貨', value: '超市百貨' },
+  { label: '團購到店', value: '團購到店' },
+]
+
+/** 賬單狀態展示映射 */
+const statusMeta: Record<string, { label: string; color: string }> = {
+  unsettled: { label: '未結清', color: 'error' },
+  settled: { label: '已結清', color: 'success' },
+  transferred: { label: '已轉結', color: 'processing' },
 }
 
-/** 品牌映射 */
-const brandMap: Record<string, string> = { '1mFood': '1mFood', flashBee: '2閃蜂' }
+/** 賬單來源展示映射 */
+const sourceLabelMap: Record<string, string> = {
+  recharge: '充值營業額扣款',
+  merge: '合併欠款轉入',
+}
 
-/** BD列表 */
-const bdList = ['古月', '浩遠', '佳明']
+/** 保留兩位小數 */
+const r2 = (n: number) => Math.round(n * 100) / 100
 
-/** 业务频道映射 */
-const channelNames = ['Supermarket', 'Foreign Trade', 'Group Purchase']
+/** 格式化金額（千分位 + 兩位小數） */
+const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/** 模拟数据 */
-const mockData: DebtRecord[] = Array.from({ length: 12 }, (_, i) => {
-  const isSettled = i % 3 === 1
-  const debtTotal = 26000
-  const paidAmount = isSettled ? 26000 : 6000
-  return {
-    key: String(i + 1),
-    index: i + 1,
-    groupId: i % 2 === 0 ? '100001' : '100002',
-    groupName: '廣州酒家',
-    storeId: `S${String(i + 1).padStart(3, '0')}`,
-    storeName: '廣州酒家',
-    brand: i % 3 === 0 ? 'flashBee' : '1mFood',
-    channel: channelNames[i % 3],
-    bd: bdList[i % 3],
-    loanDate: '2026-12-11',
-    billNo: `QK2026120${10 + i}`,
-    batchNo: '123456',
-    approvalFlow: '678910',
-    debtTotal,
-    paidAmount,
-    remainAmount: debtTotal - paidAmount,
-    status: isSettled ? 'settled' : 'unsettled',
-  }
-})
+/* ---- 數字加載動畫（遵循數據指標統計卡標準，支持兩位小數） ---- */
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+  useEffect(() => {
+    const start = performance.now()
+    const animate = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
+      setValue(r2(target * eased))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate)
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+  return value
+}
 
-/** 格式化金额 */
-const fmtAmt = (val: number) => val.toLocaleString()
+function AnimatedAmount({ value }: { value: number }) {
+  const animated = useCountUp(value)
+  return <>{fmtAmt(animated)}</>
+}
+
+/** 品牌待還統計卡（hover 上浮 + 計數動畫） */
+function BrandDebtCard({ icon, label, value, count, color, bgColor }: {
+  icon: string; label: string; value: number; count: number; color: string; bgColor: string
+}) {
+  return (
+    <div
+      className="debt-brand-card"
+      style={{ background: bgColor, border: `1px solid ${color}22`, transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-4px)'
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)'
+      }}
+    >
+      <span className="debt-brand-card-icon">{icon}</span>
+      <div className="debt-brand-card-info">
+        <span className="debt-brand-card-label">{label}</span>
+        <span className="debt-brand-card-sub">未結清 {count} 筆</span>
+      </div>
+      <span className="debt-brand-card-value" style={{ color }}><AnimatedAmount value={value} /></span>
+    </div>
+  )
+}
+
+/** 搜索篩選條件 */
+interface DebtFilters {
+  groupId?: string
+  groupName?: string
+  storeName?: string
+  brand?: string
+  billNo?: string
+  batchNo?: string
+  flowNo?: string
+  status?: string
+  source?: string
+  channel?: string
+  loanDateRange?: [{ format: (f: string) => string }, { format: (f: string) => string }]
+}
 
 export default function DebtReconcile() {
   const navigate = useNavigate()
+  const [form] = Form.useForm()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  /** 列配置元数据 */
+  const [filters, setFilters] = useState<DebtFilters>({})
+
+  /** 全部欠款單（審批通過的真實數據 + Mock 演示數據） */
+  const allBills = useMemo(() => getAllDebtBills(), [])
+
+  /** 按篩選條件過濾 */
+  const filteredBills = useMemo(() => {
+    return allBills.filter(b => {
+      if (filters.groupId && !b.groupId.includes(filters.groupId.trim())) return false
+      if (filters.groupName && !b.groupName.includes(filters.groupName.trim())) return false
+      if (filters.storeName && !b.storeName.includes(filters.storeName.trim())) return false
+      if (filters.brand && filters.brand !== 'all' && b.brand !== filters.brand) return false
+      if (filters.billNo && !b.billNo.includes(filters.billNo.trim())) return false
+      if (filters.batchNo && !b.batchNo.includes(filters.batchNo.trim())) return false
+      if (filters.flowNo && !b.flowNo.includes(filters.flowNo.trim())) return false
+      if (filters.status && b.status !== filters.status) return false
+      if (filters.source && b.source !== filters.source) return false
+      if (filters.channel && b.channel !== filters.channel) return false
+      if (filters.loanDateRange && filters.loanDateRange.length === 2) {
+        const [start, end] = filters.loanDateRange
+        const startStr = start?.format('YYYY-MM-DD')
+        const endStr = end?.format('YYYY-MM-DD')
+        if (startStr && b.loanDate < startStr) return false
+        if (endStr && b.loanDate > endStr) return false
+      }
+      return true
+    })
+  }, [allBills, filters])
+
+  /** 品牌待還統計（僅統計未結清賬單的剩餘待還） */
+  const brandStats = useMemo(() => {
+    const stats = {
+      shanfeng: { amount: 0, count: 0 },
+      mfood: { amount: 0, count: 0 },
+    }
+    filteredBills.forEach(b => {
+      if (b.status !== 'unsettled') return
+      const target = isShanfeng(b.brand) ? stats.shanfeng : stats.mfood
+      target.amount = r2(target.amount + b.remainAmount)
+      target.count += 1
+    })
+    return stats
+  }, [filteredBills])
+
+  /** 查詢 */
+  const handleSearch = () => {
+    setFilters(form.getFieldsValue())
+  }
+
+  /** 重置 */
+  const handleReset = () => {
+    form.resetFields()
+    setFilters({})
+  }
+
+  /** 列配置元數據 */
   const columnMeta = useMemo(() => [
     { key: 'index', title: '序號' },
     { key: 'groupId', title: '集團ID' },
@@ -101,10 +192,11 @@ export default function DebtReconcile() {
     { key: 'brand', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
     { key: 'bd', title: '所屬BD' },
+    { key: 'source', title: '賬單來源' },
     { key: 'loanDate', title: '借款日期' },
     { key: 'billNo', title: '賬單編號' },
-    { key: 'batchNo', title: '批次號' },
-    { key: 'approvalFlow', title: '審批流程' },
+    { key: 'batchNo', title: '關聯批次號' },
+    { key: 'flowNo', title: '流程編號' },
     { key: 'debtTotal', title: '欠款總額' },
     { key: 'paidAmount', title: '已還金額' },
     { key: 'remainAmount', title: '剩餘待還' },
@@ -113,63 +205,63 @@ export default function DebtReconcile() {
   ], [])
 
   const { configComponent, applyConfig } = useColumnConfig('debt-reconcile', columnMeta, [
-    { key: 'action', visible: true, locked: 'tail' as const }
+    { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  
-
-  const columns: TableColumnsType<DebtRecord> = [
-    { title: '序號', dataIndex: 'index', key: 'index', width: 60, align: 'center', fixed: 'left' },
-    { title: '集團ID', dataIndex: 'groupId', key: 'groupId', width: 100, fixed: 'left' },
-    { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 120 },
-    { title: '門店ID', dataIndex: 'storeId', key: 'storeId', width: 90 },
-    { title: '門店名稱', dataIndex: 'storeName', key: 'storeName', width: 120 },
-    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => (
-      <Tag style={{ 
-        margin: 0,
-        padding: '2px 10px',
-        border: v === '閃蜂' || v === 'flashBee' ? '1px solid #fadb14' : '1px solid #fa8c16',
-        color: v === '閃蜂' || v === 'flashBee' ? '#d4b106' : '#d46b08',
-        background: v === '閃蜂' || v === 'flashBee' ? '#fffbe6' : '#fff7e6',
-        borderRadius: 4,
-        fontWeight: 500
-      }}>
-        {brandMap[v] || v}
-      </Tag>
-    ) },
-    { title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 130 },
-    { title: '所屬BD', dataIndex: 'bd', key: 'bd', width: 90 },
-    { title: '借款日期', dataIndex: 'loanDate', key: 'loanDate', width: 120 },
-    { title: '賬單編號', dataIndex: 'billNo', key: 'billNo', width: 140 },
-    { title: '批次號', dataIndex: 'batchNo', key: 'batchNo', width: 100 },
-    { title: '審批流程', dataIndex: 'approvalFlow', key: 'approvalFlow', width: 100 },
+  const columns: TableColumnsType<DebtStoreRecord> = [
     {
-      title: '欠款總額', dataIndex: 'debtTotal', key: 'debtTotal', width: 110, align: 'right',
+      title: '序號', key: 'index', width: 60, align: 'center', fixed: 'left',
+      render: (_, __, i) => i + 1,
+    },
+    { title: '集團ID', dataIndex: 'groupId', key: 'groupId', width: 100, fixed: 'left' },
+    { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 120, fixed: 'left' },
+    { title: '門店ID', dataIndex: 'storeId', key: 'storeId', width: 110 },
+    { title: '門店名稱', dataIndex: 'storeName', key: 'storeName', width: 150 },
+    {
+      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      render: (v: string) => <BrandTag value={v} />,
+    },
+    {
+      title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 100,
+      render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v,
+    },
+    { title: '所屬BD', dataIndex: 'bd', key: 'bd', width: 110 },
+    {
+      title: '賬單來源', dataIndex: 'source', key: 'source', width: 130,
+      render: (v: string) => (
+        <Tag color={v === 'merge' ? 'purple' : 'blue'}>{sourceLabelMap[v] || v}</Tag>
+      ),
+    },
+    { title: '借款日期', dataIndex: 'loanDate', key: 'loanDate', width: 110 },
+    { title: '賬單編號', dataIndex: 'billNo', key: 'billNo', width: 160 },
+    { title: '關聯批次號', dataIndex: 'batchNo', key: 'batchNo', width: 160 },
+    { title: '流程編號', dataIndex: 'flowNo', key: 'flowNo', width: 160 },
+    {
+      title: '欠款總額', dataIndex: 'debtTotal', key: 'debtTotal', width: 120, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '已還金額', dataIndex: 'paidAmount', key: 'paidAmount', width: 110, align: 'right',
-      render: (v: number) => <span style={{ color: '#2E7D32', fontWeight: 500 }}>{fmtAmt(v)}</span>,
+      title: '已還金額', dataIndex: 'paidAmount', key: 'paidAmount', width: 120, align: 'right',
+      render: (v: number) => <span style={{ color: '#52C41A', fontWeight: 500 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '剩餘待還', dataIndex: 'remainAmount', key: 'remainAmount', width: 110, align: 'right',
+      title: '剩餘待還', dataIndex: 'remainAmount', key: 'remainAmount', width: 120, align: 'right',
       render: (v: number) => (
-        <span style={{ color: v > 0 ? '#E53935' : '#2E7D32', fontWeight: 600 }}>{fmtAmt(v)}</span>
+        <span style={{ color: v > 0 ? '#FF4D4F' : '#52C41A', fontWeight: 600 }}>{fmtAmt(v)}</span>
       ),
     },
     {
       title: '賬單狀態', dataIndex: 'status', key: 'status', width: 100,
-      render: (v: string) => (
-        v === 'settled'
-          ? <Tag color="green">已結清</Tag>
-          : v === 'transferred'
-            ? <Tag color="blue">已轉結</Tag>
-            : <Tag color="red">未結清</Tag>
-      ),
+      render: (v: string) => {
+        const meta = statusMeta[v] || { label: v, color: 'default' }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
     },
     {
       title: '操作', key: 'action', width: 80, fixed: 'right',
-      render: () => <a onClick={() => navigate('/debt-detail')}>詳情</a>,
+      render: (_, record) => (
+        <Button type="link" size="small" onClick={() => navigate(`/debt-detail?billNo=${record.billNo}`)}>詳情</Button>
+      ),
     },
   ]
 
@@ -177,76 +269,92 @@ export default function DebtReconcile() {
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="集團ID">
+        <Form layout="inline" form={form}>
+          <Form.Item label="集團ID" name="groupId">
             <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱">
+          <Form.Item label="集團名稱" name="groupName">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="請選擇" options={brandOptions} style={{ width: 140 }} />
+          <Form.Item label="門店名稱" name="storeName">
+            <Input placeholder="請輸入門店名稱" allowClear />
           </Form.Item>
-          <Form.Item label="批次號">
-            <Input placeholder="請輸入批次號" allowClear />
+          <Form.Item label="所屬品牌" name="brand">
+            <Select placeholder="全部" options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="審批流程">
-            <Input placeholder="請輸入審批流程" allowClear />
-          </Form.Item>
-          <Form.Item label="賬單編號">
+          <Form.Item label="賬單編號" name="billNo">
             <Input placeholder="請輸入賬單編號" allowClear />
           </Form.Item>
-          <Form.Item label="借款日期">
+          <Form.Item label="關聯批次號" name="batchNo">
+            <Input placeholder="請輸入批次號" allowClear />
+          </Form.Item>
+          <Form.Item label="流程編號" name="flowNo">
+            <Input placeholder="請輸入流程編號" allowClear />
+          </Form.Item>
+          <Form.Item label="賬單狀態" name="status">
+            <Select placeholder="全部" options={statusOptions} allowClear />
+          </Form.Item>
+          <Form.Item label="賬單來源" name="source">
+            <Select placeholder="全部" options={sourceOptions} allowClear />
+          </Form.Item>
+          <Form.Item label="業務頻道" name="channel">
+            <Select placeholder="全部" options={channelOptions} allowClear />
+          </Form.Item>
+          <Form.Item label="借款日期" name="loanDateRange">
             <RangePicker format="YYYY-MM-DD" placeholder={['開始日期', '結束日期']} />
-          </Form.Item>
-          <Form.Item label="賬單狀態">
-            <Select placeholder="請選擇" options={statusOptions} style={{ width: 120 }} />
-          </Form.Item>
-          <Form.Item label="業務頻道">
-            <Select placeholder="請選擇" options={channelOptions} style={{ width: 140 }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
       </div>
 
-      {/* 功能区域 - 三个特色卡片按钮 */}
-      <div className="debt-action-bar">
-        <div className="debt-stat-card debt-stat-card--red">
-          <span className="debt-stat-icon">💰</span>
-          <span className="debt-stat-label">總待還金額</span>
-          <span className="debt-stat-value">219,821</span>
+      {/* 品牌待還統計卡（閃蜂 / mFood） */}
+      <div className="debt-brand-cards">
+        <BrandDebtCard
+          icon="🐝"
+          label="閃蜂總待還金額"
+          value={brandStats.shanfeng.amount}
+          count={brandStats.shanfeng.count}
+          color="#FB8C00"
+          bgColor="linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%)"
+        />
+        <BrandDebtCard
+          icon="🍔"
+          label="mFood總待還金額"
+          value={brandStats.mfood.amount}
+          count={brandStats.mfood.count}
+          color="#F5680C"
+          bgColor="linear-gradient(135deg, #FBE9E7 0%, #FFCCBC 100%)"
+        />
+      </div>
+
+      {/* 功能区域 */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          <Button className="btn-import" icon={<ImportOutlined />}>還款導入</Button>
         </div>
-        <div className="debt-stat-card debt-stat-card--green">
-          <ExportOutlined className="debt-stat-icon-btn" />
-          <span className="debt-stat-label">導出</span>
-        </div>
-        <div className="debt-stat-card debt-stat-card--purple">
-          <ImportOutlined className="debt-stat-icon-btn" />
-          <span className="debt-stat-label">還款導入</span>
+        <div className="action-section-right">
+          {configComponent}
         </div>
       </div>
 
       {/* 列表区域 */}
-      <div className="action-section">
-        {configComponent}
-      </div>
-
       <div className="table-section">
-        <Table<DebtRecord>
+        <Table<DebtStoreRecord>
+          rowKey="key"
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={mockData}
+          dataSource={filteredBills}
           pagination={{
-            total: mockData.length,
-            pageSize: 10,
+            total: filteredBills.length,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
@@ -255,7 +363,7 @@ export default function DebtReconcile() {
           }}
           size="middle"
           bordered={false}
-          scroll={{ x: 2100 }}
+          scroll={{ x: 2200 }}
         />
       </div>
     </div>

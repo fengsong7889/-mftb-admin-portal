@@ -1,0 +1,150 @@
+import type { DebtStoreRecord } from '../../utils/approvalStore'
+import { getDebtRecords } from '../../utils/approvalStore'
+
+/**
+ * 欠款單 Mock 數據（演示用，覆蓋兩類來源與三種賬單狀態）
+ * 數據來源規則（均需審批通過後生成）：
+ * - source=recharge：推廣金充值實收賬戶含營業額支付（混合支付/營業額支付），
+ *   每個扣款門店生成一條欠款單
+ * - source=merge：商戶合併時註銷集團門店欠款轉入存續集團，
+ *   存續集團每個欠款償還門店生成一條欠款單；原欠款單轉結（status=transferred）
+ * 勾稽關係：欠款總額 = 已還金額 + 剩餘待還；已還金額 = 還款明細合計
+ */
+export const mockDebtBills: DebtStoreRecord[] = [
+  {
+    key: 'mock_debt_1',
+    billNo: 'QK202602150000',
+    groupId: '100001',
+    groupName: '廣州酒家',
+    brand: 'mFood',
+    storeId: '123456782',
+    storeName: '廣州酒家天河店',
+    channel: '美食外賣',
+    bd: '古月(002)',
+    source: 'recharge',
+    loanDate: '2026-02-15',
+    batchNo: 'PC202602150001',
+    flowNo: 'CZ202602150001',
+    debtTotal: 20000,
+    paidAmount: 6000,
+    remainAmount: 14000,
+    status: 'unsettled',
+    repayments: [
+      { key: 'mock_repay_1_1', date: '2026-02-20', channel: '推廣金扣款', amount: 2500, remark: '通過扣款核銷欠款金額，扣款流程編號：KK202602200000', operator: '趙匡胤(004)', operateTime: '2026-02-20 10:12:21', canDelete: true },
+      { key: 'mock_repay_1_2', date: '2026-02-25', channel: '營業額扣款', amount: 3500, remark: '本期門店營業額結算扣回', operator: '系統', operateTime: '2026-02-25 09:00:00', canDelete: true },
+    ],
+  },
+  {
+    key: 'mock_debt_2',
+    billNo: 'QK202602150001',
+    groupId: '100001',
+    groupName: '廣州酒家',
+    brand: 'mFood',
+    storeId: '123456783',
+    storeName: '廣州酒家北京路店',
+    channel: '美食外賣',
+    bd: '古月(002)',
+    source: 'recharge',
+    loanDate: '2026-02-15',
+    batchNo: 'PC202602150001',
+    flowNo: 'CZ202602150001',
+    debtTotal: 6000,
+    paidAmount: 6000,
+    remainAmount: 0,
+    status: 'settled',
+    repayments: [
+      { key: 'mock_repay_2_1', date: '2026-02-22', channel: '營業額扣款', amount: 4000, remark: '本期門店營業額結算扣回', operator: '系統', operateTime: '2026-02-22 09:00:00', canDelete: true },
+      { key: 'mock_repay_2_2', date: '2026-02-26', channel: '對公轉賬', amount: 2000, remark: '商家通過對公轉賬方式償還剩餘欠款', operator: '趙匡胤(004)', operateTime: '2026-02-26 14:35:08', canDelete: true },
+    ],
+  },
+  {
+    key: 'mock_debt_3',
+    billNo: 'QK202602180000',
+    groupId: '100002',
+    groupName: '海底撈',
+    brand: 'flashBee',
+    storeId: '223456781',
+    storeName: '海底撈澳門旗艦店',
+    channel: '團購到店',
+    bd: '浩遠(003)',
+    source: 'recharge',
+    loanDate: '2026-02-18',
+    batchNo: 'PC202602180000',
+    flowNo: 'CZ202602180000',
+    debtTotal: 15800,
+    paidAmount: 3000,
+    remainAmount: 12800,
+    status: 'unsettled',
+    repayments: [
+      { key: 'mock_repay_3_1', date: '2026-02-24', channel: '推廣金扣款', amount: 3000, remark: '通過扣款核銷欠款金額，扣款流程編號：KK202602240000', operator: '趙匡胤(004)', operateTime: '2026-02-24 11:20:45', canDelete: true },
+    ],
+  },
+  {
+    key: 'mock_debt_4',
+    billNo: 'QK202601200000',
+    groupId: '100009',
+    groupName: '亞述集團',
+    brand: 'flashBee',
+    storeId: '923456781',
+    storeName: '亞述烤肉旗艦店',
+    channel: '美食外賣',
+    bd: '關山月(001)',
+    source: 'recharge',
+    loanDate: '2026-01-20',
+    batchNo: 'PC202601200000',
+    flowNo: 'CZ202601200000',
+    debtTotal: 9800,
+    paidAmount: 9800,
+    remainAmount: 0,
+    status: 'transferred',
+    repayments: [
+      { key: 'mock_repay_4_1', date: '2026-01-28', channel: '營業額扣款', amount: 4000, remark: '本期門店營業額結算扣回', operator: '系統', operateTime: '2026-01-28 09:00:00', canDelete: true },
+      { key: 'mock_repay_4_2', date: '2026-02-20', channel: '轉移結算', amount: 5800, remark: '商戶合併，該筆欠款已轉移至存續集團「海底撈」，新賬單編號：QK202602200000', operator: '系統', operateTime: '2026-02-20 16:08:32', canDelete: false },
+    ],
+  },
+  {
+    key: 'mock_debt_5',
+    billNo: 'QK202602200000',
+    groupId: '100002',
+    groupName: '海底撈',
+    brand: 'flashBee',
+    storeId: '223456782',
+    storeName: '海底撈氹仔店',
+    channel: '--',
+    bd: '關山月(001)',
+    source: 'merge',
+    loanDate: '2026-02-20',
+    batchNo: 'PC202602200001',
+    flowNo: 'HB202602200000',
+    debtTotal: 5800,
+    paidAmount: 0,
+    remainAmount: 5800,
+    status: 'unsettled',
+    repayments: [],
+  },
+  {
+    key: 'mock_debt_6',
+    billNo: 'QK202602220000',
+    groupId: '100003',
+    groupName: '星巴克',
+    brand: 'mFood',
+    storeId: '323456781',
+    storeName: '星巴克大三巴店',
+    channel: '超市百貨',
+    bd: '浩遠(003)',
+    source: 'recharge',
+    loanDate: '2026-02-22',
+    batchNo: 'PC202602220000',
+    flowNo: 'CZ202602220000',
+    debtTotal: 12000,
+    paidAmount: 0,
+    remainAmount: 12000,
+    status: 'unsettled',
+    repayments: [],
+  },
+]
+
+/** 獲取全部欠款單（審批通過後的真實數據優先，Mock 數據兜底演示） */
+export function getAllDebtBills(): DebtStoreRecord[] {
+  return [...getDebtRecords(), ...mockDebtBills]
+}

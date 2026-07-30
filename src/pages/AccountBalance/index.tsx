@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Form, message } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Form, message, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -64,10 +64,50 @@ export default function AccountBalance() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [data, setData] = useState<AccountRecord[]>(mockData)
+
+  /** 凍結賬戶 */
+  const handleFreeze = (record: AccountRecord) => {
+    Modal.confirm({
+      title: '確認凍結',
+      content: `確定要凍結「${record.groupName}」的賬戶嗎？凍結後將無法進行充值、轉賬、扣款操作。`,
+      okText: '確定凍結',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setData(prev => prev.map(r => r.key === record.key ? { ...r, status: 'frozen' } : r))
+        message.success(`已凍結「${record.groupName}」賬戶`)
+      },
+    })
+  }
+
+  /** 解凍賬戶 */
+  const handleUnfreeze = (record: AccountRecord) => {
+    Modal.confirm({
+      title: '確認解凍',
+      content: `確定要解凍「${record.groupName}」的賬戶嗎？解凍後可恢復充值、轉賬、扣款操作。`,
+      okText: '確定解凍',
+      cancelText: '取消',
+      onOk: () => {
+        setData(prev => prev.map(r => r.key === record.key ? { ...r, status: 'normal' } : r))
+        message.success(`已解凍「${record.groupName}」賬戶`)
+      },
+    })
+  }
 
   /** 跳轉充值頁面 */
   const openRecharge = (record: AccountRecord) => {
     navigate(`/recharge-add?groupId=${record.groupId}&groupName=${encodeURIComponent(record.groupName)}&brand=${record.brand}`)
+  }
+
+  /** 跳轉轉賬頁面 */
+  const openTransfer = (record: AccountRecord) => {
+    navigate(`/transfer-add?groupId=${record.groupId}&groupName=${encodeURIComponent(record.groupName)}&brand=${record.brand}`)
+  }
+
+  /** 跳轉扣款頁面 */
+  const openDeduct = (record: AccountRecord) => {
+    navigate(`/deduct-add?groupId=${record.groupId}&groupName=${encodeURIComponent(record.groupName)}&brand=${record.brand}`)
   }
 
   /** 操作按钮 - 正常状态 */
@@ -76,9 +116,9 @@ export default function AccountBalance() {
       {hasPermission('edit') && (
         <>
           <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
-          <Button type="link" size="small" onClick={() => message.info(`轉賬：${record.groupName}`)}>轉賬</Button>
-          <Button type="link" size="small" onClick={() => message.info(`扣款：${record.groupName}`)}>扣款</Button>
-          <Button type="link" size="small" danger onClick={() => message.info(`凍結：${record.groupName}`)}>凍結</Button>
+          <Button type="link" size="small" onClick={() => openTransfer(record)}>轉賬</Button>
+          <Button type="link" size="small" onClick={() => openDeduct(record)}>扣款</Button>
+          <Button type="link" size="small" danger onClick={() => handleFreeze(record)}>凍結</Button>
         </>
       )}
       <Button type="link" size="small" onClick={() => navigate('/detail-query')}>明細</Button>
@@ -90,12 +130,7 @@ export default function AccountBalance() {
   const FrozenActions = ({ record }: { record: AccountRecord }) => (
     <Space size={0} split={<span className="action-split">|</span>}>
       {hasPermission('edit') && (
-        <>
-          <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
-          <Button type="link" size="small" onClick={() => message.info(`轉賬：${record.groupName}`)}>轉賬</Button>
-          <Button type="link" size="small" onClick={() => message.info(`扣款：${record.groupName}`)}>扣款</Button>
-          <Button type="link" size="small" onClick={() => message.info(`解凍：${record.groupName}`)}>解凍</Button>
-        </>
+        <Button type="link" size="small" onClick={() => handleUnfreeze(record)}>解凍</Button>
       )}
       <Button type="link" size="small" onClick={() => navigate('/detail-query')}>明細</Button>
       <Button type="link" size="small" onClick={() => navigate('/batch-query')}>批次查詢</Button>
@@ -222,7 +257,7 @@ export default function AccountBalance() {
       <div className="action-section">
         <div className="action-section-left">
           {hasPermission('edit') && (
-            <Button icon={<MergeCellsOutlined />}>
+            <Button icon={<MergeCellsOutlined />} onClick={() => navigate('/merge-add')}>
               商戶合併
             </Button>
           )}
@@ -243,9 +278,9 @@ export default function AccountBalance() {
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={mockData}
+          dataSource={data}
           pagination={{
-            total: mockData.length,
+            total: data.length,
             pageSize: 10,
             showTotal: (total) => `共 ${total} 條`,
             showSizeChanger: true,

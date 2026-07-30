@@ -366,6 +366,16 @@ export default function GiftDetailView() {
               style={{
                 background: c.bg, borderRadius: 10, padding: '16px 20px',
                 border: `1px solid ${c.color}22`, cursor: 'default',
+                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative', overflow: 'hidden',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
               }}
             >
               <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 8 }}>{c.label}</div>

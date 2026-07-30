@@ -13,7 +13,11 @@ import './App.css'
 const Home = lazy(() => import('./pages/Home'))
 const AccountBalance = lazy(() => import('./pages/AccountBalance'))
 const RechargeAdd = lazy(() => import('./pages/AccountBalance/RechargeAdd'))
+const TransferAdd = lazy(() => import('./pages/AccountBalance/TransferAdd'))
+const DeductAdd = lazy(() => import('./pages/AccountBalance/DeductAdd'))
+const MergeAdd = lazy(() => import('./pages/AccountBalance/MergeAdd'))
 const BatchQuery = lazy(() => import('./pages/BatchQuery'))
+const BatchDetail = lazy(() => import('./pages/BatchQuery/BatchDetail'))
 const DetailQuery = lazy(() => import('./pages/DetailQuery'))
 const WriteoffReconcile = lazy(() => import('./pages/WriteoffReconcile'))
 const DebtReconcile = lazy(() => import('./pages/DebtReconcile'))
@@ -106,7 +110,11 @@ function AuthenticatedLayout() {
               {/* 財務管理 */}
               <Route path="/account-balance" element={<AccountBalance />} />
               <Route path="/recharge-add" element={<RechargeAdd />} />
+              <Route path="/transfer-add" element={<TransferAdd />} />
+              <Route path="/deduct-add" element={<DeductAdd />} />
+              <Route path="/merge-add" element={<MergeAdd />} />
               <Route path="/batch-query" element={<BatchQuery />} />
+              <Route path="/batch-detail" element={<BatchDetail />} />
               <Route path="/detail-query" element={<DetailQuery />} />
               <Route path="/writeoff-reconcile" element={<WriteoffReconcile />} />
               <Route path="/debt-reconcile" element={<DebtReconcile />} />
