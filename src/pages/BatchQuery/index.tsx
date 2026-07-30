@@ -1,7 +1,8 @@
-import { useState , useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Input, Select, Table, Tag, Form, DatePicker } from 'antd'
 import type { TableColumnsType } from 'antd'
+import type { Dayjs } from 'dayjs'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -11,6 +12,8 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { getBatchRecords } from '../../utils/approvalStore'
+import { fetchFinBatches, withFinanceFallback } from '../../api/finance'
+import type { FinBatch, FinBatchQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -22,11 +25,11 @@ const batchTypeOptions = [
   { label: '合併', value: 'merge' },
 ]
 
-/** 是否实收选项 */
+/** 是否实收选项（值與後端存儲一致） */
 const actualOptions = [
   { label: '全部', value: 'all' },
-  { label: '是', value: 'yes' },
-  { label: '否', value: 'no' },
+  { label: '是', value: '是' },
+  { label: '否', value: '否' },
 ]
 
 /** 批次记录类型 */
@@ -113,31 +116,136 @@ const formatAmount = (val: number | null | undefined) => {
   return `${val >= 0 ? '+' : '-'}${Math.abs(val).toLocaleString()}`
 }
 
+/** 搜索區篩選條件 */
+interface BatchFilters {
+  groupId?: string
+  groupName?: string
+  brand?: string
+  batchNo?: string
+  flowNo?: string
+  tradeTime?: [Dayjs, Dayjs]
+  isActual?: string
+  batchType?: string
+  applicant?: string
+}
+
+/** 「全部」等價於不篩選 */
+function pickValue(v?: string) {
+  return !v || v === 'all' ? undefined : v
+}
+
+/** 後端不可用時的降級查詢：localStorage 批次記錄 + 演示數據本地篩選分頁 */
+function mockFetchBatches(query: FinBatchQuery) {
+  const stored: BatchRecord[] = getBatchRecords().map(r => ({
+    key: r.key,
+    index: 0,
+    groupId: r.groupId,
+    groupName: r.groupName,
+    brand: r.brand,
+    batchType: r.batchType,
+    batchNo: r.batchNo,
+    flowNo: r.flowNo,
+    tradeTime: r.tradeTime,
+    isActual: r.isActual,
+    virtualAmount: r.virtualAmount,
+    actualAmount: r.actualAmount,
+    discountAmount: r.discountAmount,
+    applicant: r.applicant,
+    bd: r.bd,
+    remark: r.remark,
+  }))
+  const filtered = [...stored, ...mockData].filter(r => {
+    if (query.groupId && !r.groupId.includes(query.groupId)) return false
+    if (query.groupName && !r.groupName.includes(query.groupName)) return false
+    if (query.brand && r.brand !== query.brand) return false
+    if (query.batchType && r.batchType !== query.batchType) return false
+    if (query.batchNo && !r.batchNo.includes(query.batchNo)) return false
+    if (query.flowNo && !r.flowNo.includes(query.flowNo)) return false
+    if (query.isActual && r.isActual !== query.isActual) return false
+    if (query.applicant && !r.applicant.includes(query.applicant)) return false
+    if (query.tradeFrom && r.tradeTime.slice(0, 10) < query.tradeFrom) return false
+    if (query.tradeTo && r.tradeTime.slice(0, 10) > query.tradeTo) return false
+    return true
+  })
+  const page = query.page || 1
+  const size = query.size || 10
+  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
+}
+
 export default function BatchQuery() {
   const navigate = useNavigate()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [searchForm] = Form.useForm<BatchFilters>()
+  const [data, setData] = useState<BatchRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState<BatchFilters>({})
+  const [pagination, setPagination] = useState({ page: 1, size: 10 })
 
-  /** 真實批次記錄（審批全部通過後寫入）+ Mock 數據 */
-  const allData = useMemo<BatchRecord[]>(() => {
-    const stored = getBatchRecords().map(r => ({
-      key: r.key,
-      groupId: r.groupId,
-      groupName: r.groupName,
-      brand: r.brand,
-      batchType: r.batchType,
-      batchNo: r.batchNo,
-      flowNo: r.flowNo,
-      tradeTime: r.tradeTime,
-      isActual: r.isActual,
-      virtualAmount: r.virtualAmount,
-      actualAmount: r.actualAmount,
-      discountAmount: r.discountAmount,
-      applicant: r.applicant,
-      bd: r.bd,
-      remark: r.remark,
-    }))
-    return [...stored, ...mockData].map((r, i) => ({ ...r, index: i + 1 }))
-  }, [])
+  /** 組裝查詢參數 */
+  const buildQuery = useCallback((): FinBatchQuery => ({
+    page: pagination.page,
+    size: pagination.size,
+    groupId: filters.groupId?.trim() || undefined,
+    groupName: filters.groupName?.trim() || undefined,
+    brand: pickValue(filters.brand),
+    batchType: pickValue(filters.batchType),
+    batchNo: filters.batchNo?.trim() || undefined,
+    flowNo: filters.flowNo?.trim() || undefined,
+    isActual: pickValue(filters.isActual),
+    applicant: filters.applicant?.trim() || undefined,
+    tradeFrom: filters.tradeTime?.[0]?.format('YYYY-MM-DD'),
+    tradeTo: filters.tradeTime?.[1]?.format('YYYY-MM-DD'),
+  }), [filters, pagination])
+
+  /** 加載批次列表（後端不可用時降級到本地記錄） */
+  const loadBatches = useCallback(async () => {
+    const query = buildQuery()
+    setLoading(true)
+    try {
+      const res = await withFinanceFallback<{ records: FinBatch[]; total: number }>(
+        () => fetchFinBatches(query),
+        () => mockFetchBatches(query),
+      )
+      const start = (query.page! - 1) * query.size!
+      setData((res.records ?? []).map((r, i) => ({
+        key: `${r.batchNo}-${r.groupId}`,
+        index: start + i + 1,
+        groupId: r.groupId,
+        groupName: r.groupName,
+        brand: r.brand,
+        batchType: r.batchType,
+        batchNo: r.batchNo,
+        flowNo: r.flowNo,
+        tradeTime: r.tradeTime,
+        isActual: r.isActual,
+        virtualAmount: r.virtualAmount,
+        actualAmount: r.actualAmount,
+        discountAmount: r.discountAmount,
+        applicant: r.applicant,
+        bd: r.bd,
+        remark: r.remark,
+      })))
+      setTotal(res.total ?? 0)
+    } finally {
+      setLoading(false)
+    }
+  }, [buildQuery])
+
+  useEffect(() => {
+    void loadBatches()
+  }, [loadBatches])
+
+  const handleSearch = () => {
+    setFilters(searchForm.getFieldsValue())
+    setPagination(p => ({ ...p, page: 1 }))
+  }
+
+  const handleReset = () => {
+    searchForm.resetFields()
+    setFilters({})
+    setPagination({ page: 1, size: 10 })
+  }
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
@@ -302,7 +410,7 @@ export default function BatchQuery() {
       width: 80,
       fixed: 'right',
       render: (_, record) => (
-        <a onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}`)}>明細</a>
+        <a onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}&groupId=${record.groupId}`)}>明細</a>
       ),
     },
   ]
@@ -311,42 +419,42 @@ export default function BatchQuery() {
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="集團ID">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="集團ID" name="groupId">
             <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱">
+          <Form.Item label="集團名稱" name="groupName">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label="所屬品牌" name="brand">
             <Select placeholder="請選擇" options={brandOptions} style={{ width: 140 }} />
           </Form.Item>
-          <Form.Item label="批次編號">
+          <Form.Item label="批次編號" name="batchNo">
             <Input placeholder="請輸入批次編號" allowClear />
           </Form.Item>
-          <Form.Item label="流程編號">
+          <Form.Item label="流程編號" name="flowNo">
             <Input placeholder="請輸入流程編號" allowClear />
           </Form.Item>
-          <Form.Item label="交易時間">
+          <Form.Item label="交易時間" name="tradeTime">
             <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm:ss"
               placeholder={['開始時間', '結束時間']}
             />
           </Form.Item>
-          <Form.Item label="是否實收">
+          <Form.Item label="是否實收" name="isActual">
             <Select placeholder="請選擇" options={actualOptions} style={{ width: 120 }} />
           </Form.Item>
-          <Form.Item label="批次類型">
+          <Form.Item label="批次類型" name="batchType">
             <Select placeholder="請選擇" options={batchTypeOptions} style={{ width: 120 }} />
           </Form.Item>
-          <Form.Item label="申請人">
+          <Form.Item label="申請人" name="applicant">
             <Input placeholder="請輸入申請人姓名/工號" allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
@@ -372,15 +480,18 @@ export default function BatchQuery() {
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={allData}
+          dataSource={data}
+          rowKey="key"
+          loading={loading}
           pagination={{
-            total: allData.length,
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            current: pagination.page,
+            pageSize: pagination.size,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (page, size) => setPagination({ page, size: size || 10 }),
           }}
           size="middle"
           bordered={false}

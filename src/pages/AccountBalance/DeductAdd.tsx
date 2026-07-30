@@ -15,7 +15,9 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
+import { submitDeductApply, withFinanceFallback } from '../../api/finance'
+import type { DeductApplyPayload } from '../../api/finance'
+import { mockSubmitApproval } from '../../api/mock/financeMock'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -152,6 +154,8 @@ export default function DeductAdd() {
   const [deductAmount, setDeductAmount] = useState<number>(0)
   const [certificateFiles, setCertificateFiles] = useState<any[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
   /** 當前批次的可扣金額 */
@@ -191,47 +195,43 @@ export default function DeductAdd() {
       const consumeStoreOpt = storeOptions.find(s => s.value === consumeStoreId)
       const consumeTypeVal = form.getFieldValue('consumeType')
       const consumeChannelVal = form.getFieldValue('consumeChannel')
-      addApprovalRecord({
-        key: `custom_${Date.now()}`,
+      const payload: DeductApplyPayload = {
         groupId: groupIdParam,
         groupName: groupNameParam,
         brand: brandParam,
-        flowNo: generateFlowNo('deduct'),
-        approvalType: 'deduct',
-        applicant: '朱棣(002)',
-        applyTime: formatNow(),
-        bizApprover: '朱元璋(001)',
-        bizApproveTime: '--',
-        bizApproveStatus: 'pending',
-        opsApprover: '--',
-        opsApproveTime: '--',
-        opsApproveStatus: 'pending',
-        finApprover: '--',
-        finApproveTime: '--',
-        finApproveStatus: 'pending',
-        flowStatus: 'pending',
-        rejectReason: '',
-        extra: {
-          deductMethod,
-          deductAmount,
-          virtualBalance: sourceVirtualBalance,
-          consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.label || '',
-          consumeStore: consumeStoreOpt?.label || '',
-          consumeType: consumeTypeOptions.find(t => t.value === consumeTypeVal)?.label || '',
-          consumeBd: form.getFieldValue('consumeBd') || '--',
-          batchNo: deductMethod === 'batch' ? (selectedBatch || '') : '',
-          batchDeductible: deductMethod === 'batch' ? (currentBatch?.deductible || 0) : 0,
-          batchSettlement: deductMethod === 'batch' ? (settlementMap[currentBatch?.settlement || ''] || '') : '',
-          remark: form.getFieldValue('remark') || '',
-        },
-      })
+        deductMethod,
+        deductAmount,
+        virtualBalance: sourceVirtualBalance,
+        consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.label || '',
+        consumeStore: consumeStoreOpt?.label || '',
+        consumeType: consumeTypeOptions.find(t => t.value === consumeTypeVal)?.label || '',
+        consumeBd: form.getFieldValue('consumeBd') || '--',
+        batchNo: deductMethod === 'batch' ? (selectedBatch || '') : '',
+        batchDeductible: deductMethod === 'batch' ? (currentBatch?.deductible || 0) : 0,
+        batchSettlement: deductMethod === 'batch' ? (settlementMap[currentBatch?.settlement || ''] || '') : '',
+        remark: form.getFieldValue('remark') || '',
+      }
+      setSubmitting(true)
+      const flowNo = await withFinanceFallback(
+        () => submitDeductApply(payload),
+        () => mockSubmitApproval({
+          approvalType: 'deduct',
+          groupId: groupIdParam,
+          groupName: groupNameParam,
+          brand: brandParam,
+          extra: { ...payload },
+        }),
+      )
+      setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
     } catch {
-      // 表单校验未通过
+      // 表单校验未通过 / 提交失败（錯誤提示由請求層給出）
+    } finally {
+      setSubmitting(false)
     }
   }
-
+  
   /** 文件上传前校验 */
   const beforeUpload = (file: File) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
@@ -599,7 +599,7 @@ export default function DeductAdd() {
       {/* 底部操作按鈕 */}
       <div className="form-footer">
         <Button onClick={() => navigate('/account-balance')}>取消</Button>
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit}>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
           提交申請
         </Button>
       </div>
@@ -630,6 +630,9 @@ export default function DeductAdd() {
               提交成功
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              {submittedFlowNo && (
+                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+              )}
               該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
             </p>
             <Button

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
@@ -8,6 +8,8 @@ import {
 import BrandTag from '../../components/BrandTag'
 import { getBatchRecordByKey } from '../../utils/approvalStore'
 import type { BatchStoreRecord } from '../../utils/approvalStore'
+import { fetchFinBatchDetail, fetchFinDetails, withFinanceFallback } from '../../api/finance'
+import type { FinBatch, FinDetail } from '../../api/finance'
 
 /** 批次類型標題映射（僅充值/轉賬/合併生成批次，扣款不生成批次） */
 const typeTitleMap: Record<string, string> = {
@@ -159,9 +161,10 @@ export default function BatchDetail() {
   const recordKey = searchParams.get('key') || ''
   const typeParam = searchParams.get('type') || 'recharge'
   const batchNoParam = searchParams.get('batchNo') || ''
+  const groupIdParam = searchParams.get('groupId') || ''
 
-  /** 批次記錄：真實記錄優先，Mock 行兜底 */
-  const record = useMemo<BatchStoreRecord>(() => {
+  /** 後端不可用時的降級批次：本地審批寫入記錄優先，Mock 行兜底 */
+  const fallbackRecord = useCallback((): BatchStoreRecord => {
     const stored = getBatchRecordByKey(recordKey)
     if (stored) return stored
     return {
@@ -173,20 +176,56 @@ export default function BatchDetail() {
     }
   }, [recordKey, typeParam, batchNoParam])
 
+  const [record, setRecord] = useState<BatchStoreRecord>(fallbackRecord)
+  /** 真實交易明細（null = 後端不可用，改用本地推導的流水） */
+  const [details, setDetails] = useState<FinDetail[] | null>(null)
+
+  useEffect(() => {
+    if (!batchNoParam) return
+    let cancelled = false
+    const load = async () => {
+      const batch = await withFinanceFallback<FinBatch | null>(
+        () => fetchFinBatchDetail(batchNoParam, groupIdParam || undefined),
+        () => null,
+      )
+      if (cancelled) return
+      if (!batch) {
+        setRecord(fallbackRecord())
+        setDetails(null)
+        return
+      }
+      setRecord({ ...batch, key: `${batch.batchNo}-${batch.groupId}` } as BatchStoreRecord)
+      const rows = await withFinanceFallback<{ records: FinDetail[] } | null>(
+        () => fetchFinDetails({ page: 1, size: 200, batchNo: batchNoParam, groupId: groupIdParam || undefined }),
+        () => null,
+      )
+      if (!cancelled) setDetails(rows?.records ?? [])
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [batchNoParam, groupIdParam, fallbackRecord])
+
   const extra = (record.extra || {}) as Record<string, any>
   const batchType = record.batchType
   const remark = extra.remark || (record.remark !== '--' ? record.remark : '')
   const typeTag = typeTagMap[batchType] || typeTagMap.recharge
 
-  /** 營業額扣款門店（充值） */
+  /** 營業額扣款門店（充值）：已扣金額取本批次該門店的扣款明細合計 */
   const deductStores: DeductStoreRow[] = useMemo(() =>
-    ((extra.deductStores as any[]) || []).map((s, i) => ({
-      key: String(i),
-      storeId: s.storeId,
-      storeName: s.storeLabel?.replace(`(${s.storeId})`, '') || s.storeLabel || '',
-      amount: s.amount,
-      deducted: extra.payMethod ? (s.deducted ?? 80) : 0,
-    })), [extra])
+    ((extra.deductStores as any[]) || []).map((s, i) => {
+      const deducted = details
+        ? details
+          .filter(d => d.storeId === s.storeId && d.tradeType === '扣款')
+          .reduce((sum, d) => sum + Math.abs(Number(d.virtualChange) || 0), 0)
+        : (s.deducted ?? 80)
+      return {
+        key: String(i),
+        storeId: s.storeId,
+        storeName: s.storeLabel?.replace(`(${s.storeId})`, '') || s.storeLabel || '',
+        amount: s.amount,
+        deducted: extra.payMethod ? deducted : 0,
+      }
+    }), [extra, details])
 
   /** 欠款償還門店（合併） */
   const repayStores: RepayStoreRow[] = useMemo(() =>
@@ -198,8 +237,22 @@ export default function BatchDetail() {
       amount: s.amount,
     })), [extra])
 
-  /** 交易明細（Mock 流水，按批次類型生成） */
+  /** 交易明細：真實明細優先，後端不可用時按批次類型本地推導 */
   const flowRows = useMemo<FlowRow[]>(() => {
+    if (details && details.length > 0) {
+      return details.map((d, i) => ({
+        key: String(i + 1),
+        tradeType: d.tradeType,
+        storeId: d.storeId || '--',
+        storeName: d.storeName || '--',
+        channel: d.channel || '--',
+        changeType: d.changeType,
+        tradeTime: d.tradeTime,
+        virtualChange: Number(d.virtualChange) || 0,
+        actualChange: d.actualChange === null || d.actualChange === undefined ? null : Number(d.actualChange),
+        relatedId: `明細ID：${d.detailId}`,
+      }))
+    }
     const t = record.tradeTime
     const rows: FlowRow[] = []
     let i = 1
@@ -233,7 +286,7 @@ export default function BatchDetail() {
       }
     }
     return rows
-  }, [batchType, record, extra, deductStores, repayStores])
+  }, [batchType, record, extra, deductStores, repayStores, details])
 
   /** 金額渲染（+藍 / -紅） */
   const renderChange = (val: number | null) => {

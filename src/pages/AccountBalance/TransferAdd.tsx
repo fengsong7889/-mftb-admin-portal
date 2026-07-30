@@ -15,7 +15,9 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
+import { submitTransferApply, withFinanceFallback } from '../../api/finance'
+import type { TransferApplyPayload } from '../../api/finance'
+import { mockSubmitApproval } from '../../api/mock/financeMock'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -97,6 +99,8 @@ export default function TransferAdd() {
   const [targetGroupId, setTargetGroupId] = useState<string | undefined>(undefined)
   const [certificateFiles, setCertificateFiles] = useState<any[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
   /** 轉出集團餘額（Mock） */
@@ -137,40 +141,34 @@ export default function TransferAdd() {
       }
       // 提交審批記錄
       const targetGroup = allGroupOptions.find(g => g.value === targetGroupId)
-      addApprovalRecord({
-        key: `custom_${Date.now()}`,
-        groupId: groupIdParam,
-        groupName: groupNameParam,
+      const payload: TransferApplyPayload = {
+        fromGroupId: groupIdParam,
+        fromGroupName: groupNameParam,
         brand: brandParam,
-        flowNo: generateFlowNo('transfer'),
-        approvalType: 'transfer',
-        applicant: '朱棣(002)',
-        applyTime: formatNow(),
-        bizApprover: '朱元璋(001)',
-        bizApproveTime: '--',
-        bizApproveStatus: 'pending',
-        opsApprover: '--',
-        opsApproveTime: '--',
-        opsApproveStatus: 'pending',
-        finApprover: '--',
-        finApproveTime: '--',
-        finApproveStatus: 'pending',
-        flowStatus: 'pending',
-        rejectReason: '',
-        extra: {
-          fromGroupId: groupIdParam,
-          fromGroupName: groupNameParam,
-          fromVirtualBalance: sourceVirtualBalance,
-          toGroupId: targetGroupId,
-          toGroupName: targetGroup?.name || '',
-          transferAmount,
-          remark: form.getFieldValue('remark') || '',
-        },
-      })
+        fromVirtualBalance: sourceVirtualBalance,
+        toGroupId: targetGroupId || '',
+        toGroupName: targetGroup?.name || '',
+        transferAmount,
+        remark: form.getFieldValue('remark') || '',
+      }
+      setSubmitting(true)
+      const flowNo = await withFinanceFallback(
+        () => submitTransferApply(payload),
+        () => mockSubmitApproval({
+          approvalType: 'transfer',
+          groupId: groupIdParam,
+          groupName: groupNameParam,
+          brand: brandParam,
+          extra: { ...payload },
+        }),
+      )
+      setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
     } catch {
-      // 表单校验未通过
+      // 表单校验未通过 / 提交失败（錯誤提示由請求層給出）
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -435,7 +433,7 @@ export default function TransferAdd() {
       {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
         <Button onClick={() => navigate('/account-balance')}>取消</Button>
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit}>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
           提交申請
         </Button>
       </div>
@@ -466,6 +464,9 @@ export default function TransferAdd() {
               提交成功
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              {submittedFlowNo && (
+                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+              )}
               該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
             </p>
             <Button

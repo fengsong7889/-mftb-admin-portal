@@ -1,7 +1,8 @@
-import { useState , useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message } from 'antd'
 import type { TableColumnsType } from 'antd'
+import type { Dayjs } from 'dayjs'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -11,7 +12,9 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
-import { getApprovalRecords, type ApprovalRecord as CustomApprovalRecord } from '../../utils/approvalStore'
+import { getApprovalRecords, updateApprovalRecord } from '../../utils/approvalStore'
+import { fetchFinApprovals, cancelFinApproval, withFinanceFallback } from '../../api/finance'
+import type { FinApprovalQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -97,6 +100,58 @@ const mockData: ApprovalRecord[] = [
   { key: '12', groupId: '1012', groupName: '真功夫', brand: 'mFood', flowNo: 'HB202601180000', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-18 08:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-18 09:45:00', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-18 11:20:00', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '品牌合併不符合規範' },
 ]
 
+/** 搜索區篩選條件 */
+interface ApprovalFilters {
+  groupId?: string
+  groupName?: string
+  brand?: string
+  approvalType?: string
+  flowNo?: string
+  flowStatus?: string
+  currentNode?: string
+  applyTime?: [Dayjs, Dayjs]
+  applicant?: string
+  approver?: string
+}
+
+/** 「全部」等價於不篩選 */
+function pickValue(v?: string) {
+  return !v || v === 'all' ? undefined : v
+}
+
+/** 定位審批中流程的當前待審節點 */
+function resolveCurrentNode(r: ApprovalRecord): string {
+  if (r.flowStatus !== 'pending') return ''
+  if (r.bizApproveStatus === 'pending') return 'business'
+  if (r.opsApproveStatus === 'pending') return 'operation'
+  return 'finance'
+}
+
+/** 後端不可用時的降級查詢：localStorage 記錄 + 演示數據本地篩選分頁 */
+function mockFetchApprovals(query: FinApprovalQuery) {
+  const all = [...(getApprovalRecords() as ApprovalRecord[]), ...mockData]
+  const filtered = all.filter(r => {
+    if (query.groupId && !r.groupId.includes(query.groupId)) return false
+    if (query.groupName && !r.groupName.includes(query.groupName)) return false
+    if (query.brand && r.brand !== query.brand) return false
+    if (query.approvalType && r.approvalType !== query.approvalType) return false
+    if (query.flowNo && !r.flowNo.includes(query.flowNo)) return false
+    if (query.flowStatus && r.flowStatus !== query.flowStatus) return false
+    if (query.currentNode && resolveCurrentNode(r) !== query.currentNode) return false
+    if (query.applicant && !r.applicant.includes(query.applicant)) return false
+    if (query.approver) {
+      const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver!))
+      if (!hit) return false
+    }
+    if (query.applyFrom && r.applyTime.slice(0, 10) < query.applyFrom) return false
+    if (query.applyTo && r.applyTime.slice(0, 10) > query.applyTo) return false
+    return true
+  })
+  const page = query.page || 1
+  const size = query.size || 10
+  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
+}
+
 export default function ApprovalCenter() {
   const navigate = useNavigate()
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -104,16 +159,60 @@ export default function ApprovalCenter() {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [approveRecord, setApproveRecord] = useState<ApprovalRecord | null>(null)
   const [form] = Form.useForm()
-  const [customRecords, setCustomRecords] = useState<ApprovalRecord[]>([])
+  const [searchForm] = Form.useForm<ApprovalFilters>()
+  const [data, setData] = useState<ApprovalRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState<ApprovalFilters>({})
+  const [pagination, setPagination] = useState({ page: 1, size: 10 })
 
-  /** 加載自定義審批記錄 */
+  /** 組裝查詢參數 */
+  const buildQuery = useCallback((): FinApprovalQuery => ({
+    page: pagination.page,
+    size: pagination.size,
+    groupId: filters.groupId?.trim() || undefined,
+    groupName: filters.groupName?.trim() || undefined,
+    brand: pickValue(filters.brand),
+    approvalType: pickValue(filters.approvalType),
+    flowNo: filters.flowNo?.trim() || undefined,
+    flowStatus: pickValue(filters.flowStatus),
+    currentNode: pickValue(filters.currentNode),
+    applicant: filters.applicant?.trim() || undefined,
+    approver: filters.approver?.trim() || undefined,
+    applyFrom: filters.applyTime?.[0]?.format('YYYY-MM-DD'),
+    applyTo: filters.applyTime?.[1]?.format('YYYY-MM-DD'),
+  }), [filters, pagination])
+
+  /** 加載審批列表（後端不可用時降級到本地記錄） */
+  const loadApprovals = useCallback(async () => {
+    const query = buildQuery()
+    setLoading(true)
+    try {
+      const res = await withFinanceFallback(
+        () => fetchFinApprovals(query),
+        () => mockFetchApprovals(query),
+      )
+      setData((res.records ?? []) as ApprovalRecord[])
+      setTotal(res.total ?? 0)
+    } finally {
+      setLoading(false)
+    }
+  }, [buildQuery])
+
   useEffect(() => {
-    const records = getApprovalRecords() as ApprovalRecord[]
-    setCustomRecords(records)
-  }, [])
+    void loadApprovals()
+  }, [loadApprovals])
 
-  /** 合併 Mock 數據 + 自定義記錄（新記錄在前） */
-  const allData = useMemo(() => [...customRecords, ...mockData], [customRecords])
+  const handleSearch = () => {
+    setFilters(searchForm.getFieldsValue())
+    setPagination(p => ({ ...p, page: 1 }))
+  }
+
+  const handleReset = () => {
+    searchForm.resetFields()
+    setFilters({})
+    setPagination({ page: 1, size: 10 })
+  }
 
   const handleDetail = (record: ApprovalRecord) => {
     navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
@@ -129,7 +228,14 @@ export default function ApprovalCenter() {
       content: `確定要撤銷流程編號「${record.flowNo}」的審批嗎？`,
       okText: '確定',
       cancelText: '取消',
-      onOk: () => message.success('撤銷成功'),
+      onOk: async () => {
+        await withFinanceFallback(
+          () => cancelFinApproval(record.flowNo),
+          () => updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' }),
+        )
+        message.success('撤銷成功')
+        await loadApprovals()
+      },
     })
   }
 
@@ -296,41 +402,41 @@ export default function ApprovalCenter() {
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="集團ID">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="集團ID" name="groupId">
             <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱">
+          <Form.Item label="集團名稱" name="groupName">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label="所屬品牌" name="brand">
             <Select placeholder="全部" options={brandOptions} />
           </Form.Item>
-          <Form.Item label="審批類型">
+          <Form.Item label="審批類型" name="approvalType">
             <Select placeholder="全部" options={approvalTypeOptions} />
           </Form.Item>
-          <Form.Item label="流程編號">
+          <Form.Item label="流程編號" name="flowNo">
             <Input placeholder="請輸入流程編號" allowClear />
           </Form.Item>
-          <Form.Item label="流程狀態">
+          <Form.Item label="流程狀態" name="flowStatus">
             <Select placeholder="全部" options={flowStatusOptions} />
           </Form.Item>
-          <Form.Item label="當前節點">
+          <Form.Item label="當前節點" name="currentNode">
             <Select placeholder="全部" options={currentNodeOptions} />
           </Form.Item>
-          <Form.Item label="申請時間">
+          <Form.Item label="申請時間" name="applyTime">
             <RangePicker placeholder={['開始時間', '結束時間']} />
           </Form.Item>
-          <Form.Item label="申請人">
+          <Form.Item label="申請人" name="applicant">
             <Input placeholder="請輸入申請人姓名/工號" allowClear />
           </Form.Item>
-          <Form.Item label="審批人">
+          <Form.Item label="審批人" name="approver">
             <Input placeholder="請輸入審批人姓名/工號" allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
@@ -351,16 +457,19 @@ export default function ApprovalCenter() {
       <div className="table-section approval-table">
         <Table<ApprovalRecord>
           columns={applyConfig(columns)}
-          dataSource={allData}
+          dataSource={data}
+          rowKey="flowNo"
+          loading={loading}
           rowSelection={{}}
           pagination={{
-            total: allData.length,
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            current: pagination.page,
+            pageSize: pagination.size,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (page, size) => setPagination({ page, size: size || 10 }),
           }}
           size="middle"
           bordered

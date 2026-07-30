@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Button, Space, Input, Select, Table, Tag, Form, message, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useNavigate } from 'react-router-dom'
@@ -12,6 +12,13 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { useAuth } from '../../contexts/AuthContext'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import {
+  fetchFinAccounts,
+  freezeFinAccount,
+  unfreezeFinAccount,
+  withFinanceFallback,
+} from '../../api/finance'
+import type { FinAccount, FinAccountQuery } from '../../api/finance'
 
 /** 账户状态选项 */
 const statusOptions = [
@@ -28,18 +35,10 @@ const statusMap: Record<string, { text: string; color: string }> = {
   mergeFrozen: { text: '合併凍結', color: 'orange' },
 }
 
-/** 模拟数据类型 */
-interface AccountRecord {
-  key: string
-  groupId: string
-  groupName: string
-  brand: string
-  virtualBalance: number
-  actualBalance: number
-  status: string
-}
+/** 账户记录（后端 FinAccountVO，Mock 降级时结构一致） */
+type AccountRecord = FinAccount & { key?: string }
 
-/** 模拟数据 */
+/** 后端不可用时的降级演示数据（保留原有 Mock，凍結/解凍在会话内生效） */
 const mockData: AccountRecord[] = [
   { key: '1', groupId: 'G10001', groupName: '美味集團有限公司', brand: 'mFood', virtualBalance: 128560.50, actualBalance: 120000.00, status: 'normal' },
   { key: '2', groupId: 'G10002', groupName: '閃蜂科技有限公司', brand: 'flashBee', virtualBalance: 89230.75, actualBalance: 85000.00, status: 'normal' },
@@ -60,11 +59,79 @@ const formatAmount = (val: number) => {
   return val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+/** 降級數據源（會話內可變，凍結/解凍後同步狀態） */
+let mockAccounts: AccountRecord[] = mockData.map(r => ({ ...r }))
+
+/** 降級查詢：本地篩選 + 分頁 */
+function mockFetchAccounts(query: FinAccountQuery) {
+  const filtered = mockAccounts.filter(r => {
+    if (query.groupId && !r.groupId.includes(query.groupId)) return false
+    if (query.groupName && !r.groupName.includes(query.groupName)) return false
+    if (query.brand && query.brand !== 'all' && r.brand !== query.brand) return false
+    if (query.status && query.status !== 'all' && r.status !== query.status) return false
+    return true
+  })
+  const page = query.page ?? 1
+  const size = query.size ?? 10
+  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
+}
+
+/** 降級狀態變更 */
+function mockUpdateAccountStatus(groupId: string, status: string) {
+  mockAccounts = mockAccounts.map(r => (r.groupId === groupId ? { ...r, status } : r))
+}
+
+/** 搜索篩選條件 */
+interface AccountFilters {
+  groupId?: string
+  groupName?: string
+  brand?: string
+  status?: string
+}
+
 export default function AccountBalance() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
+  const [form] = Form.useForm<AccountFilters>()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [data, setData] = useState<AccountRecord[]>(mockData)
+  const [data, setData] = useState<AccountRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState<AccountFilters>({})
+  const [pagination, setPagination] = useState({ page: 1, size: 10 })
+
+  /** 加載賬戶列表（後端不可用時降級到本地演示數據） */
+  const loadAccounts = useCallback(async () => {
+    const query: FinAccountQuery = { ...filters, page: pagination.page, size: pagination.size }
+    setLoading(true)
+    try {
+      const res = await withFinanceFallback(
+        () => fetchFinAccounts(query),
+        () => mockFetchAccounts(query),
+      )
+      setData(res.records ?? [])
+      setTotal(res.total ?? 0)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, pagination])
+
+  useEffect(() => {
+    void loadAccounts()
+  }, [loadAccounts])
+
+  /** 查詢 */
+  const handleSearch = () => {
+    setFilters(form.getFieldsValue())
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }
+
+  /** 重置 */
+  const handleReset = () => {
+    form.resetFields()
+    setFilters({})
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }
 
   /** 凍結賬戶 */
   const handleFreeze = (record: AccountRecord) => {
@@ -74,9 +141,13 @@ export default function AccountBalance() {
       okText: '確定凍結',
       cancelText: '取消',
       okButtonProps: { danger: true },
-      onOk: () => {
-        setData(prev => prev.map(r => r.key === record.key ? { ...r, status: 'frozen' } : r))
+      onOk: async () => {
+        await withFinanceFallback(
+          () => freezeFinAccount(record.groupId),
+          () => mockUpdateAccountStatus(record.groupId, 'frozen'),
+        )
         message.success(`已凍結「${record.groupName}」賬戶`)
+        await loadAccounts()
       },
     })
   }
@@ -88,9 +159,13 @@ export default function AccountBalance() {
       content: `確定要解凍「${record.groupName}」的賬戶嗎？解凍後可恢復充值、轉賬、扣款操作。`,
       okText: '確定解凍',
       cancelText: '取消',
-      onOk: () => {
-        setData(prev => prev.map(r => r.key === record.key ? { ...r, status: 'normal' } : r))
+      onOk: async () => {
+        await withFinanceFallback(
+          () => unfreezeFinAccount(record.groupId),
+          () => mockUpdateAccountStatus(record.groupId, 'normal'),
+        )
         message.success(`已解凍「${record.groupName}」賬戶`)
+        await loadAccounts()
       },
     })
   }
@@ -231,23 +306,23 @@ export default function AccountBalance() {
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="集團ID">
+        <Form layout="inline" form={form}>
+          <Form.Item label="集團ID" name="groupId">
             <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱">
+          <Form.Item label="集團名稱" name="groupName">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="請選擇" options={brandOptions} />
+          <Form.Item label="所屬品牌" name="brand">
+            <Select placeholder="請選擇" options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="賬戶狀態">
-            <Select placeholder="請選擇" options={statusOptions} />
+          <Form.Item label="賬戶狀態" name="status">
+            <Select placeholder="請選擇" options={statusOptions} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
@@ -273,6 +348,8 @@ export default function AccountBalance() {
       {/* 数据列表区域 */}
       <div className="table-section">
         <Table<AccountRecord>
+          rowKey="groupId"
+          loading={loading}
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
@@ -280,13 +357,14 @@ export default function AccountBalance() {
           columns={applyConfig(columns)}
           dataSource={data}
           pagination={{
-            total: data.length,
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            current: pagination.page,
+            pageSize: pagination.size,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (page, size) => setPagination({ page, size }),
           }}
           size="middle"
           bordered={false}

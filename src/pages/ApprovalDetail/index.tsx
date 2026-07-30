@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Tag, Input, Modal, Table, message } from 'antd'
 import {
@@ -12,7 +12,20 @@ import {
   EyeOutlined,
 } from '@ant-design/icons'
 import './ApprovalDetail.css'
-import { approveCurrentNode, rejectCurrentNode } from '../../utils/approvalStore'
+import {
+  approveCurrentNode,
+  rejectCurrentNode,
+  getApprovalRecordByFlowNo,
+  updateApprovalRecord,
+} from '../../utils/approvalStore'
+import {
+  fetchFinApprovalDetail,
+  approveFinApproval,
+  rejectFinApproval,
+  cancelFinApproval,
+  withFinanceFallback,
+} from '../../api/finance'
+import type { FinApproval } from '../../api/finance'
 
 /** 审批历史记录 */
 interface ApprovalTimelineItem {
@@ -337,17 +350,189 @@ const typeTitleMap: Record<string, string> = {
   gift: '推廣贈送審批',
 }
 
+const brandLabelMap: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFood' }
+const flowStatusLabelMap: Record<string, string> = {
+  pending: '審核中', approved: '已通過', rejected: '已駁回', cancelled: '已撤銷',
+}
+const payMethodLabelMap: Record<string, string> = {
+  corporate: '對公轉賬', mixed: '混合支付', revenue: '營業額支付',
+}
+const deductMethodLabelMap: Record<string, string> = {
+  account: '賬戶扣款', consume: '消費扣款', batch: '充值批次扣款',
+}
+
+function num(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function str(v: unknown): string {
+  return v == null ? '' : String(v)
+}
+
+/** extra 中的門店金額行（storeLabel 對應展示用的 storeName） */
+function storeRows(v: unknown) {
+  if (!Array.isArray(v)) return []
+  return v.map(item => {
+    const row = (item || {}) as Record<string, unknown>
+    return {
+      storeId: str(row.storeId),
+      storeName: str(row.storeLabel ?? row.storeName),
+      bd: str(row.bd),
+      amount: num(row.amount),
+    }
+  })
+}
+
+/** 單個審批節點 → 時間軸項 */
+function nodeItem(node: string, approver: string, time: string, status: string, rejectReason?: string): ApprovalTimelineItem {
+  const normalized: ApprovalTimelineItem['status'] =
+    status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending'
+  return {
+    node,
+    time: time && time !== '--' ? time : '--',
+    approver: approver && approver !== '--' ? approver : '--',
+    status: normalized,
+    comment: '',
+    rejectReason: normalized === 'rejected' ? rejectReason : undefined,
+  }
+}
+
+/**
+ * 審批記錄 → 審批詳情展示結構
+ * 後端 FinApprovalVO.extra 與 approvalStore 寫入的 extra 同構，因此真實數據與降級數據共用本映射。
+ */
+function toDetailData(record: FinApproval): ApprovalDetailData {
+  const extra = (record.extra || {}) as Record<string, unknown>
+  const brand = brandLabelMap[record.brand] || record.brand
+  const base: ApprovalDetailData = {
+    approvalType: record.approvalType as ApprovalDetailData['approvalType'],
+    applicant: record.applicant,
+    applyDate: record.applyTime,
+    flowNo: record.flowNo,
+    flowStatus: flowStatusLabelMap[record.flowStatus] || record.flowStatus,
+    brand,
+    groupId: record.groupId,
+    groupName: record.groupName,
+    notes: str(extra.remark),
+    hasRevoke: record.flowStatus === 'pending',
+    timeline: [
+      nodeItem('財務主管審批', record.finApprover, record.finApproveTime, record.finApproveStatus, record.rejectReason),
+      nodeItem('運營主管審批', record.opsApprover, record.opsApproveTime, record.opsApproveStatus, record.rejectReason),
+      nodeItem('業務主管審批', record.bizApprover, record.bizApproveTime, record.bizApproveStatus, record.rejectReason),
+      { node: '流程創建', time: record.applyTime, approver: record.applicant, status: 'submitted', comment: '' },
+    ],
+  }
+
+  if (record.approvalType === 'recharge') {
+    const payMethod = str(extra.payMethod) as ApprovalDetailData['payMethod']
+    return {
+      ...base,
+      businessType: str(extra.businessType),
+      businessChannel: str(extra.businessChannelLabel),
+      bdPerson: str(extra.bd) || '--',
+      isActual: extra.isActual === true,
+      payMethod,
+      settlementMethod: payMethodLabelMap[str(extra.payMethod)] || '--',
+      rechargeAmount: num(extra.virtualAmount),
+      actualTotal: num(extra.actualTotal),
+      discountAmount: num(extra.discountAmount),
+      bankTransfer: num(extra.bankAmount),
+      revenueDeduction: num(extra.revenueAmount),
+      deductStores: storeRows(extra.deductStores),
+    }
+  }
+  if (record.approvalType === 'deduct') {
+    const method = str(extra.deductMethod)
+    return {
+      ...base,
+      virtualBalance: num(extra.virtualBalance),
+      deductMethodType: method as ApprovalDetailData['deductMethodType'],
+      deductMethod: deductMethodLabelMap[method] || method,
+      deductAmount: num(extra.deductAmount),
+      consumeChannel: str(extra.consumeChannel),
+      consumeStore: str(extra.consumeStore),
+      consumeType: str(extra.consumeType),
+      batchNo: str(extra.batchNo),
+      batchDeductible: num(extra.batchDeductible),
+      batchSettlement: str(extra.batchSettlement),
+    }
+  }
+  if (record.approvalType === 'transfer') {
+    return {
+      ...base,
+      fromGroupId: str(extra.fromGroupId),
+      fromGroupName: str(extra.fromGroupName),
+      fromBrand: brand,
+      fromVirtualBalance: num(extra.fromVirtualBalance),
+      toGroupId: str(extra.toGroupId),
+      toGroupName: str(extra.toGroupName),
+      toBrand: brand,
+      transferAmount: num(extra.transferAmount),
+    }
+  }
+  if (record.approvalType === 'merge') {
+    return {
+      ...base,
+      sourceBrand: brand,
+      mergeGroupId: str(extra.sourceGroupId),
+      mergeGroupName: str(extra.sourceGroupName),
+      mergeBrand: brand,
+      mergeVirtualBalance: num(extra.sourceVirtualBalance),
+      mergeDebtAmount: num(extra.sourceDebtAmount),
+      mergeToGroupId: str(extra.targetGroupId),
+      mergeToGroupName: str(extra.targetGroupName),
+      mergeToBrand: brand,
+      repayStores: storeRows(extra.repayStores),
+    }
+  }
+  return base
+}
+
 export default function ApprovalDetail() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const type = searchParams.get('type') || 'recharge'
+  const urlType = searchParams.get('type') || 'recharge'
   const flowNo = searchParams.get('flowNo') || ''
-  const data = mockDetails[flowNo] || mockDetails[type] || mockDetails['CZ202601160000']
 
+  /** 後端不可用時的降級詳情：本地審批記錄優先，其次靜態演示數據 */
+  const fallbackDetail = useCallback((): ApprovalDetailData => {
+    const local = getApprovalRecordByFlowNo(flowNo)
+    if (local) return toDetailData(local as unknown as FinApproval)
+    return mockDetails[flowNo] || mockDetails[urlType] || mockDetails['CZ202601160000']
+  }, [flowNo, urlType])
+
+  const [data, setData] = useState<ApprovalDetailData>(fallbackDetail)
+  const [submitting, setSubmitting] = useState(false)
   const [approvalComment, setApprovalComment] = useState('')
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+
+  /** 審批類型以記錄為準（未加載到時回退 URL 參數） */
+  const type = data.approvalType || urlType
+  /** 僅審批中的流程可通過/駁回 */
+  const isPending = data.flowStatus === '審核中'
+
+  /** 加載審批詳情 */
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!flowNo) return
+      try {
+        const record = await withFinanceFallback<FinApproval | null>(
+          () => fetchFinApprovalDetail(flowNo),
+          () => null,
+        )
+        if (!cancelled) setData(record ? toDetailData(record) : fallbackDetail())
+      } catch {
+        // 流程不存在等業務錯誤：保留降級展示
+        if (!cancelled) setData(fallbackDetail())
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [flowNo, fallbackDetail])
 
   const handleApprove = () => {
     Modal.confirm({
@@ -355,19 +540,28 @@ export default function ApprovalDetail() {
       content: '確定要通過此審批申請嗎？',
       okText: '確定',
       cancelText: '取消',
-      onOk: () => {
-        // 真實提交的流程：三級逐級推進（業務→運營→財務）
-        const result = approveCurrentNode(flowNo)
-        if (result) {
-          if (result.finished) {
-            message.success(`${result.nodeName}通過，流程全部節點審批完成，數據已寫入批次查詢`)
+      onOk: async () => {
+        setSubmitting(true)
+        try {
+          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單
+          const result = await withFinanceFallback(
+            () => approveFinApproval(flowNo),
+            () => approveCurrentNode(flowNo),
+          )
+          if (result) {
+            message.success(result.finished
+              ? `${result.nodeName}通過，流程全部節點審批完成，數據已寫入批次查詢`
+              : `${result.nodeName}通過，流程進入「${result.nextNode}」節點`)
           } else {
-            message.success(`${result.nodeName}通過，流程進入「${result.nextNode}」節點`)
+            message.success('審批通過成功')
           }
-        } else {
-          message.success('審批通過成功')
+          navigate('/approval-center')
+        } catch (err) {
+          // 無審批權限（403）或餘額不足等業務校驗失敗，展示後端給出的具體原因
+          message.error((err as Error)?.message || '審批失敗')
+        } finally {
+          setSubmitting(false)
         }
-        navigate('/approval-center')
       },
     })
   }
@@ -376,29 +570,51 @@ export default function ApprovalDetail() {
     setShowRejectModal(true)
   }
 
-  const handleRejectConfirm = () => {
+  const handleRejectConfirm = async () => {
     if (!rejectReason.trim()) {
       return
     }
-    // 真實提交的流程：駁回當前節點，流程結束
-    const rejectedNode = rejectCurrentNode(flowNo, rejectReason)
-    if (rejectedNode) {
-      message.success(`已在「${rejectedNode}」節點駁回，流程已結束`)
-    } else {
-      message.success('審批駁回成功')
+    setSubmitting(true)
+    try {
+      // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）
+      const rejectedNode = await withFinanceFallback<string | null>(
+        async () => {
+          await rejectFinApproval(flowNo, rejectReason)
+          return null
+        },
+        () => rejectCurrentNode(flowNo, rejectReason),
+      )
+      message.success(rejectedNode
+        ? `已在「${rejectedNode}」節點駁回，流程已結束`
+        : '審批駁回成功')
+      setShowRejectModal(false)
+      navigate('/approval-center')
+    } catch (err) {
+      message.error((err as Error)?.message || '駁回失敗')
+    } finally {
+      setSubmitting(false)
     }
-    setShowRejectModal(false)
-    navigate('/approval-center')
   }
 
   const handleRevoke = () => {
     setShowRevokeModal(true)
   }
 
-  const handleRevokeConfirm = () => {
-    console.log('Revoked')
-    setShowRevokeModal(false)
-    navigate('/approval-center')
+  const handleRevokeConfirm = async () => {
+    setSubmitting(true)
+    try {
+      await withFinanceFallback(
+        () => cancelFinApproval(flowNo),
+        () => updateApprovalRecord(flowNo, { flowStatus: 'cancelled' }),
+      )
+      message.success('申請已撤銷')
+      setShowRevokeModal(false)
+      navigate('/approval-center')
+    } catch (err) {
+      message.error((err as Error)?.message || '撤銷失敗')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const renderStatusTag = (status: string) => {
@@ -478,8 +694,12 @@ export default function ApprovalDetail() {
             {data.hasRevoke && (
               <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
             )}
-            <Button type="primary" onClick={handleApprove}>通過</Button>
-            <Button danger onClick={handleReject}>駁回</Button>
+            {isPending && (
+              <>
+                <Button type="primary" loading={submitting} onClick={handleApprove}>通過</Button>
+                <Button danger loading={submitting} onClick={handleReject}>駁回</Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1019,8 +1239,12 @@ export default function ApprovalDetail() {
         {data.hasRevoke && (
           <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
         )}
-        <Button type="primary" onClick={handleApprove}>通過</Button>
-        <Button danger onClick={handleReject}>駁回</Button>
+        {isPending && (
+          <>
+            <Button type="primary" loading={submitting} onClick={handleApprove}>通過</Button>
+            <Button danger loading={submitting} onClick={handleReject}>駁回</Button>
+          </>
+        )}
       </div>
 
       {/* 撤销确认弹窗 */}
@@ -1036,7 +1260,7 @@ export default function ApprovalDetail() {
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
             <Button onClick={() => setShowRevokeModal(false)}>取消</Button>
-            <Button type="primary" onClick={handleRevokeConfirm}>確定撤銷</Button>
+            <Button type="primary" loading={submitting} onClick={handleRevokeConfirm}>確定撤銷</Button>
           </div>
         }
         width={440}
@@ -1059,7 +1283,7 @@ export default function ApprovalDetail() {
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
             <Button onClick={() => setShowRejectModal(false)}>取消</Button>
-            <Button danger onClick={handleRejectConfirm} disabled={!rejectReason.trim()}>確定駁回</Button>
+            <Button danger loading={submitting} onClick={handleRejectConfirm} disabled={!rejectReason.trim()}>確定駁回</Button>
           </div>
         }
         width={480}

@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
+import type { Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import {
   SearchOutlined,
@@ -12,6 +13,8 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions, isShanfeng } from '../../constants/brand'
 import type { DebtStoreRecord } from '../../utils/approvalStore'
+import { fetchFinDebts, withFinanceFallback } from '../../api/finance'
+import type { FinDebtBrandStats, FinDebtPageResult, FinDebtQuery } from '../../api/finance'
 import { getAllDebtBills } from './mockBills'
 
 const { RangePicker } = DatePicker
@@ -120,66 +123,120 @@ interface DebtFilters {
   status?: string
   source?: string
   channel?: string
-  loanDateRange?: [{ format: (f: string) => string }, { format: (f: string) => string }]
+  loanDateRange?: [Dayjs, Dayjs]
+}
+
+/** 「全部」等價於不篩選 */
+function pickValue(v?: string) {
+  return !v || v === 'all' ? undefined : v
+}
+
+/** 空品牌統計（加載中 / 無數據） */
+const emptyBrandStats: FinDebtBrandStats = {
+  shanfeng: { amount: 0, count: 0 },
+  mfood: { amount: 0, count: 0 },
+}
+
+/**
+ * 後端不可用時的降級查詢：本地欠款單（審批寫入 + 演示數據）篩選分頁
+ * 品牌待還統計口徑與後端一致：僅累計未結清賬單的剩餘待還
+ */
+function mockFetchDebts(query: FinDebtQuery): FinDebtPageResult {
+  const filtered = getAllDebtBills().filter(b => {
+    if (query.groupId && !b.groupId.includes(query.groupId)) return false
+    if (query.groupName && !b.groupName.includes(query.groupName)) return false
+    if (query.storeName && !b.storeName.includes(query.storeName)) return false
+    if (query.brand && b.brand !== query.brand) return false
+    if (query.billNo && !b.billNo.includes(query.billNo)) return false
+    if (query.batchNo && !b.batchNo.includes(query.batchNo)) return false
+    if (query.flowNo && !b.flowNo.includes(query.flowNo)) return false
+    if (query.status && b.status !== query.status) return false
+    if (query.source && b.source !== query.source) return false
+    if (query.channel && b.channel !== query.channel) return false
+    if (query.loanFrom && b.loanDate < query.loanFrom) return false
+    if (query.loanTo && b.loanDate > query.loanTo) return false
+    return true
+  })
+  const brandStats: FinDebtBrandStats = {
+    shanfeng: { amount: 0, count: 0 },
+    mfood: { amount: 0, count: 0 },
+  }
+  filtered.forEach(b => {
+    if (b.status !== 'unsettled') return
+    const target = isShanfeng(b.brand) ? brandStats.shanfeng : brandStats.mfood
+    target.amount = r2(target.amount + b.remainAmount)
+    target.count += 1
+  })
+  const page = query.page || 1
+  const size = query.size || 10
+  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length, brandStats }
 }
 
 export default function DebtReconcile() {
   const navigate = useNavigate()
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<DebtFilters>()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [filters, setFilters] = useState<DebtFilters>({})
+  const [data, setData] = useState<DebtStoreRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [brandStats, setBrandStats] = useState<FinDebtBrandStats>(emptyBrandStats)
+  const [loading, setLoading] = useState(false)
+  const [pagination, setPagination] = useState({ page: 1, size: 10 })
 
-  /** 全部欠款單（審批通過的真實數據 + Mock 演示數據） */
-  const allBills = useMemo(() => getAllDebtBills(), [])
+  /** 組裝查詢參數 */
+  const buildQuery = useCallback((): FinDebtQuery => ({
+    page: pagination.page,
+    size: pagination.size,
+    groupId: filters.groupId?.trim() || undefined,
+    groupName: filters.groupName?.trim() || undefined,
+    storeName: filters.storeName?.trim() || undefined,
+    brand: pickValue(filters.brand),
+    billNo: filters.billNo?.trim() || undefined,
+    batchNo: filters.batchNo?.trim() || undefined,
+    flowNo: filters.flowNo?.trim() || undefined,
+    status: pickValue(filters.status),
+    source: pickValue(filters.source),
+    channel: pickValue(filters.channel),
+    loanFrom: filters.loanDateRange?.[0]?.format('YYYY-MM-DD'),
+    loanTo: filters.loanDateRange?.[1]?.format('YYYY-MM-DD'),
+  }), [filters, pagination])
 
-  /** 按篩選條件過濾 */
-  const filteredBills = useMemo(() => {
-    return allBills.filter(b => {
-      if (filters.groupId && !b.groupId.includes(filters.groupId.trim())) return false
-      if (filters.groupName && !b.groupName.includes(filters.groupName.trim())) return false
-      if (filters.storeName && !b.storeName.includes(filters.storeName.trim())) return false
-      if (filters.brand && filters.brand !== 'all' && b.brand !== filters.brand) return false
-      if (filters.billNo && !b.billNo.includes(filters.billNo.trim())) return false
-      if (filters.batchNo && !b.batchNo.includes(filters.batchNo.trim())) return false
-      if (filters.flowNo && !b.flowNo.includes(filters.flowNo.trim())) return false
-      if (filters.status && b.status !== filters.status) return false
-      if (filters.source && b.source !== filters.source) return false
-      if (filters.channel && b.channel !== filters.channel) return false
-      if (filters.loanDateRange && filters.loanDateRange.length === 2) {
-        const [start, end] = filters.loanDateRange
-        const startStr = start?.format('YYYY-MM-DD')
-        const endStr = end?.format('YYYY-MM-DD')
-        if (startStr && b.loanDate < startStr) return false
-        if (endStr && b.loanDate > endStr) return false
-      }
-      return true
-    })
-  }, [allBills, filters])
-
-  /** 品牌待還統計（僅統計未結清賬單的剩餘待還） */
-  const brandStats = useMemo(() => {
-    const stats = {
-      shanfeng: { amount: 0, count: 0 },
-      mfood: { amount: 0, count: 0 },
+  /** 加載欠款單列表（後端優先，不可用時降級本地） */
+  const loadDebts = useCallback(async () => {
+    const query = buildQuery()
+    setLoading(true)
+    try {
+      const res = await withFinanceFallback<FinDebtPageResult>(
+        () => fetchFinDebts(query),
+        () => mockFetchDebts(query),
+      )
+      setData((res.records ?? []).map(r => ({
+        ...r,
+        key: r.billNo,
+        repayments: (r.repayments ?? []).map((p, i) => ({ ...p, key: String(p.id ?? i) })),
+      })))
+      setTotal(res.total ?? 0)
+      setBrandStats(res.brandStats ?? emptyBrandStats)
+    } finally {
+      setLoading(false)
     }
-    filteredBills.forEach(b => {
-      if (b.status !== 'unsettled') return
-      const target = isShanfeng(b.brand) ? stats.shanfeng : stats.mfood
-      target.amount = r2(target.amount + b.remainAmount)
-      target.count += 1
-    })
-    return stats
-  }, [filteredBills])
+  }, [buildQuery])
+
+  useEffect(() => {
+    void loadDebts()
+  }, [loadDebts])
 
   /** 查詢 */
   const handleSearch = () => {
     setFilters(form.getFieldsValue())
+    setPagination(p => ({ ...p, page: 1 }))
   }
 
   /** 重置 */
   const handleReset = () => {
     form.resetFields()
     setFilters({})
+    setPagination({ page: 1, size: 10 })
   }
 
   /** 列配置元數據 */
@@ -211,7 +268,7 @@ export default function DebtReconcile() {
   const columns: TableColumnsType<DebtStoreRecord> = [
     {
       title: '序號', key: 'index', width: 60, align: 'center', fixed: 'left',
-      render: (_, __, i) => i + 1,
+      render: (_, __, i) => (pagination.page - 1) * pagination.size + i + 1,
     },
     { title: '集團ID', dataIndex: 'groupId', key: 'groupId', width: 100, fixed: 'left' },
     { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 120, fixed: 'left' },
@@ -352,14 +409,17 @@ export default function DebtReconcile() {
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={filteredBills}
+          dataSource={data}
+          loading={loading}
           pagination={{
-            total: filteredBills.length,
-            showTotal: (total) => `共 ${total} 條`,
+            current: pagination.page,
+            pageSize: pagination.size,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (page, size) => setPagination({ page, size: size || 10 }),
           }}
           size="middle"
           bordered={false}

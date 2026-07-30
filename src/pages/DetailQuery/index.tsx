@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
+import type { Dayjs } from 'dayjs'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -9,25 +10,27 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { BIZ_CHANNEL_LABEL_MAP } from '../../constants/bizChannel'
 import { getDetailRecords } from '../../utils/approvalStore'
+import { fetchFinDetails, withFinanceFallback } from '../../api/finance'
+import type { FinDetail, FinDetailQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
-/** 业务频道选项 */
+/** 业务频道选项（值＝明細存儲的頻道文本） */
 const channelOptions = [
   { label: '全部', value: 'all' },
-  { label: '外賣', value: 'takeout' },
-  { label: '堂食', value: 'dineIn' },
+  ...Object.values(BIZ_CHANNEL_LABEL_MAP).map(label => ({ label, value: label })),
 ]
 
-/** 交易类型选项 */
+/** 交易类型选项（值＝明細存儲的交易類型文本） */
 const tradeTypeOptions = [
   { label: '全部', value: 'all' },
-  { label: '充值', value: 'recharge' },
-  { label: '扣款', value: 'deduct' },
-  { label: '消費', value: 'consume' },
-  { label: '轉入', value: 'transferIn' },
-  { label: '轉出', value: 'transferOut' },
+  { label: '充值', value: '充值' },
+  { label: '扣款', value: '扣款' },
+  { label: '消費', value: '消費' },
+  { label: '轉入', value: '轉入' },
+  { label: '轉出', value: '轉出' },
 ]
 
 /**
@@ -152,33 +155,146 @@ const renderChange = (val: number | null) => {
   )
 }
 
+/** 搜索區篩選條件 */
+interface DetailFilters {
+  groupId?: string
+  groupName?: string
+  brand?: string
+  storeId?: string
+  storeName?: string
+  channel?: string
+  tradeType?: string
+  changeType?: string
+  tradeTime?: [Dayjs, Dayjs]
+  batchNo?: string
+  flowNo?: string
+  detailId?: string
+}
+
+/** 「全部」等價於不篩選 */
+function pickValue(v?: string) {
+  return !v || v === 'all' ? undefined : v
+}
+
+/** 後端不可用時的降級查詢：localStorage 明細記錄 + 演示數據本地篩選分頁 */
+function mockFetchDetails(query: FinDetailQuery) {
+  const stored = getDetailRecords().map(r => ({
+    detailId: r.detailId,
+    groupId: r.groupId,
+    groupName: r.groupName,
+    brand: r.brand,
+    storeId: r.storeId,
+    storeName: r.storeName,
+    channel: r.channel,
+    tradeType: r.tradeType,
+    changeType: r.changeType,
+    tradeTime: r.tradeTime,
+    virtualChange: r.virtualChange,
+    actualChange: r.actualChange,
+    batchNo: r.batchNo,
+    flowNo: r.flowNo,
+    bd: r.bd,
+    remark: r.remark,
+  }))
+  const filtered = [...stored, ...mockData].filter(r => {
+    if (query.groupId && !r.groupId.includes(query.groupId)) return false
+    if (query.groupName && !r.groupName.includes(query.groupName)) return false
+    if (query.brand && r.brand !== query.brand) return false
+    if (query.storeId && !r.storeId.includes(query.storeId)) return false
+    if (query.storeName && !r.storeName.includes(query.storeName)) return false
+    if (query.channel && r.channel !== query.channel) return false
+    if (query.tradeType && r.tradeType !== query.tradeType) return false
+    if (query.changeType && r.changeType !== query.changeType) return false
+    if (query.batchNo && !r.batchNo.includes(query.batchNo)) return false
+    if (query.flowNo && !r.flowNo.includes(query.flowNo)) return false
+    if (query.detailId && !r.detailId.includes(query.detailId)) return false
+    if (query.tradeFrom && r.tradeTime.slice(0, 10) < query.tradeFrom) return false
+    if (query.tradeTo && r.tradeTime.slice(0, 10) > query.tradeTo) return false
+    return true
+  })
+  const page = query.page || 1
+  const size = query.size || 10
+  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
+}
+
 export default function DetailQuery() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [searchForm] = Form.useForm<DetailFilters>()
+  const [data, setData] = useState<DetailRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState<DetailFilters>({})
+  const [pagination, setPagination] = useState({ page: 1, size: 10 })
 
-  /** 真實明細記錄（審批全部通過後寫入）+ Mock 數據 */
-  const allData = useMemo<DetailRow[]>(() => {
-    const stored = getDetailRecords().map(r => ({
-      key: r.key,
-      detailId: r.detailId,
-      groupId: r.groupId,
-      groupName: r.groupName,
-      brand: r.brand,
-      storeId: r.storeId,
-      storeName: r.storeName,
-      channel: r.channel,
-      tradeType: r.tradeType,
-      changeType: r.changeType,
-      tradeTime: r.tradeTime,
-      virtualChange: r.virtualChange,
-      actualChange: r.actualChange,
-      batchNo: r.batchNo,
-      flowNo: r.flowNo,
-      bd: r.bd,
-      remark: r.remark,
-    }))
-    const mocks = mockData.map((r, i) => ({ ...r, key: `mock_${i}` }))
-    return [...stored, ...mocks].map((r, i) => ({ ...r, index: i + 1 }))
-  }, [])
+  /** 組裝查詢參數 */
+  const buildQuery = useCallback((): FinDetailQuery => ({
+    page: pagination.page,
+    size: pagination.size,
+    groupId: filters.groupId?.trim() || undefined,
+    groupName: filters.groupName?.trim() || undefined,
+    brand: pickValue(filters.brand),
+    storeId: filters.storeId?.trim() || undefined,
+    storeName: filters.storeName?.trim() || undefined,
+    channel: pickValue(filters.channel),
+    tradeType: pickValue(filters.tradeType),
+    changeType: pickValue(filters.changeType),
+    batchNo: filters.batchNo?.trim() || undefined,
+    flowNo: filters.flowNo?.trim() || undefined,
+    detailId: filters.detailId?.trim() || undefined,
+    tradeFrom: filters.tradeTime?.[0]?.format('YYYY-MM-DD'),
+    tradeTo: filters.tradeTime?.[1]?.format('YYYY-MM-DD'),
+  }), [filters, pagination])
+
+  /** 加載明細列表（後端不可用時降級到本地記錄） */
+  const loadDetails = useCallback(async () => {
+    const query = buildQuery()
+    setLoading(true)
+    try {
+      const res = await withFinanceFallback<{ records: FinDetail[]; total: number }>(
+        () => fetchFinDetails(query),
+        () => mockFetchDetails(query),
+      )
+      const start = (query.page! - 1) * query.size!
+      setData((res.records ?? []).map((r, i) => ({
+        key: r.detailId,
+        index: start + i + 1,
+        detailId: r.detailId,
+        groupId: r.groupId,
+        groupName: r.groupName,
+        brand: r.brand,
+        storeId: r.storeId,
+        storeName: r.storeName,
+        channel: r.channel,
+        tradeType: r.tradeType,
+        changeType: r.changeType,
+        tradeTime: r.tradeTime,
+        virtualChange: Number(r.virtualChange) || 0,
+        actualChange: r.actualChange === null || r.actualChange === undefined ? null : Number(r.actualChange),
+        batchNo: r.batchNo,
+        flowNo: r.flowNo,
+        bd: r.bd,
+        remark: r.remark,
+      })))
+      setTotal(res.total ?? 0)
+    } finally {
+      setLoading(false)
+    }
+  }, [buildQuery])
+
+  useEffect(() => {
+    void loadDetails()
+  }, [loadDetails])
+
+  const handleSearch = () => {
+    setFilters(searchForm.getFieldsValue())
+    setPagination(p => ({ ...p, page: 1 }))
+  }
+
+  const handleReset = () => {
+    searchForm.resetFields()
+    setFilters({})
+    setPagination({ page: 1, size: 10 })
+  }
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
@@ -340,51 +456,51 @@ export default function DetailQuery() {
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="集團ID">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="集團ID" name="groupId">
             <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱">
+          <Form.Item label="集團名稱" name="groupName">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label="所屬品牌" name="brand">
             <Select placeholder="全部" options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="門店ID">
+          <Form.Item label="門店ID" name="storeId">
             <Input placeholder="請輸入門店ID" allowClear />
           </Form.Item>
-          <Form.Item label="門店名稱">
+          <Form.Item label="門店名稱" name="storeName">
             <Input placeholder="請輸入門店名稱" allowClear />
           </Form.Item>
-          <Form.Item label="業務頻道">
+          <Form.Item label="業務頻道" name="channel">
             <Select placeholder="全部" options={channelOptions} allowClear />
           </Form.Item>
-          <Form.Item label="交易類型">
+          <Form.Item label="交易類型" name="tradeType">
             <Select placeholder="全部" options={tradeTypeOptions} allowClear />
           </Form.Item>
-          <Form.Item label="變動類別">
+          <Form.Item label="變動類別" name="changeType">
             <Select placeholder="全部" options={changeTypeOptions} allowClear showSearch />
           </Form.Item>
-          <Form.Item label="交易時間">
+          <Form.Item label="交易時間" name="tradeTime">
             <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm:ss"
               placeholder={['開始時間', '結束時間']}
             />
           </Form.Item>
-          <Form.Item label="批次號">
+          <Form.Item label="批次號" name="batchNo">
             <Input placeholder="請輸入關聯批次號" allowClear />
           </Form.Item>
-          <Form.Item label="流程編號">
+          <Form.Item label="流程編號" name="flowNo">
             <Input placeholder="請輸入流程編號" allowClear />
           </Form.Item>
-          <Form.Item label="明細ID">
+          <Form.Item label="明細ID" name="detailId">
             <Input placeholder="請輸入明細ID" allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
@@ -410,14 +526,18 @@ export default function DetailQuery() {
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={allData}
+          dataSource={data}
+          rowKey="key"
+          loading={loading}
           pagination={{
-            total: allData.length,
-            showTotal: (total) => `共 ${total} 條`,
+            current: pagination.page,
+            pageSize: pagination.size,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (page, size) => setPagination({ page, size: size || 10 }),
           }}
           size="middle"
           bordered={false}

@@ -2140,6 +2140,7 @@
 /* ========================================================================
    欠款对账详情页
    ======================================================================== */
+/* 进度条卡片容器 */
 .debt-detail-progress-card {
   background: linear-gradient(135deg, #F8FAFF 0%, #EBF3FF 100%);
   border-radius: 8px;
@@ -2164,29 +2165,97 @@
   flex: 1;
 }
 
-.debt-detail-metrics {
+/* 进度条 antd 内部动画增强 */
+.debt-detail-progress .ant-progress-bg {
+  transition: width 0.05s linear !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 4px rgba(82, 196, 26, 0.2);
+  position: relative;
+  overflow: hidden !important;
+}
+
+/* 进度条尾部柔和高亮（不使用溢出光晕，避免顶部闪缩断裂感） */
+.debt-detail-progress .ant-progress-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35));
+  border-radius: 0 6px 6px 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 进度条内部颜色扫光动画 */
+.debt-detail-progress .ant-progress-bg::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 20%,
+    rgba(255, 255, 255, 0.4) 45%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.4) 55%,
+    rgba(255, 255, 255, 0.1) 80%,
+    transparent 100%
+  );
+  animation: progressSweep 2.2s ease-in-out infinite;
+  animation-delay: 1s;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 颜色扫光动画 */
+@keyframes progressSweep {
+  0% { left: -60%; }
+  100% { left: 120%; }
+}
+
+/* 头部光晕呼吸动画（已移除，改用静态柔和高亮） */
+
+/* === 数据指标统计卡片（遵循 12.1 标准） === */
+.debt-detail-stat-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
-.debt-detail-metric {
+.debt-detail-stat-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   padding: 16px;
-  background: #FAFAFA;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 1px solid;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.debt-detail-metric-label {
-  font-size: 12px;
-  color: #636E72;
+.debt-detail-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
-.debt-detail-metric-value {
-  font-size: 24px;
+.debt-detail-stat-value {
+  font-size: 22px;
   font-weight: 700;
+  line-height: 1.3;
+}
+
+.debt-detail-stat-label {
+  font-size: 12px;
+  color: #8C8C8C;
 }
 
 /* ========================================================================
@@ -2302,3 +2371,4 @@
   margin-top: 14px;
   display: inline-block;
 }
+

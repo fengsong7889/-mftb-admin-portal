@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch } from 'antd'
+import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -16,7 +16,9 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
+import { submitRechargeApply, withFinanceFallback } from '../../api/finance'
+import type { RechargeApplyPayload } from '../../api/finance'
+import { mockSubmitApproval } from '../../api/mock/financeMock'
 
 /** 集團选项 */
 const groupOptions = [
@@ -59,6 +61,7 @@ const deductStoreOptions = [
 
 /** 扣款門店行 */
 interface DeductStoreRow {
+  key: string
   storeId: string
   storeLabel: string
   amount: number
@@ -112,12 +115,11 @@ export default function RechargeAdd() {
   const [bankAmount, setBankAmount] = useState<number>(0)
   const [revenueAmount, setRevenueAmount] = useState<number>(0)
   const [deductRows, setDeductRows] = useState<DeductStoreRow[]>([])
-  const [pendingStoreId, setPendingStoreId] = useState<string | undefined>(undefined)
-  const [pendingAmount, setPendingAmount] = useState<number | undefined>(undefined)
-  const [showAddRow, setShowAddRow] = useState(false)
   const [contractFiles, setContractFiles] = useState<any[]>([])
   const [paymentFiles, setPaymentFiles] = useState<any[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
   /** 實收賬戶充值合計 */
@@ -146,35 +148,26 @@ export default function RechargeAdd() {
     return () => clearTimeout(timer)
   }, [successVisible, countdown, navigate])
 
-  /** 新增扣款門店行 */
+  /** 新增扣款門店行（直接添加空行，用户随时编辑） */
   const handleAddDeductRow = () => {
-    if (!pendingStoreId) {
-      message.warning('請選擇扣款門店')
-      return
-    }
-    if (!pendingAmount || pendingAmount <= 0) {
-      message.warning('請輸入扣款金額')
-      return
-    }
-    if (deductRows.some(r => r.storeId === pendingStoreId)) {
-      message.warning('該門店已添加')
-      return
-    }
-    const opt = deductStoreOptions.find(o => o.value === pendingStoreId)
-    setDeductRows([...deductRows, { storeId: pendingStoreId, storeLabel: opt?.label || pendingStoreId, amount: pendingAmount }])
-    setPendingStoreId(undefined)
-    setPendingAmount(undefined)
+    setDeductRows([...deductRows, { key: `new_${Date.now()}`, storeId: '', storeLabel: '', amount: 0 }])
+  }
+
+  /** 更新扣款門店行 */
+  const handleUpdateDeductRow = (key: string, field: keyof DeductStoreRow, value: string | number) => {
+    setDeductRows(prev => prev.map(r => {
+      if (r.key !== key) return r
+      if (field === 'storeId') {
+        const opt = deductStoreOptions.find(o => o.value === value)
+        return { ...r, storeId: value as string, storeLabel: opt?.label || value as string }
+      }
+      return { ...r, [field]: value }
+    }))
   }
 
   /** 刪除扣款門店行 */
-  const handleRemoveDeductRow = (storeId: string) => {
-    setDeductRows(deductRows.filter(r => r.storeId !== storeId))
-  }
-
-  /** 清空待添加行 */
-  const handleClearPendingRow = () => {
-    setPendingStoreId(undefined)
-    setPendingAmount(undefined)
+  const handleRemoveDeductRow = (key: string) => {
+    setDeductRows(deductRows.filter(r => r.key !== key))
   }
 
   /** 提交申請 */
@@ -199,6 +192,16 @@ export default function RechargeAdd() {
             message.warning('請添加扣款門店')
             return
           }
+          const emptyStore = deductRows.find(r => !r.storeId)
+          if (emptyStore) {
+            message.warning('請為所有扣款門店選擇門店')
+            return
+          }
+          const emptyAmount = deductRows.find(r => !r.amount || r.amount <= 0)
+          if (emptyAmount) {
+            message.warning('請為所有扣款門店填寫金額')
+            return
+          }
         }
       }
       if (contractFiles.length === 0) {
@@ -211,45 +214,41 @@ export default function RechargeAdd() {
       }
       // 提交審批記錄
       const group = groupOptions.find(g => g.value === groupIdParam)
-      addApprovalRecord({
-        key: `custom_${Date.now()}`,
+      const payload: RechargeApplyPayload = {
         groupId: groupIdParam,
         groupName: group?.name || groupNameParam || '',
         brand: brandParam || 'flashBee',
-        flowNo: generateFlowNo('recharge'),
-        approvalType: 'recharge',
-        applicant: '朱棣(002)',
-        applyTime: formatNow(),
-        bizApprover: '朱元璋(001)',
-        bizApproveTime: '--',
-        bizApproveStatus: 'pending',
-        opsApprover: '--',
-        opsApproveTime: '--',
-        opsApproveStatus: 'pending',
-        finApprover: '--',
-        finApproveTime: '--',
-        finApproveStatus: 'pending',
-        flowStatus: 'pending',
-        rejectReason: '',
-        extra: {
-          businessType,
-          businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.label || '--',
-          isActual,
-          payMethod,
-          virtualAmount,
-          actualTotal,
-          discountAmount,
-          bankAmount: isActual && (payMethod === 'corporate' || payMethod === 'mixed') ? bankAmount : 0,
-          revenueAmount: isActual && (payMethod === 'mixed' || payMethod === 'revenue') ? revenueAmount : 0,
-          deductStores: deductRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, amount: r.amount })),
-          bd: form.getFieldValue('bd') || '--',
-          remark: form.getFieldValue('remark') || '',
-        },
-      })
+        businessType,
+        businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.label || '--',
+        isActual,
+        payMethod,
+        virtualAmount,
+        actualTotal,
+        discountAmount,
+        bankAmount: isActual && (payMethod === 'corporate' || payMethod === 'mixed') ? bankAmount : 0,
+        revenueAmount: isActual && (payMethod === 'mixed' || payMethod === 'revenue') ? revenueAmount : 0,
+        deductStores: deductRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, amount: r.amount })),
+        bd: form.getFieldValue('bd') || '--',
+        remark: form.getFieldValue('remark') || '',
+      }
+      setSubmitting(true)
+      const flowNo = await withFinanceFallback(
+        () => submitRechargeApply(payload),
+        () => mockSubmitApproval({
+          approvalType: 'recharge',
+          groupId: payload.groupId,
+          groupName: payload.groupName,
+          brand: payload.brand,
+          extra: { ...payload },
+        }),
+      )
+      setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
     } catch {
-      // 表单校验未通过
+      // 表单校验未通过 / 提交失败（錯誤提示由請求層或調用方給出）
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -611,89 +610,61 @@ export default function RechargeAdd() {
                       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                       <Button type="primary" size="small" icon={<PlusOutlined />}
                         style={{ borderRadius: 6 }}
-                        onClick={() => setShowAddRow(true)}
+                        onClick={() => handleAddDeductRow()}
                       >添加門店</Button>
                     </div>
+                    <ConfigProvider componentSize="middle">
                     <Table
-                      rowKey="storeId"
-                      dataSource={[...deductRows, ...(showAddRow ? [{ storeId: '__pending__', storeLabel: '', amount: 0 }] : [])]}
+                      rowKey="key"
+                      dataSource={deductRows}
                       pagination={false}
                       bordered
-                      size="small"
                       columns={[
                         {
                           title: '門店ID/名稱',
                           dataIndex: 'storeLabel',
                           width: 240,
-                          render: (val: string, record: DeductStoreRow) => {
-                            if (record.storeId === '__pending__') {
-                              return (
-                                <Select
-                                  placeholder="輸入門店名稱或ID查詢"
-                                  options={deductStoreOptions}
-                                  value={pendingStoreId}
-                                  onChange={(v) => {
-                                    setPendingStoreId(v)
-                                    if (v && pendingAmount && pendingAmount > 0) {
-                                      setTimeout(() => { handleAddDeductRow(); setShowAddRow(false) }, 100)
-                                    }
-                                  }}
-                                  showSearch
-                                  allowClear
-                                  style={{ width: '100%' }}
-                                  filterOption={(input, option) => (option?.label ?? '').includes(input)}
-                                />
-                              )
-                            }
-                            return <span style={{ fontSize: 13 }}>{val}</span>
-                          },
+                          render: (_: string, record: DeductStoreRow) => (
+                            <Select
+                              placeholder="輸入門店名稱或ID查詢"
+                              options={deductStoreOptions}
+                              value={record.storeId || undefined}
+                              onChange={(v) => handleUpdateDeductRow(record.key, 'storeId', v || '')}
+                              showSearch
+                              allowClear
+                              style={{ width: '100%' }}
+                              filterOption={(input, option) => (option?.label ?? '').includes(input)}
+                            />
+                          ),
                         },
                         {
                           title: '扣款金額',
                           dataIndex: 'amount',
                           width: 180,
                           align: 'center',
-                          render: (val: number, record: DeductStoreRow) => {
-                            if (record.storeId === '__pending__') {
-                              return (
-                                <InputNumber
-                                  placeholder="請輸入扣款金額"
-                                  min={0}
-                                  precision={2}
-                                  value={pendingAmount}
-                                  onChange={(v) => {
-                                    setPendingAmount(v ?? undefined)
-                                    if (pendingStoreId && v && v > 0) {
-                                      setTimeout(() => { handleAddDeductRow(); setShowAddRow(false) }, 100)
-                                    }
-                                  }}
-                                  style={{ width: '100%' }}
-                                  addonAfter="MOP"
-                                />
-                              )
-                            }
-                            return (
-                              <span style={{ color: '#E8720C', fontWeight: 600, fontSize: 13 }}>{val.toLocaleString()} MOP</span>
-                            )
-                          },
+                          render: (val: number, record: DeductStoreRow) => (
+                            <InputNumber
+                              placeholder="請輸入扣款金額"
+                              value={val || undefined}
+                              min={0}
+                              precision={2}
+                              addonAfter="MOP"
+                              style={{ width: '100%' }}
+                              onChange={(v) => handleUpdateDeductRow(record.key, 'amount', v ?? 0)}
+                            />
+                          ),
                         },
                         {
                           title: '操作',
                           width: 80,
                           align: 'center',
                           render: (_: unknown, record: DeductStoreRow) => (
-                            <Button type="link" danger size="small" onClick={() => {
-                              if (record.storeId === '__pending__') {
-                                handleClearPendingRow()
-                                setShowAddRow(false)
-                              } else {
-                                handleRemoveDeductRow(record.storeId)
-                              }
-                            }}>刪除</Button>
+                            <Button type="link" danger size="small" onClick={() => handleRemoveDeductRow(record.key)}>刪除</Button>
                           ),
                         },
                       ]}
                     />
+                    </ConfigProvider>
                   </div>
                 )}
               </div>
@@ -751,7 +722,7 @@ export default function RechargeAdd() {
       {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
         <Button onClick={() => navigate('/account-balance')}>取消</Button>
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit}>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
           提交申請
         </Button>
       </div>
@@ -782,6 +753,9 @@ export default function RechargeAdd() {
               提交成功
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              {submittedFlowNo && (
+                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+              )}
               該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
             </p>
             <Button

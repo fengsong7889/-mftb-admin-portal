@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table } from 'antd'
+import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -18,7 +18,9 @@ import {
   PayCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
+import { submitMergeApply, withFinanceFallback } from '../../api/finance'
+import type { MergeApplyPayload } from '../../api/finance'
+import { mockSubmitApproval } from '../../api/mock/financeMock'
 import BrandTag from '../../components/BrandTag'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -89,10 +91,9 @@ export default function MergeAdd() {
   const [targetGroupId, setTargetGroupId] = useState<string | undefined>(undefined)
   const [certificateFiles, setCertificateFiles] = useState<any[]>([])
   const [repayRows, setRepayRows] = useState<RepayStoreRow[]>([])
-  const [pendingStoreId, setPendingStoreId] = useState<string | undefined>(undefined)
-  const [pendingAmount, setPendingAmount] = useState<number | undefined>(undefined)
-  const [showAddRow, setShowAddRow] = useState(false)
   const [successVisible, setSuccessVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
   /** Mock 餘額數據 */
@@ -120,24 +121,21 @@ export default function MergeAdd() {
     return () => clearTimeout(timer)
   }, [successVisible, countdown, navigate])
 
-  /** 添加償還門店行 */
+  /** 添加償還門店行（直接添加空行） */
   const handleAddRepayRow = () => {
-    if (!pendingStoreId || !pendingAmount || pendingAmount <= 0) {
-      message.warning('請選擇門店並填寫償還金額')
-      return
-    }
-    const storeOpt = storeOptions.find(s => s.value === pendingStoreId)
-    const newRow: RepayStoreRow = {
-      key: pendingStoreId,
-      storeId: pendingStoreId,
-      storeLabel: storeOpt?.label || pendingStoreId,
-      amount: pendingAmount,
-      bd: storeOpt?.bd || '',
-    }
-    setRepayRows(prev => [...prev, newRow])
-    setPendingStoreId(undefined)
-    setPendingAmount(undefined)
-    setShowAddRow(false)
+    setRepayRows(prev => [...prev, { key: `new_${Date.now()}`, storeId: '', storeLabel: '', amount: 0, bd: '' }])
+  }
+
+  /** 更新償還門店行 */
+  const handleUpdateRepayRow = (key: string, field: keyof RepayStoreRow, value: string | number) => {
+    setRepayRows(prev => prev.map(r => {
+      if (r.key !== key) return r
+      if (field === 'storeId') {
+        const opt = storeOptions.find(s => s.value === value)
+        return { ...r, storeId: value as string, storeLabel: opt?.label || value as string, bd: opt?.bd || '' }
+      }
+      return { ...r, [field]: value }
+    }))
   }
 
   /** 刪除償還門店行 */
@@ -151,8 +149,14 @@ export default function MergeAdd() {
       await form.validateFields()
       if (!sourceGroupId) { message.warning('請選擇註銷集團'); return }
       if (!targetGroupId) { message.warning('請選擇存續集團'); return }
-      // 欠款償還金額校驗：必須恰好等於欠款總額
+      // 欠款償還門店校驗
       if (sourceDebtAmount > 0) {
+        if (repayRows.length === 0) { message.warning('請添加欠款償還門店'); return }
+        const emptyStore = repayRows.find(r => !r.storeId)
+        if (emptyStore) { message.warning('請為所有償還門店選擇門店'); return }
+        const emptyAmount = repayRows.find(r => !r.amount || r.amount <= 0)
+        if (emptyAmount) { message.warning('請為所有償還門店填寫金額'); return }
+        // 欠款償還金額校驗：必須恰好等於欠款總額
         const repayTotal = repayRows.reduce((sum, r) => sum + r.amount, 0)
         if (repayTotal === 0) { message.warning('請添加欠款償還門店並填寫償還金額'); return }
         if (repayTotal < sourceDebtAmount) {
@@ -168,41 +172,35 @@ export default function MergeAdd() {
       // 提交審批記錄
       const sourceGroup = allGroupOptions.find(g => g.value === sourceGroupId)
       const targetGroup = allGroupOptions.find(g => g.value === targetGroupId)
-      addApprovalRecord({
-        key: `custom_${Date.now()}`,
-        groupId: sourceGroupId,
-        groupName: sourceGroup?.name || '',
+      const payload: MergeApplyPayload = {
+        sourceGroupId,
+        sourceGroupName: sourceGroup?.name || '',
         brand: sourceBrand || 'mFood',
-        flowNo: generateFlowNo('merge'),
-        approvalType: 'merge',
-        applicant: '朱棣(002)',
-        applyTime: formatNow(),
-        bizApprover: '朱元璋(001)',
-        bizApproveTime: '--',
-        bizApproveStatus: 'pending',
-        opsApprover: '--',
-        opsApproveTime: '--',
-        opsApproveStatus: 'pending',
-        finApprover: '--',
-        finApproveTime: '--',
-        finApproveStatus: 'pending',
-        flowStatus: 'pending',
-        rejectReason: '',
-        extra: {
-          sourceGroupId,
-          sourceGroupName: sourceGroup?.name || '',
-          sourceVirtualBalance,
-          sourceDebtAmount,
-          targetGroupId,
-          targetGroupName: targetGroup?.name || '',
-          repayStores: repayRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, bd: r.bd, amount: r.amount })),
-          remark: form.getFieldValue('remark') || '',
-        },
-      })
+        sourceVirtualBalance,
+        sourceDebtAmount,
+        targetGroupId,
+        targetGroupName: targetGroup?.name || '',
+        repayStores: repayRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, bd: r.bd, amount: r.amount })),
+        remark: form.getFieldValue('remark') || '',
+      }
+      setSubmitting(true)
+      const flowNo = await withFinanceFallback(
+        () => submitMergeApply(payload),
+        () => mockSubmitApproval({
+          approvalType: 'merge',
+          groupId: sourceGroupId,
+          groupName: sourceGroup?.name || '',
+          brand: sourceBrand || 'mFood',
+          extra: { ...payload },
+        }),
+      )
+      setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
     } catch {
-      // 表單校驗未通過
+      // 表單校驗未通過 / 提交失敗（錯誤提示由請求層給出）
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -264,53 +262,40 @@ export default function MergeAdd() {
   const repayColumns = [
     {
       title: '門店ID/名稱', dataIndex: 'storeLabel', width: 240,
-      render: (val: string, record: RepayStoreRow) =>
-        record.key === '__pending__' ? (
-          <Select placeholder="請選擇門店" options={storeOptions} showSearch allowClear value={pendingStoreId || undefined}
-            filterOption={(input, option) => (option?.label ?? '').includes(input)}
-            onChange={(v) => {
-              setPendingStoreId(v)
-              if (v && pendingAmount && pendingAmount > 0) {
-                setTimeout(() => handleAddRepayRow(), 100)
-              }
-            }}
-            style={{ width: '100%' }} size="small"
-          />
-        ) : <span>{val}</span>,
+      render: (_: string, record: RepayStoreRow) => (
+        <Select placeholder="請選擇門店" options={storeOptions} showSearch allowClear
+          value={record.storeId || undefined}
+          onChange={(v) => handleUpdateRepayRow(record.key, 'storeId', v || '')}
+          filterOption={(input, option) => (option?.label ?? '').includes(input)}
+          style={{ width: '100%' }}
+        />
+      ),
     },
     {
       title: '歸屬BD', dataIndex: 'bd', width: 120, align: 'center' as const,
-      render: (val: string, record: RepayStoreRow) =>
-        record.key === '__pending__' ? (
-          pendingStoreId
-            ? <Tag color="blue" style={{ fontSize: 12 }}>{storeOptions.find(s => s.value === pendingStoreId)?.bd || '--'}</Tag>
-            : <span style={{ color: '#BFBFBF', fontSize: 12 }}>選擇門店後帶出</span>
-        ) : <Tag color="blue" style={{ fontSize: 12 }}>{val}</Tag>,
+      render: (val: string) => val
+        ? <Tag color="blue" style={{ fontSize: 12 }}>{val}</Tag>
+        : <span style={{ color: '#BFBFBF', fontSize: 12 }}>選擇門店後帶出</span>,
     },
     {
       title: '償還金額', dataIndex: 'amount', width: 160, align: 'center' as const,
-      render: (val: number, record: RepayStoreRow) =>
-        record.key === '__pending__' ? (
-          <InputNumber placeholder="請輸入金額" min={0} precision={2} size="small"
-            value={pendingAmount} addonAfter="MOP"
-            onChange={(v) => {
-              setPendingAmount(v || undefined)
-              if (pendingStoreId && v && v > 0) {
-                setTimeout(() => handleAddRepayRow(), 100)
-              }
-            }}
-            style={{ width: '100%' }}
-          />
-        ) : <span>{val?.toLocaleString()} MOP</span>,
+      render: (val: number, record: RepayStoreRow) => (
+        <InputNumber
+          placeholder="請輸入金額"
+          value={val || undefined}
+          min={0}
+          precision={2}
+          addonAfter="MOP"
+          style={{ width: '100%' }}
+          onChange={(v) => handleUpdateRepayRow(record.key, 'amount', v ?? 0)}
+        />
+      ),
     },
     {
       title: '操作', width: 80, align: 'center' as const,
       render: (_: unknown, record: RepayStoreRow) => (
         <Button type="link" danger size="small"
-          onClick={() => {
-            if (record.key === '__pending__') { setShowAddRow(false); setPendingStoreId(undefined); setPendingAmount(undefined) }
-            else handleRemoveRepayRow(record.key)
-          }}
+          onClick={() => handleRemoveRepayRow(record.key)}
         >刪除</Button>
       ),
     },
@@ -469,16 +454,18 @@ export default function MergeAdd() {
               <span style={{ fontSize: 12, color: '#8c8c8c' }}>註銷集團存在欠款，請選擇存續集團下的門店進行欠款償還分配</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
               <Button type="primary" size="small" icon={<PlusOutlined />}
-                onClick={() => setShowAddRow(true)} disabled={showAddRow}
+                onClick={() => handleAddRepayRow()}
                 style={{ borderRadius: 6 }}
               >添加門店</Button>
             </div>
 
-            <Table rowKey="key" size="small" bordered pagination={false}
-              dataSource={[...repayRows, ...(showAddRow ? [{ key: '__pending__', storeId: '__pending__', storeLabel: '', amount: 0, bd: '' }] : [])]}
+            <ConfigProvider componentSize="middle">
+            <Table rowKey="key" bordered pagination={false}
+              dataSource={repayRows}
               columns={repayColumns}
               locale={{ emptyText: '暫無償還門店，請點擊「添加門店」' }}
             />
+            </ConfigProvider>
 
             {repayRows.length > 0 && (() => {
               const repayTotal = repayRows.reduce((sum, r) => sum + r.amount, 0)
@@ -547,7 +534,7 @@ export default function MergeAdd() {
       {/* 底部操作按钮 */}
       <div className="form-footer">
         <Button onClick={() => navigate('/account-balance')}>取消</Button>
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit}>提交申請</Button>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>提交申請</Button>
       </div>
 
       {/* ====== 提交成功彈窗 ====== */}
@@ -570,6 +557,9 @@ export default function MergeAdd() {
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>提交成功</h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              {submittedFlowNo && (
+                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+              )}
               該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
             </p>
             <Button type="primary" size="large" onClick={() => navigate('/account-balance')}

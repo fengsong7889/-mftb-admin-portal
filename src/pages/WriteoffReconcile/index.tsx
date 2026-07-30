@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button, Input, Select, DatePicker, Table, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
+import type { Dayjs } from 'dayjs'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -9,6 +10,8 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { fetchFinWriteoffReconcile, withFinanceFallback } from '../../api/finance'
+import type { FinReconcileQuery, FinReconcileResult, FinReconcileSummary } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -196,42 +199,123 @@ function MetricItem({ label, value, color, subLabel, subValue, subColor }: {
   )
 }
 
+/** 搜索區篩選條件 */
+interface ReconcileFilters {
+  groupId?: string
+  groupName?: string
+  brand?: string
+  period?: [Dayjs, Dayjs]
+}
+
+/** 「全部」等價於不篩選 */
+function pickValue(v?: string) {
+  return !v || v === 'all' ? undefined : v
+}
+
+/** 彙總指標字段（除期初/期末外均為區間合計） */
+const SUMMARY_SUM_KEYS = [
+  'virtualRecharge', 'actualRecharge', 'bankReceipt', 'revenuePayment',
+  'consumeTotal', 'deductVirtual', 'deductActual',
+  'virtualTransferIn', 'actualTransferIn', 'virtualTransferOut', 'actualTransferOut',
+  'virtualNet', 'actualNet',
+] as const
+
+/** 空彙總（加載中 / 無數據） */
+const emptySummary: FinReconcileSummary = {
+  initVirtual: 0, initActual: 0, endVirtual: 0, endActual: 0,
+  virtualRecharge: 0, actualRecharge: 0, bankReceipt: 0, revenuePayment: 0,
+  consumeTotal: 0, deductVirtual: 0, deductActual: 0,
+  virtualTransferIn: 0, actualTransferIn: 0, virtualTransferOut: 0, actualTransferOut: 0,
+  virtualNet: 0, actualNet: 0,
+}
+
+/**
+ * 後端不可用時的降級查詢：演示日報本地篩選分頁 + 彙總
+ * 期初取各集團區間首日期初、期末取各集團區間末日期末，保證勾稽成立
+ */
+function mockFetchReconcile(query: FinReconcileQuery): FinReconcileResult {
+  const filtered = mockData.filter(r => {
+    if (query.groupId && !r.groupId.includes(query.groupId)) return false
+    if (query.groupName && !r.groupName.includes(query.groupName)) return false
+    if (query.brand && r.brand !== query.brand) return false
+    if (query.startDate && r.date < query.startDate) return false
+    if (query.endDate && r.date > query.endDate) return false
+    return true
+  })
+  const summary = { ...emptySummary }
+  SUMMARY_SUM_KEYS.forEach(k => {
+    summary[k] = r2(filtered.reduce((acc, r) => acc + r[k], 0))
+  })
+  const groupIds = [...new Set(filtered.map(r => r.groupId))]
+  groupIds.forEach(id => {
+    const rows = filtered.filter(r => r.groupId === id).sort((a, b) => a.date.localeCompare(b.date))
+    summary.initVirtual = r2(summary.initVirtual + rows[0].initVirtual)
+    summary.initActual = r2(summary.initActual + rows[0].initActual)
+    summary.endVirtual = r2(summary.endVirtual + rows[rows.length - 1].endVirtual)
+    summary.endActual = r2(summary.endActual + rows[rows.length - 1].endActual)
+  })
+  const page = query.page || 1
+  const size = query.size || 10
+  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length, summary }
+}
+
 export default function WriteoffReconcile() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [searchForm] = Form.useForm<ReconcileFilters>()
+  const [data, setData] = useState<ReconcileRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [summary, setSummary] = useState<FinReconcileSummary>(emptySummary)
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState<ReconcileFilters>({})
+  const [pagination, setPagination] = useState({ page: 1, size: 10 })
 
-  /** 週期總賬彙總（由日報數據聚合，財務對賬總覽） */
-  const summary = useMemo(() => {
-    const sum = (pick: (r: ReconcileRecord) => number) => r2(mockData.reduce((acc, r) => acc + pick(r), 0))
-    // 期初 = 各集團週期首日期初；期末 = 各集團週期末日期末
-    let initVirtual = 0, initActual = 0, endVirtual = 0, endActual = 0
-    mockGroups.forEach(g => {
-      const groupRows = mockData.filter(r => r.groupId === g.groupId).sort((a, b) => a.date.localeCompare(b.date))
-      if (groupRows.length === 0) return
-      initVirtual = r2(initVirtual + groupRows[0].initVirtual)
-      initActual = r2(initActual + groupRows[0].initActual)
-      endVirtual = r2(endVirtual + groupRows[groupRows.length - 1].endVirtual)
-      endActual = r2(endActual + groupRows[groupRows.length - 1].endActual)
-    })
-    return {
-      initVirtual,
-      initActual,
-      endVirtual,
-      endActual,
-      virtualRecharge: sum(r => r.virtualRecharge),
-      actualRecharge: sum(r => r.actualRecharge),
-      bankReceipt: sum(r => r.bankReceipt),
-      revenuePayment: sum(r => r.revenuePayment),
-      consumeTotal: sum(r => r.consumeTotal),
-      deductVirtual: sum(r => r.deductVirtual),
-      deductActual: sum(r => r.deductActual),
-      virtualTransferIn: sum(r => r.virtualTransferIn),
-      actualTransferIn: sum(r => r.actualTransferIn),
-      virtualTransferOut: sum(r => r.virtualTransferOut),
-      actualTransferOut: sum(r => r.actualTransferOut),
-      virtualNet: sum(r => r.virtualNet),
-      actualNet: sum(r => r.actualNet),
+  /** 組裝查詢參數 */
+  const buildQuery = useCallback((): FinReconcileQuery => ({
+    page: pagination.page,
+    size: pagination.size,
+    groupId: filters.groupId?.trim() || undefined,
+    groupName: filters.groupName?.trim() || undefined,
+    brand: pickValue(filters.brand),
+    startDate: filters.period?.[0]?.format('YYYY-MM-DD'),
+    endDate: filters.period?.[1]?.format('YYYY-MM-DD'),
+  }), [filters, pagination])
+
+  /** 加載對賬日報（後端不可用時降級到演示數據） */
+  const loadReconcile = useCallback(async () => {
+    const query = buildQuery()
+    setLoading(true)
+    try {
+      const res = await withFinanceFallback<FinReconcileResult>(
+        () => fetchFinWriteoffReconcile(query),
+        () => mockFetchReconcile(query),
+      )
+      const start = (query.page! - 1) * query.size!
+      setData((res.records ?? []).map((r, i) => ({
+        ...r,
+        key: `${r.groupId}_${r.date}`,
+        index: start + i + 1,
+      })))
+      setTotal(res.total ?? 0)
+      setSummary(res.summary ?? emptySummary)
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [buildQuery])
+
+  useEffect(() => {
+    void loadReconcile()
+  }, [loadReconcile])
+
+  const handleSearch = () => {
+    setFilters(searchForm.getFieldsValue())
+    setPagination(p => ({ ...p, page: 1 }))
+  }
+
+  const handleReset = () => {
+    searchForm.resetFields()
+    setFilters({})
+    setPagination({ page: 1, size: 10 })
+  }
 
   /** 列配置元數據 */
   const columnMeta = useMemo(() => [
@@ -336,17 +420,17 @@ export default function WriteoffReconcile() {
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="集團ID">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="集團ID" name="groupId">
             <Input placeholder="請輸入集團ID" allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱">
+          <Form.Item label="集團名稱" name="groupName">
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label="所屬品牌" name="brand">
             <Select placeholder="全部" options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="統計週期">
+          <Form.Item label="統計週期" name="period">
             <RangePicker
               format="YYYY-MM-DD"
               placeholder={['開始日期', '結束日期']}
@@ -354,8 +438,8 @@ export default function WriteoffReconcile() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
@@ -441,14 +525,18 @@ export default function WriteoffReconcile() {
             onChange: setSelectedRowKeys,
           }}
           columns={applyConfig(columns)}
-          dataSource={mockData}
+          dataSource={data}
+          rowKey="key"
+          loading={loading}
           pagination={{
-            total: mockData.length,
-            showTotal: (total) => `共 ${total} 條`,
+            current: pagination.page,
+            pageSize: pagination.size,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (page, size) => setPagination({ page, size: size || 10 }),
           }}
           size="small"
           bordered={false}

@@ -1,0 +1,95 @@
+package com.mftb.admin.controller;
+
+import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.ApprovalRejectDTO;
+import com.mftb.admin.dto.ApproveResultVO;
+import com.mftb.admin.dto.DeductApplyDTO;
+import com.mftb.admin.dto.FinApprovalQuery;
+import com.mftb.admin.dto.FinApprovalVO;
+import com.mftb.admin.dto.MergeApplyDTO;
+import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.RechargeApplyDTO;
+import com.mftb.admin.dto.TransferApplyDTO;
+import com.mftb.admin.service.FinApprovalService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 财务审批接口（申请提交 + 审批中心 + 三级审批流转）
+ */
+@RestController
+@RequestMapping("/api/fin/approvals")
+@RequiredArgsConstructor
+public class FinApprovalController {
+
+    private final FinApprovalService finApprovalService;
+
+    /** 审批中心列表（分页） */
+    @GetMapping
+    public Result<PageResult<FinApprovalVO>> page(FinApprovalQuery query) {
+        return Result.success(finApprovalService.page(query));
+    }
+
+    /** 审批详情 */
+    @GetMapping("/{flowNo}")
+    public Result<FinApprovalVO> detail(@PathVariable String flowNo) {
+        return Result.success(finApprovalService.detail(flowNo));
+    }
+
+    /** 提交推广金充值申请 */
+    @PostMapping("/recharge")
+    public Result<String> submitRecharge(@RequestBody RechargeApplyDTO request) {
+        String flowNo = finApprovalService.submitRecharge(request);
+        return Result.success("充值申请已提交，流程编号：" + flowNo, flowNo);
+    }
+
+    /** 提交推广金转账申请 */
+    @PostMapping("/transfer")
+    public Result<String> submitTransfer(@RequestBody TransferApplyDTO request) {
+        String flowNo = finApprovalService.submitTransfer(request);
+        return Result.success("转账申请已提交，流程编号：" + flowNo, flowNo);
+    }
+
+    /** 提交推广金扣款申请 */
+    @PostMapping("/deduct")
+    public Result<String> submitDeduct(@RequestBody DeductApplyDTO request) {
+        String flowNo = finApprovalService.submitDeduct(request);
+        return Result.success("扣款申请已提交，流程编号：" + flowNo, flowNo);
+    }
+
+    /** 提交商户合并申请 */
+    @PostMapping("/merge")
+    public Result<String> submitMerge(@RequestBody MergeApplyDTO request) {
+        String flowNo = finApprovalService.submitMerge(request);
+        return Result.success("合并申请已提交，流程编号：" + flowNo, flowNo);
+    }
+
+    /** 通过当前待审节点 */
+    @PostMapping("/{flowNo}/approve")
+    public Result<ApproveResultVO> approve(@PathVariable String flowNo) {
+        ApproveResultVO result = finApprovalService.approve(flowNo);
+        String message = result.isFinished()
+                ? "审批已全部通过，相关批次与明细已生成"
+                : "「" + result.getNodeName() + "」已通过，流转至「" + result.getNextNode() + "」";
+        return Result.success(message, result);
+    }
+
+    /** 驳回当前待审节点 */
+    @PostMapping("/{flowNo}/reject")
+    public Result<Void> reject(@PathVariable String flowNo, @RequestBody ApprovalRejectDTO request) {
+        String nodeName = finApprovalService.reject(flowNo, request.getReason());
+        return Result.success("「" + nodeName + "」已驳回", null);
+    }
+
+    /** 撤销申请 */
+    @PostMapping("/{flowNo}/cancel")
+    public Result<Void> cancel(@PathVariable String flowNo) {
+        finApprovalService.cancel(flowNo);
+        return Result.success("申请已撤销", null);
+    }
+}

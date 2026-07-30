@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.dto.MenuPermissionDTO;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * JSON 工具: 处理 function_roles / permissions 字段的序列化与反序列化
@@ -53,6 +55,19 @@ public final class JsonUtils {
             });
         } catch (Exception e) {
             return new ArrayList<>();
+        }
+    }
+
+    /** 解析 JSON 对象为 Map（财务模块 extra 扩展数据），解析失败返回空 Map */
+    public static Map<String, Object> parseMap(String json) {
+        if (json == null || json.isBlank()) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<LinkedHashMap<String, Object>>() {
+            });
+        } catch (Exception e) {
+            return new LinkedHashMap<>();
         }
     }
 

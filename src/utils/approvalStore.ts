@@ -789,6 +789,40 @@ function writeDebtRecords(record: ApprovalRecord, tradeTime: string, batchNo: st
   }
 }
 
+/**
+ * 本地新增還款記錄（後端不可用時的降級寫入）
+ * 僅能更新 localStorage 中的欠款單；靜態演示賬單返回 null，由調用方僅更新頁面狀態
+ */
+export function addDebtRepayment(billNo: string, repayment: Omit<DebtRepaymentRecord, 'key'>): DebtStoreRecord | null {
+  const all = getDebtRecords()
+  const bill = all.find(b => b.billNo === billNo)
+  if (!bill) return null
+  bill.repayments = [
+    ...(bill.repayments || []),
+    { ...repayment, key: `repay_${Date.now()}` },
+  ]
+  bill.paidAmount = round2(bill.paidAmount + repayment.amount)
+  bill.remainAmount = round2(Math.max(0, bill.debtTotal - bill.paidAmount))
+  bill.status = bill.remainAmount <= 0 ? 'settled' : 'unsettled'
+  saveDebtRecords(all)
+  return bill
+}
+
+/** 本地刪除還款記錄（後端不可用時的降級寫入），返回更新後的欠款單 */
+export function removeDebtRepayment(billNo: string, key: string): DebtStoreRecord | null {
+  const all = getDebtRecords()
+  const bill = all.find(b => b.billNo === billNo)
+  if (!bill) return null
+  const target = (bill.repayments || []).find(r => r.key === key)
+  if (!target) return null
+  bill.repayments = bill.repayments.filter(r => r.key !== key)
+  bill.paidAmount = round2(Math.max(0, bill.paidAmount - target.amount))
+  bill.remainAmount = round2(Math.max(0, bill.debtTotal - bill.paidAmount))
+  bill.status = bill.remainAmount <= 0 ? 'settled' : 'unsettled'
+  saveDebtRecords(all)
+  return bill
+}
+
 /** 生成流程編號：前綴 + 年月日 + 4位自增序號（0000起） */
 export function generateFlowNo(type: string): string {
   const prefixMap: Record<string, string> = {
