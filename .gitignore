@@ -29,6 +29,9 @@ Thumbs.db
 # *.avi
 # *.mkv
 
+# Local dev tools (JDK, Maven, etc.)
+.local/
+
 # Qoder repowiki
 .qoder/
 
