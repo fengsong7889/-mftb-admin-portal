@@ -17,8 +17,8 @@ public final class FinExtras {
     /** 空值占位符（与前端表格展示一致） */
     public static final String DASH = "--";
 
-    /** 门店选项文案中的门店ID，如「廣州酒家(123456789)」 */
-    private static final Pattern STORE_ID = Pattern.compile("\\((\\d+)\\)");
+    /** 门店选项文案末尾的门店ID/编码，如「廣州酒家(123456789)」「珠海前山分店(MD00007)」 */
+    private static final Pattern STORE_ID = Pattern.compile("\\(([A-Za-z0-9_-]+)\\)\\s*$");
 
     private FinExtras() {
     }
