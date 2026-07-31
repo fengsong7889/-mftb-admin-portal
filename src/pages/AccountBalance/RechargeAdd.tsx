@@ -251,8 +251,11 @@ export default function RechargeAdd() {
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
-    } catch {
-      // 表单校验未通过 / 提交失败（錯誤提示由請求層或調用方給出）
+    } catch (err) {
+      // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
+      if (!(err && typeof err === 'object' && 'errorFields' in err)) {
+        message.error(err instanceof Error && err.message ? err.message : '提交失败，请稍后重试')
+      }
     } finally {
       setSubmitting(false)
     }

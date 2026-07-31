@@ -263,6 +263,19 @@ const expressions: Expression[] = [
   { name: 'sleepy', message: '曹操：对酒当歌，人生几何——对电脑当歌，头发几何。' },
 ]
 
+/** 長時間無交互後躲入邊框的等待時長（毫秒） */
+const IDLE_DOCK_DELAY = 60000
+/** 躲入邊框後露出的頭部寬度（px） */
+const DOCK_PEEK = 50
+/** 躲藏後自動跳出的最短/最長等待時長（毫秒，兩者間隨機） */
+const DOCK_AUTO_POP_MIN = 20000
+const DOCK_AUTO_POP_MAX = 40000
+/** 躲入邊框時的傾斜角度（與 CSS .docked-left/.docked-right 的 rotate 角度保持一致） */
+const DOCK_TILT_DEG = 45
+/** 蜜蜂本體尺寸（與 .pet-body 的 CSS 尺寸保持一致） */
+const BODY_WIDTH = 36
+const BODY_HEIGHT = 57
+
 export default function PetMascot() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -273,12 +286,48 @@ export default function PetMascot() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [pageTipIndex, setPageTipIndex] = useState(0)
   const [isPageTip, setIsPageTip] = useState(false)
+  // 躲入邊框狀態：null = 正常顯示，'left' | 'right' = 已躲入對應側邊框
+  const [dockSide, setDockSide] = useState<'left' | 'right' | null>(null)
   const posRef = useRef(pos)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const bubbleTimerRef = useRef<number | null>(null)
   const dragMovedRef = useRef(false)
+  const idleTimerRef = useRef<number | null>(null)
 
   const current = expressions[currentIndex]
+
+  // 重置閑置計時器：長時間無交互後躲入離得最近的左/右邊框
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    idleTimerRef.current = window.setTimeout(() => {
+      const centerX = posRef.current.x + BODY_WIDTH / 2
+      setDockSide(centerX < window.innerWidth / 2 ? 'left' : 'right')
+    }, IDLE_DOCK_DELAY)
+  }, [])
+
+  useEffect(() => {
+    resetIdleTimer()
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+  }, [resetIdleTimer])
+
+  // 躲藏一段時間後自動跳出來（不用鼠標也會自己出來，避免躲太久難發現）
+  useEffect(() => {
+    if (!dockSide) return
+    const delay = DOCK_AUTO_POP_MIN + Math.random() * (DOCK_AUTO_POP_MAX - DOCK_AUTO_POP_MIN)
+    const timer = window.setTimeout(() => {
+      setDockSide(null)
+      resetIdleTimer()
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [dockSide, resetIdleTimer])
+
+  // 鼠標移入：若已躲入邊框則自動跳出來，並重新計時
+  const handleMouseEnter = () => {
+    setDockSide(null)
+    resetIdleTimer()
+  }
 
   // 根据 pathname + search 构建子界面 PRD 键（卡片/列表/各广告类型新增页独立描述）
   const prdKey = buildPrdKey(location.pathname, location.search)
@@ -349,6 +398,7 @@ export default function PetMascot() {
 
   // 点击 - 跳转到PRD全页查看
   const handleClick = () => {
+    resetIdleTimer()
     if (dragMovedRef.current) {
       dragMovedRef.current = false
       return
@@ -368,6 +418,8 @@ export default function PetMascot() {
   // 拖拽逻辑
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    setDockSide(null)
+    resetIdleTimer()
     dragMovedRef.current = false
     const startX = e.clientX
     const startY = e.clientY
@@ -402,17 +454,26 @@ export default function PetMascot() {
 
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [])
+  }, [resetIdleTimer])
+
+  // 躲入邊框時的橫向位置：蜜蜂傾斜 DOCK_TILT_DEG 後僅露出 DOCK_PEEK 寬的頭部
+  // 以中心旋轉後的橫向半寬 = (W/2)·cosθ + (H/2)·sinθ
+  const tiltRad = (DOCK_TILT_DEG * Math.PI) / 180
+  const halfExtent = (BODY_WIDTH / 2) * Math.cos(tiltRad) + (BODY_HEIGHT / 2) * Math.sin(tiltRad)
+  const dockedX = dockSide === 'left'
+    ? DOCK_PEEK - halfExtent - BODY_WIDTH / 2
+    : window.innerWidth - DOCK_PEEK + halfExtent - BODY_WIDTH / 2
 
   return (
     <>
       <div
-        className={`pet-mascot-wrapper ${isDragging ? 'dragging' : ''}`}
-        style={{ left: pos.x, top: pos.y }}
+        className={`pet-mascot-wrapper ${isDragging ? 'dragging' : ''} ${dockSide ? `docked docked-${dockSide}` : ''}`}
+        style={{ left: dockSide ? dockedX : pos.x, top: pos.y }}
         onMouseDown={handleMouseDown}
+        onMouseEnter={handleMouseEnter}
         onClick={handleClick}
       >
-        {showBubble && (
+        {showBubble && !dockSide && (
           <div className={`pet-bubble ${isPageTip ? 'page-tip' : ''}`}>
             <div className="pet-bubble-text">{getBubbleContent()}</div>
             <div className="pet-bubble-tail" />

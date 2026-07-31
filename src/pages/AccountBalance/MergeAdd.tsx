@@ -18,8 +18,10 @@ import {
   PayCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { submitMergeApply, withFinanceFallback } from '../../api/finance'
-import type { MergeApplyPayload } from '../../api/finance'
+import { fetchFinAccounts, fetchFinDebts, submitMergeApply, withFinanceFallback } from '../../api/finance'
+import type { FinAccount, MergeApplyPayload } from '../../api/finance'
+import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
+import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 import BrandTag from '../../components/BrandTag'
 
@@ -55,22 +57,17 @@ const brandOptions = [
   { label: 'mFood', value: 'mFood' },
 ]
 
-/** 集團選項（Mock） */
-const allGroupOptions = [
-  { label: '20261298121911 - 亞述集團', value: '20261298121911', name: '亞述集團', brand: 'mFood' },
-  { label: '20261298121912 - 廣州酒家', value: '20261298121912', name: '廣州酒家', brand: 'mFood' },
-  { label: '20261298121913 - 海底撈', value: '20261298121913', name: '海底撈', brand: 'mFood' },
-  { label: '20261298121914 - 閃蜂科技', value: '20261298121914', name: '閃蜂科技', brand: 'flashBee' },
-  { label: '20261298121915 - 金龍餐飲', value: '20261298121915', name: '金龍餐飲', brand: 'flashBee' },
-]
+/** 賬戶狀態文案/顏色映射 */
+const accountStatusMap: Record<string, { label: string; color: string }> = {
+  normal: { label: '正常', color: 'green' },
+  frozen: { label: '凍結', color: 'red' },
+  mergeFrozen: { label: '合併凍結', color: 'orange' },
+}
 
-/** 門店選項（Mock，含歸屬BD） */
-const storeOptions = [
-  { label: '廣州酒店天河廣場1號店(1234567890)', value: '1234567890', bd: '關山月(001)' },
-  { label: '廣州酒店越秀領展2號店(2345678910)', value: '2345678910', bd: '古月(002)' },
-  { label: '廣州酒店琶洲保利3號店(3456789012)', value: '3456789012', bd: '浩遠(003)' },
-  { label: '廣州酒店白雲萬達4號店(4567890123)', value: '4567890123', bd: '關山月(001)' },
-]
+/** 從門店選項文案末尾提取門店編碼，如「珠海前山分店(MD00007)」-> MD00007 */
+function storeCodeOf(label: string): string {
+  return label.match(/\(([A-Za-z0-9_-]+)\)\s*$/)?.[1] || label
+}
 
 /** 償還門店行 */
 interface RepayStoreRow {
@@ -96,17 +93,85 @@ export default function MergeAdd() {
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
-  /** Mock 餘額數據 */
-  const sourceVirtualBalance = sourceGroupId ? 128560.50 : 0
-  const sourceDebtAmount = sourceGroupId ? 15800.00 : 0
+  /** 同品牌推廣金賬戶列表（註銷集團選項/餘額/狀態均由此派生） */
+  const [accounts, setAccounts] = useState<FinAccount[]>([])
+  /** 全部品牌推廣金賬戶列表（存續集團可跨品牌選擇） */
+  const [allAccounts, setAllAccounts] = useState<FinAccount[]>([])
+  /** 註銷集團未結清欠款合計 */
+  const [sourceDebtAmount, setSourceDebtAmount] = useState(0)
+  /** 存續集團下門店選項（償還門店候選） */
+  const [repayStoreOptions, setRepayStoreOptions] = useState<OptionItem[]>([])
 
-  /** 根據品牌過濾集團選項 */
-  const sourceGroupOptions = sourceBrand
-    ? allGroupOptions.filter(o => o.brand === sourceBrand).map(o => ({ label: o.label, value: o.value }))
-    : []
+  // 按品牌加載推廣金賬戶列表
+  useEffect(() => {
+    if (!sourceBrand) {
+      setAccounts([])
+      return
+    }
+    fetchFinAccounts({ page: 1, size: 500, brand: sourceBrand })
+      .then(res => setAccounts(res.records || []))
+      .catch(() => setAccounts([]))
+  }, [sourceBrand])
+
+  // 加載全部品牌賬戶列表（供存續集團跨品牌選擇）
+  useEffect(() => {
+    fetchFinAccounts({ page: 1, size: 500 })
+      .then(res => setAllAccounts(res.records || []))
+      .catch(() => setAllAccounts([]))
+  }, [])
+
+  // 註銷集團切換後加載未結清欠款合計
+  useEffect(() => {
+    if (!sourceGroupId) {
+      setSourceDebtAmount(0)
+      return
+    }
+    fetchFinDebts({ page: 1, size: 500, groupId: sourceGroupId, brand: sourceBrand, status: 'unsettled' })
+      .then(res => {
+        const total = (res.records || [])
+          .filter(b => b.groupId === sourceGroupId)
+          .reduce((sum, b) => sum + (Number(b.remainAmount) || 0), 0)
+        setSourceDebtAmount(total)
+      })
+      .catch(() => setSourceDebtAmount(0))
+  }, [sourceGroupId, sourceBrand])
+
+  // 存續集團切換後加載其名下門店選項（按存續集團自身品牌），並重置已選償還門店
+  useEffect(() => {
+    setRepayRows([])
+    if (!targetGroupId) {
+      setRepayStoreOptions([])
+      return
+    }
+    fetchStoresByGroupCode(targetGroupId, targetBrand)
+      .then(list => setRepayStoreOptions(list || []))
+      .catch(() => setRepayStoreOptions([]))
+  }, [targetGroupId, targetBrand])
+
+  /** 註銷集團賬戶（虛擬餘額/狀態） */
+  const sourceAccount = accounts.find(a => a.groupId === sourceGroupId)
+  const sourceVirtualBalance = Number(sourceAccount?.virtualBalance) || 0
+  /** 已選存續集團賬戶（賬戶按集團+品牌隔離，需同時匹配品牌） */
+  const targetAccount = allAccounts.find(a => a.groupId === targetGroupId && a.brand === targetBrand)
+
+  /** 集團選項：非正常狀態賬戶標註狀態且不可選 */
+  const toGroupOption = (a: FinAccount) => ({
+    label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${accountStatusMap[a.status]?.label || a.status}）` : ''}`,
+    value: a.groupId,
+    disabled: a.status !== 'normal',
+  })
+
+  const sourceGroupOptions = sourceBrand ? accounts.map(toGroupOption) : []
+
+  /** 存續集團選項：全品牌可選，value 用「集團ID|品牌」保證唯一，品牌在選中後由「所屬品牌」字段展示 */
+  const toTargetOption = (a: FinAccount) => ({
+    label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${accountStatusMap[a.status]?.label || a.status}）` : ''}`,
+    value: `${a.groupId}|${a.brand}`,
+    disabled: a.status !== 'normal',
+  })
 
   const targetGroupOptions = (sourceBrand && sourceGroupId)
-    ? allGroupOptions.filter(o => o.brand === sourceBrand && o.value !== sourceGroupId).map(o => ({ label: o.label, value: o.value }))
+    ? allAccounts.filter(a => a.groupId !== sourceGroupId).map(toTargetOption)
     : []
 
   /** 提交成功倒計時 */
@@ -123,19 +188,33 @@ export default function MergeAdd() {
 
   /** 添加償還門店行（直接添加空行） */
   const handleAddRepayRow = () => {
+    if (!targetGroupId) {
+      message.warning('請先選擇存續集團')
+      return
+    }
     setRepayRows(prev => [...prev, { key: `new_${Date.now()}`, storeId: '', storeLabel: '', amount: 0, bd: '' }])
   }
 
-  /** 更新償還門店行 */
+  /** 更新償還門店行（選擇門店後異步帶出該門店綁定的BD） */
   const handleUpdateRepayRow = (key: string, field: keyof RepayStoreRow, value: string | number) => {
     setRepayRows(prev => prev.map(r => {
       if (r.key !== key) return r
       if (field === 'storeId') {
-        const opt = storeOptions.find(s => s.value === value)
-        return { ...r, storeId: value as string, storeLabel: opt?.label || value as string, bd: opt?.bd || '' }
+        const opt = repayStoreOptions.find(s => s.value === value)
+        return { ...r, storeId: value as string, storeLabel: opt?.label || value as string, bd: '' }
       }
       return { ...r, [field]: value }
     }))
+    if (field === 'storeId' && value) {
+      fetchStoreBds(Number(value))
+        .then(list => {
+          const bd = (list || []).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') || '--'
+          setRepayRows(prev => prev.map(r => (r.key === key ? { ...r, bd } : r)))
+        })
+        .catch(() => {
+          setRepayRows(prev => prev.map(r => (r.key === key ? { ...r, bd: '--' } : r)))
+        })
+    }
   }
 
   /** 刪除償還門店行 */
@@ -170,17 +249,15 @@ export default function MergeAdd() {
       }
       if (certificateFiles.length === 0) { message.warning('請上傳相關憑證'); return }
       // 提交審批記錄
-      const sourceGroup = allGroupOptions.find(g => g.value === sourceGroupId)
-      const targetGroup = allGroupOptions.find(g => g.value === targetGroupId)
       const payload: MergeApplyPayload = {
         sourceGroupId,
-        sourceGroupName: sourceGroup?.name || '',
+        sourceGroupName: sourceAccount?.groupName || '',
         brand: sourceBrand || 'mFood',
         sourceVirtualBalance,
         sourceDebtAmount,
         targetGroupId,
-        targetGroupName: targetGroup?.name || '',
-        repayStores: repayRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, bd: r.bd, amount: r.amount })),
+        targetGroupName: targetAccount?.groupName || '',
+        repayStores: repayRows.map(r => ({ storeId: storeCodeOf(r.storeLabel), storeLabel: r.storeLabel, bd: r.bd, amount: r.amount })),
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
@@ -189,7 +266,7 @@ export default function MergeAdd() {
         () => mockSubmitApproval({
           approvalType: 'merge',
           groupId: sourceGroupId,
-          groupName: sourceGroup?.name || '',
+          groupName: sourceAccount?.groupName || '',
           brand: sourceBrand || 'mFood',
           extra: { ...payload },
         }),
@@ -197,8 +274,11 @@ export default function MergeAdd() {
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
-    } catch {
-      // 表單校驗未通過 / 提交失敗（錯誤提示由請求層給出）
+    } catch (err) {
+      // 表單校驗未通過時 antd 已在字段標紅；財務接口為靜默請求，後端業務錯誤需在此提示
+      if (!(err && typeof err === 'object' && 'errorFields' in err)) {
+        message.error(err instanceof Error && err.message ? err.message : '提交失敗，請稍後重試')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -263,7 +343,7 @@ export default function MergeAdd() {
     {
       title: '門店ID/名稱', dataIndex: 'storeLabel', width: 240,
       render: (_: string, record: RepayStoreRow) => (
-        <Select placeholder="請選擇門店" options={storeOptions} showSearch allowClear
+        <Select placeholder={repayStoreOptions.length ? '請選擇門店' : '存續集團下暫無門店'} options={repayStoreOptions} showSearch allowClear
           value={record.storeId || undefined}
           onChange={(v) => handleUpdateRepayRow(record.key, 'storeId', v || '')}
           filterOption={(input, option) => (option?.label ?? '').includes(input)}
@@ -361,12 +441,16 @@ export default function MergeAdd() {
             <Form.Item label="註銷集團" name="sourceGroupId" rules={[{ required: true, message: '請選擇註銷集團' }]}>
               <Select placeholder={sourceBrand ? '請選擇即將關閉的集團' : '請先選擇品牌'} options={sourceGroupOptions}
                 showSearch allowClear disabled={!sourceBrand}
-                onChange={(val) => { setSourceGroupId(val); setTargetGroupId(undefined); form.setFieldsValue({ targetGroupId: undefined }) }}
+                onChange={(val) => { setSourceGroupId(val); setTargetGroupId(undefined); setTargetBrand(undefined); form.setFieldsValue({ targetGroupId: undefined }) }}
                 filterOption={(input, option) => (option?.label ?? '').includes(input)}
               />
             </Form.Item>
             <Form.Item label="賬戶狀態">
-              {sourceGroupId ? <Tag color="green">正常</Tag> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+              {sourceGroupId
+                ? <Tag color={accountStatusMap[sourceAccount?.status || 'normal']?.color || 'green'}>
+                    {accountStatusMap[sourceAccount?.status || 'normal']?.label || '正常'}
+                  </Tag>
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
             </Form.Item>
           </div>
 
@@ -421,7 +505,7 @@ export default function MergeAdd() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>存續集團</span>
             <Tag color="green" style={{ marginLeft: 0, fontSize: 11 }}>接收資產</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>接收註銷集團的全部資產與餘額，僅展示與註銷集團所屬品牌一致的集團</span>
+            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>接收註銷集團的全部資產與餘額，可選擇任意品牌的集團</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -429,15 +513,34 @@ export default function MergeAdd() {
             <Form.Item label="存續集團" name="targetGroupId" rules={[{ required: true, message: '請選擇存續集團' }]}>
               <Select placeholder={sourceGroupId ? '請選擇接收資產的集團' : '請先選擇註銷集團'} options={targetGroupOptions}
                 showSearch allowClear disabled={!sourceGroupId}
-                onChange={(val) => { setTargetGroupId(val); const g = allGroupOptions.find(o => o.value === val); setTargetBrand(g?.brand) }}
+                onChange={(val?: string) => {
+                  const [gid, gbrand] = (val || '').split('|')
+                  setTargetGroupId(gid || undefined)
+                  setTargetBrand(gbrand || undefined)
+                }}
                 filterOption={(input, option) => (option?.label ?? '').includes(input)}
               />
             </Form.Item>
             <Form.Item label="所屬品牌">
-              {targetGroupId ? <BrandTag value={targetBrand || sourceBrand || 'mFood'} /> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+              {targetGroupId
+                ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <BrandTag value={targetBrand || 'mFood'} />
+                    {targetBrand && sourceBrand && targetBrand !== sourceBrand && (
+                      <span style={{ color: '#FAAD14', fontSize: 12 }}>
+                        <ExclamationCircleOutlined style={{ marginRight: 4 }} />與註銷集團品牌不一致，請確認後再提交
+                      </span>
+                    )}
+                  </span>
+                )
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
             </Form.Item>
             <Form.Item label="賬戶狀態">
-              {targetGroupId ? <Tag color="green">正常</Tag> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+              {targetGroupId
+                ? <Tag color={accountStatusMap[targetAccount?.status || 'normal']?.color || 'green'}>
+                    {accountStatusMap[targetAccount?.status || 'normal']?.label || '正常'}
+                  </Tag>
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
             </Form.Item>
           </div>
         </div>

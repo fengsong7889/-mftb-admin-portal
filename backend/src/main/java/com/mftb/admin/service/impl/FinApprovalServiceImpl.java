@@ -240,7 +240,15 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (request.getSourceGroupId().equals(request.getTargetGroupId())) {
             throw new BusinessException("注销集团与存续集团不能相同");
         }
-        FinAccount source = accountService.requireUsable(request.getSourceGroupId(), request.getBrand());
+        // 注销集团：未充值开户或余额为 0 时无资金可并，直接拦截
+        FinAccount source = accountService.find(request.getSourceGroupId(), request.getBrand());
+        if (source == null || FinExtras.nonNull(source.getVirtualBalance()).compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("集团 " + request.getSourceGroupId() + " 品牌 " + brandLabel(request.getBrand())
+                    + " 推广金账户余额为 0，无需合并推广金申请");
+        }
+        source = accountService.requireUsable(request.getSourceGroupId(), request.getBrand());
+        // 存续集团：余额为 0（未开户）也可接收资产，先自动零余额开户再校验状态
+        accountService.getOrCreate(request.getTargetGroupId(), request.getTargetGroupName(), request.getBrand());
         FinAccount target = accountService.requireUsable(request.getTargetGroupId(), request.getBrand());
 
         // 欠款偿还金额必须恰好等于注销集团待还欠款总额
@@ -477,6 +485,11 @@ public class FinApprovalServiceImpl implements FinApprovalService {
 
     private List<StoreAmountDTO> storeList(List<StoreAmountDTO> stores) {
         return stores == null ? List.of() : stores;
+    }
+
+    /** 品牌展示名（flashBee=闪蜂） */
+    private static String brandLabel(String brand) {
+        return "flashBee".equals(brand) ? "闪蜂" : String.valueOf(brand);
     }
 
     private static void requireText(String value, String message) {

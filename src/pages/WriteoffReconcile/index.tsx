@@ -502,8 +502,8 @@ export default function WriteoffReconcile() {
           </SummaryCard>
 
           <SummaryCard title="交易淨額" icon="🧮" bgColor="#F0FFF4">
-            <MetricItem label="虛擬賬戶交易淨額" value={summary.virtualNet} color="#2E7D32"
-              subLabel="實收賬戶交易淨額" subValue={summary.actualNet} subColor="#2E7D32" />
+            <MetricItem label="虛擬賬戶交易淨額" value={summary.virtualNet} color="#2E7D32" />
+            <MetricItem label="實收賬戶交易淨額" value={summary.actualNet} color="#2E7D32" />
           </SummaryCard>
         </div>
       </div>

@@ -15,8 +15,8 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { submitTransferApply, withFinanceFallback } from '../../api/finance'
-import type { TransferApplyPayload } from '../../api/finance'
+import { fetchFinAccounts, submitTransferApply, withFinanceFallback } from '../../api/finance'
+import type { FinAccount, TransferApplyPayload } from '../../api/finance'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -45,14 +45,12 @@ function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; su
   return <>{prefix}{animated.toLocaleString()}{suffix}</>
 }
 
-/** 集團选项（Mock） */
-const allGroupOptions = [
-  { label: '20261298121911 - 亞述集團', value: '20261298121911', name: '亞述集團', brand: 'mFood' },
-  { label: '20261298121912 - 廣州酒家', value: '20261298121912', name: '廣州酒家', brand: 'mFood' },
-  { label: '20261298121913 - 海底撈', value: '20261298121913', name: '海底撈', brand: 'mFood' },
-  { label: '20261298121914 - 閃蜂科技', value: '20261298121914', name: '閃蜂科技', brand: 'flashBee' },
-  { label: '20261298121915 - 金龍餐飲', value: '20261298121915', name: '金龍餐飲', brand: 'flashBee' },
-]
+/** 賬戶狀態文案/顏色映射 */
+const accountStatusMap: Record<string, { label: string; color: string }> = {
+  normal: { label: '正常', color: 'green' },
+  frozen: { label: '凍結', color: 'red' },
+  mergeFrozen: { label: '合併凍結', color: 'orange' },
+}
 
 /** 数字金额转中文大写 */
 function amountToChinese(num: number): string {
@@ -103,13 +101,30 @@ export default function TransferAdd() {
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
-  /** 轉出集團餘額（Mock） */
-  const sourceVirtualBalance = 128560.50
+  /** 同品牌推廣金賬戶列表（轉出餘額與轉入集團选项均由此派生） */
+  const [accounts, setAccounts] = useState<FinAccount[]>([])
 
-  /** 根據品牌過濾轉入集團選項（排除當前集團） */
-  const targetGroupOptions = allGroupOptions
-    .filter(o => o.brand === brandParam && o.value !== groupIdParam)
-    .map(o => ({ label: `${o.value} - ${o.name}`, value: o.value }))
+  useEffect(() => {
+    fetchFinAccounts({ page: 1, size: 500, brand: brandParam })
+      .then(res => setAccounts(res.records || []))
+      .catch(() => setAccounts([]))
+  }, [brandParam])
+
+  /** 轉出集團賬戶（虛擬餘額/狀態） */
+  const sourceAccount = accounts.find(a => a.groupId === groupIdParam)
+  const sourceVirtualBalance = Number(sourceAccount?.virtualBalance) || 0
+
+  /** 轉入集團选項：同品牌且排除當前集團，非正常狀態賬戶不可選 */
+  const targetGroupOptions = accounts
+    .filter(a => a.groupId !== groupIdParam)
+    .map(a => ({
+      label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${accountStatusMap[a.status]?.label || a.status}）` : ''}`,
+      value: a.groupId,
+      disabled: a.status !== 'normal',
+    }))
+
+  /** 已選轉入集團賬戶 */
+  const targetAccount = accounts.find(a => a.groupId === targetGroupId)
 
   // 提交成功彈窗倒計時
   useEffect(() => {
@@ -140,14 +155,13 @@ export default function TransferAdd() {
         return
       }
       // 提交審批記錄
-      const targetGroup = allGroupOptions.find(g => g.value === targetGroupId)
       const payload: TransferApplyPayload = {
         fromGroupId: groupIdParam,
         fromGroupName: groupNameParam,
         brand: brandParam,
         fromVirtualBalance: sourceVirtualBalance,
         toGroupId: targetGroupId || '',
-        toGroupName: targetGroup?.name || '',
+        toGroupName: targetAccount?.groupName || '',
         transferAmount,
         remark: form.getFieldValue('remark') || '',
       }
@@ -165,8 +179,11 @@ export default function TransferAdd() {
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)
-    } catch {
-      // 表单校验未通过 / 提交失败（錯誤提示由請求層給出）
+    } catch (err) {
+      // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
+      if (!(err && typeof err === 'object' && 'errorFields' in err)) {
+        message.error(err instanceof Error && err.message ? err.message : '提交失败，请稍后重试')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -295,7 +312,9 @@ export default function TransferAdd() {
               <BrandTag value={brandParam} />
             </Form.Item>
             <Form.Item label="賬戶狀態">
-              <Tag color="green">正常</Tag>
+              <Tag color={accountStatusMap[sourceAccount?.status || 'normal']?.color || 'green'}>
+                {accountStatusMap[sourceAccount?.status || 'normal']?.label || '正常'}
+              </Tag>
             </Form.Item>
           </div>
         </div>
@@ -314,7 +333,7 @@ export default function TransferAdd() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
             <Form.Item label="轉入集團" name="targetGroupId" rules={[{ required: true, message: '請選擇轉入集團' }]}>
               <Select
-                placeholder="請選擇轉入集團（同品牌）"
+                placeholder={targetGroupOptions.length ? '請選擇轉入集團（同品牌）' : '暫無同品牌可轉入集團'}
                 options={targetGroupOptions}
                 showSearch
                 allowClear
@@ -326,7 +345,11 @@ export default function TransferAdd() {
               {targetGroupId ? <BrandTag value={brandParam} /> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
             </Form.Item>
             <Form.Item label="賬戶狀態">
-              {targetGroupId ? <Tag color="green">正常</Tag> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+              {targetGroupId
+                ? <Tag color={accountStatusMap[targetAccount?.status || 'normal']?.color || 'green'}>
+                    {accountStatusMap[targetAccount?.status || 'normal']?.label || '正常'}
+                  </Tag>
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
             </Form.Item>
           </div>
         </div>

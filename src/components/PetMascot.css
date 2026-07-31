@@ -12,6 +12,11 @@
   transition: filter 0.3s ease;
 }
 
+/* 非拖拽時 left/top/旋轉均平滑過渡（躲入/跳出邊框動畫） */
+.pet-mascot-wrapper:not(.dragging) {
+  transition: filter 0.3s ease, left 0.5s cubic-bezier(0.4, 0, 0.2, 1), top 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .pet-mascot-wrapper:hover {
   filter: drop-shadow(0 8px 22px rgba(232, 114, 12, 0.55));
 }
@@ -40,6 +45,38 @@
 
 .pet-mascot-wrapper:not(.dragging):hover .pet-body::after {
   opacity: 1;
+}
+
+/* ========== 閑置躲入邊框（只露頭部探出） ========== */
+/* 傾斜 45° 躲入：躲左邊框時頭斜朝右上、躲右邊框時頭斜朝左上，露出頭部探出（角度需與 TSX 的 DOCK_TILT_DEG 保持一致） */
+.pet-mascot-wrapper.docked-left {
+  transform: rotate(45deg);
+}
+
+.pet-mascot-wrapper.docked-right {
+  transform: rotate(-45deg);
+}
+
+.pet-mascot-wrapper.docked {
+  cursor: pointer;
+  filter: drop-shadow(0 2px 8px rgba(232, 114, 12, 0.3));
+  opacity: 0.9;
+}
+
+/* 躲藏時暫停漂浮動畫，改為緩慢探頭張望 */
+.pet-mascot-wrapper.docked .pet-body {
+  animation: petPeek 3s ease-in-out infinite;
+}
+
+/* 躲藏時隱藏地面陰影與提示文字 */
+.pet-mascot-wrapper.docked .pet-body::before,
+.pet-mascot-wrapper.docked .pet-body::after {
+  display: none;
+}
+
+@keyframes petPeek {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .pet-body {

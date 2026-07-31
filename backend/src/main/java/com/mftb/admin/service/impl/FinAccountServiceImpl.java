@@ -110,7 +110,12 @@ public class FinAccountServiceImpl implements FinAccountService {
 
     @Override
     public FinAccount requireUsable(String groupId, String brand) {
-        FinAccount account = requireAccount(groupId, brand);
+        // 集团有门店即视为已开通账户（列表按集团×品牌派生零余额行），
+        // 未充值前无账户记录，按余额为 0 提示，避免「尚未开通」文案让人误解
+        FinAccount account = findByGroupBrand(groupId, brand);
+        if (account == null) {
+            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 推广金账户余额为 0，无法发起资金操作，请先充值");
+        }
         if (STATUS_FROZEN.equals(account.getStatus())) {
             throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已冻结，无法发起资金操作");
         }

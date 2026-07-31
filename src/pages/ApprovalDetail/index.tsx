@@ -965,10 +965,6 @@ export default function ApprovalDetail() {
                     <span className="approval-info-label">所屬品牌</span>
                     <span className="approval-info-value">{data.fromBrand}</span>
                   </div>
-                  <div className="approval-info-item">
-                    <span className="approval-info-label">虛擬賬戶餘額</span>
-                    <span className="approval-info-value approval-amount--blue">MOP {data.fromVirtualBalance?.toLocaleString()}</span>
-                  </div>
                 </div>
               </div>
               {/* 转入集团资讯 */}
