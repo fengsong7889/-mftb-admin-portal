@@ -337,6 +337,15 @@ export default function BatchDetail() {
   /** 充值信息版塊 */
   const renderRechargeInfo = () => {
     const payMethod = payMethodMap[extra.payMethod as string] || '--'
+    /** 虛擬賬戶充值金額（到賬總額） */
+    const virtualAmount = Number(record.virtualAmount) || 0
+    /** 實收賬戶充值金額（非實收批次為 null，展示 --） */
+    const actualAmount = record.actualAmount === null || record.actualAmount === undefined
+      ? null : Number(record.actualAmount)
+    /** 優惠金額：記錄有值優先，否則按 虛擬到賬 - 實收 推導 */
+    const discountAmount = record.discountAmount === null || record.discountAmount === undefined
+      ? (actualAmount !== null ? Math.max(virtualAmount - actualAmount, 0) : 0)
+      : Number(record.discountAmount)
     return (
       <>
         <div style={gridStyle}>
@@ -349,10 +358,28 @@ export default function BatchDetail() {
           <InfoItem label="申請人" value={record.applicant || '--'} />
           <InfoItem label="歸屬BD" value={record.bd || '--'} />
         </div>
+        {/* 充值金額信息：虛擬到賬 / 實收 / 優惠 */}
+        <div style={{ borderTop: '1px dashed rgba(0,0,0,0.08)', margin: '20px 0' }} />
+        <div style={gridStyle}>
+          <InfoItem
+            label="虛擬賬戶充值金額"
+            value={virtualAmount.toLocaleString()}
+            valueStyle={{ color: '#1890FF', fontWeight: 600 }}
+          />
+          <InfoItem
+            label="實收賬戶充值金額"
+            value={actualAmount === null ? <span style={{ color: '#999' }}>--</span> : actualAmount.toLocaleString()}
+            valueStyle={{ color: '#52C41A', fontWeight: 600 }}
+          />
+          <InfoItem
+            label="優惠金額"
+            value={discountAmount.toLocaleString()}
+            valueStyle={{ color: '#FF4D4F', fontWeight: 600 }}
+          />
+        </div>
         {record.isActual === '是' && (
           <>
-            <div style={{ borderTop: '1px dashed rgba(0,0,0,0.08)', margin: '20px 0' }} />
-            <div style={gridStyle}>
+            <div style={{ ...gridStyle, marginTop: 20 }}>
               <InfoItem label="結算方式" value={payMethod} />
               <InfoItem label="銀行轉賬金額" value={(Number(extra.bankAmount) || 0).toLocaleString()} valueStyle={{ color: '#E8720C', fontWeight: 600 }} />
               <InfoItem label="營業額支付金額" value={(Number(extra.revenueAmount) || 0).toLocaleString()} valueStyle={{ color: '#E8720C', fontWeight: 600 }} />
