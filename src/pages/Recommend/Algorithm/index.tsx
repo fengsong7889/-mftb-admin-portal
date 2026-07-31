@@ -175,6 +175,11 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 47, name: '自然流量-美食外賣mFood版', code: 'ALG_ORG_002', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
   { id: 48, name: '自然流量-超市百貨閃蜂版', code: 'ALG_ORG_003', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
   { id: 49, name: '自然流量-超市百貨mFood版', code: 'ALG_ORG_004', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 0 },
+  // 猜你喜歡 - 4条
+  { id: 50, name: '猜你喜歡-美食外賣閃蜂版', code: 'ALG_GYL_001', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 51, name: '猜你喜歡-美食外賣mFood版', code: 'ALG_GYL_002', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 52, name: '猜你喜歡-超市百貨閃蜂版', code: 'ALG_GYL_003', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
+  { id: 53, name: '猜你喜歡-超市百貨mFood版', code: 'ALG_GYL_004', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 0 },
 ]
 
 export default function Algorithm() {

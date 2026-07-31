@@ -9,6 +9,7 @@ import {
   ReloadOutlined,
   ExportOutlined,
   PlusOutlined,
+  AuditOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
@@ -18,6 +19,7 @@ import type { MerchantGroupItem } from '../../api/merchantGroup'
 import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import type { StoreItem } from '../../api/store'
 import { fetchStoresByGroup } from '../../api/store'
+import { getApprovalRecords } from '../../utils/approvalStore'
 
 /** 廣告類型 */
 const adTypeOptions = [
@@ -70,6 +72,19 @@ export default function GiftDetail() {
   // 集团/门店下拉
   const [groups, setGroups] = useState<MerchantGroupItem[]>([])
   const [stores, setStores] = useState<StoreItem[]>([])
+
+  // 審批中的贈送申請數（TG 流程為本地記錄，列表加載時同步刷新）
+  const [pendingGiftCount, setPendingGiftCount] = useState(0)
+  useEffect(() => {
+    setPendingGiftCount(
+      getApprovalRecords().filter(r => r.approvalType === 'gift' && r.flowStatus === 'pending').length,
+    )
+  }, [dataSource])
+
+  /** 跳轉審批中心並自動篩選贈送類型流程（含審批中/已駁回等全部狀態） */
+  const handleGoApproval = () => {
+    navigate('/approval-center?approvalType=gift')
+  }
 
   // 加载集团下拉
   useEffect(() => {
@@ -350,6 +365,15 @@ export default function GiftDetail() {
             <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
               導出
             </Button>
+          )}
+          <Button icon={<AuditOutlined />} onClick={handleGoApproval}>查看審批進度</Button>
+          {pendingGiftCount > 0 && (
+            <span
+              onClick={handleGoApproval}
+              style={{ color: '#E8720C', fontSize: 13, cursor: 'pointer', alignSelf: 'center' }}
+            >
+              {pendingGiftCount} 筆申請審批中，通過後剩餘天數自動生效
+            </span>
           )}
         </div>
         <div className="action-section-right">
