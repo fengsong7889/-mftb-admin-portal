@@ -33,8 +33,6 @@ public class BizDataInitializer implements CommandLineRunner {
         migrateLegacyBizChannels();
         seedMerchantGroups();
         seedStores();
-        seedGiftRecords();
-        seedGiftConsumes();
     }
 
     /** 存量集团ID迁移: 非 JT+6位数字 格式的编号按 id 顺序重编为 JT 序列 */
@@ -278,72 +276,7 @@ public class BizDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** 赠送记录种子数据 (按 gift_id 幂等) */
-    private void seedGiftRecords() {
-        // gift_id, group_code, group_name, store_code, store_name, brand, ad_type,
-        // total, valid, used, remaining, gift_date, expire_date, status, reason, applicant, apply_time, approval_status
-        Object[][] records = {
-                {"2401-001", "JT000001", "美味餐廳集團", "MD00001", "澳門總店", "2", "new_store",
-                        30, 180, 12, 18, "2024-01-15", "2024-07-15", 1, "新集團入駐扶持", "張三", "2024-01-15 10:30:00", 2},
-                {"2310-001", "JT000002", "生鮮超市集團", "MD00002", "氹仔分店", "1", "revival",
-                        60, 180, 60, 0, "2023-10-01", "2024-04-01", 2, "集團盤活復蘇計劃", "李四", "2023-10-01 14:20:00", 2},
-                {"2401-003", "JT000003", "時尚百貨集團", "MD00003", "新馬路店", "2", "exclusive",
-                        90, 365, 45, 45, "2024-01-01", "2024-12-31", 1, "大促活動支持", "王五", "2024-01-01 09:15:00", 2},
-                {"2306-001", "JT000004", "速遞物流集團", "MD00004", "黑沙環店", "1", "new_store",
-                        15, 90, 0, 15, "2023-06-01", "2023-12-01", 3, "合作夥伴獎勵", "趙六", "2023-06-01 11:00:00", 2},
-                {"2401-004", "JT000005", "甜品屋集團", "MD00005", "官也街老店", "2", "new_store",
-                        7, 30, 0, 0, null, null, 1, "新集團開業扶持", "關羽", "2024-01-20 16:30:00", 1},
-                {"2401-005", "JT000006", "火鍋城集團", "MD00006", "珠海旗艦店", "1", "ka",
-                        14, 60, 0, 0, null, null, 1, "集團盤活復蘇計劃", "張飛", "2024-01-18 09:45:00", 3},
-        };
-        int inserted = 0;
-        for (Object[] r : records) {
-            inserted += jdbcTemplate.update(
-                    "INSERT INTO biz_gift_record (gift_id, group_id, group_name, store_id, store_name, brand, ad_type, "
-                            + "total_days, valid_days, used_days, remaining_days, gift_date, expire_date, status, "
-                            + "reason, applicant, apply_time, approval_status) "
-                            + "SELECT ?, g.id, ?, s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? "
-                            + "FROM biz_merchant_group g, biz_store s "
-                            + "WHERE g.group_code = ? AND s.store_code = ? "
-                            + "AND NOT EXISTS (SELECT 1 FROM biz_gift_record WHERE gift_id = ?)",
-                    r[0], r[2], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13],
-                    r[14], r[15], r[16], r[17], r[1], r[3], r[0]);
-        }
-        if (inserted > 0) {
-            log.info("已写入 {} 条赠送记录种子数据", inserted);
-        }
-    }
-
-    /** 消费流水种子数据 (按 gift_id + trade_type + change_date 幂等) */
-    private void seedGiftConsumes() {
-        // gift_id, trade_type, balance_change, change_date, algorithm_id, algorithm_name, order_no, remaining_days, remark
-        Object[][] consumes = {
-                {"2401-001", "ad_purchase", -5, "2024-02-10", "A001", "新店廣告-外賣版", "AD202402100001", 25, ""},
-                {"2401-001", "ad_refund", 3, "2024-02-15", "A001", "新店廣告-首頁版", "AD202402150002", 28, ""},
-                {"2310-001", "ad_purchase", -10, "2023-11-05", "A002", "盤活復蘇-團購版", "AD202311050001", 20, ""},
-                {"2401-003", "manual_deduct", -8, "2024-01-20", "A003", "獨家商家-超市版", "—", 37,
-                        "商家違規進行虛假宣傳，經運營主管審核手動扣除贈送天數作為懲罰。"},
-                {"2306-001", "auto_expire", -7, "2024-03-01", "A004", "金牌商家-全渠道", "—", 8,
-                        "贈送天數有效期到期，系統自動收回剩餘天數。"},
-                {"2401-004", "ad_refund", 4, "2024-02-28", "A005", "人氣商家-首頁版", "AD202402280001", 14, ""},
-        };
-        int inserted = 0;
-        for (Object[] c : consumes) {
-            inserted += jdbcTemplate.update(
-                    "INSERT INTO biz_gift_consume (gift_record_id, gift_id, group_id, group_name, store_id, store_name, "
-                            + "brand, ad_type, trade_type, balance_change, change_date, algorithm_id, algorithm_name, "
-                            + "order_no, remaining_days, remark) "
-                            + "SELECT gr.id, gr.gift_id, gr.group_id, gr.group_name, gr.store_id, gr.store_name, "
-                            + "gr.brand, gr.ad_type, ?, ?, ?, ?, ?, ?, ?, ? "
-                            + "FROM biz_gift_record gr WHERE gr.gift_id = ? "
-                            + "AND NOT EXISTS (SELECT 1 FROM biz_gift_consume "
-                            + "WHERE gift_id = ? AND trade_type = ? AND change_date = ?)",
-                    c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[0], c[0], c[1], c[3]);
-        }
-        if (inserted > 0) {
-            log.info("已写入 {} 条赠送消费流水种子数据", inserted);
-        }
-    }
+    /** 赠送记录/消费流水不再写入种子数据: 业务上尚未发生任何赠送, 数据均由真实赠送操作产生 */
 
     private boolean tableExists(String table) {
         Integer count = jdbcTemplate.queryForObject(
