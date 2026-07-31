@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
@@ -85,8 +85,8 @@ interface ApprovalRecord {
 }
 
 const mockData: ApprovalRecord[] = [
-  { key: '13', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'ZS202607170000', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 10:00:00', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '14', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'ZS202607170001', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 11:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-07-17 12:20:00', bizApproveStatus: 'approved', opsApprover: '劉邦(000)', opsApproveTime: '2026-07-17 14:30:00', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
+  { key: '13', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'TG202607170000', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 10:00:00', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
+  { key: '14', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'TG202607170001', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 11:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-07-17 12:20:00', bizApproveStatus: 'approved', opsApprover: '劉邦(000)', opsApproveTime: '2026-07-17 14:30:00', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '1', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'CZ202601160000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
   { key: '2', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'KK202601160000', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '混合支付營業額佔比太高' },
   { key: '3', groupId: '1003', groupName: '海底撈', brand: 'flashBee', flowNo: 'ZZ202601160000', approvalType: 'transfer', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'rejected', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '營收不足以抵扣該營業額支付' },
@@ -128,35 +128,45 @@ function resolveCurrentNode(r: ApprovalRecord): string {
   return 'finance'
 }
 
+/** 單條記錄是否命中當前篩選條件 */
+function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boolean {
+  if (query.groupId && !r.groupId.includes(query.groupId)) return false
+  if (query.groupName && !r.groupName.includes(query.groupName)) return false
+  if (query.brand && r.brand !== query.brand) return false
+  if (query.approvalType && r.approvalType !== query.approvalType) return false
+  if (query.flowNo && !r.flowNo.includes(query.flowNo)) return false
+  if (query.flowStatus && r.flowStatus !== query.flowStatus) return false
+  if (query.currentNode && resolveCurrentNode(r) !== query.currentNode) return false
+  if (query.applicant && !r.applicant.includes(query.applicant)) return false
+  if (query.approver) {
+    const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver!))
+    if (!hit) return false
+  }
+  if (query.applyFrom && r.applyTime.slice(0, 10) < query.applyFrom) return false
+  if (query.applyTo && r.applyTime.slice(0, 10) > query.applyTo) return false
+  return true
+}
+
 /** 後端不可用時的降級查詢：localStorage 記錄 + 演示數據本地篩選分頁 */
 function mockFetchApprovals(query: FinApprovalQuery) {
   const all = [...(getApprovalRecords() as ApprovalRecord[]), ...mockData]
-  const filtered = all.filter(r => {
-    if (query.groupId && !r.groupId.includes(query.groupId)) return false
-    if (query.groupName && !r.groupName.includes(query.groupName)) return false
-    if (query.brand && r.brand !== query.brand) return false
-    if (query.approvalType && r.approvalType !== query.approvalType) return false
-    if (query.flowNo && !r.flowNo.includes(query.flowNo)) return false
-    if (query.flowStatus && r.flowStatus !== query.flowStatus) return false
-    if (query.currentNode && resolveCurrentNode(r) !== query.currentNode) return false
-    if (query.applicant && !r.applicant.includes(query.applicant)) return false
-    if (query.approver) {
-      const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver!))
-      if (!hit) return false
-    }
-    if (query.applyFrom && r.applyTime.slice(0, 10) < query.applyFrom) return false
-    if (query.applyTo && r.applyTime.slice(0, 10) > query.applyTo) return false
-    return true
-  })
+  const filtered = all.filter(r => matchesApprovalQuery(r, query))
   const page = query.page || 1
   const size = query.size || 10
   return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
+}
+
+/** 推廣贈送（TG）審批暫為前端流程：後端查詢結果需合併本地贈送審批記錄 */
+function localGiftApprovals(query: FinApprovalQuery): ApprovalRecord[] {
+  return (getApprovalRecords() as ApprovalRecord[])
+    .filter(r => r.approvalType === 'gift' && matchesApprovalQuery(r, query))
 }
 
 export default function ApprovalCenter() {
   const navigate = useNavigate()
   // 菜单权限：approval-center
   const { user, hasPermission } = useAuth()
+  const [searchParams] = useSearchParams()
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<ApprovalRecord | null>(null)
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
@@ -166,8 +176,25 @@ export default function ApprovalCenter() {
   const [data, setData] = useState<ApprovalRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [filters, setFilters] = useState<ApprovalFilters>({})
+  /** 入口頁可通過 URL 帶入初始篩選（如贈送明細 → /approval-center?approvalType=gift） */
+  const initialFilters = useMemo<ApprovalFilters>(() => {
+    const f: ApprovalFilters = {}
+    const approvalType = searchParams.get('approvalType')
+    const flowStatus = searchParams.get('flowStatus')
+    const flowNo = searchParams.get('flowNo')
+    if (approvalType) f.approvalType = approvalType
+    if (flowStatus) f.flowStatus = flowStatus
+    if (flowNo) f.flowNo = flowNo
+    return f
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const [filters, setFilters] = useState<ApprovalFilters>(initialFilters)
   const [pagination, setPagination] = useState({ page: 1, size: 10 })
+
+  /** URL 初始篩選同步回搜索表單 */
+  useEffect(() => {
+    searchForm.setFieldsValue(initialFilters)
+  }, [initialFilters, searchForm])
 
   /** 組裝查詢參數 */
   const buildQuery = useCallback((): FinApprovalQuery => ({
@@ -186,7 +213,7 @@ export default function ApprovalCenter() {
     applyTo: filters.applyTime?.[1]?.format('YYYY-MM-DD'),
   }), [filters, pagination])
 
-  /** 加載審批列表（後端不可用時降級到本地記錄） */
+  /** 加載審批列表（後端不可用時降級到本地記錄；贈送 TG 流程為前端記錄，按流程編號去重後合併展示） */
   const loadApprovals = useCallback(async () => {
     const query = buildQuery()
     setLoading(true)
@@ -195,8 +222,12 @@ export default function ApprovalCenter() {
         () => fetchFinApprovals(query),
         () => mockFetchApprovals(query),
       )
-      setData((res.records ?? []) as ApprovalRecord[])
-      setTotal(res.total ?? 0)
+      const records = (res.records ?? []) as ApprovalRecord[]
+      // 後端查詢不含本地 TG 贈送流程，需補充合併；降級查詢已包含，去重後不重複追加
+      const extraGifts = localGiftApprovals(query)
+        .filter(g => !records.some(r => r.flowNo === g.flowNo))
+      setData([...extraGifts, ...records])
+      setTotal((res.total ?? 0) + extraGifts.length)
     } finally {
       setLoading(false)
     }
@@ -257,10 +288,15 @@ export default function ApprovalCenter() {
       okText: '確定',
       cancelText: '取消',
       onOk: async () => {
-        await withFinanceFallback(
-          () => cancelFinApproval(record.flowNo),
-          () => updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' }),
-        )
+        // 贈送 TG 流程為前端記錄，直接本地撤銷，不調後端
+        if (record.approvalType === 'gift') {
+          updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' })
+        } else {
+          await withFinanceFallback(
+            () => cancelFinApproval(record.flowNo),
+            () => updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' }),
+          )
+        }
         message.success('撤銷成功')
         await loadApprovals()
       },

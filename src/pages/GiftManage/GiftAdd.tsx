@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Button, Form, Input, Select, Tag, InputNumber, Upload, Radio, message } from 'antd'
+import { Button, Form, Input, Select, Tag, InputNumber, Upload, message } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
 import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import type { StoreItem } from '../../api/store'
 import { fetchStoresByGroup } from '../../api/store'
-import { createGiftRecord } from '../../api/gift'
+import { mockSubmitApproval } from '../../api/mock/financeMock'
+import BrandTag from '../../components/BrandTag'
 
 const { TextArea } = Input
 
@@ -16,6 +17,14 @@ const adTypeOptions = [
   { label: '盤活復蘇', value: 'revival' },
 ]
 
+/** 所屬品牌只讀展示（受 Form 控制）：選擇門店後直接展示品牌標籤，無需單選 */
+function BrandDisplay({ value }: { value?: string }) {
+  if (!value) {
+    return <span style={{ color: '#8C8C8C', fontSize: 13 }}>請先選擇門店，品牌將自動帶出</span>
+  }
+  return <BrandTag value={value} />
+}
+
 export default function GiftAdd() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -23,6 +32,7 @@ export default function GiftAdd() {
   const [successVisible, setSuccessVisible] = useState(false)
   const [countdown, setCountdown] = useState(5)
   const [submitting, setSubmitting] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
 
   // 集团/门店数据
   const [groups, setGroups] = useState<MerchantGroupItem[]>([])
@@ -66,15 +76,21 @@ export default function GiftAdd() {
     }
   }, [isGiftMode, presetGroupId, presetStoreId, searchParams, form])
 
-  // 集团选择变化时加载门店
+  // 集团选择变化时加载门店（品牌随门店自动带出，切换集团后同步清空）
   useEffect(() => {
     if (selectedGroupId && !isGiftMode) {
       fetchStoresByGroup(selectedGroupId)
         .then(setStores)
         .catch(() => setStores([]))
-      form.setFieldsValue({ storeId: undefined })
+      form.setFieldsValue({ storeId: undefined, brand: undefined })
     }
   }, [selectedGroupId, isGiftMode, form])
+
+  /** 選擇門店後自動帶出所屬品牌（無需用戶手動選擇） */
+  const handleStoreChange = (storeId?: number) => {
+    const store = stores.find(s => s.id === storeId)
+    form.setFieldsValue({ brand: store?.brand })
+  }
 
   // 倒計時邏輯
   useEffect(() => {
@@ -101,17 +117,32 @@ export default function GiftAdd() {
       const certificateFiles = form.getFieldValue('certificate') || []
       const credentials = certificateFiles.map((f: { name?: string }) => f.name || '').filter(Boolean)
 
-      await createGiftRecord({
-        groupId: values.groupId,
-        storeId: values.storeId,
+      // 提交審批記錄（TG 流程號）：審批全部通過後才寫入贈送記錄/剩餘天數
+      const group = groups.find(g => g.id === values.groupId)
+      const store = stores.find(s => s.id === values.storeId)
+      const flowNo = mockSubmitApproval({
+        approvalType: 'gift',
+        groupId: group?.groupCode || String(values.groupId),
+        groupName: group?.groupName || '',
         brand: values.brand,
-        adType: values.adType,
-        giftDays: values.giftDays,
-        validDays: values.validDays,
-        reason: values.reason,
-        credentials,
+        extra: {
+          groupId: values.groupId,
+          groupCode: group?.groupCode,
+          groupName: group?.groupName,
+          storeId: values.storeId,
+          storeCode: store?.storeCode,
+          storeName: store?.storeName,
+          adType: values.adType,
+          giftDays: values.giftDays,
+          validDays: values.validDays,
+          reason: values.reason,
+          remark: values.reason,
+          credentials,
+        },
       })
 
+      setSubmittedFlowNo(flowNo)
+      setCountdown(5)
       setSuccessVisible(true)
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
@@ -232,6 +263,7 @@ export default function GiftAdd() {
                 placeholder="請先選擇集團"
                 optionFilterProp="label"
                 disabled={!selectedGroupId}
+                onChange={handleStoreChange}
                 options={stores.map(s => ({
                   label: `${s.storeCode} - ${s.storeName}`,
                   value: s.id,
@@ -243,12 +275,10 @@ export default function GiftAdd() {
           <Form.Item
             label="所屬品牌"
             name="brand"
-            rules={[{ required: true, message: '請選擇所屬品牌' }]}
+            tooltip="選擇門店後自動帶出，無需手動選擇"
+            rules={[{ required: true, message: '請先選擇門店，品牌將自動帶出' }]}
           >
-            <Radio.Group disabled={isGiftMode}>
-              <Radio value="flashBee">閃蜂</Radio>
-              <Radio value="mFood">mFood</Radio>
-            </Radio.Group>
+            <BrandDisplay />
           </Form.Item>
         </div>
       </div>
@@ -396,7 +426,10 @@ export default function GiftAdd() {
               提交成功
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+              {submittedFlowNo && (
+                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 600 }}>{submittedFlowNo}</span><br /></>
+              )}
+              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度，審批通過後剩餘天數自動生效
             </p>
             <Button
               type="primary"

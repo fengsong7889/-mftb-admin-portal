@@ -1,9 +1,12 @@
 /**
  * 審批數據共享存儲（localStorage）
- * 充值/轉賬/扣款/合併等頁面提交後，數據進入審批中心
+ * 充值/轉賬/扣款/合併/推廣贈送等頁面提交後，數據進入審批中心
  */
 
+import { createGiftRecord } from '../api/gift'
+
 const STORAGE_KEY = 'mftb_approval_records'
+const LEGACY_TG_CLEANUP_KEY = 'mftb_approval_tg_cleanup_v2'
 
 export interface ApprovalRecord {
   key: string
@@ -33,8 +36,38 @@ export interface ApprovalRecord {
   extra?: Record<string, unknown>
 }
 
+/** 舊版預設審批人（已廢棄，僅用於存量數據清洗） */
+const LEGACY_NODE_APPROVERS = ['朱元璋(001)', '李世民(003)', '趙匡胤(004)']
+
+/**
+ * 一次性清理：
+ * 1. 刪除早期測試提交的 TG 贈送流程（申請人為演示賬號 朱棣(002) 的臟數據，修復後申請人已改為當前登錄人）
+ * 2. 待審節點若殘留舊版預設審批人，重置為 '--'（與後端一致：審批人由實際操作人在審批時記錄）
+ */
+function cleanupLegacyGiftRecords(): void {
+  if (localStorage.getItem(LEGACY_TG_CLEANUP_KEY) === 'done') return
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const records: ApprovalRecord[] = JSON.parse(raw)
+      const cleaned = records
+        .filter(r => !(r.approvalType === 'gift' && r.applicant === '朱棣(002)'))
+        .map(r => {
+          const fixed = { ...r }
+          if (fixed.bizApproveStatus === 'pending' && LEGACY_NODE_APPROVERS.includes(fixed.bizApprover)) fixed.bizApprover = '--'
+          if (fixed.opsApproveStatus === 'pending' && LEGACY_NODE_APPROVERS.includes(fixed.opsApprover)) fixed.opsApprover = '--'
+          if (fixed.finApproveStatus === 'pending' && LEGACY_NODE_APPROVERS.includes(fixed.finApprover)) fixed.finApprover = '--'
+          return fixed
+        })
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned))
+    }
+  } catch { /* 解析失敗跳過清理，不影響審批記錄讀取 */ }
+  localStorage.setItem(LEGACY_TG_CLEANUP_KEY, 'done')
+}
+
 /** 獲取所有自定義審批記錄 */
 export function getApprovalRecords(): ApprovalRecord[] {
+  cleanupLegacyGiftRecords()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : []
@@ -64,11 +97,14 @@ export function updateApprovalRecord(flowNo: string, updates: Partial<ApprovalRe
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records))
 }
 
-/** 各節點默認審批人（Mock） */
-const NODE_APPROVERS: Record<string, string> = {
-  biz: '朱元璋(001)',
-  ops: '李世民(003)',
-  fin: '趙匡胤(004)',
+/** 當前登錄人簽名（姓名(工號)）：與後端 operatorSignature 行為一致，審批時記錄實際操作人 */
+function currentOperatorSignature(): string {
+  try {
+    const info = JSON.parse(localStorage.getItem('user_info') || '{}')
+    if (info.name && info.empId) return `${info.name}(${info.empId})`
+    if (info.name) return info.name
+  } catch { /* 解析失敗回退默認操作人 */ }
+  return '系統管理員'
 }
 
 /** 審批節點推進結果 */
@@ -86,23 +122,22 @@ export function approveCurrentNode(flowNo: string): ApproveNodeResult | null {
   const record = getApprovalRecordByFlowNo(flowNo)
   if (!record || record.flowStatus !== 'pending') return null
   const now = formatNow()
+  const approver = currentOperatorSignature()
   if (record.bizApproveStatus === 'pending') {
     updateApprovalRecord(flowNo, {
-      bizApprover: NODE_APPROVERS.biz, bizApproveTime: now, bizApproveStatus: 'approved',
-      opsApprover: NODE_APPROVERS.ops,
+      bizApprover: approver, bizApproveTime: now, bizApproveStatus: 'approved',
     })
     return { nodeName: '業務主管審批', finished: false, nextNode: '運營主管審批' }
   }
   if (record.opsApproveStatus === 'pending') {
     updateApprovalRecord(flowNo, {
-      opsApprover: NODE_APPROVERS.ops, opsApproveTime: now, opsApproveStatus: 'approved',
-      finApprover: NODE_APPROVERS.fin,
+      opsApprover: approver, opsApproveTime: now, opsApproveStatus: 'approved',
     })
     return { nodeName: '運營主管審批', finished: false, nextNode: '財務主管審批' }
   }
   if (record.finApproveStatus === 'pending') {
     updateApprovalRecord(flowNo, {
-      finApprover: NODE_APPROVERS.fin, finApproveTime: now, finApproveStatus: 'approved',
+      finApprover: approver, finApproveTime: now, finApproveStatus: 'approved',
       flowStatus: 'approved',
     })
     // 全部節點通過 → 寫入批次查詢（充值/轉賬/合併）與明細查詢（全部類型）
@@ -118,23 +153,24 @@ export function rejectCurrentNode(flowNo: string, reason: string): string | null
   const record = getApprovalRecordByFlowNo(flowNo)
   if (!record || record.flowStatus !== 'pending') return null
   const now = formatNow()
+  const approver = currentOperatorSignature()
   if (record.bizApproveStatus === 'pending') {
     updateApprovalRecord(flowNo, {
-      bizApprover: NODE_APPROVERS.biz, bizApproveTime: now, bizApproveStatus: 'rejected',
+      bizApprover: approver, bizApproveTime: now, bizApproveStatus: 'rejected',
       flowStatus: 'rejected', rejectReason: reason,
     })
     return '業務主管審批'
   }
   if (record.opsApproveStatus === 'pending') {
     updateApprovalRecord(flowNo, {
-      opsApprover: NODE_APPROVERS.ops, opsApproveTime: now, opsApproveStatus: 'rejected',
+      opsApprover: approver, opsApproveTime: now, opsApproveStatus: 'rejected',
       flowStatus: 'rejected', rejectReason: reason,
     })
     return '運營主管審批'
   }
   if (record.finApproveStatus === 'pending') {
     updateApprovalRecord(flowNo, {
-      finApprover: NODE_APPROVERS.fin, finApproveTime: now, finApproveStatus: 'rejected',
+      finApprover: approver, finApproveTime: now, finApproveStatus: 'rejected',
       flowStatus: 'rejected', rejectReason: reason,
     })
     return '財務主管審批'
@@ -203,6 +239,10 @@ export function generateBatchNo(): string {
  * - 扣款：不生成批次，僅寫入扣款明細（按最早批次 FIFO 依次扣減，可能跨多個批次）
  */
 function writeApprovedRecords(record: ApprovalRecord, tradeTime: string): void {
+  if (record.approvalType === 'gift') {
+    writeGiftApprovedRecord(record)
+    return
+  }
   if (record.approvalType === 'deduct') {
     writeDeductDetailRecords(record, tradeTime)
     return
@@ -212,6 +252,24 @@ function writeApprovedRecords(record: ApprovalRecord, tradeTime: string): void {
     writeFlowDetailRecords(record, tradeTime, batchNo)
     writeDebtRecords(record, tradeTime, batchNo)
   }
+}
+
+/**
+ * 推廣贈送審批全部通過後寫入贈送記錄（此時剩餘天數才會新增）
+ * 審批未通過/被駁回的申請不會寫入；後端不可用時由 gift API 自動降級寫入本地 Mock 贈送數據
+ */
+function writeGiftApprovedRecord(record: ApprovalRecord): void {
+  const extra = (record.extra || {}) as Record<string, any>
+  void createGiftRecord({
+    groupId: Number(extra.groupId) || 0,
+    storeId: Number(extra.storeId) || 0,
+    brand: record.brand,
+    adType: String(extra.adType || ''),
+    giftDays: Number(extra.giftDays) || 0,
+    validDays: Number(extra.validDays) || 0,
+    reason: String(extra.reason || extra.remark || ''),
+    credentials: Array.isArray(extra.credentials) ? (extra.credentials as string[]) : [],
+  }).catch(() => { /* 贈送記錄寫入失敗不阻斷審批流轉 */ })
 }
 
 /**
@@ -830,7 +888,7 @@ export function generateFlowNo(type: string): string {
     deduct: 'KK',
     transfer: 'ZZ',
     merge: 'HB',
-    gift: 'ZS',
+    gift: 'TG',
   }
   const prefix = prefixMap[type] || 'SP'
   const now = new Date()

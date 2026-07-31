@@ -99,6 +99,7 @@ interface ApprovalDetailData {
   giftBrand?: string
   giftAdType?: string
   giftDays?: number
+  giftValidDays?: number
   // 通用
   groupId?: string
   groupName?: string
@@ -318,7 +319,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     approvalType: 'gift',
     applicant: '朱棣(002)',
     applyDate: '2026-07-17 10:00:00',
-    flowNo: 'ZS202607170000',
+    flowNo: 'TG202607170000',
     flowStatus: '審核中',
     brand: '閃蜂',
     giftGroupId: 'G001',
@@ -328,6 +329,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     giftBrand: '閃蜂',
     giftAdType: '新店廣告',
     giftDays: 30,
+    giftValidDays: 90,
     documents: [
       { type: 'image' }, { type: 'image' },
     ],
@@ -354,8 +356,15 @@ const brandLabelMap: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFoo
 const flowStatusLabelMap: Record<string, string> = {
   pending: '審核中', approved: '已通過', rejected: '已駁回', cancelled: '已撤銷',
 }
+/** 流程狀態標籤顏色（與審批中心列表保持一致：審核中藍/通過綠/駁回紅/撤銷灰） */
+const flowStatusColorMap: Record<string, string> = {
+  審核中: 'processing', 已通過: 'success', 已駁回: 'error', 已撤銷: 'default',
+}
 const payMethodLabelMap: Record<string, string> = {
   corporate: '對公轉賬', mixed: '混合支付', revenue: '營業額支付',
+}
+const giftAdTypeLabelMap: Record<string, string> = {
+  new_store: '新店廣告', revival: '盤活復蘇', exclusive: '獨家商家', gold: '金牌商家', ka: '人氣商家',
 }
 const deductMethodLabelMap: Record<string, string> = {
   account: '賬戶扣款', consume: '消費扣款', batch: '充值批次扣款',
@@ -486,6 +495,26 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
       repayStores: storeRows(extra.repayStores),
     }
   }
+  if (record.approvalType === 'gift') {
+    const adType = str(extra.adType)
+    const credentials = Array.isArray(extra.credentials) ? (extra.credentials as string[]) : []
+    return {
+      ...base,
+      giftGroupId: str(extra.groupCode) || record.groupId,
+      giftGroupName: str(extra.groupName) || record.groupName,
+      giftStoreId: str(extra.storeCode) || str(extra.storeId),
+      giftStoreName: str(extra.storeName),
+      giftBrand: brand,
+      giftAdType: giftAdTypeLabelMap[adType] || adType,
+      giftDays: num(extra.giftDays),
+      giftValidDays: num(extra.validDays),
+      notes: str(extra.reason) || str(extra.remark),
+      documents: credentials.map(name => ({
+        type: name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image',
+        name,
+      })),
+    }
+  }
   return base
 }
 
@@ -543,14 +572,16 @@ export default function ApprovalDetail() {
       onOk: async () => {
         setSubmitting(true)
         try {
-          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單
-          const result = await withFinanceFallback(
-            () => approveFinApproval(flowNo),
-            () => approveCurrentNode(flowNo),
-          )
+          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；贈送 TG 流程為前端記錄，直接本地審批
+          const result = type === 'gift'
+            ? approveCurrentNode(flowNo)
+            : await withFinanceFallback(
+              () => approveFinApproval(flowNo),
+              () => approveCurrentNode(flowNo),
+            )
           if (result) {
             message.success(result.finished
-              ? `${result.nodeName}通過，流程全部節點審批完成，數據已寫入批次查詢`
+              ? `${result.nodeName}通過，流程全部節點審批完成，${type === 'gift' ? '贈送天數已寫入贈送明細' : '數據已寫入批次查詢'}`
               : `${result.nodeName}通過，流程進入「${result.nextNode}」節點`)
           } else {
             message.success('審批通過成功')
@@ -576,14 +607,16 @@ export default function ApprovalDetail() {
     }
     setSubmitting(true)
     try {
-      // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）
-      const rejectedNode = await withFinanceFallback<string | null>(
-        async () => {
-          await rejectFinApproval(flowNo, rejectReason)
-          return null
-        },
-        () => rejectCurrentNode(flowNo, rejectReason),
-      )
+      // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；贈送 TG 流程直接本地駁回
+      const rejectedNode = type === 'gift'
+        ? rejectCurrentNode(flowNo, rejectReason)
+        : await withFinanceFallback<string | null>(
+          async () => {
+            await rejectFinApproval(flowNo, rejectReason)
+            return null
+          },
+          () => rejectCurrentNode(flowNo, rejectReason),
+        )
       message.success(rejectedNode
         ? `已在「${rejectedNode}」節點駁回，流程已結束`
         : '審批駁回成功')
@@ -603,10 +636,15 @@ export default function ApprovalDetail() {
   const handleRevokeConfirm = async () => {
     setSubmitting(true)
     try {
-      await withFinanceFallback(
-        () => cancelFinApproval(flowNo),
-        () => updateApprovalRecord(flowNo, { flowStatus: 'cancelled' }),
-      )
+      // 贈送 TG 流程為前端記錄，直接本地撤銷，不調後端
+      if (type === 'gift') {
+        updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
+      } else {
+        await withFinanceFallback(
+          () => cancelFinApproval(flowNo),
+          () => updateApprovalRecord(flowNo, { flowStatus: 'cancelled' }),
+        )
+      }
       message.success('申請已撤銷')
       setShowRevokeModal(false)
       navigate('/approval-center')
@@ -727,7 +765,7 @@ export default function ApprovalDetail() {
               <div className="approval-info-item">
                 <span className="approval-info-label">流程狀態</span>
                 <span className="approval-info-value">
-                  <Tag color="warning" className="approval-status-tag">{data.flowStatus}</Tag>
+                  <Tag color={flowStatusColorMap[data.flowStatus] || 'default'} className="approval-status-tag">{data.flowStatus}</Tag>
                 </span>
               </div>
             </div>
@@ -1155,6 +1193,10 @@ export default function ApprovalDetail() {
                 <div className="approval-info-item">
                   <span className="approval-info-label">贈送天數</span>
                   <span className="approval-info-value approval-gift-highlight">{data.giftDays} 天</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">有效期</span>
+                  <span className="approval-info-value approval-gift-highlight">{data.giftValidDays ?? '--'} 天</span>
                 </div>
               </div>
             </div>
