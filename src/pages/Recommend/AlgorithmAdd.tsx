@@ -301,7 +301,7 @@ export default function AlgorithmAdd() {
       {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
         /* 自然流量：4 個維度的商家評分規則配置 */
         <OrganicTrafficScoreConfig readOnly={isDetailMode} />
-      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT) ? (
+      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE) ? (
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -369,6 +369,181 @@ export default function AlgorithmAdd() {
             </div>
           </div>
             </>
+          )}
+
+          {/* ===== 猜你喜歡：用戶興趣得分規則 ===== */}
+          {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>用戶興趣得分規則</div>
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
+                按用戶行為對店鋪累計興趣得分（用戶 × 店鋪 維度）：收藏、下單分別加分；得分按滾動窗口計算，超過有效期的行為分數自動失效
+              </div>
+
+              {/* 收藏店鋪得分 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>收藏店鋪得分:</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>用戶收藏店鋪即 +</span>
+                <Form.Item name="favoriteScore" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber min={1} max={100} precision={0} style={{ width: 80 }} addonAfter="分" disabled={isDetailMode} />
+                </Form.Item>
+                <Form.Item name="favoriteCancelDeduct" noStyle valuePropName="checked" initialValue={true}>
+                  <Checkbox disabled={isDetailMode}>取消收藏時扣回對應分數</Checkbox>
+                </Form.Item>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（店鋪僅有收藏 / 取消收藏兩種狀態，收藏態計分一次，不重複叠加）</span>
+              </div>
+
+              {/* 下單店鋪得分 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>下單店鋪得分:</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>用戶每完成一筆訂單 +</span>
+                <Form.Item name="orderScore" noStyle initialValue={10} rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber min={1} max={100} precision={0} style={{ width: 80 }} addonAfter="分" disabled={isDetailMode} />
+                </Form.Item>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>計算訂單類型:</span>
+                <Form.Item name="likeOrderTypeDelivery" noStyle valuePropName="checked" initialValue={true}>
+                  <Checkbox disabled={isDetailMode}>配送訂單</Checkbox>
+                </Form.Item>
+                <Form.Item name="likeOrderTypePickup" noStyle valuePropName="checked" initialValue={true}>
+                  <Checkbox disabled={isDetailMode}>自取訂單</Checkbox>
+                </Form.Item>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（僅統計已完成訂單，退款/取消訂單不計分）</span>
+              </div>
+
+              {/* 得分有效期 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>得分有效期:</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>僅計算近</span>
+                <Form.Item name="scoreValidDays" noStyle initialValue={30} rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber min={1} max={365} precision={0} style={{ width: 80 }} addonAfter="天" disabled={isDetailMode} />
+                </Form.Item>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>內的收藏 / 下單行為</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（滾動窗口，超期行為分數自動失效，保證推薦反映用戶近期偏好）</span>
+              </div>
+            </div>
+          )}
+
+          {/* ===== 猜你喜歡：推送規則 ===== */}
+          {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 4 }}>推送規則</div>
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
+                興趣得分達到推送閾值的店鋪，才會進入該用戶瀑布流「猜你喜歡」坑位的曝光候選集
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>推送閾值:</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>當店鋪興趣得分 ≥</span>
+                <Form.Item name="pushThreshold" noStyle initialValue={20} rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber min={1} max={9999} precision={0} style={{ width: 100 }} addonAfter="分" disabled={isDetailMode} />
+                </Form.Item>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>時，推送至瀑布流「猜你喜歡」區域展示</span>
+              </div>
+              <div style={{ marginTop: 10, fontSize: 12, color: '#8c8c8c', paddingLeft: 108 }}>
+                低於閾值的店鋪不進入曝光候選集；得分因超出有效期回落至閾值以下時，系統自動將其移出候選集。
+              </div>
+            </div>
+          )}
+
+          {/* ===== 猜你喜歡：算法策略（三種曝光方案可選） ===== */}
+          {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
+            <div style={{
+              border: '1px solid #d6e4ff',
+              borderRadius: 8,
+              background: '#f0f5ff',
+              overflow: 'hidden',
+              marginBottom: 16,
+            }}>
+              {/* 標題欄 */}
+              <div style={{
+                fontSize: 14, fontWeight: 600, color: '#1890ff',
+                padding: '10px 20px',
+                borderBottom: '1px solid #d6e4ff',
+                background: '#e6f4ff',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <SettingOutlined />
+                算法策略
+              </div>
+
+              <div style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                  <Form.Item
+                    name="merchantExposureStrategy"
+                    style={{ flex: 1, marginBottom: 0 }}
+                    wrapperCol={{ span: 24 }}
+                  >
+                    <Select
+                      placeholder="請選擇"
+                      style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                      options={[
+                        { label: '輪詢計算', value: 'random' },
+                        { label: '加權隨機（輪盤賭）', value: 'weightedRandom' },
+                        { label: '分數優先＋曝光衰減', value: 'scoreDecay' },
+                      ]}
+                      disabled={isDetailMode}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 輪詢計算說明 */}
+                {merchantExposureStrategy === 'random' && (
+                  <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                    <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                      系統自動統計該用戶興趣得分達到推送閾值的店鋪，生成店鋪 ID 列表並按順序排列，然後逐個輪播展示，確保每個達標店鋪獲得均勻的曝光機會。過程中如有新達標店鋪，系統會自動納入候選集並加入排序展示；如店鋪得分回落至閾值以下，系統會自動剔除，後續店鋪依次往前頂補位。
+                    </span>
+                  </div>
+                )}
+
+                {/* 加權隨機說明 */}
+                {merchantExposureStrategy === 'weightedRandom' && (
+                  <div style={{ marginTop: 16, padding: '12px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6 }}>
+                    <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
+                      每次用戶請求到達時，在達標店鋪中按興趣得分加權隨機抽取一個店鋪展示：分數越高，被抽中概率越大，但低分達標店鋪也有曝光機會，兼顧精準度與多樣性。
+                    </div>
+                    <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>分配公式：</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(店鋪i) = score_i / Σ(達標店鋪得分)</span>
+                      <Popover
+                        trigger="click"
+                        placement="right"
+                        title={<span style={{ fontWeight: 600, color: '#d46b08' }}>📊 分配示例</span>}
+                        content={
+                          <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px' }}>
+                            <div style={{ color: '#595959', marginBottom: 6 }}>
+                              假設 3 個達標店鋪得分：A=60, B=30, C=20，總分=110
+                            </div>
+                            <div style={{ color: '#595959' }}>
+                              A 曝光概率 54.5%、B 27.3%、C 18.2%
+                            </div>
+                            <div style={{ marginTop: 8, padding: '6px 8px', background: '#fff7e6', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
+                              💡 請求 1000 次時，A 約 545 次、B 約 273 次、C 約 182 次
+                            </div>
+                          </div>
+                        }
+                      >
+                        <QuestionCircleOutlined style={{ color: '#d46b08', cursor: 'pointer', fontSize: 13 }} />
+                      </Popover>
+                    </div>
+                  </div>
+                )}
+
+                {/* 分數優先＋曝光衰減說明 */}
+                {merchantExposureStrategy === 'scoreDecay' && (
+                  <div style={{ marginTop: 16, padding: '12px 16px', background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 6 }}>
+                    <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
+                      每次用戶請求到達時，展示當前興趣得分最高的達標店鋪；展示後對該店鋪的曝光得分臨時乘以衰減係數（冷卻），下一次請求時次高分店鋪頂上，實現「高分優先、輪流曝光」，避免單一店鋪霸屏。冷卻僅影響曝光排序，不改變真實興趣得分。
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>曝光衰減係數:</span>
+                      <Form.Item name="exposureDecayFactor" noStyle initialValue={0.7} rules={[{ required: true, message: '請輸入' }]}>
+                        <InputNumber min={0.1} max={0.9} step={0.1} style={{ width: 90 }} disabled={isDetailMode} />
+                      </Form.Item>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>（每曝光一次，曝光得分 × 係數；係數越小輪換越快，冷卻僅當日生效，次日自動恢復原始得分）</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {/* 波浪計算（僅新店廣告） */}
