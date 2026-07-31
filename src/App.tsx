@@ -7,6 +7,7 @@ import HeaderBar from './components/HeaderBar'
 import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
+import MenuPermissionGuard from './components/MenuPermissionGuard'
 import './App.css'
 
 /* 懒加载所有页面组件，避免启动时一次性加载所有模块 */
@@ -105,6 +106,7 @@ function AuthenticatedLayout() {
         <Content className="app-content">
           <RouteErrorBoundary>
             <Suspense fallback={<PageLoading />}>
+              <MenuPermissionGuard>
               <Routes>
               <Route path="/" element={<Home />} />
               {/* 財務管理 */}
@@ -188,6 +190,7 @@ function AuthenticatedLayout() {
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </MenuPermissionGuard>
             </Suspense>
           </RouteErrorBoundary>
         </Content>

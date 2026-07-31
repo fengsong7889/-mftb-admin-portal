@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { Role, MenuPermission } from '../pages/Permission/types'
-import { STORAGE_KEYS } from '../pages/Permission/types'
+import { STORAGE_KEYS, CONTROLLED_MENU_KEYS } from '../pages/Permission/types'
 import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY } from '../api'
 
 export interface UserInfo {
@@ -27,7 +27,8 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>
   logout: () => void
   updateAvatar: (avatar: string) => void
-  hasPermission: (permission: string) => boolean // 权限检查方法
+  hasPermission: (permission: string) => boolean // 权限检查方法（支持 'action' 或 'menuKey:action'）
+  hasMenuPermission: (menuKey: string) => boolean // 菜单访问权限检查（仅受控菜单校验）
   hasDataPermission: (type: 'location' | 'merchant', key: string) => boolean // 数据权限检查方法
 }
 
@@ -178,32 +179,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return role ? role.permissions : []
   }, [])
 
-  /** 权限检查方法 */
+  /** 归集当前用户的全部菜单权限（后端下发优先，兼容旧 localStorage 角色数据） */
+  const getUserMenuPermissions = useCallback((): MenuPermission[] => {
+    if (!user) return []
+    if (user.permissions && user.permissions.length > 0) return user.permissions
+    if (user.functionRoles && user.functionRoles.length > 0) {
+      return user.functionRoles.map(roleId => getRolePermissions(roleId)).flat()
+    }
+    return []
+  }, [user, getRolePermissions])
+
+  /** 权限检查方法：支持 'menuKey:action'（按菜单精确校验）与 'action'（任意菜单含该操作即可，兼容旧调用） */
   const hasPermission = useCallback((permission: string) => {
     if (!user) return false
     // admin 拥有所有权限
     if (user.role === 'admin') return true
 
-    // 优先使用后端登录时下发的合并菜单权限
-    if (user.permissions && user.permissions.length > 0) {
-      return user.permissions.some(p => p.actions.includes(permission))
+    const menuPermissions = getUserMenuPermissions()
+
+    // 'menuKey:action' 格式：校验指定菜单的指定操作
+    if (permission.includes(':')) {
+      const [menuKey, action] = permission.split(':')
+      return menuPermissions.some(p => p.menuKey === menuKey && p.actions.includes(action))
     }
 
-    // 兼容旧逻辑：检查用户绑定的角色是否包含该权限（localStorage 角色数据）
-    if (user.functionRoles && user.functionRoles.length > 0) {
-      const allActions = user.functionRoles
-        .map(roleId => getRolePermissions(roleId))
-        .flat()
-        .flatMap(p => p.actions)
-      return allActions.includes(permission)
+    if (menuPermissions.length > 0) {
+      return menuPermissions.some(p => p.actions.includes(permission))
     }
-    
+
     // guest 只有查看权限，没有编辑权限
     if (user.role === 'guest') {
       return permission !== 'edit' && permission !== 'delete' && permission !== 'create'
     }
     return false
-  }, [user, getRolePermissions])
+  }, [user, getUserMenuPermissions])
+
+  /** 菜单访问权限：受控菜单需持有该菜单任一 action 授权；非受控菜单默认放行 */
+  const hasMenuPermission = useCallback((menuKey: string) => {
+    if (!user) return false
+    if (user.role === 'admin') return true
+    // 未接入权限校验的原型菜单：所有登录用户可访问
+    if (!CONTROLLED_MENU_KEYS.includes(menuKey)) return true
+    return getUserMenuPermissions().some(p => p.menuKey === menuKey && p.actions.length > 0)
+  }, [user, getUserMenuPermissions])
 
   /** 数据权限检查方法 */
   const hasDataPermission = useCallback((type: 'location' | 'merchant', key: string) => {
@@ -222,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user])
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, updateAvatar, hasPermission, hasDataPermission }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, updateAvatar, hasPermission, hasMenuPermission, hasDataPermission }}>
       {children}
     </AuthContext.Provider>
   )

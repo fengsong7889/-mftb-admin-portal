@@ -3,6 +3,7 @@ import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tree
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '../../../contexts/AuthContext'
 import {
   createEmployee,
   deleteEmployee,
@@ -92,6 +93,8 @@ export default function EmployeeManagement() {
 
   // 功能角色列表（新增/编辑时下拉选择）
   const [roles, setRoles] = useState<RoleItem[]>([])
+  // 功能权限校验（菜单 key: employee-management）
+  const { hasPermission } = useAuth()
   // 部门列表（新增/编辑时选择所属部门）
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   // 职位列表（新增/编辑时选择职位，带出职级）
@@ -384,18 +387,22 @@ export default function EmployeeManagement() {
         const isBuiltinAdmin = record.username === BUILTIN_ADMIN
         return (
           <Space size={4}>
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              編輯
-            </Button>
-            <Button type="link" size="small" onClick={() => handleOpenResetPwd(record)}>
-              重置密碼
-            </Button>
-            {!isBuiltinAdmin && (
+            {hasPermission('employee-management:edit') && (
+              <Button type="link" size="small" onClick={() => handleEdit(record)}>
+                編輯
+              </Button>
+            )}
+            {hasPermission('employee-management:edit') && (
+              <Button type="link" size="small" onClick={() => handleOpenResetPwd(record)}>
+                重置密碼
+              </Button>
+            )}
+            {!isBuiltinAdmin && hasPermission('employee-management:edit') && (
               <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
                 {record.status === EMPLOYEE_STATUS.ENABLED ? '停用' : '啟用'}
               </Button>
             )}
-            {!isBuiltinAdmin && (
+            {!isBuiltinAdmin && hasPermission('employee-management:delete') && (
               <Popconfirm
                 title="確認刪除"
                 description={`確定要刪除員工「${record.name}」嗎？`}
@@ -447,9 +454,11 @@ export default function EmployeeManagement() {
       {/* 操作区：仅新增，放右侧 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新增
-          </Button>
+          {hasPermission('employee-management:create') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              新增
+            </Button>
+          )}
           {configComponent}
         </div>
       </div>

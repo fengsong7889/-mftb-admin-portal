@@ -3,6 +3,7 @@ import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, mess
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '../../../contexts/AuthContext'
 import {
   bindRoleUsers,
   createRole,
@@ -43,6 +44,8 @@ export default function RoleManagement() {
   const [keyword, setKeyword] = useState<string>()
   const [status, setStatus] = useState<number>()
   const [searchForm] = Form.useForm()
+  // 功能权限校验（菜单 key: role-management）
+  const { hasPermission } = useAuth()
 
   // 新增/编辑弹窗
   const [editModalVisible, setEditModalVisible] = useState(false)
@@ -276,26 +279,34 @@ export default function RoleManagement() {
       width: 230,
       render: (_, record) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>
-            編輯
-          </Button>
-          <Button type="link" size="small" onClick={() => handleOpenBind(record)}>
-            綁定賬號
-          </Button>
-          <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === ROLE_STATUS.ENABLED ? '停用' : '啟用'}
-          </Button>
-          <Popconfirm
-            title="確認刪除"
-            description={`確定要刪除角色「${record.name}」嗎？刪除後已綁定賬號將失去該角色權限。`}
-            onConfirm={() => handleDelete(record)}
-            okText="確認"
-            cancelText="取消"
-          >
-            <Button type="link" size="small" danger>
-              刪除
+          {hasPermission('role-management:edit') && (
+            <Button type="link" size="small" onClick={() => handleEdit(record)}>
+              編輯
             </Button>
-          </Popconfirm>
+          )}
+          {hasPermission('role-management:edit') && (
+            <Button type="link" size="small" onClick={() => handleOpenBind(record)}>
+              綁定賬號
+            </Button>
+          )}
+          {hasPermission('role-management:edit') && (
+            <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
+              {record.status === ROLE_STATUS.ENABLED ? '停用' : '啟用'}
+            </Button>
+          )}
+          {hasPermission('role-management:delete') && (
+            <Popconfirm
+              title="確認刪除"
+              description={`確定要刪除角色「${record.name}」嗎？刪除後已綁定賬號將失去該角色權限。`}
+              onConfirm={() => handleDelete(record)}
+              okText="確認"
+              cancelText="取消"
+            >
+              <Button type="link" size="small" danger>
+                刪除
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -367,9 +378,11 @@ export default function RoleManagement() {
       {/* 操作区：仅新增，放右侧 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新增
-          </Button>
+          {hasPermission('role-management:create') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              新增
+            </Button>
+          )}
           {configComponent}
         </div>
       </div>

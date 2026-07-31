@@ -10,6 +10,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import type { GiftConsumeItem } from '../../api/gift'
 import { fetchGiftConsume } from '../../api/gift'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
@@ -70,6 +71,8 @@ const tradeTypeColorMap: Record<string, string> = {
 }
 
 export default function GiftConsumeDetail() {
+  // 菜单权限：gift-consume-detail
+  const { hasPermission } = useAuth()
   const [form] = Form.useForm()
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
@@ -478,9 +481,11 @@ export default function GiftConsumeDetail() {
       {/* 操作按鈕 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            導出
-          </Button>
+          {hasPermission('gift-consume-detail:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
+              導出
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
           {configComponent}

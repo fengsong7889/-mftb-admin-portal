@@ -3,6 +3,7 @@ import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, mess
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '../../../contexts/AuthContext'
 import {
   POSITION_RANK_OPTIONS,
   POSITION_SEQUENCE,
@@ -45,6 +46,8 @@ export default function PositionManagement() {
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<PositionFormValues>()
   const sequence = Form.useWatch('sequence', form)
+  // 功能权限校验（菜单 key: position-management）
+  const { hasPermission } = useAuth()
 
   /** 加载职位列表 */
   const fetchList = useCallback(async () => {
@@ -196,20 +199,24 @@ export default function PositionManagement() {
       width: 140,
       render: (_, record) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>
-            編輯
-          </Button>
-          <Popconfirm
-            title="確認刪除"
-            description={`確定要刪除職位「${record.name}」嗎？`}
-            onConfirm={() => handleDelete(record)}
-            okText="確認"
-            cancelText="取消"
-          >
-            <Button type="link" size="small" danger>
-              刪除
+          {hasPermission('position-management:edit') && (
+            <Button type="link" size="small" onClick={() => handleEdit(record)}>
+              編輯
             </Button>
-          </Popconfirm>
+          )}
+          {hasPermission('position-management:delete') && (
+            <Popconfirm
+              title="確認刪除"
+              description={`確定要刪除職位「${record.name}」嗎？`}
+              onConfirm={() => handleDelete(record)}
+              okText="確認"
+              cancelText="取消"
+            >
+              <Button type="link" size="small" danger>
+                刪除
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -252,9 +259,11 @@ export default function PositionManagement() {
       {/* 操作区：仅新增，放右侧 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新增
-          </Button>
+          {hasPermission('position-management:create') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              新增
+            </Button>
+          )}
           {configComponent}
         </div>
       </div>

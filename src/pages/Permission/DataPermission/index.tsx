@@ -88,7 +88,8 @@ interface AuthRow extends DataAuthorization {
 }
 
 export default function DataPermission() {
-  const { user } = useAuth()
+  // 功能权限校验（菜单 key: data-permission）
+  const { user, hasPermission } = useAuth()
   const [roles, setRoles] = useState<RoleItem[]>([])
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -285,20 +286,24 @@ export default function DataPermission() {
       <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
         詳情
       </Button>
-      <Button type="link" size="small" onClick={() => handleEdit(record)}>
-        編輯
-      </Button>
-      <Popconfirm
-        title="確認刪除"
-        description={`確定要刪除「${record.targetName}」在「${COUNTRY_NAME_MAP[record.country] ?? record.country}」的數據授權嗎？`}
-        onConfirm={() => handleDelete(record)}
-        okText="確認"
-        cancelText="取消"
-      >
-        <Button type="link" size="small" danger>
-          刪除
+      {hasPermission('data-permission:edit') && (
+        <Button type="link" size="small" onClick={() => handleEdit(record)}>
+          編輯
         </Button>
-      </Popconfirm>
+      )}
+      {hasPermission('data-permission:delete') && (
+        <Popconfirm
+          title="確認刪除"
+          description={`確定要刪除「${record.targetName}」在「${COUNTRY_NAME_MAP[record.country] ?? record.country}」的數據授權嗎？`}
+          onConfirm={() => handleDelete(record)}
+          okText="確認"
+          cancelText="取消"
+        >
+          <Button type="link" size="small" danger>
+            刪除
+          </Button>
+        </Popconfirm>
+      )}
     </Space>
   )
 
@@ -354,9 +359,11 @@ export default function DataPermission() {
     <div>
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新增
-          </Button>
+          {hasPermission('data-permission:create') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              新增
+            </Button>
+          )}
           {type === DATA_TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
         </div>
       </div>

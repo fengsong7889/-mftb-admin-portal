@@ -3,6 +3,7 @@ import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Tab
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ApartmentOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '../../../contexts/AuthContext'
 import {
   DEPT_STATUS,
   createDepartment,
@@ -100,6 +101,8 @@ export default function OrganizationManagement() {
   const [editing, setEditing] = useState<DepartmentItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<DepartmentFormValues>()
+  // 功能权限校验（菜单 key: organization-management）
+  const { hasPermission } = useAuth()
 
   // 树展开节点（受控：数据加载后默认仅展开根节点）
   const [expandedKeys, setExpandedKeys] = useState<number[]>([])
@@ -317,23 +320,29 @@ export default function OrganizationManagement() {
       width: 180,
       render: (_, record) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>
-            編輯
-          </Button>
-          <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === DEPT_STATUS.ENABLED ? '停用' : '啟用'}
-          </Button>
-          <Popconfirm
-            title="確認刪除"
-            description={`確定要刪除部門「${record.name}」嗎？`}
-            onConfirm={() => handleDelete(record)}
-            okText="確認"
-            cancelText="取消"
-          >
-            <Button type="link" size="small" danger>
-              刪除
+          {hasPermission('organization-management:edit') && (
+            <Button type="link" size="small" onClick={() => handleEdit(record)}>
+              編輯
             </Button>
-          </Popconfirm>
+          )}
+          {hasPermission('organization-management:edit') && (
+            <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
+              {record.status === DEPT_STATUS.ENABLED ? '停用' : '啟用'}
+            </Button>
+          )}
+          {hasPermission('organization-management:delete') && (
+            <Popconfirm
+              title="確認刪除"
+              description={`確定要刪除部門「${record.name}」嗎？`}
+              onConfirm={() => handleDelete(record)}
+              okText="確認"
+              cancelText="取消"
+            >
+              <Button type="link" size="small" danger>
+                刪除
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -395,9 +404,11 @@ export default function OrganizationManagement() {
         {/* 操作区：仅新增，放右侧 */}
         <div className="action-section">
           <div className="action-section-right">
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增
-            </Button>
+            {hasPermission('organization-management:create') && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                新增
+              </Button>
+            )}
             {configComponent}
           </div>
         </div>

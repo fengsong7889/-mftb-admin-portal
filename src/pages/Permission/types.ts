@@ -179,6 +179,8 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   // 账户余额
   'account-balance': [
     { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
   ],
   // 批次查询
   'batch-query': [
@@ -199,6 +201,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'debt-reconcile': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
+    { key: 'import', label: '還款導入' },
   ],
   // 核销对账
   'writeoff-reconcile': [
@@ -209,6 +212,17 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'approval-center': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
+  ],
+  // 推广赠送（商家推广工具-赠送管理）
+  'gift-detail': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'export', label: '導出' },
+  ],
+  // 消费明细（商家推广工具-赠送管理）
+  'gift-consume-detail': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
   ],
   // 权限管理
   'permission': [
@@ -704,33 +718,45 @@ export const menuPermissionTree: PermissionModule[] = [
     name: '首頁',
   },
   {
-    key: 'recommend',
-    name: '商戶推廣工具',
+    key: 'merchant_group',
+    name: '商戶集團管理',
     children: [
-      { key: 'recommend-dashboard', name: '數據看板' },
-      { key: 'recommend-algorithm', name: '算法配置' },
+      { key: 'merchant-group-list', name: '集團管理' },
+      { key: 'store-list', name: '門店管理' },
+    ],
+  },
+  {
+    key: 'merchant_promotion',
+    name: '商家推廣工具',
+    children: [
+      { key: 'promotion-dashboard', name: '數據看板' },
+      { key: 'promotion-algorithm', name: '算法庫' },
+      { key: 'promotion-slot-config', name: '瀑布流策略' },
+      { key: 'promotion-waterfall', name: '銷售定價' },
       {
-        key: 'recommend-slot-group',
-        name: '瀑布流配置',
+        key: 'gift-manage',
+        name: '贈送管理',
         children: [
-          { key: 'recommend-slot', name: '坑位配置' },
-          { key: 'recommend-pricing', name: '銷售價格' },
+          { key: 'gift-detail', name: '推廣贈送' },
+          { key: 'gift-consume-detail', name: '消費明細' },
         ],
       },
+      { key: 'ad-sales', name: '廣告銷售' },
+      { key: 'promotion-word-library', name: '詞庫管理' },
+    ],
+  },
+  {
+    key: 'promotion-tool',
+    name: '推廣通',
+    children: [
+      { key: 'promotion-sales-config', name: '店鋪推廣' },
       {
-        key: 'recommend-order-group',
-        name: '訂單管理',
+        key: 'promotion-report-group',
+        name: '報表分析',
         children: [
-          { key: 'recommend-order', name: '訂單列表' },
-          { key: 'recommend-calendar', name: '投放日曆' },
-        ],
-      },
-      {
-        key: 'recommend-report-group',
-        name: '統計報表',
-        children: [
-          { key: 'recommend-effect-report', name: '效果報表' },
-          { key: 'recommend-revenue-report', name: '營收報表' },
+          { key: 'promotion-report-overview', name: '數據概覽' },
+          { key: 'promotion-report-order', name: '訂單效果報表' },
+          { key: 'promotion-report-compare', name: '推薦類型對比' },
         ],
       },
     ],
@@ -791,7 +817,7 @@ export const menuPermissionTree: PermissionModule[] = [
     children: [
       {
         key: 'promotion',
-        name: '商戶推廣工具',
+        name: '推廣金管理',
         children: [
           { key: 'account-balance', name: '賬戶餘額' },
           { key: 'batch-query', name: '批次查詢' },
@@ -833,74 +859,69 @@ export const menuPermissionTree: PermissionModule[] = [
       { key: 'data-permission', name: '數據授權' },
     ],
   },
-  {
-    key: 'system',
-    name: '系統設置',
-    children: [
-      { key: 'menu-management', name: '菜單管理' },
-      { key: 'system-template', name: '系統模板' },
-      { key: 'layout-settings', name: '布局設置' },
-      { key: 'basic-settings', name: '基礎設置' },
-    ],
-  },
-  {
-    key: 'user-management',
-    name: '用戶管理',
-    children: [
-      { key: 'user-feedback', name: '用戶意見反饋' },
-      { key: 'user-list', name: '用戶列表' },
-      { key: 'user-avatar', name: '用戶頭像管理' },
-      { key: 'user-frozen', name: '用戶凍結列表' },
-      { key: 'device-frozen', name: '設備號凍結列表' },
-      { key: 'user-location-special', name: '用戶收貨地圖特殊收錄' },
-      { key: 'user-location-blacklist', name: '用戶收貨地圖黑名單' },
-      { key: 'whitelist', name: '白名單(內外測試人員)' },
-    ],
-  },
-  {
-    key: 'operation-platform',
-    name: '運營平台工具',
-  },
-  {
-    key: 'operation-delivery',
-    name: '運營投放管理',
-    children: [
-      { key: 'delivery-list', name: '投放列表' },
-    ],
-  },
-  {
-    key: 'merchant-group',
-    name: '商戶集團管理',
-    children: [
-      { key: 'merchant-onboarding', name: '商家入駐' },
-      { key: 'merchant-feedback', name: '商家意見' },
-      { key: 'group-list', name: '集團列表' },
-      { key: 'group-permission', name: '集團權限(運營主管)' },
-      { key: 'store-basic-info', name: '門店基礎信息管理' },
-      { key: 'contract-management', name: '合同管理' },
-      { key: 'group-brand-library', name: '集團門店品牌庫管理' },
-    ],
-  },
-  {
-    key: 'delivery-business',
-    name: '到家業務(外賣)',
-    children: [
-      { key: 'product-tags', name: '商品標簽' },
-      { key: 'product-params', name: '商品參數' },
-      { key: 'store-management', name: '門店管理' },
-      { key: 'store-categories', name: '門店營業品類' },
-      { key: 'product-platform-categories', name: '商品平台分類' },
-    ],
-  },
-  {
-    key: 'group-buy-business',
-    name: '到店業務(團購)',
-    children: [
-      { key: 'group-buy-store', name: '團購門店管理' },
-      { key: 'group-buy-product', name: '商品管理' },
-    ],
-  },
 ]
+
+/**
+ * 已接入權限校驗的受控菜單 key（叶子菜单）
+ * 無對應菜單權限（任一 action）時：側邊欄隱藏該菜單、路由禁止訪問
+ * 其餘原型菜單暫不受控，所有登錄用戶可見
+ */
+export const CONTROLLED_MENU_KEYS: string[] = [
+  // 集團人事
+  'employee-management',
+  'organization-management',
+  'position-management',
+  // 權限管理
+  'role-management',
+  'function-permission',
+  'data-permission',
+  // 財務管理
+  'account-balance',
+  'batch-query',
+  'detail-query',
+  'writeoff-reconcile',
+  'debt-reconcile',
+  'approval-center',
+  // 商家推廣工具 - 贈送管理
+  'gift-detail',
+  'gift-consume-detail',
+]
+
+/**
+ * 受控路由路徑 → 菜單 key 映射（含二級頁面歸屬其入口菜單）
+ * 用於路由守衛判斷當前頁面所需的菜單權限
+ */
+export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
+  // 集團人事
+  '/employee-management': 'employee-management',
+  '/organization-management': 'organization-management',
+  '/position-management': 'position-management',
+  // 權限管理
+  '/role-management': 'role-management',
+  '/function-permission': 'function-permission',
+  '/data-permission': 'data-permission',
+  // 財務管理 - 推廣金管理
+  '/account-balance': 'account-balance',
+  '/recharge-add': 'account-balance',
+  '/transfer-add': 'account-balance',
+  '/deduct-add': 'account-balance',
+  '/merge-add': 'account-balance',
+  '/batch-query': 'batch-query',
+  '/batch-detail': 'batch-query',
+  '/detail-query': 'detail-query',
+  // 財務管理 - 商戶通對賬
+  '/writeoff-reconcile': 'writeoff-reconcile',
+  '/debt-reconcile': 'debt-reconcile',
+  '/debt-detail': 'debt-reconcile',
+  // 財務管理 - 審批管理
+  '/approval-center': 'approval-center',
+  '/approval-detail': 'approval-center',
+  // 商家推廣工具 - 贈送管理
+  '/gift-detail': 'gift-detail',
+  '/gift-add': 'gift-detail',
+  '/gift-detail-view': 'gift-detail',
+  '/gift-consume-detail': 'gift-consume-detail',
+}
 
 /** localStorage Key */
 export const STORAGE_KEYS = {

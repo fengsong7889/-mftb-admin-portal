@@ -10,6 +10,7 @@ import {
   ImportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions, isShanfeng } from '../../constants/brand'
 import type { DebtStoreRecord } from '../../utils/approvalStore'
@@ -174,6 +175,8 @@ function mockFetchDebts(query: FinDebtQuery): FinDebtPageResult {
 
 export default function DebtReconcile() {
   const navigate = useNavigate()
+  // 菜单权限：debt-reconcile
+  const { hasPermission } = useAuth()
   const [form] = Form.useForm<DebtFilters>()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [filters, setFilters] = useState<DebtFilters>({})
@@ -392,8 +395,12 @@ export default function DebtReconcile() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
-          <Button className="btn-import" icon={<ImportOutlined />}>還款導入</Button>
+          {hasPermission('debt-reconcile:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          )}
+          {hasPermission('debt-reconcile:import') && (
+            <Button className="btn-import" icon={<ImportOutlined />}>還款導入</Button>
+          )}
         </div>
         <div className="action-section-right">
           {configComponent}

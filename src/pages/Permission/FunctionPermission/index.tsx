@@ -10,6 +10,7 @@ import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments, updateDepartmentPermissions } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '../../../contexts/AuthContext'
 import './index.css'
 
 /** 授权对象类型（Tab） */
@@ -122,6 +123,8 @@ export default function FunctionPermission() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<TargetType>(TARGET_TYPE.ROLE)
+  // 功能权限校验（菜单 key: function-permission）
+  const { hasPermission } = useAuth()
 
   // 新增/编辑授权弹窗
   const [modalVisible, setModalVisible] = useState(false)
@@ -291,20 +294,24 @@ export default function FunctionPermission() {
       <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
         詳情
       </Button>
-      <Button type="link" size="small" onClick={() => handleEdit(record)}>
-        編輯
-      </Button>
-      <Popconfirm
-        title="確認刪除"
-        description={`確定要刪除「${record.name}」的授權嗎？刪除後其成員將失去對應菜單權限。`}
-        onConfirm={() => handleDelete(record)}
-        okText="確認"
-        cancelText="取消"
-      >
-        <Button type="link" size="small" danger>
-          刪除
+      {hasPermission('function-permission:edit') && (
+        <Button type="link" size="small" onClick={() => handleEdit(record)}>
+          編輯
         </Button>
-      </Popconfirm>
+      )}
+      {hasPermission('function-permission:delete') && (
+        <Popconfirm
+          title="確認刪除"
+          description={`確定要刪除「${record.name}」的授權嗎？刪除後其成員將失去對應菜單權限。`}
+          onConfirm={() => handleDelete(record)}
+          okText="確認"
+          cancelText="取消"
+        >
+          <Button type="link" size="small" danger>
+            刪除
+          </Button>
+        </Popconfirm>
+      )}
     </Space>
   )
 
@@ -352,9 +359,11 @@ export default function FunctionPermission() {
     <div>
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新增
-          </Button>
+          {hasPermission('function-permission:create') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              新增
+            </Button>
+          )}
           {type === TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
         </div>
       </div>

@@ -8,6 +8,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { fetchFinWriteoffReconcile, withFinanceFallback } from '../../api/finance'
@@ -260,6 +261,8 @@ function mockFetchReconcile(query: FinReconcileQuery): FinReconcileResult {
 }
 
 export default function WriteoffReconcile() {
+  // 菜单权限：writeoff-reconcile
+  const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [searchForm] = Form.useForm<ReconcileFilters>()
   const [data, setData] = useState<ReconcileRecord[]>([])
@@ -508,9 +511,11 @@ export default function WriteoffReconcile() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>
-            導出
-          </Button>
+          {hasPermission('writeoff-reconcile:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />}>
+              導出
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
           {configComponent}

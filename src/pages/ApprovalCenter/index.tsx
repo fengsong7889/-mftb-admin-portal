@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
+import { useAuth } from '../../contexts/AuthContext'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { getApprovalRecords, updateApprovalRecord } from '../../utils/approvalStore'
 import { fetchFinApprovals, cancelFinApproval, withFinanceFallback } from '../../api/finance'
@@ -154,6 +155,8 @@ function mockFetchApprovals(query: FinApprovalQuery) {
 
 export default function ApprovalCenter() {
   const navigate = useNavigate()
+  // 菜单权限：approval-center
+  const { user, hasPermission } = useAuth()
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<ApprovalRecord | null>(null)
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
@@ -217,6 +220,31 @@ export default function ApprovalCenter() {
   const handleDetail = (record: ApprovalRecord) => {
     navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
   }
+
+  /** 判斷人員字段（如 朱棣(002)）是否為當前登錄人（按姓名/工號匹配） */
+  const isCurrentUser = useCallback((person?: string) => {
+    if (!user || !person || person === '--') return false
+    return (
+      (!!user.name && person.includes(user.name)) ||
+      (!!user.empId && person.includes(user.empId)) ||
+      (!!user.username && person.includes(user.username))
+    )
+  }, [user])
+
+  /** 審批按鈕：需持有編輯功能權限，且僅當前待審節點的審批人可見 */
+  const canApprove = useCallback((record: ApprovalRecord) => {
+    if (!hasPermission('approval-center:edit')) return false
+    if (record.flowStatus !== 'pending') return false
+    const node = resolveCurrentNode(record)
+    const approver = node === 'business' ? record.bizApprover : node === 'operation' ? record.opsApprover : record.finApprover
+    return isCurrentUser(approver)
+  }, [isCurrentUser, hasPermission])
+
+  /** 撤銷按鈕：需持有編輯功能權限，僅申請人可見，且流程仍在審批中（已通過/駁回/撤銷不顯示） */
+  const canCancel = useCallback((record: ApprovalRecord) => {
+    if (!hasPermission('approval-center:edit')) return false
+    return record.flowStatus === 'pending' && isCurrentUser(record.applicant)
+  }, [isCurrentUser, hasPermission])
 
   const handleApprove = (record: ApprovalRecord) => {
     navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
@@ -387,11 +415,11 @@ export default function ApprovalCenter() {
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleDetail(record)}>詳情</Button>
-          {record.flowStatus === 'pending' && (
-            <>
-              <Button type="link" size="small" onClick={() => handleApprove(record)}>審批</Button>
-              <Button type="link" size="small" danger onClick={() => handleCancel(record)}>撤銷</Button>
-            </>
+          {canApprove(record) && (
+            <Button type="link" size="small" onClick={() => handleApprove(record)}>審批</Button>
+          )}
+          {canCancel(record) && (
+            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>撤銷</Button>
           )}
         </Space>
       ),

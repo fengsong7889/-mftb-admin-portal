@@ -9,6 +9,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { getBatchRecords } from '../../utils/approvalStore'
@@ -174,6 +175,8 @@ function mockFetchBatches(query: FinBatchQuery) {
 
 export default function BatchQuery() {
   const navigate = useNavigate()
+  // 菜单权限：batch-query
+  const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [searchForm] = Form.useForm<BatchFilters>()
   const [data, setData] = useState<BatchRecord[]>([])
@@ -463,9 +466,11 @@ export default function BatchQuery() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>
-            導出
-          </Button>
+          {hasPermission('batch-query:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />}>
+              導出
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
           {configComponent}

@@ -11,6 +11,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import type { GiftRecordItem } from '../../api/gift'
 import { fetchGiftRecords, deductGiftDays } from '../../api/gift'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
@@ -38,6 +39,8 @@ const adTypeMap: Record<string, string> = {
 
 export default function GiftDetail() {
   const navigate = useNavigate()
+  // 菜单权限：gift-detail
+  const { hasPermission } = useAuth()
   const [form] = Form.useForm()
   const [deductModalVisible, setDeductModalVisible] = useState(false)
   const [currentRecord, setCurrentRecord] = useState<GiftRecordItem | null>(null)
@@ -249,13 +252,15 @@ export default function GiftDetail() {
           >
             贈送明細
           </Button>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => handleGift(record)}
-          >
-            贈送
-          </Button>
+          {hasPermission('gift-detail:create') && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleGift(record)}
+            >
+              贈送
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -341,14 +346,18 @@ export default function GiftDetail() {
       {/* 操作按鈕 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            導出
-          </Button>
+          {hasPermission('gift-detail:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
+              導出
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增贈送
-          </Button>
+          {hasPermission('gift-detail:create') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              新增贈送
+            </Button>
+          )}
           {configComponent}
         </div>
       </div>

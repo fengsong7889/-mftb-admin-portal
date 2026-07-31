@@ -188,7 +188,7 @@ export default function AccountBalance() {
   /** 操作按钮 - 正常状态 */
   const NormalActions = ({ record }: { record: AccountRecord }) => (
     <Space size={0} split={<span className="action-split">|</span>}>
-      {hasPermission('edit') && (
+      {hasPermission('account-balance:edit') && (
         <>
           <Button type="link" size="small" onClick={() => openRecharge(record)}>充值</Button>
           <Button type="link" size="small" onClick={() => openTransfer(record)}>轉賬</Button>
@@ -204,7 +204,7 @@ export default function AccountBalance() {
   /** 操作按钮 - 冻结状态 */
   const FrozenActions = ({ record }: { record: AccountRecord }) => (
     <Space size={0} split={<span className="action-split">|</span>}>
-      {hasPermission('edit') && (
+      {hasPermission('account-balance:edit') && (
         <Button type="link" size="small" onClick={() => handleUnfreeze(record)}>解凍</Button>
       )}
       <Button type="link" size="small" onClick={() => navigate('/detail-query')}>明細</Button>
@@ -331,14 +331,16 @@ export default function AccountBalance() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          {hasPermission('edit') && (
+          {hasPermission('account-balance:edit') && (
             <Button icon={<MergeCellsOutlined />} onClick={() => navigate('/merge-add')}>
               商戶合併
             </Button>
           )}
-          <Button className="btn-export" icon={<ExportOutlined />}>
-            導出
-          </Button>
+          {hasPermission('account-balance:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />}>
+              導出
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
           {configComponent}

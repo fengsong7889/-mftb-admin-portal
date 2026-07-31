@@ -8,6 +8,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { BIZ_CHANNEL_LABEL_MAP } from '../../constants/bizChannel'
@@ -218,6 +219,8 @@ function mockFetchDetails(query: FinDetailQuery) {
 }
 
 export default function DetailQuery() {
+  // 菜单权限：detail-query
+  const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [searchForm] = Form.useForm<DetailFilters>()
   const [data, setData] = useState<DetailRow[]>([])
@@ -509,9 +512,11 @@ export default function DetailQuery() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>
-            導出
-          </Button>
+          {hasPermission('detail-query:export') && (
+            <Button className="btn-export" icon={<ExportOutlined />}>
+              導出
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
           {configComponent}

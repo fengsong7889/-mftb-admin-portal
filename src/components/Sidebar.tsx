@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Layout, Menu, message, Modal, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import BrandLogo from './BrandLogo'
+import { useAuth } from '../contexts/AuthContext'
 import {
   AccountBookOutlined,
   WalletOutlined,
@@ -522,12 +523,38 @@ interface SidebarProps {
   collapsed: boolean
 }
 
+/** 按菜單權限遞歸過濾菜單：受控叶子菜單無授權則隱藏；父菜單子項全部隱藏時一併隱藏 */
+const filterMenusByPermission = (
+  items: MenuItem[],
+  hasMenuPermission: (menuKey: string) => boolean,
+): MenuItem[] => {
+  return items
+    .map((item) => {
+      if (!item) return null
+      const withChildren = item as MenuItem & { children?: MenuItem[] }
+      if (withChildren.children && withChildren.children.length > 0) {
+        const children = filterMenusByPermission(withChildren.children, hasMenuPermission)
+        if (children.length === 0) return null
+        return { ...withChildren, children }
+      }
+      return hasMenuPermission(String(item.key)) ? item : null
+    })
+    .filter((item): item is MenuItem => item !== null)
+}
+
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { hasMenuPermission } = useAuth()
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [pwdValue, setPwdValue] = useState('')
   const [pendingKey, setPendingKey] = useState<string>('')
+
+  /** 按當前登錄人權限過濾後的可見菜單 */
+  const visibleMenuItems = useMemo(
+    () => filterMenusByPermission(menuItems, hasMenuPermission),
+    [hasMenuPermission],
+  )
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
@@ -595,7 +622,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       <Menu
         mode="inline"
         theme="dark"
-        items={menuItems}
+        items={visibleMenuItems}
         onClick={handleMenuClick}
         selectedKeys={[selectedKey]}
         defaultOpenKeys={[]}
