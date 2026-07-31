@@ -41,6 +41,9 @@ public interface StoreService {
     /** 解除绑定BD */
     void removeBd(Long storeId, Long bindId);
 
+    /** 按集团编码+品牌查询门店下拉选项（充值扣款门店用） */
+    List<OptionVO> listByGroupCode(String groupCode, String brand);
+
     /** 按集团ID（group_code）查询集团下门店已绑定的BD选项 */
     List<OptionVO> listBdOptionsByGroupCode(String groupCode);
 

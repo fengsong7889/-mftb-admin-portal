@@ -249,6 +249,28 @@ public class StoreServiceImpl implements StoreService {
     }
 
     @Override
+    public List<OptionVO> listByGroupCode(String groupCode, String brand) {
+        if (!StringUtils.hasText(groupCode)) {
+            return List.of();
+        }
+        BizMerchantGroup group = groupMapper.selectOne(new LambdaQueryWrapper<BizMerchantGroup>()
+                .eq(BizMerchantGroup::getGroupCode, groupCode.trim()).last("LIMIT 1"));
+        if (group == null) {
+            return List.of();
+        }
+        LambdaQueryWrapper<BizStore> wrapper = new LambdaQueryWrapper<BizStore>()
+                .eq(BizStore::getGroupId, group.getId());
+        if (StringUtils.hasText(brand)) {
+            wrapper.eq(BizStore::getBrand, brand.trim());
+        }
+        wrapper.orderByAsc(BizStore::getId);
+        List<BizStore> stores = storeMapper.selectList(wrapper);
+        return stores.stream()
+                .map(s -> new OptionVO(String.valueOf(s.getId()), s.getStoreName() + "(" + s.getStoreCode() + ")"))
+                .toList();
+    }
+
+    @Override
     public List<OptionVO> listBdOptionsByGroupCode(String groupCode) {
         if (!StringUtils.hasText(groupCode)) {
             return List.of();

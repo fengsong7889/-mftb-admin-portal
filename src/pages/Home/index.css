@@ -10,9 +10,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 36px;
+  padding: 12px 32px;
   margin-bottom: 5px;
-  border-radius: 14px;
+  border-radius: 12px;
   color: white;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   position: relative;
@@ -66,19 +66,46 @@
   75% { transform: rotate(-10deg); }
 }
 
+.home-welcome-left {
+  flex: 1;
+  min-width: 0;
+}
+
 .home-welcome-left h2 {
-  margin: 0 0 10px 0;
-  font-size: 26px;
+  margin: 0 0 4px 0;
+  font-size: 20px;
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.home-welcome-quote {
+.home-welcome-marquee {
   margin: 0;
-  font-size: 15px;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  height: 18px;
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 88%, transparent 100%);
+}
+
+.home-welcome-marquee-track {
+  display: inline-flex;
+  animation: marqueeSlide 60s linear infinite;
+  will-change: transform;
+}
+
+.home-welcome-marquee-text {
+  display: inline-block;
+  font-size: 12px;
   opacity: 0.92;
-  font-style: italic;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  padding-right: 80px;
+}
+
+@keyframes marqueeSlide {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 .home-welcome-right {
@@ -88,14 +115,14 @@
 }
 
 .home-welcome-datetime {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 500;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-variant-numeric: tabular-nums;
 }
 
 .home-welcome-weekday {
-  font-size: 15px;
+  font-size: 13px;
   opacity: 0.88;
 }
 

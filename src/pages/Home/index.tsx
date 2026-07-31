@@ -26,18 +26,10 @@ import {
 } from '@ant-design/icons'
 import './index.css'
 
-/** 励志语句库 */
-const motivationalQuotes = [
-  '每一天都是新的开始,加油!',
-  '努力工作,快乐生活!',
-  '保持热爱,奔赴山海!',
-  '你的努力,终将成就更好的自己!',
-  '不忘初心,方得始终!',
-  '越努力,越幸运!',
-  '今天流下的汗水,是明天成功的基石!',
-  '脚踏实地,仰望星空!',
-  '坚持不懈,梦想终会实现!',
-  '用心做好每一件事,成功自然水到渠成!',
+/** 系统提示滚动文案 */
+const systemTips = [
+  '該原型系統部分菜單界面已實現前後端聯調，支持賬號密碼登錄並運行真實數據',
+  '數據庫可通過 SQLPUB 平台在線訪問，隨時查看最新業務數據',
 ]
 
 /** 所有可用菜单 */
@@ -167,7 +159,6 @@ export default function Home() {
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
   const [showAddMenu, setShowAddMenu] = useState(false)
-  const [quote, setQuote] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -179,9 +170,6 @@ export default function Home() {
   const rechargeAmount = useCountUp(28000)
 
   useEffect(() => {
-    const randomIndex = Math.floor(Math.random() * motivationalQuotes.length)
-    setQuote(motivationalQuotes[randomIndex])
-
     timerRef.current = setInterval(() => {
       setCurrentTime(new Date())
     }, 1000)
@@ -294,7 +282,16 @@ export default function Home() {
       <div className="home-welcome home-welcome--animated">
         <div className="home-welcome-left">
           <h2>歡迎回來,小蜜蜂 <span className="home-welcome-emoji">🐝</span></h2>
-          <p className="home-welcome-quote">{quote}</p>
+          <div className="home-welcome-marquee">
+            <div className="home-welcome-marquee-track">
+              <span className="home-welcome-marquee-text">
+                {systemTips.join('  ·  ')}
+              </span>
+              <span className="home-welcome-marquee-text" aria-hidden>
+                {systemTips.join('  ·  ')}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="home-welcome-right">
           <div className="home-welcome-datetime">{formatDate(currentTime)}</div>

@@ -1,5 +1,6 @@
-import request from './request'
+import request, { isBackendUnavailable } from './request'
 import type { OptionItem } from './types'
+import { mockFetchEmployees } from './mock/hr-mock'
 
 /** 员工信息（后端返回，不含密码） */
 export interface EmployeeItem {
@@ -58,8 +59,13 @@ export interface PageResult<T> {
 }
 
 /** 分页查询员工 */
-export function fetchEmployees(params: EmployeeQuery) {
-  return request.get<unknown, PageResult<EmployeeItem>>('/employees', { params })
+export async function fetchEmployees(params: EmployeeQuery) {
+  try {
+    return await request.get<unknown, PageResult<EmployeeItem>>('/employees', { params })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchEmployees(params)
+    throw err
+  }
 }
 
 /** 员工搜索下拉选项（选项值为工号，仅启用状态；门店绑定BD选择员工用，附带部门/职位/职级信息） */

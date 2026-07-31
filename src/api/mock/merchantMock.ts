@@ -222,6 +222,14 @@ export function mockFetchStoresByGroup(groupId: number): StoreItem[] {
   return read<StoreItem>(KEY_STORES).filter(s => s.groupId === groupId)
 }
 
+export function mockFetchStoresByGroupCode(groupCode: string, brand?: string): OptionItem[] {
+  let stores = read<StoreItem>(KEY_STORES).filter(s => s.groupCode === groupCode)
+  if (brand) {
+    stores = stores.filter(s => s.brand === brand)
+  }
+  return stores.map(s => ({ value: String(s.id), label: `${s.storeName}(${s.storeCode})` }))
+}
+
 export function mockFetchStoreOptions(keyword: string): OptionItem[] {
   const kw = keyword.trim().toLowerCase()
   return read<StoreItem>(KEY_STORES)

@@ -3,6 +3,7 @@ import type { OptionItem } from './types'
 import {
   mockFetchStores,
   mockFetchStoresByGroup,
+  mockFetchStoresByGroupCode,
   mockFetchStoreOptions,
   mockFetchStoreUpdatedByOptions,
   mockCreateStore,
@@ -104,12 +105,22 @@ export async function fetchStores(params: StoreQueryParams) {
   }
 }
 
-/** 按集团查询门店（下拉选项用） */
+/** 按集团ID查询门店（下拉选项用） */
 export async function fetchStoresByGroup(groupId: number) {
   try {
     return await request.get<unknown, StoreItem[]>(`/stores/by-group/${groupId}`, SILENT)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockFetchStoresByGroup(groupId)
+    throw err
+  }
+}
+
+/** 按集团编码+品牌查询门店（充值扣款门店下拉用） */
+export async function fetchStoresByGroupCode(groupCode: string, brand?: string) {
+  try {
+    return await request.get<unknown, OptionItem[]>('/stores/by-group-code', { params: { groupCode, brand }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStoresByGroupCode(groupCode, brand)
     throw err
   }
 }

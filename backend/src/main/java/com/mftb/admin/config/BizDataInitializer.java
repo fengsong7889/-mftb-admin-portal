@@ -25,6 +25,7 @@ public class BizDataInitializer implements CommandLineRunner {
     public void run(String... args) {
         createMerchantGroupTableIfAbsent();
         createStoreTableIfAbsent();
+        createStoreBdTableIfAbsent();
         createGiftRecordTableIfAbsent();
         createGiftConsumeTableIfAbsent();
         migrateLegacyGroupCodes();
@@ -136,6 +137,25 @@ public class BizDataInitializer implements CommandLineRunner {
                         + "UNIQUE KEY uk_store_code (store_code)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店表'");
         log.info("已自动创建门店表 biz_store");
+    }
+
+    /** 门店绑定BD关系表（一家门店可绑定多个BD） */
+    private void createStoreBdTableIfAbsent() {
+        if (tableExists("biz_store_bd")) {
+            return;
+        }
+        jdbcTemplate.execute(
+                "CREATE TABLE biz_store_bd ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键', "
+                        + "store_id BIGINT NOT NULL COMMENT '门店主键 (关联 biz_store.id)', "
+                        + "bd_emp_id VARCHAR(32) NOT NULL COMMENT 'BD员工工号 (关联 sys_user.emp_id)', "
+                        + "bd_name VARCHAR(64) NULL COMMENT 'BD员工姓名快照', "
+                        + "created_by VARCHAR(64) NULL COMMENT '绑定人', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '绑定时间', "
+                        + "UNIQUE KEY uk_store_bd (store_id, bd_emp_id), "
+                        + "KEY idx_bd_emp (bd_emp_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店绑定BD关系表'");
+        log.info("已自动创建门店绑定BD关系表 biz_store_bd");
     }
 
     /** 赠送记录表 */

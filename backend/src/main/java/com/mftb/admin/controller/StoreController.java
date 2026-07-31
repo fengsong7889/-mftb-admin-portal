@@ -45,6 +45,13 @@ public class StoreController {
         return Result.success(storeService.listByGroupId(groupId));
     }
 
+    /** 按集团编码+品牌查询门店下拉选项（充值扣款门店用） */
+    @GetMapping("/by-group-code")
+    public Result<List<OptionVO>> listByGroupCode(@RequestParam String groupCode,
+                                                   @RequestParam(required = false) String brand) {
+        return Result.success(storeService.listByGroupCode(groupCode, brand));
+    }
+
     /** 门店ID/名称搜索下拉选项 */
     @GetMapping("/options")
     public Result<List<OptionVO>> options(@RequestParam(required = false) String keyword) {

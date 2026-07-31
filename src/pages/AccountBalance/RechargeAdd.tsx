@@ -18,7 +18,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import { submitRechargeApply, withFinanceFallback } from '../../api/finance'
 import type { RechargeApplyPayload } from '../../api/finance'
-import { fetchStoreBdOptions } from '../../api/store'
+import { fetchStoreBdOptions, fetchStoresByGroupCode } from '../../api/store'
 import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 
@@ -46,13 +46,6 @@ const businessChannelMap: Record<string, { label: string; value: string }[]> = {
     { label: '團購到店', value: 'groupBuyStore' },
   ],
 }
-
-/** 扣款門店選項 */
-const deductStoreOptions = [
-  { label: '廣州酒店天河廣場1號店(1234567890)', value: '1234567890' },
-  { label: '廣州酒店越秀領展2號店(2345678910)', value: '2345678910' },
-  { label: '廣州酒店琶洲保利3號店(3456789012)', value: '3456789012' },
-]
 
 /** 扣款門店行 */
 interface DeductStoreRow {
@@ -118,14 +111,19 @@ export default function RechargeAdd() {
   const [countdown, setCountdown] = useState(5)
   // 歸屬BD選項：集團下門店已綁定的BD（門店管理菜單綁定）
   const [bdOptions, setBdOptions] = useState<OptionItem[]>([])
+  // 扣款門店選項：當前集團下的門店列表
+  const [deductStoreOptions, setDeductStoreOptions] = useState<OptionItem[]>([])
 
-  // 按集團ID加載門店綁定的BD選項
+  // 按集團ID加載門店綁定的BD選項 & 集團下門店列表
   useEffect(() => {
     if (!groupIdParam) return
     fetchStoreBdOptions(groupIdParam)
       .then(list => setBdOptions(list || []))
       .catch(() => setBdOptions([]))
-  }, [groupIdParam])
+    fetchStoresByGroupCode(groupIdParam, brandParam)
+      .then(list => setDeductStoreOptions(list || []))
+      .catch(() => setDeductStoreOptions([]))
+  }, [groupIdParam, brandParam])
 
   /** 實收賬戶充值合計 */
   const actualTotal = useMemo(() => {
