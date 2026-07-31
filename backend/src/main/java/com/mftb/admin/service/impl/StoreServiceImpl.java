@@ -355,9 +355,10 @@ public class StoreServiceImpl implements StoreService {
     @Override
     public void delete(Long id) {
         BizStore store = requireStore(id);
-        store.setDeleted(1);
+        // @TableLogic 字段会被 updateById 自动忽略, 必须用 deleteById 触发逻辑删除 (UPDATE SET deleted=1)
         store.setUpdatedBy(operatorResolver.currentOperatorName());
         storeMapper.updateById(store);
+        storeMapper.deleteById(id);
     }
 
     /**

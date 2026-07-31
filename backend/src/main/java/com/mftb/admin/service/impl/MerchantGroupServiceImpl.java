@@ -150,9 +150,10 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
         if (storeCount > 0) {
             throw new BusinessException("该集团下还有 " + storeCount + " 家门店，请先删除门店后再删除集团");
         }
-        group.setDeleted(1);
+        // @TableLogic 字段会被 updateById 自动忽略, 必须用 deleteById 触发逻辑删除 (UPDATE SET deleted=1)
         group.setUpdatedBy(operatorResolver.currentOperatorName());
         groupMapper.updateById(group);
+        groupMapper.deleteById(id);
     }
 
     /**
