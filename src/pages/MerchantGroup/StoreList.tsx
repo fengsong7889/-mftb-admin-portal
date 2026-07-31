@@ -14,12 +14,13 @@ import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { toDateRangeParams } from '../../utils/dateRange'
 import type { DateRangeValue } from '../../utils/dateRange'
-import type { StoreItem, StoreQueryParams } from '../../api/store'
+import type { StoreBdItem, StoreItem, StoreQueryParams } from '../../api/store'
 import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions, deleteStore } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS, formatBizChannel } from '../../constants/bizChannel'
 import { exportToCSV } from '../../utils/exportCSV'
 import StoreEditModal from './StoreEditModal'
+import StoreBindBdModal from './StoreBindBdModal'
 
 const { RangePicker } = DatePicker
 
@@ -79,6 +80,10 @@ export default function StoreList() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<StoreItem | null>(null)
 
+  // 绑定BD弹窗
+  const [bindBdOpen, setBindBdOpen] = useState(false)
+  const [bindBdRecord, setBindBdRecord] = useState<StoreItem | null>(null)
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -130,6 +135,17 @@ export default function StoreList() {
     setModalOpen(true)
   }
 
+  const handleBindBd = (record: StoreItem) => {
+    setBindBdRecord(record)
+    setBindBdOpen(true)
+  }
+
+  const handleBindBdSuccess = () => {
+    setBindBdOpen(false)
+    setBindBdRecord(null)
+    loadData()
+  }
+
   const handleDelete = (record: StoreItem) => {
     Modal.confirm({
       title: '確認刪除',
@@ -171,6 +187,7 @@ export default function StoreList() {
       { title: '所屬品牌', dataIndex: 'brand' },
       { title: '業務頻道', dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
       { title: '登錄主賬號', dataIndex: 'loginAccount' },
+      { title: '綁定BD', dataIndex: 'bdList', render: (v: unknown) => (Array.isArray(v) ? (v as StoreBdItem[]).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') : '') },
       { title: '最後更新人', dataIndex: 'updatedBy' },
       { title: '最後更新時間', dataIndex: 'updatedAt' },
       { title: '創建時間', dataIndex: 'createdAt' },
@@ -236,6 +253,16 @@ export default function StoreList() {
       render: (val: string) => val || '-',
     },
     {
+      title: '綁定BD',
+      dataIndex: 'bdList',
+      key: 'bdList',
+      width: 160,
+      render: (val: StoreBdItem[] | undefined) =>
+        val && val.length > 0
+          ? val.map(b => <div key={b.id}>{`${b.bdName || b.bdEmpId}(${b.bdEmpId})`}</div>)
+          : '-',
+    },
+    {
       title: '最後更新人',
       dataIndex: 'updatedBy',
       key: 'updatedBy',
@@ -259,12 +286,15 @@ export default function StoreList() {
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 190,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>
             編輯
+          </Button>
+          <Button type="link" size="small" onClick={() => handleBindBd(record)}>
+            綁定BD
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
             刪除
@@ -379,6 +409,14 @@ export default function StoreList() {
         presetGroupId={presetGroupId}
         onClose={() => { setModalOpen(false); setEditingRecord(null) }}
         onSuccess={handleModalSuccess}
+      />
+
+      {/* 綁定BD彈窗 */}
+      <StoreBindBdModal
+        open={bindBdOpen}
+        record={bindBdRecord}
+        onClose={() => { setBindBdOpen(false); setBindBdRecord(null) }}
+        onSuccess={handleBindBdSuccess}
       />
     </div>
   )

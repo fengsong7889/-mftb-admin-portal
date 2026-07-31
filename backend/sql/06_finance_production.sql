@@ -1,12 +1,11 @@
 -- ============================================================
--- MFTB 搜广推系统 - 财务管理模块
+-- MFTB 搜广推系统 - 财务管理模块（生产环境适用）
 -- 数据库: MySQL 8.0+
 -- 覆盖模块: 推广金账户 / 审批流程 / 批次 / 交易明细 / 欠款单 / 还款明细 / 业务编号序号
 -- 注意: 使用 CREATE TABLE IF NOT EXISTS，幂等可重复执行
 -- 说明: 空库起步，业务数据全部由界面操作（申请 -> 三级审批通过）产生
+-- 执行方式: 连接生产库后直接执行本脚本即可
 -- ============================================================
-
-USE mftb_admin;
 
 -- ============================================================
 -- 一、推广金账户表（集团维度一行）
@@ -27,14 +26,10 @@ CREATE TABLE IF NOT EXISTS biz_fin_account (
     UNIQUE KEY uk_fin_account_group_brand (group_code, brand),
     KEY idx_fin_account_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推广金账户表';
--- 已有环境升级（旧版唯一键为 group_code 单列）：
--- ALTER TABLE biz_fin_account DROP INDEX uk_fin_account_group,
---   ADD UNIQUE KEY uk_fin_account_group_brand (group_code, brand);
 
 -- ============================================================
 -- 二、财务审批流程表
 -- 对应前端「审批中心」菜单，三级审批: 业务主管 -> 运营主管 -> 财务主管
--- 财务主管通过后由后端事务写入批次/明细/欠款单并变更账户余额
 -- ============================================================
 CREATE TABLE IF NOT EXISTS biz_fin_approval (
     id                 BIGINT       PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -69,7 +64,6 @@ CREATE TABLE IF NOT EXISTS biz_fin_approval (
 
 -- ============================================================
 -- 三、批次表
--- 对应前端「批次查询」菜单；仅充值/转账/合并生成批次，扣款不生成批次
 -- ============================================================
 CREATE TABLE IF NOT EXISTS biz_fin_batch (
     id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -99,8 +93,6 @@ CREATE TABLE IF NOT EXISTS biz_fin_batch (
 
 -- ============================================================
 -- 四、交易明细表
--- 对应前端「明细查询」菜单，充消对账报表由本表按集团按日聚合得出
--- 实收账户变动金额按等比例规则计算: 虚拟变动 x (实收充值 / 虚拟充值)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS biz_fin_detail (
     id             BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -132,9 +124,6 @@ CREATE TABLE IF NOT EXISTS biz_fin_detail (
 
 -- ============================================================
 -- 五、欠款单表
--- 对应前端「欠款对账」菜单
--- 数据来源: 充值申请(实收=混合支付/营业额支付，每个扣款门店一条) 审批通过
---          商户合并申请(存续集团每个偿还门店一条) 审批通过
 -- ============================================================
 CREATE TABLE IF NOT EXISTS biz_fin_debt_bill (
     id            BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -166,7 +155,6 @@ CREATE TABLE IF NOT EXISTS biz_fin_debt_bill (
 
 -- ============================================================
 -- 六、还款明细表
--- 转移结算记录由商户合并审批通过时系统自动生成，can_delete=0 不可删除
 -- ============================================================
 CREATE TABLE IF NOT EXISTS biz_fin_debt_repayment (
     id           BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -188,24 +176,19 @@ CREATE TABLE IF NOT EXISTS biz_fin_debt_repayment (
 
 -- ============================================================
 -- 七、业务编号序号表
--- 统一管理各类业务编号的每日自增序号（前缀 + 年月日 + 4位自增）
--- 前缀: CZ=充值流程 KK=扣款流程 ZZ=转账流程 HB=合并流程 PC=批次 MX=明细 QK=欠款单
--- 生成方式: INSERT ... ON DUPLICATE KEY UPDATE current_value = current_value + 1
 -- ============================================================
 CREATE TABLE IF NOT EXISTS sys_biz_seq (
     id            BIGINT      PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     prefix        VARCHAR(8)  NOT NULL                   COMMENT '编号前缀',
     date_key      VARCHAR(8)  NOT NULL                   COMMENT '日期键 yyyyMMdd',
     current_value INT         NOT NULL DEFAULT 0         COMMENT '当前序号(从0开始，编号中补齐4位)',
-    created_at    DATETIME    DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
-    updated_at    DATETIME    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    created_at    DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
+    updated_at    DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_biz_seq (prefix, date_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务编号序号表';
 
 -- ============================================================
--- 八、初始数据（幂等：仅当不存在时插入）
--- 财务三级审批角色，需在「角色管理」菜单绑定给对应审批人员
--- 拥有系统角色 admin 的用户可审批所有节点（后端兜底）
+-- 八、初始审批角色（幂等：仅当不存在时插入）
 -- ============================================================
 INSERT INTO sys_role (name, code, description, status)
 SELECT '业务主管审批', 'FIN_BIZ_APPROVER', '财务审批流程第一级：业务主管节点审批权限', 1

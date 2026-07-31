@@ -4,6 +4,7 @@ import com.mftb.admin.entity.BizStore;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 门店视图对象
@@ -20,6 +21,8 @@ public class StoreVO {
     private String brand;
     private String bizChannel;
     private String loginAccount;
+    /** 已绑定的BD列表（一家门店可绑定多个） */
+    private List<StoreBdVO> bdList;
     private String updatedBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

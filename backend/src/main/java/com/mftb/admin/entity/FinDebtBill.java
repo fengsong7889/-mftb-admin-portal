@@ -43,7 +43,7 @@ public class FinDebtBill {
     /** 业务频道 */
     private String channel;
 
-    /** 所属BD */
+    /** 归属BD */
     private String bd;
 
     /** 账单来源: recharge=充值营业额扣款 merge=合并欠款转入 */

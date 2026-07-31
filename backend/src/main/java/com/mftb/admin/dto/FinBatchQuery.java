@@ -38,7 +38,7 @@ public class FinBatchQuery extends FinPageQuery {
     /** 申请人（模糊匹配） */
     private String applicant;
 
-    /** 所属BD（模糊匹配） */
+    /** 归属BD（模糊匹配） */
     private String bd;
 
     /** 交易时间-开始日期 */

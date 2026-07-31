@@ -18,6 +18,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import { submitRechargeApply, withFinanceFallback } from '../../api/finance'
 import type { RechargeApplyPayload } from '../../api/finance'
+import { fetchStoreBdOptions } from '../../api/store'
+import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 
 /** 集團选项 */
@@ -25,13 +27,6 @@ const groupOptions = [
   { label: '20261298121911 - 亞述集團', value: '20261298121911', name: '亞述集團' },
   { label: '20261298121912 - 廣州酒家', value: '20261298121912', name: '廣州酒家' },
   { label: '20261298121913 - 海底撈', value: '20261298121913', name: '海底撈' },
-]
-
-/** BD选项 */
-const bdOptions = [
-  { label: '關山月(001)', value: '關山月(001)' },
-  { label: '古月(002)', value: '古月(002)' },
-  { label: '浩遠(003)', value: '浩遠(003)' },
 ]
 
 /** 實收賬戶充值方式 */
@@ -121,6 +116,16 @@ export default function RechargeAdd() {
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
+  // 歸屬BD選項：集團下門店已綁定的BD（門店管理菜單綁定）
+  const [bdOptions, setBdOptions] = useState<OptionItem[]>([])
+
+  // 按集團ID加載門店綁定的BD選項
+  useEffect(() => {
+    if (!groupIdParam) return
+    fetchStoreBdOptions(groupIdParam)
+      .then(list => setBdOptions(list || []))
+      .catch(() => setBdOptions([]))
+  }, [groupIdParam])
 
   /** 實收賬戶充值合計 */
   const actualTotal = useMemo(() => {
@@ -228,7 +233,10 @@ export default function RechargeAdd() {
         bankAmount: isActual && (payMethod === 'corporate' || payMethod === 'mixed') ? bankAmount : 0,
         revenueAmount: isActual && (payMethod === 'mixed' || payMethod === 'revenue') ? revenueAmount : 0,
         deductStores: deductRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, amount: r.amount })),
-        bd: form.getFieldValue('bd') || '--',
+        bd: (() => {
+          const bdVal = form.getFieldValue('bd')
+          return bdOptions.find(o => o.value === bdVal)?.label || bdVal || '--'
+        })(),
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
@@ -445,7 +453,13 @@ export default function RechargeAdd() {
               )}
             </Form.Item>
             <Form.Item label="歸屬BD" name="bd" style={{ marginBottom: 0 }}>
-              <Select placeholder="請選擇BD" options={bdOptions} allowClear />
+              <Select
+                placeholder={bdOptions.length ? '請選擇BD' : '該集團門店暫未綁定BD'}
+                options={bdOptions}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+              />
             </Form.Item>
           </div>
 

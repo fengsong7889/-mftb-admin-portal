@@ -56,7 +56,7 @@ public class FinBatch {
     /** 申请人 */
     private String applicant;
 
-    /** 所属BD */
+    /** 归属BD */
     private String bd;
 
     /** 备注 */

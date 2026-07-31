@@ -262,7 +262,7 @@ export default function BatchQuery() {
     { key: 'actualAmount', title: '實收金額' },
     { key: 'discountAmount', title: '優惠金額' },
     { key: 'applicant', title: '申請人' },
-    { key: 'bd', title: '所屬BD' },
+    { key: 'bd', title: '歸屬BD' },
     { key: 'remark', title: '備註' },
     { key: 'action', title: '操作' },
   ], [])

@@ -248,7 +248,7 @@ export default function DebtReconcile() {
     { key: 'storeName', title: '門店名稱' },
     { key: 'brand', title: '所屬品牌' },
     { key: 'channel', title: '業務頻道' },
-    { key: 'bd', title: '所屬BD' },
+    { key: 'bd', title: '歸屬BD' },
     { key: 'source', title: '賬單來源' },
     { key: 'loanDate', title: '借款日期' },
     { key: 'billNo', title: '賬單編號' },
@@ -282,7 +282,7 @@ export default function DebtReconcile() {
       title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 100,
       render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v,
     },
-    { title: '所屬BD', dataIndex: 'bd', key: 'bd', width: 110 },
+    { title: '歸屬BD', dataIndex: 'bd', key: 'bd', width: 110 },
     {
       title: '賬單來源', dataIndex: 'source', key: 'source', width: 130,
       render: (v: string) => (

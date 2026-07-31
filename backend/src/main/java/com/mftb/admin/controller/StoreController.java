@@ -3,6 +3,8 @@ package com.mftb.admin.controller;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StoreBdVO;
+import com.mftb.admin.dto.StoreBindBdRequest;
 import com.mftb.admin.dto.StoreQuery;
 import com.mftb.admin.dto.StoreRequest;
 import com.mftb.admin.dto.StoreVO;
@@ -55,6 +57,12 @@ public class StoreController {
         return Result.success(storeService.searchUpdatedByOptions(keyword));
     }
 
+    /** 按集团ID（group_code）查询集团下门店已绑定的BD选项（推广金充值归属BD用） */
+    @GetMapping("/bd-options")
+    public Result<List<OptionVO>> bdOptions(@RequestParam String groupCode) {
+        return Result.success(storeService.listBdOptionsByGroupCode(groupCode));
+    }
+
     /** 新增门店 */
     @PostMapping
     public Result<StoreVO> create(@Valid @RequestBody StoreRequest request) {
@@ -65,6 +73,25 @@ public class StoreController {
     @PutMapping("/{id}")
     public Result<StoreVO> update(@PathVariable Long id, @Valid @RequestBody StoreRequest request) {
         return Result.success("门店信息已更新", storeService.update(id, request));
+    }
+
+    /** 查询门店已绑定的BD列表（含部门/职位/职级） */
+    @GetMapping("/{id}/bds")
+    public Result<List<StoreBdVO>> listBds(@PathVariable Long id) {
+        return Result.success(storeService.listBds(id));
+    }
+
+    /** 新增绑定BD */
+    @PostMapping("/{id}/bds")
+    public Result<StoreBdVO> addBd(@PathVariable Long id, @RequestBody StoreBindBdRequest request) {
+        return Result.success("BD绑定成功", storeService.addBd(id, request.getBdEmpId()));
+    }
+
+    /** 解除绑定BD */
+    @DeleteMapping("/{id}/bds/{bindId}")
+    public Result<Void> removeBd(@PathVariable Long id, @PathVariable Long bindId) {
+        storeService.removeBd(id, bindId);
+        return Result.success("BD已解绑", null);
     }
 
     /** 删除门店 */

@@ -10,7 +10,8 @@ import type {
   MerchantGroupPayload,
   MerchantGroupQueryParams,
 } from '../merchantGroup'
-import type { StoreItem, StorePageResult, StorePayload, StoreQueryParams } from '../store'
+import type { StoreBdItem, StoreItem, StorePageResult, StorePayload, StoreQueryParams } from '../store'
+import { mockFetchEmployees } from './hr-mock'
 
 const MOCK_PREFIX = 'mftb_mock_'
 const KEY_GROUPS = `${MOCK_PREFIX}merchant_groups`
@@ -39,8 +40,8 @@ const SEED_GROUPS: MockGroup[] = [
 ]
 
 const SEED_STORES: StoreItem[] = [
-  { id: 1, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', bizType: '1', bizChannel: '1', loginAccount: 'hh_store01', updatedBy: '系統管理員', createdAt: '2025-01-08 10:30:00', updatedAt: '2025-06-20 10:00:00' },
-  { id: 2, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', bizType: '1', bizChannel: '1,3', loginAccount: 'hh_store02', updatedBy: '張三', createdAt: '2025-01-15 09:00:00', updatedAt: '2025-06-25 15:20:00' },
+  { id: 1, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', bizType: '1', bizChannel: '1', loginAccount: 'hh_store01', bdList: [{ id: 1, bdEmpId: 'MT0003', bdName: '關山月', department: '市場部', position: '商務拓展經理', jobLevel: 'M2' }], updatedBy: '系統管理員', createdAt: '2025-01-08 10:30:00', updatedAt: '2025-06-20 10:00:00' },
+  { id: 2, groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', bizType: '1', bizChannel: '1,3', loginAccount: 'hh_store02', bdList: [{ id: 2, bdEmpId: 'MT0004', bdName: '古月', department: '市場部', position: '商務拓展專員', jobLevel: 'P3' }], updatedBy: '張三', createdAt: '2025-01-15 09:00:00', updatedAt: '2025-06-25 15:20:00' },
   { id: 3, groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeCode: 'MD00003', storeName: '珠海百貨·拱北店', brand: 'flashBee', bizType: '2', bizChannel: '2', loginAccount: 'zh_store01', updatedBy: '李四', createdAt: '2025-02-18 14:00:00', updatedAt: '2025-07-02 09:30:00' },
   { id: 4, groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeCode: 'MD00004', storeName: '珠海百貨·香洲店', brand: 'flashBee', bizType: '2', bizChannel: '2,3', loginAccount: 'zh_store02', updatedBy: '系統管理員', createdAt: '2025-02-25 11:10:00', updatedAt: '2025-07-08 13:50:00' },
   { id: 5, groupId: 3, groupCode: 'JT000003', groupName: '氹仔美食廣場集團', storeCode: 'MD00005', storeName: '美食廣場·官也街店', brand: 'mFood', bizType: '1', bizChannel: '1', loginAccount: 'tp_store01', updatedBy: '王五', createdAt: '2025-03-10 10:00:00', updatedAt: '2025-07-12 10:40:00' },
@@ -280,4 +281,70 @@ export function mockDeleteStore(id: number): void {
   if (idx < 0) throw new Error('門店不存在')
   stores.splice(idx, 1)
   write(KEY_STORES, stores)
+}
+
+/** 查询门店已绑定的BD列表 */
+export function mockFetchStoreBds(storeId: number): StoreBdItem[] {
+  const stores = read<StoreItem>(KEY_STORES)
+  const store = stores.find(s => s.id === storeId)
+  if (!store) throw new Error('門店不存在')
+  return store.bdList || []
+}
+
+/** 为门店新增绑定BD（自动带出员工部门/职位/职级；重复绑定报错） */
+export function mockAddStoreBd(storeId: number, bdEmpId: string): StoreBdItem {
+  const stores = read<StoreItem>(KEY_STORES)
+  const idx = stores.findIndex(s => s.id === storeId)
+  if (idx < 0) throw new Error('門店不存在')
+  const bdList = stores[idx].bdList || []
+  if (bdList.some(b => b.bdEmpId === bdEmpId)) throw new Error('該員工已綁定為門店BD')
+  const emp = mockFetchEmployees({ page: 1, size: 999 }).records.find(e => e.empId === bdEmpId)
+  const bind: StoreBdItem = {
+    id: Date.now(),
+    bdEmpId,
+    bdName: emp?.name || bdEmpId,
+    department: emp?.department,
+    position: emp?.position,
+    jobLevel: emp?.jobLevel,
+  }
+  stores[idx] = {
+    ...stores[idx],
+    bdList: [...bdList, bind],
+    updatedBy: currentOperator(),
+    updatedAt: now(),
+  }
+  write(KEY_STORES, stores)
+  return bind
+}
+
+/** 解除门店的某条BD绑定 */
+export function mockRemoveStoreBd(storeId: number, bindId: number): void {
+  const stores = read<StoreItem>(KEY_STORES)
+  const idx = stores.findIndex(s => s.id === storeId)
+  if (idx < 0) throw new Error('門店不存在')
+  const bdList = stores[idx].bdList || []
+  if (!bdList.some(b => b.id === bindId)) throw new Error('綁定記錄不存在')
+  stores[idx] = {
+    ...stores[idx],
+    bdList: bdList.filter(b => b.id !== bindId),
+    updatedBy: currentOperator(),
+    updatedAt: now(),
+  }
+  write(KEY_STORES, stores)
+}
+
+/** 按集团ID（group_code）查询集团下门店已绑定的BD选项（去重） */
+export function mockFetchStoreBdOptions(groupCode: string): OptionItem[] {
+  const stores = read<StoreItem>(KEY_STORES)
+  const seen = new Set<string>()
+  const options: OptionItem[] = []
+  for (const s of stores) {
+    if (s.groupCode !== groupCode) continue
+    for (const b of s.bdList || []) {
+      if (seen.has(b.bdEmpId)) continue
+      seen.add(b.bdEmpId)
+      options.push({ value: b.bdEmpId, label: `${b.bdName || b.bdEmpId}(${b.bdEmpId})` })
+    }
+  }
+  return options
 }

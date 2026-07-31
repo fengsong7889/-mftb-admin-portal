@@ -13,6 +13,8 @@ interface RemoteSearchSelectProps {
   initialOptions?: OptionItem[]
   /** 搜索防抖间隔，默认 300ms */
   debounceMs?: number
+  /** 透传至 Select 的样式（弹窗等非搜索区场景需自行控制宽度） */
+  style?: React.CSSProperties
 }
 
 /**
@@ -25,6 +27,7 @@ export default function RemoteSearchSelect({
   fetchOptions,
   initialOptions,
   debounceMs = 300,
+  style,
 }: RemoteSearchSelectProps) {
   const [options, setOptions] = useState<OptionItem[]>(initialOptions ?? [])
   const [loading, setLoading] = useState(false)
@@ -82,6 +85,7 @@ export default function RemoteSearchSelect({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      style={style}
       showSearch
       allowClear
       filterOption={false}

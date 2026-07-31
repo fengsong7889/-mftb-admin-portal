@@ -5,13 +5,18 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StoreBdVO;
 import com.mftb.admin.dto.StoreQuery;
 import com.mftb.admin.dto.StoreRequest;
 import com.mftb.admin.dto.StoreVO;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
+import com.mftb.admin.entity.BizStoreBd;
+import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
+import com.mftb.admin.mapper.BizStoreBdMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.StoreService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +47,8 @@ public class StoreServiceImpl implements StoreService {
 
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
+    private final BizStoreBdMapper bdMapper;
+    private final SysUserMapper userMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
 
@@ -91,6 +99,7 @@ public class StoreServiceImpl implements StoreService {
                 })
                 .toList();
 
+        attachBdList(records);
         return new PageResult<>(records, pageResult.getTotal());
     }
 
@@ -184,6 +193,141 @@ public class StoreServiceImpl implements StoreService {
         storeMapper.updateById(store);
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());
         return StoreVO.from(store, group.getGroupCode(), group.getGroupName());
+    }
+
+    @Override
+    public List<StoreBdVO> listBds(Long storeId) {
+        requireStore(storeId);
+        List<BizStoreBd> binds = bdMapper.selectList(new LambdaQueryWrapper<BizStoreBd>()
+                .eq(BizStoreBd::getStoreId, storeId)
+                .orderByAsc(BizStoreBd::getId));
+        return toBdVos(binds, loadBdUserMap(binds));
+    }
+
+    @Override
+    public StoreBdVO addBd(Long storeId, String bdEmpId) {
+        requireStore(storeId);
+        if (!StringUtils.hasText(bdEmpId)) {
+            throw new BusinessException("请选择BD员工");
+        }
+        SysUser bd = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getEmpId, bdEmpId.trim()).last("LIMIT 1"));
+        if (bd == null) {
+            throw new BusinessException("BD员工不存在");
+        }
+        Long exists = bdMapper.selectCount(new LambdaQueryWrapper<BizStoreBd>()
+                .eq(BizStoreBd::getStoreId, storeId)
+                .eq(BizStoreBd::getBdEmpId, bd.getEmpId()));
+        if (exists != null && exists > 0) {
+            throw new BusinessException("该员工已绑定为门店BD");
+        }
+        BizStoreBd bind = new BizStoreBd();
+        bind.setStoreId(storeId);
+        bind.setBdEmpId(bd.getEmpId());
+        bind.setBdName(bd.getName());
+        bind.setCreatedBy(operatorResolver.currentOperatorName());
+        bdMapper.insert(bind);
+        touchStore(storeId);
+        StoreBdVO vo = new StoreBdVO();
+        vo.setId(bind.getId());
+        vo.setBdEmpId(bd.getEmpId());
+        vo.setBdName(bd.getName());
+        vo.setDepartment(bd.getDepartment());
+        vo.setPosition(bd.getPosition());
+        vo.setJobLevel(bd.getJobLevel());
+        return vo;
+    }
+
+    @Override
+    public void removeBd(Long storeId, Long bindId) {
+        BizStoreBd bind = bdMapper.selectById(bindId);
+        if (bind == null || !bind.getStoreId().equals(storeId)) {
+            throw new BusinessException("绑定记录不存在");
+        }
+        bdMapper.deleteById(bindId);
+        touchStore(storeId);
+    }
+
+    @Override
+    public List<OptionVO> listBdOptionsByGroupCode(String groupCode) {
+        if (!StringUtils.hasText(groupCode)) {
+            return List.of();
+        }
+        BizMerchantGroup group = groupMapper.selectOne(new LambdaQueryWrapper<BizMerchantGroup>()
+                .eq(BizMerchantGroup::getGroupCode, groupCode.trim()).last("LIMIT 1"));
+        if (group == null) {
+            return List.of();
+        }
+        List<BizStore> stores = storeMapper.selectList(new LambdaQueryWrapper<BizStore>()
+                .eq(BizStore::getGroupId, group.getId())
+                .orderByAsc(BizStore::getId));
+        if (stores.isEmpty()) {
+            return List.of();
+        }
+        List<BizStoreBd> binds = bdMapper.selectList(new LambdaQueryWrapper<BizStoreBd>()
+                .in(BizStoreBd::getStoreId, stores.stream().map(BizStore::getId).toList())
+                .orderByAsc(BizStoreBd::getId));
+        // 同一BD绑定多家门店时去重, 保持绑定顺序
+        Map<String, String> bdMap = new LinkedHashMap<>();
+        for (BizStoreBd b : binds) {
+            bdMap.putIfAbsent(b.getBdEmpId(), b.getBdName());
+        }
+        return bdMap.entrySet().stream()
+                .map(e -> new OptionVO(e.getKey(), e.getValue() + "(" + e.getKey() + ")"))
+                .toList();
+    }
+
+    /** 为分页记录批量填充已绑定的BD列表 */
+    private void attachBdList(List<StoreVO> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        List<BizStoreBd> binds = bdMapper.selectList(new LambdaQueryWrapper<BizStoreBd>()
+                .in(BizStoreBd::getStoreId, records.stream().map(StoreVO::getId).toList())
+                .orderByAsc(BizStoreBd::getId));
+        Map<String, SysUser> userMap = loadBdUserMap(binds);
+        Map<Long, List<BizStoreBd>> byStore = binds.stream()
+                .collect(Collectors.groupingBy(BizStoreBd::getStoreId));
+        for (StoreVO vo : records) {
+            vo.setBdList(toBdVos(byStore.getOrDefault(vo.getId(), List.of()), userMap));
+        }
+    }
+
+    /** 批量加载BD对应的员工信息（部门/职位/职级） */
+    private Map<String, SysUser> loadBdUserMap(List<BizStoreBd> binds) {
+        if (binds.isEmpty()) {
+            return Map.of();
+        }
+        Set<String> empIds = binds.stream().map(BizStoreBd::getBdEmpId).collect(Collectors.toSet());
+        return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getEmpId, empIds)).stream()
+                .collect(Collectors.toMap(SysUser::getEmpId, Function.identity(), (a, b) -> a));
+    }
+
+    /** 绑定记录 -> 视图对象，员工信息取实时快照, 员工已删除时回退绑定时姓名 */
+    private List<StoreBdVO> toBdVos(List<BizStoreBd> binds, Map<String, SysUser> userMap) {
+        return binds.stream().map(b -> {
+            StoreBdVO vo = new StoreBdVO();
+            vo.setId(b.getId());
+            vo.setBdEmpId(b.getBdEmpId());
+            SysUser user = userMap.get(b.getBdEmpId());
+            vo.setBdName(user != null ? user.getName() : b.getBdName());
+            if (user != null) {
+                vo.setDepartment(user.getDepartment());
+                vo.setPosition(user.getPosition());
+                vo.setJobLevel(user.getJobLevel());
+            }
+            return vo;
+        }).toList();
+    }
+
+    /** BD绑定变更后刷新门店最后更新人/时间 */
+    private void touchStore(Long storeId) {
+        BizStore store = storeMapper.selectById(storeId);
+        if (store != null) {
+            store.setUpdatedBy(operatorResolver.currentOperatorName());
+            storeMapper.updateById(store);
+        }
     }
 
     @Override

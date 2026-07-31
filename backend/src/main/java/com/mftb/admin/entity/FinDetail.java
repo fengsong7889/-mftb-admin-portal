@@ -62,7 +62,7 @@ public class FinDetail {
     /** 流程编号 */
     private String flowNo;
 
-    /** 所属BD */
+    /** 归属BD */
     private String bd;
 
     /** 备注 */

@@ -1,4 +1,5 @@
 import request from './request'
+import type { OptionItem } from './types'
 
 /** 员工信息（后端返回，不含密码） */
 export interface EmployeeItem {
@@ -59,6 +60,15 @@ export interface PageResult<T> {
 /** 分页查询员工 */
 export function fetchEmployees(params: EmployeeQuery) {
   return request.get<unknown, PageResult<EmployeeItem>>('/employees', { params })
+}
+
+/** 员工搜索下拉选项（选项值为工号，仅启用状态；门店绑定BD选择员工用，附带部门/职位/职级信息） */
+export async function fetchEmployeeOptions(keyword: string): Promise<OptionItem[]> {
+  const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, status: 1 })
+  return (res.records || []).map(e => {
+    const extra = [e.department, e.position, e.jobLevel].filter(Boolean).join(' / ')
+    return { value: e.empId, label: `${e.name}(${e.empId})${extra ? ` · ${extra}` : ''}` }
+  })
 }
 
 /** 新增员工 */

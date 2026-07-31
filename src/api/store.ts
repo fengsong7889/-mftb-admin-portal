@@ -8,7 +8,27 @@ import {
   mockCreateStore,
   mockUpdateStore,
   mockDeleteStore,
+  mockFetchStoreBds,
+  mockAddStoreBd,
+  mockRemoveStoreBd,
+  mockFetchStoreBdOptions,
 } from './mock/merchantMock'
+
+/** 门店已绑定的BD（含员工部门/职位/职级） */
+export interface StoreBdItem {
+  /** 绑定记录ID */
+  id: number
+  /** BD员工工号 */
+  bdEmpId: string
+  /** BD员工姓名 */
+  bdName?: string
+  /** 所在部门 */
+  department?: string
+  /** 职位 */
+  position?: string
+  /** 职级 (如 M3 / T5 / P2) */
+  jobLevel?: string
+}
 
 /** 门店信息 */
 export interface StoreItem {
@@ -22,6 +42,8 @@ export interface StoreItem {
   bizType?: string
   bizChannel?: string
   loginAccount?: string
+  /** 已绑定的BD列表（一家门店可绑定多个） */
+  bdList?: StoreBdItem[]
   updatedBy?: string
   createdAt?: string
   updatedAt?: string
@@ -138,6 +160,46 @@ export async function deleteStore(id: number) {
     return await request.delete<unknown, void>(`/stores/${id}`, SILENT)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockDeleteStore(id)
+    throw err
+  }
+}
+
+/** 查询门店已绑定的BD列表（含部门/职位/职级） */
+export async function fetchStoreBds(storeId: number) {
+  try {
+    return await request.get<unknown, StoreBdItem[]>(`/stores/${storeId}/bds`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStoreBds(storeId)
+    throw err
+  }
+}
+
+/** 新增绑定BD */
+export async function addStoreBd(storeId: number, bdEmpId: string) {
+  try {
+    return await request.post<unknown, StoreBdItem>(`/stores/${storeId}/bds`, { bdEmpId }, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockAddStoreBd(storeId, bdEmpId)
+    throw err
+  }
+}
+
+/** 解除绑定BD */
+export async function removeStoreBd(storeId: number, bindId: number) {
+  try {
+    return await request.delete<unknown, void>(`/stores/${storeId}/bds/${bindId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockRemoveStoreBd(storeId, bindId)
+    throw err
+  }
+}
+
+/** 按集团ID（group_code）查询集团下门店已绑定的BD选项（推广金充值归属BD用） */
+export async function fetchStoreBdOptions(groupCode: string) {
+  try {
+    return await request.get<unknown, OptionItem[]>('/stores/bd-options', { params: { groupCode }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchStoreBdOptions(groupCode)
     throw err
   }
 }

@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StoreBdVO;
 import com.mftb.admin.dto.StoreQuery;
 import com.mftb.admin.dto.StoreRequest;
 import com.mftb.admin.dto.StoreVO;
@@ -30,6 +31,18 @@ public interface StoreService {
 
     /** 编辑门店 */
     StoreVO update(Long id, StoreRequest request);
+
+    /** 查询门店已绑定的BD列表（含部门/职位/职级） */
+    List<StoreBdVO> listBds(Long storeId);
+
+    /** 新增绑定BD */
+    StoreBdVO addBd(Long storeId, String bdEmpId);
+
+    /** 解除绑定BD */
+    void removeBd(Long storeId, Long bindId);
+
+    /** 按集团ID（group_code）查询集团下门店已绑定的BD选项 */
+    List<OptionVO> listBdOptionsByGroupCode(String groupCode);
 
     /** 删除门店 */
     void delete(Long id);
