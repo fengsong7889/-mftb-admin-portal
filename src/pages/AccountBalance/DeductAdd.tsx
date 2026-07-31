@@ -15,8 +15,10 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { submitDeductApply, withFinanceFallback } from '../../api/finance'
+import { fetchFinAccounts, fetchFinBatches, submitDeductApply, withFinanceFallback } from '../../api/finance'
 import type { DeductApplyPayload } from '../../api/finance'
+import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
+import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -78,26 +80,13 @@ const consumeTypeOptions = [
   { label: '專業套餐', value: 'proPlan' },
 ]
 
-/** BD選項 */
-const bdOptions = [
-  { label: '關山月(001)', value: '關山月(001)' },
-  { label: '古月(002)', value: '古月(002)' },
-  { label: '浩遠(003)', value: '浩遠(003)' },
-]
-
-/** 門店選項 */
-const storeOptions = [
-  { label: '廣州酒店天河廣場1號店(1234567890)', value: '1234567890' },
-  { label: '廣州酒店越秀領展2號店(2345678910)', value: '2345678910' },
-  { label: '廣州酒店琶洲保利3號店(3456789012)', value: '3456789012' },
-]
-
-/** 充值批次選項（Mock） */
-const batchOptions = [
-  { label: 'PC2026071500001', value: 'PC2026071500001', deductible: 50000, settlement: 'mixed' },
-  { label: 'PC2026071000002', value: 'PC2026071000002', deductible: 30000, settlement: 'corporate' },
-  { label: 'PC2026070500003', value: 'PC2026070500003', deductible: 80000, settlement: 'revenue' },
-]
+/** 充值批次選項（批次號 + 可扣金額 + 結算方式） */
+interface BatchOption {
+  label: string
+  value: string
+  deductible: number
+  settlement: string
+}
 
 /** 結算方式映射 */
 const settlementMap: Record<string, string> = {
@@ -149,8 +138,14 @@ export default function DeductAdd() {
   const [form] = Form.useForm()
   const [deductMethod, setDeductMethod] = useState('consume')
   const [selectedBatch, setSelectedBatch] = useState<string | undefined>(undefined)
-  /** 轉出集團餘額（Mock） */
-  const sourceVirtualBalance = 128560.50
+  /** 集團虛擬賬戶餘額（數據庫讀取） */
+  const [sourceVirtualBalance, setSourceVirtualBalance] = useState(0)
+  /** 門店選項：該集團下且品牌相同的門店 */
+  const [storeOptions, setStoreOptions] = useState<OptionItem[]>([])
+  /** 歸屬BD選項：所選門店綁定的BD */
+  const [bdOptions, setBdOptions] = useState<OptionItem[]>([])
+  /** 充值批次選項：該集團的充值批次 */
+  const [batchOptions, setBatchOptions] = useState<BatchOption[]>([])
   const [deductAmount, setDeductAmount] = useState<number>(0)
   const [certificateFiles, setCertificateFiles] = useState<any[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
@@ -160,7 +155,51 @@ export default function DeductAdd() {
 
   /** 當前批次的可扣金額 */
   const currentBatch = batchOptions.find(b => b.value === selectedBatch)
-  const maxDeductible = currentBatch ? currentBatch.deductible : 999999
+
+  // 加載虛擬賬戶餘額（按集團+品牌定位賬戶）
+  useEffect(() => {
+    if (!groupIdParam) return
+    fetchFinAccounts({ page: 1, size: 1, groupId: groupIdParam, brand: brandParam })
+      .then(res => setSourceVirtualBalance(Number(res.records?.[0]?.virtualBalance) || 0))
+      .catch(() => setSourceVirtualBalance(0))
+  }, [groupIdParam, brandParam])
+
+  // 加載門店選項（集團下且所屬品牌與集團一致）
+  useEffect(() => {
+    if (!groupIdParam) return
+    fetchStoresByGroupCode(groupIdParam, brandParam)
+      .then(list => setStoreOptions(list || []))
+      .catch(() => setStoreOptions([]))
+  }, [groupIdParam, brandParam])
+
+  // 加載充值批次選項（數據庫充值批次，可扣金額=虛擬充值金額）
+  useEffect(() => {
+    if (!groupIdParam) return
+    fetchFinBatches({ page: 1, size: 200, groupId: groupIdParam, brand: brandParam, batchType: 'recharge' })
+      .then(res => {
+        const options = (res.records || []).map(b => ({
+          label: b.batchNo,
+          value: b.batchNo,
+          deductible: Number(b.virtualAmount) || 0,
+          settlement: String(b.extra?.payMethod || ''),
+        }))
+        setBatchOptions(options)
+      })
+      .catch(() => setBatchOptions([]))
+  }, [groupIdParam, brandParam])
+
+  /** 選擇門店後：重置歸屬BD，並加載該門店綁定的BD選項 */
+  const handleStoreChange = (storeId?: string) => {
+    form.setFieldValue('consumeBd', undefined)
+    setBdOptions([])
+    if (!storeId) return
+    fetchStoreBds(Number(storeId))
+      .then(list => setBdOptions((list || []).map(b => ({
+        value: b.bdEmpId,
+        label: `${b.bdName || b.bdEmpId}(${b.bdEmpId})`,
+      }))))
+      .catch(() => setBdOptions([]))
+  }
 
   // 提交成功彈窗倒計時
   useEffect(() => {
@@ -195,6 +234,7 @@ export default function DeductAdd() {
       const consumeStoreOpt = storeOptions.find(s => s.value === consumeStoreId)
       const consumeTypeVal = form.getFieldValue('consumeType')
       const consumeChannelVal = form.getFieldValue('consumeChannel')
+      const consumeBdVal = form.getFieldValue('consumeBd')
       const payload: DeductApplyPayload = {
         groupId: groupIdParam,
         groupName: groupNameParam,
@@ -205,7 +245,7 @@ export default function DeductAdd() {
         consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.label || '',
         consumeStore: consumeStoreOpt?.label || '',
         consumeType: consumeTypeOptions.find(t => t.value === consumeTypeVal)?.label || '',
-        consumeBd: form.getFieldValue('consumeBd') || '--',
+        consumeBd: bdOptions.find(o => o.value === consumeBdVal)?.label || consumeBdVal || '--',
         batchNo: deductMethod === 'batch' ? (selectedBatch || '') : '',
         batchDeductible: deductMethod === 'batch' ? (currentBatch?.deductible || 0) : 0,
         batchSettlement: deductMethod === 'batch' ? (settlementMap[currentBatch?.settlement || ''] || '') : '',
@@ -446,14 +486,27 @@ export default function DeductAdd() {
                 <Select placeholder="請選擇業務頻道" options={businessChannelOptions} allowClear />
               </Form.Item>
               <Form.Item label="門店名稱" name="consumeStore" rules={[{ required: true, message: '請選擇門店' }]}>
-                <Select placeholder="請選擇門店" options={storeOptions} showSearch allowClear
-                  filterOption={(input, option) => (option?.label ?? '').includes(input)} />
+                <Select
+                  placeholder={storeOptions.length ? '請選擇門店' : '該集團下暫無同品牌門店'}
+                  options={storeOptions}
+                  showSearch
+                  allowClear
+                  onChange={handleStoreChange}
+                  filterOption={(input, option) => (option?.label ?? '').includes(input)}
+                />
               </Form.Item>
               <Form.Item label="消費類型" name="consumeType" rules={[{ required: true, message: '請選擇消費類型' }]}>
                 <Select placeholder="請選擇消費類型" options={consumeTypeOptions} allowClear />
               </Form.Item>
               <Form.Item label="歸屬BD" name="consumeBd">
-                <Select placeholder="請選擇BD" options={bdOptions} allowClear />
+                <Select
+                  placeholder={
+                    !form.getFieldValue('consumeStore') ? '請先選擇門店'
+                      : bdOptions.length ? '請選擇BD' : '該門店暫未綁定BD'
+                  }
+                  options={bdOptions}
+                  allowClear
+                />
               </Form.Item>
               <Form.Item label="扣款金額" required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
                 <InputNumber
@@ -482,7 +535,7 @@ export default function DeductAdd() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px 24px' }}>
                 <Form.Item label="批次號" name="batchNo" rules={[{ required: true, message: '請選擇批次號' }]}>
                   <Select
-                    placeholder="請選擇充值批次"
+                    placeholder={batchOptions.length ? '請選擇充值批次' : '該集團暫無充值批次'}
                     options={batchOptions.map(b => ({ label: b.label, value: b.value }))}
                     showSearch
                     allowClear
@@ -502,7 +555,7 @@ export default function DeductAdd() {
                 <Form.Item label="結算方式">
                   <Input
                     disabled
-                    value={currentBatch ? settlementMap[currentBatch.settlement] : undefined}
+                    value={currentBatch ? (settlementMap[currentBatch.settlement] || '--') : undefined}
                     placeholder="選擇批次後展示"
                   />
                 </Form.Item>

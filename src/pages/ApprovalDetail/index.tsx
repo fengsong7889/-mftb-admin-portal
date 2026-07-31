@@ -893,10 +893,6 @@ export default function ApprovalDetail() {
                     <span className="approval-info-label">所屬品牌</span>
                     <span className="approval-info-value">{data.brand}</span>
                   </div>
-                  <div className="approval-info-item">
-                    <span className="approval-info-label">虛擬賬戶餘額</span>
-                    <span className="approval-info-value approval-amount--blue">MOP {data.virtualBalance?.toLocaleString()}</span>
-                  </div>
                 </div>
               </div>
               {/* 扣款方式 */}
