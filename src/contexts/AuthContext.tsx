@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS, CONTROLLED_MENU_KEYS } from '../pages/Permission/types'
-import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY } from '../api'
+import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, resetUnauthorizedGuard } from '../api'
 
 export interface UserInfo {
   username: string
@@ -44,6 +44,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('user_info')
     return saved ? JSON.parse(saved) : null
   })
+
+  /**
+   * 监听登录失效事件（Token 过期 / 被清除 / 无效，由请求拦截器 401 触发）：
+   * 同步清除 React 登录态，路由守卫自动将用户带回登录页。
+   * 仅清 localStorage 不清 React 状态会导致用户停留在系统内反复查询失败。
+   */
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setIsAuthenticated(false)
+      setUser(null)
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem('is_authenticated')
+      localStorage.removeItem('user_info')
+    }
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
+  }, [])
 
   /**
    * 启动时后台静默刷新当前登录人信息：
@@ -126,6 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setIsAuthenticated(true)
       setUser(mappedUser)
+      // 重置登录失效标记，保证本次会话内 Token 再次过期时仍可正常登出
+      resetUnauthorizedGuard()
       // 保存 Token 与登录状态
       localStorage.setItem(TOKEN_KEY, result.token)
       localStorage.setItem('is_authenticated', 'true')
@@ -137,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (fallback.success) {
         setIsAuthenticated(true)
         setUser(fallback.user!)
+        resetUnauthorizedGuard()
         localStorage.setItem('is_authenticated', 'true')
         localStorage.setItem('user_info', JSON.stringify(fallback.user))
         // Mock 模式不写入真实 Token，仅写入标志位避免下次再调后端

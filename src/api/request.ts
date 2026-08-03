@@ -24,6 +24,12 @@ const SUCCESS_CODE = 200
 /** 未认证状态码 */
 const UNAUTHORIZED_CODE = 401
 
+/** 登录失效全局事件: AuthContext 监听后清除 React 登录态, 触发路由守卫跳回登录页 */
+export const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized'
+
+/** 并发请求同时返回 401 时只处理一次, 登录成功后通过 resetUnauthorizedGuard 重置 */
+let unauthorizedHandled = false
+
 /**
  * 计算 API 基础地址: 统一保证以 /api 结尾
  * 开发环境通过 Vite proxy 代理到后端 (见 vite.config.ts)
@@ -63,10 +69,11 @@ request.interceptors.response.use(
       return res.data as never
     }
     const silent = response.config?.headers?.[SILENT_HEADER] === '1'
-    // 未认证: 清除登录态并跳转登录页（静默请求由调用方自行处理, 如登录接口的 mock 降级）
+    // 未认证: 无论是否静默都清除登录态并跳转登录页（静默仅抑制普通错误提示,
+    // 登录失效必须强制登出, 否则启动刷新用户信息失败时用户会留在系统内反复查询失败）
     if (res.code === UNAUTHORIZED_CODE) {
-      if (!silent) handleUnauthorized()
-      return Promise.reject(new Error(res.message || '登录已过期'))
+      handleUnauthorized()
+      return Promise.reject(new Error(res.message || '登录校验已过期，请重新登录'))
     }
     // 其它业务错误: 弹出提示（除非调用方声明静默）
     if (!silent) {
@@ -79,7 +86,8 @@ request.interceptors.response.use(
     const status = error?.response?.status
     const silent = error?.config?.headers?.[SILENT_HEADER] === '1'
     if (status === UNAUTHORIZED_CODE) {
-      if (!silent) handleUnauthorized()
+      // 登录失效一律强制登出（handleUnauthorized 内部已做去重）
+      handleUnauthorized()
     } else if (status === 403) {
       if (!silent) message.error('没有访问权限')
     } else if (status >= 500) {
@@ -91,16 +99,29 @@ request.interceptors.response.use(
   },
 )
 
-/** 处理未认证: 清除本地登录信息并跳转登录页 */
+/**
+ * 处理登录失效（Token 过期 / 被清除 / 无效）:
+ * 清除本地登录信息, 提示用户, 并通知 AuthContext 同步清除 React 登录态,
+ * 由路由守卫将用户带回登录页。并发 401 只处理一次。
+ */
 function handleUnauthorized() {
+  if (unauthorizedHandled) return
+  unauthorizedHandled = true
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem('is_authenticated')
   localStorage.removeItem('user_info')
-  message.error('登录已过期, 请重新登录')
-  // HashRouter 场景下跳转登录页
+  message.error('登录校验已过期，请重新登录')
+  // 通知 AuthContext 清除 React 状态（isAuthenticated），路由守卫自动跳回登录页
+  window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
+  // 兜底: HashRouter 场景下直接跳转登录页
   if (window.location.hash !== '#/login') {
     window.location.hash = '#/login'
   }
+}
+
+/** 重新登录成功后重置登录失效标记, 保证同一 SPA 会话内再次过期仍可正常登出 */
+export function resetUnauthorizedGuard() {
+  unauthorizedHandled = false
 }
 
 /**
