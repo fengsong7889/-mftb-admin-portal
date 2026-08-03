@@ -4,12 +4,8 @@
 -- 字符集: utf8mb4
 -- ============================================================
 
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS mftb_admin
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_general_ci;
-
-USE mftb_admin;
+-- 注意: 本脚本不创建/切换数据库，请在目标数据库中直接执行
+-- (数据库由 JDBC 连接串指定，如 fengsong / fengsong_test)
 
 -- ============================================================
 -- 一、系统基础表

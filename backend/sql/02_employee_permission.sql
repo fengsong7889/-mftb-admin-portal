@@ -3,8 +3,6 @@
 -- 在 01_init_system.sql 基础上执行
 -- ============================================================
 
-USE mftb_admin;
-
 -- sys_user 增加功能角色绑定字段 (JSON 数组, 存 sys_role.id, 如 [1,3])
 ALTER TABLE sys_user
     ADD COLUMN function_roles TEXT NULL COMMENT '绑定的功能角色ID JSON数组' AFTER role;
