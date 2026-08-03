@@ -19,6 +19,17 @@ import {
 } from './types'
 import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES, AlgorithmType } from '../Recommend/constants'
 import GradientDiscountBanner from './GradientDiscountBanner'
+import {
+  fetchAdAlgorithms,
+  fetchAdInventory,
+  fetchAdPricingActive,
+  placeAdStarOrder,
+  withAdFallback,
+  type AdInventoryCell,
+  type AdInventoryVO,
+} from '../../api/adPromotion'
+import { fetchStores, type StoreItem } from '../../api/store'
+import { fetchFinAccounts } from '../../api/finance'
 
 interface CartItem {
   key: string
@@ -26,6 +37,7 @@ interface CartItem {
   region: Region           // 商圈
   regionName: string       // 商圈名称
   mealSlot: string
+  mealSlotKey: string    // 餐段时段 key（breakfast/lunch/afternoon/dinner/supper）
   timeSlots: number[]
   originalPrice: number  // 原价
   salePrice: number      // 售价
@@ -118,6 +130,46 @@ const BD_OPTIONS = [
   { label: '劉敏', value: 'bd-004' },
 ]
 
+/** 默认算法下拉选项（后端不可用时的演示数据） */
+const DEFAULT_ALGORITHM_OPTIONS = [
+  { label: '無敵星星-首頁版', value: 'invincible_star' },
+  { label: '新店廣告-外賣版', value: 'new_store_ad' },
+  { label: '盤活復蘇-團購版', value: 'hot_revive' },
+  { label: '獨家商家-超市版', value: 'exclusive_merchant' },
+  { label: '流量廣告-全渠道', value: 'traffic_ad' },
+  { label: '猜你喜歡-主力版', value: 'guess_you_like' },
+  { label: '自然流量-默認', value: 'organic_traffic' },
+  { label: '搜索算法-綜合版', value: 'search_algo' },
+]
+
+/** 默认多时段折扣梯度（演示配置，真实数据由定价配置覆盖） */
+const DEFAULT_MULTI_SLOT_DISCOUNT_TIERS = [
+  { minSlots: 10, discount: 80, label: '8折' },
+  { minSlots: 8, discount: 85, label: '85折' },
+  { minSlots: 5, discount: 90, label: '9折' },
+  { minSlots: 3, discount: 95, label: '95折' },
+]
+
+/** 后端品牌 → 前端品牌值（flashBee=閃蜂 mFood=mFood） */
+const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
+/** 前端品牌值 → 后端品牌 */
+const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
+
+/** 解析定价配置的多时段梯度折扣 JSON（后端 discount=95 表示 95 折） */
+function parseDiscountTiers(json?: string): Array<{ minSlots: number; discount: number; label: string }> {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json)
+    if (!Array.isArray(arr)) return []
+    return (arr as Array<{ minSlots?: number; discount?: number }>)
+      .filter(t => t && Number(t.minSlots) > 0 && Number(t.discount) > 0)
+      .map(t => ({ minSlots: Number(t.minSlots), discount: Number(t.discount), label: `${Number(t.discount) / 10}折` }))
+      .sort((a, b) => b.minSlots - a.minSlots)
+  } catch {
+    return []
+  }
+}
+
 // 时段定义（早餐/午餐/下午茶/晚餐/夜宵）
 const MEAL_TIME_SLOTS = [
   { key: 'breakfast', label: '早餐', timeRange: '07:00-10:00', slots: [14, 15, 16, 17, 18, 19] },
@@ -174,8 +226,6 @@ function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
 
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const navigate = useNavigate()
-  // 当前库存项的可售天数（盘活复苏 150 天，其他 12 天）
-  const sellableDays = getSellableDays(inventoryItem.algorithmType)
   const [selectedDates, setSelectedDates] = useState<Dayjs[]>([])
   const [activeDate, setActiveDate] = useState<Dayjs | null>(null) // 当前查看的日期
   const [hoveredDate, setHoveredDate] = useState<string | null>(null)
@@ -212,6 +262,42 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     }
   }, [currentTime, cartItems])
 
+  // 初始化：加载真实算法下拉与门店下拉
+  useEffect(() => {
+    if (inventoryItem.algorithmType === AlgorithmType.INVINCIBLE_STAR) {
+      withAdFallback(
+        () => fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, status: 1 }),
+        () => null,
+      ).then(res => {
+        if (!res || res.records.length === 0) return
+        const meta: Record<string, { apiId: number }> = {}
+        const brandOverrides: Record<string, string> = {}
+        const options = res.records.map(a => {
+          const value = String(a.id)
+          meta[value] = { apiId: a.id as number }
+          const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
+          if (uiBrand) brandOverrides[value] = uiBrand
+          return { label: a.algoName, value }
+        })
+        setAlgorithmOptions([...options, ...DEFAULT_ALGORITHM_OPTIONS.filter(o => o.value !== 'invincible_star')])
+        setAlgorithmMetaMap(meta)
+        setAlgorithmBrandOverrides(brandOverrides)
+      }).catch(() => {})
+    }
+    // 真实门店数据（含集团编码与归属BD）
+    fetchStores({ page: 1, size: 100 }).then(res => {
+      if (res.records.length === 0) return
+      const map: Record<string, StoreItem> = {}
+      const options = res.records.map(s => {
+        map[s.storeCode] = s
+        return { label: `${s.storeName}（ID：${s.storeCode}）`, value: s.storeCode, name: s.storeName }
+      })
+      setStoreOptions(options)
+      setStoreMap(map)
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // 查询条件状态
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
@@ -224,36 +310,102 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
   const [currentAlgorithmRefundEnabled, setCurrentAlgorithmRefundEnabled] = useState<boolean | null>(null)
 
+  // ===== 真实接口接线 =====
+  // 算法下拉（無敵星星加载真实算法库数据，value=算法ID）
+  const [algorithmOptions, setAlgorithmOptions] = useState(DEFAULT_ALGORITHM_OPTIONS)
+  const [algorithmMetaMap, setAlgorithmMetaMap] = useState<Record<string, { apiId: number }>>({})
+  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  // 门店下拉（真实门店，value=storeCode）
+  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string; name?: string }>>(STORE_OPTIONS)
+  const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
+  const [bdOptions, setBdOptions] = useState(BD_OPTIONS)
+  // 真实库存（查询后加载：格子售罄状态 + 预售窗口 + 折扣梯度）
+  const [inventoryData, setInventoryData] = useState<AdInventoryVO | null>(null)
+  // 多时段折扣梯度（默认演示配置，查询后由定价配置覆盖）
+  const [multiSlotTiers, setMultiSlotTiers] = useState(DEFAULT_MULTI_SLOT_DISCOUNT_TIERS)
+  const [lastPaidAmount, setLastPaidAmount] = useState(0)
+  const [paying, setPaying] = useState(false)
+
+  // 可售天数：真实库存以预售天数为准，否则盘活复苏 180 天、其他 12 天
+  const sellableDays = inventoryData ? inventoryData.presaleDays : getSellableDays(inventoryItem.algorithmType)
+
   // 当前活动日期的字符串
   const activeDateStr = activeDate?.format('YYYY-MM-DD') || ''
 
   // 检查购物车是否有加购数据
   const hasCartItems = cartItems.length > 0
 
+  // 真实格子索引：date|region|mealSlot → 格子
+  const realCellMap = useMemo(() => {
+    const map: Record<string, AdInventoryCell> = {}
+    inventoryData?.cells.forEach(c => { map[`${c.bizDate}|${c.region}|${c.mealSlot}`] = c })
+    return map
+  }, [inventoryData])
+  const getRealCell = (dateStr: string, regionKey: Region | string, mealSlotKey: string) =>
+    realCellMap[`${dateStr}|${Number(regionKey)}|${mealSlotKey}`]
+
+  // 查询推广金账户余额（集团+品牌，后端不可用时保留演示余额）
+  const loadMerchantBalance = (groupCode?: string, uiBrand?: string | null) => {
+    const backendBrand = uiBrand ? UI_TO_BACKEND_BRAND[uiBrand] : undefined
+    if (!groupCode || !backendBrand) return
+    withAdFallback(() => fetchFinAccounts({ groupId: groupCode, brand: backendBrand }), () => null)
+      .then(res => {
+        if (res && res.records.length > 0) setMerchantBalance(res.records[0].virtualBalance)
+      })
+      .catch(() => {})
+  }
+
+  // 算法变更时刷新退款开关与折扣梯度（来自启用中的定价配置）
+  const applyAlgorithmMeta = (value: string | null) => {
+    const apiId = value ? algorithmMetaMap[value]?.apiId : undefined
+    if (apiId) {
+      withAdFallback(() => fetchAdPricingActive(apiId), () => null)
+        .then(p => {
+          if (!p) return
+          setCurrentAlgorithmRefundEnabled(p.refundEnabled === 1)
+          const tiers = parseDiscountTiers(p.discountTiers)
+          if (tiers.length > 0) setMultiSlotTiers(tiers)
+        })
+        .catch(() => {})
+    } else {
+      setCurrentAlgorithmRefundEnabled(value ? (ALGORITHM_REFUND_CONFIG[value] ?? null) : null)
+    }
+  }
+
+  // 门店变更时带出归属BD
+  const applyStoreBd = (value: string | null) => {
+    const store = value ? storeMap[value] : undefined
+    const bdList = store?.bdList ?? []
+    if (bdList.length > 0) {
+      setBdOptions(bdList.map(bd => ({ label: bd.bdName || bd.bdEmpId, value: bd.bdEmpId })))
+      setSearchBD(bdList[0].bdEmpId)
+    } else {
+      const mock = MOCK_STORES.find(s => s.id === value)
+      setBdOptions(BD_OPTIONS)
+      setSearchBD(mock ? mock.bd : null)
+    }
+  }
+
+  // 取算法对应的品牌（真实算法优先，其次 mock 映射）
+  const getAlgorithmBrand = (value: string | null) =>
+    value ? (algorithmBrandOverrides[value] ?? ALGORITHM_BRAND_MAP[value]) : undefined
+
   // 算法名称变更处理：自动带出品牌，并检查购物车冲突
   const handleAlgorithmChange = (value: string | null) => {
-    // 更新退款配置状态
-    setCurrentAlgorithmRefundEnabled(value ? ALGORITHM_REFUND_CONFIG[value] : null)
+    // 更新退款配置状态（真实算法异步从定价配置加载）
+    applyAlgorithmMeta(value)
     if (hasCartItems && value !== searchAlgorithm) {
       setPendingAction(() => {
         setSearchAlgorithm(value)
         // 自动带出品牌
-        if (value && ALGORITHM_BRAND_MAP[value]) {
-          setSearchBrand(ALGORITHM_BRAND_MAP[value])
-        } else {
-          setSearchBrand(null)
-        }
+        setSearchBrand(getAlgorithmBrand(value) ?? null)
       })
       setIsConflictModalVisible(true)
       return
     }
     setSearchAlgorithm(value)
     // 自动带出品牌
-    if (value && ALGORITHM_BRAND_MAP[value]) {
-      setSearchBrand(ALGORITHM_BRAND_MAP[value])
-    } else {
-      setSearchBrand(null)
-    }
+    setSearchBrand(getAlgorithmBrand(value) ?? null)
   }
 
   // 门店名称变更处理：自动带出BD，并检查购物车冲突
@@ -262,24 +414,14 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       setPendingAction(() => {
         setSearchStoreName(value)
         // 自动带出BD
-        const store = MOCK_STORES.find(s => s.id === value)
-        if (store) {
-          setSearchBD(store.bd)
-        } else {
-          setSearchBD(null)
-        }
+        applyStoreBd(value)
       })
       setIsConflictModalVisible(true)
       return
     }
     setSearchStoreName(value)
     // 自动带出BD
-    const store = MOCK_STORES.find(s => s.id === value)
-    if (store) {
-      setSearchBD(store.bd)
-    } else {
-      setSearchBD(null)
-    }
+    applyStoreBd(value)
   }
 
   // 确认切换（清空已选）
@@ -302,10 +444,32 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   }
 
   // 查询：必须选择算法名称（品牌已自动带出）、门店名称
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
     if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
     if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
+    // 真实算法：加载库存（售罄状态 + 预售窗口 + 折扣梯度）
+    const apiId = algorithmMetaMap[searchAlgorithm]?.apiId
+    if (apiId) {
+      try {
+        const inv = await withAdFallback(() => fetchAdInventory(apiId), () => null)
+        if (inv) {
+          setInventoryData(inv)
+          const tiers = parseDiscountTiers(inv.discountTiers)
+          if (tiers.length > 0) setMultiSlotTiers(tiers)
+        } else {
+          // 后端不可用：降级为演示库存
+          setInventoryData(null)
+        }
+      } catch (err) {
+        message.error((err as Error).message || '庫存查詢失敗')
+        return
+      }
+    } else {
+      setInventoryData(null)
+    }
+    // 推广金余额（集团+品牌）
+    loadMerchantBalance(storeMap[searchStoreName]?.groupCode, searchBrand)
     setHasSearched(true)
     // 自动选中第一个可用日期
     if (allDates.length > 0) {
@@ -322,6 +486,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     setSearchStoreName(null)
     setSearchBD(null)
     setHasSearched(false)
+    setInventoryData(null)
+    setBdOptions(BD_OPTIONS)
   }
   
   // Mock数据 - 商家推广金余额
@@ -333,8 +499,38 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   }
 
   // 确认支付
-  const handleConfirmPayment = () => {
-    // 计算含折扣的总价
+  const handleConfirmPayment = async () => {
+    const apiId = searchAlgorithm ? algorithmMetaMap[searchAlgorithm]?.apiId : undefined
+    const store = searchStoreName ? storeMap[searchStoreName] : undefined
+    // 真實下單：調用後端接口從推廣金賬戶扣款
+    if (apiId && store && inventoryData) {
+      setPaying(true)
+      try {
+        const order = await placeAdStarOrder({
+          algoId: apiId,
+          groupCode: store.groupCode,
+          storeCode: store.storeCode,
+          bdEmpId: searchBD || undefined,
+          cells: cartItems.map(item => ({ bizDate: item.date, region: Number(item.region), mealSlot: item.mealSlotKey })),
+        })
+        setIsPaymentModalVisible(false)
+        setCartItems([])
+        setLastPaidAmount(order.actualAmount)
+        setIsSuccessModalVisible(true)
+        // 刷新庫存（已購格子變為售罄）與推廣金餘額
+        fetchAdInventory(apiId).then(setInventoryData).catch(() => {})
+        loadMerchantBalance(store.groupCode, searchBrand)
+      } catch (err) {
+        message.error((err as Error).message || '下單失敗，請稍後再試')
+        // 格子可能已被其他商家搶購，刷新庫存
+        fetchAdInventory(apiId).then(setInventoryData).catch(() => {})
+      } finally {
+        setPaying(false)
+      }
+      return
+    }
+
+    // Mock 流程：本地计算含折扣的总价
     const grouped: Record<string, CartItem[]> = {}
     cartItems.forEach(item => {
       if (!grouped[item.date]) grouped[item.date] = []
@@ -349,6 +545,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     
     // 扣除推广金余额
     setMerchantBalance(prev => prev - totalAmount)
+    setLastPaidAmount(totalAmount)
     
     // 关闭支付弹窗
     setIsPaymentModalVisible(false)
@@ -376,11 +573,13 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 生成所有日期列表（从当天开始，不展示已过去的日期）
   const allDates = useMemo(() => {
     const availableStart = dayjs(inventoryItem.availableStartDate)
-    const availableEnd = dayjs(inventoryItem.availableEndDate)
     const today = dayjs().startOf('day')
     // 起始日期取当天和可购买起始日期的较晚者
     const startDate = today.isAfter(availableStart) ? today : availableStart
-    const endDate = availableEnd
+    // 真实库存：预售窗口 + 7 天待开售展示；否则用库存项的可购窗口
+    const endDate = inventoryData
+      ? today.add(inventoryData.presaleDays + 6, 'day')
+      : dayjs(inventoryItem.availableEndDate)
     const dates: Dayjs[] = []
     
     let current = startDate
@@ -389,7 +588,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       current = current.add(1, 'day')
     }
     return dates
-  }, [inventoryItem.availableStartDate, inventoryItem.availableEndDate])
+  }, [inventoryItem.availableStartDate, inventoryItem.availableEndDate, inventoryData])
 
   // 当前页的日期列表
   const dateList = useMemo(() => {
@@ -416,12 +615,28 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   }
 
   // 获取某个日期某时段的综合状态
-  const getMealSlotStatus = (date: Dayjs, mealSlot: typeof MEAL_TIME_SLOTS[0]) => {
+  const getMealSlotStatus = (date: Dayjs, mealSlot: typeof MEAL_TIME_SLOTS[0], regionKey?: Region | string) => {
     const dateStr = date.format('YYYY-MM-DD')
-    const statuses = generateTimeSlotStatuses(inventoryItem.id, dateStr)
     
     // 检查是否已被锁定（已加购到购物车）
     const locked = isMealSlotLocked(date, mealSlot)
+    
+    // 真实库存模式：以接口返回的格子状态为准（独家占，整段可售/售罄）
+    if (inventoryData && regionKey !== undefined) {
+      const cell = getRealCell(dateStr, regionKey, mealSlot.key)
+      if (locked) {
+        return { status: 'locked' as const, availableSlots: mealSlot.slots.length, totalSlots: mealSlot.slots.length }
+      }
+      if (cell?.status === 'available') {
+        return { status: 'available' as const, availableSlots: mealSlot.slots.length, totalSlots: mealSlot.slots.length }
+      }
+      if (cell?.status === 'soldOut') {
+        return { status: 'soldOut' as const, availableSlots: 0, totalSlots: mealSlot.slots.length }
+      }
+      return { status: 'unavailable' as const, availableSlots: 0, totalSlots: mealSlot.slots.length }
+    }
+    
+    const statuses = generateTimeSlotStatuses(inventoryItem.id, dateStr)
     
     // 统计该时段内所有半小时的状态
     const slotStates = mealSlot.slots.map(slotIndex => statuses[slotIndex])
@@ -494,19 +709,11 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     setActiveDate(date)
   }
 
-  // 多时段折扣配置
-  const MULTI_SLOT_DISCOUNT_TIERS = [
-    { minSlots: 10, discount: 80, label: '8折' },
-    { minSlots: 8, discount: 85, label: '85折' },
-    { minSlots: 5, discount: 90, label: '9折' },
-    { minSlots: 3, discount: 95, label: '95折' },
-  ]
-
   // 计算某日期下的折扣（按格子数，每个格子=1个时段）
   const getDateDiscount = (dateStr: string) => {
     const dateItems = cartItems.filter(item => item.date === dateStr)
     const totalSlots = dateItems.length  // 每个 cartItem 代表一个格子（商圈×餐段）
-    for (const tier of MULTI_SLOT_DISCOUNT_TIERS) {
+    for (const tier of multiSlotTiers) {
       if (totalSlots >= tier.minSlots) return tier
     }
     return null
@@ -514,7 +721,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
   // 点击时段格子（多选切换，带日期）
   const handleMealSlotClick = (date: Dayjs, mealSlot: typeof MEAL_TIME_SLOTS[0], regionKey: Region | string) => {
-    const status = getMealSlotStatus(date, mealSlot)
+    const status = getMealSlotStatus(date, mealSlot, regionKey)
     if (status.status !== 'available') {
       message.info('該時段暫不可購買')
       return
@@ -541,16 +748,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                options={[
-                  { label: '無敵星星-首頁版', value: 'invincible_star' },
-                  { label: '新店廣告-外賣版', value: 'new_store_ad' },
-                  { label: '盤活復蘇-團購版', value: 'hot_revive' },
-                  { label: '獨家商家-超市版', value: 'exclusive_merchant' },
-                  { label: '流量廣告-全渠道', value: 'traffic_ad' },
-                  { label: '猜你喜歡-主力版', value: 'guess_you_like' },
-                  { label: '自然流量-默認', value: 'organic_traffic' },
-                  { label: '搜索算法-綜合版', value: 'search_algo' },
-                ]}
+                options={algorithmOptions}
               />
             </Form.Item>
             <Form.Item label="所屬品牌">
@@ -573,7 +771,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                options={STORE_OPTIONS}
+                options={storeOptions}
               />
             </Form.Item>
             <Form.Item label="歸屬BD">
@@ -588,7 +786,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   const label = (option?.label ?? '').toString().toLowerCase()
                   return label.includes(keyword)
                 }}
-                options={BD_OPTIONS}
+                options={bdOptions}
               />
             </Form.Item>
             <Form.Item>
@@ -632,7 +830,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       <>
       {/* 梯度折扣横幅：展示算法配置的多时段折扣规则 */}
       <GradientDiscountBanner
-        tiers={MULTI_SLOT_DISCOUNT_TIERS.map(t => ({ threshold: t.minSlots, discount: t.discount }))}
+        tiers={multiSlotTiers.map(t => ({ threshold: t.minSlots, discount: t.discount }))}
         unitLabel="個時段"
         scopeLabel="單日"
         currentCount={activeDate ? cartItems.filter(i => i.date === activeDateStr).length + selectedCells.filter(c => c.date === activeDateStr).length : 0}
@@ -778,11 +976,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
                     {/* 时段列 */}
                     {MEAL_TIME_SLOTS.map(meal => {
-                      const statuses = generateTimeSlotStatuses(inventoryItem.id + region.key, activeDateStr)
-                      const slotStates = meal.slots.map(slotIndex => statuses[slotIndex])
-                      const availableCount = slotStates.filter(s => s === TimeSlotStatus.AVAILABLE).length
-                      const soldOutCount = slotStates.filter(s => s === TimeSlotStatus.SOLD_OUT).length
-                      
                       const isLocked = cartItems.some(item => 
                         item.date === activeDateStr && 
                         item.region === region.key &&
@@ -799,43 +992,64 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         ? Math.max(0, LOCK_DURATION_SECONDS - Math.floor((currentTime - lockedCartItem.lockTime) / 1000))
                         : 0
                       
+                      const realCell = inventoryData ? getRealCell(activeDateStr, region.key, meal.key) : undefined
                       let status: 'available' | 'soldOut' | 'unavailable' | 'locked'
-                      let availableSlots: number
+                      let price: number
                       
-                      if (isLocked) {
-                        status = 'locked'
-                        availableSlots = availableCount
-                      } else if (soldOutCount > 0) {
-                        // 有已售罄時段 → 顯示為已售罄
-                        status = 'soldOut'
-                        availableSlots = 0
-                      } else if (availableCount < meal.slots.length) {
-                        // 有不可售時段 → 顯示為不可售
-                        status = 'unavailable'
-                        availableSlots = 0
-                      } else if (availableCount > 0) {
-                        // 全部可售
-                        status = 'available'
-                        availableSlots = availableCount
+                      if (realCell) {
+                        // 真實庫存：獨家占，整格可售/售罄，格價=商圈日價/5
+                        price = realCell.cellPrice
+                        if (isLocked) {
+                          status = 'locked'
+                        } else if (realCell.status === 'soldOut') {
+                          status = 'soldOut'
+                        } else if (realCell.status === 'available') {
+                          status = 'available'
+                        } else {
+                          status = 'unavailable'
+                        }
                       } else {
-                        status = 'unavailable'
-                        availableSlots = 0
+                        const statuses = generateTimeSlotStatuses(inventoryItem.id + region.key, activeDateStr)
+                        const slotStates = meal.slots.map(slotIndex => statuses[slotIndex])
+                        const availableCount = slotStates.filter(s => s === TimeSlotStatus.AVAILABLE).length
+                        const soldOutCount = slotStates.filter(s => s === TimeSlotStatus.SOLD_OUT).length
+                        let availableSlots: number
+                        
+                        if (isLocked) {
+                          status = 'locked'
+                          availableSlots = availableCount
+                        } else if (soldOutCount > 0) {
+                          // 有已售罄時段 → 顯示為已售罄
+                          status = 'soldOut'
+                          availableSlots = 0
+                        } else if (availableCount < meal.slots.length) {
+                          // 有不可售時段 → 顯示為不可售
+                          status = 'unavailable'
+                          availableSlots = 0
+                        } else if (availableCount > 0) {
+                          // 全部可售
+                          status = 'available'
+                          availableSlots = availableCount
+                        } else {
+                          status = 'unavailable'
+                          availableSlots = 0
+                        }
+                        
+                        const slotsForPrice = status === 'soldOut' ? meal.slots.length : availableSlots
+                        const totalAvailableSlots = 36
+                        const pricePerSlot = calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
+                        price = pricePerSlot * slotsForPrice
                       }
-                      
-                      const slotsForPrice = status === 'soldOut' ? meal.slots.length : availableSlots
-                      const totalAvailableSlots = 36
-                      const pricePerSlot = calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
-                      const price = pricePerSlot * slotsForPrice
                       const isSelected = selectedCells.some(c => c.date === activeDateStr && c.regionKey === region.key && c.mealSlotKey === meal.key)
                       const isAvailable = status === 'available'
                       const isSoldOut = status === 'soldOut'
                       const isLockedStatus = status === 'locked'
                       
                       const noDiscountSlots = getNoDiscountSlotsByRow(activeDateStr)
-                      const hasNoDiscount = meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
+                      const hasNoDiscount = realCell ? true : meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
                       
-                      // Mock: 生成确定性库存数量（基于 region + meal 的 hash）
-                      const mockInventory = ((Number(region.key) * 7 + meal.slots[0] * 13) % 20) + 3
+                      // 库存数量：真实模式独家占固定 1，Mock 模式按 hash 生成
+                      const mockInventory = realCell ? 1 : ((Number(region.key) * 7 + meal.slots[0] * 13) % 20) + 3
                       
                       return (
                         <td 
@@ -963,6 +1177,21 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                     const meal = MEAL_TIME_SLOTS.find(m => m.key === cell.mealSlotKey)
                     if (!meal) return
                     const regionName = REGION_LIST.find(r => r.key === cell.regionKey)?.name || '-'
+                    const realCell = inventoryData ? getRealCell(dateStr, cell.regionKey, meal.key) : undefined
+                    if (realCell) {
+                      // 真實庫存：只預覽可售格子，價格=格子單價
+                      if (realCell.status !== 'available') return
+                      items.push({
+                        regionKey: cell.regionKey,
+                        regionName,
+                        mealSlotKey: cell.mealSlotKey,
+                        mealSlotLabel: meal.label,
+                        salePrice: realCell.cellPrice,
+                        originalPrice: realCell.cellPrice,
+                        timeSlots: meal.slots,
+                      })
+                      return
+                    }
                     const statuses = generateTimeSlotStatuses(inventoryItem.id + Number(cell.regionKey), dateStr)
                     const availableSlots = meal.slots.filter(slotIndex => statuses[slotIndex] === TimeSlotStatus.AVAILABLE)
                     if (availableSlots.length === 0) return
@@ -1041,7 +1270,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         const allSlots = cartCellCount + previewCellCount
                         let discount = null
                         if (allSlots >= 3) {
-                          for (const tier of MULTI_SLOT_DISCOUNT_TIERS) {
+                          for (const tier of multiSlotTiers) {
                             if (allSlots >= tier.minSlots) { discount = tier; break }
                           }
                         }
@@ -1067,14 +1296,26 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           if (!meal) return
                           const regionName = REGION_LIST.find(r => r.key === cell.regionKey)?.name || '-'
                           const dateStr = cell.date
-                          const statuses = generateTimeSlotStatuses(inventoryItem.id + Number(cell.regionKey), dateStr)
-                          const availableSlots = meal.slots.filter(slotIndex => statuses[slotIndex] === TimeSlotStatus.AVAILABLE)
-                          if (availableSlots.length === 0) return
-                          
-                          const salePrice = getMealSlotPrice(meal, availableSlots.length)
-                          const noDiscountSlots = getNoDiscountSlotsByRow(dateStr)
-                          const hasNoDiscount = meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
-                          const originalPrice = hasNoDiscount ? salePrice : inventoryItem.dailyPrice
+                          let salePrice: number
+                          let originalPrice: number
+                          let timeSlots: number[]
+                          const realCell = inventoryData ? getRealCell(dateStr, cell.regionKey, meal.key) : undefined
+                          if (realCell) {
+                            // 真實庫存：只加購可售格子，價格=格子單價
+                            if (realCell.status !== 'available') return
+                            salePrice = realCell.cellPrice
+                            originalPrice = realCell.cellPrice
+                            timeSlots = meal.slots
+                          } else {
+                            const statuses = generateTimeSlotStatuses(inventoryItem.id + Number(cell.regionKey), dateStr)
+                            const availableSlots = meal.slots.filter(slotIndex => statuses[slotIndex] === TimeSlotStatus.AVAILABLE)
+                            if (availableSlots.length === 0) return
+                            salePrice = getMealSlotPrice(meal, availableSlots.length)
+                            const noDiscountSlots = getNoDiscountSlotsByRow(dateStr)
+                            const hasNoDiscount = meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
+                            originalPrice = hasNoDiscount ? salePrice : inventoryItem.dailyPrice
+                            timeSlots = availableSlots
+                          }
                           
                           allItems.push({
                             cell,
@@ -1084,11 +1325,12 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                               region: cell.regionKey as Region,
                               regionName,
                               mealSlot: meal.label,
-                              timeSlots: availableSlots,
+                              mealSlotKey: meal.key,
+                              timeSlots,
                               originalPrice,
                               salePrice,
                               storeId: searchStoreName || '',
-                              storeName: searchStoreName ? STORE_OPTIONS.find(s => s.value === searchStoreName)?.name || '' : '',
+                              storeName: searchStoreName ? (storeMap[searchStoreName]?.storeName || storeOptions.find(s => s.value === searchStoreName)?.name || '') : '',
                               lockTime: Date.now(),
                             }
                           })
@@ -1099,9 +1341,9 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           return
                         }
                         
-                        // 当选择时段≥2个时，随机抽取部分时段变为售罄
+                        // Mock 模式：模擬提交過程中部分時段被搶購（真實模式以下單接口校驗為準）
                         let finalItems = allItems
-                        if (allItems.length >= 2) {
+                        if (!inventoryData && allItems.length >= 2) {
                           // 随机抽取 20%~30% 的时段售罄（至少1个）
                           const soldOutCount = Math.max(1, Math.floor(allItems.length * (0.2 + Math.random() * 0.1)))
                           const indices = [...Array(allItems.length).keys()]
@@ -1364,6 +1606,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         onCancel={() => setIsPaymentModalVisible(false)}
         okText="確定支付"
         cancelText="取消"
+        confirmLoading={paying}
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
         width={600}
       >
@@ -1476,7 +1719,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
               margin: 0,
               lineHeight: 1.2,
             }}>
-              $1985.89
+              ${lastPaidAmount > 0 ? lastPaidAmount : '--'}
             </p>
           </div>
         </div>

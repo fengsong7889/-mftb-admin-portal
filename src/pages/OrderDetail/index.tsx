@@ -7,6 +7,14 @@ import {
   BarChartOutlined, EyeOutlined, AimOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  fetchAdOrderDetail,
+  fetchAdPricingActive,
+  refundAdOrder,
+  withAdFallback,
+  brandToAppType,
+  type AdOrderDetail,
+} from '../../api/adPromotion'
 
 /* ---- 数字动画 Hook ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -163,6 +171,91 @@ interface OrderItem {
   operatorName?: string // 操作人姓名
   operatorId?: string // 操作人工號
   terminalActor?: 'staff' | 'merchant' // 終態操作發起方：業務人員 / 商家
+  /** 数据来源：api=后端真实数据 mock=演示数据 */
+  source?: 'api' | 'mock'
+}
+
+/* ---- 后端订单映射 ---- */
+
+/** 餐段时段 key → 中文名称 */
+const MEAL_SLOT_LABEL: Record<string, string> = {
+  breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
+}
+
+/** 后端频道 → 前端频道（3=超市百貨 4=團購到店，其余归美食外卖） */
+function mapAdChannel(channel?: number): RecommendChannel {
+  if (channel === 3) return RecommendChannel.SUPERMARKET
+  if (channel === 4) return RecommendChannel.GROUP_BUY
+  return RecommendChannel.DELIVERY
+}
+
+/** 后端订单状态 → 详情页状态（后端 4=已退款 5=已取消） */
+function mapAdStatus(status: number): OrderStatus {
+  if (status === 4) return OrderStatus.REFUNDED
+  if (status === 5) return OrderStatus.CANCELLED
+  return status as OrderStatus
+}
+
+/** 解析取消扣费梯度 JSON（[{remainDays,ratio}] → [{maxDays,feePercent}]） */
+function parseCancelFeeTiers(json?: string): { maxDays: number; feePercent: number }[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json)
+    if (!Array.isArray(arr)) return []
+    return (arr as Array<{ remainDays?: number; ratio?: number }>)
+      .filter(t => t && Number(t.remainDays) >= 0 && Number(t.ratio) >= 0)
+      .map(t => ({ maxDays: Number(t.remainDays), feePercent: Number(t.ratio) }))
+      .sort((a, b) => a.maxDays - b.maxDays)
+  } catch {
+    return []
+  }
+}
+
+/** 后端订单详情 → 详情页 OrderItem（明细拆为时段价格行，梯度折扣已分摊到明细） */
+function toDetailOrder(
+  vo: AdOrderDetail,
+  pricing?: { cancelFeeRules: { maxDays: number; feePercent: number }[]; refundEnabled: boolean },
+): OrderItem {
+  const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  const slotPrices: SlotPriceItem[] = vo.items.map(item => ({
+    slot: MEAL_SLOT_LABEL[item.mealSlot] || item.mealSlot,
+    date: item.bizDate,
+    originalPrice: item.originalPrice,
+    discount: item.originalPrice > 0 ? Math.max(1, Math.round((item.salePrice / item.originalPrice) * 10)) : 10,
+    actualPrice: item.salePrice,
+    region: item.region,
+  }))
+  const regions = Array.from(new Set(vo.items.map(i => i.region)))
+  const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || (vo.orderTime || '').slice(0, 10)
+  return {
+    id: vo.orderNo,
+    orderNo: vo.orderNo,
+    algorithmId: String(vo.algoId),
+    promotionName: vo.algoName,
+    app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
+    channel: mapAdChannel(vo.channel),
+    region: regions.length === 1 ? regions[0] : regions,
+    recommendType: vo.algoType as RecommendType,
+    slotPosition: 0,
+    groupId: vo.groupCode,
+    groupName: vo.groupName || '-',
+    storeId: vo.storeCode || '-',
+    storeName: vo.storeName || '-',
+    purchaseDate: (vo.orderTime || '').slice(0, 10),
+    originalPrice: vo.originalAmount,
+    discountPrice: vo.originalAmount - vo.discountAmount,
+    actualPrice: vo.actualAmount,
+    status: mapAdStatus(vo.status),
+    orderTime: fmt(vo.orderTime),
+    payTime: vo.payTime ? fmt(vo.payTime) : undefined,
+    slotPrices,
+    gradientDiscount: null,
+    cancelFeeRules: pricing?.cancelFeeRules ?? [],
+    refundAmount: vo.refundAmount ? vo.refundAmount : undefined,
+    refundEnabled: pricing?.refundEnabled ?? true,
+    promoStartDate: firstBizDate,
+    source: 'api',
+  }
 }
 
 /* ---- 推广数据 Mock ---- */
@@ -555,10 +648,34 @@ export default function OrderDetail() {
   const [slotsCollapsed, setSlotsCollapsed] = useState(false)
   const [promoAnimKey, setPromoAnimKey] = useState(0)
 
-  useEffect(() => {
-    if (orderId) {
-      setOrder([...mockOrders, ...newStoreOrders, ...popularOrders].find(o => o.id === orderId) || null)
+  // 从后端加载真实订单详情（id 即订单号），含计价配置中的退款规则
+  const loadApiOrder = async (orderNo: string): Promise<OrderItem> => {
+    const detail = await fetchAdOrderDetail(orderNo)
+    let pricing: { cancelFeeRules: { maxDays: number; feePercent: number }[]; refundEnabled: boolean } | undefined
+    try {
+      const p = await withAdFallback(() => fetchAdPricingActive(detail.algoId), () => null)
+      if (p) {
+        pricing = { cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers), refundEnabled: p.refundEnabled === 1 }
+      }
+    } catch {
+      // 计价配置缺失时使用默认规则
     }
+    return toDetailOrder(detail, pricing)
+  }
+
+  useEffect(() => {
+    if (!orderId) return
+    const local = [...mockOrders, ...newStoreOrders, ...popularOrders].find(o => o.id === orderId)
+    if (local) {
+      setOrder(local)
+      return
+    }
+    // 真實訂單：id 即訂單號，從後端加載
+    let cancelled = false
+    loadApiOrder(orderId)
+      .then(o => { if (!cancelled) setOrder(o) })
+      .catch(() => { if (!cancelled) setOrder(null) })
+    return () => { cancelled = true }
   }, [orderId])
 
   // 计算退款信息
@@ -697,7 +814,20 @@ export default function OrderDetail() {
     setRefundModalVisible(true)
   }
 
-  const confirmRefund = () => {
+  const confirmRefund = async () => {
+    // 真實訂單：調用後端退款接口（按取消扣費梯度回補推廣金賬戶）
+    if (order?.source === 'api') {
+      try {
+        await refundAdOrder(order.orderNo)
+        const fresh = await loadApiOrder(order.orderNo)
+        setOrder(fresh)
+        setRefundModalVisible(false)
+        message.success('退款成功，已按扣費梯度退回推廣金賬戶')
+      } catch (err) {
+        message.error((err as Error).message || '退款失敗，請稍後再試')
+      }
+      return
+    }
     const newStatus = isNewStore ? OrderStatus.CANCELLED : OrderStatus.PROMOTED
     setOrder(prev => prev ? { ...prev, status: newStatus } : null)
     setRefundModalVisible(false)

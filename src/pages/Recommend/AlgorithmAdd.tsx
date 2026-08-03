@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, StarFilled } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
 import { mockAlgorithmData } from './Algorithm/index'
+import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, withAdFallback, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import './WeightSlider.css'
 
@@ -141,17 +142,27 @@ export default function AlgorithmAdd() {
     setWaveNodes(prev => prev.map(n => ({ ...n, ranges: [] })))
   }
 
-  // 编辑模式或详情模式下加载默认数据
+  // 编辑模式或详情模式下加载默认数据（后端不可用时降级到本地演示数据）
   useEffect(() => {
-    if (algorithmIdParam) {
-      const record = mockAlgorithmData.find(item => item.id === Number(algorithmIdParam))
-      if (record) {
+    if (!algorithmIdParam) return
+    void withAdFallback(
+      async () => {
+        const detail = await fetchAdAlgorithmDetail(Number(algorithmIdParam))
         form.setFieldsValue({
-          name: record.name,
-          brand: record.brand,
+          name: detail.algoName,
+          brand: brandToAppType(detail.brand),
         })
-      }
-    }
+      },
+      () => {
+        const record = mockAlgorithmData.find(item => item.id === Number(algorithmIdParam))
+        if (record) {
+          form.setFieldsValue({
+            name: record.name,
+            brand: record.brand,
+          })
+        }
+      },
+    ).catch(() => { /* 静默请求：错误不阻断页面 */ })
   }, [algorithmIdParam, form])
 
   // 返回算法列表页
@@ -207,16 +218,38 @@ export default function AlgorithmAdd() {
     { id: 'M008', name: '法式甜品店', brand: '閃蜂', businessType: '團購到店' },
   ]
 
-  // 提交表单
+  // 提交表单（新增/编辑写入后端，后端不可用时降级为本地提示）
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      console.log('新增算法数据:', values)
-      message.success('算法新增成功')
+      const payload: AdAlgorithmRequest = {
+        algoName: values.name,
+        algoType: Number(algorithmTypeParam),
+        brand: appTypeToBrand(values.brand),
+        params: {
+          presaleMode,
+          continuousPurchase,
+          merchantLimit,
+          merchants: selectedMerchants,
+          regionLimit,
+          regions: selectedRegions,
+          merchantExposureStrategy: values.merchantExposureStrategy,
+        },
+      }
+      await withAdFallback(
+        () => isEditMode
+          ? updateAdAlgorithm(Number(algorithmIdParam), payload)
+          : createAdAlgorithm(payload),
+        () => Promise.resolve({ algoCode: '', algoName: payload.algoName, algoType: payload.algoType }),
+      )
+      message.success(isEditMode ? '算法更新成功' : '算法新增成功')
       setIsEditing(false)
       navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)
     } catch (error) {
-      console.error('验证失败:', error)
+      // 表单校验失败不提示（antd 已标红），接口业务错误提示后端返回信息
+      if (error instanceof Error) {
+        message.error(error.message || '保存失败')
+      }
     }
   }
 

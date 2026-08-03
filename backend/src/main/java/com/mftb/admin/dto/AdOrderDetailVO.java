@@ -1,0 +1,76 @@
+package com.mftb.admin.dto;
+
+import com.mftb.admin.entity.AdOrderItemStar;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 广告订单详情 VO（含无敌星星明细）
+ */
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class AdOrderDetailVO extends AdOrderVO {
+
+    /** 订单明细（格子列表） */
+    private List<Item> items = new ArrayList<>();
+
+    public static AdOrderDetailVO from(AdOrderVO order) {
+        AdOrderDetailVO vo = new AdOrderDetailVO();
+        vo.setId(order.getId());
+        vo.setOrderNo(order.getOrderNo());
+        vo.setAlgoType(order.getAlgoType());
+        vo.setAlgoId(order.getAlgoId());
+        vo.setAlgoName(order.getAlgoName());
+        vo.setBrand(order.getBrand());
+        vo.setChannel(order.getChannel());
+        vo.setGroupCode(order.getGroupCode());
+        vo.setGroupName(order.getGroupName());
+        vo.setStoreCode(order.getStoreCode());
+        vo.setStoreName(order.getStoreName());
+        vo.setBdEmpId(order.getBdEmpId());
+        vo.setItemCount(order.getItemCount());
+        vo.setOriginalAmount(order.getOriginalAmount());
+        vo.setDiscountAmount(order.getDiscountAmount());
+        vo.setActualAmount(order.getActualAmount());
+        vo.setRefundAmount(order.getRefundAmount());
+        vo.setStatus(order.getStatus());
+        vo.setOrderTime(order.getOrderTime());
+        vo.setPayTime(order.getPayTime());
+        vo.setFlowNo(order.getFlowNo());
+        vo.setRemark(order.getRemark());
+        vo.setCreatedAt(order.getCreatedAt());
+        return vo;
+    }
+
+    /** 订单明细行（商圈 x 日期 x 餐段） */
+    @Data
+    public static class Item {
+        private Long id;
+        private LocalDate bizDate;
+        private Integer region;
+        private String mealSlot;
+        private BigDecimal originalPrice;
+        private BigDecimal salePrice;
+        private BigDecimal refundPrice;
+        /** 投放状态: 1=待投放 2=已投放 3=已退款 */
+        private Integer deliveryStatus;
+
+        public static Item from(AdOrderItemStar entity) {
+            Item item = new Item();
+            item.setId(entity.getId());
+            item.setBizDate(entity.getBizDate());
+            item.setRegion(entity.getRegion());
+            item.setMealSlot(entity.getMealSlot());
+            item.setOriginalPrice(entity.getOriginalPrice());
+            item.setSalePrice(entity.getSalePrice());
+            item.setRefundPrice(entity.getRefundPrice());
+            item.setDeliveryStatus(entity.getDeliveryStatus());
+            return item;
+        }
+    }
+}

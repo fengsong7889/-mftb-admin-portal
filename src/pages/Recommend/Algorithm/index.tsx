@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Space, Table, Tag, Card, Tabs, Modal, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS, ALGO_CARD_COLOR_MAP } from '../constants'
+import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, withAdFallback, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '../../../hooks/useCardOrder'
 import BrandTag from '../../../components/BrandTag'
@@ -182,6 +183,19 @@ export const mockAlgorithmData: AlgorithmRecord[] = [
   { id: 53, name: '猜你喜歡-超市百貨mFood版', code: 'ALG_GYL_004', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 0 },
 ]
 
+/** 後端算法 VO → 前端列表記錄 */
+const toAlgorithmRecord = (vo: AdAlgorithm): AlgorithmRecord => ({
+  id: vo.id ?? 0,
+  name: vo.algoName,
+  code: vo.algoCode,
+  type: vo.algoType as AlgorithmType,
+  channel: (vo.channel ?? RecommendChannel.DELIVERY) as RecommendChannel,
+  placementInterface: vo.placementInterface as PlacementInterface | undefined,
+  brand: brandToAppType(vo.brand),
+  status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
+  slotCount: vo.slotCount ?? 0,
+})
+
 export default function Algorithm() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -210,14 +224,32 @@ export default function Algorithm() {
     initialType ? filterByBusinessType(dataList.filter(item => item.type === initialType)) : dataList
   )
 
+  /** 加載算法列表（後端不可用時降級到本地演示數據） */
+  useEffect(() => {
+    let mounted = true
+    void withAdFallback(
+      async () => {
+        const res = await fetchAdAlgorithms({ page: 1, size: 500 })
+        return (res.records ?? []).map(toAlgorithmRecord)
+      },
+      () => mockAlgorithmData,
+    ).then(list => {
+      if (!mounted) return
+      setDataList(list)
+      setFilteredData(initialType ? filterByBusinessType(list.filter(item => item.type === initialType)) : list)
+    })
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // 统计每种广告类型的算法数量
   const typeCountMap = useMemo(() => {
     const map: Record<number, number> = {}
-    mockAlgorithmData.forEach(item => {
+    dataList.forEach(item => {
       map[item.type] = (map[item.type] || 0) + 1
     })
     return map
-  }, [])
+  }, [dataList])
 
   // 点击卡片 → 进入列表（同步 type/tab 到 URL，使小蜜蜂 PRD 切换到列表界面）
   const handleSelectType = (type: AlgorithmType, tab: 'delivery' | 'groupBuy') => {
@@ -245,7 +277,16 @@ export default function Algorithm() {
       content: `確定要${actionText}算法「${record.name}」嗎？`,
       okText: '確定',
       cancelText: '取消',
-      onOk: () => {
+      onOk: async () => {
+        try {
+          await withAdFallback(
+            () => updateAdAlgorithmStatus(record.id, newStatus),
+            () => { /* 後端不可用：僅更新本地狀態 */ },
+          )
+        } catch (err) {
+          message.error((err as Error).message || `${actionText}失敗`)
+          return
+        }
         setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
         setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
         message.success(`已${actionText}「${record.name}」`)
@@ -261,7 +302,16 @@ export default function Algorithm() {
       okText: '確定',
       cancelText: '取消',
       okButtonProps: { danger: true },
-      onOk: () => {
+      onOk: async () => {
+        try {
+          await withAdFallback(
+            () => deleteAdAlgorithm(record.id),
+            () => { /* 後端不可用：僅更新本地狀態 */ },
+          )
+        } catch (err) {
+          message.error((err as Error).message || '刪除失敗')
+          return
+        }
         setDataList(prev => prev.filter(item => item.id !== record.id))
         setFilteredData(prev => prev.filter(item => item.id !== record.id))
         message.success('刪除成功')

@@ -7,12 +7,14 @@
  * 皮膚組成元素（參考 APP 實際展示樣式）：
  *  - 卡片邊框：支持 無邊框 / 選擇配色 / 上傳邊框圖 三種方式，小圖/大圖模式通用
  *  - 大圖模式左側豎版主圖：必須上傳（小圖模式無需上傳圖片）
- *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播（餐品一張張往上輪播），由商家選擇
+ *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播，可多選（配置該皮膚支持的佈局）；
+ *    風格不售賣給商家，商家僅選擇大圖模式圖片與邊框風格，具體展示哪種佈局、
+ *    在瀑布流第幾個位置展示由系統配置瀑布流策略時決定
  *  - 售價按天計算（MOP/天）
  *  - 內置預覽：運營人員可查看所配置皮膚在小圖/大圖模式下的展示效果
  */
 import { useState, useEffect } from 'react'
-import { Button, ColorPicker, Form, Input, InputNumber, Radio, Select, Space, Switch, Table, Upload, message, Modal } from 'antd'
+import { Button, Checkbox, ColorPicker, Form, Input, InputNumber, Select, Space, Switch, Table, Upload, message, Modal } from 'antd'
 import type { UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -93,8 +95,8 @@ interface SkinItem {
   name: string
   /** 售價 MOP/天 */
   price?: number
-  /** 菜品展示佈局（大圖模式）：大圖拼列 / 階梯輪播 */
-  dishLayout: DishLayout
+  /** 菜品展示佈局（大圖模式，可多選）：配置該皮膚支持的佈局，具體展示由系統瀑布流策略決定 */
+  dishLayouts: DishLayout[]
   /** 邊框方式：無 / 配色 / 上傳邊框圖 */
   borderType: 'none' | 'color' | 'image'
   /** 邊框顏色（borderType=color 時生效） */
@@ -112,7 +114,7 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   id: skinIdSeed++,
   name: '',
   price: undefined,
-  dishLayout: 'grid',
+  dishLayouts: ['grid'],
   borderType: 'image',
   borderColor: '#FF4D4F',
   borderImage: null,
@@ -147,17 +149,17 @@ const MOCK_DETAIL_IMAGE = svgDataUrl(
 const buildMockSkins = (): SkinItem[] => [
   createSkin({
     name: '紅運當頭', price: 28, borderType: 'color', borderColor: '#FF4D4F',
-    dishLayout: 'grid',
+    dishLayouts: ['grid'],
     bigImage: buildMockBigImage('#FF4D4F', '#FFA39E', '紅運當頭'),
   }),
   createSkin({
     name: '橙意滿滿', price: 18, borderType: 'color', borderColor: '#E8720C',
-    dishLayout: 'carousel',
+    dishLayouts: ['grid', 'carousel'],
     bigImage: buildMockBigImage('#E8720C', '#FFB347', '橙意滿滿'),
   }),
   createSkin({
     name: '簡約無框', price: 8, borderType: 'none',
-    dishLayout: 'grid',
+    dishLayouts: ['carousel'],
     bigImage: buildMockBigImage('#595959', '#8C8C8C', '簡約無框'),
   }),
 ]
@@ -178,6 +180,8 @@ export default function PopularSkinPricing() {
   const [previewSkin, setPreviewSkin] = useState<SkinItem | null>(null)
   // 階梯輪播餐品指針：current 為當前張，prev 為正在向左滑出的上一張
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
+  // 大圖模式預覽風格指針：皮膚支持多種佈局時每 3 秒自動輪換，模擬系統隨機分配效果
+  const [previewLayoutIndex, setPreviewLayoutIndex] = useState(0)
   // 狀態（底部 Switch：啟用/停用）
   const [status, setStatus] = useState<ServiceStatus>(ServiceStatus.ENABLED)
   // 購買多天折扣配置（梯度）
@@ -228,13 +232,23 @@ export default function PopularSkinPricing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId, form])
 
-  // 階梯輪播：當前張向左滑出、下一張從後方呈現上來，關閉彈窗/切換佈局時自動停止
+  // 階梯輪播：當前張向左滑出、下一張從後方呈現上來，關閉彈窗/所選佈局不含輪播時自動停止
   useEffect(() => {
-    if (!previewSkin || previewSkin.dishLayout !== 'carousel') return
+    if (!previewSkin || !previewSkin.dishLayouts.includes('carousel')) return
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
     }, 2200)
+    return () => clearInterval(timer)
+  }, [previewSkin])
+
+  // 大圖模式風格自動輪換預覽：支持多種佈局時每 3 秒切換一種，點擊風格標籤可手動定位
+  useEffect(() => {
+    setPreviewLayoutIndex(0)
+    if (!previewSkin || previewSkin.dishLayouts.length <= 1) return
+    const timer = setInterval(() => {
+      setPreviewLayoutIndex(i => (i + 1) % previewSkin.dishLayouts.length)
+    }, 3000)
     return () => clearInterval(timer)
   }, [previewSkin])
 
@@ -313,6 +327,10 @@ export default function PopularSkinPricing() {
         const label = skin.name.trim() || `皮膚 ${i + 1}`
         if (!skin.name.trim()) {
           message.error(`${label}：請填寫皮膚名稱`)
+          return
+        }
+        if (skin.dishLayouts.length === 0) {
+          message.error(`${label}：請至少選擇一種菜品展示佈局`)
           return
         }
         if (skin.borderType === 'image' && !skin.borderImage) {
@@ -753,13 +771,15 @@ export default function PopularSkinPricing() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px' }}>
                 <div>
                   <div style={fieldLabelStyle}>{requiredMark}菜品展示佈局</div>
-                  <Radio.Group
-                    value={skin.dishLayout}
+                  <Checkbox.Group
+                    value={skin.dishLayouts}
                     disabled={isDetailMode}
-                    onChange={e => updateSkin(skin.id, { dishLayout: e.target.value })}
+                    onChange={vals => updateSkin(skin.id, { dishLayouts: vals as DishLayout[] })}
                     options={DISH_LAYOUT_OPTIONS}
                   />
-                  <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4 }}>大圖模式下餐品展示效果，可在預覽中查看</div>
+                  <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4, lineHeight: '16px' }}>
+                    可多選，配置該皮膚支持的佈局；風格不售賣給商家，何時展示哪種佈局、在瀑布流第幾個位置展示，由系統配置瀑布流策略時決定
+                  </div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -1047,7 +1067,26 @@ export default function PopularSkinPricing() {
 
               {/* 大圖模式：左側豎版主圖 + 右側店鋪信息/優惠券/品牌說/商品列 */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>大圖模式</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>大圖模式</span>
+                  {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
+                  {previewSkin.dishLayouts.length > 1 && previewSkin.dishLayouts.map((layout, idx) => {
+                    const isActive = idx === Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)
+                    return (
+                      <span
+                        key={layout}
+                        onClick={() => setPreviewLayoutIndex(idx)}
+                        style={{
+                          fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
+                          color: isActive ? '#E8720C' : '#8C8C8C',
+                          background: isActive ? '#FFF7E6' : '#F0F0F0',
+                          border: `1px solid ${isActive ? '#E8720C' : 'transparent'}`,
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                      >{DISH_LAYOUT_OPTIONS.find(o => o.value === layout)?.label}</span>
+                    )
+                  })}
+                </div>
                 <div style={previewCardStyle(previewSkin)}>
                   {previewBorderOverlay(previewSkin)}
                   <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
@@ -1067,10 +1106,21 @@ export default function PopularSkinPricing() {
                       )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {previewInfoBlock()}
-                      {/* 菜品展示區：按皮膚配置的佈局展示 */}
-                      {previewSkin.dishLayout === 'grid' ? renderDishGrid() : renderDishCarousel()}
+                      {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
+                      {previewSkin.dishLayouts.length === 0 && (
+                        <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>未選擇菜品展示佈局</div>
+                      )}
+                      {(() => {
+                        const layout = previewSkin.dishLayouts[Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)]
+                        if (!layout) return null
+                        return layout === 'grid' ? renderDishGrid() : renderDishCarousel()
+                      })()}
                     </div>
                   </div>
+                </div>
+                {/* 風格分配說明 */}
+                <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
+                  💡 大圖模式風格由系統隨機分配，在皮膚支持的風格間自動切換展示，商家無需選擇；在瀑布流第幾個位置以大圖模式展示，同樣由系統策略決定
                 </div>
               </div>
             </div>

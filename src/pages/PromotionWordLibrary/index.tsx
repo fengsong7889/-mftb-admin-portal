@@ -5,7 +5,6 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
-  ImportOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -88,8 +87,7 @@ export default function PromotionWordLibrary() {
   const [editingRecord, setEditingRecord] = useState<WordRecord | null>(null)
   const [form] = Form.useForm()
   const [data, setData] = useState<WordRecord[]>(mockData)
-  const [remarkModalOpen, setRemarkModalOpen] = useState(false)
-  const [remarkContent, setRemarkContent] = useState({ word: '', remark: '' })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   /* ---- 列配置 ---- */
   const columnMeta = useMemo(() => [
@@ -156,10 +154,6 @@ export default function PromotionWordLibrary() {
     })
   }
 
-  const handleBatchImport = () => {
-    message.info('批量導入功能開發中')
-  }
-
   const handleExport = () => {
     message.success('導出成功')
   }
@@ -185,7 +179,6 @@ export default function PromotionWordLibrary() {
       dataIndex: 'matchCount',
       key: 'matchCount',
       width: 100,
-      align: 'right',
       sorter: (a, b) => a.matchCount - b.matchCount,
       render: (val: number) => <span>{val.toLocaleString()}</span>,
     },
@@ -211,10 +204,9 @@ export default function PromotionWordLibrary() {
       dataIndex: 'remark',
       key: 'remark',
       width: 200,
-      render: (val: string, record: WordRecord) =>
-        val
-          ? <Button type="link" size="small" style={{ padding: 0 }} onClick={() => { setRemarkContent({ word: record.word, remark: val }); setRemarkModalOpen(true) }}>查看</Button>
-          : <span style={{ color: '#BFBFBF' }}>—</span>,
+      ellipsis: true,
+      render: (val: string) =>
+        val ? <span title={val}>{val}</span> : <span style={{ color: '#BFBFBF' }}>—</span>,
     },
     {
       title: '操作',
@@ -234,8 +226,7 @@ export default function PromotionWordLibrary() {
   ]
 
   /* ---- 统计数字 ---- */
-  const totalCount = data.length
-  const activeCount = data.filter(d => d.status === 'active').length
+  // (统计文字已移除)
 
   return (
     <div className="content-area">
@@ -269,11 +260,7 @@ export default function PromotionWordLibrary() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-import" icon={<ImportOutlined />} onClick={handleBatchImport}>批量導入</Button>
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
-          <span style={{ color: '#999', fontSize: 13 }}>
-            共 <b style={{ color: '#E8720C' }}>{totalCount}</b> 條詞條，啟用 <b style={{ color: '#52C41A' }}>{activeCount}</b> 條
-          </span>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增詞條</Button>
@@ -287,6 +274,10 @@ export default function PromotionWordLibrary() {
           columns={applyConfig(columns)}
           dataSource={data}
           rowKey="id"
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+          }}
           pagination={{
             total: data.length,
             pageSize: 10,
@@ -341,18 +332,6 @@ export default function PromotionWordLibrary() {
         </Form>
       </Modal>
 
-      {/* 备注详情弹窗 */}
-      <Modal
-        title={`備註 — ${remarkContent.word}`}
-        open={remarkModalOpen}
-        onCancel={() => setRemarkModalOpen(false)}
-        footer={null}
-        width={480}
-      >
-        <div style={{ padding: '12px 0', whiteSpace: 'pre-wrap', lineHeight: 1.8, color: '#262626' }}>
-          {remarkContent.remark || '暫無備註'}
-        </div>
-      </Modal>
     </div>
   )
 }

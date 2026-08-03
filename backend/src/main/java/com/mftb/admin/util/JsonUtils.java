@@ -71,6 +71,19 @@ public final class JsonUtils {
         }
     }
 
+    /** 解析 JSON 对象数组为 List<Map>（广告模块折扣/扣费梯度等），解析失败返回空列表 */
+    public static List<Map<String, Object>> parseMapList(String json) {
+        if (json == null || json.isBlank()) {
+            return new ArrayList<>();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<Map<String, Object>>>() {
+            });
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
     /** 序列化为 JSON 字符串 */
     public static String toJson(Object obj) {
         try {

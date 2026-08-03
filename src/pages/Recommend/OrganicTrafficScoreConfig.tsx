@@ -1,15 +1,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Segmented } from 'antd'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Popover } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { ServiceStatus } from './constants'
 import {
-  ScoreDimension, StoreSubDimension, ScoreMode,
+  ScoreDimension, ScoreMode,
   SCORE_DIMENSION_LABEL, SCORE_DIMENSION_DESC, SCORE_DIMENSION_ICON, SCORE_DIMENSION_COLOR,
-  STORE_SUB_DIMENSION_LABEL, SCORE_MODE_LABEL, SCORE_MODE_COLOR, SCORE_MODE_OPTIONS,
-  DEFAULT_DIMENSION_WEIGHT, DEFAULT_STORE_SUB_WEIGHT, DIMENSION_WEIGHT_TOTAL,
+  SCORE_MODE_LABEL, SCORE_MODE_COLOR, SCORE_MODE_OPTIONS,
+  DEFAULT_DIMENSION_WEIGHT, DIMENSION_WEIGHT_TOTAL,
   DEFAULT_SCORE_TIMER_MINUTES, DEFAULT_ORGANIC_SCORE_RULES,
-  type OrganicScoreRule,
+  RANGE_SCORE_KEYS, RANGE_SCORE_LABELS, DEFAULT_RANGE_SCORES,
+  type OrganicScoreRule, type RangeScores,
 } from './organicTrafficConfig'
 
 /** 數值計數動畫（1200ms，遵循數據指標統計卡標準） */
@@ -39,12 +40,8 @@ function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string
 const DIMENSION_ORDER: ScoreDimension[] = [
   ScoreDimension.COMMERCIAL,
   ScoreDimension.STORE,
-  ScoreDimension.USER,
   ScoreDimension.PLATFORM,
 ]
-
-/** 店鋪維度子維度順序 */
-const STORE_SUB_ORDER: StoreSubDimension[] = [StoreSubDimension.BASIC_INFO, StoreSubDimension.OPERATION]
 
 /** 評分項表格每頁條數 */
 const RULE_PAGE_SIZE = 10
@@ -58,7 +55,20 @@ interface RuleFormValues {
   description: string
   mode: ScoreMode
   score: number
+  /** 統計天數（可選，僅部分規則需要） */
+  statDays?: number
+  /** 配送範圍分層分數（僅配送範圍規則使用） */
+  rangeScores?: RangeScores
   status: ServiceStatus
+}
+
+/** 判斷是否為配送範圍規則（需配置短程/中程/遠程/跨橋分數，不需要分值字段） */
+const isDeliveryRange = (id?: string) => !!id && id.startsWith('PLT_02')
+
+/** 判斷是否需要統計天數（僅訂單、好評、差評等時效性指標需要） */
+const needsStatDays = (id?: string) => {
+  if (!id) return false
+  return ['STO_02A', 'STO_02B', 'STO_03'].includes(id)
 }
 
 interface Props {
@@ -67,18 +77,16 @@ interface Props {
 }
 
 /**
- * 自然流量算法參數配置：4 個維度的商家評分規則。
+ * 自然流量算法參數配置：3 個維度的商家評分規則。
  * 自然流量不售賣坑位，商家靠綜合得分高低較量排名。
  */
 export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [rules, setRules] = useState<OrganicScoreRule[]>(DEFAULT_ORGANIC_SCORE_RULES)
   const [dimensionWeight, setDimensionWeight] = useState<Record<ScoreDimension, number>>(DEFAULT_DIMENSION_WEIGHT)
-  const [storeSubWeight, setStoreSubWeight] = useState<Record<StoreSubDimension, number>>(DEFAULT_STORE_SUB_WEIGHT)
   const [timerMinutes, setTimerMinutes] = useState<number>(DEFAULT_SCORE_TIMER_MINUTES)
 
   // 維度切換與表格內篩選（避免所有維度平鋪導致頁面過長）
   const [activeDimension, setActiveDimension] = useState<ScoreDimension>(ScoreDimension.COMMERCIAL)
-  const [activeStoreSub, setActiveStoreSub] = useState<StoreSubDimension>(StoreSubDimension.BASIC_INFO)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<ServiceStatus | undefined>(undefined)
 
@@ -89,7 +97,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<OrganicScoreRule | null>(null)
   const [modalDimension, setModalDimension] = useState<ScoreDimension>(ScoreDimension.COMMERCIAL)
-  const [modalSubDimension, setModalSubDimension] = useState<StoreSubDimension | undefined>(undefined)
   const [ruleForm] = Form.useForm<RuleFormValues>()
   /** 監聽彈窗內計分方式，金額倍率時分值字段填倍率 */
   const ruleFormMode = Form.useWatch('mode', ruleForm)
@@ -99,16 +106,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     () => DIMENSION_ORDER.reduce((sum, d) => sum + (dimensionWeight[d] || 0), 0),
     [dimensionWeight],
   )
-  const storeSubWeightTotal = storeSubWeight[StoreSubDimension.BASIC_INFO] + storeSubWeight[StoreSubDimension.OPERATION]
 
-  /** 按維度（含子維度）取規則 */
-  const getRules = (dimension: ScoreDimension, subDimension?: StoreSubDimension) =>
-    rules.filter(r => r.dimension === dimension && (subDimension === undefined || r.subDimension === subDimension))
+  /** 按維度取規則 */
+  const getRules = (dimension: ScoreDimension) =>
+    rules.filter(r => r.dimension === dimension)
 
   /** 按維度取規則並疊加關鍵字 / 狀態篩選 */
-  const getFilteredRules = (dimension: ScoreDimension, subDimension?: StoreSubDimension) => {
+  const getFilteredRules = (dimension: ScoreDimension) => {
     const kw = keyword.trim().toLowerCase()
-    return getRules(dimension, subDimension).filter(r => {
+    return getRules(dimension).filter(r => {
       const matchStatus = statusFilter === undefined || r.status === statusFilter
       const matchKeyword = kw === ''
         || r.name.toLowerCase().includes(kw)
@@ -125,13 +131,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     setStatusFilter(undefined)
   }
 
-  /** 切換店鋪子維度時重置篩選條件 */
-  const handleStoreSubChange = (key: string) => {
-    setActiveStoreSub(Number(key) as StoreSubDimension)
-    setKeyword('')
-    setStatusFilter(undefined)
-  }
-
   /** 各維度啟用項數量（統計卡） */
   const enabledCountMap = useMemo(() => {
     const map = {} as Record<ScoreDimension, number>
@@ -142,15 +141,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   }, [rules])
 
   /** 打開新增彈窗 */
-  const handleOpenAdd = (dimension: ScoreDimension, subDimension?: StoreSubDimension) => {
+  const handleOpenAdd = (dimension: ScoreDimension) => {
     setEditingRule(null)
     setModalDimension(dimension)
-    setModalSubDimension(subDimension)
     ruleForm.setFieldsValue({
       name: '',
       description: '',
-      mode: ScoreMode.FIXED,
+      mode: ScoreMode.RULE_BONUS,
       score: 50,
+      statDays: undefined,
+      rangeScores: undefined,
       status: ServiceStatus.ENABLED,
     })
     setModalOpen(true)
@@ -160,12 +160,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const handleOpenEdit = (record: OrganicScoreRule) => {
     setEditingRule(record)
     setModalDimension(record.dimension)
-    setModalSubDimension(record.subDimension)
     ruleForm.setFieldsValue({
       name: record.name,
       description: record.description,
       mode: record.mode,
       score: record.score,
+      statDays: record.statDays,
+      rangeScores: record.rangeScores,
       status: record.status,
     })
     setModalOpen(true)
@@ -179,13 +180,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       message.success(`已更新評分項「${values.name}」`)
     } else {
       const prefix = modalDimension === ScoreDimension.COMMERCIAL ? 'COM'
-        : modalDimension === ScoreDimension.USER ? 'USR'
-        : modalDimension === ScoreDimension.PLATFORM ? 'PLT'
-        : modalSubDimension === StoreSubDimension.BASIC_INFO ? 'STB' : 'STO'
+        : modalDimension === ScoreDimension.PLATFORM ? 'PLT' : 'ST'
       const newRule: OrganicScoreRule = {
         id: `${prefix}_CUSTOM_${Date.now()}`,
         dimension: modalDimension,
-        subDimension: modalSubDimension,
         builtin: false,
         ...values,
       }
@@ -249,18 +247,42 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       render: (v: ScoreMode) => <Tag color={SCORE_MODE_COLOR[v]}>{SCORE_MODE_LABEL[v]}</Tag>,
     },
     {
-      title: '分值', dataIndex: 'score', key: 'score', width: 110,
-      render: (v: number, record) => (
-        <InputNumber
-          value={v}
-          min={-100}
-          max={100}
-          size="small"
-          style={{ width: 84 }}
-          disabled={readOnly}
-          onChange={val => handleScoreChange(record.id, val)}
-        />
-      ),
+      title: '分值', dataIndex: 'score', key: 'score', width: 130,
+      render: (v: number, record) => {
+        if (record.rangeScores) {
+          return (
+            <Popover
+              title={<span style={{ fontSize: 13, fontWeight: 600 }}>{record.name} · 分層分值</span>}
+              content={
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 20px', minWidth: 160 }}>
+                  {RANGE_SCORE_KEYS.map(key => (
+                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ color: '#8C8C8C', fontSize: 12 }}>{RANGE_SCORE_LABELS[key]}</span>
+                      <span style={{ fontWeight: 600, color: '#262626' }}>{record.rangeScores![key]} 分</span>
+                    </div>
+                  ))}
+                </div>
+              }
+              trigger="hover"
+            >
+              <Button type="link" size="small" style={{ padding: '0 4px', fontSize: 12 }}>
+                查看分層
+              </Button>
+            </Popover>
+          )
+        }
+        return (
+          <InputNumber
+            value={v}
+            min={-100}
+            max={100}
+            size="small"
+            style={{ width: 84 }}
+            disabled={readOnly}
+            onChange={val => handleScoreChange(record.id, val)}
+          />
+        )
+      },
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 90,
@@ -294,9 +316,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   ]
 
   /** 渲染一組評分項：篩選工具條 + 分頁表格 */
-  const renderRulePanel = (dimension: ScoreDimension, subDimension?: StoreSubDimension) => {
-    const total = getRules(dimension, subDimension)
-    const data = getFilteredRules(dimension, subDimension)
+  const renderRulePanel = (dimension: ScoreDimension) => {
+    const total = getRules(dimension)
+    const data = getFilteredRules(dimension)
     const enabledCount = total.filter(r => r.status === ServiceStatus.ENABLED).length
     return (
       <>
@@ -328,7 +350,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               type="primary"
               icon={<PlusOutlined />}
               style={{ marginLeft: 'auto' }}
-              onClick={() => handleOpenAdd(dimension, subDimension)}
+              onClick={() => handleOpenAdd(dimension)}
             >
               新增配置
             </Button>
@@ -386,8 +408,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         <span style={{ fontSize: 12, color: '#8c8c8c' }}>自然流量按綜合得分高低排名</span>
       </div>
-      {/* 4 個維度權重統計卡（帶計數動畫與 hover 動效） */}
-      <div key={weightTotal} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+      {/* 3 個維度權重統計卡（帶計數動畫與 hover 動效） */}
+      <div key={weightTotal} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
         {DIMENSION_ORDER.map(dimension => {
           const { color, bg } = SCORE_DIMENSION_COLOR[dimension]
           return (
@@ -420,7 +442,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         })}
       </div>
 
-      {/* 維度權重與定時器配置：單行 5 列緊湊佈局 */}
+      {/* 維度權重與定時器配置：單行 4 列緊湊佈局 */}
       <div style={{
         padding: '14px 20px', background: '#fff', border: '1px solid #f0f0f0',
         borderRadius: 8, marginBottom: 16,
@@ -432,7 +454,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             當前合計 {weightTotal}%{weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（需等於 ${DIMENSION_WEIGHT_TOTAL}%）`}
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {DIMENSION_ORDER.map(dimension => (
             <div key={dimension}>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{SCORE_DIMENSION_LABEL[dimension]}</div>
@@ -483,46 +505,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             children: (
               <>
                 {renderDimensionHeader(dimension)}
-                {dimension === ScoreDimension.STORE ? (
-                  <>
-                    {/* 店鋪維度子維度權重 + 子維度切換 */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14,
-                      padding: '10px 16px', background: '#FAFAFA', borderRadius: 8,
-                    }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#262626', whiteSpace: 'nowrap' }}>子維度權重</span>
-                      {STORE_SUB_ORDER.map(sub => (
-                        <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{STORE_SUB_DIMENSION_LABEL[sub]}</span>
-                          <InputNumber
-                            value={storeSubWeight[sub]}
-                            min={0}
-                            max={DIMENSION_WEIGHT_TOTAL}
-                            addonAfter="%"
-                            style={{ width: 120 }}
-                            disabled={readOnly}
-                            onChange={val => setStoreSubWeight(prev => ({ ...prev, [sub]: val ?? 0 }))}
-                          />
-                        </div>
-                      ))}
-                      <span style={{ fontSize: 12, color: storeSubWeightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
-                        合計 {storeSubWeightTotal}%
-                      </span>
-                    </div>
-                    <Segmented
-                      value={activeStoreSub}
-                      style={{ marginBottom: 14 }}
-                      onChange={val => handleStoreSubChange(String(val))}
-                      options={STORE_SUB_ORDER.map(sub => ({
-                        value: sub,
-                        label: `${STORE_SUB_DIMENSION_LABEL[sub]}（${getRules(ScoreDimension.STORE, sub).length}）`,
-                      }))}
-                    />
-                    {renderRulePanel(ScoreDimension.STORE, activeStoreSub)}
-                  </>
-                ) : (
-                  renderRulePanel(dimension)
-                )}
+                {renderRulePanel(dimension)}
               </>
             ),
           }))}
@@ -540,11 +523,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         <div style={{ fontSize: 13, lineHeight: 2, color: '#595959', marginTop: 12 }}>
           <div>1. 自然流量不售賣坑位，同一坑位內所有符合條件的商家<strong>靠綜合得分高低較量排名</strong>，得分越高排序越前。</div>
           <div>2. 綜合得分 = Σ（維度權重 × 該維度得分率），維度得分率 = 該維度啟用項實得分之和 ÷ 啟用項滿分之和。</div>
-          <div>3. 店鋪維度得分率 = 基礎信息得分率 × 基礎信息權重 + 店鋪運營得分率 × 店鋪運營權重。</div>
-          <div>4. 扣分降權項為負分，命中後直接從對應維度得分中扣減；停用的評分項不參與計算，也不計入滿分分母。</div>
-          <div>5. 4 個維度權重合計必須等於 {DIMENSION_WEIGHT_TOTAL}%，店鋪維度下子維度權重合計也必須等於 {DIMENSION_WEIGHT_TOTAL}%。</div>
-          <div>6. 得分由系統按定時器週期重算，同分商家按「店鋪評分 → 近30天訂單量 → 距離」依次比較。</div>
-          <div>7. 系統內置評分項不可刪除，僅可編輯、調整分值與啟用/停用；自定義項可刪除。</div>
+          <div>3. 扣分降權項為負分，命中後直接從對應維度得分中扣減；停用的評分項不參與計算，也不計入滿分分母。</div>
+          <div>4. 3 個維度權重合計必須等於 {DIMENSION_WEIGHT_TOTAL}%。</div>
+          <div>5. 得分由系統按定時器週期重算，同分商家按「店鋪評分 → 近30天訂單量 → 距離」依次比較。</div>
+          <div>6. 系統內置評分項不可刪除，僅可編輯、調整分值與啟用/停用；自定義項可刪除。</div>
         </div>
       </Modal>
 
@@ -564,11 +546,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           <Form.Item label="所屬維度">
             <Input
               disabled
-              value={
-                modalSubDimension !== undefined
-                  ? `${SCORE_DIMENSION_LABEL[modalDimension]} · ${STORE_SUB_DIMENSION_LABEL[modalSubDimension]}`
-                  : SCORE_DIMENSION_LABEL[modalDimension]
-              }
+              value={SCORE_DIMENSION_LABEL[modalDimension]}
             />
           </Form.Item>
           <Form.Item label="評分項名稱" name="name" rules={[{ required: true, message: '請輸入評分項名稱' }]}>
@@ -580,16 +558,46 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           <Form.Item label="計分方式" name="mode" rules={[{ required: true, message: '請選擇計分方式' }]}>
             <Select options={SCORE_MODE_OPTIONS} placeholder="請選擇計分方式" />
           </Form.Item>
-          <Form.Item
-            label="分值"
-            name="score"
-            rules={[{ required: true, message: '請輸入分值' }]}
-            extra={ruleFormMode === ScoreMode.AMOUNT_MULTIPLIER
-              ? '金額倍率方式：此處填倍率值，得分 = 金額 × 倍率（如 2 表示金額×2）'
-              : '加分項填正值，扣分降權項填負值，取值範圍 -100 ~ 100'}
-          >
-            <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder="請輸入分值" />
-          </Form.Item>
+          {!isDeliveryRange(editingRule?.id) && (
+            <Form.Item
+              label="分值"
+              name="score"
+              rules={[{ required: !isDeliveryRange(editingRule?.id), message: '請輸入分值' }]}
+              extra={ruleFormMode === ScoreMode.AMOUNT_MULTIPLIER
+                ? '金額倍率方式：此處填倍率值，得分 = 金額 × 倍率（如 2 表示金額×2）'
+                : '加分項填正值，扣分降權項填負值，取值範圍 -100 ~ 100'}
+            >
+              <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder="請輸入分值" />
+            </Form.Item>
+          )}
+          {isDeliveryRange(editingRule?.id) && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#262626', marginBottom: 8 }}>配送範圍分層分值</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                {RANGE_SCORE_KEYS.map(key => (
+                  <Form.Item
+                    key={key}
+                    label={RANGE_SCORE_LABELS[key]}
+                    name={['rangeScores', key]}
+                    rules={[{ required: true, message: `請輸入${RANGE_SCORE_LABELS[key]}分值` }]}
+                    style={{ marginBottom: 0 }}
+                    initialValue={DEFAULT_RANGE_SCORES[key]}
+                  >
+                    <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder="分值" addonAfter="分" />
+                  </Form.Item>
+                ))}
+              </div>
+            </div>
+          )}
+          {(editingRule ? needsStatDays(editingRule.id) : false) && (
+            <Form.Item
+              label="統計天數"
+              name="statDays"
+              extra="設置後按該天數範圍內數據計算，留空則不限天數"
+            >
+              <InputNumber min={1} max={365} style={{ width: '100%' }} placeholder="如 30" addonAfter="天" />
+            </Form.Item>
+          )}
           <Form.Item
             label="狀態"
             name="status"

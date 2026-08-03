@@ -29,6 +29,8 @@ public class BizSeqService {
     public static final String PREFIX_DETAIL = "MX";
     /** 欠款单 */
     public static final String PREFIX_DEBT = "QK";
+    /** 广告订单 */
+    public static final String PREFIX_AD_ORDER = "GD";
 
     private static final DateTimeFormatter DATE_KEY = DateTimeFormatter.ofPattern("yyyyMMdd");
 

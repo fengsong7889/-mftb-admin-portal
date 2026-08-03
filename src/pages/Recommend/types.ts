@@ -135,6 +135,8 @@ export interface WaterfallSlotConfig {
   updatedBy: string                   // 最后更新人
   updatedAt: string                   // 最后更新时间
   createdAt: string
+  /** 数据来源: api=后端真实数据（id 为负数，真实配置ID = -id），mock=本地演示数据 */
+  source?: 'api' | 'mock'
 }
 
 export interface WaterfallConfig {

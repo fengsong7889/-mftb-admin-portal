@@ -20,6 +20,10 @@ const { RangePicker } = DatePicker
  * 人氣商家 - 購買廣告（皮膚售賣）
  * 對應銷售定價「人氣商家」皮膚定價配置：業務配置多套皮膚（邊框 + 大圖 + 菜品展示佈局）並按天定價，
  * 商家在此選擇皮膚套件 + 購買時長完成下單，購買後 APP 瀑布流店鋪卡片按所選皮膚展示。
+ *
+ * 風格不售賣給商家：一套皮膚可支持多種菜品展示佈局（大圖拼列 / 階梯輪播），
+ * 商家僅選擇大圖模式圖片與邊框風格，具體展示哪種佈局、在瀑布流第幾個位置展示，
+ * 由系統配置瀑布流策略時決定，商家不可選擇。
  */
 
 /** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 */
@@ -103,8 +107,8 @@ interface SaleSkin {
   borderColor?: string
   /** 皮膚主色漸變（大圖模式左側主圖示意） */
   tagBg: string
-  /** 菜品展示佈局（同定價配置，商家選擇） */
-  dishLayout: DishLayout
+  /** 該皮膚支持的菜品展示佈局（平台配置，由系統瀑布流策略自動分配，商家不可選擇） */
+  dishLayouts: DishLayout[]
   /** 賣點描述 */
   desc: string
   /** 已售套數（氛圍數據） */
@@ -119,51 +123,51 @@ const posterSlogan = (skinId: number) => POSTER_SLOGANS[skinId % POSTER_SLOGANS.
 const SALE_SKINS: SaleSkin[] = [
   {
     id: 1, name: '紅運當頭', pricePerDay: 28, borderType: 'color', borderColor: '#FF4D4F',
-    tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', desc: '喜慶紅框，節慶檔期首選', sold: 386, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', desc: '喜慶紅框，節慶檔期首選', sold: 386, dishLayouts: ['grid'],
   },
   {
     id: 2, name: '橙意滿滿', pricePerDay: 18, borderType: 'color', borderColor: '#E8720C',
-    tagBg: 'linear-gradient(135deg, #E8720C, #F59432)', desc: '品牌橙框，醒目聚焦高轉化', sold: 512, dishLayout: 'carousel',
+    tagBg: 'linear-gradient(135deg, #E8720C, #F59432)', desc: '品牌橙框，醒目聚焦高轉化', sold: 512, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 3, name: '紫氣東來', pricePerDay: 22, borderType: 'color', borderColor: '#722ED1',
-    tagBg: 'linear-gradient(135deg, #722ED1, #9254DE)', desc: '高級紫框，品質商家氛圍感', sold: 208, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #722ED1, #9254DE)', desc: '高級紫框，品質商家氛圍感', sold: 208, dishLayouts: ['grid'],
   },
   {
     id: 4, name: '簡約無框', pricePerDay: 8, borderType: 'none',
-    tagBg: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', desc: '無邊框輕量款，入門首選', sold: 655, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', desc: '無邊框輕量款，入門首選', sold: 655, dishLayouts: ['grid'],
   },
   {
     id: 5, name: '金碧輝煌', pricePerDay: 32, borderType: 'color', borderColor: '#FAAD14',
-    tagBg: 'linear-gradient(135deg, #FAAD14, #FFC53D)', desc: '土豪金框，旺鋪氣場拉滿', sold: 173, dishLayout: 'carousel',
+    tagBg: 'linear-gradient(135deg, #FAAD14, #FFC53D)', desc: '土豪金框，旺鋪氣場拉滿', sold: 173, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 6, name: '碧海藍天', pricePerDay: 20, borderType: 'color', borderColor: '#1890FF',
-    tagBg: 'linear-gradient(135deg, #1890FF, #40A9FF)', desc: '清爽藍框，飲品甜品百搭', sold: 294, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #1890FF, #40A9FF)', desc: '清爽藍框，飲品甜品百搭', sold: 294, dishLayouts: ['grid'],
   },
   {
     id: 7, name: '翠綠生機', pricePerDay: 20, borderType: 'color', borderColor: '#52C41A',
-    tagBg: 'linear-gradient(135deg, #52C41A, #73D13D)', desc: '健康綠框，輕食沙拉首選', sold: 231, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #52C41A, #73D13D)', desc: '健康綠框，輕食沙拉首選', sold: 231, dishLayouts: ['grid'],
   },
   {
     id: 8, name: '青峰翡翠', pricePerDay: 24, borderType: 'color', borderColor: '#13C2C2',
-    tagBg: 'linear-gradient(135deg, #13C2C2, #36CFC9)', desc: '青碧色框，清新耳目一新', sold: 156, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #13C2C2, #36CFC9)', desc: '青碧色框，清新耳目一新', sold: 156, dishLayouts: ['grid'],
   },
   {
     id: 9, name: '粉黛甜心', pricePerDay: 26, borderType: 'color', borderColor: '#EB2F96',
-    tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayout: 'carousel',
+    tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayouts: ['carousel'],
   },
   {
     id: 10, name: '暗夜黑金', pricePerDay: 30, borderType: 'color', borderColor: '#8B6D3B',
-    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayout: 'grid',
+    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayouts: ['grid'],
   },
   {
     id: 11, name: '橘光暮色', pricePerDay: 25, borderType: 'color', borderColor: '#FA541C',
-    tagBg: 'linear-gradient(135deg, #FA541C, #FF7A45)', desc: '暮色橘框，宵夜燒烤氛圍感', sold: 267, dishLayout: 'carousel',
+    tagBg: 'linear-gradient(135deg, #FA541C, #FF7A45)', desc: '暮色橘框，宵夜燒烤氛圍感', sold: 267, dishLayouts: ['carousel'],
   },
   {
     id: 12, name: '極光幻彩', pricePerDay: 36, borderType: 'color', borderColor: '#2F54EB',
-    tagBg: 'linear-gradient(135deg, #2F54EB, #722ED1)', desc: '幻彩漸變框，旗艦頂級曝光款', sold: 95, dishLayout: 'carousel',
+    tagBg: 'linear-gradient(135deg, #2F54EB, #722ED1)', desc: '幻彩漸變框，旗艦頂級曝光款', sold: 95, dishLayouts: ['grid', 'carousel'],
   },
 ]
 
@@ -243,6 +247,8 @@ export default function PopularSkinPicker() {
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   // 階梯輪播餐品指針（同定價預覽）：current 為當前張，prev 為正在向左滑出的上一張
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
+  // 大圖模式預覽風格指針：皮膚支持多種佈局時每 3 秒自動輪換，模擬系統隨機分配效果
+  const [previewLayoutIndex, setPreviewLayoutIndex] = useState(0)
 
   const selectedSkin = SALE_SKINS.find(s => s.id === selectedSkinId) || null
   const selectedStore = MOCK_STORES.find(s => s.id === searchStoreName) || null
@@ -267,13 +273,23 @@ export default function PopularSkinPicker() {
     ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（自選${customDates.length}天）`
     : '未選擇'
 
-  // 階梯輪播預覽：所選皮膚為階梯輪播佈局時逐張輪播，切換皮膚時重置
+  // 階梯輪播預覽：所選皮膚支持階梯輪播佈局時逐張輪播，切換皮膚時重置
   useEffect(() => {
-    if (!selectedSkin || selectedSkin.dishLayout !== 'carousel') return
+    if (!selectedSkin || !selectedSkin.dishLayouts.includes('carousel')) return
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
     }, 2200)
+    return () => clearInterval(timer)
+  }, [selectedSkin])
+
+  // 大圖模式風格自動輪換預覽：支持多種佈局時每 3 秒切換一種，點擊風格標籤可手動定位
+  useEffect(() => {
+    setPreviewLayoutIndex(0)
+    if (!selectedSkin || selectedSkin.dishLayouts.length <= 1) return
+    const timer = setInterval(() => {
+      setPreviewLayoutIndex(i => (i + 1) % selectedSkin.dishLayouts.length)
+    }, 3000)
     return () => clearInterval(timer)
   }, [selectedSkin])
 
@@ -573,8 +589,12 @@ export default function PopularSkinPicker() {
         <div style={{ flex: 1, minWidth: 0 }}>
           {previewInfoRows(13)}
           {previewTagsRow()}
-          {/* 菜品展示區：按皮膚配置的佈局展示（大圖拼列 / 階梯輪播） */}
-          {skin.dishLayout === 'grid' ? renderDishGridMini() : renderDishCarouselMini()}
+          {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
+          {(() => {
+            const layout = skin.dishLayouts[Math.min(previewLayoutIndex, skin.dishLayouts.length - 1)]
+            if (!layout) return null
+            return layout === 'grid' ? renderDishGridMini() : renderDishCarouselMini()
+          })()}
         </div>
       </div>
     </div>
@@ -675,6 +695,8 @@ export default function PopularSkinPicker() {
                     <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>☁️ 同一門店同一時段僅可生效一套皮膚</span>
                     <span style={{ color: '#FFD591' }}>|</span>
                     <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>🔄 到期後自動恢復默認樣式，可隨時續購</span>
+                    <span style={{ color: '#FFD591' }}>|</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>🧩 大圖模式菜品佈局由系統按瀑布流策略自動分配，無需選擇</span>
                   </div>
                 </div>
               }
@@ -712,12 +734,14 @@ export default function PopularSkinPicker() {
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>{skin.name}</span>
                       </div>
-                      {/* 菜品展示佈局（同定價配置）+ 已售 + 價格 */}
+                      {/* 支持的菜品展示佈局（系統自動分配，商家不可選擇）+ 已售 + 價格 */}
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-                        <span style={{
-                          fontSize: 9, color: '#595959', background: '#F0F0F0', borderRadius: 3,
-                          padding: '1px 5px', flexShrink: 0,
-                        }}>{DISH_LAYOUT_LABEL[skin.dishLayout]}</span>
+                        {skin.dishLayouts.map(l => (
+                          <span key={l} style={{
+                            fontSize: 9, color: '#595959', background: '#F0F0F0', borderRadius: 3,
+                            padding: '1px 5px', flexShrink: 0,
+                          }}>{DISH_LAYOUT_LABEL[l]}</span>
+                        ))}
                         <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>🔥已售{skin.sold}套</span>
                         <div style={{ flex: 1 }} />
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#FF4D4F' }}>${skin.pricePerDay}</span>
@@ -930,8 +954,31 @@ export default function PopularSkinPicker() {
                 <div>
                   <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>小圖模式</div>
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
-                  <div style={{ fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px' }}>大圖模式</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '12px 0 6px' }}>
+                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>大圖模式</span>
+                    {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
+                    {selectedSkin.dishLayouts.length > 1 && selectedSkin.dishLayouts.map((l, idx) => {
+                      const isActive = idx === Math.min(previewLayoutIndex, selectedSkin.dishLayouts.length - 1)
+                      return (
+                        <span
+                          key={l}
+                          onClick={() => setPreviewLayoutIndex(idx)}
+                          style={{
+                            fontSize: 10, cursor: 'pointer', borderRadius: 3, padding: '1px 6px', lineHeight: '16px',
+                            color: isActive ? '#E8720C' : '#8C8C8C',
+                            background: isActive ? '#FFF7E6' : '#F0F0F0',
+                            border: `1px solid ${isActive ? '#E8720C' : 'transparent'}`,
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          }}
+                        >{DISH_LAYOUT_LABEL[l]}</span>
+                      )
+                    })}
+                  </div>
                   {renderWaterfallCompare(renderSkinBigPreview(selectedSkin))}
+                  {/* 風格分配說明：消除商家對固定展示風格的誤解 */}
+                  <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
+                    💡 大圖模式風格由系統隨機分配，在皮膚支持的風格間自動切換展示，商家無需選擇；在瀑布流第幾個位置以大圖模式展示，同樣由系統策略決定
+                  </div>
                 </div>
               ) : (
                 <Empty description="請先選擇皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />

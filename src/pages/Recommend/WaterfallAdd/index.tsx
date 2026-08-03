@@ -32,6 +32,18 @@ import {
 } from '../constants'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
+import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, withAdFallback, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest } from '../../../api/adPromotion'
+
+/** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
+function parseJsonList(json?: string): Record<string, unknown>[] {
+  if (!json) return []
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
 
 /** 算法类型图标 */
 const TYPE_ICON: Record<number, string> = {
@@ -260,6 +272,11 @@ function WaterfallAddGeneral() {
   
   // 广告位选择（已移除展示位置）
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
+
+  // 可选算法列表（后端可用时用算法库真实数据，否则用演示数据）
+  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType }[]>(
+    ALGORITHM_OPTIONS.map(a => ({ id: a.id, name: a.name, app: a.app })),
+  )
   
   // 区域计价配置
   const [selectedRegions, setSelectedRegions] = useState<Region[]>([])
@@ -322,10 +339,29 @@ function WaterfallAddGeneral() {
     }
   }, [urlAlgorithmType, form])
 
-  // 编辑/详情模式下加载数据
+  /** 加载启用中的算法库，作为算法下拉选项 */
   useEffect(() => {
-    if (urlId) {
-      // Mock: 根据 id 加载数据（从 Waterfall 页面的 mockData 结构映射）
+    void withAdFallback(
+      async () => {
+        const res = await fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED })
+        const opts = (res.records ?? []).map(a => ({
+          id: a.id ?? 0,
+          name: a.algoName,
+          app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
+        }))
+        if (opts.length > 0) setAlgorithmSelectOptions(opts)
+      },
+      () => { /* 后端不可用：保留演示选项 */ },
+    ).catch(() => { /* 静默请求：错误不阻断页面 */ })
+  }, [])
+
+  // 编辑/详情模式下加载数据（无敌星星接入后端计价详情，后端不可用时降级演示数据）
+  useEffect(() => {
+    if (!urlId) return
+    const isStar = (urlAlgorithmType ?? AlgorithmType.INVINCIBLE_STAR) === AlgorithmType.INVINCIBLE_STAR
+
+    /** 演示数据回填（原有 mock 逻辑） */
+    const loadMock = () => {
       const mockRecord = {
         id: Number(urlId),
         algorithmId: 1,
@@ -370,6 +406,55 @@ function WaterfallAddGeneral() {
       setSelectedRegions([Region.KOKSAA])
       setRegionPricingConfigs([mockRegionConfig])
     }
+
+    if (!isStar) {
+      loadMock()
+      return
+    }
+    void withAdFallback(
+      async () => {
+        const detail = await fetchAdPricingDetail(Number(urlId))
+        const app = (brandToAppType(detail.brand) ?? AppType.SHANFENG) as AppType
+        form.setFieldsValue({
+          algorithmId: detail.algoId,
+          app,
+          channel: detail.channel,
+        })
+        setSelectedApp(app)
+        setSelectedChannel((detail.channel ?? RecommendChannel.DELIVERY) as RecommendChannel)
+        setSelectedAlgorithmType(AlgorithmType.INVINCIBLE_STAR)
+        setSelectedAlgorithmInfo({ id: detail.algoId, name: detail.algoName || '' })
+        setPresaleDays(detail.presaleDays ?? 7)
+        setRefundEnabled(detail.refundEnabled === 1)
+        setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
+        // 多时段梯度折扣（后端百分比记法 → 前端「折」记法）
+        const tiers = parseJsonList(detail.discountTiers)
+        setGradients(tiers.map(t => ({ count: Number(t.minSlots) || 0, discount: (Number(t.discount) || 0) / 10 })))
+        setGradientEnabled(tiers.length > 0)
+        // 取消扣费梯度
+        const fees = parseJsonList(detail.cancelFeeTiers)
+        if (fees.length > 0) {
+          setCancelFeeRules(fees.map((f, i) => ({ id: i + 1, maxDays: Number(f.remainDays) || 0, feePercent: Number(f.ratio) || 0 })))
+        }
+        // 分商圈日单价（按 5 餐段拆分展示）
+        const configs: RegionPricingConfig[] = (detail.regionPrices ?? []).map(rp => {
+          const price = Number(rp.dailyPrice) || 0
+          return {
+            region: rp.region as Region,
+            regionLabel: REGION_OPTIONS.find(o => o.value === rp.region)?.label ?? String(rp.region),
+            pricing: { fullDay: price, breakfast: price / 5, lunch: price / 5, afternoon: price / 5, dinner: price / 5, night: price / 5 },
+            discountEnabled: false,
+            discounts: {},
+            limitedTimeDiscount: false,
+            discountDateRange: undefined,
+            dailySalesLimit: 2,
+          }
+        })
+        setSelectedRegions(configs.map(c => c.region))
+        setRegionPricingConfigs(configs)
+      },
+      loadMock,
+    ).catch(() => { /* 静默请求：错误不阻断页面 */ })
   }, [urlId, urlAlgorithmType, form])
 
   // 自定义美化 Switch
@@ -618,12 +703,48 @@ function WaterfallAddGeneral() {
     }
   }
 
-  // 提交表单
+  // 提交表单（无敌星星写入后端计价配置，后端不可用时降级为本地提示）
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
       setLoading(true)
-      
+
+      if (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR) {
+        const algoId = (selectedAlgorithmInfo?.id ?? values.algorithmId) as number | undefined
+        if (!algoId) {
+          message.error('請選擇算法')
+          return
+        }
+        const payload: AdPricingStarRequest = {
+          algoId,
+          brand: appTypeToBrand(selectedApp),
+          channel: selectedChannel,
+          presaleDays,
+          refundEnabled: refundEnabled ? 1 : 2,
+          // 「折」记法 → 后端百分比记法（6折 = 60）
+          discountTiers: gradientEnabled
+            ? gradients.filter(g => g.count > 0).map(g => ({ minSlots: g.count, discount: Math.round(g.discount * 10) }))
+            : [],
+          cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
+          blockMerchant: 2,
+          status,
+          regionPrices: regionPricingConfigs.map(c => {
+            const slots = ['breakfast', 'lunch', 'afternoon', 'dinner', 'night']
+            const sum = slots.reduce((acc, k) => acc + (c.pricing[k] ?? 0), 0)
+            return { region: c.region, dailyPrice: c.pricing.fullDay ?? sum }
+          }),
+        }
+        await withAdFallback(
+          () => isEditMode
+            ? updateAdPricing(Number(urlId), payload)
+            : createAdPricing(payload),
+          () => Promise.resolve({ algoId, presaleDays } as unknown as AdPricingStar),
+        )
+        message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
+        navigate('/promotion-waterfall')
+        return
+      }
+
       const submitData = {
         app: selectedApp,
         channel: selectedChannel,
@@ -641,12 +762,15 @@ function WaterfallAddGeneral() {
         gradients,
         status,
       }
-      
+
       console.log('提交數據:', submitData)
       message.success('新增成功')
       navigate('/promotion-waterfall')
     } catch (error) {
-      console.error('表單驗證失敗:', error)
+      // 表单校验失败不提示（antd 已标红），接口业务错误提示后端返回信息
+      if (error instanceof Error) {
+        message.error(error.message || '保存失敗')
+      }
     } finally {
       setLoading(false)
     }
@@ -784,16 +908,19 @@ function WaterfallAddGeneral() {
                   placeholder="請選擇算法"
                   showSearch
                   optionFilterProp="label"
-                  options={ALGORITHM_OPTIONS.map(alg => ({
+                  options={algorithmSelectOptions.map(alg => ({
                     label: alg.name,
                     value: alg.id,
                   }))}
                   onChange={(value) => {
-                    // 根据算法自动带出所属品牌
-                    const selectedAlg = ALGORITHM_OPTIONS.find(alg => alg.id === value)
-                    if (selectedAlg?.app) {
-                      form.setFieldsValue({ app: selectedAlg.app })
-                      setSelectedApp(selectedAlg.app)
+                    // 根据算法自动带出所属品牌，并记录选中算法信息
+                    const selectedAlg = algorithmSelectOptions.find(alg => alg.id === value)
+                    if (selectedAlg) {
+                      setSelectedAlgorithmInfo({ id: selectedAlg.id, name: selectedAlg.name })
+                      if (selectedAlg.app) {
+                        form.setFieldsValue({ app: selectedAlg.app })
+                        setSelectedApp(selectedAlg.app)
+                      }
                     }
                   }}
                 />

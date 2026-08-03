@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker, Tabs } from 'antd'
 const { RangePicker } = DatePicker
 import type { ColumnsType } from 'antd/es/table'
@@ -20,6 +20,7 @@ import {
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
 import { mockAlgorithmData } from '../Algorithm'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, withAdFallback, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
 
@@ -244,6 +245,27 @@ const generateMockData = (): WaterfallSlotConfig[] => {
 
 const mockData: WaterfallSlotConfig[] = generateMockData()
 
+/** 後端計價配置 → 定價列表行（id 取負數以避免與 mock 衝突，真實配置ID = -id） */
+const toPricingRow = (vo: AdPricingStar): WaterfallSlotConfig => ({
+  id: -(vo.id ?? 0),
+  adId: `PR${String(vo.id ?? 0).padStart(6, '0')}`,
+  promotionName: vo.algoName || '-',
+  app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
+  channel: (vo.channel ?? RecommendChannel.DELIVERY) as RecommendChannel,
+  bizChannel: vo.channel === RecommendChannel.GROUP_BUY ? 'groupBuy' : vo.channel === RecommendChannel.SUPERMARKET ? 'supermarket' : 'food',
+  slotPosition: 0,
+  algorithmId: vo.algoId,
+  algorithmName: vo.algoName || '-',
+  algorithmType: AlgorithmType.INVINCIBLE_STAR,
+  merchantLimit: 'unlimited',
+  regionLimit: 'unlimited',
+  status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
+  updatedBy: vo.updatedBy || '-',
+  updatedAt: vo.updatedAt ? String(vo.updatedAt).replace('T', ' ').slice(0, 19) : '-',
+  createdAt: vo.createdAt ? String(vo.createdAt).replace('T', ' ').slice(0, 19) : '-',
+  source: 'api',
+})
+
 export default function Waterfall() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -251,6 +273,7 @@ export default function Waterfall() {
   const [searchForm] = Form.useForm()
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(urlType) // null = 卡片选择页
   const [bizTypeTab, setBizTypeTab] = useState<string>('delivery') // 外賣到家 / 團購到店
+  const [dataList, setDataList] = useState<WaterfallSlotConfig[]>(mockData)
   const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>(mockData)
   const [modalVisible, setModalVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -265,10 +288,35 @@ export default function Waterfall() {
   // 各算法类型对应的记录数
   const typeCountMap = useMemo(() => {
     const map: Record<number, number> = {}
-    mockData.forEach(item => {
+    dataList.forEach(item => {
       map[item.algorithmType] = (map[item.algorithmType] || 0) + 1
     })
     return map
+  }, [dataList])
+
+  /** 加載定價列表（無敵星星接入後端真實數據，後端不可用時降級到本地演示數據） */
+  useEffect(() => {
+    let mounted = true
+    void withAdFallback(
+      async () => {
+        const res = await fetchAdPricingList({ page: 1, size: 200 })
+        const realRows = (res.records ?? []).map(toPricingRow)
+        // 後端可用時，無敵星星定價以真實數據為準，其他類型暫保留演示數據
+        return [...realRows, ...mockData.filter(m => m.algorithmType !== AlgorithmType.INVINCIBLE_STAR)]
+      },
+      () => mockData,
+    ).then(list => {
+      if (!mounted) return
+      setDataList(list)
+      if (urlType != null) {
+        const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
+        setFilteredData(list.filter(item => item.algorithmType === urlType && allowed.includes(item.bizChannel ?? '')))
+      } else {
+        setFilteredData(list)
+      }
+    })
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 业务频道选项（根据业务类型过滤）
@@ -283,14 +331,14 @@ export default function Waterfall() {
   const handleSelectType = (type: AlgorithmType) => {
     setSelectedAlgorithmType(type)
     const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
-    setFilteredData(mockData.filter(item => item.algorithmType === type && allowed.includes(item.bizChannel ?? '')))
+    setFilteredData(dataList.filter(item => item.algorithmType === type && allowed.includes(item.bizChannel ?? '')))
     searchForm.resetFields()
   }
 
   // 返回卡片选择页
   const handleBackToCards = () => {
     setSelectedAlgorithmType(null)
-    setFilteredData(mockData)
+    setFilteredData(dataList)
     searchForm.resetFields()
   }
   
@@ -305,9 +353,9 @@ export default function Waterfall() {
   
   // 搜索处理
   const handleSearch = (values: any) => {
-    // 基礎範圍：當前選中的廣告類型 + 當前業務類型（tab）允許的業務频道
+    // 基礎範圍：當前選中的廣告類型 + 當前業務類型（tab）允許的業務頻道
     const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
-    let result = mockData.filter(item =>
+    let result = dataList.filter(item =>
       (selectedAlgorithmType == null || item.algorithmType === selectedAlgorithmType) &&
       allowed.includes(item.bizChannel ?? '')
     )
@@ -344,7 +392,7 @@ export default function Waterfall() {
   const handleReset = () => {
     searchForm.resetFields()
     const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
-    setFilteredData(mockData.filter(item =>
+    setFilteredData(dataList.filter(item =>
       (selectedAlgorithmType == null || item.algorithmType === selectedAlgorithmType) &&
       allowed.includes(item.bizChannel ?? '')
     ))
@@ -393,10 +441,21 @@ export default function Waterfall() {
   const handleDelete = (record: WaterfallSlotConfig) => {
     Modal.confirm({
       title: '確認刪除',
-      content: `確定要刪除位置${record.slotPosition}的配置嗎？`,
+      content: `確定要刪除「${record.promotionName || `位置${record.slotPosition}`}」的定價配置嗎？`,
       okText: '確定',
       cancelText: '取消',
-      onOk: () => {
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        if (record.source === 'api') {
+          try {
+            await deleteAdPricing(-record.id)
+          } catch (err) {
+            message.error((err as Error).message || '刪除失敗')
+            return
+          }
+          setDataList(prev => prev.filter(item => item.id !== record.id))
+          setFilteredData(prev => prev.filter(item => item.id !== record.id))
+        }
         message.success('刪除成功')
       },
     })
@@ -406,13 +465,23 @@ export default function Waterfall() {
   const handleToggleStatus = (record: WaterfallSlotConfig) => {
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
     const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
-    
+
     Modal.confirm({
       title: `確認${actionText}`,
-      content: `確定要${actionText}位置${record.slotPosition}的配置嗎？`,
+      content: `確定要${actionText}「${record.promotionName || `位置${record.slotPosition}`}」的定價配置嗎？`,
       okText: '確定',
       cancelText: '取消',
-      onOk: () => {
+      onOk: async () => {
+        if (record.source === 'api') {
+          try {
+            await updateAdPricingStatus(-record.id, newStatus)
+          } catch (err) {
+            message.error((err as Error).message || `${actionText}失敗`)
+            return
+          }
+          setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+          setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+        }
         message.success(`${actionText}成功`)
       },
     })
@@ -509,14 +578,14 @@ export default function Waterfall() {
           <Button 
             type="link" 
             size="small" 
-            onClick={() => navigate(`/promotion-waterfall-add?id=${record.id}&mode=detail&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
+            onClick={() => navigate(`/promotion-waterfall-add?id=${record.source === 'api' ? -record.id : record.id}&mode=detail&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
             詳情
           </Button>
           <Button 
             type="link" 
             size="small" 
-            onClick={() => navigate(`/promotion-waterfall-add?id=${record.id}&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
+            onClick={() => navigate(`/promotion-waterfall-add?id=${record.source === 'api' ? -record.id : record.id}&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
             編輯
           </Button>

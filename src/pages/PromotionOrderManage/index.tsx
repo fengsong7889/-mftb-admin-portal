@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
 import BrandTag from '../../components/BrandTag'
+import { fetchAdOrders, withAdFallback, brandToAppType, type AdOrder } from '../../api/adPromotion'
 const { RangePicker } = DatePicker
 import {
   SearchOutlined,
@@ -164,6 +165,41 @@ interface OrderItem {
   status: OrderStatus
   orderTime: string
   payTime?: string
+  /** 数据来源：api=后端真实数据 mock=演示数据 */
+  source?: 'api' | 'mock'
+}
+
+/** 后端订单 → 列表行（id 使用订单号，与详情页跳转对齐） */
+function toOrderItem(vo: AdOrder): OrderItem {
+  const channelMap: Record<number, RecommendChannel> = {
+    2: RecommendChannel.DELIVERY,
+    3: RecommendChannel.SUPERMARKET,
+    4: RecommendChannel.GROUP_BUY,
+  }
+  const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  return {
+    id: vo.orderNo,
+    orderNo: vo.orderNo,
+    promotionName: vo.algoName,
+    app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
+    channel: channelMap[vo.channel ?? 2] ?? RecommendChannel.DELIVERY,
+    region: [],
+    recommendType: vo.algoType as RecommendType,
+    slotPosition: 0,
+    groupId: vo.groupCode,
+    groupName: vo.groupName || '-',
+    storeId: vo.storeCode || '-',
+    storeName: vo.storeName || '-',
+    mealSlots: vo.itemCount ? [`${vo.itemCount} 個時段`] : [],
+    purchaseDate: (vo.orderTime || '').slice(0, 10),
+    originalPrice: vo.originalAmount,
+    discountPrice: vo.originalAmount - vo.discountAmount,
+    actualPrice: vo.actualAmount,
+    status: vo.status as OrderStatus,
+    orderTime: fmt(vo.orderTime),
+    payTime: vo.payTime ? fmt(vo.payTime) : undefined,
+    source: 'api',
+  }
 }
 
 // Mock 订单数据（15条）
@@ -502,6 +538,23 @@ export default function PromotionOrderManage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const orderType = searchParams.get('type') || ''
+  const fromSource = searchParams.get('from') || ''
+
+  // 订单数据：后端可用时无敵星星以真实数据为准，其他类型保留演示数据
+  const [orders, setOrders] = useState<OrderItem[]>(mockOrders)
+  const loadOrders = () => {
+    withAdFallback(() => fetchAdOrders({ page: 1, size: 200 }), () => null)
+      .then(res => {
+        if (!res) return
+        const realRows = res.records.map(toOrderItem)
+        const mockRows = mockOrders.filter(o => o.recommendType !== RecommendType.INVINCIBLE_STAR)
+        setOrders([...realRows, ...mockRows])
+      })
+      .catch(() => {})
+  }
+  useEffect(() => {
+    loadOrders()
+  }, [])
 
   const [filters, setFilters] = useState({
     orderNo: '',
@@ -517,7 +570,7 @@ export default function PromotionOrderManage() {
 
   // 根据 orderType 过滤对应类型的订单
   const filteredOrders = useMemo(() => {
-    return mockOrders.filter(order => {
+    return orders.filter(order => {
       // 按URL参数中的订单类型过滤
       if (orderType) {
         const typeName = RECOMMEND_TYPE_LABEL[order.recommendType]
@@ -550,7 +603,7 @@ export default function PromotionOrderManage() {
       }
       return true
     })
-  }, [filters, orderType])
+  }, [filters, orderType, orders])
 
   // 列配置元数据
   const columnMeta = useMemo(() => [
@@ -758,7 +811,7 @@ export default function PromotionOrderManage() {
       width: 100,
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" size="small" >
+        <Button type="link" size="small" onClick={() => navigate(`/order-detail?id=${record.id}&type=${encodeURIComponent(orderType)}${fromSource ? `&from=${encodeURIComponent(fromSource)}` : ''}`)}>
           查看詳情
         </Button>
       ),
@@ -937,7 +990,7 @@ export default function PromotionOrderManage() {
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
-                <Button type="primary" icon={<SearchOutlined />}>
+                <Button type="primary" icon={<SearchOutlined />} onClick={loadOrders}>
                   查詢
                 </Button>
                 <Button onClick={handleReset}>重置</Button>

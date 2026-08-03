@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS, CONTROLLED_MENU_KEYS } from '../pages/Permission/types'
-import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, resetUnauthorizedGuard } from '../api'
+import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, resetUnauthorizedGuard, isBackendUnavailable } from '../api'
 
 export interface UserInfo {
   username: string
@@ -151,19 +151,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('user_info', JSON.stringify(mappedUser))
       return { success: true }
     } catch (err) {
-      // 后端不可用时（如部署在 GitHub Pages 无后端环境），降级到前端 Mock 登录
-      const fallback = mockLogin(username, password)
-      if (fallback.success) {
-        setIsAuthenticated(true)
-        setUser(fallback.user!)
-        resetUnauthorizedGuard()
-        localStorage.setItem('is_authenticated', 'true')
-        localStorage.setItem('user_info', JSON.stringify(fallback.user))
-        // Mock 模式不写入真实 Token，仅写入标志位避免下次再调后端
-        localStorage.setItem(TOKEN_KEY, 'mock-token')
-        return { success: true }
+      // 仅在后端真正不可用（网络异常 / 404 / 5xx，如纯静态部署无后端）时才降级 Mock 登录；
+      // 后端返回的业务错误（账号或密码错误 / 账号不存在等）必须如实提示，
+      // 否则错误密码会走 Mock 通道“登录成功”，mock-token 会导致后续所有接口 401，反复被登出回登录页
+      if (isBackendUnavailable(err)) {
+        const fallback = mockLogin(username, password)
+        if (fallback.success) {
+          setIsAuthenticated(true)
+          setUser(fallback.user!)
+          resetUnauthorizedGuard()
+          localStorage.setItem('is_authenticated', 'true')
+          localStorage.setItem('user_info', JSON.stringify(fallback.user))
+          // Mock 模式不写入真实 Token，仅写入标志位避免下次再调后端
+          localStorage.setItem(TOKEN_KEY, 'mock-token')
+          return { success: true }
+        }
+        return { success: false, message: fallback.message }
       }
-      const msg = fallback.message || (err instanceof Error ? err.message : '登錄失敗')
+      const msg = err instanceof Error && err.message ? err.message : '登錄失敗'
       return { success: false, message: msg }
     }
   }, [])
