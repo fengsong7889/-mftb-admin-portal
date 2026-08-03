@@ -47,14 +47,15 @@
   opacity: 1;
 }
 
-/* ========== 閑置躲入邊框（只露頭部探出） ========== */
-/* 傾斜 45° 躲入：躲左邊框時頭斜朝右上、躲右邊框時頭斜朝左上，露出頭部探出（角度需與 TSX 的 DOCK_TILT_DEG 保持一致） */
-.pet-mascot-wrapper.docked-left {
-  transform: rotate(45deg);
-}
-
+/* ========== 閑置躲藏（僅在右側或底部躲藏，只露一點頭） ========== */
+/* 傾斜 45° 躲入右邊框：頭斜朝左上，露出頭部探出（角度需與 TSX 的 DOCK_TILT_DEG 保持一致） */
 .pet-mascot-wrapper.docked-right {
   transform: rotate(-45deg);
+}
+
+/* 貼下邊緣躲藏：不旋轉，僅露出頭頂 */
+.pet-mascot-wrapper.docked-bottom {
+  transform: none;
 }
 
 .pet-mascot-wrapper.docked {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, StarFilled } from '@ant-design/icons'
 import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
 import { mockAlgorithmData } from './Algorithm/index'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
@@ -39,6 +39,15 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.GOLDEN_SIGNBOARD]: '🏅',
   [AlgorithmType.PRODUCT_PROMO]: '🎯',
 }
+
+/** 猜你喜歡：評價檔位（對應 APP 評價界面 1~5 星），正數加分、負數減分 */
+const RATING_LEVELS = [
+  { stars: 1, label: '非常差', color: '#FF4D4F', fieldName: 'reviewScore1', defaultScore: -5 },
+  { stars: 2, label: '差', color: '#FAAD14', fieldName: 'reviewScore2', defaultScore: -3 },
+  { stars: 3, label: '一般', color: '#8C8C8C', fieldName: 'reviewScore3', defaultScore: 0 },
+  { stars: 4, label: '滿意', color: '#52C41A', fieldName: 'reviewScore4', defaultScore: 3 },
+  { stars: 5, label: '非常滿意', color: '#E8720C', fieldName: 'reviewScore5', defaultScore: 5 },
+]
 
 /** 店鋪等級配置（獨家商家保障單量 / 品牌商家保障流量共用）：等級 / 標籤 / 標籤色 / 默認值 */
 const STORE_LEVEL_BLOCK_OPTIONS = [
@@ -376,7 +385,7 @@ export default function AlgorithmAdd() {
             <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>用戶興趣得分規則</div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
-                按用戶行為對店鋪累計興趣得分（用戶 × 店鋪 維度）：收藏、下單分別加分；得分按滾動窗口計算，超過有效期的行為分數自動失效
+                按用戶行為對店鋪累計興趣得分（用戶 × 店鋪 維度）：收藏、下單分別加分；差評對應減分；得分按滾動窗口計算，超過有效期的行為分數自動失效
               </div>
 
               {/* 收藏店鋪得分 */}
@@ -392,21 +401,54 @@ export default function AlgorithmAdd() {
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>（店鋪僅有收藏 / 取消收藏兩種狀態，收藏態計分一次，不重複叠加）</span>
               </div>
 
-              {/* 下單店鋪得分 */}
+              {/* 下單店鋪得分（不區分訂單類型） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>下單店鋪得分:</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>用戶每完成一筆訂單 +</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>用戶每下一筆訂單 +</span>
                 <Form.Item name="orderScore" noStyle initialValue={10} rules={[{ required: true, message: '請輸入' }]}>
                   <InputNumber min={1} max={100} precision={0} style={{ width: 80 }} addonAfter="分" disabled={isDetailMode} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>計算訂單類型:</span>
-                <Form.Item name="likeOrderTypeDelivery" noStyle valuePropName="checked" initialValue={true}>
-                  <Checkbox disabled={isDetailMode}>配送訂單</Checkbox>
-                </Form.Item>
-                <Form.Item name="likeOrderTypePickup" noStyle valuePropName="checked" initialValue={true}>
-                  <Checkbox disabled={isDetailMode}>自取訂單</Checkbox>
-                </Form.Item>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（僅統計已完成訂單，退款/取消訂單不計分）</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（用戶下單即代表喜歡該店鋪，不區分配送 / 自取等訂單類型）</span>
+              </div>
+
+              {/* 訂單評價得分（五檔星級加減分，卡片樣式與品牌商家「店鋪等級保障流量」一致） */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0, paddingTop: 34 }}>訂單評價得分:</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                    {RATING_LEVELS.map(({ stars, label, color, fieldName, defaultScore }) => (
+                      <div key={stars} style={{
+                        background: '#fff',
+                        border: `1px solid ${color}33`,
+                        borderTop: `3px solid ${color}`,
+                        borderRadius: 8,
+                        padding: '12px 12px 14px',
+                        textAlign: 'center',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                          <span style={{
+                            padding: '0 12px', height: 24, lineHeight: '24px', borderRadius: 12,
+                            fontSize: 13, fontWeight: 700, color: '#fff',
+                            background: color, display: 'inline-block', whiteSpace: 'nowrap',
+                          }}>{label}</span>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <StarFilled key={n} style={{ fontSize: 14, color: n <= stars ? color : '#d9d9d9', marginRight: 1 }} />
+                          ))}
+                        </div>
+                        <Form.Item name={fieldName} noStyle initialValue={defaultScore} rules={[{ required: true, message: '請輸入' }]}>
+                          <InputNumber min={-100} max={100} precision={0} style={{ width: '100%' }} addonAfter="分" disabled={isDetailMode} />
+                        </Form.Item>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c', lineHeight: '20px' }}>
+                    訂單完成後用戶給予的評價會動態調整得分：正數加分、負數減分、0 不加減分；即使訂單已完成，差評仍會對應減分。
+                    評價加減分以對應訂單為錨點：評價時訂單仍在得分有效期內則生效，並隨該訂單到期一併失效；訂單已超出有效期後再評價，不再計分
+                  </div>
+                </div>
               </div>
 
               {/* 得分有效期 */}
@@ -416,7 +458,7 @@ export default function AlgorithmAdd() {
                 <Form.Item name="scoreValidDays" noStyle initialValue={30} rules={[{ required: true, message: '請輸入' }]}>
                   <InputNumber min={1} max={365} precision={0} style={{ width: 80 }} addonAfter="天" disabled={isDetailMode} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>內的收藏 / 下單行為</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>內的收藏 / 下單 / 評價行為</span>
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>（滾動窗口，超期行為分數自動失效，保證推薦反映用戶近期偏好）</span>
               </div>
             </div>

@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, Switch, message } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, Switch, Radio, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
-  DeleteOutlined,
   ImportOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
@@ -15,28 +14,6 @@ const { RangePicker } = DatePicker
 const { TextArea } = Input
 
 /* ──────────── 常量定义 ──────────── */
-
-/** 词库分类 */
-const WORD_CATEGORY = {
-  product:    { label: '品類詞',     color: 'blue' },
-  dish:       { label: '菜名詞',     color: 'orange' },
-  ingredient: { label: '食材詞',     color: 'green' },
-  flavor:     { label: '口味/做法詞', color: 'purple' },
-  brand:      { label: '品牌詞',     color: 'gold' },
-  promo:      { label: '營銷詞',     color: 'red' },
-  scene:      { label: '場景詞',     color: 'cyan' },
-} as const
-
-type CategoryKey = keyof typeof WORD_CATEGORY
-
-/** 词条来源 */
-const WORD_SOURCE = {
-  manual: '手動錄入',
-  system: '系統提取',
-  import: '批量導入',
-} as const
-
-type SourceKey = keyof typeof WORD_SOURCE
 
 /** 业务频道 */
 const CHANNEL_OPTIONS = [
@@ -58,14 +35,6 @@ const statusOptions = [
   { label: '停用', value: 'inactive' },
 ]
 
-/** 来源选项 */
-const sourceOptions = [
-  { label: '全部', value: 'all' },
-  { label: '手動錄入', value: 'manual' },
-  { label: '系統提取', value: 'system' },
-  { label: '批量導入', value: 'import' },
-]
-
 /** 频道选项 */
 const channelFilterOptions = [
   { label: '全部', value: 'all' },
@@ -80,9 +49,7 @@ interface WordRecord {
   key: string
   id: number
   word: string
-  category: CategoryKey
-  channels: string[]
-  source: SourceKey
+  channel: string
   status: 'active' | 'inactive'
   matchCount: number
   updatedBy: string
@@ -93,25 +60,25 @@ interface WordRecord {
 /* ──────────── Mock 数据 ──────────── */
 
 const mockData: WordRecord[] = [
-  { key: '1', id: 1, word: '牛肉面', category: 'product', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 12580, updatedBy: '張曉明(E10023)', updateTime: '2026-07-28 10:30:00', remark: '核心品類詞' },
-  { key: '2', id: 2, word: '奶茶', category: 'product', channels: ['takeaway', 'supermarket'], source: 'manual', status: 'active', matchCount: 23450, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-27 15:20:00', remark: '飲品品類' },
-  { key: '3', id: 3, word: '火鍋', category: 'product', channels: ['takeaway'], source: 'system', status: 'active', matchCount: 8920, updatedBy: '王建華(E10067)', updateTime: '2026-07-26 09:15:00', remark: '' },
-  { key: '4', id: 4, word: '火爆牛肉面套餐', category: 'dish', channels: ['takeaway'], source: 'system', status: 'active', matchCount: 3260, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-25 14:00:00', remark: '商家上傳菜品提取' },
-  { key: '5', id: 5, word: '珍珠奶茶', category: 'dish', channels: ['takeaway'], source: 'system', status: 'active', matchCount: 7840, updatedBy: '張曉明(E10023)', updateTime: '2026-07-24 11:45:00', remark: '' },
-  { key: '6', id: 6, word: '麻辣火鍋', category: 'dish', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 5120, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-23 16:30:00', remark: '辣味火鍋' },
-  { key: '7', id: 7, word: '牛肉', category: 'ingredient', channels: ['takeaway', 'supermarket'], source: 'system', status: 'active', matchCount: 18760, updatedBy: '王建華(E10067)', updateTime: '2026-07-22 08:20:00', remark: '高頻食材' },
-  { key: '8', id: 8, word: '珍珠', category: 'ingredient', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 6430, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-21 13:10:00', remark: '奶茶配料' },
-  { key: '9', id: 9, word: '豆腐', category: 'ingredient', channels: ['takeaway', 'supermarket'], source: 'import', status: 'active', matchCount: 4210, updatedBy: '張曉明(E10023)', updateTime: '2026-07-20 10:00:00', remark: '批量導入' },
-  { key: '10', id: 10, word: '麻辣', category: 'flavor', channels: ['takeaway'], source: 'system', status: 'active', matchCount: 15320, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-19 15:30:00', remark: '高頻口味' },
-  { key: '11', id: 11, word: '燒烤', category: 'flavor', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 9870, updatedBy: '王建華(E10067)', updateTime: '2026-07-18 09:20:00', remark: '' },
-  { key: '12', id: 12, word: '紅燒', category: 'flavor', channels: ['takeaway'], source: 'manual', status: 'inactive', matchCount: 2340, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-17 14:15:00', remark: '使用頻率低，已停用' },
-  { key: '13', id: 13, word: 'KFC', category: 'brand', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 4560, updatedBy: '張曉明(E10023)', updateTime: '2026-07-16 10:30:00', remark: '品牌簡稱' },
-  { key: '14', id: 14, word: '麥當勞', category: 'brand', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 6780, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-15 11:00:00', remark: '' },
-  { key: '15', id: 15, word: '買一送一', category: 'promo', channels: ['takeaway', 'groupBuy'], source: 'system', status: 'active', matchCount: 8920, updatedBy: '王建華(E10067)', updateTime: '2026-07-14 08:45:00', remark: '常見營銷詞' },
-  { key: '16', id: 16, word: '限時優惠', category: 'promo', channels: ['takeaway', 'supermarket', 'groupBuy'], source: 'import', status: 'active', matchCount: 5430, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-13 16:20:00', remark: '' },
-  { key: '17', id: 17, word: '早餐', category: 'scene', channels: ['takeaway'], source: 'system', status: 'active', matchCount: 11230, updatedBy: '張曉明(E10023)', updateTime: '2026-07-12 09:30:00', remark: '時段場景詞' },
-  { key: '18', id: 18, word: '夜宵', category: 'scene', channels: ['takeaway'], source: 'manual', status: 'active', matchCount: 7650, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-11 14:00:00', remark: '' },
-  { key: '19', id: 19, word: '下午茶', category: 'scene', channels: ['takeaway', 'groupBuy'], source: 'manual', status: 'inactive', matchCount: 1890, updatedBy: '王建華(E10067)', updateTime: '2026-07-10 11:15:00', remark: '使用頻率低' },
+  { key: '1', id: 1, word: '牛肉面', channel: 'takeaway', status: 'active', matchCount: 12580, updatedBy: '張曉明(E10023)', updateTime: '2026-07-28 10:30:00', remark: '核心品類詞' },
+  { key: '2', id: 2, word: '奶茶', channel: 'supermarket', status: 'active', matchCount: 23450, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-27 15:20:00', remark: '飲品品類' },
+  { key: '3', id: 3, word: '火鍋', channel: 'takeaway', status: 'active', matchCount: 8920, updatedBy: '王建華(E10067)', updateTime: '2026-07-26 09:15:00', remark: '' },
+  { key: '4', id: 4, word: '火爆牛肉面套餐', channel: 'takeaway', status: 'active', matchCount: 3260, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-25 14:00:00', remark: '商家上傳菜品提取' },
+  { key: '5', id: 5, word: '珍珠奶茶', channel: 'takeaway', status: 'active', matchCount: 7840, updatedBy: '張曉明(E10023)', updateTime: '2026-07-24 11:45:00', remark: '' },
+  { key: '6', id: 6, word: '麻辣火鍋', channel: 'takeaway', status: 'active', matchCount: 5120, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-23 16:30:00', remark: '辣味火鍋' },
+  { key: '7', id: 7, word: '牛肉', channel: 'supermarket', status: 'active', matchCount: 18760, updatedBy: '王建華(E10067)', updateTime: '2026-07-22 08:20:00', remark: '高頻食材' },
+  { key: '8', id: 8, word: '珍珠', channel: 'takeaway', status: 'active', matchCount: 6430, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-21 13:10:00', remark: '奶茶配料' },
+  { key: '9', id: 9, word: '豆腐', channel: 'supermarket', status: 'active', matchCount: 4210, updatedBy: '張曉明(E10023)', updateTime: '2026-07-20 10:00:00', remark: '批量導入' },
+  { key: '10', id: 10, word: '麻辣', channel: 'takeaway', status: 'active', matchCount: 15320, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-19 15:30:00', remark: '高頻口味' },
+  { key: '11', id: 11, word: '燒烤', channel: 'takeaway', status: 'active', matchCount: 9870, updatedBy: '王建華(E10067)', updateTime: '2026-07-18 09:20:00', remark: '' },
+  { key: '12', id: 12, word: '紅燒', channel: 'takeaway', status: 'inactive', matchCount: 2340, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-17 14:15:00', remark: '使用頻率低，已停用' },
+  { key: '13', id: 13, word: 'KFC', channel: 'takeaway', status: 'active', matchCount: 4560, updatedBy: '張曉明(E10023)', updateTime: '2026-07-16 10:30:00', remark: '品牌簡稱' },
+  { key: '14', id: 14, word: '麥當勞', channel: 'takeaway', status: 'active', matchCount: 6780, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-15 11:00:00', remark: '' },
+  { key: '15', id: 15, word: '買一送一', channel: 'groupBuy', status: 'active', matchCount: 8920, updatedBy: '王建華(E10067)', updateTime: '2026-07-14 08:45:00', remark: '常見營銷詞' },
+  { key: '16', id: 16, word: '限時優惠', channel: 'supermarket', status: 'active', matchCount: 5430, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-13 16:20:00', remark: '' },
+  { key: '17', id: 17, word: '早餐', channel: 'takeaway', status: 'active', matchCount: 11230, updatedBy: '張曉明(E10023)', updateTime: '2026-07-12 09:30:00', remark: '時段場景詞' },
+  { key: '18', id: 18, word: '夜宵', channel: 'takeaway', status: 'active', matchCount: 7650, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-11 14:00:00', remark: '' },
+  { key: '19', id: 19, word: '下午茶', channel: 'groupBuy', status: 'inactive', matchCount: 1890, updatedBy: '王建華(E10067)', updateTime: '2026-07-10 11:15:00', remark: '使用頻率低' },
 ]
 
 /* ──────────── 组件 ──────────── */
@@ -120,7 +87,6 @@ export default function PromotionWordLibrary() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<WordRecord | null>(null)
   const [form] = Form.useForm()
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [data, setData] = useState<WordRecord[]>(mockData)
   const [remarkModalOpen, setRemarkModalOpen] = useState(false)
   const [remarkContent, setRemarkContent] = useState({ word: '', remark: '' })
@@ -128,13 +94,11 @@ export default function PromotionWordLibrary() {
   /* ---- 列配置 ---- */
   const columnMeta = useMemo(() => [
     { key: 'word', title: '詞條' },
-    { key: 'category', title: '分類' },
-    { key: 'channels', title: '所屬頻道' },
-    { key: 'source', title: '來源' },
-    { key: 'status', title: '狀態' },
+    { key: 'channel', title: '所屬頻道' },
     { key: 'matchCount', title: '匹配次數' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updateTime', title: '最後更新時間' },
+    { key: 'status', title: '狀態' },
     { key: 'remark', title: '備註' },
     { key: 'action', title: '操作' },
   ], [])
@@ -147,7 +111,7 @@ export default function PromotionWordLibrary() {
   const handleAdd = () => {
     setEditingRecord(null)
     form.resetFields()
-    form.setFieldsValue({ category: 'product', source: 'manual', status: true })
+    form.setFieldsValue({ status: true })
     setIsModalOpen(true)
   }
 
@@ -170,25 +134,6 @@ export default function PromotionWordLibrary() {
       onOk: () => {
         setData(prev => prev.filter(item => item.id !== record.id))
         message.success('刪除成功')
-      },
-    })
-  }
-
-  const handleBatchDelete = () => {
-    if (selectedRowKeys.length === 0) {
-      message.warning('請先選擇要刪除的詞條')
-      return
-    }
-    Modal.confirm({
-      title: '批量刪除',
-      content: `確定要刪除選中的 ${selectedRowKeys.length} 條詞條嗎？此操作不可恢復。`,
-      okText: '確定',
-      cancelText: '取消',
-      okButtonProps: { danger: true },
-      onOk: () => {
-        setData(prev => prev.filter(item => !selectedRowKeys.includes(item.id)))
-        setSelectedRowKeys([])
-        message.success(`已刪除 ${selectedRowKeys.length} 條`)
       },
     })
   }
@@ -229,36 +174,23 @@ export default function PromotionWordLibrary() {
       render: (val: string) => <span style={{ fontWeight: 600, color: '#2D3436' }}>{val}</span>,
     },
     {
-      title: '分類',
-      dataIndex: 'category',
-      key: 'category',
-      width: 100,
-      render: (cat: CategoryKey) => {
-        const cfg = WORD_CATEGORY[cat]
-        return <Tag color={cfg.color}>{cfg.label}</Tag>
-      },
-    },
-    {
       title: '所屬頻道',
-      dataIndex: 'channels',
-      key: 'channels',
-      width: 150,
-      render: (chs: string[]) => (
-        <Space size={[4, 4]} wrap>
-          {chs.map(ch => <Tag key={ch}>{CHANNEL_LABEL[ch] || ch}</Tag>)}
-        </Space>
-      ),
+      dataIndex: 'channel',
+      key: 'channel',
+      width: 120,
+      render: (ch: string) => <Tag>{CHANNEL_LABEL[ch] || ch}</Tag>,
     },
     {
-      title: '來源',
-      dataIndex: 'source',
-      key: 'source',
+      title: '匹配次數',
+      dataIndex: 'matchCount',
+      key: 'matchCount',
       width: 100,
-      render: (src: SourceKey) => {
-        const colorMap: Record<string, string> = { manual: 'green', system: 'blue', import: 'orange' }
-        return <Tag color={colorMap[src]}>{WORD_SOURCE[src]}</Tag>
-      },
+      align: 'right',
+      sorter: (a, b) => a.matchCount - b.matchCount,
+      render: (val: number) => <span>{val.toLocaleString()}</span>,
     },
+    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
+    { title: '最後更新時間', dataIndex: 'updateTime', key: 'updateTime', width: 150 },
     {
       title: '狀態',
       dataIndex: 'status',
@@ -274,17 +206,6 @@ export default function PromotionWordLibrary() {
         />
       ),
     },
-    {
-      title: '匹配次數',
-      dataIndex: 'matchCount',
-      key: 'matchCount',
-      width: 100,
-      align: 'right',
-      sorter: (a, b) => a.matchCount - b.matchCount,
-      render: (val: number) => <span>{val.toLocaleString()}</span>,
-    },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
-    { title: '最後更新時間', dataIndex: 'updateTime', key: 'updateTime', width: 150 },
     {
       title: '備註',
       dataIndex: 'remark',
@@ -324,22 +245,8 @@ export default function PromotionWordLibrary() {
           <Form.Item label="詞條關鍵詞">
             <Input placeholder="請輸入關鍵詞" allowClear />
           </Form.Item>
-          <Form.Item label="詞庫分類">
-            <Select
-              options={[
-                { label: '全部', value: 'all' },
-                ...Object.entries(WORD_CATEGORY).map(([key, val]) => ({ label: val.label, value: key })),
-              ]}
-              defaultValue="all"
-              placeholder="全部"
-              allowClear
-            />
-          </Form.Item>
           <Form.Item label="狀態">
             <Select options={statusOptions} defaultValue="all" placeholder="全部" allowClear />
-          </Form.Item>
-          <Form.Item label="來源">
-            <Select options={sourceOptions} defaultValue="all" placeholder="全部" allowClear />
           </Form.Item>
           <Form.Item label="所屬頻道">
             <Select options={channelFilterOptions} defaultValue="all" placeholder="全部" allowClear />
@@ -362,12 +269,10 @@ export default function PromotionWordLibrary() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>批量刪除</Button>
           <Button className="btn-import" icon={<ImportOutlined />} onClick={handleBatchImport}>批量導入</Button>
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
           <span style={{ color: '#999', fontSize: 13 }}>
             共 <b style={{ color: '#E8720C' }}>{totalCount}</b> 條詞條，啟用 <b style={{ color: '#52C41A' }}>{activeCount}</b> 條
-            {selectedRowKeys.length > 0 && <span>，已選 <b>{selectedRowKeys.length}</b> 條</span>}
           </span>
         </div>
         <div className="action-section-right">
@@ -382,10 +287,6 @@ export default function PromotionWordLibrary() {
           columns={applyConfig(columns)}
           dataSource={data}
           rowKey="id"
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
           pagination={{
             total: data.length,
             pageSize: 10,
@@ -421,41 +322,15 @@ export default function PromotionWordLibrary() {
             <Input placeholder="請輸入詞條（如：牛肉面）" />
           </Form.Item>
           <Form.Item
-            label="詞庫分類"
-            name="category"
-            rules={[{ required: true, message: '請選擇詞庫分類' }]}
-          >
-            <Select
-              options={Object.entries(WORD_CATEGORY).map(([key, val]) => ({
-                label: val.label,
-                value: key,
-              }))}
-              placeholder="請選擇詞庫分類"
-            />
-          </Form.Item>
-          <Form.Item
             label="所屬頻道"
-            name="channels"
+            name="channel"
             rules={[{ required: true, message: '請選擇所屬頻道' }]}
           >
-            <Select
-              mode="multiple"
-              options={CHANNEL_OPTIONS}
-              placeholder="請選擇適用的業務頻道"
-            />
-          </Form.Item>
-          <Form.Item
-            label="來源"
-            name="source"
-            rules={[{ required: true, message: '請選擇來源' }]}
-          >
-            <Select
-              options={Object.entries(WORD_SOURCE).map(([key, val]) => ({
-                label: val,
-                value: key,
-              }))}
-              placeholder="請選擇來源"
-            />
+            <Radio.Group optionType="button" buttonStyle="solid">
+              {CHANNEL_OPTIONS.map(opt => (
+                <Radio.Button key={opt.value} value={opt.value}>{opt.label}</Radio.Button>
+              ))}
+            </Radio.Group>
           </Form.Item>
           <Form.Item label="是否啟用" name="status" valuePropName="checked">
             <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />

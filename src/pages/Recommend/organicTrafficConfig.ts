@@ -38,6 +38,8 @@ export enum ScoreMode {
   DECAY = 4,
   /** 扣分降權：命中條件按滿分扣減 */
   DEDUCT = 5,
+  /** 金額倍率：得分 = 金額 × 倍率（分值字段填倍率） */
+  AMOUNT_MULTIPLIER = 6,
 }
 
 export const SCORE_DIMENSION_LABEL: Record<ScoreDimension, string> = {
@@ -81,6 +83,7 @@ export const SCORE_MODE_LABEL: Record<ScoreMode, string> = {
   [ScoreMode.LINEAR]: '線性映射',
   [ScoreMode.DECAY]: '衰減函數',
   [ScoreMode.DEDUCT]: '扣分降權',
+  [ScoreMode.AMOUNT_MULTIPLIER]: '金額倍率',
 }
 
 export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
@@ -89,6 +92,7 @@ export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
   [ScoreMode.LINEAR]: 'cyan',
   [ScoreMode.DECAY]: 'purple',
   [ScoreMode.DEDUCT]: 'red',
+  [ScoreMode.AMOUNT_MULTIPLIER]: 'gold',
 }
 
 export const SCORE_MODE_OPTIONS = [
@@ -97,6 +101,7 @@ export const SCORE_MODE_OPTIONS = [
   { label: SCORE_MODE_LABEL[ScoreMode.LINEAR], value: ScoreMode.LINEAR },
   { label: SCORE_MODE_LABEL[ScoreMode.DECAY], value: ScoreMode.DECAY },
   { label: SCORE_MODE_LABEL[ScoreMode.DEDUCT], value: ScoreMode.DEDUCT },
+  { label: SCORE_MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
 ]
 
 /** 單條評分規則 */
@@ -139,87 +144,40 @@ const { ENABLED, DISABLED } = ServiceStatus
 
 /** 默認評分規則（可在界面上新增/停用/調整分值） */
 export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
-  // ===== 商業維度 =====
-  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '金字招牌廣告購買', description: '商家購買金字招牌廣告期間加分，按剩餘有效期遞減', mode: ScoreMode.FIXED, score: 100, status: ENABLED, builtin: true },
-  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '點金廣告購買', description: '商家購買點金廣告期間加分，按投放消耗檔位計分', mode: ScoreMode.TIERED, score: 100, status: ENABLED, builtin: true },
-  { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '無敵星星購買', description: '購買無敵星星的推廣時段內加分', mode: ScoreMode.FIXED, score: 90, status: ENABLED, builtin: true },
-  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '人氣商家(KA)簽約', description: '人氣商家簽約有效期內加分', mode: ScoreMode.FIXED, score: 80, status: ENABLED, builtin: true },
-  { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '品牌商家(KA)簽約', description: 'KA 品牌商家身份加分', mode: ScoreMode.FIXED, score: 80, status: ENABLED, builtin: true },
-  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '獨家商家協議', description: '與平台簽署獨家經營協議的商家加分', mode: ScoreMode.FIXED, score: 80, status: ENABLED, builtin: true },
-  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '新店廣告購買', description: '新店廣告投放期內加分', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
-  { id: 'COM_08', dimension: ScoreDimension.COMMERCIAL, name: '盤活復蘇購買', description: '盤活復蘇投放期內加分', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
-  { id: 'COM_09', dimension: ScoreDimension.COMMERCIAL, name: '廣告消耗金額', description: '近 30 天廣告總消耗金額分檔計分', mode: ScoreMode.TIERED, score: 100, status: ENABLED, builtin: true },
-  { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '佣金費率', description: '商家實際抽成費率越高，商業貢獻得分越高', mode: ScoreMode.LINEAR, score: 80, status: ENABLED, builtin: true },
-  { id: 'COM_11', dimension: ScoreDimension.COMMERCIAL, name: '推廣賬戶餘額充足度', description: '賬戶餘額可支撐推廣天數分檔計分', mode: ScoreMode.TIERED, score: 50, status: ENABLED, builtin: true },
-  { id: 'COM_12', dimension: ScoreDimension.COMMERCIAL, name: '平台活動參與度', description: '報名滿減 / 折扣 / 秒殺 / 新客立減等平台活動的數量', mode: ScoreMode.TIERED, score: 70, status: ENABLED, builtin: true },
-  { id: 'COM_13', dimension: ScoreDimension.COMMERCIAL, name: '商家補貼力度', description: '商家自主承擔的優惠金額佔訂單金額比例', mode: ScoreMode.LINEAR, score: 60, status: ENABLED, builtin: true },
-  { id: 'COM_14', dimension: ScoreDimension.COMMERCIAL, name: '配送方式', description: '平台配送商家高於商家自配送商家', mode: ScoreMode.FIXED, score: 40, status: ENABLED, builtin: true },
-  { id: 'COM_15', dimension: ScoreDimension.COMMERCIAL, name: '合作年限', description: '商家入駐平台時長分檔計分', mode: ScoreMode.TIERED, score: 30, status: ENABLED, builtin: true },
-  { id: 'COM_16', dimension: ScoreDimension.COMMERCIAL, name: '逾期欠款', description: '存在逾期欠款或對賬駁回未處理時扣分', mode: ScoreMode.DEDUCT, score: -80, status: ENABLED, builtin: true },
-  { id: 'COM_17', dimension: ScoreDimension.COMMERCIAL, name: '當日推廣預算耗盡', description: '當日推廣預算耗盡後不再享商業維度加分', mode: ScoreMode.DEDUCT, score: -50, status: ENABLED, builtin: true },
-  { id: 'COM_18', dimension: ScoreDimension.COMMERCIAL, name: '結算違約記錄', description: '存在佣金結算違約記錄時扣分', mode: ScoreMode.DEDUCT, score: -60, status: DISABLED, builtin: true },
+  // ===== 商業維度（商家營銷投入與付費推廣） =====
+  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動固定加分', mode: ScoreMode.FIXED, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費固定加分', mode: ScoreMode.FIXED, score: 20, status: ENABLED, builtin: true },
+  { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '浮動計分：得分 = 領券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減活動固定加分', mode: ScoreMode.FIXED, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '浮動計分：得分 = 贈券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包-按金額', description: '浮動計分：得分 = 紅包金額 × 倍率，如紅包 10 元、倍率 2 則得 20 分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券-按金額', description: '浮動計分：得分 = 券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_08', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減-按平均折扣', description: '浮動計分：得分 = 商家出資金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_09', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: ScoreMode.FIXED, score: 80, status: ENABLED, builtin: true },
+  { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-金字招牌', description: '購買金字招牌廣告投放期內加分', mode: ScoreMode.FIXED, score: 100, status: ENABLED, builtin: true },
 
-  // ===== 店鋪維度 · 基礎信息 =====
-  { id: 'STB_01', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪裝修得分', description: '門頭圖 / 招牌圖 / 品牌色 / 店鋪風格等裝修完成度', mode: ScoreMode.LINEAR, score: 100, status: ENABLED, builtin: true },
-  { id: 'STB_02', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪頭圖質量', description: '首圖清晰度、尺寸合規、無違規水印', mode: ScoreMode.TIERED, score: 80, status: ENABLED, builtin: true },
-  { id: 'STB_03', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '商品圖片完整率', description: '有主圖商品數 / 在售商品數', mode: ScoreMode.LINEAR, score: 100, status: ENABLED, builtin: true },
-  { id: 'STB_04', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '商品圖片高清率', description: '達到高清標準的商品圖佔比', mode: ScoreMode.LINEAR, score: 70, status: ENABLED, builtin: true },
-  { id: 'STB_05', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '菜單完整度', description: '在售 SKU 數量與商品分類齊全度', mode: ScoreMode.TIERED, score: 90, status: ENABLED, builtin: true },
-  { id: 'STB_06', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '商品描述完整度', description: '有規格 / 描述 / 口味標籤的商品佔比', mode: ScoreMode.LINEAR, score: 60, status: ENABLED, builtin: true },
-  { id: 'STB_07', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '資質證照齊全', description: '營業執照、食品經營許可證等證照有效且齊全', mode: ScoreMode.FIXED, score: 100, status: ENABLED, builtin: true },
-  { id: 'STB_08', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪類目準確度', description: '店鋪主營類目與實際在售商品的匹配度', mode: ScoreMode.LINEAR, score: 70, status: ENABLED, builtin: true },
-  { id: 'STB_09', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '品牌與標籤完整', description: '品牌 Logo、店鋪標籤、招牌菜標記是否完善', mode: ScoreMode.LINEAR, score: 50, status: ENABLED, builtin: true },
-  { id: 'STB_10', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '營業時間配置', description: '營業時段配置完整且與實際營業一致', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
-  { id: 'STB_11', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '配送信息合理度', description: '起送價、配送費、配送範圍設置合理度', mode: ScoreMode.TIERED, score: 60, status: ENABLED, builtin: true },
-  { id: 'STB_12', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪公告與說明', description: '店鋪公告、打包說明、發票信息完善度', mode: ScoreMode.LINEAR, score: 40, status: ENABLED, builtin: true },
-  { id: 'STB_13', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '門店定位準確度', description: '門店定位與實際地址偏差越小得分越高', mode: ScoreMode.DECAY, score: 50, status: ENABLED, builtin: true },
-  { id: 'STB_14', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '資質過期或信息缺失', description: '證照過期、關鍵信息缺失時扣分', mode: ScoreMode.DEDUCT, score: -100, status: ENABLED, builtin: true },
+  // ===== 店鋪維度 · 基礎信息（主營時段與店鋪身份標籤） =====
+  { id: 'STB_01', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '主營時段', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
+  { id: 'STB_02', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪標籤-新店', description: '新店身份標籤加分，替代原平台新店扶持加權，不重複計分', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
+  { id: 'STB_03', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪標籤-熱門', description: '熱門店鋪身份標籤加分', mode: ScoreMode.FIXED, score: 50, status: ENABLED, builtin: true },
+  { id: 'STB_04', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪標籤-金牌', description: '金牌店鋪身份標籤加分', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
+  { id: 'STB_05', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.BASIC_INFO, name: '店鋪標籤-獨家', description: '獨家店鋪身份標籤加分，替代原商業維度獨家商家協議，不重複計分', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
 
-  // ===== 店鋪維度 · 店鋪運營 =====
-  { id: 'STO_01', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '營業狀態', description: '營業中 / 休息一會 / 爆單暫停 / 休息打烊，非營業狀態直接降權', mode: ScoreMode.FIXED, score: 100, status: ENABLED, builtin: true },
-  { id: 'STO_02', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '店鋪評分', description: '店鋪綜合星級評分（5 分制歸一化至 0~1）', mode: ScoreMode.LINEAR, score: 100, status: ENABLED, builtin: true },
-  { id: 'STO_03', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '出餐速度', description: '平均出餐時長越短得分越高', mode: ScoreMode.DECAY, score: 90, status: ENABLED, builtin: true },
-  { id: 'STO_04', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '接單速度', description: '平均接單時長越短得分越高', mode: ScoreMode.DECAY, score: 70, status: ENABLED, builtin: true },
-  { id: 'STO_05', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '接單率', description: '有效接單訂單佔全部進單的比例', mode: ScoreMode.LINEAR, score: 80, status: ENABLED, builtin: true },
-  { id: 'STO_06', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '好評率', description: '好評數 / 有效評價數', mode: ScoreMode.LINEAR, score: 90, status: ENABLED, builtin: true },
-  { id: 'STO_07', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '好評數', description: '近 90 天好評絕對數量分檔計分', mode: ScoreMode.TIERED, score: 60, status: ENABLED, builtin: true },
-  { id: 'STO_08', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '差評率', description: '差評佔比越高扣分越多', mode: ScoreMode.DEDUCT, score: -90, status: ENABLED, builtin: true },
-  { id: 'STO_09', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '評價回覆率', description: '商家回覆用戶評價的比例', mode: ScoreMode.LINEAR, score: 40, status: ENABLED, builtin: true },
-  { id: 'STO_10', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '訂單完成率', description: '近 30 天完成訂單佔比', mode: ScoreMode.LINEAR, score: 90, status: ENABLED, builtin: true },
-  { id: 'STO_11', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '商家取消/拒單率', description: '商家主動取消或拒單訂單佔比', mode: ScoreMode.DEDUCT, score: -80, status: ENABLED, builtin: true },
-  { id: 'STO_12', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '出餐超時率', description: '超出承諾出餐時長的訂單佔比', mode: ScoreMode.DEDUCT, score: -70, status: ENABLED, builtin: true },
-  { id: 'STO_13', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '配送超時率', description: '超出預計送達時間的訂單佔比', mode: ScoreMode.DEDUCT, score: -60, status: ENABLED, builtin: true },
-  { id: 'STO_14', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '缺貨退款率', description: '因缺貨導致退款的訂單佔比', mode: ScoreMode.DEDUCT, score: -70, status: ENABLED, builtin: true },
-  { id: 'STO_15', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '客訴率', description: '每千單客訴量，越高扣分越多', mode: ScoreMode.DEDUCT, score: -80, status: ENABLED, builtin: true },
-  { id: 'STO_16', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '客訴處理時效', description: '客訴平均處理時長越短得分越高', mode: ScoreMode.DECAY, score: 40, status: ENABLED, builtin: true },
-  { id: 'STO_17', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '近30天訂單量', description: '近 30 天成交單量分檔計分', mode: ScoreMode.TIERED, score: 100, status: ENABLED, builtin: true },
-  { id: 'STO_18', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '訂單量增長趨勢', description: '訂單量環比增長率', mode: ScoreMode.LINEAR, score: 60, status: ENABLED, builtin: true },
-  { id: 'STO_19', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '復購率', description: '近 90 天復購用戶佔比', mode: ScoreMode.LINEAR, score: 80, status: ENABLED, builtin: true },
-  { id: 'STO_20', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '客單價', description: '客單價與所在商圈區間的匹配度', mode: ScoreMode.TIERED, score: 50, status: ENABLED, builtin: true },
-  { id: 'STO_21', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '商品上新頻率', description: '近 30 天上新或更新商品數量', mode: ScoreMode.TIERED, score: 40, status: ENABLED, builtin: true },
-  { id: 'STO_22', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '庫存準確率', description: '售完商品及時置空的比例', mode: ScoreMode.LINEAR, score: 50, status: ENABLED, builtin: true },
-  { id: 'STO_23', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: 'IM 回覆及時率', description: '商家 IM 平均首響時長越短得分越高', mode: ScoreMode.DECAY, score: 40, status: ENABLED, builtin: true },
-  { id: 'STO_24', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '活動優惠力度', description: '滿減 / 折扣 / 新客立減等優惠強度', mode: ScoreMode.TIERED, score: 70, status: ENABLED, builtin: true },
-  { id: 'STO_25', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '食安與違規記錄', description: '食安事故、平台違規處罰記錄扣分', mode: ScoreMode.DEDUCT, score: -100, status: ENABLED, builtin: true },
+  // ===== 店鋪維度 · 店鋪運營（經營履跡，所有用戶同一個分） =====
+  { id: 'STO_01', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.TIERED, score: 100, status: ENABLED, builtin: true },
+  { id: 'STO_02', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '店鋪口碑', description: '口碑最高 5 分，按評分檔位加減分，只取最近 30 天評價計算', mode: ScoreMode.TIERED, score: 100, status: ENABLED, builtin: true },
+  { id: 'STO_03', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '店鋪銷量', description: '月銷量達標固定加分；超出部分按訂單數 × 倍率加分；需達起步訂單數後才開始計算；僅統計已完成有效訂單，已取消 / 退款訂單不計', mode: ScoreMode.TIERED, score: 100, status: ENABLED, builtin: true },
+  { id: 'STO_04', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '出餐速度', description: '平均出餐時長越短得分越高，店鋪自身效率指標', mode: ScoreMode.DECAY, score: 90, status: ENABLED, builtin: true },
+  { id: 'STO_05', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '拒絕訂單', description: '商家拒絕訂單按次扣分', mode: ScoreMode.DEDUCT, score: -80, status: ENABLED, builtin: true },
+  { id: 'STO_06', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '優質評價', description: '用戶優質評價（好評帶圖 / 文字）按數量加分', mode: ScoreMode.TIERED, score: 60, status: ENABLED, builtin: true },
+  { id: 'STO_07', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '出餐超時', description: '超出承諾出餐時長的訂單按佔比扣分', mode: ScoreMode.DEDUCT, score: -70, status: ENABLED, builtin: true },
+  { id: 'STO_08', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '取消訂單', description: '商家主動取消訂單按次扣分', mode: ScoreMode.DEDUCT, score: -80, status: ENABLED, builtin: true },
+  { id: 'STO_09', dimension: ScoreDimension.STORE, subDimension: StoreSubDimension.OPERATION, name: '超時接單', description: '超出接單時限未接單按次扣分', mode: ScoreMode.DEDUCT, score: -60, status: ENABLED, builtin: true },
 
-  // ===== 用戶維度 =====
-  { id: 'USR_01', dimension: ScoreDimension.USER, name: '購買過的店鋪', description: '用戶在該店鋪有歷史成交訂單', mode: ScoreMode.FIXED, score: 100, status: ENABLED, builtin: true },
-  { id: 'USR_02', dimension: ScoreDimension.USER, name: '購買次數與時間衰減', description: '下單次數越多、距今越近得分越高', mode: ScoreMode.DECAY, score: 90, status: ENABLED, builtin: true },
-  { id: 'USR_03', dimension: ScoreDimension.USER, name: '收藏過的店鋪', description: '用戶已收藏該店鋪', mode: ScoreMode.FIXED, score: 80, status: ENABLED, builtin: true },
-  { id: 'USR_04', dimension: ScoreDimension.USER, name: '加購未下單', description: '購物車存在該店鋪商品但未提交訂單', mode: ScoreMode.FIXED, score: 60, status: ENABLED, builtin: true },
-  { id: 'USR_05', dimension: ScoreDimension.USER, name: '瀏覽未下單', description: '近 7 天點擊進店但未下單，按時間衰減', mode: ScoreMode.DECAY, score: 50, status: ENABLED, builtin: true },
-  { id: 'USR_06', dimension: ScoreDimension.USER, name: '搜索命中記錄', description: '近 7 天搜索行為命中該店鋪或其商品', mode: ScoreMode.DECAY, score: 50, status: ENABLED, builtin: true },
-  { id: 'USR_07', dimension: ScoreDimension.USER, name: '品類偏好匹配', description: '店鋪主營類目與用戶偏好類目的相似度', mode: ScoreMode.LINEAR, score: 90, status: ENABLED, builtin: true },
-  { id: 'USR_08', dimension: ScoreDimension.USER, name: '口味標籤匹配', description: '用戶口味標籤與店鋪招牌菜標籤匹配度', mode: ScoreMode.LINEAR, score: 70, status: ENABLED, builtin: true },
-  { id: 'USR_09', dimension: ScoreDimension.USER, name: '價格帶偏好匹配', description: '店鋪客單價與用戶常消費價格帶匹配度', mode: ScoreMode.LINEAR, score: 70, status: ENABLED, builtin: true },
-  { id: 'USR_10', dimension: ScoreDimension.USER, name: '時段偏好匹配', description: '當前時段（早餐/午餐/下午茶/晚餐/夜宵）與用戶習慣匹配度', mode: ScoreMode.LINEAR, score: 60, status: ENABLED, builtin: true },
-  { id: 'USR_11', dimension: ScoreDimension.USER, name: '常用地址距離匹配', description: '店鋪與用戶常用收貨地址的距離衰減', mode: ScoreMode.DECAY, score: 70, status: ENABLED, builtin: true },
-  { id: 'USR_12', dimension: ScoreDimension.USER, name: '協同過濾相似度', description: '相似人群對該店鋪的偏好強度', mode: ScoreMode.LINEAR, score: 80, status: ENABLED, builtin: true },
-  { id: 'USR_13', dimension: ScoreDimension.USER, name: '會員等級加權', description: '會員 / 付費會員專享店鋪給予加權', mode: ScoreMode.TIERED, score: 40, status: ENABLED, builtin: true },
-  { id: 'USR_14', dimension: ScoreDimension.USER, name: '新客探索加權', description: '從未在該店下單的用戶給予探索性曝光', mode: ScoreMode.FIXED, score: 50, status: ENABLED, builtin: true },
-  { id: 'USR_15', dimension: ScoreDimension.USER, name: '差評或投訴記錄', description: '用戶對該店鋪有差評或投訴記錄時扣分', mode: ScoreMode.DEDUCT, score: -90, status: ENABLED, builtin: true },
-  { id: 'USR_16', dimension: ScoreDimension.USER, name: '負反饋（不喜歡/屏蔽）', description: '用戶標記不喜歡或屏蔽該店鋪時大幅降權', mode: ScoreMode.DEDUCT, score: -100, status: ENABLED, builtin: true },
-  { id: 'USR_17', dimension: ScoreDimension.USER, name: '曝光疲勞（未點擊）', description: '同一用戶近期多次曝光該店但未點擊時降權', mode: ScoreMode.DEDUCT, score: -60, status: ENABLED, builtin: true },
+  // ===== 用戶維度（個性化關係，每個用戶不同的分） =====
+  { id: 'USR_01', dimension: ScoreDimension.USER, name: '用戶瀏覽店鋪-關鍵詞', description: '用戶搜索關鍵詞命中該店鋪，按關鍵詞排名 × 倍率計分；取排名前 N 個最新關鍵詞', mode: ScoreMode.LINEAR, score: 50, status: ENABLED, builtin: true },
+  { id: 'USR_02', dimension: ScoreDimension.USER, name: '用戶下單店鋪', description: '取用戶最近下單的前 N 家店鋪加分，下單時間越近得分越高', mode: ScoreMode.DECAY, score: 90, status: ENABLED, builtin: true },
+  { id: 'USR_03', dimension: ScoreDimension.USER, name: '用戶收藏店鋪', description: '取用戶最新收藏的 N 家店鋪加分', mode: ScoreMode.FIXED, score: 80, status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
   { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: 'e^(-k×距離km)，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, status: ENABLED, builtin: true },
@@ -230,7 +188,7 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'PLT_06', dimension: ScoreDimension.PLATFORM, name: '高峰時段調節', description: '用餐高峰按運力與商家承載能力調節曝光', mode: ScoreMode.TIERED, score: 50, status: ENABLED, builtin: true },
   { id: 'PLT_07', dimension: ScoreDimension.PLATFORM, name: '商圈流量調控', description: '按商圈 / 區域（澳門、氹仔、珠海）配置流量係數', mode: ScoreMode.LINEAR, score: 70, status: ENABLED, builtin: true },
   { id: 'PLT_08', dimension: ScoreDimension.PLATFORM, name: '類目流量配額', description: '保障各品類曝光均衡，避免單一品類壟斷', mode: ScoreMode.LINEAR, score: 60, status: ENABLED, builtin: true },
-  { id: 'PLT_09', dimension: ScoreDimension.PLATFORM, name: '新店扶持加權', description: '新店週期內給予流量扶持，並隨經營天數衰減', mode: ScoreMode.DECAY, score: 80, status: ENABLED, builtin: true },
+  { id: 'PLT_09', dimension: ScoreDimension.PLATFORM, name: '新店扶持加權', description: '已由店鋪維度「店鋪標籤-新店」承接，停用避免重複計分', mode: ScoreMode.DECAY, score: 80, status: DISABLED, builtin: true },
   { id: 'PLT_10', dimension: ScoreDimension.PLATFORM, name: '曝光公平度補償', description: '長期低曝光的合規商家給予補償加權', mode: ScoreMode.LINEAR, score: 60, status: ENABLED, builtin: true },
   { id: 'PLT_11', dimension: ScoreDimension.PLATFORM, name: '多樣性打散', description: '同品牌 / 同類目連續出現時降權打散', mode: ScoreMode.DEDUCT, score: -50, status: ENABLED, builtin: true },
   { id: 'PLT_12', dimension: ScoreDimension.PLATFORM, name: '商家曝光疲勞控制', description: '同一商家短時間內重複曝光降權', mode: ScoreMode.DEDUCT, score: -50, status: ENABLED, builtin: true },

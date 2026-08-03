@@ -263,18 +263,51 @@ const expressions: Expression[] = [
   { name: 'sleepy', message: '曹操：对酒当歌，人生几何——对电脑当歌，头发几何。' },
 ]
 
-/** 長時間無交互後躲入邊框的等待時長（毫秒） */
+/** 長時間無交互後躲藏起來的等待時長（毫秒） */
 const IDLE_DOCK_DELAY = 60000
-/** 躲入邊框後露出的頭部寬度（px） */
+/** 躲藏後露出的頭部寬度（px，左右傾斜躲藏時使用） */
 const DOCK_PEEK = 50
+/** 貼下邊緣躲藏時露出的高度（px） */
+const EDGE_PEEK = 22
 /** 躲藏後自動跳出的最短/最長等待時長（毫秒，兩者間隨機） */
 const DOCK_AUTO_POP_MIN = 20000
 const DOCK_AUTO_POP_MAX = 40000
-/** 躲入邊框時的傾斜角度（與 CSS .docked-left/.docked-right 的 rotate 角度保持一致） */
+/** 躲藏時的傾斜角度（與 CSS .docked-left/.docked-right 的 rotate 角度保持一致） */
 const DOCK_TILT_DEG = 45
 /** 蜜蜂本體尺寸（與 .pet-body 的 CSS 尺寸保持一致） */
 const BODY_WIDTH = 36
 const BODY_HEIGHT = 57
+
+/**
+ * 躲藏位置：只允許在右側或底部躲藏
+ * - right：貼右邊緣，傾斜 45° 只露頭
+ * - bottom：貼下邊緣，只露頭頂
+ */
+type HideSpot = 'right' | 'bottom'
+
+const HIDE_SPOTS: HideSpot[] = ['right', 'bottom']
+
+/** 隨機挑一個躲藏位置（避免連續躲同一個地方） */
+const randomHideSpot = (exclude?: HideSpot | null): HideSpot => {
+  const pool = HIDE_SPOTS.filter(s => s !== exclude)
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+/** 從躲藏位置跳出來時，只出現在右側邊緣或底部邊緣（不會出現在屏幕中間） */
+const randomFreePos = () => {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const margin = 24
+  const maxX = w - BODY_WIDTH - margin
+  const maxY = h - BODY_HEIGHT - margin
+  const spots = [
+    // 右側邊緣：隨機高度
+    () => ({ x: maxX, y: Math.round(maxY * (0.1 + Math.random() * 0.8)) }),
+    // 底部邊緣：隨機橫向位置
+    () => ({ x: Math.round(maxX * (0.1 + Math.random() * 0.8)), y: maxY }),
+  ]
+  return spots[Math.floor(Math.random() * spots.length)]()
+}
 
 export default function PetMascot() {
   const location = useLocation()
@@ -286,22 +319,26 @@ export default function PetMascot() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [pageTipIndex, setPageTipIndex] = useState(0)
   const [isPageTip, setIsPageTip] = useState(false)
-  // 躲入邊框狀態：null = 正常顯示，'left' | 'right' = 已躲入對應側邊框
-  const [dockSide, setDockSide] = useState<'left' | 'right' | null>(null)
+  // 躲藏狀態：null = 正常顯示，否則為當前躲藏位置
+  const [hideSpot, setHideSpot] = useState<HideSpot | null>(null)
   const posRef = useRef(pos)
+  const hideSpotRef = useRef<HideSpot | null>(null)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const bubbleTimerRef = useRef<number | null>(null)
   const dragMovedRef = useRef(false)
   const idleTimerRef = useRef<number | null>(null)
 
+  useEffect(() => {
+    hideSpotRef.current = hideSpot
+  }, [hideSpot])
+
   const current = expressions[currentIndex]
 
-  // 重置閑置計時器：長時間無交互後躲入離得最近的左/右邊框
+  // 重置閑置計時器：長時間無交互後隨機躲到屏幕某個邊緣/角落
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
     idleTimerRef.current = window.setTimeout(() => {
-      const centerX = posRef.current.x + BODY_WIDTH / 2
-      setDockSide(centerX < window.innerWidth / 2 ? 'left' : 'right')
+      setHideSpot(randomHideSpot(hideSpotRef.current))
     }, IDLE_DOCK_DELAY)
   }, [])
 
@@ -312,20 +349,22 @@ export default function PetMascot() {
     }
   }, [resetIdleTimer])
 
-  // 躲藏一段時間後自動跳出來（不用鼠標也會自己出來，避免躲太久難發現）
+  // 躲藏一段時間後自動換個地方冒出來（不用鼠標也會自己出現，避免躲太久難發現）
   useEffect(() => {
-    if (!dockSide) return
+    if (!hideSpot) return
     const delay = DOCK_AUTO_POP_MIN + Math.random() * (DOCK_AUTO_POP_MAX - DOCK_AUTO_POP_MIN)
     const timer = window.setTimeout(() => {
-      setDockSide(null)
+      setPos(randomFreePos())
+      setHideSpot(null)
       resetIdleTimer()
     }, delay)
     return () => clearTimeout(timer)
-  }, [dockSide, resetIdleTimer])
+  }, [hideSpot, resetIdleTimer])
 
-  // 鼠標移入：若已躲入邊框則自動跳出來，並重新計時
+  // 鼠標移入：若已躲藏則跳出來，並重新計時
   const handleMouseEnter = () => {
-    setDockSide(null)
+    if (hideSpot) setPos(randomFreePos())
+    setHideSpot(null)
     resetIdleTimer()
   }
 
@@ -418,7 +457,7 @@ export default function PetMascot() {
   // 拖拽逻辑
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    setDockSide(null)
+    setHideSpot(null)
     resetIdleTimer()
     dragMovedRef.current = false
     const startX = e.clientX
@@ -456,24 +495,34 @@ export default function PetMascot() {
     window.addEventListener('mouseup', onUp)
   }, [resetIdleTimer])
 
-  // 躲入邊框時的橫向位置：蜜蜂傾斜 DOCK_TILT_DEG 後僅露出 DOCK_PEEK 寬的頭部
-  // 以中心旋轉後的橫向半寬 = (W/2)·cosθ + (H/2)·sinθ
-  const tiltRad = (DOCK_TILT_DEG * Math.PI) / 180
-  const halfExtent = (BODY_WIDTH / 2) * Math.cos(tiltRad) + (BODY_HEIGHT / 2) * Math.sin(tiltRad)
-  const dockedX = dockSide === 'left'
-    ? DOCK_PEEK - halfExtent - BODY_WIDTH / 2
-    : window.innerWidth - DOCK_PEEK + halfExtent - BODY_WIDTH / 2
+  // 根據躲藏位置計算蜜蜂的座標（僅支持右側/底部躲藏）
+  const dockInfo = (() => {
+    if (!hideSpot) return { x: pos.x, y: pos.y, cls: '' }
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const tiltRad = (DOCK_TILT_DEG * Math.PI) / 180
+    // 傾斜 45° 後露出 DOCK_PEEK 寬的頭部所需的偏移量
+    const halfExtent = (BODY_WIDTH / 2) * Math.cos(tiltRad) + (BODY_HEIGHT / 2) * Math.sin(tiltRad)
+    const midX = (w - BODY_WIDTH) / 2
+    switch (hideSpot) {
+      case 'right':
+        return { x: w - DOCK_PEEK + halfExtent - BODY_WIDTH / 2, y: pos.y, cls: 'docked-right' }
+      case 'bottom':
+      default:
+        return { x: midX, y: h - EDGE_PEEK, cls: 'docked-bottom' }
+    }
+  })()
 
   return (
     <>
       <div
-        className={`pet-mascot-wrapper ${isDragging ? 'dragging' : ''} ${dockSide ? `docked docked-${dockSide}` : ''}`}
-        style={{ left: dockSide ? dockedX : pos.x, top: pos.y }}
+        className={`pet-mascot-wrapper ${isDragging ? 'dragging' : ''} ${hideSpot ? `docked ${dockInfo.cls}` : ''}`}
+        style={{ left: dockInfo.x, top: dockInfo.y }}
         onMouseDown={handleMouseDown}
         onMouseEnter={handleMouseEnter}
         onClick={handleClick}
       >
-        {showBubble && !dockSide && (
+        {showBubble && !hideSpot && (
           <div className={`pet-bubble ${isPageTip ? 'page-tip' : ''}`}>
             <div className="pet-bubble-text">{getBubbleContent()}</div>
             <div className="pet-bubble-tail" />

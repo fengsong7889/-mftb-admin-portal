@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Radio, Tabs, Segmented } from 'antd'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Segmented } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { ServiceStatus } from './constants'
@@ -91,6 +91,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [modalDimension, setModalDimension] = useState<ScoreDimension>(ScoreDimension.COMMERCIAL)
   const [modalSubDimension, setModalSubDimension] = useState<StoreSubDimension | undefined>(undefined)
   const [ruleForm] = Form.useForm<RuleFormValues>()
+  /** 監聽彈窗內計分方式，金額倍率時分值字段填倍率 */
+  const ruleFormMode = Form.useWatch('mode', ruleForm)
 
   /** 權重總和（用於校驗提示） */
   const weightTotal = useMemo(
@@ -582,15 +584,21 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             label="分值"
             name="score"
             rules={[{ required: true, message: '請輸入分值' }]}
-            extra="加分項填正值，扣分降權項填負值，取值範圍 -100 ~ 100"
+            extra={ruleFormMode === ScoreMode.AMOUNT_MULTIPLIER
+              ? '金額倍率方式：此處填倍率值，得分 = 金額 × 倍率（如 2 表示金額×2）'
+              : '加分項填正值，扣分降權項填負值，取值範圍 -100 ~ 100'}
           >
             <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder="請輸入分值" />
           </Form.Item>
-          <Form.Item label="狀態" name="status" rules={[{ required: true, message: '請選擇狀態' }]}>
-            <Radio.Group>
-              <Radio value={ServiceStatus.ENABLED}>啟用</Radio>
-              <Radio value={ServiceStatus.DISABLED}>停用</Radio>
-            </Radio.Group>
+          <Form.Item
+            label="狀態"
+            name="status"
+            valuePropName="checked"
+            getValueProps={v => ({ checked: v === ServiceStatus.ENABLED })}
+            normalize={(checked: boolean) => checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED}
+            rules={[{ required: true, message: '請選擇狀態' }]}
+          >
+            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
       </Modal>
