@@ -5,10 +5,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmVO;
+import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdAlgorithm;
+import com.mftb.admin.entity.BizMerchantGroup;
+import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
+import com.mftb.admin.mapper.BizMerchantGroupMapper;
+import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
+import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,11 +37,14 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private static final Pattern CODE_SEQ = Pattern.compile("(\\d+)$");
 
     private final AdAlgorithmMapper algorithmMapper;
+    private final AdPricingStarService pricingService;
+    private final BizStoreMapper storeMapper;
+    private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
 
     @Override
     public PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
-                                          Integer channel, Integer status, String keyword) {
+                                          Integer channel, Integer status, String keyword, String storeCode) {
         LambdaQueryWrapper<AdAlgorithm> wrapper = new LambdaQueryWrapper<>();
         if (algoType != null) wrapper.eq(AdAlgorithm::getAlgoType, algoType);
         if (StringUtils.hasText(brand)) wrapper.eq(AdAlgorithm::getBrand, brand);
@@ -50,7 +60,42 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         List<AdAlgorithmVO> records = result.getRecords().stream()
                 .map(AdAlgorithmVO::from)
                 .toList();
+        // 销售菜单场景: 过滤掉对该门店屏蔽的算法（规则6）
+        if (StringUtils.hasText(storeCode)) {
+            int before = records.size();
+            records = records.stream()
+                    .filter(algo -> !isBlockedForStore(algo.getId(), storeCode))
+                    .toList();
+            return new PageResult<>(records, Math.max(0, result.getTotal() - (before - records.size())));
+        }
         return new PageResult<>(records, result.getTotal());
+    }
+
+    /** 该算法启用中的定价是否屏蔽了指定门店（含其所属集团） */
+    private boolean isBlockedForStore(Long algoId, String storeCode) {
+        AdPricingStarVO pricing = pricingService.activeByAlgo(algoId);
+        if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {
+            return false;
+        }
+        BizStore store = storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
+                .eq(BizStore::getStoreCode, storeCode)
+                .last("LIMIT 1"));
+        String groupCode = null;
+        if (store != null && store.getGroupId() != null) {
+            BizMerchantGroup group = groupMapper.selectById(store.getGroupId());
+            groupCode = group != null ? group.getGroupCode() : null;
+        }
+        for (Map<String, Object> entry : JsonUtils.parseMapList(pricing.getBlockList())) {
+            String entryStore = entry.get("storeCode") == null ? null : String.valueOf(entry.get("storeCode"));
+            String entryGroup = entry.get("groupCode") == null ? null : String.valueOf(entry.get("groupCode"));
+            if (storeCode.equals(entryStore)) {
+                return true;
+            }
+            if (groupCode != null && groupCode.equals(entryGroup)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

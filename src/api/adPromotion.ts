@@ -101,6 +101,8 @@ export interface AdAlgorithmQuery {
   channel?: number
   status?: number
   keyword?: string
+  /** 銷售菜單場景: 傳入後過濾掉對該門店屏蔽的算法 */
+  storeCode?: string
 }
 
 /** 算法分頁查詢 */
@@ -163,6 +165,10 @@ export interface AdPricingStar {
   blockMerchant?: number
   /** 屏蔽商家列表 JSON 字符串 */
   blockList?: string
+  /** 可售時段 JSON 數組字符串（空或含 fullDay 表示全部時段） */
+  sellTimeSlots?: string
+  /** 時段折扣配置 JSON 數組字符串（分商圈，百分比記法） */
+  slotDiscounts?: string
   /** 服務狀態: 1=啟用 2=停用 */
   status?: number
   remark?: string
@@ -186,10 +192,30 @@ export interface AdPricingStarRequest {
   cancelFeeTiers?: Record<string, unknown>[]
   blockMerchant?: number
   blockList?: Record<string, unknown>[]
+  /** 可售時段: ["breakfast","lunch"] 等; 空或含 fullDay 表示全部時段 */
+  sellTimeSlots?: string[]
+  /** 分商圈時段折扣配置（整體替換，百分比記法: 80=8折） */
+  slotDiscounts?: AdRegionSlotDiscount[]
   status?: number
   remark?: string
   /** 分商圈日單價配置（整體替換） */
   regionPrices?: AdRegionPrice[]
+}
+
+/** 商圈時段折扣（百分比記法: 80 = 8折） */
+export interface AdRegionSlotDiscount {
+  region: number
+  /** 全時段折扣（購買當天全部 5 個時段時適用） */
+  fullDay?: number
+  breakfast?: number
+  lunch?: number
+  afternoon?: number
+  dinner?: number
+  supper?: number
+  /** 限時打折開關（僅持久化展示用） */
+  limitedTime?: boolean
+  startDate?: string
+  endDate?: string
 }
 
 /** 計價配置查詢參數 */
@@ -249,8 +275,8 @@ export interface AdInventoryCell {
   mealSlot: AdMealSlot
   /** 格子單價（商圈日單價 / 5） */
   cellPrice: number
-  /** 格子狀態: available=可購買 soldOut=已售罄 upcoming=待開售 */
-  status: 'available' | 'soldOut' | 'upcoming'
+  /** 格子狀態: available=可購買 soldOut=已售罄 unavailable=不可售 upcoming=待開售 */
+  status: 'available' | 'soldOut' | 'unavailable' | 'upcoming'
 }
 
 /** 庫存查詢結果 */
@@ -259,12 +285,14 @@ export interface AdInventoryVO {
   presaleDays: number
   /** 多時段梯度折扣 JSON 字符串（前端展示折扣規則） */
   discountTiers?: string
+  /** 分商圈時段折扣配置 JSON 字符串（前端預覽折後價） */
+  slotDiscounts?: string
   cells: AdInventoryCell[]
 }
 
-/** 查詢可購買格子 */
-export function fetchAdInventory(algoId: number) {
-  return request.get<unknown, AdInventoryVO>('/ad/sales/star/inventory', { params: { algoId }, ...SILENT })
+/** 查詢可購買格子（storeCode/groupCode 用於屏蔽商家攔截） */
+export function fetchAdInventory(algoId: number, storeCode?: string, groupCode?: string) {
+  return request.get<unknown, AdInventoryVO>('/ad/sales/star/inventory', { params: { algoId, storeCode, groupCode }, ...SILENT })
 }
 
 /** 下單請求（從推廣金賬戶扣款） */
@@ -284,7 +312,26 @@ export function placeAdStarOrder(data: AdStarOrderRequest) {
   return request.post<unknown, AdOrder>('/ad/sales/star/order', data, SILENT)
 }
 
+/** 加購鎖定格子 60 秒（其它商家看到已售罄，到期自動釋放） */
+export function lockAdCells(data: AdStarOrderRequest) {
+  return request.post<unknown, void>('/ad/sales/star/lock', data, SILENT)
+}
+
+/** 釋放加購鎖（移除購物車/取消時調用） */
+export function unlockAdCells(data: AdStarOrderRequest) {
+  return request.post<unknown, void>('/ad/sales/star/unlock', data, SILENT)
+}
+
 /* ==================== 訂單查詢 + 退款 ==================== */
+
+/** 餐段時段 key → 展示時間段（與演示數據樣式對齊） */
+export const MEAL_SLOT_TIME_LABEL: Record<string, string> = {
+  breakfast: '07:00-10:00',
+  lunch: '11:00-14:00',
+  afternoon: '14:00-17:00',
+  dinner: '17:00-21:00',
+  supper: '21:00-02:00',
+}
 
 /** 廣告訂單（與後端 AdOrderVO 對齊） */
 export interface AdOrder {
@@ -294,6 +341,8 @@ export interface AdOrder {
   algoType: number
   algoId: number
   algoName: string
+  /** 算法编码（如 ALG00001） */
+  algoCode?: string
   brand?: string
   channel?: number
   groupCode: string
@@ -301,6 +350,14 @@ export interface AdOrder {
   storeCode?: string
   storeName?: string
   bdEmpId?: string
+  /** 下单人类型: 1=商家 2=业务人员 */
+  operatorType?: number
+  operatorId?: string
+  operatorName?: string
+  /** 所属商圈（明细去重聚合） */
+  regions?: number[]
+  /** 购买时段（明细去重聚合, breakfast/lunch/afternoon/dinner/supper） */
+  mealSlots?: string[]
   itemCount?: number
   originalAmount: number
   discountAmount: number

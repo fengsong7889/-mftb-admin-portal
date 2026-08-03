@@ -9,9 +9,9 @@ import com.mftb.admin.dto.PageResult;
  */
 public interface AdAlgorithmService {
 
-    /** 算法分页查询 */
+    /** 算法分页查询（storeCode 非空时过滤掉对该门店屏蔽的算法，供销售菜单下拉使用） */
     PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
-                                   Integer channel, Integer status, String keyword);
+                                   Integer channel, Integer status, String keyword, String storeCode);
 
     /** 算法详情 */
     AdAlgorithmVO detail(Long id);

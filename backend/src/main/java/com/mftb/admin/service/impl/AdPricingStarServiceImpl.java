@@ -150,6 +150,8 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
         entity.setCancelFeeTiers(request.getCancelFeeTiers() == null ? null : JsonUtils.toJson(request.getCancelFeeTiers()));
         entity.setBlockMerchant(request.getBlockMerchant() == null ? 2 : request.getBlockMerchant());
         entity.setBlockList(request.getBlockList() == null ? null : JsonUtils.toJson(request.getBlockList()));
+        entity.setSellTimeSlots(request.getSellTimeSlots() == null ? null : JsonUtils.toJson(request.getSellTimeSlots()));
+        entity.setSlotDiscounts(request.getSlotDiscounts() == null ? null : JsonUtils.toJson(request.getSlotDiscounts()));
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
         }

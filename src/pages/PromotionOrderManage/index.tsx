@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
 import BrandTag from '../../components/BrandTag'
-import { fetchAdOrders, withAdFallback, brandToAppType, type AdOrder } from '../../api/adPromotion'
+import { fetchAdOrders, withAdFallback, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
 const { RangePicker } = DatePicker
 import {
   SearchOutlined,
@@ -177,20 +177,24 @@ function toOrderItem(vo: AdOrder): OrderItem {
     4: RecommendChannel.GROUP_BUY,
   }
   const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  // 所屬商圈: 後端由訂單明細去重聚合返回
+  const regions = (vo.regions || []).map(r => r as Region)
+  // 購買時段: 餐段 key → 時間段標籤
+  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
     promotionName: vo.algoName,
     app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
     channel: channelMap[vo.channel ?? 2] ?? RecommendChannel.DELIVERY,
-    region: [],
+    region: regions.length === 1 ? regions[0] : regions,
     recommendType: vo.algoType as RecommendType,
     slotPosition: 0,
     groupId: vo.groupCode,
     groupName: vo.groupName || '-',
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
-    mealSlots: vo.itemCount ? [`${vo.itemCount} 個時段`] : [],
+    mealSlots,
     purchaseDate: (vo.orderTime || '').slice(0, 10),
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,

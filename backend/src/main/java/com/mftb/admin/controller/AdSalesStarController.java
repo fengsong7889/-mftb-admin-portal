@@ -24,10 +24,26 @@ public class AdSalesStarController {
 
     private final AdSalesStarService salesService;
 
-    /** 查询可购买格子（商圈 x 日期 x 餐段） */
+    /** 查询可购买格子（商圈 x 日期 x 餐段；storeCode/groupCode 用于屏蔽商家拦截） */
     @GetMapping("/inventory")
-    public Result<AdInventoryVO> inventory(@RequestParam Long algoId) {
-        return Result.success(salesService.inventory(algoId));
+    public Result<AdInventoryVO> inventory(@RequestParam Long algoId,
+                                           @RequestParam(required = false) String storeCode,
+                                           @RequestParam(required = false) String groupCode) {
+        return Result.success(salesService.inventory(algoId, storeCode, groupCode));
+    }
+
+    /** 加购锁定格子 60 秒（其它商家看到已售罄，到期自动释放） */
+    @PostMapping("/lock")
+    public Result<Void> lockCells(@Valid @RequestBody AdStarOrderRequest request) {
+        salesService.lockCells(request);
+        return Result.success();
+    }
+
+    /** 释放加购锁（移除购物车/取消时调用） */
+    @PostMapping("/unlock")
+    public Result<Void> unlockCells(@Valid @RequestBody AdStarOrderRequest request) {
+        salesService.unlockCells(request);
+        return Result.success();
     }
 
     /** 提交订单并从推广金账户扣款 */

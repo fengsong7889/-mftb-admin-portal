@@ -9,9 +9,15 @@ import com.mftb.admin.dto.AdStarOrderRequest;
  */
 public interface AdSalesStarService {
 
-    /** 查询可购买格子（商圈 x 日期 x 餐段，预售窗口内） */
-    AdInventoryVO inventory(Long algoId);
+    /** 查询可购买格子（商圈 x 日期 x 餐段，预售窗口内；storeCode/groupCode 用于屏蔽商家拦截） */
+    AdInventoryVO inventory(Long algoId, String storeCode, String groupCode);
 
     /** 提交订单并从推广金账户扣款 */
     AdOrderVO placeOrder(AdStarOrderRequest request);
+
+    /** 加购锁定格子 60 秒（其它商家看到已售罄，到期自动释放） */
+    void lockCells(AdStarOrderRequest request);
+
+    /** 释放加购锁（移除购物车/取消时调用） */
+    void unlockCells(AdStarOrderRequest request);
 }

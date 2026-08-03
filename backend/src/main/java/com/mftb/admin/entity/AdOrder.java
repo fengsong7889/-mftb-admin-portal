@@ -32,6 +32,9 @@ public class AdOrder {
     /** 算法名称快照 */
     private String algoName;
 
+    /** 算法编码快照 */
+    private String algoCode;
+
     /** 所属品牌: flashBee / mFood */
     private String brand;
 
@@ -52,6 +55,15 @@ public class AdOrder {
 
     /** 归属BD */
     private String bdEmpId;
+
+    /** 下单人类型: 1=商家 2=业务人员 */
+    private Integer operatorType;
+
+    /** 下单人ID (商家=门店ID, 业务人员=工号) */
+    private String operatorId;
+
+    /** 下单人姓名 */
+    private String operatorName;
 
     /** 明细格子数 */
     private Integer itemCount;

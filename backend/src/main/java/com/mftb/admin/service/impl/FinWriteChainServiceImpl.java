@@ -20,6 +20,7 @@ import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -328,6 +329,132 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             total = total.add(FinExtras.nonNull(detail.getVirtualChange()).abs());
         }
         return total;
+    }
+
+    /* ==================== 广告消费 ==================== */
+
+    /**
+     * 广告消费（商家购买广告算法扣款）: 变动类别记录广告类型（如無敵星星），
+     * 按充值批次交易时间 FIFO 拆分明细并挂批次号，批次明细页据此展示消费记录
+     * @return 首条明细ID（供订单 flowNo 关联）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String writeAdConsume(String groupCode, String groupName, String brand,
+                                 String storeCode, String storeName, String channel,
+                                 BigDecimal amount, String changeType, String bd,
+                                 String remark, String flowNo, LocalDateTime tradeTime) {
+        List<DeductPart> parts = splitByFifo(groupCode, amount);
+        Map<String, BalanceDelta> deltas = new LinkedHashMap<>();
+        boolean multi = parts.size() > 1;
+        String firstDetailId = null;
+        for (int i = 0; i < parts.size(); i++) {
+            DeductPart part = parts.get(i);
+            String splitTag = multi ? "（跨批次扣款 " + (i + 1) + "/" + parts.size() + "）" : "";
+
+            BigDecimal virtualChange = part.amount().negate();
+            FinDetail row = buildAdDetail(groupCode, groupName, brand, storeCode, storeName, channel,
+                    tradeTime, part.batchNo(), StringUtils.hasText(flowNo) ? flowNo : FinExtras.DASH,
+                    bd, TRADE_CONSUME, changeType, virtualChange,
+                    calcActualChange(virtualChange, batchActualRatio(part.batchNo())),
+                    remark + splitTag);
+            if (firstDetailId == null) {
+                firstDetailId = row.getDetailId();
+            }
+            saveDetail(row, deltas);
+        }
+        applyDeltas(deltas, brand);
+        return firstDetailId;
+    }
+
+    /* ==================== 广告退款 ==================== */
+
+    /**
+     * 广告退款: 按原消费明细占比回退原批次，实收按对应批次实收比例等比例回补。
+     * 找不到原消费明细（存量旧订单）时单条写入，实收按集团综合实收比例回补。
+     * @return 首条明细ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String writeAdRefund(String groupCode, String groupName, String brand,
+                                String storeCode, String storeName, String channel,
+                                BigDecimal amount, String changeType, String bd,
+                                String remark, String orderNo, LocalDateTime tradeTime) {
+        List<FinDetail> consumes = detailMapper.selectList(
+                new LambdaQueryWrapper<FinDetail>()
+                        .eq(FinDetail::getFlowNo, orderNo)
+                        .eq(FinDetail::getTradeType, TRADE_CONSUME)
+                        .lt(FinDetail::getVirtualChange, BigDecimal.ZERO)
+                        .orderByAsc(FinDetail::getId));
+
+        Map<String, BalanceDelta> deltas = new LinkedHashMap<>();
+        String firstDetailId = null;
+        if (!consumes.isEmpty()) {
+            BigDecimal consumeTotal = BigDecimal.ZERO;
+            for (FinDetail consume : consumes) {
+                consumeTotal = consumeTotal.add(FinExtras.nonNull(consume.getVirtualChange()).abs());
+            }
+            BigDecimal allocated = BigDecimal.ZERO;
+            for (int i = 0; i < consumes.size(); i++) {
+                FinDetail src = consumes.get(i);
+                // 按原消费占比分摊退款额，末条承担尾差，保证合计精确
+                BigDecimal partAmount;
+                if (i == consumes.size() - 1) {
+                    partAmount = amount.subtract(allocated);
+                } else {
+                    partAmount = consumeTotal.compareTo(BigDecimal.ZERO) > 0
+                            ? FinExtras.round2(amount
+                                    .multiply(FinExtras.nonNull(src.getVirtualChange()).abs())
+                                    .divide(consumeTotal, 10, RoundingMode.HALF_UP))
+                            : amount;
+                    allocated = allocated.add(partAmount);
+                }
+                if (partAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                FinDetail row = buildAdDetail(groupCode, groupName, brand, storeCode, storeName, channel,
+                        tradeTime, src.getBatchNo(), orderNo, bd, TRADE_CONSUME, changeType,
+                        partAmount, calcActualChange(partAmount, batchActualRatio(src.getBatchNo())), remark);
+                if (firstDetailId == null) {
+                    firstDetailId = row.getDetailId();
+                }
+                saveDetail(row, deltas);
+            }
+        } else {
+            FinDetail row = buildAdDetail(groupCode, groupName, brand, storeCode, storeName, channel,
+                    tradeTime, FinExtras.DASH, orderNo, bd, TRADE_CONSUME, changeType,
+                    amount, calcActualChange(amount, groupActualRatio(groupCode)), remark);
+            firstDetailId = row.getDetailId();
+            saveDetail(row, deltas);
+        }
+        applyDeltas(deltas, brand);
+        return firstDetailId;
+    }
+
+    /** 广告消费/退款明细公共构造 */
+    private FinDetail buildAdDetail(String groupCode, String groupName, String brand,
+                                    String storeCode, String storeName, String channel,
+                                    LocalDateTime tradeTime, String batchNo, String flowNo,
+                                    String bd, String tradeType, String changeType,
+                                    BigDecimal virtualChange, BigDecimal actualChange, String remark) {
+        FinDetail row = new FinDetail();
+        row.setDetailId(bizSeqService.next(BizSeqService.PREFIX_DETAIL));
+        row.setGroupCode(groupCode);
+        row.setGroupName(groupName);
+        row.setBrand(brand);
+        row.setStoreCode(StringUtils.hasText(storeCode) ? storeCode : FinExtras.DASH);
+        row.setStoreName(StringUtils.hasText(storeName) ? storeName : FinExtras.DASH);
+        row.setChannel(StringUtils.hasText(channel) ? channel : DEFAULT_CHANNEL);
+        row.setTradeTime(tradeTime);
+        row.setBatchNo(StringUtils.hasText(batchNo) ? batchNo : FinExtras.DASH);
+        row.setFlowNo(flowNo);
+        row.setBd(StringUtils.hasText(bd) ? bd : FinExtras.DASH);
+        row.setTradeType(tradeType);
+        row.setChangeType(changeType);
+        row.setVirtualChange(virtualChange);
+        row.setActualChange(actualChange);
+        row.setRemark(remark);
+        return row;
     }
 
     /* ==================== 商户合并 ==================== */

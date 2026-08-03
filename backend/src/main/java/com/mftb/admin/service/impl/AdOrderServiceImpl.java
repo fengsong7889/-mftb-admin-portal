@@ -9,14 +9,18 @@ import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemStar;
+import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
+import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.FinAccountService;
+import com.mftb.admin.service.FinWriteChainService;
+import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -30,9 +34,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 推广广告订单服务实现（订单查询 + 退款）
@@ -43,9 +49,11 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private final AdOrderMapper orderMapper;
     private final AdOrderItemStarMapper itemMapper;
+    private final AdAlgorithmMapper algorithmMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
     private final FinAccountService accountService;
+    private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -67,6 +75,7 @@ public class AdOrderServiceImpl implements AdOrderService {
         List<AdOrderVO> records = result.getRecords().stream()
                 .map(AdOrderVO::from)
                 .toList();
+        fillSummaries(records);
         return new PageResult<>(records, result.getTotal());
     }
 
@@ -74,6 +83,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     public AdOrderDetailVO detail(String orderNo) {
         AdOrder order = require(orderNo);
         AdOrderDetailVO vo = AdOrderDetailVO.from(AdOrderVO.from(order));
+        fillSummaries(List.of(vo));
         List<AdOrderItemStar> items = itemMapper.selectList(
                 new LambdaQueryWrapper<AdOrderItemStar>()
                         .eq(AdOrderItemStar::getOrderId, order.getId())
@@ -126,26 +136,14 @@ public class AdOrderServiceImpl implements AdOrderService {
             refundTotal = refundTotal.add(refundPrice);
         }
 
-        // 回补推广金账户 + 写退款明细（与购买消费明细同类型正负相抵）
+        // 回补推广金账户 + 写退款明细（财务写入链: 回退原批次, 实收按批次比例等比例回补）
         LocalDateTime now = LocalDateTime.now();
-        FinDetail detail = new FinDetail();
-        detail.setDetailId(bizSeqService.next(BizSeqService.PREFIX_DETAIL));
-        detail.setGroupCode(order.getGroupCode());
-        detail.setGroupName(order.getGroupName());
-        detail.setBrand(order.getBrand());
-        detail.setStoreCode(StringUtils.hasText(order.getStoreCode()) ? order.getStoreCode() : "--");
-        detail.setStoreName(StringUtils.hasText(order.getStoreName()) ? order.getStoreName() : "--");
-        detail.setChannel("外賣");
-        detail.setTradeType("消費");
-        detail.setChangeType("廣告退款");
-        detail.setTradeTime(now);
-        detail.setVirtualChange(refundTotal);
-        detail.setFlowNo(order.getOrderNo());
-        detail.setBd(StringUtils.hasText(order.getBdEmpId()) ? order.getBdEmpId() : "--");
-        detail.setRemark("無敵星星廣告退款 訂單" + order.getOrderNo());
-        finDetailMapper.insert(detail);
-
-        accountService.changeBalance(order.getGroupCode(), order.getBrand(), refundTotal, null);
+        String changeType = AdAlgoTypeNames.of(order.getAlgoType());
+        finWriteChainService.writeAdRefund(
+                order.getGroupCode(), order.getGroupName(), order.getBrand(),
+                order.getStoreCode(), order.getStoreName(), "外賣",
+                refundTotal, changeType, order.getBdEmpId(),
+                changeType + "廣告退款 訂單" + order.getOrderNo(), order.getOrderNo(), now);
 
         order.setRefundAmount(round2(safe(order.getRefundAmount()).add(refundTotal)));
         order.setStatus(4); // 已退款
@@ -155,6 +153,49 @@ public class AdOrderServiceImpl implements AdOrderService {
     }
 
     /* ==================== 内部方法 ==================== */
+
+    /**
+     * 列表/详情补充展示字段:
+     * 1) 商圈/时段由订单明细去重聚合;
+     * 2) 存量订单无算法编码快照时回查算法表填充
+     */
+    private void fillSummaries(List<AdOrderVO> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        List<Long> orderIds = records.stream().map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        Map<Long, List<AdOrderItemStar>> byOrder = orderIds.isEmpty() ? Map.of()
+                : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
+                        .in(AdOrderItemStar::getOrderId, orderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemStar::getOrderId));
+        for (AdOrderVO vo : records) {
+            List<AdOrderItemStar> items = byOrder.getOrDefault(vo.getId(), List.of());
+            vo.setRegions(items.stream().map(AdOrderItemStar::getRegion)
+                    .filter(java.util.Objects::nonNull).distinct().sorted().toList());
+            List<String> slots = new ArrayList<>();
+            for (String slot : AdSalesStarServiceImpl.MEAL_SLOTS) {
+                if (items.stream().anyMatch(i -> slot.equals(i.getMealSlot()))) {
+                    slots.add(slot);
+                }
+            }
+            vo.setMealSlots(slots);
+        }
+        // 存量订单无 algo_code 快照 → 回查算法表补齐
+        List<Long> missingAlgoIds = records.stream()
+                .filter(r -> !StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null)
+                .map(AdOrderVO::getAlgoId).distinct().toList();
+        if (!missingAlgoIds.isEmpty()) {
+            Map<Long, String> codeMap = algorithmMapper.selectList(
+                    new LambdaQueryWrapper<AdAlgorithm>().in(AdAlgorithm::getId, missingAlgoIds))
+                    .stream().filter(a -> StringUtils.hasText(a.getAlgoCode()))
+                    .collect(Collectors.toMap(AdAlgorithm::getId, AdAlgorithm::getAlgoCode, (a, b) -> a));
+            records.forEach(r -> {
+                if (!StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null) {
+                    r.setAlgoCode(codeMap.get(r.getAlgoId()));
+                }
+            });
+        }
+    }
 
     private AdOrder require(String orderNo) {
         AdOrder order = orderMapper.selectOne(

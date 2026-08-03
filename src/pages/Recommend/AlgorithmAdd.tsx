@@ -736,11 +736,13 @@ export default function AlgorithmAdd() {
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                           options={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? [
                             { label: '隨機計算', value: 'random' },
+                          ] : selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? [
+                            { label: '輪詢計算', value: 'random' },
                           ] : [
                             { label: '維度計算', value: 'merchant' },
                             { label: '輪詢計算', value: 'random' },
                           ]}
-                          disabled={isDetailMode || selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR}
+                          disabled={isDetailMode || selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD}
                         />
                       </Form.Item>
                     </div>

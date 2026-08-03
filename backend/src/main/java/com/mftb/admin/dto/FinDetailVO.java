@@ -12,6 +12,12 @@ import java.math.BigDecimal;
 @Data
 public class FinDetailVO {
 
+    /** 存储交易类型: 消费（退款以正数消费明细与原消费正负相抵） */
+    private static final String STORED_CONSUME = "消費";
+
+    /** 展示交易类型: 退款（金额为正的消费明细即退款回补） */
+    public static final String DISPLAY_REFUND = "退款";
+
     private Long id;
     private String detailId;
 
@@ -27,7 +33,7 @@ public class FinDetailVO {
     private String storeName;
     private String channel;
 
-    /** 交易类型: 充值 / 扣款 / 消费 / 转入 / 转出 */
+    /** 交易类型: 充值 / 扣款 / 消费 / 退款 / 转入 / 转出 */
     private String tradeType;
 
     /** 变动类别 */
@@ -56,7 +62,7 @@ public class FinDetailVO {
         vo.setStoreId(detail.getStoreCode());
         vo.setStoreName(detail.getStoreName());
         vo.setChannel(detail.getChannel());
-        vo.setTradeType(detail.getTradeType());
+        vo.setTradeType(displayTradeType(detail));
         vo.setChangeType(detail.getChangeType());
         vo.setTradeTime(DateTimeUtils.format(detail.getTradeTime()));
         vo.setVirtualChange(detail.getVirtualChange());
@@ -66,5 +72,18 @@ public class FinDetailVO {
         vo.setBd(detail.getBd());
         vo.setRemark(detail.getRemark());
         return vo;
+    }
+
+    /**
+     * 展示交易类型: 消费类型中金额为正的明细是退款回补（消费是扣费），
+     * 展示为「退款」；存储仍为「消費」以保持与原消费明细正负相抵口径。
+     */
+    private static String displayTradeType(FinDetail detail) {
+        if (STORED_CONSUME.equals(detail.getTradeType())
+                && detail.getVirtualChange() != null
+                && detail.getVirtualChange().signum() > 0) {
+            return DISPLAY_REFUND;
+        }
+        return detail.getTradeType();
     }
 }

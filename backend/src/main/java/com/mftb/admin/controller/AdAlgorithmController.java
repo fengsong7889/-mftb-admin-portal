@@ -38,8 +38,9 @@ public class AdAlgorithmController {
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) Integer channel,
             @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(algorithmService.page(page, size, algoType, brand, channel, status, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String storeCode) {
+        return Result.success(algorithmService.page(page, size, algoType, brand, channel, status, keyword, storeCode));
     }
 
     /** 算法详情 */

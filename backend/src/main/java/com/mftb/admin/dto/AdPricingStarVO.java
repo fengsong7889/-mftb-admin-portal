@@ -28,6 +28,10 @@ public class AdPricingStarVO {
     private Integer blockMerchant;
     /** 屏蔽商家列表 JSON 字符串 */
     private String blockList;
+    /** 可售时段 JSON 数组字符串（空或含 fullDay 表示全部时段） */
+    private String sellTimeSlots;
+    /** 时段折扣配置 JSON 数组字符串（分商圈，百分比记法） */
+    private String slotDiscounts;
     private Integer status;
     private String remark;
     private String updatedBy;
@@ -50,6 +54,8 @@ public class AdPricingStarVO {
         vo.setCancelFeeTiers(entity.getCancelFeeTiers());
         vo.setBlockMerchant(entity.getBlockMerchant());
         vo.setBlockList(entity.getBlockList());
+        vo.setSellTimeSlots(entity.getSellTimeSlots());
+        vo.setSlotDiscounts(entity.getSlotDiscounts());
         vo.setStatus(entity.getStatus());
         vo.setRemark(entity.getRemark());
         vo.setUpdatedBy(entity.getUpdatedBy());

@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS biz_ad_order (
     algo_type        TINYINT       NOT NULL                   COMMENT '算法类型快照',
     algo_id          BIGINT        NOT NULL                   COMMENT '算法ID (关联 biz_ad_algorithm.id)',
     algo_name        VARCHAR(128)                             COMMENT '算法名称快照',
+    algo_code        VARCHAR(64)                              COMMENT '算法编码快照',
     brand            VARCHAR(64)                              COMMENT '所属品牌: flashBee / mFood',
     channel          TINYINT                                  COMMENT '业务频道快照',
     group_code       VARCHAR(32)   NOT NULL                   COMMENT '购买集团ID (关联 biz_merchant_group.group_code)',
@@ -54,6 +55,9 @@ CREATE TABLE IF NOT EXISTS biz_ad_order (
     store_code       VARCHAR(32)                              COMMENT '购买门店ID',
     store_name       VARCHAR(128)                             COMMENT '门店名称快照',
     bd_emp_id        VARCHAR(64)                              COMMENT '归属BD',
+    operator_type    TINYINT                                  COMMENT '下单人类型: 1=商家 2=业务人员',
+    operator_id      VARCHAR(64)                              COMMENT '下单人ID (商家=门店ID, 业务人员=工号)',
+    operator_name    VARCHAR(64)                              COMMENT '下单人姓名',
     item_count       INT           NOT NULL DEFAULT 0         COMMENT '明细格子数',
     original_amount  DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '原价合计',
     discount_amount  DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '折扣优惠金额',
@@ -95,6 +99,8 @@ CREATE TABLE IF NOT EXISTS biz_ad_pricing_star (
     cancel_fee_tiers JSON                                   COMMENT '取消扣费梯度(JSON)',
     block_merchant  TINYINT      NOT NULL DEFAULT 2         COMMENT '屏蔽商家开关: 1=启用 2=关闭',
     block_list      JSON                                    COMMENT '屏蔽商家列表(JSON)',
+    sell_time_slots JSON                                    COMMENT '可售时段(JSON数组, 如["breakfast","lunch"], 空或含fullDay=全部时段)',
+    slot_discounts  JSON                                    COMMENT '时段折扣配置(JSON数组, 分商圈: fullDay/breakfast/lunch/afternoon/dinner/supper, 百分比记法)',
     status          TINYINT      NOT NULL DEFAULT 1         COMMENT '服务状态: 1=启用 2=停用',
     remark          VARCHAR(500)                            COMMENT '备注',
     updated_by      VARCHAR(64)                             COMMENT '最后更新人',
@@ -145,6 +151,23 @@ CREATE TABLE IF NOT EXISTS biz_ad_order_item_star (
     KEY idx_ad_item_cell (biz_date, region, meal_slot),
     KEY idx_ad_item_status (delivery_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='无敌星星订单明细表(独家占)';
+
+-- ============================================================
+-- 五点五、格子加购锁表（规则: 商家加购后锁定60秒, 其它商家看到已售罄）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS biz_ad_cell_lock (
+    id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    algo_id         BIGINT        NOT NULL                   COMMENT '关联算法ID (biz_ad_algorithm.id)',
+    biz_date        DATE          NOT NULL                   COMMENT '投放日期',
+    region          TINYINT       NOT NULL                   COMMENT '商圈',
+    meal_slot       VARCHAR(16)   NOT NULL                   COMMENT '餐段时段: breakfast/lunch/afternoon/dinner/supper',
+    group_code      VARCHAR(64)   NOT NULL                   COMMENT '锁定商家集团编码',
+    store_code      VARCHAR(64)                              COMMENT '锁定门店编码',
+    expire_at       DATETIME      NOT NULL                   COMMENT '锁释放时间(加购时间+60秒)',
+    created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
+    UNIQUE KEY uk_ad_cell_lock (algo_id, biz_date, region, meal_slot),
+    KEY idx_ad_cell_lock_expire (expire_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='无敌星星格子加购锁(60秒)';
 
 -- ============================================================
 -- 六、初始数据（幂等: 仅当不存在时插入）

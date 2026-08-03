@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message, Tabs } from 'antd'
+import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message, Tabs, Spin, Result } from 'antd'
 import {
   ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined,
   ShopOutlined, FileTextOutlined, DollarOutlined,
@@ -211,26 +211,57 @@ function parseCancelFeeTiers(json?: string): { maxDays: number; feePercent: numb
   }
 }
 
-/** 后端订单详情 → 详情页 OrderItem（明细拆为时段价格行，梯度折扣已分摊到明细） */
+/** 解析多時段梯度折扣 JSON（[{minSlots,discount}]，百分比記法） */
+function parseDiscountTiers(json?: string): { minSlots: number; discount: number }[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json)
+    if (!Array.isArray(arr)) return []
+    return (arr as Array<{ minSlots?: number; discount?: number }>)
+      .filter(t => t && Number(t.minSlots) > 0 && Number(t.discount) > 0)
+      .map(t => ({ minSlots: Number(t.minSlots), discount: Number(t.discount) }))
+  } catch {
+    return []
+  }
+}
+
+/** 后端订单详情 → 详情页 OrderItem（明细折扣还原为定价配置的时段折扣口径） */
 function toDetailOrder(
   vo: AdOrderDetail,
-  pricing?: { cancelFeeRules: { maxDays: number; feePercent: number }[]; refundEnabled: boolean },
+  pricing?: {
+    cancelFeeRules: { maxDays: number; feePercent: number }[]
+    refundEnabled: boolean
+    discountTiers: { minSlots: number; discount: number }[]
+  },
 ): OrderItem {
   const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
-  const slotPrices: SlotPriceItem[] = vo.items.map(item => ({
-    slot: MEAL_SLOT_LABEL[item.mealSlot] || item.mealSlot,
-    date: item.bizDate,
-    originalPrice: item.originalPrice,
-    discount: item.originalPrice > 0 ? Math.max(1, Math.round((item.salePrice / item.originalPrice) * 10)) : 10,
-    actualPrice: item.salePrice,
-    region: item.region,
-  }))
+  // 匹配梯度折扣（与后端同算法: minSlots 降序取第一个满足格子数的梯度）
+  const cellCount = vo.itemCount ?? vo.items.length
+  const matchedTier = [...(pricing?.discountTiers ?? [])]
+    .sort((a, b) => b.minSlots - a.minSlots)
+    .find(t => cellCount >= t.minSlots)
+  const tierPct = matchedTier ? matchedTier.discount : 100
+  const slotPrices: SlotPriceItem[] = vo.items.map(item => {
+    // 明细实付含梯度折上折 → 还原时段折扣后价格，展示定价配置的时段折扣
+    const afterSlot = tierPct > 0 ? (item.salePrice / tierPct) * 100 : item.salePrice
+    const discount = item.originalPrice > 0
+      ? Math.min(10, Math.max(1, Math.round((afterSlot / item.originalPrice) * 10)))
+      : 10
+    return {
+      slot: MEAL_SLOT_LABEL[item.mealSlot] || item.mealSlot,
+      date: item.bizDate,
+      originalPrice: item.originalPrice,
+      discount,
+      actualPrice: item.salePrice,
+      region: item.region,
+    }
+  })
   const regions = Array.from(new Set(vo.items.map(i => i.region)))
   const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || (vo.orderTime || '').slice(0, 10)
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
-    algorithmId: String(vo.algoId),
+    algorithmId: vo.algoCode || String(vo.algoId),
     promotionName: vo.algoName,
     app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
     channel: mapAdChannel(vo.channel),
@@ -249,7 +280,7 @@ function toDetailOrder(
     orderTime: fmt(vo.orderTime),
     payTime: vo.payTime ? fmt(vo.payTime) : undefined,
     slotPrices,
-    gradientDiscount: null,
+    gradientDiscount: matchedTier ? { count: matchedTier.minSlots, discount: matchedTier.discount / 10 } : null,
     cancelFeeRules: pricing?.cancelFeeRules ?? [],
     refundAmount: vo.refundAmount ? vo.refundAmount : undefined,
     refundEnabled: pricing?.refundEnabled ?? true,
@@ -647,15 +678,32 @@ export default function OrderDetail() {
   const [refundModalVisible, setRefundModalVisible] = useState(false)
   const [slotsCollapsed, setSlotsCollapsed] = useState(false)
   const [promoAnimKey, setPromoAnimKey] = useState(0)
+  /** 真實訂單後端加載中（初始即為 true，避免首幀閃現「訂單不存在」） */
+  const [apiLoading, setApiLoading] = useState(() => {
+    const oid = new URLSearchParams(window.location.hash.split('?')[1] || '').get('id')
+    return !!oid
+  })
+  /** 加載失敗原因：not-found=訂單不存在 transient=後端暫不可用/網絡異常 */
+  const [loadError, setLoadError] = useState<'not-found' | 'transient' | null>(null)
+  /** 重試計數: 臨時失敗時點「重新加載」觸發重新請求 */
+  const [retryKey, setRetryKey] = useState(0)
 
-  // 从后端加载真实订单详情（id 即订单号），含计价配置中的退款规则
+  // 从后端加载真实订单详情（id 即订单号），含计价配置中的退款规则与梯度折扣
   const loadApiOrder = async (orderNo: string): Promise<OrderItem> => {
     const detail = await fetchAdOrderDetail(orderNo)
-    let pricing: { cancelFeeRules: { maxDays: number; feePercent: number }[]; refundEnabled: boolean } | undefined
+    let pricing: {
+      cancelFeeRules: { maxDays: number; feePercent: number }[]
+      refundEnabled: boolean
+      discountTiers: { minSlots: number; discount: number }[]
+    } | undefined
     try {
       const p = await withAdFallback(() => fetchAdPricingActive(detail.algoId), () => null)
       if (p) {
-        pricing = { cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers), refundEnabled: p.refundEnabled === 1 }
+        pricing = {
+          cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers),
+          refundEnabled: p.refundEnabled === 1,
+          discountTiers: parseDiscountTiers(p.discountTiers),
+        }
       }
     } catch {
       // 计价配置缺失时使用默认规则
@@ -668,15 +716,24 @@ export default function OrderDetail() {
     const local = [...mockOrders, ...newStoreOrders, ...popularOrders].find(o => o.id === orderId)
     if (local) {
       setOrder(local)
+      setApiLoading(false)
       return
     }
-    // 真實訂單：id 即訂單號，從後端加載
+    // 真實訂單：id 即訂單號，從後端加載（區分加載中 / 訂單不存在 / 臨時失敗）
     let cancelled = false
+    setApiLoading(true)
+    setLoadError(null)
     loadApiOrder(orderId)
       .then(o => { if (!cancelled) setOrder(o) })
-      .catch(() => { if (!cancelled) setOrder(null) })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setOrder(null)
+        const msg = err instanceof Error ? err.message : ''
+        setLoadError(msg.includes('訂單不存在') ? 'not-found' : 'transient')
+      })
+      .finally(() => { if (!cancelled) setApiLoading(false) })
     return () => { cancelled = true }
-  }, [orderId])
+  }, [orderId, retryKey])
 
   // 计算退款信息
   const refundInfo = useMemo(() => {
@@ -729,7 +786,20 @@ export default function OrderDetail() {
   if (!order) {
     return (
       <div className="content-area" style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Empty description="訂單不存在" />
+        {apiLoading ? (
+          <Spin size="large" tip="訂單加載中...">
+            <div style={{ width: 200, height: 80 }} />
+          </Spin>
+        ) : loadError === 'transient' ? (
+          <Result
+            status="warning"
+            title="訂單加載失敗"
+            subTitle="後端服務暫不可用或網絡異常，請稍後重試"
+            extra={<Button type="primary" onClick={() => setRetryKey(k => k + 1)}>重新加載</Button>}
+          />
+        ) : (
+          <Empty description="訂單不存在" />
+        )}
       </div>
     )
   }

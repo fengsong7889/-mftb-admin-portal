@@ -33,6 +33,7 @@ import {
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
 import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, withAdFallback, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest } from '../../../api/adPromotion'
+import { fetchStores } from '../../../api/store'
 
 /** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
 function parseJsonList(json?: string): Record<string, unknown>[] {
@@ -185,25 +186,6 @@ interface Merchant {
   storeName: string
 }
 
-// Mock数据 - 商家列表
-const MOCK_MERCHANTS: Merchant[] = [
-  { id: '1', groupId: 'G001', groupName: '美味集團', storeId: 'S001', storeName: '美味早餐店' },
-  { id: '2', groupId: 'G001', groupName: '美味集團', storeId: 'S002', storeName: '美味午餐廳' },
-  { id: '3', groupId: 'G001', groupName: '美味集團', storeId: 'S003', storeName: '美味下午茶' },
-  { id: '4', groupId: 'G002', groupName: '鮮美食堂', storeId: 'S004', storeName: '鮮美食堂-旗艦店' },
-  { id: '5', groupId: 'G002', groupName: '鮮美食堂', storeId: 'S005', storeName: '鮮美食堂-分店' },
-  { id: '6', groupId: 'G003', groupName: '快餐聯盟', storeId: 'S006', storeName: '快餐聯盟-中心店' },
-  { id: '7', groupId: 'G003', groupName: '快餐聯盟', storeId: 'S007', storeName: '快餐聯盟-東區店' },
-  { id: '8', groupId: 'G003', groupName: '快餐聯盟', storeId: 'S008', storeName: '快餐聯盟-西區店' },
-  { id: '9', groupId: 'G004', groupName: '火鍋大王', storeId: 'S009', storeName: '火鍋大王-總店' },
-  { id: '10', groupId: 'G004', groupName: '火鍋大王', storeId: 'S010', storeName: '火鍋大王-分店' },
-  { id: '11', groupId: 'G005', groupName: '咖啡物語', storeId: 'S011', storeName: '咖啡物語-旗艦店' },
-  { id: '12', groupId: 'G005', groupName: '咖啡物語', storeId: 'S012', storeName: '咖啡物語-分店' },
-  { id: '13', groupId: 'G006', groupName: '甜品王國', storeId: 'S013', storeName: '甜品王國-中心店' },
-  { id: '14', groupId: 'G006', groupName: '甜品王國', storeId: 'S014', storeName: '甜品王國-東區店' },
-  { id: '15', groupId: 'G007', groupName: '燒烤帝國', storeId: 'S015', storeName: '燒烤帝國-總店' },
-]
-
 /**
  * 地圖尺寸修復器（解決 Leaflet 放在 Modal 彈窗中的灰屏 / 只加載左上角瓦片問題）
  * - active 變為 true（彈窗打開）後，等待彈窗動畫結束再 invalidateSize 重新測量容器尺寸
@@ -314,6 +296,19 @@ function WaterfallAddGeneral() {
   const [merchantSearchForm] = Form.useForm()
   const [tempSelectedMerchants, setTempSelectedMerchants] = useState<Merchant[]>([]) // 弹窗临时选择
   const [merchantSearchValues, setMerchantSearchValues] = useState<Record<string, string>>({}) // 已应用的搜索条件
+  // 屏蔽商家可选列表：使用数据库真实门店数据（非演示数据）
+  const [dbMerchants, setDbMerchants] = useState<Merchant[]>([])
+  useEffect(() => {
+    fetchStores({ page: 1, size: 500 }).then(res => {
+      setDbMerchants(res.records.map(s => ({
+        id: s.storeCode,
+        groupId: s.groupCode,
+        groupName: s.groupName,
+        storeId: s.storeCode,
+        storeName: s.storeName,
+      })))
+    }).catch(() => { /* 静默请求：错误不阻断页面 */ })
+  }, [])
   
   // 盘活复苏 - 按天定价配置
   const [dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
@@ -431,6 +426,18 @@ function WaterfallAddGeneral() {
         const tiers = parseJsonList(detail.discountTiers)
         setGradients(tiers.map(t => ({ count: Number(t.minSlots) || 0, discount: (Number(t.discount) || 0) / 10 })))
         setGradientEnabled(tiers.length > 0)
+        // 屏蔽商家回填
+        setMerchantLimit(detail.blockMerchant === 1)
+        setSelectedMerchants(parseJsonList(detail.blockList).map(b => ({
+          id: String(b.storeCode ?? ''),
+          groupId: String(b.groupCode ?? ''),
+          groupName: String(b.groupName ?? ''),
+          storeId: String(b.storeCode ?? ''),
+          storeName: String(b.storeName ?? ''),
+        })).filter(m => m.storeId))
+        // 可售时段回填（后端 supper → 前端 night；空或含 fullDay → 全部时段）
+        const sellSlots = parseJsonList(detail.sellTimeSlots).map(s => String(s)).map(s => s === 'supper' ? 'night' : s)
+        setOnlySellTimeSlots(sellSlots.length > 0 ? sellSlots : ['fullDay'])
         // 取消扣费梯度
         const fees = parseJsonList(detail.cancelFeeTiers)
         if (fees.length > 0) {
@@ -450,8 +457,35 @@ function WaterfallAddGeneral() {
             dailySalesLimit: 2,
           }
         })
-        setSelectedRegions(configs.map(c => c.region))
-        setRegionPricingConfigs(configs)
+        // 时段折扣配置回填（后端百分比 → 前端「折」记法）
+        const sdByRegion = new Map<number, Record<string, unknown>>()
+        parseJsonList(detail.slotDiscounts).forEach(sd => {
+          const region = Number(sd.region)
+          if (Number.isFinite(region)) sdByRegion.set(region, sd)
+        })
+        const toZhe = (v: unknown) => (v == null ? undefined : Math.round((Number(v) / 10) * 10) / 10)
+        const finalConfigs = configs.map(c => {
+          const sd = sdByRegion.get(Number(c.region))
+          if (!sd) return c
+          return {
+            ...c,
+            discountEnabled: true,
+            discounts: {
+              fullDay: toZhe(sd.fullDay),
+              breakfast: toZhe(sd.breakfast),
+              lunch: toZhe(sd.lunch),
+              afternoon: toZhe(sd.afternoon),
+              dinner: toZhe(sd.dinner),
+              night: toZhe(sd.supper),
+            },
+            limitedTimeDiscount: Boolean(sd.limitedTime),
+            discountDateRange: sd.startDate && sd.endDate
+              ? [dayjs(String(sd.startDate)), dayjs(String(sd.endDate))] as [dayjs.Dayjs, dayjs.Dayjs]
+              : undefined,
+          }
+        })
+        setSelectedRegions(finalConfigs.map(c => c.region))
+        setRegionPricingConfigs(finalConfigs)
       },
       loadMock,
     ).catch(() => { /* 静默请求：错误不阻断页面 */ })
@@ -694,10 +728,11 @@ function WaterfallAddGeneral() {
     }))
   }
 
-  // 返回列表
+  // 返回列表（始终携带当前算法类型，保证回到该类型的列表视图）
   const handleBack = () => {
-    if (urlAlgorithmType) {
-      navigate(`/promotion-waterfall?type=${urlAlgorithmType}`)
+    const type = urlAlgorithmType ?? selectedAlgorithmType
+    if (type != null) {
+      navigate(`/promotion-waterfall?type=${type}`)
     } else {
       navigate('/promotion-waterfall')
     }
@@ -726,7 +761,31 @@ function WaterfallAddGeneral() {
             ? gradients.filter(g => g.count > 0).map(g => ({ minSlots: g.count, discount: Math.round(g.discount * 10) }))
             : [],
           cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
-          blockMerchant: 2,
+          // 屏蔽商家（规则6）：开关+名单落库，销售端据此拦截
+          blockMerchant: merchantLimit ? 1 : 2,
+          blockList: merchantLimit
+            ? selectedMerchants.map(m => ({ storeCode: m.storeId, storeName: m.storeName, groupCode: m.groupId, groupName: m.groupName }))
+            : [],
+          // 可售时段（规则7）：前端 night ↔ 后端 supper
+          sellTimeSlots: onlySellTimeSlots.map(s => s === 'night' ? 'supper' : s),
+          // 时段折扣配置（分商圈落库，前端「折」记法 → 后端百分比记法: 8折=80）
+          slotDiscounts: regionPricingConfigs
+            .filter(c => c.discountEnabled)
+            .map(c => {
+              const toPercent = (v: number | undefined) => (v != null ? Math.round(v * 10) : undefined)
+              return {
+                region: c.region,
+                fullDay: toPercent(c.discounts.fullDay),
+                breakfast: toPercent(c.discounts.breakfast),
+                lunch: toPercent(c.discounts.lunch),
+                afternoon: toPercent(c.discounts.afternoon),
+                dinner: toPercent(c.discounts.dinner),
+                supper: toPercent(c.discounts.night),
+                limitedTime: c.limitedTimeDiscount || undefined,
+                startDate: c.limitedTimeDiscount && c.discountDateRange?.[0] ? c.discountDateRange[0].format('YYYY-MM-DD') : undefined,
+                endDate: c.limitedTimeDiscount && c.discountDateRange?.[1] ? c.discountDateRange[1].format('YYYY-MM-DD') : undefined,
+              }
+            }),
           status,
           regionPrices: regionPricingConfigs.map(c => {
             const slots = ['breakfast', 'lunch', 'afternoon', 'dinner', 'night']
@@ -741,7 +800,7 @@ function WaterfallAddGeneral() {
           () => Promise.resolve({ algoId, presaleDays } as unknown as AdPricingStar),
         )
         message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
-        navigate('/promotion-waterfall')
+        navigate(`/promotion-waterfall?type=${AlgorithmType.INVINCIBLE_STAR}`)
         return
       }
 
@@ -765,7 +824,7 @@ function WaterfallAddGeneral() {
 
       console.log('提交數據:', submitData)
       message.success('新增成功')
-      navigate('/promotion-waterfall')
+      navigate(`/promotion-waterfall?type=${selectedAlgorithmType}`)
     } catch (error) {
       // 表单校验失败不提示（antd 已标红），接口业务错误提示后端返回信息
       if (error instanceof Error) {
@@ -778,7 +837,7 @@ function WaterfallAddGeneral() {
 
   // 商家搜索过滤（支持集团ID/名称合并搜索、门店ID/名称合并搜索）
   const filteredMerchants = useMemo(() => {
-    return MOCK_MERCHANTS.filter(m => {
+    return dbMerchants.filter(m => {
       if (merchantSearchValues.groupKeyword) {
         const kw = merchantSearchValues.groupKeyword.toLowerCase()
         if (!m.groupId.toLowerCase().includes(kw) && !m.groupName.toLowerCase().includes(kw)) return false
@@ -789,29 +848,29 @@ function WaterfallAddGeneral() {
       }
       return true
     })
-  }, [merchantSearchValues])
+  }, [merchantSearchValues, dbMerchants])
 
   // 集团下拉选项（去重）
   const groupOptions = useMemo(() => {
     const map = new Map<string, { label: string; value: string }>()
-    MOCK_MERCHANTS.forEach(m => {
+    dbMerchants.forEach(m => {
       if (!map.has(m.groupId)) {
         map.set(m.groupId, { label: `${m.groupId} - ${m.groupName}`, value: m.groupId })
       }
     })
     return Array.from(map.values())
-  }, [])
+  }, [dbMerchants])
 
   // 门店下拉选项（去重）
   const storeOptions = useMemo(() => {
     const map = new Map<string, { label: string; value: string }>()
-    MOCK_MERCHANTS.forEach(m => {
+    dbMerchants.forEach(m => {
       if (!map.has(m.storeId)) {
         map.set(m.storeId, { label: `${m.storeId} - ${m.storeName}`, value: m.storeId })
       }
     })
     return Array.from(map.values())
-  }, [])
+  }, [dbMerchants])
 
   // 商家搜索
   const handleMerchantSearch = () => {
@@ -1410,23 +1469,30 @@ function WaterfallAddGeneral() {
                       )}
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                      {TIME_SLOTS.map(slot => (
+                      {TIME_SLOTS.map(slot => {
+                        const discountValue = config.discounts[slot.key]
+                        return (
                         <Form.Item
                           key={slot.key}
                           label={`${slot.label}折扣`}
                           style={{ marginBottom: 0 }}
                         >
-                          <InputNumber
-                            min={1}
-                            max={100}
-                            placeholder={`請輸入${slot.label}折扣`}
-                            style={{ width: '100%' }}
-                            addonAfter="折"
-                            value={config.discounts[slot.key]}
-                            onChange={(value) => handleUpdateRegionDiscount(config.region, slot.key, value)}
-                          />
+                          {isDetailMode && (discountValue === null || discountValue === undefined) ? (
+                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: '#fafafa', border: '1px solid #e8eaed', borderRadius: 6, color: '#8c8c8c' }}>無折扣</div>
+                          ) : (
+                            <InputNumber
+                              min={1}
+                              max={100}
+                              placeholder={`請輸入${slot.label}折扣`}
+                              style={{ width: '100%' }}
+                              addonAfter="折"
+                              value={discountValue}
+                              onChange={(value) => handleUpdateRegionDiscount(config.region, slot.key, value)}
+                            />
+                          )}
                         </Form.Item>
-                      ))}
+                        )
+                      })}
                     </div>
                     </>
                   )}

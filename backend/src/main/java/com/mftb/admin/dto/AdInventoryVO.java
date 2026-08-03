@@ -22,6 +22,9 @@ public class AdInventoryVO {
     /** 多时段梯度折扣 JSON 字符串（前端展示折扣规则） */
     private String discountTiers;
 
+    /** 分商圈时段折扣配置 JSON 字符串（前端预览折后价） */
+    private String slotDiscounts;
+
     /** 格子列表 */
     private List<Cell> cells = new ArrayList<>();
 

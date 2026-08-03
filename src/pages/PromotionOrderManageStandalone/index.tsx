@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
 const { RangePicker } = DatePicker
 import { SearchOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
@@ -28,6 +28,7 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = 
 }
 
 import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
+import { fetchAdOrders, withAdFallback, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
 
 // 品牌枚举
 enum AppType {
@@ -186,6 +187,58 @@ interface OrderItem {
   operatorType?: OrderOperatorType  // 下單人類型
   operatorId?: string         // 下單人ID（商家=門店ID，業務人員=工號）
   operatorName?: string       // 下單人姓名
+  /** 数据来源：api=後端真實數據 mock=演示數據 */
+  source?: 'api' | 'mock'
+}
+
+/** 後端訂單 → 列表行（無敵星星真實數據） */
+function toOrderItem(vo: AdOrder): OrderItem {
+  const channelMap: Record<number, RecommendChannel> = {
+    2: RecommendChannel.DELIVERY,
+    3: RecommendChannel.SUPERMARKET,
+    4: RecommendChannel.GROUP_BUY,
+  }
+  // 後端狀態: 1=待推廣 2=推廣中 3=已推廣 4=已退款 5=已取消 → 前端枚舉
+  const statusMap: Record<number, OrderStatus> = {
+    1: OrderStatus.PENDING_PROMOTION,
+    2: OrderStatus.PROMOTING,
+    3: OrderStatus.PROMOTED,
+    4: OrderStatus.REFUNDED,
+    5: OrderStatus.CANCELLED,
+  }
+  const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  // 所屬商圈: 後端由訂單明細去重聚合返回
+  const regions = (vo.regions || []).map(r => r as Region)
+  // 購買時段: 餐段 key → 時間段標籤（與演示數據樣式一致）
+  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
+  return {
+    id: vo.orderNo,
+    orderNo: vo.orderNo,
+    algorithmId: vo.algoCode || String(vo.algoId),
+    promotionName: vo.algoName,
+    app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
+    channel: channelMap[vo.channel ?? 2] ?? RecommendChannel.DELIVERY,
+    region: regions.length === 1 ? regions[0] : regions,
+    recommendType: vo.algoType as RecommendType,
+    slotPosition: 0,
+    groupId: vo.groupCode,
+    groupName: vo.groupName || '-',
+    storeId: vo.storeCode || '-',
+    storeName: vo.storeName || '-',
+    mealSlots,
+    purchaseDate: (vo.orderTime || '').slice(0, 10),
+    originalPrice: vo.originalAmount,
+    discountPrice: vo.originalAmount - vo.discountAmount,
+    actualPrice: vo.actualAmount,
+    status: statusMap[vo.status] ?? OrderStatus.PENDING_PROMOTION,
+    orderTime: fmt(vo.orderTime),
+    payTime: vo.payTime ? fmt(vo.payTime) : undefined,
+    refundAmount: vo.refundAmount || undefined,
+    operatorType: vo.operatorType as OrderOperatorType | undefined,
+    operatorId: vo.operatorId,
+    operatorName: vo.operatorName,
+    source: 'api',
+  }
 }
 
 // 生成人氣商家訂單日期（起始日 + 連續天數）
@@ -1438,6 +1491,23 @@ export default function PromotionOrderManage() {
   const fromSource = searchParams.get('from') || ''
   const backPath = fromSource === 'ad-sales' ? '/ad-sales' : '/promotion-sales-config'
 
+  // 訂單數據：後端可用時無敵星星以真實數據為準，其他類型保留演示數據
+  const [orders, setOrders] = useState<OrderItem[]>(mockOrders)
+  const loadOrders = () => {
+    withAdFallback(() => fetchAdOrders({ page: 1, size: 200 }), () => null)
+      .then(res => {
+        if (!res) return
+        const realRows = res.records.map(toOrderItem)
+        const mockRows = mockOrders.filter(o => o.recommendType !== RecommendType.INVINCIBLE_STAR)
+        setOrders([...realRows, ...mockRows])
+      })
+      .catch(() => {})
+  }
+  useEffect(() => {
+    loadOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const [filters, setFilters] = useState({
     orderNo: '',
     app: undefined as AppType | undefined,
@@ -1457,7 +1527,7 @@ export default function PromotionOrderManage() {
 
   // 根据 orderType 过滤对应类型的订单
   const filteredOrders = useMemo(() => {
-    return mockOrders.filter(order => {
+    return orders.filter(order => {
       // 按URL参数中的订单类型过滤
       if (orderType) {
         const typeName = RECOMMEND_TYPE_LABEL[order.recommendType]
@@ -1515,7 +1585,7 @@ export default function PromotionOrderManage() {
       }
       return true
     })
-  }, [filters, orderType])
+  }, [filters, orderType, orders])
 
   // 列配置元数据
   const columnMeta = useMemo(() => [

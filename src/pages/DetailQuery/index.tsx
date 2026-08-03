@@ -24,12 +24,13 @@ const channelOptions = [
   ...Object.values(BIZ_CHANNEL_LABEL_MAP).map(label => ({ label, value: label })),
 ]
 
-/** 交易类型选项（值＝明細存儲的交易類型文本） */
+/** 交易类型选项（值＝明細存储/展示的交易类型文本；退款由后端将正数消费明细映射展示） */
 const tradeTypeOptions = [
   { label: '全部', value: 'all' },
   { label: '充值', value: '充值' },
   { label: '扣款', value: '扣款' },
   { label: '消費', value: '消費' },
+  { label: '退款', value: '退款' },
   { label: '轉入', value: '轉入' },
   { label: '轉出', value: '轉出' },
 ]
@@ -92,6 +93,7 @@ const tradeTypeColor: Record<string, string> = {
   充值: 'blue',
   扣款: 'red',
   消費: 'purple',
+  退款: 'cyan',
   轉入: 'green',
   轉出: 'orange',
 }

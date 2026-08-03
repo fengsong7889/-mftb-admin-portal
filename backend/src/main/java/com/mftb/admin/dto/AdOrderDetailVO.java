@@ -26,6 +26,7 @@ public class AdOrderDetailVO extends AdOrderVO {
         vo.setAlgoType(order.getAlgoType());
         vo.setAlgoId(order.getAlgoId());
         vo.setAlgoName(order.getAlgoName());
+        vo.setAlgoCode(order.getAlgoCode());
         vo.setBrand(order.getBrand());
         vo.setChannel(order.getChannel());
         vo.setGroupCode(order.getGroupCode());
@@ -33,6 +34,11 @@ public class AdOrderDetailVO extends AdOrderVO {
         vo.setStoreCode(order.getStoreCode());
         vo.setStoreName(order.getStoreName());
         vo.setBdEmpId(order.getBdEmpId());
+        vo.setOperatorType(order.getOperatorType());
+        vo.setOperatorId(order.getOperatorId());
+        vo.setOperatorName(order.getOperatorName());
+        vo.setRegions(order.getRegions());
+        vo.setMealSlots(order.getMealSlots());
         vo.setItemCount(order.getItemCount());
         vo.setOriginalAmount(order.getOriginalAmount());
         vo.setDiscountAmount(order.getDiscountAmount());

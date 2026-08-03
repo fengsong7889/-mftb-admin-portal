@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -45,7 +46,16 @@ public class FinDetailServiceImpl implements FinDetailService {
             wrapper.eq(FinDetail::getChannel, query.getChannel());
         }
         if (StringUtils.hasText(query.getTradeType())) {
-            wrapper.eq(FinDetail::getTradeType, query.getTradeType());
+            // 展示口径: 退款=正数消费明细，消费=非正数消费明细（存储均为「消費」）
+            if ("退款".equals(query.getTradeType())) {
+                wrapper.eq(FinDetail::getTradeType, "消費")
+                        .gt(FinDetail::getVirtualChange, BigDecimal.ZERO);
+            } else if ("消費".equals(query.getTradeType())) {
+                wrapper.eq(FinDetail::getTradeType, "消費")
+                        .le(FinDetail::getVirtualChange, BigDecimal.ZERO);
+            } else {
+                wrapper.eq(FinDetail::getTradeType, query.getTradeType());
+            }
         }
         if (StringUtils.hasText(query.getChangeType())) {
             wrapper.eq(FinDetail::getChangeType, query.getChangeType());

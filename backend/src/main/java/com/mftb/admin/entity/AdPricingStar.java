@@ -49,6 +49,12 @@ public class AdPricingStar {
     /** 屏蔽商家列表（JSON 字符串） */
     private String blockList;
 
+    /** 可售时段（JSON 数组字符串, 如 ["breakfast","lunch"]; 空或含 fullDay 表示全部时段） */
+    private String sellTimeSlots;
+
+    /** 时段折扣配置（JSON 数组字符串, 分商圈: fullDay/breakfast/.../supper, 百分比记法） */
+    private String slotDiscounts;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

@@ -42,6 +42,12 @@ public class AdPricingStarRequest {
     /** 屏蔽商家列表 */
     private List<Map<String, Object>> blockList;
 
+    /** 可售时段: ["breakfast","lunch"] 等; 空或含 fullDay 表示全部时段 */
+    private List<String> sellTimeSlots;
+
+    /** 分商圈时段折扣配置（整体替换） */
+    private List<RegionSlotDiscount> slotDiscounts;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 
@@ -58,5 +64,30 @@ public class AdPricingStarRequest {
         private Integer region;
         /** 该商圈日单价（MOP） */
         private BigDecimal dailyPrice;
+    }
+
+    /** 商圈时段折扣（百分比记法: 80 = 8折） */
+    @Data
+    public static class RegionSlotDiscount {
+        /** 商圈 */
+        private Integer region;
+        /** 全时段折扣（购买当天全部 5 个时段时适用） */
+        private Integer fullDay;
+        /** 早餐折扣 */
+        private Integer breakfast;
+        /** 午餐折扣 */
+        private Integer lunch;
+        /** 下午茶折扣 */
+        private Integer afternoon;
+        /** 晚餐折扣 */
+        private Integer dinner;
+        /** 宵夜折扣 */
+        private Integer supper;
+        /** 限时打折开关（仅持久化展示用） */
+        private Boolean limitedTime;
+        /** 折扣周期开始日期 */
+        private String startDate;
+        /** 折扣周期结束日期 */
+        private String endDate;
     }
 }
