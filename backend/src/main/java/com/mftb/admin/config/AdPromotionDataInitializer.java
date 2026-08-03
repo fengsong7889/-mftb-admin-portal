@@ -32,9 +32,11 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
                 return;
             }
             try (InputStream is = resource.getInputStream()) {
-                String sql = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
+                String raw = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
+                // 先去除行注释（-- 开头），避免分号分割后注释与下一条语句粘连
+                String noComment = raw.replaceAll("(?m)^\\s*--.*$", "");
                 // 按分号分割并逐条执行（忽略空语句）
-                for (String stmt : sql.split(";")) {
+                for (String stmt : noComment.split(";")) {
                     String trimmed = stmt.trim();
                     if (!trimmed.isEmpty()) {
                         jdbcTemplate.execute(trimmed);
