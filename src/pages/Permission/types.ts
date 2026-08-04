@@ -25,20 +25,28 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'home': [
     { key: 'view', label: '查看' },
   ],
-  // 商户推广工具 - 数据看板
-  'recommend-dashboard': [
+  // 商戶集團管理
+  'merchant-group-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 門店管理
+  'store-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // 商家推廣工具 - 數據看板
+  'promotion-dashboard': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
-  // 算法配置
-  'recommend-algorithm': [
-    { key: 'view', label: '查看' },
-    { key: 'edit', label: '編輯' },
-    { key: 'enable', label: '啟用' },
-    { key: 'disable', label: '停用' },
-  ],
-  // 坑位配置
-  'recommend-slot': [
+  // 算法庫
+  'promotion-algorithm': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
@@ -46,27 +54,57 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'enable', label: '啟用' },
     { key: 'disable', label: '停用' },
   ],
-  // 销售价格
-  'recommend-pricing': [
+  // 瀑布流策略
+  'promotion-slot-config': [
     { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 銷售定價
+  'promotion-waterfall': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
   ],
-  // 订单列表
-  'recommend-order': [
+  // 廣告銷售
+  'ad-sales': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // 詞庫管理（商家推廣工具）
+  'promotion-word-library': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 店鋪推廣（推廣通）
+  'promotion-sales-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // 推廣通 - 數據概覽
+  'promotion-report-overview': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
-  // 投放日历
-  'recommend-calendar': [
-    { key: 'view', label: '查看' },
-  ],
-  // 效果报表
-  'recommend-effect-report': [
+  // 推廣通 - 訂單效果報表
+  'promotion-report-order': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
-  // 营收报表
-  'recommend-revenue-report': [
+  // 推廣通 - 推薦類型對比
+  'promotion-report-compare': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
@@ -867,6 +905,52 @@ export const menuPermissionTree: PermissionModule[] = [
  * 其餘原型菜單暫不受控，所有登錄用戶可見
  */
 export const CONTROLLED_MENU_KEYS: string[] = [
+  // 首頁
+  'home',
+  // 商戶集團管理
+  'merchant-group-list',
+  'store-list',
+  // 商家推廣工具
+  'promotion-dashboard',
+  'promotion-algorithm',
+  'promotion-slot-config',
+  'promotion-waterfall',
+  'ad-sales',
+  'promotion-word-library',
+  // 商家推廣工具 - 贈送管理
+  'gift-detail',
+  'gift-consume-detail',
+  // 推廣通
+  'promotion-sales-config',
+  'promotion-report-overview',
+  'promotion-report-order',
+  'promotion-report-compare',
+  // 搜索管理 - 搜索配置
+  'global-config',
+  'channel-strategy',
+  // 搜索管理 - 搜索引導
+  'hint-config',
+  'hot-search-config',
+  'search-weight-config',
+  // 搜索管理 - 搜索詞庫
+  'word-segmentation',
+  'synonym-config',
+  'hot-search-library',
+  'stop-words',
+  // 搜索管理 - 效果校驗
+  'search-verify',
+  'hint-verify',
+  'hot-search-verify',
+  // 搜索管理 - 報表統計
+  'hint-report',
+  'hot-search-report',
+  // 財務管理
+  'account-balance',
+  'batch-query',
+  'detail-query',
+  'writeoff-reconcile',
+  'debt-reconcile',
+  'approval-center',
   // 集團人事
   'employee-management',
   'organization-management',
@@ -875,16 +959,6 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'role-management',
   'function-permission',
   'data-permission',
-  // 財務管理
-  'account-balance',
-  'batch-query',
-  'detail-query',
-  'writeoff-reconcile',
-  'debt-reconcile',
-  'approval-center',
-  // 商家推廣工具 - 贈送管理
-  'gift-detail',
-  'gift-consume-detail',
 ]
 
 /**
@@ -892,14 +966,58 @@ export const CONTROLLED_MENU_KEYS: string[] = [
  * 用於路由守衛判斷當前頁面所需的菜單權限
  */
 export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
-  // 集團人事
-  '/employee-management': 'employee-management',
-  '/organization-management': 'organization-management',
-  '/position-management': 'position-management',
-  // 權限管理
-  '/role-management': 'role-management',
-  '/function-permission': 'function-permission',
-  '/data-permission': 'data-permission',
+  // 首頁
+  '/': 'home',
+  // 商戶集團管理
+  '/merchant-group-list': 'merchant-group-list',
+  '/store-list': 'store-list',
+  // 商家推廣工具
+  '/promotion-dashboard': 'promotion-dashboard',
+  '/promotion-algorithm': 'promotion-algorithm',
+  '/promotion-algorithm-add': 'promotion-algorithm',
+  '/promotion-algorithm-flow': 'promotion-algorithm',
+  '/promotion-slot-config': 'promotion-slot-config',
+  '/promotion-slot-config-add': 'promotion-slot-config',
+  '/promotion-waterfall': 'promotion-waterfall',
+  '/promotion-waterfall1': 'promotion-waterfall',
+  '/promotion-waterfall-add': 'promotion-waterfall',
+  '/ad-sales': 'ad-sales',
+  '/promotion-word-library': 'promotion-word-library',
+  // 商家推廣工具 - 贈送管理
+  '/gift-detail': 'gift-detail',
+  '/gift-add': 'gift-detail',
+  '/gift-detail-view': 'gift-detail',
+  '/gift-consume-detail': 'gift-consume-detail',
+  // 推廣通
+  '/promotion-sales-config': 'promotion-sales-config',
+  '/promotion-order-manage': 'promotion-sales-config',
+  '/merchant-order-manage': 'promotion-sales-config',
+  '/order-detail': 'promotion-sales-config',
+  '/promotion-report-overview': 'promotion-report-overview',
+  '/promotion-report-order': 'promotion-report-order',
+  '/promotion-report-compare': 'promotion-report-compare',
+  // 搜索管理 - 搜索配置
+  '/global-config': 'global-config',
+  '/channel-strategy': 'channel-strategy',
+  // 搜索管理 - 搜索引導
+  '/hint-config': 'hint-config',
+  '/hint-preview': 'hint-config',
+  '/hot-search-config': 'hot-search-config',
+  '/hot-search-preview': 'hot-search-config',
+  '/search-weight-config': 'search-weight-config',
+  // 搜索管理 - 搜索詞庫
+  '/word-segmentation': 'word-segmentation',
+  '/synonym-config': 'synonym-config',
+  '/hot-search-library': 'hot-search-library',
+  '/stop-words': 'stop-words',
+  // 搜索管理 - 效果校驗
+  '/search-verify': 'search-verify',
+  '/search-verify-detail/:id': 'search-verify',
+  '/hint-verify': 'hint-verify',
+  '/hot-search-verify': 'hot-search-verify',
+  // 搜索管理 - 報表統計
+  '/hint-report': 'hint-report',
+  '/hot-search-report': 'hot-search-report',
   // 財務管理 - 推廣金管理
   '/account-balance': 'account-balance',
   '/recharge-add': 'account-balance',
@@ -916,11 +1034,14 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 財務管理 - 審批管理
   '/approval-center': 'approval-center',
   '/approval-detail': 'approval-center',
-  // 商家推廣工具 - 贈送管理
-  '/gift-detail': 'gift-detail',
-  '/gift-add': 'gift-detail',
-  '/gift-detail-view': 'gift-detail',
-  '/gift-consume-detail': 'gift-consume-detail',
+  // 集團人事
+  '/employee-management': 'employee-management',
+  '/organization-management': 'organization-management',
+  '/position-management': 'position-management',
+  // 權限管理
+  '/role-management': 'role-management',
+  '/function-permission': 'function-permission',
+  '/data-permission': 'data-permission',
 }
 
 /** localStorage Key */

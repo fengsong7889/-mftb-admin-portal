@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS, CONTROLLED_MENU_KEYS } from '../pages/Permission/types'
-import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, resetUnauthorizedGuard, isBackendUnavailable } from '../api'
+import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, resetUnauthorizedGuard } from '../api'
 
 export interface UserInfo {
   username: string
@@ -64,12 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * 启动时后台静默刷新当前登录人信息：
-   * 人事资料（部门/职位/职级等）变更后，无需重新登录即可展示最新数据；
-   * Mock 登录（无后端）或接口失败时静默跳过，保留本地快照。
+   * 人事资料（部门/职位/职级等）变更后，无需重新登录即可展示最新数据。
    */
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (!token || token === 'mock-token') return
+    if (!token) return
     getUserInfo()
       .then((info) => {
         setUser((prev) => {
@@ -94,37 +93,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {})
   }, [])
 
-  /**
-   * 前端 Mock 登录：当后端不可用时（如部署在 GitHub Pages 纯-static 环境），
-   * 使用环境变量中的凭据进行本地登录，保证演示环境可用。
-   */
-  const mockLogin = (username: string, password: string): { success: boolean; message?: string; user?: UserInfo } => {
-    const adminPwd = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
-    const trimmed = username.trim().toUpperCase()
-
-    // 内置管理员：工号 MF00001 / 环境变量密码
-    if (trimmed === 'MF00001' && adminPwd && password === adminPwd) {
-      return {
-        success: true,
-        user: {
-          username: 'MF00001',
-          name: '系統管理員',
-          empId: 'MF00001',
-          avatar: 'pikachu-default',
-          role: 'admin',
-          department: '集團總裁辦',
-          position: '高級副總裁',
-          positionEn: 'SVP',
-          jobLevel: 'M10',
-        },
-      }
-    }
-    return { success: false, message: '工號或密碼錯誤' }
-  }
-
   const login = useCallback(async (username: string, password: string) => {
     try {
-      // 优先尝试调用后端登录接口
+      // 调用后端登录接口，所有认证必须经过后端数据库验证
       const result = await loginApi({ username, password })
       // 将后端返回的用户信息映射为前端 UserInfo
       const backendUser = result.userInfo
@@ -151,23 +122,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('user_info', JSON.stringify(mappedUser))
       return { success: true }
     } catch (err) {
-      // 仅在后端真正不可用（网络异常 / 404 / 5xx，如纯静态部署无后端）时才降级 Mock 登录；
-      // 后端返回的业务错误（账号或密码错误 / 账号不存在等）必须如实提示，
-      // 否则错误密码会走 Mock 通道“登录成功”，mock-token 会导致后续所有接口 401，反复被登出回登录页
-      if (isBackendUnavailable(err)) {
-        const fallback = mockLogin(username, password)
-        if (fallback.success) {
-          setIsAuthenticated(true)
-          setUser(fallback.user!)
-          resetUnauthorizedGuard()
-          localStorage.setItem('is_authenticated', 'true')
-          localStorage.setItem('user_info', JSON.stringify(fallback.user))
-          // Mock 模式不写入真实 Token，仅写入标志位避免下次再调后端
-          localStorage.setItem(TOKEN_KEY, 'mock-token')
-          return { success: true }
-        }
-        return { success: false, message: fallback.message }
-      }
       const msg = err instanceof Error && err.message ? err.message : '登錄失敗'
       return { success: false, message: msg }
     }

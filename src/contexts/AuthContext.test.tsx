@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { AxiosError } from 'axios'
 import { AuthProvider, useAuth } from './AuthContext'
 import * as api from '../api'
 
@@ -84,28 +83,13 @@ describe('AuthContext', () => {
     expect(result.current.isAuthenticated).toBe(false)
   })
 
-  it('后端不可用时降级 Mock 登录', async () => {
-    // 无响应的网络错误视为后端不可用
-    mockedLogin.mockRejectedValueOnce(new AxiosError('Network Error', 'ERR_NETWORK'))
+  it('后端不可用时登录失败（禁止 Mock 降级）', async () => {
+    mockedLogin.mockRejectedValueOnce(new Error('服务器异常, 请稍后重试'))
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await act(async () => {
       const res = await result.current.login('MF00001', '111222')
-      expect(res.success).toBe(true)
-    })
-
-    expect(result.current.isAuthenticated).toBe(true)
-    expect(window.localStorage.getItem('mftb_token')).toBe('mock-token')
-  })
-
-  it('后端不可用且 Mock 密码错误时返回繁体中文提示', async () => {
-    mockedLogin.mockRejectedValueOnce(new AxiosError('Network Error', 'ERR_NETWORK'))
-    const { result } = renderHook(() => useAuth(), { wrapper })
-
-    await act(async () => {
-      const res = await result.current.login('MF00001', 'wrong')
       expect(res.success).toBe(false)
-      expect(res.message).toContain('工號或密碼錯誤')
     })
 
     expect(result.current.isAuthenticated).toBe(false)

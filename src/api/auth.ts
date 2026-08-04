@@ -34,10 +34,7 @@ export interface LoginResult {
 
 /** 登录 */
 export function login(params: LoginParams) {
-  // 带静默标记：后端不可用时由 AuthContext 降级到 mock 登录，避免全局弹出「服务器异常」
-  return request.post<unknown, LoginResult>('/auth/login', params, {
-    headers: { [SILENT_HEADER]: '1' },
-  })
+  return request.post<unknown, LoginResult>('/auth/login', params)
 }
 
 /** 登出 */
