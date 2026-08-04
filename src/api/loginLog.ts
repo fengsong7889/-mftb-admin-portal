@@ -7,8 +7,8 @@ export interface LoginLogRecord {
   employeeName: string
   departmentId: number | null
   departmentName: string
-  loginTime: string
-  logoutTime: string | null
+  loginTime: number | string
+  logoutTime: number | string | null
   duration: number | null
   logoutReason: string | null
 }

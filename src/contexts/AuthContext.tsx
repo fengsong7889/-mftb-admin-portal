@@ -37,6 +37,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+/**
+ * 解析 IP 地理位置（省市）
+ * 使用 ipapi.co 免費 API（支持 HTTPS + CORS，每日 1000 次配額）
+ */
+async function resolveIpLocation(ip: string): Promise<string> {
+  try {
+    const res = await fetch(`https://ipapi.co/${ip}/json/`)
+    if (!res.ok) return ''
+    const data = await res.json()
+    if (data.error) return ''
+    const parts: string[] = []
+    if (data.region) parts.push(data.region)
+    if (data.city && data.city !== data.region) parts.push(data.city)
+    return parts.join(' ')
+  } catch {
+    return ''
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   // 从 localStorage 初始化登录状态
@@ -104,6 +123,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('is_authenticated')
       localStorage.removeItem('user_info')
+
+      // 異步解析登錄 IP 的地理位置（省市），解析完成後更新彈窗
+      if (detail.loginIp) {
+        resolveIpLocation(detail.loginIp).then((location) => {
+          if (location) {
+            setConflictInfo(prev => prev ? { ...prev, loginLocation: location } : prev)
+          }
+        })
+      }
     }
     window.addEventListener(SESSION_CONFLICT_EVENT, handleSessionConflict)
     return () => window.removeEventListener(SESSION_CONFLICT_EVENT, handleSessionConflict)

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, DatePicker, Form, Input, Modal, Select, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
+import dayjs from 'dayjs'
 import { ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchDepartments } from '../../api/department'
@@ -209,8 +210,8 @@ export default function LoginLog() {
       { title: '員工工號', dataIndex: 'empId' },
       { title: '員工姓名', dataIndex: 'employeeName' },
       { title: '所屬部門', dataIndex: 'departmentName' },
-      { title: '登錄時間', dataIndex: 'loginTime' },
-      { title: '退出時間', dataIndex: 'logoutTime', render: (v: string | null) => v || '' },
+      { title: '登錄時間', dataIndex: 'loginTime', render: (v: number | string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '' },
+      { title: '退出時間', dataIndex: 'logoutTime', render: (v: number | string | null) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '' },
       { title: '在線時長', dataIndex: 'duration', render: (v: number | null) => {
         // 統一使用後端計算的 duration（避免前端解析 loginTime 的時區歧義）
         return v != null ? formatDuration(v) : ''
@@ -287,7 +288,8 @@ export default function LoginLog() {
       dataIndex: 'loginTime',
       key: 'loginTime',
       width: 180,
-      sorter: (a, b) => a.loginTime.localeCompare(b.loginTime),
+      render: (val: number | string) => dayjs(val).format('YYYY-MM-DD HH:mm:ss'),
+      sorter: (a, b) => Number(a.loginTime) - Number(b.loginTime),
       defaultSortOrder: 'descend',
     },
     {
@@ -295,7 +297,7 @@ export default function LoginLog() {
       dataIndex: 'logoutTime',
       key: 'logoutTime',
       width: 180,
-      render: (val: string | null) => val || '-',
+      render: (val: number | string | null) => val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
       title: '在線時長',

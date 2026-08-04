@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, Tabs } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
 import BrandTag from '../../../components/BrandTag'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, WalletOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -259,8 +260,8 @@ const toPricingRow = (vo: AdPricingStar): WaterfallSlotConfig => ({
   regionLimit: 'unlimited',
   status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
   updatedBy: vo.updatedBy || '-',
-  updatedAt: vo.updatedAt ? String(vo.updatedAt).replace('T', ' ').slice(0, 19) : '-',
-  createdAt: vo.createdAt ? String(vo.createdAt).replace('T', ' ').slice(0, 19) : '-',
+  updatedAt: vo.updatedAt ? dayjs(vo.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-',
+  createdAt: vo.createdAt ? dayjs(vo.createdAt).format('YYYY-MM-DD HH:mm:ss') : '-',
   source: 'api',
 })
 
