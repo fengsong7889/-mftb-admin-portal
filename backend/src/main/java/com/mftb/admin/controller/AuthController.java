@@ -111,7 +111,10 @@ public class AuthController {
         }
         // 被管理员强制下线
         if (user.getForceLogoutOperator() != null) {
-            return Result.error(401, "您的账号已被管理员强制下线");
+            Map<String, String> data = new HashMap<>();
+            data.put("operatorName", user.getForceLogoutOperator());
+            data.put("operatorEmpId", user.getForceLogoutEmpId() != null ? user.getForceLogoutEmpId() : "");
+            return new Result<>(401, "您的账号已被管理员强制下线", data);
         }
         // 被其他设备登录顶下线：返回新登录设备的 IP
         if (StringUtils.hasText(user.getActiveToken()) && !token.equals(user.getActiveToken())) {

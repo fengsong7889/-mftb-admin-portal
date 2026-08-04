@@ -314,10 +314,10 @@ export default function AccountBalance() {
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
           <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="請選擇" options={brandOptions} allowClear />
+            <Select placeholder="全部" options={brandOptions} allowClear />
           </Form.Item>
           <Form.Item label="賬戶狀態" name="status">
-            <Select placeholder="請選擇" options={statusOptions} allowClear />
+            <Select placeholder="全部" options={statusOptions} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

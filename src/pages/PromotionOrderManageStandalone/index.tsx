@@ -28,6 +28,7 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = 
 }
 
 import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
+import { AlgorithmType } from '../Recommend/constants'
 import { fetchAdOrders, withAdFallback, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
 
 // 品牌枚举
@@ -112,37 +113,32 @@ const REGION_TREE_DATA = [
   },
 ]
 
-// 推荐类型枚举
-enum RecommendType {
-  INVINCIBLE_STAR = 1,
-  REVITALIZATION_AD = 2,
-  NEW_STORE_AD = 3,
-  TRAFFIC_AD = 4,
-  POPULAR_MERCHANT = 5,
-}
+// 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致）
+type RecommendType = AlgorithmType
+const RecommendType = AlgorithmType
 
-const RECOMMEND_TYPE_LABEL: Record<RecommendType, string> = {
+const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [RecommendType.REVITALIZATION_AD]: '盤活復蘇',
+  [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
   [RecommendType.TRAFFIC_AD]: '流量廣告',
-  [RecommendType.POPULAR_MERCHANT]: '人氣商家',
+  [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
 }
 
-const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
+const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '⭐',
-  [RecommendType.REVITALIZATION_AD]: '🔥',
+  [RecommendType.HOT_REVIVE_AD]: '🔥',
   [RecommendType.NEW_STORE_AD]: '🏪',
   [RecommendType.TRAFFIC_AD]: '📊',
-  [RecommendType.POPULAR_MERCHANT]: '🏆',
+  [RecommendType.POPULAR_MERCHANT_KA]: '🏆',
 }
 
-const _RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
+const _RECOMMEND_TYPE_COLOR: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: 'gold',
-  [RecommendType.REVITALIZATION_AD]: 'green',
+  [RecommendType.HOT_REVIVE_AD]: 'green',
   [RecommendType.NEW_STORE_AD]: 'blue',
   [RecommendType.TRAFFIC_AD]: 'purple',
-  [RecommendType.POPULAR_MERCHANT]: 'geekblue',
+  [RecommendType.POPULAR_MERCHANT_KA]: 'geekblue',
 }
 
 // 下单人类型枚举
@@ -266,7 +262,7 @@ function genPopularOrder(
   const actualPrice = days >= 7 ? Math.round(originalPrice * 0.95) : originalPrice
   return {
     id, orderNo, algorithmId, promotionName, app, channel, region,
-    recommendType: RecommendType.POPULAR_MERCHANT, slotPosition,
+    recommendType: RecommendType.POPULAR_MERCHANT_KA, slotPosition,
     groupId, groupName, storeId, storeName, skinName,
     purchaseDate: orderTime.split(' ')[0], mealSlots: [], purchaseDays,
     originalPrice, discountPrice: actualPrice, actualPrice,
@@ -849,7 +845,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.KOKSAA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 3,
     groupId: 'G10001',
     groupName: '澳門美食集團',
@@ -876,7 +872,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 5,
     groupId: 'G10002',
     groupName: '閃蜂餐飲連鎖',
@@ -903,7 +899,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.SANMA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 2,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -929,7 +925,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.KOKSAA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 4,
     groupId: 'G10001',
     groupName: '澳門美食集團',
@@ -961,7 +957,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 1,
     groupId: 'G10002',
     groupName: '閃蜂餐飲連鎖',
@@ -992,7 +988,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.KOKSAA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 2,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -1019,7 +1015,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.SANMA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 3,
     groupId: 'G10001',
     groupName: '澳門美食集團',
@@ -1046,7 +1042,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 4,
     groupId: 'G10002',
     groupName: '閃蜂餐飲連鎖',
@@ -1072,7 +1068,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.KOKSAA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 1,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -1099,7 +1095,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.DELIVERY,
     region: Region.SANMA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 5,
     groupId: 'G10001',
     groupName: '澳門美食集團',
@@ -1126,7 +1122,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.KOKSAA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 2,
     groupId: 'G10002',
     groupName: '閃蜂餐飲連鎖',
@@ -1153,7 +1149,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 3,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -1179,7 +1175,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.SANMA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 4,
     groupId: 'G10001',
     groupName: '澳門美食集團',
@@ -1205,7 +1201,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,
     region: Region.KOKSAA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 1,
     groupId: 'G10002',
     groupName: '閃蜂餐飲連鎖',
@@ -1232,7 +1228,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 5,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -1776,7 +1772,7 @@ export default function PromotionOrderManage() {
       key: 'purchaseContent',
       width: 220,
       render: (_, record) => {
-        if (orderType === '盤活復蘇' || orderType === '新店廣告' || orderType === '人氣商家' || record.recommendType === RecommendType.REVITALIZATION_AD || record.recommendType === RecommendType.NEW_STORE_AD || record.recommendType === RecommendType.POPULAR_MERCHANT) {
+        if (orderType === '盤活復蘇' || orderType === '新店廣告' || orderType === '人氣商家' || record.recommendType === RecommendType.HOT_REVIVE_AD || record.recommendType === RecommendType.NEW_STORE_AD || record.recommendType === RecommendType.POPULAR_MERCHANT_KA) {
           // 盤活復蘇/人氣商家：展示天數（人氣商家額外展示皮膚套件），點擊弹窗查看具體日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {
             const days = record.purchaseDays.length
@@ -2309,7 +2305,6 @@ export default function PromotionOrderManage() {
           rowSelection={{
             type: 'checkbox',
             onChange: (selectedRowKeys, selectedRows) => {
-              console.log('选中行:', selectedRowKeys, selectedRows)
             },
           }}
           scroll={{ x: 2800 }}

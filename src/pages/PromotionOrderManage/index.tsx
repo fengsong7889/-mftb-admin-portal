@@ -12,6 +12,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { AlgorithmType } from '../Recommend/constants'
 
 // 订单状态枚举
 enum OrderStatus {
@@ -113,31 +114,27 @@ const REGION_TREE_DATA = [
   },
 ]
 
-// 推荐类型枚举
-enum RecommendType {
-  INVINCIBLE_STAR = 1,
-  REVITALIZATION_AD = 2,
-  NEW_STORE_AD = 3,
-  TRAFFIC_AD = 4,
-}
+// 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致）
+type RecommendType = AlgorithmType
+const RecommendType = AlgorithmType
 
-const RECOMMEND_TYPE_LABEL: Record<RecommendType, string> = {
+const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [RecommendType.REVITALIZATION_AD]: '盤活復蘇',
+  [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
   [RecommendType.TRAFFIC_AD]: '流量廣告',
 }
 
-const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
+const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '⭐',
-  [RecommendType.REVITALIZATION_AD]: '🔥',
+  [RecommendType.HOT_REVIVE_AD]: '🔥',
   [RecommendType.NEW_STORE_AD]: '🏪',
   [RecommendType.TRAFFIC_AD]: '📊',
 }
 
-const _RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
+const _RECOMMEND_TYPE_COLOR: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: 'gold',
-  [RecommendType.REVITALIZATION_AD]: 'green',
+  [RecommendType.HOT_REVIVE_AD]: 'green',
   [RecommendType.NEW_STORE_AD]: 'blue',
   [RecommendType.TRAFFIC_AD]: 'purple',
 }
@@ -259,7 +256,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.SHANFENG,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.SANMA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 2,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -368,7 +365,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 4,
     groupId: 'G10002',
     groupName: '閃蜂餐飲連鎖',
@@ -456,7 +453,7 @@ const mockOrders: OrderItem[] = [
     app: AppType.MFOOD,
     channel: RecommendChannel.GROUP_BUY,
     region: Region.FAHUA,
-    recommendType: RecommendType.REVITALIZATION_AD,
+    recommendType: RecommendType.HOT_REVIVE_AD,
     slotPosition: 3,
     groupId: 'G10003',
     groupName: '大灣區餐飲集團',
@@ -735,7 +732,7 @@ export default function PromotionOrderManage() {
       key: 'purchaseContent',
       width: 220,
       render: (_, record) => {
-        if (orderType === '盤活復蘇' || record.recommendType === RecommendType.REVITALIZATION_AD) {
+        if (orderType === '盤活復蘇' || record.recommendType === RecommendType.HOT_REVIVE_AD) {
           // 盤活復蘇：只展示天數+日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {
             const first = record.purchaseDays[0]
@@ -1023,7 +1020,6 @@ export default function PromotionOrderManage() {
           rowSelection={{
             type: 'checkbox',
             onChange: (selectedRowKeys, selectedRows) => {
-              console.log('选中行:', selectedRowKeys, selectedRows)
             },
           }}
           scroll={{ x: 2200 }}

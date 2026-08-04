@@ -97,7 +97,6 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
         message.warning('請填寫直觀賬戶充值金額')
         return
       }
-      console.log('充值表单数据：', { ...values, directAmount, actualAmount, bankAmount, remark, uploadedFiles })
       message.success('充值提交成功！')
       onClose()
     } catch {

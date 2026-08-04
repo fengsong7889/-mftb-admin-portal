@@ -59,7 +59,7 @@ function formatDuration(seconds: number | null): string {
 
 /** 員工動態頁面 */
 export default function LoginLog() {
-  const { user } = useAuth()
+  const { hasPermission } = useAuth()
   const [searchForm] = Form.useForm()
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -335,7 +335,7 @@ export default function LoginLog() {
       fixed: 'right',
       render: (_: unknown, record: LoginLogRecord) => (
         <>
-          {record.logoutTime == null && user?.role === 'admin' && (
+          {record.logoutTime == null && hasPermission('login-log:forceLogout') && (
             <Button type="link" danger size="small" onClick={() => handleForceLogout(record)}>
               下線
             </Button>

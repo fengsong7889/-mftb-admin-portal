@@ -424,7 +424,6 @@ export default function Waterfall() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      console.log('表单数据:', values)
       message.success(editingRecord ? '編輯成功' : '新增成功')
       setModalVisible(false)
       form.resetFields()

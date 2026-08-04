@@ -357,7 +357,6 @@ export default function PopularSkinPricing() {
         }
       }
       setLoading(true)
-      console.log('提交皮膚定價:', { ...values, skins, status, gradientEnabled, gradients, presaleDays, refundEnabled, cancelFeeRules, detailFileList })
       message.success(isEditMode ? '編輯成功' : '新增成功')
       navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
     } catch {

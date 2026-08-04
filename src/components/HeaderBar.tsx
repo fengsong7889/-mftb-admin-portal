@@ -95,12 +95,12 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
     navigate('/login', { replace: true })
   }
 
-  /** 修改密码 */
+  /** 修改密码（TODO: 后端密码修改接口落地后替换当前演示逻辑） */
   const handleChangePwd = () => {
     if (!oldPwd) { message.warning('請輸入原密碼'); return }
     if (!newPwd) { message.warning('請輸入新密碼'); return }
     if (newPwd !== confirmPwd) { message.error('兩次輸入的密碼不一致'); return }
-    if (oldPwd !== '123456') { message.error('原密碼錯誤'); return }
+    if (newPwd.length < 6) { message.error('新密碼長度不能少於 6 位'); return }
     message.success('密碼修改成功')
     setPwdModalOpen(false)
     setOldPwd(''); setNewPwd(''); setConfirmPwd('')

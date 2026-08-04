@@ -280,6 +280,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'login-log': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
+    { key: 'forceLogout', label: '下線' },
   ],
   // 员工管理
   'employee-management': [

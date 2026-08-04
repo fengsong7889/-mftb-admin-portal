@@ -108,7 +108,6 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
 
   const handleSubmit = () => {
     form.validateFields().then((values) => {
-      console.log('表单数据:', values)
       message.success('新增底紋詞成功')
       onSuccess?.()
       onCancel()

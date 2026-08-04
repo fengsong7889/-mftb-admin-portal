@@ -263,7 +263,6 @@ export default function PromotionSlotConfigAdd() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields()
-      console.log('表单数据:', values)
       message.success('保存成功')
       navigate('/promotion-slot-config')
     } catch (error) {

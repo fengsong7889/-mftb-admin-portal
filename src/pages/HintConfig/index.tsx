@@ -322,25 +322,25 @@ export default function HintConfig() {
             <Input placeholder="請輸入底紋ID搜索" allowClear />
           </Form.Item>
           <Form.Item label="所屬品牌">
-            <Select placeholder="全部" options={brandOptions} />
+            <Select placeholder="全部" allowClear options={brandOptions} />
           </Form.Item>
           <Form.Item label="搜索頻道">
-            <Select placeholder="全部" options={searchChannelOptions} />
+            <Select placeholder="全部" allowClear options={searchChannelOptions} />
           </Form.Item>
           <Form.Item label="展示時段">
-            <Select placeholder="全部" options={timeSlotOptions} />
+            <Select placeholder="全部" allowClear options={timeSlotOptions} />
           </Form.Item>
           <Form.Item label="展示區域">
-            <Select placeholder="全部" options={regionOptions} />
+            <Select placeholder="全部" allowClear options={regionOptions} />
           </Form.Item>
           <Form.Item label="狀態">
-            <Select placeholder="全部" options={statusOptions} />
+            <Select placeholder="全部" allowClear options={statusOptions} />
           </Form.Item>
           <Form.Item label="生效時間">
             <RangePicker placeholder={['開始時間', '結束時間']} />
           </Form.Item>
           <Form.Item label="業務終端">
-            <Select placeholder="全部" options={terminalOptions} />
+            <Select placeholder="全部" allowClear options={terminalOptions} />
           </Form.Item>
           <Form.Item label="最後更新人">
             <Input placeholder="請輸入申請人姓名/工號" allowClear />

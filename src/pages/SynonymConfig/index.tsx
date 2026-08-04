@@ -369,13 +369,13 @@ export default function SynonymConfig() {
             <Input placeholder="請輸入關鍵詞" allowClear />
           </Form.Item>
           <Form.Item label="同義詞類型">
-            <Select options={synonymTypeOptions} defaultValue="all" />
+            <Select placeholder="全部" allowClear options={synonymTypeOptions} defaultValue="all" />
           </Form.Item>
           <Form.Item label="業務場景">
-            <Select options={scenarioOptions} defaultValue="all" />
+            <Select placeholder="全部" allowClear options={scenarioOptions} defaultValue="all" />
           </Form.Item>
           <Form.Item label="狀態">
-            <Select options={statusOptions} defaultValue="all" />
+            <Select placeholder="全部" allowClear options={statusOptions} defaultValue="all" />
           </Form.Item>
           <Form.Item label="更新時間">
             <RangePicker />

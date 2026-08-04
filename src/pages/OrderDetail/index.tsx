@@ -15,6 +15,7 @@ import {
   brandToAppType,
   type AdOrderDetail,
 } from '../../api/adPromotion'
+import { AlgorithmType } from '../Recommend/constants'
 
 /* ---- 数字动画 Hook ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -99,20 +100,22 @@ const REGION_LABEL: Record<number, string> = {
   6: '花城市區', 7: '北安機場', 8: '左酒店區', 9: '右酒店區', 10: '澳大專區', 11: '黑沙灘區',
 }
 
-enum RecommendType { INVINCIBLE_STAR = 1, REVITALIZATION_AD = 2, NEW_STORE_AD = 3, TRAFFIC_AD = 4, POPULAR_MERCHANT = 5 }
-const RECOMMEND_TYPE_LABEL: Record<RecommendType, string> = {
+// 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致）
+type RecommendType = AlgorithmType
+const RecommendType = AlgorithmType
+const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [RecommendType.REVITALIZATION_AD]: '盤活復蘇',
+  [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
   [RecommendType.TRAFFIC_AD]: '流量廣告',
-  [RecommendType.POPULAR_MERCHANT]: '人氣商家',
+  [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
 }
-const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
+const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '⭐',
-  [RecommendType.REVITALIZATION_AD]: '🔥',
+  [RecommendType.HOT_REVIVE_AD]: '🔥',
   [RecommendType.NEW_STORE_AD]: '🏪',
   [RecommendType.TRAFFIC_AD]: '📊',
-  [RecommendType.POPULAR_MERCHANT]: '🏆',
+  [RecommendType.POPULAR_MERCHANT_KA]: '🏆',
 }
 
 /* ---- 接口 ---- */
@@ -387,7 +390,7 @@ function genOrder(
   refundEnabled: boolean = true,
   dateRegions?: number[][],
 ): OrderItem {
-  const isRevive = recType === RecommendType.REVITALIZATION_AD
+  const isRevive = recType === RecommendType.HOT_REVIVE_AD
   const isPast = status !== OrderStatus.PENDING_PROMOTION && status !== OrderStatus.PROMOTING
   const baseDates = isPast ? pastDates : dates
   const slotPrices: SlotPriceItem[] = []
@@ -483,21 +486,21 @@ const mockOrders: OrderItem[] = [
   genOrder('14','ORD20250623014','ALG001','無敵星星·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-06-23',3500,3150,3150,OrderStatus.PROMOTED,'2025-06-23 06:20:00','2025-06-23 06:25:00',[0,1,2,3,4,0,1],0,null,3150),
   genOrder('15','ORD20250622015','ALG002','新店廣告·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-06-22',1700,1530,1530,OrderStatus.PROMOTED,'2025-06-22 10:05:00','2025-06-22 10:10:00',[0,1,2],0,null,1530),
   // 盤活復甦訂單 (id: 101-115)
-  genOrder('101','ORD20250715101','ALG003','盤活復甦·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.REVITALIZATION_AD,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-15',3000,2700,2700,OrderStatus.PROMOTING,'2025-07-15 10:30:00','2025-07-15 10:35:00',[0,1,2],0,{count:3,discount:9}),
-  genOrder('102','ORD20250714102','ALG003','盤活復甦·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10002','閃蜂餐飲連鎖','S20002','氹仔分店','2025-07-14',2500,2250,2250,OrderStatus.PENDING_PROMOTION,'2025-07-14 14:20:00','2025-07-14 14:25:00',[0,1],0,null,undefined,false),
-  genOrder('103','ORD20250713103','ALG003','盤活復甦·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.REVITALIZATION_AD,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-13',4000,3600,3600,OrderStatus.PROMOTED,'2025-07-13 09:15:00',undefined,[0,1,2,3],0,null),
-  genOrder('104','ORD20250712104','ALG003','盤活復甦·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-12',1500,1350,1350,OrderStatus.REFUNDED,'2025-07-12 16:40:00','2025-07-12 16:45:00',[0],0,null,270),
-  genOrder('105','ORD20250711105','ALG003','盤活復甦·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.REVITALIZATION_AD,1,'G10002','閃蜂餐飲連鎖','S20005','新馬路店','2025-07-11',5000,4500,4500,OrderStatus.REFUNDED,'2025-07-11 11:20:00',undefined,[0,1,2,3,4],0,null,2250),
-  genOrder('106','ORD20250710106','ALG003','盤活復甦·早鳥優惠',AppType.MFOOD,RecommendChannel.GROUP_BUY,1,RecommendType.REVITALIZATION_AD,2,'G10003','大灣區餐飲集團','S20001','澳門總店','2025-07-10',2000,1800,1800,OrderStatus.PENDING_PROMOTION,'2025-07-10 08:30:00','2025-07-10 08:35:00',[0,1],0,null),
-  genOrder('107','ORD20250709107','ALG003','盤活復·零售閃購',AppType.SHANFENG,RecommendChannel.DELIVERY,3,RecommendType.REVITALIZATION_AD,3,'G10001','澳門美食集團','S20002','氹仔分店','2025-07-09',3500,3150,3150,OrderStatus.PENDING_PROMOTION,'2025-07-09 10:15:00','2025-07-09 10:20:00',[0,1,2],0,null,undefined,false),
-  genOrder('108','ORD20250708108','ALG003','盤活復甦·團購到店',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,4,'G10002','閃蜂餐飲連鎖','S20003','珠海旗艦店','2025-07-08',2800,2520,2520,OrderStatus.PROMOTED,'2025-07-08 15:45:00',undefined,[0,1],0,null),
-  genOrder('109','ORD20250707109','ALG003','盤活復甦·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-07-07',4500,4050,4050,OrderStatus.PROMOTED,'2025-07-07 09:20:00','2025-07-07 09:25:00',[0,1,2,3],0,null,4050),
-  genOrder('110','ORD20250706110','ALG003','盤活復甦·夜宵專場',AppType.MFOOD,RecommendChannel.DELIVERY,3,RecommendType.REVITALIZATION_AD,5,'G10001','澳門美食集團','S20005','新馬路店','2025-07-06',2200,1980,1980,OrderStatus.PROMOTED,'2025-07-06 20:10:00','2025-07-06 20:15:00',[0,1],0,null),
-  genOrder('111','ORD20250705111','ALG003','盤活復甦·澳門專區',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.REVITALIZATION_AD,2,'G10002','閃蜂餐飲連鎖','S20001','澳門總店','2025-07-05',6000,5400,5400,OrderStatus.PENDING_PROMOTION,'2025-07-05 11:30:00','2025-07-05 11:35:00',[0,1,2,3,4,0],0,null,undefined,false),
-  genOrder('112','ORD20250704112','ALG003','盤活復甦·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.REVITALIZATION_AD,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-07-04',1400,1260,1260,OrderStatus.PROMOTED,'2025-07-04 13:50:00',undefined,[0,1],0,null,1260),
-  genOrder('113','ORD20250703113','ALG003','盤活復甦·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.REVITALIZATION_AD,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-07-03',3200,2880,2880,OrderStatus.PROMOTED,'2025-07-03 07:40:00',undefined,[0,1,2],0,null),
-  genOrder('114','ORD20250702114','ALG003','盤活復甦·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.REVITALIZATION_AD,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-07-02',7000,6300,6300,OrderStatus.PROMOTED,'2025-07-02 06:20:00','2025-07-02 06:25:00',[0,1,2,3,4,0,1],0,null,6300),
-  genOrder('115','ORD20250701115','ALG003','盤活復甦·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.REVITALIZATION_AD,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-07-01',3800,3420,3420,OrderStatus.PROMOTED,'2025-07-01 10:05:00','2025-07-01 10:10:00',[0,1,2],0,null,3420),
+  genOrder('101','ORD20250715101','ALG003','盤活復甦·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.HOT_REVIVE_AD,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-15',3000,2700,2700,OrderStatus.PROMOTING,'2025-07-15 10:30:00','2025-07-15 10:35:00',[0,1,2],0,{count:3,discount:9}),
+  genOrder('102','ORD20250714102','ALG003','盤活復甦·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.HOT_REVIVE_AD,5,'G10002','閃蜂餐飲連鎖','S20002','氹仔分店','2025-07-14',2500,2250,2250,OrderStatus.PENDING_PROMOTION,'2025-07-14 14:20:00','2025-07-14 14:25:00',[0,1],0,null,undefined,false),
+  genOrder('103','ORD20250713103','ALG003','盤活復甦·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.HOT_REVIVE_AD,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-13',4000,3600,3600,OrderStatus.PROMOTED,'2025-07-13 09:15:00',undefined,[0,1,2,3],0,null),
+  genOrder('104','ORD20250712104','ALG003','盤活復甦·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.HOT_REVIVE_AD,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-12',1500,1350,1350,OrderStatus.REFUNDED,'2025-07-12 16:40:00','2025-07-12 16:45:00',[0],0,null,270),
+  genOrder('105','ORD20250711105','ALG003','盤活復甦·週末專場',AppType.SHANFENG,RecommendChannel.SUPERMARKET,6,RecommendType.HOT_REVIVE_AD,1,'G10002','閃蜂餐飲連鎖','S20005','新馬路店','2025-07-11',5000,4500,4500,OrderStatus.REFUNDED,'2025-07-11 11:20:00',undefined,[0,1,2,3,4],0,null,2250),
+  genOrder('106','ORD20250710106','ALG003','盤活復甦·早鳥優惠',AppType.MFOOD,RecommendChannel.GROUP_BUY,1,RecommendType.HOT_REVIVE_AD,2,'G10003','大灣區餐飲集團','S20001','澳門總店','2025-07-10',2000,1800,1800,OrderStatus.PENDING_PROMOTION,'2025-07-10 08:30:00','2025-07-10 08:35:00',[0,1],0,null),
+  genOrder('107','ORD20250709107','ALG003','盤活復·零售閃購',AppType.SHANFENG,RecommendChannel.DELIVERY,3,RecommendType.HOT_REVIVE_AD,3,'G10001','澳門美食集團','S20002','氹仔分店','2025-07-09',3500,3150,3150,OrderStatus.PENDING_PROMOTION,'2025-07-09 10:15:00','2025-07-09 10:20:00',[0,1,2],0,null,undefined,false),
+  genOrder('108','ORD20250708108','ALG003','盤活復甦·團購到店',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.HOT_REVIVE_AD,4,'G10002','閃蜂餐飲連鎖','S20003','珠海旗艦店','2025-07-08',2800,2520,2520,OrderStatus.PROMOTED,'2025-07-08 15:45:00',undefined,[0,1],0,null),
+  genOrder('109','ORD20250707109','ALG003','盤活復甦·大首頁推薦',AppType.SHANFENG,RecommendChannel.SUPERMARKET,1,RecommendType.HOT_REVIVE_AD,1,'G10003','大灣區餐飲集團','S20004','黑沙環店','2025-07-07',4500,4050,4050,OrderStatus.PROMOTED,'2025-07-07 09:20:00','2025-07-07 09:25:00',[0,1,2,3],0,null,4050),
+  genOrder('110','ORD20250706110','ALG003','盤活復甦·夜宵專場',AppType.MFOOD,RecommendChannel.DELIVERY,3,RecommendType.HOT_REVIVE_AD,5,'G10001','澳門美食集團','S20005','新馬路店','2025-07-06',2200,1980,1980,OrderStatus.PROMOTED,'2025-07-06 20:10:00','2025-07-06 20:15:00',[0,1],0,null),
+  genOrder('111','ORD20250705111','ALG003','盤活復甦·澳門專區',AppType.SHANFENG,RecommendChannel.DELIVERY,1,RecommendType.HOT_REVIVE_AD,2,'G10002','閃蜂餐飲連鎖','S20001','澳門總店','2025-07-05',6000,5400,5400,OrderStatus.PENDING_PROMOTION,'2025-07-05 11:30:00','2025-07-05 11:35:00',[0,1,2,3,4,0],0,null,undefined,false),
+  genOrder('112','ORD20250704112','ALG003','盤活復甦·氹仔熱推',AppType.MFOOD,RecommendChannel.GROUP_BUY,6,RecommendType.HOT_REVIVE_AD,3,'G10003','大灣區餐飲集團','S20002','氹仔分店','2025-07-04',1400,1260,1260,OrderStatus.PROMOTED,'2025-07-04 13:50:00',undefined,[0,1],0,null,1260),
+  genOrder('113','ORD20250703113','ALG003','盤活復甦·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.HOT_REVIVE_AD,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-07-03',3200,2880,2880,OrderStatus.PROMOTED,'2025-07-03 07:40:00',undefined,[0,1,2],0,null),
+  genOrder('114','ORD20250702114','ALG003','盤活復甦·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.HOT_REVIVE_AD,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-07-02',7000,6300,6300,OrderStatus.PROMOTED,'2025-07-02 06:20:00','2025-07-02 06:25:00',[0,1,2,3,4,0,1],0,null,6300),
+  genOrder('115','ORD20250701115','ALG003','盤活復甦·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.HOT_REVIVE_AD,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-07-01',3800,3420,3420,OrderStatus.PROMOTED,'2025-07-01 10:05:00','2025-07-01 10:10:00',[0,1,2],0,null,3420),
 ]
 
 /* ---- 新店廣告 Mock ---- */
@@ -583,7 +586,7 @@ function genPopularOrder(
   ]
   return {
     id, orderNo, algorithmId: algoId, promotionName: promoName, app, channel, region,
-    recommendType: RecommendType.POPULAR_MERCHANT, slotPosition: slotPos,
+    recommendType: RecommendType.POPULAR_MERCHANT_KA, slotPosition: slotPos,
     groupId: gid, groupName: gname, storeId: sid, storeName: sname, skinName,
     purchaseDate: otime.split(' ')[0], originalPrice,
     discountPrice: actualPrice, actualPrice, status, orderTime: otime, payTime: ptime,
@@ -807,8 +810,8 @@ export default function OrderDetail() {
   const statusInfo = ORDER_STATUS_MAP[order.status]
   const isRefunded = order.status === OrderStatus.REFUNDED
   const isNewStore = order.recommendType === RecommendType.NEW_STORE_AD
-  const isPopular = order.recommendType === RecommendType.POPULAR_MERCHANT
-  const isRevive = order.recommendType === RecommendType.REVITALIZATION_AD
+  const isPopular = order.recommendType === RecommendType.POPULAR_MERCHANT_KA
+  const isRevive = order.recommendType === RecommendType.HOT_REVIVE_AD
   // 是否有時段/每日折扣步驟（僅無敵星星有）
   const hasSlotDiscount = !isNewStore && !isPopular && !isRevive
 
@@ -1306,7 +1309,7 @@ export default function OrderDetail() {
         ))}
 
         {/* 盘活复苏/人氣商家（按天計價）：单商圈，商圈为标题，下方平铺推广日期 */}
-        {(order.recommendType === RecommendType.REVITALIZATION_AD || isPopular) && (() => {
+        {(order.recommendType === RecommendType.HOT_REVIVE_AD || isPopular) && (() => {
           const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
           return (
             <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
@@ -1751,7 +1754,7 @@ export default function OrderDetail() {
                   </div>
                   {(order.promoData || []).length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '24px 0', color: '#8C8C8C', fontSize: 13 }}>暫無推廣數據</div>
-                  ) : order.recommendType === RecommendType.REVITALIZATION_AD || order.recommendType === RecommendType.NEW_STORE_AD || isPopular ? (
+                  ) : order.recommendType === RecommendType.HOT_REVIVE_AD || order.recommendType === RecommendType.NEW_STORE_AD || isPopular ? (
                     /* 盘活复苏：单商圈标题 + 平铺推广日期 */
                     (() => {
                       const regionVal = Array.isArray(order.region) ? order.region[0] : order.region

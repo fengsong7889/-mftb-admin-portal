@@ -1,23 +1,20 @@
 // 推广通报表分析 - 类型定义
+import { AlgorithmType } from '../Recommend/constants'
 
-/** 推荐类型枚举 */
-export enum ReportRecommendType {
-  INVINCIBLE_STAR = 1,      // 無敵星星
-  REVITALIZATION_AD = 2,    // 盤活復蘇
-  NEW_STORE_AD = 3,         // 新店廣告
-  TRAFFIC_AD = 4,           // 流量廣告
-}
+/** 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致） */
+export type ReportRecommendType = AlgorithmType
+export const ReportRecommendType = AlgorithmType
 
-export const REPORT_RECOMMEND_TYPE_LABEL: Record<ReportRecommendType, string> = {
+export const REPORT_RECOMMEND_TYPE_LABEL: Partial<Record<ReportRecommendType, string>> = {
   [ReportRecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [ReportRecommendType.REVITALIZATION_AD]: '盤活復蘇',
+  [ReportRecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [ReportRecommendType.NEW_STORE_AD]: '新店廣告',
   [ReportRecommendType.TRAFFIC_AD]: '流量廣告',
 }
 
-export const REPORT_RECOMMEND_TYPE_COLOR: Record<ReportRecommendType, string> = {
+export const REPORT_RECOMMEND_TYPE_COLOR: Partial<Record<ReportRecommendType, string>> = {
   [ReportRecommendType.INVINCIBLE_STAR]: 'gold',
-  [ReportRecommendType.REVITALIZATION_AD]: 'green',
+  [ReportRecommendType.HOT_REVIVE_AD]: 'green',
   [ReportRecommendType.NEW_STORE_AD]: 'blue',
   [ReportRecommendType.TRAFFIC_AD]: 'purple',
 }

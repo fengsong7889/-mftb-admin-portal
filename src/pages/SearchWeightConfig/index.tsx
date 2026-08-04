@@ -744,24 +744,24 @@ export default function SearchWeightConfig() {
     <div className="content-area">
       {/* 查詢區域 */}
       <div className="search-section">
-        <Form layout="inline" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <Form layout="inline">
           <Form.Item label="集團名稱/ID">
             <Input placeholder="請輸入集團名稱或ID" allowClear />
           </Form.Item>
           <Form.Item label="所屬品牌">
-            <Select placeholder="全部" options={brandOptions} />
+            <Select placeholder="全部" allowClear options={brandOptions} />
           </Form.Item>
           <Form.Item label="搜索頻道">
-            <Select placeholder="全部" options={searchChannelOptions} />
+            <Select placeholder="全部" allowClear options={searchChannelOptions} />
           </Form.Item>
           <Form.Item label="干預方向">
-            <Select placeholder="全部" options={interventionDirectionOptions} />
+            <Select placeholder="全部" allowClear options={interventionDirectionOptions} />
           </Form.Item>
           <Form.Item label="調整方式">
-            <Select mode="multiple" placeholder="全部" options={adjustMethodQueryOptions} />
+            <Select mode="multiple" placeholder="全部" allowClear options={adjustMethodQueryOptions} />
           </Form.Item>
           <Form.Item label="狀態">
-            <Select placeholder="全部" options={statusOptions} />
+            <Select placeholder="全部" allowClear options={statusOptions} />
           </Form.Item>
           <Form.Item label="生效時間">
             <RangePicker placeholder={['開始時間', '結束時間']} />

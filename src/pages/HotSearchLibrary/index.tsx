@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload, Card } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload } from 'antd'
 import type { TableColumnsType } from 'antd'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
@@ -299,8 +299,7 @@ export default function HotSearchLibrary() {
   return (
     <div className="content-area">
       {/* 查询区域 */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
-        <div className="search-section">
+      <div className="search-section">
           <Form layout="inline">
           <Form.Item label="熱搜詞">
             <Input
@@ -312,6 +311,8 @@ export default function HotSearchLibrary() {
           </Form.Item>
           <Form.Item label="所屬品牌">
             <Select
+              placeholder="全部"
+              allowClear
               value={filterBrand}
               onChange={v => { setFilterBrand(v); setActiveEntry('all') }}
               options={brandOptions}
@@ -319,6 +320,8 @@ export default function HotSearchLibrary() {
           </Form.Item>
           <Form.Item label="搜索入口">
             <Select
+              placeholder="全部"
+              allowClear
               value={activeEntry}
               onChange={v => setActiveEntry(v || 'all')}
               options={entryOptions}
@@ -359,7 +362,6 @@ export default function HotSearchLibrary() {
           </Form.Item>
           </Form>
         </div>
-      </Card>
 
       {/* 操作区域 */}
       <div className="action-section">

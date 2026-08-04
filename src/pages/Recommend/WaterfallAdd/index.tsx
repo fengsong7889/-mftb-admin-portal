@@ -820,7 +820,6 @@ function WaterfallAddGeneral() {
         status,
       }
 
-      console.log('提交數據:', submitData)
       message.success('新增成功')
       navigate(`/promotion-waterfall?type=${selectedAlgorithmType}`)
     } catch (error) {

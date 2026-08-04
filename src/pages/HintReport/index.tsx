@@ -202,27 +202,27 @@ export default function HintReport() {
       <div className="search-section">
         <Form layout="inline">
           <Form.Item label="底紋詞">
-            <Input placeholder="請輸入底紋詞" allowClear style={{ height: 30 }} />
+            <Input placeholder="請輸入底紋詞" allowClear />
           </Form.Item>
           <Form.Item label="詞源類型">
-            <Select placeholder="請選擇" options={hintTypeOptions} style={{ height: 30, width: 200 }} />
+            <Select placeholder="全部" allowClear options={hintTypeOptions} />
           </Form.Item>
           <Form.Item label="所屬品牌">
-            <Select placeholder="請選擇" options={brandOptions} style={{ height: 30, width: 200 }} />
+            <Select placeholder="全部" allowClear options={brandOptions} />
           </Form.Item>
           <Form.Item label="展示終端">
-            <Select placeholder="請選擇" options={terminalOptions} style={{ height: 30, width: 200 }} />
+            <Select placeholder="全部" allowClear options={terminalOptions} />
           </Form.Item>
           <Form.Item label="區域">
-            <Select placeholder="請選擇" options={regionOptions} style={{ height: 30, width: 200 }} />
+            <Select placeholder="全部" allowClear options={regionOptions} />
           </Form.Item>
           <Form.Item label="統計日期">
-            <RangePicker style={{ height: 30 }} />
+            <RangePicker />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} style={{ height: 30 }}>查詢</Button>
-              <Button icon={<ReloadOutlined />} style={{ height: 30 }}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
+              <Button icon={<ReloadOutlined />}>重置</Button>
             </div>
           </Form.Item>
         </Form>
