@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider, useAuth } from './AuthContext'
 import * as api from '../api'
 
@@ -33,7 +34,7 @@ function mockLoginSuccess(role: 'admin' | 'guest') {
 }
 
 function wrapper({ children }: { children: React.ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>
+  return <MemoryRouter><AuthProvider>{children}</AuthProvider></MemoryRouter>
 }
 
 describe('AuthContext', () => {
