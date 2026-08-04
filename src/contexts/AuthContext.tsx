@@ -37,19 +37,45 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+/** 英文地名 → 中文映射（覆盖港澳台 + 大陆主要省市） */
+const LOCATION_ZH_MAP: Record<string, string> = {
+  // 特别行政区
+  'Macau': '澳门', 'Hong Kong': '香港',
+  // 大陆省份
+  'Guangdong': '广东', 'Beijing': '北京', 'Shanghai': '上海', 'Tianjin': '天津',
+  'Chongqing': '重庆', 'Zhejiang': '浙江', 'Jiangsu': '江苏', 'Fujian': '福建',
+  'Shandong': '山东', 'Hebei': '河北', 'Henan': '河南', 'Hubei': '湖北',
+  'Hunan': '湖南', 'Anhui': '安徽', 'Jiangxi': '江西', 'Sichuan': '四川',
+  'Shaanxi': '陕西', 'Liaoning': '辽宁', 'Jilin': '吉林', 'Heilongjiang': '黑龙江',
+  'Yunnan': '云南', 'Guizhou': '贵州', 'Guangxi': '广西', 'Hainan': '海南',
+  'Gansu': '甘肃', 'Shanxi': '山西', 'Inner Mongolia': '内蒙古', 'Xinjiang': '新疆',
+  'Xizang': '西藏', 'Ningxia': '宁夏', 'Qinghai': '青海',
+  // 主要城市
+  'Shenzhen': '深圳', 'Guangzhou': '广州', 'Dongguan': '东莞', 'Foshan': '佛山',
+  'Zhuhai': '珠海', 'Huizhou': '惠州', 'Nanjing': '南京', 'Suzhou': '苏州',
+  'Wuxi': '无锡', 'Hangzhou': '杭州', 'Ningbo': '宁波', 'Wenzhou': '温州',
+  'Xiamen': '厦门', 'Fuzhou': '福州', 'Quanzhou': '泉州', 'Wuhan': '武汉',
+  'Chengdu': '成都', 'Changsha': '长沙', 'Hefei': '合肥', 'Nanchang': '南昌',
+  'Kunming': '昆明', 'Guiyang': '贵阳', 'Nanning': '南宁', 'Haikou': '海口',
+  'Shenyang': '沈阳', 'Dalian': '大连', 'Qingdao': '青岛', 'Jinan': '济南',
+  'Zhengzhou': '郑州', 'Taiyuan': '太原', 'Xian': '西安', 'Lanzhou': '兰州',
+}
+
 /**
  * 解析 IP 地理位置（省市，中文）
- * 使用 ip-api.com 免費 API（支持 lang=zh-CN 返回中文地名，每分 45 次配額）
+ * 使用 ipapi.co HTTPS API，配合英文→中文地名映射
  */
 async function resolveIpLocation(ip: string): Promise<string> {
   try {
-    const res = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN`)
+    const res = await fetch(`https://ipapi.co/${ip}/json/`)
     if (!res.ok) return ''
     const data = await res.json()
-    if (data.status !== 'success') return ''
+    if (data.error) return ''
+    const region = LOCATION_ZH_MAP[data.region] || data.region || ''
+    const city = LOCATION_ZH_MAP[data.city] || data.city || ''
     const parts: string[] = []
-    if (data.regionName) parts.push(data.regionName)
-    if (data.city && data.city !== data.regionName) parts.push(data.city)
+    if (region) parts.push(region)
+    if (city && city !== region) parts.push(city)
     return parts.join(' ')
   } catch {
     return ''
@@ -109,8 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   /**
-   * 監聽被頂下線事件：賬號在其他設備登錄，先彈窗提醒，
-   * 等用戶點擊「我知道了」後再清除登錄態並跳轉登錄頁。
+   * 監聽被頂下線事件：賬號在其他設備登錄，先解析 IP 地點，
+   * 等數據就緒後再彈窗提醒，避免彈窗時地點為空。
    * 注意：此處不能立即 setIsAuthenticated(false)，否則路由守衛會
    * 瞬間切換到 /login，導致 Modal 被 Login 頁面遮擋。
    */
@@ -118,19 +144,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handleSessionConflict = (e: Event) => {
       const detail = (e as CustomEvent<SessionConflictDetail>).detail
       pendingLogoutRef.current = true
-      setConflictInfo(detail)
       // 先清除 localStorage 中的 token，防止後續請求繼續攜帶失效 token
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('is_authenticated')
       localStorage.removeItem('user_info')
 
-      // 異步解析登錄 IP 的地理位置（省市），解析完成後更新彈窗
+      // 先解析 IP 地點，完成後再彈窗（確保地點數據不為空）
       if (detail.loginIp) {
         resolveIpLocation(detail.loginIp).then((location) => {
-          if (location) {
-            setConflictInfo(prev => prev ? { ...prev, loginLocation: location } : prev)
-          }
+          setConflictInfo({ ...detail, loginLocation: location || detail.loginLocation || '-' })
         })
+      } else {
+        // 無 IP 信息，直接彈窗
+        setConflictInfo({ ...detail, loginLocation: '-' })
       }
     }
     window.addEventListener(SESSION_CONFLICT_EVENT, handleSessionConflict)
