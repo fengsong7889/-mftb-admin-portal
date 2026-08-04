@@ -23,6 +23,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 认证接口
  */
@@ -73,7 +76,7 @@ public class AuthController {
      * 返回具体异常原因以便前端主动弹窗提醒。
      */
     @GetMapping("/check")
-    public Result<Void> check(HttpServletRequest request) {
+    public Result<?> check(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             return Result.error(ResultCode.UNAUTHORIZED);
@@ -94,14 +97,16 @@ public class AuthController {
         }
         // 被管理员强制下线
         if (user.getForceLogoutOperator() != null) {
-            return Result.<Void>error(401, "您的账号已被管理员强制下线");
+            return Result.error(401, "您的账号已被管理员强制下线");
         }
-        // 被其他设备登录顶下线
+        // 被其他设备登录顶下线：返回新登录设备的 IP
         if (StringUtils.hasText(user.getActiveToken()) && !token.equals(user.getActiveToken())) {
             if ("account_disabled".equals(user.getForceLogoutReason())) {
                 return Result.error(ResultCode.ACCOUNT_DISABLED);
             }
-            return Result.<Void>error(401, "您的账号已在其他设备登录");
+            Map<String, String> data = new HashMap<>();
+            data.put("loginIp", user.getActiveLoginIp() != null ? user.getActiveLoginIp() : "");
+            return new Result<>(401, "您的账号已在其他设备登录", data);
         }
         return Result.success();
     }

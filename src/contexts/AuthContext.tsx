@@ -230,7 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         if (!res.ok || stopped) return
 
-        const result = await res.json() as { code: number; message: string }
+        const result = await res.json() as { code: number; message: string; data?: { loginIp?: string } }
         if (stopped) return
 
         if (result.code === 200) return // 会话正常
@@ -252,10 +252,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               })
             )
           } else if (msg.includes('其他设备')) {
-            // 被其他设备顶下线
+            // 被其他设备顶下线：从响应中提取新登录设备的 IP
+            const loginIp = result.data?.loginIp || ''
             window.dispatchEvent(
               new CustomEvent<SessionConflictDetail>(SESSION_CONFLICT_EVENT, {
-                detail: { loginIp: '', loginLocation: '' },
+                detail: { loginIp, loginLocation: '' },
               })
             )
           }
