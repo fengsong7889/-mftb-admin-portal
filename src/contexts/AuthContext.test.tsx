@@ -131,8 +131,8 @@ describe('AuthContext', () => {
     })
     expect(result.current.isAuthenticated).toBe(true)
 
-    act(() => {
-      result.current.logout()
+    await act(async () => {
+      await result.current.logout()
     })
     expect(result.current.isAuthenticated).toBe(false)
     expect(result.current.user).toBe(null)
