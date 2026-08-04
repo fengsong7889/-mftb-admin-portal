@@ -38,6 +38,11 @@ const statusMap: Record<string, { text: string; color: string }> = {
 type AccountRecord = FinAccount & { key?: string }
 
 /** 格式化金额 */
+const formatAmount = (val: number) => {
+  return val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/** 搜索筛选条件 */
 interface AccountFilters {
   groupId?: string
   groupName?: string
