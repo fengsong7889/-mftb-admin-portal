@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmVO;
+import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdAlgorithm;
@@ -14,6 +15,7 @@ import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
+import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -38,6 +40,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
 
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingStarService pricingService;
+    private final AdPricingReviveService revivePricingService;
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
@@ -71,11 +74,25 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         return new PageResult<>(records, result.getTotal());
     }
 
-    /** 该算法启用中的定价是否屏蔽了指定门店（含其所属集团） */
+    /** 该算法启用中的定价是否屏蔽了指定门店（含其所属集团），按算法类型取对应计价配置 */
     private boolean isBlockedForStore(Long algoId, String storeCode) {
-        AdPricingStarVO pricing = pricingService.activeByAlgo(algoId);
-        if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {
-            return false;
+        Integer blockMerchant;
+        String blockListJson;
+        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
+        if (algorithm != null && algorithm.getAlgoType() != null && algorithm.getAlgoType() == 3) {
+            AdPricingReviveVO pricing = revivePricingService.activeByAlgo(algoId);
+            if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {
+                return false;
+            }
+            blockMerchant = pricing.getBlockMerchant();
+            blockListJson = pricing.getBlockList();
+        } else {
+            AdPricingStarVO pricing = pricingService.activeByAlgo(algoId);
+            if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {
+                return false;
+            }
+            blockMerchant = pricing.getBlockMerchant();
+            blockListJson = pricing.getBlockList();
         }
         BizStore store = storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
                 .eq(BizStore::getStoreCode, storeCode)
@@ -85,7 +102,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
             BizMerchantGroup group = groupMapper.selectById(store.getGroupId());
             groupCode = group != null ? group.getGroupCode() : null;
         }
-        for (Map<String, Object> entry : JsonUtils.parseMapList(pricing.getBlockList())) {
+        for (Map<String, Object> entry : JsonUtils.parseMapList(blockListJson)) {
             String entryStore = entry.get("storeCode") == null ? null : String.valueOf(entry.get("storeCode"));
             String entryGroup = entry.get("groupCode") == null ? null : String.valueOf(entry.get("groupCode"));
             if (storeCode.equals(entryStore)) {

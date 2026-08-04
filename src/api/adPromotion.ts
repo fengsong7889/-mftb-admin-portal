@@ -144,6 +144,8 @@ export interface AdRegionPrice {
   region: number
   /** 該商圈日單價（MOP） */
   dailyPrice: number
+  /** 每天銷售個數（庫存），缺省 1 = 獨家占 */
+  dailySalesLimit?: number
 }
 
 /** 計價配置（與後端 AdPricingStarVO 對齊） */
@@ -275,6 +277,10 @@ export interface AdInventoryCell {
   mealSlot: AdMealSlot
   /** 格子單價（商圈日單價 / 5） */
   cellPrice: number
+  /** 每天銷售個數（庫存），缺省 1 = 獨家占 */
+  salesLimit?: number
+  /** 剩余可售個數 */
+  remaining?: number
   /** 格子狀態: available=可購買 soldOut=已售罄 unavailable=不可售 upcoming=待開售 */
   status: 'available' | 'soldOut' | 'unavailable' | 'upcoming'
 }
@@ -337,7 +343,7 @@ export const MEAL_SLOT_TIME_LABEL: Record<string, string> = {
 export interface AdOrder {
   id?: number
   orderNo: string
-  /** 算法類型: 1=無敵星星 */
+  /** 算法類型: 1=無敵星星 3=盤活復蘇 */
   algoType: number
   algoId: number
   algoName: string
@@ -363,21 +369,29 @@ export interface AdOrder {
   discountAmount: number
   actualAmount: number
   refundAmount: number
+  /** 贈送天數抵扣快照 */
+  giftDays?: number | null
+  /** 贈送抵扣金額快照 */
+  giftAmount?: number | null
   /** 訂單狀態: 1=待推廣 2=推廣中 3=已推廣 4=已退款 5=已取消 */
   status: number
-  orderTime?: string
-  payTime?: string
+  /** 購買日期列表（盤活復蘇按天售賣，明細日期去重排序） */
+  purchaseDays?: string[]
+  /** 後端 LocalDateTime 統一序列化為毫秒時間戳，保留字符串兼容 */
+  orderTime?: string | number
+  payTime?: string | number
   flowNo?: string
   remark?: string
   createdAt?: string
 }
 
-/** 訂單明細行（商圈 x 日期 x 餐段） */
+/** 訂單明細行（商圈 x 日期 x 餐段；盤活復蘇無 mealSlot） */
 export interface AdOrderItem {
   id?: number
   bizDate: string
   region: number
-  mealSlot: string
+  /** 餐段時段；盤活復蘇按天售賣時為空 */
+  mealSlot?: string | null
   originalPrice: number
   /** 折後實付分攤價 */
   salePrice: number
@@ -419,4 +433,252 @@ export function fetchAdOrderDetail(orderNo: string) {
 /** 退款（按取消扣費梯度計算後回補推廣金賬戶） */
 export function refundAdOrder(orderNo: string) {
   return request.post<unknown, AdOrderDetail>(`/ad/orders/${orderNo}/refund`, null, SILENT)
+}
+
+/* ==================== 銷售定價（盤活復蘇計價） ==================== */
+
+/** 盤活復蘇計價配置（與後端 AdPricingReviveVO 對齊） */
+export interface AdPricingRevive {
+  id?: number
+  algoId: number
+  algoName?: string
+  brand?: AdBrand | string
+  channel?: number
+  /** 預售天數（今天起 N 天可售），默認 180 */
+  presaleDays: number
+  /** 退款開關: 1=允許退款 2=不允許 */
+  refundEnabled?: number
+  /** 多天梯度折扣 JSON 字符串，如 [{"minDays":3,"discount":95}] */
+  discountTiers?: string
+  /** 取消扣費梯度 JSON 字符串 */
+  cancelFeeTiers?: string
+  /** 屏蔽商家開關: 1=啟用 2=關閉 */
+  blockMerchant?: number
+  /** 屏蔽商家列表 JSON 字符串 */
+  blockList?: string
+  /** 服務狀態: 1=啟用 2=停用 */
+  status?: number
+  remark?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+  /** 分商圈計價（含每日銷售個數=庫存） */
+  regionPrices?: AdRegionPrice[]
+}
+
+/** 盤活復蘇計價配置新增/編輯請求 */
+export interface AdPricingReviveRequest {
+  algoId: number
+  brand?: string
+  channel?: number
+  presaleDays: number
+  refundEnabled?: number
+  /** 多天梯度折扣: [{"minDays":3,"discount":95}] */
+  discountTiers?: Record<string, unknown>[]
+  /** 取消扣費梯度: [{"remainDays":0,"ratio":100}] */
+  cancelFeeTiers?: Record<string, unknown>[]
+  blockMerchant?: number
+  blockList?: Record<string, unknown>[]
+  status?: number
+  remark?: string
+  /** 分商圈計價配置（整體替換） */
+  regionPrices?: AdRegionPrice[]
+}
+
+/** 盤活復蘇計價配置查詢參數 */
+export interface AdPricingReviveQuery {
+  page?: number
+  size?: number
+  algoId?: number
+  brand?: string
+  status?: number
+}
+
+/** 盤活復蘇計價配置分頁查詢 */
+export function fetchAdRevivePricingList(params: AdPricingReviveQuery) {
+  return request.get<unknown, AdPageResult<AdPricingRevive>>('/ad/pricing/revive', { params, ...SILENT })
+}
+
+/** 盤活復蘇計價配置詳情 */
+export function fetchAdRevivePricingDetail(id: number) {
+  return request.get<unknown, AdPricingRevive>(`/ad/pricing/revive/${id}`, SILENT)
+}
+
+/** 按算法查詢啟用中的盤活復蘇計價配置 */
+export function fetchAdRevivePricingActive(algoId: number) {
+  return request.get<unknown, AdPricingRevive>('/ad/pricing/revive/active', { params: { algoId }, ...SILENT })
+}
+
+/** 新增盤活復蘇計價配置 */
+export function createAdRevivePricing(data: AdPricingReviveRequest) {
+  return request.post<unknown, AdPricingRevive>('/ad/pricing/revive', data, SILENT)
+}
+
+/** 編輯盤活復蘇計價配置 */
+export function updateAdRevivePricing(id: number, data: AdPricingReviveRequest) {
+  return request.put<unknown, AdPricingRevive>(`/ad/pricing/revive/${id}`, data, SILENT)
+}
+
+/** 盤活復蘇計價配置啟用/停用 */
+export function updateAdRevivePricingStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/ad/pricing/revive/${id}/status`, { status }, SILENT)
+}
+
+/** 刪除盤活復蘇計價配置 */
+export function deleteAdRevivePricing(id: number) {
+  return request.delete<unknown, void>(`/ad/pricing/revive/${id}`, SILENT)
+}
+
+/* ==================== 廣告銷售（盤活復蘇: 庫存 + 下單） ==================== */
+
+/** 盤活復蘇可售格子（商圈 x 日期） */
+export interface AdReviveInventoryCell {
+  /** 投放日期 YYYY-MM-DD */
+  bizDate: string
+  region: number
+  /** 日單價（商圈日單價） */
+  dailyPrice: number
+  /** 每天銷售個數（庫存） */
+  salesLimit: number
+  /** 剩余可售個數 */
+  remaining: number
+  /** 格子狀態: available=可購買 soldOut=已售罄 */
+  status: 'available' | 'soldOut'
+}
+
+/** 盤活復蘇庫存查詢結果 */
+export interface AdReviveInventoryVO {
+  algoId: number
+  presaleDays: number
+  /** 多天梯度折扣 JSON 字符串（前端展示折扣規則） */
+  discountTiers?: string
+  /** 退款開關: 1=允許退款 2=不允許 */
+  refundEnabled?: number
+  cells: AdReviveInventoryCell[]
+}
+
+/** 查詢盤活復蘇可購買格子 */
+export function fetchAdReviveInventory(algoId: number, storeCode?: string, groupCode?: string) {
+  return request.get<unknown, AdReviveInventoryVO>('/ad/sales/revive/inventory', { params: { algoId, storeCode, groupCode }, ...SILENT })
+}
+
+/** 盤活復蘇下單請求（從推廣金賬戶扣款，支持贈送天數抵扣） */
+export interface AdReviveOrderRequest {
+  algoId: number
+  groupCode: string
+  storeCode?: string
+  bdEmpId?: string
+  remark?: string
+  /** 贈送天數抵扣（來自贈送管理發放的余額） */
+  giftDays?: number
+  /** 選購的格子列表（商圈 x 日期） */
+  cells: { bizDate: string; region: number }[]
+}
+
+/** 提交盤活復蘇訂單並從推廣金賬戶扣款 */
+export function placeAdReviveOrder(data: AdReviveOrderRequest) {
+  return request.post<unknown, AdOrder>('/ad/sales/revive/order', data, SILENT)
+}
+
+/** 盤活復蘇加購鎖定格子 60 秒 */
+export function lockAdReviveCells(data: AdReviveOrderRequest) {
+  return request.post<unknown, void>('/ad/sales/revive/lock', data, SILENT)
+}
+
+/** 釋放盤活復蘇加購鎖 */
+export function unlockAdReviveCells(data: AdReviveOrderRequest) {
+  return request.post<unknown, void>('/ad/sales/revive/unlock', data, SILENT)
+}
+
+/* ==================== 瀑布流策略 ==================== */
+
+/**
+ * 瀑布流策略（與後端 AdWaterfallVO 對齊）
+ * id 即配置ID，APP 按該 ID 引用本條配置渲染瀑布流：
+ * 已配置坑位讀取對應算法數據，未配置坑位統一讀取自然流量兜底算法數據
+ */
+export interface WaterfallStrategy {
+  id?: number
+  strategyName: string
+  brand?: AdBrand | string
+  /** 自然流量兜底算法ID（未配置坑位讀取該算法數據） */
+  naturalAlgoId?: number | null
+  naturalAlgoName?: string
+  /** 過濾用戶不喜歡: 1=開啟 2=關閉 */
+  filterDislike?: number
+  /** 服務狀態: 1=啟用 2=停用 */
+  status?: number
+  remark?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+  /** 坑位明細（按坑位序號升序） */
+  slots?: WaterfallSlotItem[]
+}
+
+/** 坑位明細條目（一個坑位只能展示一種算法） */
+export interface WaterfallSlotItem {
+  id?: number
+  /** 坑位序號（從1開始） */
+  slotPosition: number
+  algoId: number
+  algoName?: string
+  /** 算法類型快照: 1=無敵星星 2=新店廣告 3=盤活復蘇 ... */
+  algoType?: number
+  /** 坑位狀態: 1=啟用 2=停用 */
+  status?: number
+}
+
+/** 瀑布流策略新增/編輯請求（坑位明細整體替換） */
+export interface WaterfallStrategyRequest {
+  strategyName: string
+  brand?: string
+  naturalAlgoId?: number | null
+  filterDislike?: number
+  status?: number
+  remark?: string
+  slots?: { slotPosition: number; algoId: number; status?: number }[]
+}
+
+/** 瀑布流策略查詢參數 */
+export interface WaterfallQuery {
+  page?: number
+  size?: number
+  /** 配置ID */
+  id?: number
+  strategyName?: string
+  brand?: string
+  status?: number
+  /** 按算法過濾（包含該算法的策略） */
+  algoId?: number
+}
+
+/** 策略分頁查詢 */
+export function fetchWaterfallList(params: WaterfallQuery) {
+  return request.get<unknown, AdPageResult<WaterfallStrategy>>('/ad/waterfall', { params, ...SILENT })
+}
+
+/** 策略詳情（含坑位明細 + 自然流量兜底算法） */
+export function fetchWaterfallDetail(id: number) {
+  return request.get<unknown, WaterfallStrategy>(`/ad/waterfall/${id}`, SILENT)
+}
+
+/** 新增策略 */
+export function createWaterfall(data: WaterfallStrategyRequest) {
+  return request.post<unknown, WaterfallStrategy>('/ad/waterfall', data, SILENT)
+}
+
+/** 編輯策略 */
+export function updateWaterfall(id: number, data: WaterfallStrategyRequest) {
+  return request.put<unknown, WaterfallStrategy>(`/ad/waterfall/${id}`, data, SILENT)
+}
+
+/** 策略啟用/停用 */
+export function updateWaterfallStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/ad/waterfall/${id}/status`, { status }, SILENT)
+}
+
+/** 刪除策略 */
+export function deleteWaterfall(id: number) {
+  return request.delete<unknown, void>(`/ad/waterfall/${id}`, SILENT)
 }

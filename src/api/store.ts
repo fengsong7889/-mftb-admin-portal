@@ -43,6 +43,8 @@ export interface StoreItem {
   bizType?: string
   bizChannel?: string
   loginAccount?: string
+  /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（盘活复苏按商圈售卖时跟随门店） */
+  region?: number | null
   /** 已绑定的BD列表（一家门店可绑定多个） */
   bdList?: StoreBdItem[]
   updatedBy?: string
@@ -64,6 +66,8 @@ export interface StorePayload {
   bizType?: string
   bizChannel?: string
   loginAccount?: string
+  /** 所在区域/商圈 */
+  region?: number | null
 }
 
 /** 门店列表查询参数 */

@@ -10,11 +10,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchAdOrderDetail,
   fetchAdPricingActive,
+  fetchAdRevivePricingActive,
   refundAdOrder,
   brandToAppType,
   type AdOrderDetail,
 } from '../../api/adPromotion'
-import { AlgorithmType } from '../Recommend/constants'
+import { AlgorithmType, REGION_LABEL } from '../Recommend/constants'
+import dayjs from 'dayjs'
 
 /* ---- 数字动画 Hook ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -94,10 +96,7 @@ const CHANNEL_LABEL: Record<RecommendChannel, string> = {
   [RecommendChannel.SUPERMARKET]: '超市百貨',
 }
 
-const REGION_LABEL: Record<number, string> = {
-  1: '黑沙環區', 2: '高士德區', 3: '新馬路區', 4: '新皇朝區', 5: '港珠澳區',
-  6: '花城市區', 7: '北安機場', 8: '左酒店區', 9: '右酒店區', 10: '澳大專區', 11: '黑沙灘區',
-}
+// 商圈名称映射：统一引用全局商圈数据（含珠海区域）
 
 // 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致）
 type RecommendType = AlgorithmType
@@ -227,6 +226,20 @@ function parseDiscountTiers(json?: string): { minSlots: number; discount: number
   }
 }
 
+/** 解析多天梯度折扣 JSON（[{minDays,discount}]，盤活復蘇，映射為 minSlots 口徑復用展示邏輯） */
+function parseDayDiscountTiers(json?: string): { minSlots: number; discount: number }[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json)
+    if (!Array.isArray(arr)) return []
+    return (arr as Array<{ minDays?: number; discount?: number }>)
+      .filter(t => t && Number(t.minDays) > 0 && Number(t.discount) > 0)
+      .map(t => ({ minSlots: Number(t.minDays), discount: Number(t.discount) }))
+  } catch {
+    return []
+  }
+}
+
 /** 后端订单详情 → 详情页 OrderItem（明细折扣还原为定价配置的时段折扣口径） */
 function toDetailOrder(
   vo: AdOrderDetail,
@@ -236,13 +249,20 @@ function toDetailOrder(
     discountTiers: { minSlots: number; discount: number }[]
   },
 ): OrderItem {
-  const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  // 後端 LocalDateTime 統一序列化為毫秒時間戳，兼容字符串/數字兩種格式
+  const fmt = (t?: string | number) => {
+    if (t == null || t === '') return ''
+    if (typeof t === 'number') return dayjs(t).format('YYYY-MM-DD HH:mm:ss')
+    return String(t).replace('T', ' ').slice(0, 19)
+  }
   // 匹配梯度折扣（与后端同算法: minSlots 降序取第一个满足格子数的梯度）
   const cellCount = vo.itemCount ?? vo.items.length
   const matchedTier = [...(pricing?.discountTiers ?? [])]
     .sort((a, b) => b.minSlots - a.minSlots)
     .find(t => cellCount >= t.minSlots)
   const tierPct = matchedTier ? matchedTier.discount : 100
+  // 明细 salePrice 已是梯度折後價（含實付分攤）：還原為折前價再參與費用明細計算，
+  // 避免梯度折扣在 finalPrice = subtotal × 梯度倍率 中被重複乘兩次
   const slotPrices: SlotPriceItem[] = vo.items.map(item => {
     // 明细实付含梯度折上折 → 还原时段折扣后价格，展示定价配置的时段折扣
     const afterSlot = tierPct > 0 ? (item.salePrice / tierPct) * 100 : item.salePrice
@@ -250,16 +270,16 @@ function toDetailOrder(
       ? Math.min(10, Math.max(1, Math.round((afterSlot / item.originalPrice) * 10)))
       : 10
     return {
-      slot: MEAL_SLOT_LABEL[item.mealSlot] || item.mealSlot,
+      slot: item.mealSlot ? (MEAL_SLOT_LABEL[item.mealSlot] || item.mealSlot) : '全天',
       date: item.bizDate,
       originalPrice: item.originalPrice,
       discount,
-      actualPrice: item.salePrice,
+      actualPrice: Math.round(afterSlot * 100) / 100,
       region: item.region,
     }
   })
   const regions = Array.from(new Set(vo.items.map(i => i.region)))
-  const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || (vo.orderTime || '').slice(0, 10)
+  const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || fmt(vo.orderTime).slice(0, 10)
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
@@ -274,7 +294,7 @@ function toDetailOrder(
     groupName: vo.groupName || '-',
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
-    purchaseDate: (vo.orderTime || '').slice(0, 10),
+    purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
     actualPrice: vo.actualAmount,
@@ -699,12 +719,17 @@ export default function OrderDetail() {
       discountTiers: { minSlots: number; discount: number }[]
     } | undefined
     try {
-      const p = await fetchAdPricingActive(detail.algoId).catch(() => null)
+      // 按算法類型取對應計價配置：盤活復蘇(3)用 revive 定價，其餘用星星定價
+      const p = detail.algoType === 3
+        ? await fetchAdRevivePricingActive(detail.algoId).catch(() => null)
+        : await fetchAdPricingActive(detail.algoId).catch(() => null)
       if (p) {
         pricing = {
           cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers),
           refundEnabled: p.refundEnabled === 1,
-          discountTiers: parseDiscountTiers(p.discountTiers),
+          discountTiers: detail.algoType === 3
+            ? parseDayDiscountTiers(p.discountTiers)
+            : parseDiscountTiers(p.discountTiers),
         }
       }
     } catch {
@@ -1225,7 +1250,7 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? '推廣商圈與日期' : isPopular ? '購買商圈天數與價格' : '購買商圈時段與價格'} />
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? '推廣商圈與日期' : (isPopular || isRevive) ? '購買商圈天數與價格' : '購買商圈時段與價格'} />
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
@@ -1357,8 +1382,8 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: '#FAFAFA' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? '推廣日期' : '時段'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? '每日單價（MOP）' : '原價（MOP）'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{(isPopular || isRevive) ? '推廣日期' : '時段'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? '每日單價（MOP）' : isRevive ? '日單價（MOP）' : '原價（MOP）'}</th>
                     {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折扣</th>}
                     {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>折後價（MOP）</th>}
                     {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>推廣狀態</th>}
@@ -1367,7 +1392,7 @@ export default function OrderDetail() {
                 <tbody>
                   {order.slotPrices.map((sp, i) => (
                     <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                      <td style={{ padding: '8px 16px', textAlign: 'center' }}>{isPopular ? sp.date : sp.slot}</td>
+                      <td style={{ padding: '8px 16px', textAlign: 'center' }}>{(isPopular || isRevive) ? sp.date : sp.slot}</td>
                       <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
                       {!isPopular && <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                         {sp.discount < 10 ? <Tag color="green">{sp.discount}折</Tag> : <span style={{ color: '#8C8C8C' }}>無折扣</span>}
@@ -1507,9 +1532,9 @@ export default function OrderDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* 第1步：时段小计 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{isPopular ? '① 每日原價合計' : '① 時段原價合計'}</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{(isPopular || isRevive) ? '① 每日原價合計' : '① 時段原價合計'}</span>
               <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>MOP {totalOriginal}</span>
-              <span style={{ fontSize: 11, color: '#BFBFBF' }}>（共 {order.slotPrices.length} {isPopular ? '天' : '個時段'}）</span>
+              <span style={{ fontSize: 11, color: '#BFBFBF' }}>（共 {order.slotPrices.length} {(isPopular || isRevive) ? '天' : '個時段'}）</span>
             </div>
 
             {/* 第2步：時段/每日折扣（僅無敵星星顯示） */}
@@ -1530,7 +1555,7 @@ export default function OrderDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{hasSlotDiscount ? '③' : '②'} 梯度折扣</span>
                 <span style={{ fontSize: 13, color: '#595959' }}>
-                  滿 {order.gradientDiscount.count} {isPopular ? '天' : '個時段'}享 <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}折</strong>
+                  滿 {order.gradientDiscount.count} {(isPopular || isRevive) ? '天' : '個時段'}享 <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}折</strong>
                 </span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>
                   → MOP {finalPrice}
@@ -1552,10 +1577,10 @@ export default function OrderDetail() {
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>實付推廣金額</span>
                 <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                   {order.gradientDiscount
-                    ? (isPopular
+                    ? ((isPopular || isRevive)
                       ? `（${order.slotPrices.length}天 × 每日單價${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`
                       : `（${order.slotPrices.length}個時段 × 各時段折扣${order.gradientDiscount.count > order.slotPrices.length ? '，未觸發梯度' : `，已享${order.gradientDiscount.discount}折梯度`}）`)
-                    : (isPopular ? `（${order.slotPrices.length}天 × 每日單價）` : `（${order.slotPrices.length}個時段 × 各時段折扣）`)
+                    : ((isPopular || isRevive) ? `（${order.slotPrices.length}天 × 每日單價）` : `（${order.slotPrices.length}個時段 × 各時段折扣）`)
                   }
                 </span>
               </div>
@@ -1583,8 +1608,8 @@ export default function OrderDetail() {
             border: '1px dashed #FFD591', fontSize: 12, color: '#8C8C8C', lineHeight: 2,
           }}>
             <div style={{ fontWeight: 600, color: '#595959', marginBottom: 4 }}>📐 計算公式：</div>
-            {isPopular ? (
-              // 人氣商家：直接顯示每日單價合計 × 梯度折扣
+            {(isPopular || isRevive) ? (
+              // 人氣商家/盤活復蘇：按天計價，直接顯示每日單價合計 × 梯度折扣
               <>
                 {order.slotPrices.length} 天 × 每日單價 MOP {order.slotPrices[0]?.originalPrice || 0} = <strong style={{ color: '#262626' }}>{totalOriginal}</strong>
                 {order.gradientDiscount && (

@@ -49,7 +49,8 @@ import java.util.Set;
 /**
  * 无敌星星广告销售服务实现（库存查询 + 下单扣款）
  * <p>
- * 售卖单位: 商圈 x 日期 x 5餐段时段, 独家占（应用层校验, 退款后释放）。
+ * 售卖单位: 商圈 x 日期 x 5餐段时段, 按商圈每日销售个数(dailySalesLimit)控制库存，
+ * 默认 1 即独家占；退款/取消后释放可再售。
  * 格子单价 = 商圈日单价 / 5, 多选格子按梯度折扣计价后从推广金账户扣款。
  */
 @Service
@@ -94,8 +95,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         LocalDateTime now = LocalDateTime.now();
         // 规则1: 仅预售期内可售；规则2: 仅遍历定价已配置商圈
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
-        Set<String> occupied = occupiedCells(today, endDate);
-        Map<String, String> activeLocks = activeLocks(algoId, today, endDate);
+        Map<String, Integer> occupied = occupiedCounts(today, endDate);
+        Map<String, Set<String>> lockGroups = activeLockGroups(algoId, today, endDate);
         Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots());
 
         AdInventoryVO vo = new AdInventoryVO();
@@ -106,6 +107,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         for (AdPricingStarVO.RegionPriceItem regionPrice : pricing.getRegionPrices()) {
             BigDecimal cellPrice = round2(regionPrice.getDailyPrice()
                     .divide(BigDecimal.valueOf(MEAL_SLOTS.size()), RoundingMode.HALF_UP));
+            int salesLimit = regionPrice.getDailySalesLimit() == null || regionPrice.getDailySalesLimit() < 1
+                    ? 1 : regionPrice.getDailySalesLimit();
             for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
                 for (String slot : MEAL_SLOTS) {
                     AdInventoryVO.Cell cell = new AdInventoryVO.Cell();
@@ -113,9 +116,11 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
                     cell.setRegion(regionPrice.getRegion());
                     cell.setMealSlot(slot);
                     cell.setCellPrice(cellPrice);
+                    cell.setSalesLimit(salesLimit);
                     String key = cellKey(date, regionPrice.getRegion(), slot);
-                    cell.setStatus(resolveCellStatus(date, slot, key, occupied, activeLocks,
-                            groupCode, sellSlots, today, now));
+                    int taken = takenCount(key, occupied, lockGroups, groupCode);
+                    cell.setRemaining(Math.max(0, salesLimit - taken));
+                    cell.setStatus(resolveCellStatus(date, slot, salesLimit, taken, sellSlots, today, now));
                     vo.getCells().add(cell);
                 }
             }
@@ -129,20 +134,13 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
 
     /**
      * 格子状态判定:
-     * 规则3 被活跃订单占用 → 已售罄（退款后释放）;
-     * 规则4 被其它商家加购锁定 → 已售罄（60秒后释放）;
+     * 规则3 占用数(活跃订单)+其它商家锁数 达到库存 → 已售罄（退款后释放）;
      * 规则7 不在定价可售时段内 → 不可售;
      * 规则5 当天已过时段开始时间 → 不可售。
      */
-    private String resolveCellStatus(LocalDate date, String slot, String key,
-                                     Set<String> occupied, Map<String, String> activeLocks,
-                                     String viewerGroupCode, Set<String> sellSlots,
-                                     LocalDate today, LocalDateTime now) {
-        if (occupied.contains(key)) {
-            return "soldOut";
-        }
-        String lockGroup = activeLocks.get(key);
-        if (lockGroup != null && !lockGroup.equals(viewerGroupCode)) {
+    private String resolveCellStatus(LocalDate date, String slot, int salesLimit, int taken,
+                                     Set<String> sellSlots, LocalDate today, LocalDateTime now) {
+        if (taken >= salesLimit) {
             return "soldOut";
         }
         if (!sellSlots.contains(slot)) {
@@ -178,8 +176,11 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
         Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots());
         Map<Integer, BigDecimal> regionDailyPrice = new LinkedHashMap<>();
+        Map<Integer, Integer> regionSalesLimit = new LinkedHashMap<>();
         for (AdPricingStarVO.RegionPriceItem item : pricing.getRegionPrices()) {
             regionDailyPrice.put(item.getRegion(), item.getDailyPrice());
+            regionSalesLimit.put(item.getRegion(), item.getDailySalesLimit() == null || item.getDailySalesLimit() < 1
+                    ? 1 : item.getDailySalesLimit());
         }
         Set<String> requestKeys = new HashSet<>();
         for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
@@ -209,16 +210,14 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             }
         }
 
-        // 3. 独家占校验（仅活跃订单占用格子）+ 规则4 其它商家加购锁校验
-        Set<String> occupied = occupiedCells(today, endDate);
-        Map<String, String> activeLocks = activeLocks(request.getAlgoId(), today, endDate);
+        // 3. 库存校验（仅活跃订单占用格子）+ 规则4 其它商家加购锁校验
+        Map<String, Integer> occupied = occupiedCounts(today, endDate);
+        Map<String, Set<String>> lockGroups = activeLockGroups(request.getAlgoId(), today, endDate);
         for (String key : requestKeys) {
-            if (occupied.contains(key)) {
+            int taken = takenCount(key, occupied, lockGroups, request.getGroupCode());
+            int limit = salesLimitOfKey(key, regionSalesLimit);
+            if (taken >= limit) {
                 throw new BusinessException("部分格子已售罄，請刷新後重新選擇");
-            }
-            String lockGroup = activeLocks.get(key);
-            if (lockGroup != null && !lockGroup.equals(request.getGroupCode())) {
-                throw new BusinessException("部分格子已被其他商家加購鎖定，請稍後再試");
             }
         }
 
@@ -366,11 +365,14 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
         Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots());
         Set<Integer> configuredRegions = new HashSet<>();
+        Map<Integer, Integer> regionSalesLimit = new LinkedHashMap<>();
         for (AdPricingStarVO.RegionPriceItem item : pricing.getRegionPrices()) {
             configuredRegions.add(item.getRegion());
+            regionSalesLimit.put(item.getRegion(), item.getDailySalesLimit() == null || item.getDailySalesLimit() < 1
+                    ? 1 : item.getDailySalesLimit());
         }
-        Set<String> occupied = occupiedCells(today, endDate);
-        Map<String, String> activeLocks = activeLocks(request.getAlgoId(), today, endDate);
+        Map<String, Integer> occupied = occupiedCounts(today, endDate);
+        Map<String, Set<String>> lockGroups = activeLockGroups(request.getAlgoId(), today, endDate);
 
         for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
             if (cell.getBizDate() == null || cell.getRegion() == null || !StringUtils.hasText(cell.getMealSlot())) {
@@ -393,12 +395,10 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
                 throw new BusinessException("該時段已開始，無法加購");
             }
             String key = cellKey(cell.getBizDate(), cell.getRegion(), cell.getMealSlot());
-            if (occupied.contains(key)) {
+            int taken = takenCount(key, occupied, lockGroups, request.getGroupCode());
+            int limit = salesLimitOfKey(key, regionSalesLimit);
+            if (taken >= limit) {
                 throw new BusinessException("該時段已售罄");
-            }
-            String lockGroup = activeLocks.get(key);
-            if (lockGroup != null && !lockGroup.equals(request.getGroupCode())) {
-                throw new BusinessException("該時段已被其他商家加購鎖定");
             }
         }
 
@@ -464,33 +464,61 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         return pricing;
     }
 
-    /** 预售窗口内被活跃订单（未退款）占用的格子集合 */
-    private Set<String> occupiedCells(LocalDate start, LocalDate end) {
+    /** 预售窗口内被活跃订单（未退款）占用的格子计数: 格子键 → 占用个数 */
+    private Map<String, Integer> occupiedCounts(LocalDate start, LocalDate end) {
         List<AdOrderItemStar> items = itemMapper.selectList(
                 new LambdaQueryWrapper<AdOrderItemStar>()
                         .ge(AdOrderItemStar::getBizDate, start)
                         .le(AdOrderItemStar::getBizDate, end)
                         .in(AdOrderItemStar::getDeliveryStatus, 1, 2));
-        Set<String> keys = new HashSet<>();
+        Map<String, Integer> counts = new LinkedHashMap<>();
         for (AdOrderItemStar item : items) {
-            keys.add(cellKey(item.getBizDate(), item.getRegion(), item.getMealSlot()));
+            counts.merge(cellKey(item.getBizDate(), item.getRegion(), item.getMealSlot()), 1, Integer::sum);
         }
-        return keys;
+        return counts;
     }
 
-    /** 预售窗口内未过期的加购锁: 格子键 → 锁定集团编码 */
-    private Map<String, String> activeLocks(Long algoId, LocalDate start, LocalDate end) {
+    /** 预售窗口内未过期的加购锁: 格子键 → 持锁集团集合（同集团唯一键仅一条） */
+    private Map<String, Set<String>> activeLockGroups(Long algoId, LocalDate start, LocalDate end) {
         List<AdCellLock> locks = lockMapper.selectList(
                 new LambdaQueryWrapper<AdCellLock>()
                         .eq(AdCellLock::getAlgoId, algoId)
                         .ge(AdCellLock::getBizDate, start)
                         .le(AdCellLock::getBizDate, end)
                         .gt(AdCellLock::getExpireAt, LocalDateTime.now()));
-        Map<String, String> map = new LinkedHashMap<>();
+        Map<String, Set<String>> map = new LinkedHashMap<>();
         for (AdCellLock lock : locks) {
-            map.put(cellKey(lock.getBizDate(), lock.getRegion(), lock.getMealSlot()), lock.getGroupCode());
+            map.computeIfAbsent(cellKey(lock.getBizDate(), lock.getRegion(), lock.getMealSlot()),
+                    k -> new HashSet<>()).add(lock.getGroupCode());
         }
         return map;
+    }
+
+    /** 格子已被占用个数: 活跃订单占用 + 其它商家加购锁（本商家锁不占用自己的可购额度） */
+    private static int takenCount(String key, Map<String, Integer> occupied,
+                                  Map<String, Set<String>> lockGroups, String viewerGroupCode) {
+        int taken = occupied.getOrDefault(key, 0);
+        Set<String> groups = lockGroups.get(key);
+        if (groups != null) {
+            for (String group : groups) {
+                if (!group.equals(viewerGroupCode)) {
+                    taken++;
+                }
+            }
+        }
+        return taken;
+    }
+
+    /** 从格子键(日期|商圈|餐段)提取商圈并取库存上限 */
+    private static int salesLimitOfKey(String key, Map<Integer, Integer> regionSalesLimit) {
+        String[] parts = key.split("\\|");
+        if (parts.length >= 2) {
+            try {
+                return regionSalesLimit.getOrDefault(Integer.parseInt(parts[1]), 1);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return 1;
     }
 
     /** 下单成功后释放本商家的加购锁 */

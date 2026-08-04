@@ -172,6 +172,7 @@ public class StoreServiceImpl implements StoreService {
         store.setBrand(request.getBrand());
         store.setBizChannel(request.getBizChannel());
         store.setLoginAccount(request.getLoginAccount());
+        store.setRegion(request.getRegion());
         store.setUpdatedBy(operatorResolver.currentOperatorName());
         store.setDeleted(0);
         storeMapper.insert(store);
@@ -189,6 +190,7 @@ public class StoreServiceImpl implements StoreService {
         store.setBrand(request.getBrand());
         store.setBizChannel(request.getBizChannel());
         store.setLoginAccount(request.getLoginAccount());
+        store.setRegion(request.getRegion());
         store.setUpdatedBy(operatorResolver.currentOperatorName());
         storeMapper.updateById(store);
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());

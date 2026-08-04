@@ -1,37 +1,23 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Button, Space, Table, Tag, Select, Form, Input, message, Modal } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import BrandTag from '../../components/BrandTag'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import {
+  fetchWaterfallList, updateWaterfallStatus, deleteWaterfall,
+  fetchAdAlgorithms, withAdFallback,
+} from '../../api/adPromotion'
+import type { WaterfallStrategy } from '../../api/adPromotion'
 
-/** 瀑布流配置记录 */
-export interface WaterfallSlotConfig {
-  id: number
-  promotionName: string
-  slotIndex: number
-  businessChannel: string  // 业务频道: food / supermarket / groupBuy
-  pageLocation: string     // 页面位置: home / delivery / supermarket / groupBuy
-  timeSlot: string         // 时段: allDay / breakfast / lunch / afternoonTea / dinner / midnightSnack
-  app: string
-  position: number
-  algorithmId: number
-  algorithmName: string
-  algorithmType: string
-  weight: number
-  status: 'active' | 'inactive'
-  updatedBy: string
-  updatedAt: string
+/** 状态标签: 1=启用 2=停用 */
+const STATUS_LABEL: Record<number, string> = {
+  1: '啟用',
+  2: '停用',
 }
 
-/** 状态标签 */
-const STATUS_LABEL: Record<string, string> = {
-  active: '啟用',
-  inactive: '停用',
-}
-
-/** 伪随机数生成器 */
+/** 伪随机数生成器（本地演示数据用） */
 const pseudoRandom = (seed: number) => {
   const x = Math.sin(seed) * 10000
   return x - Math.floor(x)
@@ -47,167 +33,169 @@ const PROMOTION_NAMES = [
   '搜索算法品牌周',
 ]
 
-/** Mock数据 - 24条，閃蜂和mFood各12条 */
+/** Mock数据 - 后端不可用时降级展示 */
 // eslint-disable-next-line react-refresh/only-export-components
-export const mockData: WaterfallSlotConfig[] = (() => {
-  const businessChannels = ['food', 'supermarket', 'groupBuy']
-  const pageLocations: Record<string, string> = {
-    food: 'home',
-    supermarket: 'supermarket',
-    groupBuy: 'groupBuy',
-  }
-  const timeSlots = ['breakfast', 'lunch', 'afternoonTea', 'dinner', 'midnightSnack']
-  const algorithmTypes = ['invincibleStar', 'youLike', 'newShopAd', 'activateAd', 'exclusiveShop']
-  const algorithmNames: Record<string, string[]> = {
-    invincibleStar: ['無敵星星-首頁版', '無敵星星-外賣版', '無敵星星-團購版'],
-    youLike: ['猜你喜歡-主力版', '猜你喜歡-週末版', '猜你喜歡-夜間版'],
-    newShopAd: ['新店廣告-首頁版', '新店廣告-早餐版', '新店廣告-午市版'],
-    activateAd: ['盤活復蘇-首頁版', '盤活復蘇-午市版', '盤活復蘇-晚市版'],
-    exclusiveShop: ['獨家商家-首頁版', '獨家商家-超市版', '獨家商家-晚市版'],
-  }
-  const users = ['admin', 'operator', 'user001', 'user002']
-  
-  // 生成品牌数组：12个闪峰 + 12个mFood，然后随机洗牌
-  const appPool = [...Array(12).fill('shanfeng'), ...Array(12).fill('mfood')]
-  for (let i = appPool.length - 1; i > 0; i--) {
-    const j = Math.floor(pseudoRandom(i * 31) * (i + 1))
-    ;[appPool[i], appPool[j]] = [appPool[j], appPool[i]]
-  }
-  
-  const data: WaterfallSlotConfig[] = []
-  let id = 1
-  
-  // 生成24条数据，品牌随机交错分布
+export const mockData: WaterfallStrategy[] = (() => {
+  const appPool = ['flashBee', 'mFood']
+  const data: WaterfallStrategy[] = []
   for (let i = 0; i < 24; i++) {
-    const seed = id * 100
-    const app = appPool[i]
-    const businessChannel = businessChannels[i % businessChannels.length]
-    const pageLocation = pageLocations[businessChannel]
-    const ts = timeSlots[i % timeSlots.length]
-    const algorithmType = algorithmTypes[Math.floor(pseudoRandom(seed + 1) * algorithmTypes.length)]
-    const names = algorithmNames[algorithmType]
-    const algorithmName = names[Math.floor(pseudoRandom(seed + 2) * names.length)]
-    
+    const id = i + 1
     data.push({
       id,
-      promotionName: PROMOTION_NAMES[(id - 1) % PROMOTION_NAMES.length],
-      slotIndex: (i % 5) + 1,
-      businessChannel,
-      pageLocation,
-      timeSlot: ts,
-      app,
-      position: (i % 5) + 1,
-      algorithmId: Math.floor(pseudoRandom(seed + 3) * 10) + 1,
-      algorithmName,
-      algorithmType,
-      weight: Math.floor(pseudoRandom(seed + 4) * 50) + 40,
-      status: pseudoRandom(seed + 5) > 0.2 ? 'active' : 'inactive',
-      updatedBy: users[Math.floor(pseudoRandom(seed + 6) * users.length)],
-      updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} ${String(8 + Math.floor(pseudoRandom(seed + 7) * 12)).padStart(2, '0')}:${String(Math.floor(pseudoRandom(seed + 8) * 60)).padStart(2, '0')}:00`,
+      strategyName: PROMOTION_NAMES[i % PROMOTION_NAMES.length],
+      brand: appPool[i % appPool.length],
+      status: pseudoRandom(id * 100 + 5) > 0.2 ? 1 : 2,
+      updatedBy: 'admin',
+      updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} 10:00:00`,
+      slots: [],
     })
-    id++
   }
-  
   return data
 })()
+
+/** 算法名称筛选选项（后端不可用时降级） */
+const MOCK_ALGO_OPTIONS = [
+  { label: '無敵星星-首頁黃金展位', value: 1 },
+]
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()
   const [searchForm] = Form.useForm()
-  const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>(mockData)
+  const [data, setData] = useState<WaterfallStrategy[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [loading, setLoading] = useState(false)
+  /** 后端不可用降级标记: true 时查询走本地 Mock 过滤 */
+  const [mockMode, setMockMode] = useState(false)
+  /** 算法名称筛选选项（来自算法库） */
+  const [algoOptions, setAlgoOptions] = useState<{ label: string; value: number }[]>(MOCK_ALGO_OPTIONS)
 
-  // 初始化时查询全部数据
+  /** 算法名称选项: 来自算法库已启用算法（当前仅无敌星星接入） */
   useEffect(() => {
-    setFilteredData(mockData)
+    fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
+      .then(res => {
+        if (res.records.length > 0) {
+          setAlgoOptions(res.records.map(a => ({ label: a.algoName, value: a.id as number })))
+        }
+      })
+      .catch(() => { /* 保留降级选项 */ })
+  }, [])
+
+  /** 加载列表: 后端可用走服务端分页, 不可用降级本地 Mock 过滤 */
+  const load = useCallback(async (p: number, s: number, values?: Record<string, unknown>) => {
+    const v = values ?? searchForm.getFieldsValue()
+    setLoading(true)
+    try {
+      if (mockMode) {
+        let result = [...mockData]
+        if (v.id) result = result.filter(item => String(item.id).includes(String(v.id)))
+        if (v.strategyName) result = result.filter(item => item.strategyName.includes(String(v.strategyName)))
+        if (v.brand) result = result.filter(item => item.brand === v.brand)
+        if (v.status) result = result.filter(item => item.status === v.status)
+        setData(result)
+        setTotal(result.length)
+      } else {
+        const res = await withAdFallback(
+          () => fetchWaterfallList({
+            page: p, size: s,
+            id: v.id ? Number(v.id) : undefined,
+            strategyName: v.strategyName || undefined,
+            brand: v.brand || undefined,
+            status: v.status,
+            algoId: v.algoId,
+          }),
+          async () => {
+            setMockMode(true)
+            return { records: mockData, total: mockData.length }
+          },
+        )
+        setData(res.records)
+        setTotal(res.total)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [mockMode, searchForm])
+
+  // 初始化查询
+  useEffect(() => {
+    load(1, pageSize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 编辑
-  const handleEdit = (record: WaterfallSlotConfig) => {
+  const handleEdit = (record: WaterfallStrategy) => {
     navigate(`/promotion-slot-config-add?id=${record.id}`)
   }
 
   // 查看详情
-  const handleViewDetail = (record: WaterfallSlotConfig) => {
+  const handleViewDetail = (record: WaterfallStrategy) => {
     navigate(`/promotion-slot-config-add?id=${record.id}&mode=detail`)
   }
 
   // 启用/停用
-  const handleToggleStatus = (record: WaterfallSlotConfig) => {
-    const newStatus: 'active' | 'inactive' = record.status === 'active' ? 'inactive' : 'active'
-    const actionText = newStatus === 'active' ? '啟用' : '停用'
+  const handleToggleStatus = (record: WaterfallStrategy) => {
+    const newStatus = record.status === 1 ? 2 : 1
+    const actionText = newStatus === 1 ? '啟用' : '停用'
     Modal.confirm({
       title: `確認${actionText}`,
-      content: `確定要${actionText}「${record.promotionName}」嗎？`,
+      content: `確定要${actionText}「${record.strategyName}」嗎？`,
       okText: '確定',
       cancelText: '取消',
-      onOk: () => {
-        const updated = filteredData.map(item =>
-          item.id === record.id ? { ...item, status: newStatus } : item
-        )
-        setFilteredData(updated)
-        message.success(`已${actionText}「${record.promotionName}」`)
+      onOk: async () => {
+        if (mockMode) {
+          setData(prev => prev.map(item =>
+            item.id === record.id ? { ...item, status: newStatus } : item
+          ))
+          message.success(`已${actionText}「${record.strategyName}」`)
+          return
+        }
+        await updateWaterfallStatus(record.id as number, newStatus)
+        message.success(`已${actionText}「${record.strategyName}」`)
+        load(page, pageSize)
       },
     })
   }
 
-
   // 删除
-  const handleDelete = (record: WaterfallSlotConfig) => {
+  const handleDelete = (record: WaterfallStrategy) => {
     Modal.confirm({
       title: '確認刪除',
-      content: `確定要刪除瀑布流「${record.promotionName}」嗎？`,
+      content: `確定要刪除瀑布流「${record.strategyName}」嗎？`,
       okText: '確定',
       cancelText: '取消',
       okButtonProps: { danger: true },
-      onOk: () => {
-        setFilteredData(prev => prev.filter(item => item.id !== record.id))
+      onOk: async () => {
+        if (mockMode) {
+          setData(prev => prev.filter(item => item.id !== record.id))
+          message.success('刪除成功')
+          return
+        }
+        await deleteWaterfall(record.id as number)
         message.success('刪除成功')
+        load(page, pageSize)
       },
     })
   }
+
   // 搜索处理
   const handleSearch = () => {
-    const values = searchForm.getFieldsValue()
-    let result = [...mockData]
-    
-    // 配置ID
-    if (values.id) {
-      result = result.filter(item => String(item.id).includes(String(values.id)))
-    }
-    
-    // 瀑布流名称
-    if (values.promotionName) {
-      result = result.filter(item => item.promotionName?.includes(values.promotionName))
-    }
-    
-    // 所属品牌
-    if (values.app) {
-      result = result.filter(item => item.app === values.app)
-    }
-    
-    // 算法名称
-    if (values.algorithmName) {
-      result = result.filter(item => item.algorithmName === values.algorithmName)
-    }
-    
-    // 状态
-    if (values.status) {
-      result = result.filter(item => item.status === values.status)
-    }
-    
-    setFilteredData(result)
+    setPage(1)
+    load(1, pageSize)
   }
 
   // 重置搜索
   const handleReset = () => {
     searchForm.resetFields()
-    setFilteredData(mockData)
+    setPage(1)
+    load(1, pageSize, {})
   }
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'id', title: '配置ID' },
-    { key: 'promotionName', title: '瀑布流名稱' },
+    { key: 'strategyName', title: '瀑布流名稱' },
     { key: 'app', title: '所屬品牌' },
     { key: 'status', title: '狀態' },
     { key: 'action', title: '操作' },
@@ -218,7 +206,7 @@ export default function PromotionSlotConfig() {
   ])
 
   // 列定义
-  const columns: ColumnsType<WaterfallSlotConfig> = [
+  const columns: ColumnsType<WaterfallStrategy> = [
     {
       title: '配置ID',
       dataIndex: 'id',
@@ -231,14 +219,14 @@ export default function PromotionSlotConfig() {
     },
     {
       title: '瀑布流名稱',
-      dataIndex: 'promotionName',
-      key: 'promotionName',
+      dataIndex: 'strategyName',
+      key: 'strategyName',
       width: 200,
       render: (text: string) => <strong>{text}</strong>,
     },
     {
       title: '所屬品牌',
-      dataIndex: 'app',
+      dataIndex: 'brand',
       key: 'app',
       width: 100,
       render: (v: string) => (
@@ -251,8 +239,8 @@ export default function PromotionSlotConfig() {
       key: 'status',
       width: 80,
       align: 'center',
-      render: (v: string) => (
-        <Tag color={v === 'active' ? 'green' : 'default'}>
+      render: (v: number) => (
+        <Tag color={v === 1 ? 'green' : 'default'}>
           {STATUS_LABEL[v]}
         </Tag>
       ),
@@ -274,11 +262,11 @@ export default function PromotionSlotConfig() {
           <Button 
             type="link" 
             size="small"
-            danger={record.status === 'active'}
-            style={record.status !== 'active' ? { color: '#52c41a' } : undefined}
+            danger={record.status === 1}
+            style={record.status !== 1 ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
-            {record.status === 'active' ? '停用' : '啟用'}
+            {record.status === 1 ? '停用' : '啟用'}
           </Button>
           <Button 
             type="link" 
@@ -308,51 +296,38 @@ export default function PromotionSlotConfig() {
           <Form.Item label="配置ID" name="id">
             <Input placeholder="請輸入配置ID" allowClear />
           </Form.Item>
-          <Form.Item label="瀑布流名稱" name="promotionName">
+          <Form.Item label="瀑布流名稱" name="strategyName">
             <Input placeholder="請輸入瀑布流名稱" allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="app">
+          <Form.Item label="所屬品牌" name="brand">
             <Select 
               placeholder="全部" 
               allowClear
+              style={{ width: 120 }}
               options={[
-                { label: '閃蜂', value: 'shanfeng' },
-                { label: 'mFood', value: 'mfood' },
+                { label: '閃蜂', value: 'flashBee' },
+                { label: 'mFood', value: 'mFood' },
               ]}
             />
           </Form.Item>
-          <Form.Item label="算法名稱" name="algorithmName">
+          <Form.Item label="算法名稱" name="algoId">
             <Select 
-              placeholder="請輸入搜索" 
+              placeholder="請選擇算法" 
               allowClear
               showSearch
+              style={{ width: 220 }}
               optionFilterProp="label"
-              options={[
-                { label: '無敵星星-首頁版', value: '無敵星星-首頁版' },
-                { label: '無敵星星-外賣版', value: '無敵星星-外賣版' },
-                { label: '無敵星星-團購版', value: '無敵星星-團購版' },
-                { label: '猜你喜歡-主力版', value: '猜你喜歡-主力版' },
-                { label: '猜你喜歡-週末版', value: '猜你喜歡-週末版' },
-                { label: '猜你喜歡-夜間版', value: '猜你喜歡-夜間版' },
-                { label: '新店廣告-首頁版', value: '新店廣告-首頁版' },
-                { label: '新店廣告-早餐版', value: '新店廣告-早餐版' },
-                { label: '新店廣告-午市版', value: '新店廣告-午市版' },
-                { label: '盤活復蘇-首頁版', value: '盤活復蘇-首頁版' },
-                { label: '盤活復蘇-午市版', value: '盤活復蘇-午市版' },
-                { label: '盤活復蘇-晚市版', value: '盤活復蘇-晚市版' },
-                { label: '獨家商家-首頁版', value: '獨家商家-首頁版' },
-                { label: '獨家商家-超市版', value: '獨家商家-超市版' },
-                { label: '獨家商家-晚市版', value: '獨家商家-晚市版' },
-              ]}
+              options={algoOptions}
             />
           </Form.Item>
           <Form.Item label="狀態" name="status">
             <Select 
               placeholder="全部"
               allowClear
+              style={{ width: 100 }}
               options={[
-                { label: '啟用', value: 'active' },
-                { label: '停用', value: 'inactive' },
+                { label: '啟用', value: 1 },
+                { label: '停用', value: 2 },
               ]}
             />
           </Form.Item>
@@ -381,15 +356,23 @@ export default function PromotionSlotConfig() {
 
       {/* 列表区域 */}
       <div className="table-section">
-        <Table<WaterfallSlotConfig>
+        <Table<WaterfallStrategy>
           columns={applyConfig(columns)}
-          dataSource={filteredData}
+          dataSource={data}
+          loading={loading}
           pagination={{
-            pageSize: 10,
+            current: page,
+            pageSize,
+            total,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (t) => `共 ${t} 條`,
+            onChange: (p, s) => {
+              setPage(p)
+              setPageSize(s)
+              load(p, s)
+            },
           }}
           size="small"
           rowKey="id"
@@ -401,5 +384,3 @@ export default function PromotionSlotConfig() {
     </div>
   )
 }
-
-

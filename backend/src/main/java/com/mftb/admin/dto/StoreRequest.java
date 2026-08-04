@@ -26,4 +26,7 @@ public class StoreRequest {
 
     /** 登录主账号 */
     private String loginAccount;
+
+    /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（盘活复苏按商圈售卖时跟随门店） */
+    private Integer region;
 }

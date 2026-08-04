@@ -5,18 +5,22 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdOrderDetailVO;
 import com.mftb.admin.dto.AdOrderVO;
+import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdOrder;
+import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
+import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
+import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
@@ -49,9 +53,11 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private final AdOrderMapper orderMapper;
     private final AdOrderItemStarMapper itemMapper;
+    private final AdOrderItemReviveMapper reviveItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
+    private final AdPricingReviveService revivePricingService;
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
@@ -84,12 +90,21 @@ public class AdOrderServiceImpl implements AdOrderService {
         AdOrder order = require(orderNo);
         AdOrderDetailVO vo = AdOrderDetailVO.from(AdOrderVO.from(order));
         fillSummaries(List.of(vo));
-        List<AdOrderItemStar> items = itemMapper.selectList(
-                new LambdaQueryWrapper<AdOrderItemStar>()
-                        .eq(AdOrderItemStar::getOrderId, order.getId())
-                        .orderByAsc(AdOrderItemStar::getBizDate)
-                        .orderByAsc(AdOrderItemStar::getRegion));
-        items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        if (isRevive(order)) {
+            List<AdOrderItemRevive> items = reviveItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemRevive>()
+                            .eq(AdOrderItemRevive::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemRevive::getBizDate)
+                            .orderByAsc(AdOrderItemRevive::getRegion));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        } else {
+            List<AdOrderItemStar> items = itemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemStar>()
+                            .eq(AdOrderItemStar::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemStar::getBizDate)
+                            .orderByAsc(AdOrderItemStar::getRegion));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        }
         return vo;
     }
 
@@ -101,47 +116,81 @@ public class AdOrderServiceImpl implements AdOrderService {
             throw new BusinessException("當前訂單狀態不可退款");
         }
 
-        // 退款开关校验（按订单所属算法的计价配置）
-        AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
-        if (pricing != null && pricing.getRefundEnabled() != null && pricing.getRefundEnabled() == 2) {
+        // 退款开关校验（按订单所属算法类型取对应计价配置）
+        Integer refundEnabled = null;
+        String cancelFeeTiersJson = null;
+        if (isRevive(order)) {
+            AdPricingReviveVO pricing = revivePricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
+        } else {
+            AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
+        }
+        if (refundEnabled != null && refundEnabled == 2) {
             throw new BusinessException("該算法未開放退款");
         }
-        String cancelFeeTiersJson = pricing == null ? null : pricing.getCancelFeeTiers();
 
         FinAccount account = accountService.find(order.getGroupCode(), order.getBrand());
         if (account == null) {
             throw new BusinessException("推廣金賬戶不存在，無法退款");
         }
 
-        List<AdOrderItemStar> items = itemMapper.selectList(
-                new LambdaQueryWrapper<AdOrderItemStar>()
-                        .eq(AdOrderItemStar::getOrderId, order.getId())
-                        .in(AdOrderItemStar::getDeliveryStatus, 1, 2));
-        if (items.isEmpty()) {
-            throw new BusinessException("訂單沒有可退款的明細");
-        }
-
-        // 按取消扣费梯度逐格计算应退金额（剩余天数 = 投放日 - 今天）
+        // 按取消扣费梯度逐格计算应退金额（剩余天数 = 投放日 - 今天），退款只退实付分摊价
         LocalDate today = LocalDate.now();
         BigDecimal refundTotal = BigDecimal.ZERO;
-        for (AdOrderItemStar item : items) {
-            long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-            BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-            BigDecimal refundPrice = round2(item.getSalePrice()
-                    .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                    .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
-            item.setRefundPrice(refundPrice);
-            item.setDeliveryStatus(3); // 已退款 → 释放格子（独家占仅统计活跃明细）
-            itemMapper.updateById(item);
-            refundTotal = refundTotal.add(refundPrice);
+        if (isRevive(order)) {
+            List<AdOrderItemRevive> items = reviveItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemRevive>()
+                            .eq(AdOrderItemRevive::getOrderId, order.getId())
+                            .in(AdOrderItemRevive::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemRevive item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3); // 已退款 → 释放库存（仅统计活跃明细）
+                reviveItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else {
+            List<AdOrderItemStar> items = itemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemStar>()
+                            .eq(AdOrderItemStar::getOrderId, order.getId())
+                            .in(AdOrderItemStar::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemStar item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3); // 已退款 → 释放格子（库存仅统计活跃明细）
+                itemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
         }
 
         // 回补推广金账户 + 写退款明细（财务写入链: 回退原批次, 实收按批次比例等比例回补）
         LocalDateTime now = LocalDateTime.now();
         String changeType = AdAlgoTypeNames.of(order.getAlgoType());
+        String finChannel = order.getChannel() != null && order.getChannel() == 4 ? "團購" : "外賣";
         finWriteChainService.writeAdRefund(
                 order.getGroupCode(), order.getGroupName(), order.getBrand(),
-                order.getStoreCode(), order.getStoreName(), "外賣",
+                order.getStoreCode(), order.getStoreName(), finChannel,
                 refundTotal, changeType, order.getBdEmpId(),
                 changeType + "廣告退款 訂單" + order.getOrderNo(), order.getOrderNo(), now);
 
@@ -156,19 +205,37 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     /**
      * 列表/详情补充展示字段:
-     * 1) 商圈/时段由订单明细去重聚合;
+     * 1) 商圈/时段由订单明细去重聚合（盘活复苏无时段维度）;
      * 2) 存量订单无算法编码快照时回查算法表填充
      */
     private void fillSummaries(List<AdOrderVO> records) {
         if (records.isEmpty()) {
             return;
         }
-        List<Long> orderIds = records.stream().map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
-        Map<Long, List<AdOrderItemStar>> byOrder = orderIds.isEmpty() ? Map.of()
+        List<Long> starOrderIds = records.stream().filter(r -> !isReviveType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        List<Long> reviveOrderIds = records.stream().filter(r -> isReviveType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        Map<Long, List<AdOrderItemStar>> byOrder = starOrderIds.isEmpty() ? Map.of()
                 : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
-                        .in(AdOrderItemStar::getOrderId, orderIds))
+                        .in(AdOrderItemStar::getOrderId, starOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemStar::getOrderId));
+        Map<Long, List<AdOrderItemRevive>> reviveByOrder = reviveOrderIds.isEmpty() ? Map.of()
+                : reviveItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemRevive>()
+                        .in(AdOrderItemRevive::getOrderId, reviveOrderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemRevive::getOrderId));
         for (AdOrderVO vo : records) {
+            if (isReviveType(vo.getAlgoType())) {
+                List<AdOrderItemRevive> items = reviveByOrder.getOrDefault(vo.getId(), List.of());
+                vo.setRegions(items.stream().map(AdOrderItemRevive::getRegion)
+                        .filter(java.util.Objects::nonNull).distinct().sorted().toList());
+                vo.setMealSlots(new ArrayList<>()); // 盘活复苏按天售卖，无时段维度
+                // 購買日期列表：明細 biz_date 去重排序，供列表「推廣天數」面板展示
+                vo.setPurchaseDays(items.stream().map(AdOrderItemRevive::getBizDate)
+                        .filter(java.util.Objects::nonNull).distinct().sorted()
+                        .map(Object::toString).toList());
+                continue;
+            }
             List<AdOrderItemStar> items = byOrder.getOrDefault(vo.getId(), List.of());
             vo.setRegions(items.stream().map(AdOrderItemStar::getRegion)
                     .filter(java.util.Objects::nonNull).distinct().sorted().toList());
@@ -206,6 +273,15 @@ public class AdOrderServiceImpl implements AdOrderService {
             throw new BusinessException("訂單不存在");
         }
         return order;
+    }
+
+    /** 盘活复苏订单（algo_type=3） */
+    private static boolean isRevive(AdOrder order) {
+        return isReviveType(order.getAlgoType());
+    }
+
+    private static boolean isReviveType(Integer algoType) {
+        return algoType != null && algoType == 3;
     }
 
     /**

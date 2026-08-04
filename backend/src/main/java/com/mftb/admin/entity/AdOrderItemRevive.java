@@ -1,0 +1,58 @@
+package com.mftb.admin.entity;
+
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+/**
+ * 盘活复苏订单明细实体（差异层，按天库存）
+ * 一行 = 一个「商圈 x 日期」格子（无餐段维度）
+ */
+@Data
+@TableName("biz_ad_order_item_revive")
+public class AdOrderItemRevive {
+
+    @TableId
+    private Long id;
+
+    /** 订单主表ID（biz_ad_order.id） */
+    private Long orderId;
+
+    /** 订单编号快照 */
+    private String orderNo;
+
+    /** 投放日期 */
+    private LocalDate bizDate;
+
+    /** 商圈 */
+    private Integer region;
+
+    /** 格子原价（商圈日单价） */
+    private BigDecimal originalPrice;
+
+    /** 实付分摊价（折扣后） */
+    private BigDecimal salePrice;
+
+    /** 已退款金额（取消扣费梯度） */
+    private BigDecimal refundPrice;
+
+    /** 投放状态: 1=待投放 2=已投放 3=已退款 */
+    private Integer deliveryStatus;
+
+    /** 逻辑删除 */
+    @TableLogic
+    private Integer deleted;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
+}

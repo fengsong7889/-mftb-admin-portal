@@ -64,6 +64,8 @@ public class AdPricingStarRequest {
         private Integer region;
         /** 该商圈日单价（MOP） */
         private BigDecimal dailyPrice;
+        /** 每天销售个数（库存），缺省 1 保持独家占行为 */
+        private Integer dailySalesLimit;
     }
 
     /** 商圈时段折扣（百分比记法: 80 = 8折） */

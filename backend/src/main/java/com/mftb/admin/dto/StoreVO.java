@@ -21,6 +21,8 @@ public class StoreVO {
     private String brand;
     private String bizChannel;
     private String loginAccount;
+    /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区 */
+    private Integer region;
     /** 已绑定的BD列表（一家门店可绑定多个） */
     private List<StoreBdVO> bdList;
     private String updatedBy;
@@ -38,6 +40,7 @@ public class StoreVO {
         vo.setBrand(store.getBrand());
         vo.setBizChannel(store.getBizChannel());
         vo.setLoginAccount(store.getLoginAccount());
+        vo.setRegion(store.getRegion());
         vo.setUpdatedBy(store.getUpdatedBy());
         vo.setCreatedAt(store.getCreatedAt());
         vo.setUpdatedAt(store.getUpdatedAt());

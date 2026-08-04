@@ -175,6 +175,8 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
             region.setPricingId(pricingId);
             region.setRegion(price.getRegion());
             region.setDailyPrice(price.getDailyPrice() == null ? BigDecimal.ZERO : price.getDailyPrice());
+            region.setDailySalesLimit(price.getDailySalesLimit() == null || price.getDailySalesLimit() < 1
+                    ? 1 : price.getDailySalesLimit());
             region.setDeleted(0);
             regionMapper.insert(region);
         }
@@ -191,6 +193,7 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
             item.setId(region.getId());
             item.setRegion(region.getRegion());
             item.setDailyPrice(region.getDailyPrice());
+            item.setDailySalesLimit(region.getDailySalesLimit() == null ? 1 : region.getDailySalesLimit());
             vo.getRegionPrices().add(item);
         }
         return vo;

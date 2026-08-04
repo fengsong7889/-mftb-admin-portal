@@ -80,6 +80,12 @@ public class AdOrder {
     /** 已退款金额（按取消扣费梯度） */
     private BigDecimal refundAmount;
 
+    /** 赠送天数抵扣快照 */
+    private Integer giftDays;
+
+    /** 赠送抵扣金额快照 */
+    private BigDecimal giftAmount;
+
     /** 订单状态: 1=待推广 2=推广中 3=已推广 4=已退款 5=已取消 */
     private Integer status;
 

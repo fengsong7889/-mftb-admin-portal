@@ -37,6 +37,9 @@ public class BizStore {
     /** 登录主账号 */
     private String loginAccount;
 
+    /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（与广告定价商圈枚举一致） */
+    private Integer region;
+
     /** 最后更新人 */
     private String updatedBy;
 

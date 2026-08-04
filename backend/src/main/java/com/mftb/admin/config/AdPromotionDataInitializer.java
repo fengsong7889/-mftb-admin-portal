@@ -18,43 +18,58 @@ import java.util.Map;
 /**
  * 广告推广模块数据初始化器: 启动时自动创建 biz_ad_* 表并写入种子数据
  * <p>
- * 对应脚本 backend/sql/09_ad_promotion.sql
+ * 对应脚本 backend/sql/09_ad_promotion.sql、backend/sql/13_waterfall_strategy.sql
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AdPromotionDataInitializer implements CommandLineRunner {
 
+    /** 启动时自动执行的初始化脚本（classpath 下，幂等可重复执行） */
+    private static final List<String> INIT_SCRIPTS = List.of(
+            "09_ad_promotion.sql",
+            "13_waterfall_strategy.sql");
+
     private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) {
         try {
-            ClassPathResource resource = new ClassPathResource("09_ad_promotion.sql");
-            if (!resource.exists()) {
-                log.warn("未找到 09_ad_promotion.sql，跳过广告推广表初始化");
-                return;
-            }
-            try (InputStream is = resource.getInputStream()) {
-                String raw = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
-                // 先去除行注释（-- 开头），避免分号分割后注释与下一条语句粘连
-                String noComment = raw.replaceAll("(?m)^\\s*--.*$", "");
-                // 按分号分割并逐条执行（忽略空语句）
-                for (String stmt : noComment.split(";")) {
-                    String trimmed = stmt.trim();
-                    if (!trimmed.isEmpty()) {
-                        jdbcTemplate.execute(trimmed);
-                    }
-                }
-                log.info("已执行 09_ad_promotion.sql 初始化广告推广表");
+            for (String script : INIT_SCRIPTS) {
+                executeSqlScript(script);
             }
             ensureSellTimeSlotsColumn();
             ensureSlotDiscountsColumn();
             ensureOrderExtraColumns();
+            ensureStockAndGiftColumns();
+            ensureStoreRegionColumn();
+            ensureCellLockGroupKey();
             migrateAdConsumeDetails();
             repairAdDetailActualChange();
         } catch (Exception e) {
             log.error("广告推广表初始化失败: {}", e.getMessage(), e);
+        }
+    }
+
+    /** 执行单个初始化脚本（去除行注释后按分号逐条执行） */
+    private void executeSqlScript(String scriptName) throws java.io.IOException {
+        ClassPathResource resource = new ClassPathResource(scriptName);
+        if (!resource.exists()) {
+            log.warn("未找到 {}，跳过初始化", scriptName);
+            return;
+        }
+        try (InputStream is = resource.getInputStream()) {
+            String raw = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
+            // 先去除行注释（-- 开头），避免分号分割后注释与下一条语句粘连
+            String noComment = raw.replaceAll("(?m)^\\s*--.*$", "");
+            // 按分号分割并逐条执行（忽略空语句）
+            for (String stmt : noComment.split(";")) {
+                String trimmed = stmt.trim();
+                if (!trimmed.isEmpty()) {
+                    jdbcTemplate.execute(trimmed);
+                }
+            }
+            log.info("已执行 {} 初始化数据表", scriptName);
         }
     }
 
@@ -93,6 +108,62 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.warn("slot_discounts 列检查/补列失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 存量库兼容: 库存与赠送快照列补齐（幂等）
+     * 1) biz_ad_pricing_star_region.daily_sales_limit: 每日销售个数=库存, 默认 1 保持存量独家占行为
+     * 2) biz_ad_order.gift_days / gift_amount: 赠送天数抵扣快照
+     */
+    private void ensureStockAndGiftColumns() {
+        addColumnIfAbsent("biz_ad_pricing_star_region", "daily_sales_limit",
+                "ALTER TABLE biz_ad_pricing_star_region ADD COLUMN daily_sales_limit INT NOT NULL DEFAULT 1"
+                        + " COMMENT '每天销售个数(库存)' AFTER daily_price");
+        addColumnIfAbsent("biz_ad_order", "gift_days",
+                "ALTER TABLE biz_ad_order ADD COLUMN gift_days INT DEFAULT 0"
+                        + " COMMENT '赠送天数抵扣快照' AFTER refund_amount");
+        addColumnIfAbsent("biz_ad_order", "gift_amount",
+                "ALTER TABLE biz_ad_order ADD COLUMN gift_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00"
+                        + " COMMENT '赠送抵扣金额快照' AFTER gift_days");
+    }
+
+    /**
+     * 存量库兼容: biz_store.region 门店所在商圈列补齐（幂等）
+     * 盘活复苏按商圈定价售卖, 购买时商圈跟随门店所在区域
+     */
+    private void ensureStoreRegionColumn() {
+        addColumnIfAbsent("biz_store", "region",
+                "ALTER TABLE biz_store ADD COLUMN region INT"
+                        + " COMMENT '所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区' AFTER login_account");
+    }
+
+    /**
+     * 存量库兼容: biz_ad_cell_lock 唯一键补充 group_code（幂等）
+     * 库存>1 时多商家可分别锁定同一格子, 旧键 (algo_id,biz_date,region,meal_slot) 需替换
+     */
+    private void ensureCellLockGroupKey() {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE()"
+                            + " AND table_name = 'biz_ad_cell_lock' AND index_name = 'uk_ad_cell_lock'"
+                            + " AND column_name = 'group_code'",
+                    Integer.class);
+            if (count != null && count > 0) {
+                return;
+            }
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE()"
+                            + " AND table_name = 'biz_ad_cell_lock' AND index_name = 'uk_ad_cell_lock'",
+                    Integer.class);
+            if (exists != null && exists > 0) {
+                jdbcTemplate.execute("ALTER TABLE biz_ad_cell_lock DROP INDEX uk_ad_cell_lock");
+            }
+            jdbcTemplate.execute("ALTER TABLE biz_ad_cell_lock ADD UNIQUE KEY uk_ad_cell_lock"
+                    + " (algo_id, biz_date, region, meal_slot, group_code)");
+            log.info("已重建 biz_ad_cell_lock 唯一键(含 group_code)");
+        } catch (Exception e) {
+            log.warn("biz_ad_cell_lock 唯一键升级失败: {}", e.getMessage());
         }
     }
 

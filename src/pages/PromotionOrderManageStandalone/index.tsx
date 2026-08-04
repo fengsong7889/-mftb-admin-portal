@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table'
 import BrandTag from '../../components/BrandTag'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import dayjs from 'dayjs'
 
 // 订单状态枚举
 enum OrderStatus {
@@ -202,11 +203,22 @@ function toOrderItem(vo: AdOrder): OrderItem {
     4: OrderStatus.REFUNDED,
     5: OrderStatus.CANCELLED,
   }
-  const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  // 後端 LocalDateTime 統一序列化為毫秒時間戳，兼容字符串/數字兩種格式
+  const fmt = (t?: string | number) => {
+    if (t == null || t === '') return ''
+    if (typeof t === 'number') return dayjs(t).format('YYYY-MM-DD HH:mm:ss')
+    return String(t).replace('T', ' ').slice(0, 19)
+  }
   // 所屬商圈: 後端由訂單明細去重聚合返回
   const regions = (vo.regions || []).map(r => r as Region)
   // 購買時段: 餐段 key → 時間段標籤（與演示數據樣式一致）
   const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
+  // 盤活復蘇按天售賣無時段維度：優先用後端返回的購買日期列表，無日期時以明細格子數佔位
+  const purchaseDays = vo.algoType === 3 && (vo.mealSlots || []).length === 0
+    ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
+        ? vo.purchaseDays
+        : Array.from({ length: vo.itemCount || 0 }, () => ''))
+    : undefined
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
@@ -222,7 +234,8 @@ function toOrderItem(vo: AdOrder): OrderItem {
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
     mealSlots,
-    purchaseDate: (vo.orderTime || '').slice(0, 10),
+    purchaseDays,
+    purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
     actualPrice: vo.actualAmount,
@@ -490,11 +503,11 @@ export default function PromotionOrderManage() {
 
             const dateContent = (
               <Space direction="vertical" size={4}>
-                {record.purchaseDays.map((date, index) => (
+                {record.purchaseDays.some(d => !!d) ? record.purchaseDays.map((date, index) => (
                   <Tag key={index} color="green" style={{ margin: 0 }}>
                     {date}
                   </Tag>
-                ))}
+                )) : <span style={{ fontSize: 12, color: '#8c8c8c' }}>具體投放日期請查看訂單詳情</span>}
               </Space>
             )
 

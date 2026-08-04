@@ -33,11 +33,17 @@ public class AdOrderVO {
     private List<Integer> regions;
     /** 购买时段（明细去重聚合, 如 breakfast/lunch） */
     private List<String> mealSlots;
+    /** 購買日期列表（盤活復蘇按天售賣，明細 biz_date 去重排序） */
+    private List<String> purchaseDays;
     private Integer itemCount;
     private BigDecimal originalAmount;
     private BigDecimal discountAmount;
     private BigDecimal actualAmount;
     private BigDecimal refundAmount;
+    /** 赠送天数抵扣快照 */
+    private Integer giftDays;
+    /** 赠送抵扣金额快照 */
+    private BigDecimal giftAmount;
     private Integer status;
     private LocalDateTime orderTime;
     private LocalDateTime payTime;
@@ -68,6 +74,8 @@ public class AdOrderVO {
         vo.setDiscountAmount(entity.getDiscountAmount());
         vo.setActualAmount(entity.getActualAmount());
         vo.setRefundAmount(entity.getRefundAmount());
+        vo.setGiftDays(entity.getGiftDays());
+        vo.setGiftAmount(entity.getGiftAmount());
         vo.setStatus(entity.getStatus());
         vo.setOrderTime(entity.getOrderTime());
         vo.setPayTime(entity.getPayTime());

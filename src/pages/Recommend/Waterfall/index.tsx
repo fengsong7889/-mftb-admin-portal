@@ -19,7 +19,7 @@ import {
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
 import { mockAlgorithmData, type AlgorithmRecord } from '../Algorithm'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
 
@@ -128,10 +128,10 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.PRODUCT_PROMO]: 'red',
 }
 
-/** 後端計價配置 → 定價列表行 */
-const toPricingRow = (vo: AdPricingStar): WaterfallSlotConfig => ({
+/** 後端計價配置 → 定價列表行（按來源設置算法類型） */
+const toPricingRow = (vo: AdPricingStar, algoType: AlgorithmType): WaterfallSlotConfig => ({
   id: -(vo.id ?? 0),
-  adId: `PR${String(vo.id ?? 0).padStart(6, '0')}`,
+  adId: `${algoType === AlgorithmType.HOT_REVIVE_AD ? 'RV' : 'PR'}${String(vo.id ?? 0).padStart(6, '0')}`,
   promotionName: vo.algoName || '-',
   app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
   channel: (vo.channel ?? RecommendChannel.DELIVERY) as RecommendChannel,
@@ -139,7 +139,7 @@ const toPricingRow = (vo: AdPricingStar): WaterfallSlotConfig => ({
   slotPosition: 0,
   algorithmId: vo.algoId,
   algorithmName: vo.algoName || '-',
-  algorithmType: AlgorithmType.INVINCIBLE_STAR,
+  algorithmType: algoType,
   merchantLimit: 'unlimited',
   regionLimit: 'unlimited',
   status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
@@ -177,13 +177,19 @@ export default function Waterfall() {
     return map
   }, [dataList])
 
-  /** 加載定價列表 */
+  /** 加載定價列表（無敵星星 + 盤活復蘇並行拉取後合併） */
   useEffect(() => {
     let mounted = true
-    fetchAdPricingList({ page: 1, size: 200 })
-      .then(res => {
+    Promise.all([
+      fetchAdPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
+      fetchAdRevivePricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
+    ])
+      .then(([starRes, reviveRes]) => {
         if (!mounted) return
-        const list = (res.records ?? []).map(toPricingRow)
+        const list = [
+          ...(starRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.INVINCIBLE_STAR)),
+          ...(reviveRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.HOT_REVIVE_AD)),
+        ]
         setDataList(list)
         if (urlType != null) {
           const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
@@ -192,7 +198,6 @@ export default function Waterfall() {
           setFilteredData(list)
         }
       })
-      .catch(() => {})
     return () => { mounted = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -325,7 +330,11 @@ export default function Waterfall() {
       onOk: async () => {
         if (record.source === 'api') {
           try {
-            await deleteAdPricing(-record.id)
+            if (record.algorithmType === AlgorithmType.HOT_REVIVE_AD) {
+              await deleteAdRevivePricing(-record.id)
+            } else {
+              await deleteAdPricing(-record.id)
+            }
           } catch (err) {
             message.error((err as Error).message || '刪除失敗')
             return
@@ -351,7 +360,11 @@ export default function Waterfall() {
       onOk: async () => {
         if (record.source === 'api') {
           try {
-            await updateAdPricingStatus(-record.id, newStatus)
+            if (record.algorithmType === AlgorithmType.HOT_REVIVE_AD) {
+              await updateAdRevivePricingStatus(-record.id, newStatus)
+            } else {
+              await updateAdPricingStatus(-record.id, newStatus)
+            }
           } catch (err) {
             message.error((err as Error).message || `${actionText}失敗`)
             return

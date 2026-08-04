@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Modal, Form, Input, Select, message } from 'antd'
+import { Modal, Form, Input, Select, message, TreeSelect } from 'antd'
 import type { StoreItem, StorePayload } from '../../api/store'
 import { createStore, updateStore } from '../../api/store'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
 import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS } from '../../constants/bizChannel'
+import { REGION_TREE_DATA } from '../Recommend/constants'
+
+/** 所在区域树：父级（澳門區域/氹仔區域）仅作分组展示不可选，只能选具体商圈 */
+const STORE_REGION_TREE = REGION_TREE_DATA.map(node => ({
+  ...node,
+  selectable: false,
+}))
 
 /** 品牌选项 */
 const BRAND_OPTIONS = [
@@ -48,6 +55,7 @@ export default function StoreEditModal({
           groupId: editingRecord.groupId,
           storeName: editingRecord.storeName,
           loginAccount: editingRecord.loginAccount,
+          region: editingRecord.region ?? undefined,
         })
         // 品牌為單選，直接設置字符串值；業務頻道仍為多選
         form.setFieldValue('brand', editingRecord.brand ? editingRecord.brand.trim() : undefined)
@@ -139,6 +147,17 @@ export default function StoreEditModal({
             mode="multiple"
             allowClear
             options={BIZ_CHANNEL_OPTIONS}
+          />
+        </Form.Item>
+        {/* 所在區域=商圈：按澳門區域/氹仔區域树形分组展示，購買按商圈定價的廣告時跟隨門店 */}
+        <Form.Item name="region" label="所在區域" tooltip="門店所在商圈，購買按商圈定價的廣告（如盤活復蘇）時自動匹配對應商圈的價格與庫存">
+          <TreeSelect
+            placeholder="請選擇所在區域"
+            allowClear
+            showSearch
+            treeNodeFilterProp="title"
+            treeDefaultExpandAll
+            treeData={STORE_REGION_TREE}
           />
         </Form.Item>
         <Form.Item

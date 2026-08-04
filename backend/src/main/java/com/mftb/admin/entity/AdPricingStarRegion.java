@@ -29,6 +29,9 @@ public class AdPricingStarRegion {
     /** 该商圈日单价（MOP） */
     private BigDecimal dailyPrice;
 
+    /** 每天销售个数（库存），默认 1 = 独家占 */
+    private Integer dailySalesLimit;
+
     /** 逻辑删除 */
     @TableLogic
     private Integer deleted;

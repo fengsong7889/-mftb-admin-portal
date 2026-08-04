@@ -138,6 +138,16 @@ export async function deductGiftDays(id: number, data: GiftDeductPayload) {
   }
 }
 
+/** 可用赠送天数合计（广告销售下单前展示抵扣余额；后端不可用时返回 0，不降级 Mock） */
+export async function fetchGiftAvailableDays(storeId: number, adType: string): Promise<number> {
+  try {
+    return await request.get<unknown, number>('/gifts/available-days', { params: { storeId, adType }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return 0
+    throw err
+  }
+}
+
 /** 消费明细列表（后端不可用时自动降级到本地 Mock 数据） */
 export async function fetchGiftConsume(params: {
   page?: number; size?: number; groupId?: number; storeId?: number; brand?: string

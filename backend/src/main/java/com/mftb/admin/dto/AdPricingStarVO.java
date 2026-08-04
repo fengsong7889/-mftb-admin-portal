@@ -70,5 +70,7 @@ public class AdPricingStarVO {
         private Long id;
         private Integer region;
         private BigDecimal dailyPrice;
+        /** 每天销售个数（库存），默认 1 = 独家占 */
+        private Integer dailySalesLimit;
     }
 }

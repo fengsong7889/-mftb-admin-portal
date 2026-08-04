@@ -171,6 +171,78 @@ public class GiftServiceImpl implements GiftService {
         return new PageResult<>(records, pageResult.getTotal());
     }
 
+    @Override
+    public int availableDays(Long storeId, String adType) {
+        return usableRecords(storeId, adType).stream()
+                .mapToInt(r -> r.getRemainingDays() == null ? 0 : r.getRemainingDays())
+                .sum();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deductForOrder(Long storeId, String adType, int days, String orderNo,
+                               String algorithmId, String algorithmName) {
+        if (storeId == null || !StringUtils.hasText(adType) || days <= 0) {
+            return;
+        }
+        List<BizGiftRecord> records = usableRecords(storeId, adType);
+        int total = records.stream().mapToInt(r -> r.getRemainingDays() == null ? 0 : r.getRemainingDays()).sum();
+        if (total < days) {
+            throw new BusinessException("贈送天數餘額不足，當前可用 " + total + " 天");
+        }
+        int remaining = days;
+        for (BizGiftRecord record : records) {
+            if (remaining <= 0) {
+                break;
+            }
+            int balance = record.getRemainingDays() == null ? 0 : record.getRemainingDays();
+            if (balance <= 0) {
+                continue;
+            }
+            int deduct = Math.min(balance, remaining);
+            record.setUsedDays((record.getUsedDays() == null ? 0 : record.getUsedDays()) + deduct);
+            record.setRemainingDays(balance - deduct);
+            if (record.getRemainingDays() == 0) {
+                record.setStatus(2); // 已用完
+            }
+            record.setUpdatedBy(operatorResolver.currentOperatorName());
+            giftRecordMapper.updateById(record);
+
+            BizGiftConsume consume = new BizGiftConsume();
+            consume.setGiftRecordId(record.getId());
+            consume.setGiftId(record.getGiftId());
+            consume.setGroupId(record.getGroupId());
+            consume.setGroupName(record.getGroupName());
+            consume.setStoreId(record.getStoreId());
+            consume.setStoreName(record.getStoreName());
+            consume.setBrand(record.getBrand());
+            consume.setAdType(record.getAdType());
+            consume.setTradeType("ad_purchase");
+            consume.setBalanceChange(-deduct);
+            consume.setChangeDate(LocalDate.now());
+            consume.setAlgorithmId(algorithmId);
+            consume.setAlgorithmName(algorithmName);
+            consume.setOrderNo(orderNo);
+            consume.setRemainingDays(record.getRemainingDays());
+            consume.setRemark("廣告購買抵扣 訂單" + (orderNo == null ? "" : orderNo));
+            giftConsumeMapper.insert(consume);
+            remaining -= deduct;
+        }
+    }
+
+    /** 门店在指定广告类型下可用赠送记录（可用、未过期、有余额），按到期时间升序（FIFO） */
+    private List<BizGiftRecord> usableRecords(Long storeId, String adType) {
+        return giftRecordMapper.selectList(
+                new LambdaQueryWrapper<BizGiftRecord>()
+                        .eq(BizGiftRecord::getStoreId, storeId)
+                        .eq(BizGiftRecord::getAdType, adType)
+                        .eq(BizGiftRecord::getStatus, 1)
+                        .gt(BizGiftRecord::getRemainingDays, 0)
+                        .ge(BizGiftRecord::getExpireDate, LocalDate.now())
+                        .orderByAsc(BizGiftRecord::getExpireDate)
+                        .orderByAsc(BizGiftRecord::getId));
+    }
+
     /** 列表补充真实集团/门店数据: 业务编号 + 最新名称 (已删除的保留快照名称) */
     private void enrichRecordGroupStore(List<GiftRecordVO> records) {
         Map<Long, BizMerchantGroup> groupMap = groupMapByIds(

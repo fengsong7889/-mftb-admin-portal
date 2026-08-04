@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS biz_store (
     brand          VARCHAR(64)                             COMMENT '所属品牌: flashBee / mFood / flashBee,mFood',
     biz_channel    VARCHAR(128)                            COMMENT '业务频道（美食外賣/超市百貨/團購到店，可多选逗号分隔）',
     login_account  VARCHAR(64)                             COMMENT '登录主账号',
+    region         INT                                     COMMENT '所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（与广告定价商圈枚举一致）',
     updated_by     VARCHAR(64)                             COMMENT '最后更新人',
     deleted        TINYINT      DEFAULT 0                  COMMENT '逻辑删除',
     created_at     DATETIME     DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',

@@ -1,5 +1,6 @@
 package com.mftb.admin.dto;
 
+import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -44,6 +45,8 @@ public class AdOrderDetailVO extends AdOrderVO {
         vo.setDiscountAmount(order.getDiscountAmount());
         vo.setActualAmount(order.getActualAmount());
         vo.setRefundAmount(order.getRefundAmount());
+        vo.setGiftDays(order.getGiftDays());
+        vo.setGiftAmount(order.getGiftAmount());
         vo.setStatus(order.getStatus());
         vo.setOrderTime(order.getOrderTime());
         vo.setPayTime(order.getPayTime());
@@ -72,6 +75,20 @@ public class AdOrderDetailVO extends AdOrderVO {
             item.setBizDate(entity.getBizDate());
             item.setRegion(entity.getRegion());
             item.setMealSlot(entity.getMealSlot());
+            item.setOriginalPrice(entity.getOriginalPrice());
+            item.setSalePrice(entity.getSalePrice());
+            item.setRefundPrice(entity.getRefundPrice());
+            item.setDeliveryStatus(entity.getDeliveryStatus());
+            return item;
+        }
+
+        /** 盘活复苏明细（无餐段维度） */
+        public static Item from(AdOrderItemRevive entity) {
+            Item item = new Item();
+            item.setId(entity.getId());
+            item.setBizDate(entity.getBizDate());
+            item.setRegion(entity.getRegion());
+            item.setMealSlot(null);
             item.setOriginalPrice(entity.getOriginalPrice());
             item.setSalePrice(entity.getSalePrice());
             item.setRefundPrice(entity.getRefundPrice());

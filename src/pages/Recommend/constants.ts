@@ -91,7 +91,7 @@ export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.PRODUCT_PROMO]: 'red',
 } as Record<AlgorithmType, string>
 
-/** 区域（与地圖規劃商圈数据一致） */
+/** 区域（全系统唯一商圈枚举：定价/门店/购买/订单等所有商圈相关数据均引用此处） */
 export enum Region {
   // 澳門區域
   KOKSAA = 1,         // 黑沙環區
@@ -106,6 +106,9 @@ export enum Region {
   RHOTEL = 9,         // 右酒店區
   UM = 10,            // 澳大專區
   HACS = 11,          // 黑沙灘區
+  // 珠海區域
+  GONGBEI = 12,       // 拱北區域
+  HENGQIN = 13,       // 横琴區域
 }
 
 export const REGION_OPTIONS = [
@@ -120,21 +123,30 @@ export const REGION_OPTIONS = [
   { label: '右酒店區', value: Region.RHOTEL },
   { label: '澳大專區', value: Region.UM },
   { label: '黑沙灘區', value: Region.HACS },
+  { label: '拱北區域', value: Region.GONGBEI },
+  { label: '横琴區域', value: Region.HENGQIN },
 ]
+
+/** 商圈值 → 名称映射（由 REGION_OPTIONS 派生，唯一来源） */
+export const REGION_LABEL: Record<number, string> = Object.fromEntries(
+  REGION_OPTIONS.map(o => [o.value, o.label]),
+)
 
 /** 区域父节点值（用于TreeSelect二级选择） */
 export const AREA_PARENT_VALUES = {
   MACAU_AREA: 'macau_area',
   TAIPA_AREA: 'taipa_area',
+  ZH_AREA: 'zh_area',
 } as const
 
 /** 区域 → 商圈映射（用于选择区域时过滤） */
 export const AREA_TO_REGIONS: Record<string, Region[]> = {
   [AREA_PARENT_VALUES.MACAU_AREA]: [Region.KOKSAA, Region.COSTA, Region.SANMA, Region.SANWONG, Region.HKM],
   [AREA_PARENT_VALUES.TAIPA_AREA]: [Region.FAHUA, Region.AIRPORT, Region.LHOTEL, Region.RHOTEL, Region.UM, Region.HACS],
+  [AREA_PARENT_VALUES.ZH_AREA]: [Region.GONGBEI, Region.HENGQIN],
 }
 
-/** 商圈树形数据（与地圖規劃一致，支持二级选择） */
+/** 商圈树形数据（全系统唯一来源：定价选商圈/门店所在区域等二级选择均引用此处） */
 export const REGION_TREE_DATA = [
   {
     value: AREA_PARENT_VALUES.MACAU_AREA,
@@ -159,6 +171,15 @@ export const REGION_TREE_DATA = [
       { value: Region.RHOTEL, title: '右酒店區' },
       { value: Region.UM, title: '澳大專區' },
       { value: Region.HACS, title: '黑沙灘區' },
+    ],
+  },
+  {
+    value: AREA_PARENT_VALUES.ZH_AREA,
+    title: '珠海區域',
+    selectable: true,
+    children: [
+      { value: Region.GONGBEI, title: '拱北區域' },
+      { value: Region.HENGQIN, title: '横琴區域' },
     ],
   },
 ]

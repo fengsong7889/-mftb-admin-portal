@@ -26,11 +26,13 @@ import {
   ServiceStatus,
   APP_OPTIONS,
   REGION_OPTIONS,
+  REGION_TREE_DATA,
+  AREA_TO_REGIONS,
   ALGORITHM_TYPE_OPTIONS,
 } from '../constants'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
-import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest } from '../../../api/adPromotion'
+import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
 import { fetchStores } from '../../../api/store'
 
 /** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
@@ -122,40 +124,13 @@ const TIME_SLOTS = [
   { key: 'night', label: '宵夜' },
 ]
 
-// 商圈选择树形数据
-const regionTreeData = [
-  {
-    key: '1',
-    title: '澳門區域',
-    children: [
-      { key: '1-1', title: '黑沙環區' },
-      { key: '1-2', title: '高士德區' },
-      { key: '1-3', title: '新馬路區' },
-      { key: '1-4', title: '新皇朝區' },
-      { key: '1-5', title: '港珠澳區' },
-    ],
-  },
-  {
-    key: '2',
-    title: '氹仔區域',
-    children: [
-      { key: '2-1', title: '花城市區' },
-      { key: '2-2', title: '北安機場' },
-      { key: '2-3', title: '左酒店區' },
-      { key: '2-4', title: '右酒店區' },
-      { key: '2-5', title: '澳大專區' },
-      { key: '2-6', title: '黑沙灘區' },
-    ],
-  },
-  {
-    key: '3',
-    title: '珠海區域',
-    children: [
-      { key: '3-1', title: '拱北區域' },
-      { key: '3-2', title: '橫琴區域' },
-    ],
-  },
-]
+// 商圈选择树形数据：直接引用全局统一商圈数据（含珠海区域），与门店所在区域等模块保持一致
+const regionTreeData = REGION_TREE_DATA.map(area => ({
+  key: String(area.value),
+  title: area.title,
+  value: area.value as string | number,
+  children: (area.children ?? []).map(c => ({ key: String(c.value), title: c.title, value: c.value as string | number })),
+}))
 
 // 区域计价配置接口
 interface RegionPricingConfig {
@@ -254,7 +229,7 @@ function WaterfallAddGeneral() {
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
 
   // 可选算法列表（后端可用时用算法库真实数据，否则用演示数据）
-  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType }[]>(
+  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType; algoType?: number }[]>(
     ALGORITHM_OPTIONS.map(a => ({ id: a.id, name: a.name, app: a.app })),
   )
   
@@ -265,7 +240,7 @@ function WaterfallAddGeneral() {
   
   // 商圈选择弹窗
   const [regionSelectModalVisible, setRegionSelectModalVisible] = useState(false)
-  const [selectedRegionNode, setSelectedRegionNode] = useState<{ key: string; title: string; level: number } | null>(null)
+  const [selectedRegionNode, setSelectedRegionNode] = useState<{ key: string; value: string | number; title: string; level: number } | null>(null)
   const [replacingRegion, setReplacingRegion] = useState<Region | null>(null) // 正在更换的商圈
   
 
@@ -336,20 +311,82 @@ function WaterfallAddGeneral() {
   useEffect(() => {
     fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED })
       .then(res => {
-        const opts = (res.records ?? []).map(a => ({
+        // 盤活復蘇入口只展示盤活復蘇類型（algoType=3）的算法
+        const records = urlAlgorithmType === AlgorithmType.HOT_REVIVE_AD
+          ? (res.records ?? []).filter(a => a.algoType === AlgorithmType.HOT_REVIVE_AD)
+          : (res.records ?? [])
+        const opts = records.map(a => ({
           id: a.id ?? 0,
           name: a.algoName,
+          algoType: a.algoType,
           app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
         }))
         if (opts.length > 0) setAlgorithmSelectOptions(opts)
       })
       .catch(() => { /* 静默请求：错误不阻断页面 */ })
-  }, [])
+  }, [urlAlgorithmType])
 
   // 编辑/详情模式下加载数据
   useEffect(() => {
     if (!urlId) return
-    const isStar = (urlAlgorithmType ?? AlgorithmType.INVINCIBLE_STAR) === AlgorithmType.INVINCIBLE_STAR
+    const algoType = urlAlgorithmType ?? AlgorithmType.INVINCIBLE_STAR
+    if (algoType === AlgorithmType.HOT_REVIVE_AD) {
+      // 盤活復蘇：加载 revive 计价配置回填
+      ;(async () => {
+        try {
+          const detail = await fetchAdRevivePricingDetail(Number(urlId))
+          const app = (brandToAppType(detail.brand) ?? AppType.SHANFENG) as AppType
+          form.setFieldsValue({
+            algorithmId: detail.algoId,
+            app,
+            channel: detail.channel,
+          })
+          setSelectedApp(app)
+          setSelectedChannel((detail.channel ?? RecommendChannel.DELIVERY) as RecommendChannel)
+          setSelectedAlgorithmType(AlgorithmType.HOT_REVIVE_AD)
+          setSelectedAlgorithmInfo({ id: detail.algoId, name: detail.algoName || '' })
+          setPresaleDays(detail.presaleDays ?? 180)
+          setRefundEnabled(detail.refundEnabled === 1)
+          setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
+          // 多天梯度折扣（后端百分比记法 → 前端「折」记法）
+          const tiers = parseJsonList(detail.discountTiers)
+          setGradients(tiers.map(t => ({ count: Number(t.minDays) || 0, discount: (Number(t.discount) || 0) / 10 })))
+          setGradientEnabled(tiers.length > 0)
+          // 屏蔽商家回填
+          setMerchantLimit(detail.blockMerchant === 1)
+          setSelectedMerchants(parseJsonList(detail.blockList).map(b => ({
+            id: String(b.storeCode ?? ''),
+            groupId: String(b.groupCode ?? ''),
+            groupName: String(b.groupName ?? ''),
+            storeId: String(b.storeCode ?? ''),
+            storeName: String(b.storeName ?? ''),
+          })).filter(m => m.storeId))
+          // 取消扣费梯度
+          const fees = parseJsonList(detail.cancelFeeTiers)
+          if (fees.length > 0) {
+            setCancelFeeRules(fees.map((f, i) => ({ id: i + 1, maxDays: Number(f.remainDays) || 0, feePercent: Number(f.ratio) || 0 })))
+          }
+          // 分商圈日单价（每日销售个数=库存回填）
+          const configs: RegionPricingConfig[] = (detail.regionPrices ?? []).map(rp => {
+            const price = Number(rp.dailyPrice) || 0
+            return {
+              region: rp.region as Region,
+              regionLabel: REGION_OPTIONS.find(o => o.value === rp.region)?.label ?? String(rp.region),
+              pricing: { fullDay: price, breakfast: price / 5, lunch: price / 5, afternoon: price / 5, dinner: price / 5, night: price / 5 },
+              discountEnabled: false,
+              discounts: {},
+              limitedTimeDiscount: false,
+              discountDateRange: undefined,
+              dailySalesLimit: rp.dailySalesLimit ?? 2,
+            }
+          })
+          setSelectedRegions(configs.map(c => c.region))
+          setRegionPricingConfigs(configs)
+        } catch { /* 静默请求 */ }
+      })()
+      return
+    }
+    const isStar = algoType === AlgorithmType.INVINCIBLE_STAR
     if (!isStar) return
     ;(async () => {
       try {
@@ -388,7 +425,7 @@ function WaterfallAddGeneral() {
         if (fees.length > 0) {
           setCancelFeeRules(fees.map((f, i) => ({ id: i + 1, maxDays: Number(f.remainDays) || 0, feePercent: Number(f.ratio) || 0 })))
         }
-        // 分商圈日单价（按 5 餐段拆分展示）
+        // 分商圈日单价（按 5 餐段拆分展示；每日销售个数=库存回填）
         const configs: RegionPricingConfig[] = (detail.regionPrices ?? []).map(rp => {
           const price = Number(rp.dailyPrice) || 0
           return {
@@ -399,7 +436,7 @@ function WaterfallAddGeneral() {
             discounts: {},
             limitedTimeDiscount: false,
             discountDateRange: undefined,
-            dailySalesLimit: 2,
+            dailySalesLimit: rp.dailySalesLimit ?? 2,
           }
         })
         // 时段折扣配置回填（后端百分比 → 前端「折」记法）
@@ -734,7 +771,7 @@ function WaterfallAddGeneral() {
           regionPrices: regionPricingConfigs.map(c => {
             const slots = ['breakfast', 'lunch', 'afternoon', 'dinner', 'night']
             const sum = slots.reduce((acc, k) => acc + (c.pricing[k] ?? 0), 0)
-            return { region: c.region, dailyPrice: c.pricing.fullDay ?? sum }
+            return { region: c.region, dailyPrice: c.pricing.fullDay ?? sum, dailySalesLimit: c.dailySalesLimit }
           }),
         }
         if (isEditMode) {
@@ -744,6 +781,45 @@ function WaterfallAddGeneral() {
         }
         message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
         navigate(`/promotion-waterfall?type=${AlgorithmType.INVINCIBLE_STAR}`)
+        return
+      }
+
+      if (selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD) {
+        const algoId = (selectedAlgorithmInfo?.id ?? values.algorithmId) as number | undefined
+        if (!algoId) {
+          message.error('請選擇算法')
+          return
+        }
+        const payload: AdPricingReviveRequest = {
+          algoId,
+          brand: appTypeToBrand(selectedApp),
+          channel: selectedChannel,
+          presaleDays,
+          refundEnabled: refundEnabled ? 1 : 2,
+          // 多天梯度折扣：「折」记法 → 后端百分比记法（95折 = 95），维度为购买天数
+          discountTiers: gradientEnabled
+            ? gradients.filter(g => g.count > 0).map(g => ({ minDays: g.count, discount: Math.round(g.discount * 10) }))
+            : [],
+          cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
+          // 屏蔽商家：开关+名单落库，销售端据此拦截
+          blockMerchant: merchantLimit ? 1 : 2,
+          blockList: merchantLimit
+            ? selectedMerchants.map(m => ({ storeCode: m.storeId, storeName: m.storeName, groupCode: m.groupId, groupName: m.groupName }))
+            : [],
+          status,
+          regionPrices: regionPricingConfigs.map(c => {
+            const slots = ['breakfast', 'lunch', 'afternoon', 'dinner', 'night']
+            const sum = slots.reduce((acc, k) => acc + (c.pricing[k] ?? 0), 0)
+            return { region: c.region, dailyPrice: c.pricing.fullDay ?? sum, dailySalesLimit: c.dailySalesLimit }
+          }),
+        }
+        if (isEditMode) {
+          await updateAdRevivePricing(Number(urlId), payload)
+        } else {
+          await createAdRevivePricing(payload)
+        }
+        message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
+        navigate(`/promotion-waterfall?type=${AlgorithmType.HOT_REVIVE_AD}`)
         return
       }
 
@@ -1607,33 +1683,17 @@ function WaterfallAddGeneral() {
                 message.warning('請選擇一個區域或商圈')
                 return
               }
-              // 根据树节点ID映射到Region（与地圖規劃商圈数据一致）
-              const nodeKey = selectedRegionNode.key
-              const keyToRegionMap: Record<string, Region> = {
-                '1-1': Region.KOKSAA,    // 黑沙環區
-                '1-2': Region.COSTA,     // 高士德區
-                '1-3': Region.SANMA,     // 新馬路區
-                '1-4': Region.SANWONG,   // 新皇朝區
-                '1-5': Region.HKM,       // 港珠澳區
-                '2-1': Region.FAHUA,     // 花城市區
-                '2-2': Region.AIRPORT,   // 北安機場
-                '2-3': Region.LHOTEL,    // 左酒店區
-                '2-4': Region.RHOTEL,    // 右酒店區
-                '2-5': Region.UM,        // 澳大專區
-                '2-6': Region.HACS,      // 黑沙灘區
-                '3-1': Region.KOKSAA,    // 拱北區域（暫用黑沙環）
-                '3-2': Region.COSTA,     // 橫琴區域（暫用高士德）
-              }
-              // 如果选择的是父节点（区域），默认取第一个子商圈
+              // 商圈节点 value 即 Region 枚举值（全局统一数据）；选区域（父节点）时取其首个子商圈
               let regionValue: Region
-              if (nodeKey === '1') regionValue = Region.KOKSAA
-              else if (nodeKey === '2') regionValue = Region.FAHUA
-              else if (nodeKey === '3') regionValue = Region.KOKSAA
-              else regionValue = keyToRegionMap[nodeKey]
-              
-              if (!regionValue) {
-                message.warning('無法識別所選區域，請重新選擇')
-                return
+              if (typeof selectedRegionNode.value === 'number') {
+                regionValue = selectedRegionNode.value as Region
+              } else {
+                const first = AREA_TO_REGIONS[selectedRegionNode.value]?.[0]
+                if (!first) {
+                  message.warning('無法識別所選區域，請重新選擇')
+                  return
+                }
+                regionValue = first
               }
               
               // 更换商圈模式
@@ -1680,6 +1740,7 @@ function WaterfallAddGeneral() {
                   onSelect={(keys, info) => {
                     setSelectedRegionNode({
                       key: keys[0] as string,
+                      value: (info.node as { value?: string | number }).value ?? keys[0] as string,
                       title: info.node.title as string,
                       level: info.node.children ? 1 : 2,
                     })

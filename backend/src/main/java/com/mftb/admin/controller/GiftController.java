@@ -58,6 +58,12 @@ public class GiftController {
         return Result.success();
     }
 
+    /** 可用赠送天数合计（广告销售下单前展示抵扣余额） */
+    @GetMapping("/available-days")
+    public Result<Integer> availableDays(@RequestParam Long storeId, @RequestParam String adType) {
+        return Result.success(giftService.availableDays(storeId, adType));
+    }
+
     /** 消费明细列表（分页） */
     @GetMapping("/consume")
     public Result<PageResult<GiftConsumeVO>> listConsume(

@@ -39,6 +39,10 @@ public class AdInventoryVO {
         private String mealSlot;
         /** 格子单价（商圈日单价 / 5） */
         private BigDecimal cellPrice;
+        /** 每天销售个数（库存） */
+        private Integer salesLimit;
+        /** 剩余可售个数（已扣除占用与其他商家加购锁） */
+        private Integer remaining;
         /** 格子状态: available=可购买 soldOut=已售罄 upcoming=待开售 */
         private String status;
     }

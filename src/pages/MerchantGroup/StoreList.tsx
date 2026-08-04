@@ -17,6 +17,7 @@ import type { StoreBdItem, StoreItem, StoreQueryParams } from '../../api/store'
 import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions, deleteStore } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS, formatBizChannel } from '../../constants/bizChannel'
+import { REGION_OPTIONS } from '../Recommend/constants'
 import { exportToCSV } from '../../utils/exportCSV'
 import StoreEditModal from './StoreEditModal'
 import StoreBindBdModal from './StoreBindBdModal'
@@ -186,6 +187,7 @@ export default function StoreList() {
       { title: '所屬品牌', dataIndex: 'brand' },
       { title: '業務頻道', dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
       { title: '登錄主賬號', dataIndex: 'loginAccount' },
+      { title: '所在區域', dataIndex: 'region' },
       { title: '綁定BD', dataIndex: 'bdList', render: (v: unknown) => (Array.isArray(v) ? (v as StoreBdItem[]).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') : '') },
       { title: '最後更新人', dataIndex: 'updatedBy' },
       { title: '最後更新時間', dataIndex: 'updatedAt' },
@@ -250,6 +252,14 @@ export default function StoreList() {
       key: 'loginAccount',
       width: 140,
       render: (val: string) => val || '-',
+    },
+    {
+      title: '所在區域',
+      dataIndex: 'region',
+      key: 'region',
+      width: 120,
+      render: (val: number | null | undefined) =>
+        val ? (REGION_OPTIONS.find(o => o.value === val)?.label ?? String(val)) : '-',
     },
     {
       title: '綁定BD',

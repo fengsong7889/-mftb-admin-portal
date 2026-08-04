@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Popover, TreeSelect } from 'antd'
 import BrandTag from '../../components/BrandTag'
 import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
+import dayjs from 'dayjs'
 const { RangePicker } = DatePicker
 import {
   SearchOutlined,
@@ -173,11 +174,22 @@ function toOrderItem(vo: AdOrder): OrderItem {
     3: RecommendChannel.SUPERMARKET,
     4: RecommendChannel.GROUP_BUY,
   }
-  const fmt = (t?: string) => (t ? t.replace('T', ' ').slice(0, 19) : '')
+  // 後端 LocalDateTime 統一序列化為毫秒時間戳，兼容字符串/數字兩種格式
+  const fmt = (t?: string | number) => {
+    if (t == null || t === '') return ''
+    if (typeof t === 'number') return dayjs(t).format('YYYY-MM-DD HH:mm:ss')
+    return String(t).replace('T', ' ').slice(0, 19)
+  }
   // 所屬商圈: 後端由訂單明細去重聚合返回
   const regions = (vo.regions || []).map(r => r as Region)
   // 購買時段: 餐段 key → 時間段標籤
   const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
+  // 盤活復蘇按天售賣無時段維度：優先用後端返回的購買日期列表，無日期時以明細格子數佔位
+  const purchaseDays = vo.algoType === 3 && (vo.mealSlots || []).length === 0
+    ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
+        ? vo.purchaseDays
+        : Array.from({ length: vo.itemCount || 0 }, () => ''))
+    : undefined
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
@@ -192,7 +204,8 @@ function toOrderItem(vo: AdOrder): OrderItem {
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
     mealSlots,
-    purchaseDate: (vo.orderTime || '').slice(0, 10),
+    purchaseDays,
+    purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
     actualPrice: vo.actualAmount,
@@ -401,15 +414,18 @@ export default function PromotionOrderManage() {
         if (orderType === '盤活復蘇' || record.recommendType === RecommendType.HOT_REVIVE_AD) {
           // 盤活復蘇：只展示天數+日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {
+            const days = record.purchaseDays.length
+            const hasDates = record.purchaseDays.some(d => !!d)
             const first = record.purchaseDays[0]
             const last = record.purchaseDays[record.purchaseDays.length - 1]
-            const days = record.purchaseDays.length
             return (
               <Space direction="vertical" size={2}>
                 <Tag color="green" style={{ margin: 0 }}>{days}天</Tag>
-                <span style={{ fontSize: 12, color: '#595959' }}>
-                  {first.slice(5)} ~ {last.slice(5)}
-                </span>
+                {hasDates && (
+                  <span style={{ fontSize: 12, color: '#595959' }}>
+                    {first.slice(5)} ~ {last.slice(5)}
+                  </span>
+                )}
               </Space>
             )
           }
