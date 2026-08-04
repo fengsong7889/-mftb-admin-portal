@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -19,6 +19,7 @@ import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE, POSITION_SEQUENCE_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
 import type { PositionItem } from '../../../api/position'
+import { exportToCSV } from '../../../utils/exportCSV'
 
 
 /** 员工状态枚举 */
@@ -111,6 +112,9 @@ export default function EmployeeManagement() {
   const watchPositionId = Form.useWatch('positionId', form)
   // 监听所选职级序列，用于过滤职位选项
   const watchSequence = Form.useWatch('sequence', form)
+
+  // 全选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 重置密码弹窗
   const [pwdModalVisible, setPwdModalVisible] = useState(false)
@@ -332,6 +336,28 @@ export default function EmployeeManagement() {
     fetchRoleList()
   }
 
+  /** 导出当前搜索结果 */
+  const handleExport = () => {
+    if (dataSource.length === 0) {
+      message.warning('當前無數據可導出')
+      return
+    }
+    const exportColumns = [
+      { title: '工號', dataIndex: 'empId' },
+      { title: '姓名', dataIndex: 'name' },
+      { title: '部門', dataIndex: 'department' },
+      { title: '職位名稱(中文)', dataIndex: 'position' },
+      { title: '職位名稱(英文)', dataIndex: 'positionEn' },
+      { title: '職級序列', dataIndex: 'sequence' },
+      { title: '職級', dataIndex: 'jobLevel' },
+      { title: '職等', dataIndex: 'rank' },
+      { title: '狀態', dataIndex: 'status', render: (v: number) => v === EMPLOYEE_STATUS.ENABLED ? '啟用' : '停用' },
+      { title: '最後更新人', dataIndex: 'updatedBy' },
+      { title: '最後更新時間', dataIndex: 'updatedAt' },
+    ]
+    exportToCSV('員工管理', exportColumns, dataSource)
+  }
+
   /** 根据角色ID渲染角色名称标签 */
   const renderRoleTags = (roleIds: number[]) => {
     if (!roleIds || roleIds.length === 0) {
@@ -481,8 +507,11 @@ export default function EmployeeManagement() {
         </Form>
       </div>
 
-      {/* 操作区：仅新增，放右侧 */}
+      {/* 操作区 */}
       <div className="action-section">
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+        </div>
         <div className="action-section-right">
           {hasPermission('employee-management:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -498,6 +527,10 @@ export default function EmployeeManagement() {
         dataSource={dataSource}
         rowKey="id"
         loading={loading}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+        }}
         pagination={{
           current: page,
           pageSize,

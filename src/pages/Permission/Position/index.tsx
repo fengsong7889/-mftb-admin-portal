@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -15,6 +15,7 @@ import {
   updatePosition,
 } from '../../../api/position'
 import type { PositionItem, PositionPayload } from '../../../api/position'
+import { exportToCSV } from '../../../utils/exportCSV'
 
 /** 每个序列的职级范围配置 */
 const JOB_LEVEL_CONFIG: Record<string, { start: number; end: number }> = {
@@ -48,6 +49,8 @@ export default function PositionManagement() {
   const sequence = Form.useWatch('sequence', form)
   // 功能权限校验（菜单 key: position-management）
   const { hasPermission } = useAuth()
+  // 全选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   /** 加载职位列表 */
   const fetchList = useCallback(async () => {
@@ -170,6 +173,25 @@ export default function PositionManagement() {
     }
   }
 
+  /** 导出当前过滤后的列表数据 */
+  const handleExport = () => {
+    if (tableData.length === 0) {
+      message.warning('當前無數據可導出')
+      return
+    }
+    const exportColumns = [
+      { title: '職位ID', dataIndex: 'id' },
+      { title: '職位名稱(中文)', dataIndex: 'name' },
+      { title: '職位名稱(英文)', dataIndex: 'nameEn' },
+      { title: '職級序列', dataIndex: 'sequence', render: (v: string) => POSITION_SEQUENCE[v] || v || '' },
+      { title: '職級', dataIndex: 'jobLevel' },
+      { title: '職等', dataIndex: 'rank' },
+      { title: '最後更新人', dataIndex: 'updatedBy' },
+      { title: '最後更新時間', dataIndex: 'updatedAt' },
+    ]
+    exportToCSV('職位管理', exportColumns, tableData)
+  }
+
   const columns: TableColumnsType<PositionItem> = [
     { title: '職位ID', dataIndex: 'id', key: 'id', width: 90 },
     { title: '職位名稱(中文)', dataIndex: 'name', key: 'name', width: 160 },
@@ -256,8 +278,11 @@ export default function PositionManagement() {
         </Form>
       </div>
 
-      {/* 操作区：仅新增，放右侧 */}
+      {/* 操作区 */}
       <div className="action-section">
+        <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+        </div>
         <div className="action-section-right">
           {hasPermission('position-management:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -273,6 +298,10 @@ export default function PositionManagement() {
         dataSource={tableData}
         rowKey="id"
         loading={loading}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+        }}
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,

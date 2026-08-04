@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
-import { ApartmentOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -15,6 +15,7 @@ import {
 import type { DepartmentItem, DepartmentPayload } from '../../../api/department'
 import { fetchEmployees } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
+import { exportToCSV } from '../../../utils/exportCSV'
 import './index.css'
 
 const statusOptions = [
@@ -103,6 +104,8 @@ export default function OrganizationManagement() {
   const [form] = Form.useForm<DepartmentFormValues>()
   // 功能权限校验（菜单 key: organization-management）
   const { hasPermission } = useAuth()
+  // 全选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 树展开节点（受控：数据加载后默认仅展开根节点）
   const [expandedKeys, setExpandedKeys] = useState<number[]>([])
@@ -297,6 +300,23 @@ export default function OrganizationManagement() {
     }
   }
 
+  /** 导出当前过滤后的列表数据 */
+  const handleExport = () => {
+    if (tableData.length === 0) {
+      message.warning('當前無數據可導出')
+      return
+    }
+    const exportColumns = [
+      { title: '部門狀態', dataIndex: 'status', render: (v: number) => v === DEPT_STATUS.ENABLED ? '有效' : '無效' },
+      { title: '部門編碼', dataIndex: 'code' },
+      { title: '部門名稱', dataIndex: 'name' },
+      { title: '部門對接人', dataIndex: 'leader' },
+      { title: '上級部門', dataIndex: 'parentName' },
+      { title: '在編人數', dataIndex: 'userCount' },
+    ]
+    exportToCSV('組織管理', exportColumns, tableData)
+  }
+
   const columns: TableColumnsType<DepartmentItem> = [
     {
       title: '部門狀態',
@@ -401,8 +421,11 @@ export default function OrganizationManagement() {
           </Form>
         </div>
 
-        {/* 操作区：仅新增，放右侧 */}
+        {/* 操作区 */}
         <div className="action-section">
+          <div className="action-section-left">
+            <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+          </div>
           <div className="action-section-right">
             {hasPermission('organization-management:create') && (
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -418,6 +441,10 @@ export default function OrganizationManagement() {
           dataSource={tableData}
           rowKey="id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys),
+          }}
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,

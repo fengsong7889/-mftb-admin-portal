@@ -7,6 +7,7 @@ import { fetchDepartments } from '../../api/department'
 import type { DepartmentItem } from '../../api/department'
 import { fetchLoginLogs, forceLogout, deleteLoginLog } from '../../api/loginLog'
 import type { LoginLogRecord } from '../../api/loginLog'
+import { exportToCSV } from '../../utils/exportCSV'
 
 const { RangePicker } = DatePicker
 
@@ -64,6 +65,8 @@ export default function LoginLog() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [now, setNow] = useState(new Date()) // 用於實時更新在線時長
+  // 全选
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 搜索條件
   const [keyword, setKeyword] = useState<string | undefined>()
@@ -201,10 +204,31 @@ export default function LoginLog() {
     setPage(1)
   }
 
-  /** 導出 */
+  /** 導出當前搜索結果 */
   const handleExport = () => {
-    // TODO: 對接後端導出接口
-    message.info('導出功能開發中')
+    if (dataSource.length === 0) {
+      message.warning('當前無數據可導出')
+      return
+    }
+    const exportColumns = [
+      { title: '員工工號', dataIndex: 'empId' },
+      { title: '員工姓名', dataIndex: 'employeeName' },
+      { title: '所屬部門', dataIndex: 'departmentName' },
+      { title: '登錄時間', dataIndex: 'loginTime' },
+      { title: '退出時間', dataIndex: 'logoutTime', render: (v: string | null) => v || '' },
+      { title: '在線時長', dataIndex: 'duration', render: (v: number | null, record: LoginLogRecord) => {
+        if (record.logoutTime != null && v != null) return formatDuration(v)
+        const loginMs = new Date(record.loginTime).getTime()
+        const nowMs = new Date().getTime()
+        const seconds = Math.floor((nowMs - loginMs) / 1000)
+        return seconds > 0 ? formatDuration(seconds) : ''
+      }},
+      { title: '狀態', dataIndex: 'logoutReason', render: (_: unknown, record: LoginLogRecord) => {
+        if (record.logoutTime == null) return '在線'
+        return record.logoutReason === 'timeout' ? '離線-超時退出' : record.logoutReason === 'forced' ? '離線-強制下線' : '離線-主動退出'
+      }},
+    ]
+    exportToCSV('員工動態', exportColumns, dataSource)
   }
 
   /** 強制下線 */
@@ -404,6 +428,10 @@ export default function LoginLog() {
         rowKey="id"
         loading={loading}
         scroll={{ x: 1200 }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+        }}
         pagination={{
           current: page,
           pageSize,
