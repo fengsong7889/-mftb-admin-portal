@@ -202,6 +202,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {})
   }, [])
 
+  /**
+   * 定时轮询会话状态：主动检测被管理员强制下线 / 被其他设备顶下线 / 账号停用。
+   * 每 10 秒调用一次 /api/auth/check，发现异常立即派发全局事件触发弹窗提醒。
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    // 复用 request.ts 中的 base URL 计算逻辑
+    const raw = import.meta.env.VITE_API_BASE_URL as string | undefined
+    const base = raw
+      ? (raw.replace(/\/+$/, '').endsWith('/api') ? raw.replace(/\/+$/, '') : `${raw.replace(/\/+$/, '')}/api`)
+      : '/api'
+    const checkUrl = `${base}/auth/check`
+
+    let stopped = false
+
+    const poll = async () => {
+      if (stopped) return
+      const token = localStorage.getItem(TOKEN_KEY)
+      if (!token) return
+
+      try {
+        const res = await fetch(checkUrl, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok || stopped) return
+
+        const result = await res.json() as { code: number; message: string }
+        if (stopped) return
+
+        if (result.code === 200) return // 会话正常
+
+        // 账号被停用
+        if (result.code === 1002) {
+          window.dispatchEvent(new CustomEvent(ACCOUNT_DISABLED_EVENT))
+          return
+        }
+
+        // code === 401: 根据消息区分原因
+        if (result.code === 401) {
+          const msg = result.message || ''
+          if (msg.includes('管理员')) {
+            // 被管理员强制下线
+            window.dispatchEvent(
+              new CustomEvent<ForceLogoutDetail>(FORCE_LOGOUT_EVENT, {
+                detail: { operatorName: '管理员', operatorEmpId: '' },
+              })
+            )
+          } else if (msg.includes('其他设备')) {
+            // 被其他设备顶下线
+            window.dispatchEvent(
+              new CustomEvent<SessionConflictDetail>(SESSION_CONFLICT_EVENT, {
+                detail: { loginIp: '', loginLocation: '' },
+              })
+            )
+          }
+          // Token 过期等其它情况不做处理，等待下次业务请求触发常规 401 流程
+        }
+      } catch {
+        // 网络异常静默忽略，下次轮询重试
+      }
+    }
+
+    const timer = setInterval(poll, 10_000)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+    }
+  }, [isAuthenticated])
+
   const login = useCallback(async (username: string, password: string) => {
     try {
       // 调用后端登录接口，所有认证必须经过后端数据库验证

@@ -39,6 +39,7 @@ public class SecurityConfig {
     private static final String[] WHITE_LIST = {
             "/api/auth/login",
             "/api/auth/logout",
+            "/api/auth/check",  // 前端轮询会话状态（内部自行校验 Token）
             "/error"
     };
 
