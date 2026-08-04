@@ -47,12 +47,26 @@ public class AuthController {
 
     /** 登出 */
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(HttpServletRequest request) {
         // 记录主动退出
         try {
+            String username = null;
+            // 优先从 SecurityContext 获取用户名
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.getName() != null) {
-                loginLogService.recordLogout(authentication.getName());
+            if (authentication != null && authentication.getName() != null
+                    && !"anonymousUser".equals(authentication.getName())) {
+                username = authentication.getName();
+            }
+            // Fallback: 直接从 JWT Token 解析用户名（防止 Filter 未设置 SecurityContext 的情况）
+            if (username == null) {
+                String header = request.getHeader("Authorization");
+                if (header != null && header.startsWith("Bearer ")) {
+                    String token = header.substring(7);
+                    username = jwtUtil.getUsername(token);
+                }
+            }
+            if (username != null) {
+                loginLogService.recordLogout(username);
             }
         } catch (Exception e) {
             // 日志记录失败不影响登出流程

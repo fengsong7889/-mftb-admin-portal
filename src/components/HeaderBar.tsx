@@ -90,8 +90,8 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   }
 
   /** 退出登录 */
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login', { replace: true })
   }
 

@@ -341,12 +341,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const logout = useCallback(() => {
-    // 通知后端登出(失败不阻断本地清理)
-    logoutApi().catch(() => {})
+  const logout = useCallback(async () => {
+    // 通知后端登出，等待完成後再清理本地狀態，確保 logoutTime 被記錄
+    try {
+      await logoutApi()
+    } catch {
+      // 失敗不阻斷本地清理
+    }
     setIsAuthenticated(false)
     setUser(null)
-    // 清除本地登录信息
+    // 清除本地登錄信息
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem('is_authenticated')
     localStorage.removeItem('user_info')

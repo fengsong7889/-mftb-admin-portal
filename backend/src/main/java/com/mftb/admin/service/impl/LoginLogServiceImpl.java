@@ -33,9 +33,6 @@ public class LoginLogServiceImpl implements LoginLogService {
     private final SysLoginLogMapper loginLogMapper;
     private final SysUserMapper sysUserMapper;
 
-    @Value("${jwt.expiration:86400000}")
-    private Long jwtExpiration;
-
     /** 空闲超时时间（毫秒），与 JwtAuthenticationFilter 保持一致 */
     @Value("${session.idle-timeout:1800000}")
     private Long sessionIdleTimeout;
@@ -83,23 +80,46 @@ public class LoginLogServiceImpl implements LoginLogService {
     @Override
     @Transactional
     public void markTimeoutSessions() {
-        // 使用空闲超时阈值标记离线会话（用户无操作超过阈值即视为离线）
+        // 使用空闲超时阈值标记离线会话
         LocalDateTime threshold = LocalDateTime.now().minus(Duration.ofMillis(sessionIdleTimeout));
 
-        // 查找所有在线且最后活跃时间早于阈值的记录
-        List<SysLoginLog> staleSessions = loginLogMapper.selectList(
+        // 查找所有在线记录（logoutTime 为 NULL）
+        List<SysLoginLog> onlineSessions = loginLogMapper.selectList(
                 new LambdaQueryWrapper<SysLoginLog>()
-                        .isNull(SysLoginLog::getLogoutTime)
-                        .lt(SysLoginLog::getLoginTime, threshold));
+                        .isNull(SysLoginLog::getLogoutTime));
 
-        for (SysLoginLog session : staleSessions) {
-            session.setLogoutTime(session.getLoginTime().plus(Duration.ofMillis(jwtExpiration)));
+        int marked = 0;
+        for (SysLoginLog session : onlineSessions) {
+            // 通过 userId 查询该用户的最后活跃时间
+            SysUser user = sysUserMapper.selectById(session.getUserId());
+            if (user == null) {
+                // 用户不存在，直接标记超时
+                session.setLogoutTime(LocalDateTime.now());
+                session.setLogoutReason("timeout");
+                loginLogMapper.updateById(session);
+                marked++;
+                continue;
+            }
+
+            // 判断用户是否仍然活跃：lastActiveAt 在阈值之内说明用户仍在操作
+            if (user.getLastActiveAt() != null && user.getLastActiveAt().isAfter(threshold)) {
+                // 用户仍在线，跳过
+                continue;
+            }
+
+            // 用户确实已不活跃，标记为超时退出
+            // logoutTime 取 lastActiveAt + 超时阈值（即实际超时发生的时刻），若无 lastActiveAt 则取 loginTime + 阈值
+            LocalDateTime actualTimeout = user.getLastActiveAt() != null
+                    ? user.getLastActiveAt().plus(Duration.ofMillis(sessionIdleTimeout))
+                    : session.getLoginTime().plus(Duration.ofMillis(sessionIdleTimeout));
+            session.setLogoutTime(actualTimeout);
             session.setLogoutReason("timeout");
             loginLogMapper.updateById(session);
+            marked++;
         }
 
-        if (!staleSessions.isEmpty()) {
-            log.info("标记超时退出会话: {} 条", staleSessions.size());
+        if (marked > 0) {
+            log.info("标记超时退出会话: {} 条", marked);
         }
     }
 

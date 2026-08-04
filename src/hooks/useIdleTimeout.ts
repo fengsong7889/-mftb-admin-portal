@@ -51,10 +51,10 @@ export function useIdleTimeout() {
   }, [])
 
   /** 执行登出 */
-  const doLogout = useCallback(() => {
+  const doLogout = useCallback(async () => {
     clearAllTimers()
     closeWarningModal()
-    logout()
+    await logout()
     // 跳转登录页（HashRouter 兼容）
     window.location.hash = '#/login'
   }, [logout, clearAllTimers, closeWarningModal])
