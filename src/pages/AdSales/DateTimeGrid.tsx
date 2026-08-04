@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Card, Tag, Space, message, Empty, Button, Table, Select, Radio, Modal, TreeSelect, Input, Form } from 'antd'
+import { Card, Tag, Space, message, Empty, Button, Table, Select, Modal, Form } from 'antd'
 import {
   CalendarOutlined,
   ShopOutlined,
@@ -10,13 +10,12 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import {
-  TimeSlotStatus,
   calcSlotPrice,
   getNoDiscountSlotsByRow,
   type InventoryItem,
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
-import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES, AlgorithmType } from '../Recommend/constants'
+import { Region, AlgorithmType } from '../Recommend/constants'
 import GradientDiscountBanner from './GradientDiscountBanner'
 import {
   fetchAdAlgorithms,
@@ -56,7 +55,7 @@ interface RegionCombination {
 }
 
 /** Mock数据 - 组合商圈 */
-const MOCK_REGION_COMBINATIONS: RegionCombination[] = [
+const _MOCK_REGION_COMBINATIONS: RegionCombination[] = [
   {
     id: 1,
     name: '澳門區域組合',
@@ -221,15 +220,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [selectedCells, setSelectedCells] = useState<Array<{date: string; regionKey: Region | string; mealSlotKey: string}>>([])
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedRegion, setSelectedRegion] = useState<Region | string | undefined>(undefined)
-  const [selectedCombination, setSelectedCombination] = useState<number | undefined>(undefined)
-  const [regionMode, setRegionMode] = useState<'single' | 'combination'>('single')
+  const [_selectedRegion, _setSelectedRegion] = useState<Region | string | undefined>(undefined)
+  const [_selectedCombination, _setSelectedCombination] = useState<number | undefined>(undefined)
+  const [_regionMode, _setRegionMode] = useState<'single' | 'combination'>('single')
   const pageSize = 7
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [isSoldOutModalVisible, setIsSoldOutModalVisible] = useState(false)
   const [soldOutDetails, setSoldOutDetails] = useState<Array<{date: string; regionName: string; mealSlot: string}>>([])
-  const [selectedStore, setSelectedStore] = useState<string | undefined>(undefined)
+  const [_selectedStore, _setSelectedStore] = useState<string | undefined>(undefined)
   const [currentTime, setCurrentTime] = useState(Date.now())
 
   // 倒计时：每秒更新当前时间
@@ -657,7 +656,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const totalPages = Math.ceil(allDates.length / pageSize)
 
   // 单个时段价格（使用固定总时段数48，不随选择变化）
-  const slotPrice = useMemo(() => {
+  const _slotPrice = useMemo(() => {
     // 固定使用48个时段作为基准（去除凌晨0-6点的12个不可售时段，实际36个）
     const totalAvailableSlots = 36
     return calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
@@ -704,7 +703,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   }
 
   // 计算时段总价
-  const getMealSlotPrice = (mealSlot: typeof MEAL_TIME_SLOTS[0], availableSlots: number) => {
+  const _getMealSlotPrice = (mealSlot: typeof MEAL_TIME_SLOTS[0], availableSlots: number) => {
     // 使用固定总时段数36计算单价
     const totalAvailableSlots = 36
     const pricePerSlot = calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
@@ -1525,7 +1524,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
           {/* 折扣汇总：时段折扣 + 时段个数梯度折上折 */}
           {(() => {
-            const { totalOriginal, slotDiscountAmount, tier, totalFinal } = computeCartSettlement()
+            const { totalOriginal, slotDiscountAmount: _slotDiscountAmount, tier: _tier, totalFinal } = computeCartSettlement()
             const totalDiscount = Math.round((totalOriginal - totalFinal) * 100) / 100
             return (
               <table style={{ width: '100%', fontSize: 12, marginBottom: 12 }}>

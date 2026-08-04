@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Card, Tag, Button, Space, message, Tabs } from 'antd'
+import { Card, Tag, Button, message, Tabs } from 'antd'
 import {
-  ThunderboltOutlined,
   ArrowLeftOutlined,
   ShoppingCartOutlined,
   OrderedListOutlined,
@@ -69,7 +68,7 @@ export default function PromotionSalesConfig() {
   const [currentStep, setCurrentStep] = useState(initial.step)
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(initial.algorithmType)
   const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(initial.inventory)
-  const [selectedApp, setSelectedApp] = useState<AppType | null | undefined>(null)
+  const [selectedApp, _setSelectedApp] = useState<AppType | null | undefined>(null)
   const [selectedTab, setSelectedTab] = useState<'delivery' | 'groupBuy'>('delivery')
 
   // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）

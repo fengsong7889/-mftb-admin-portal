@@ -4,7 +4,6 @@ import {
   SettingOutlined,
   ReloadOutlined,
   HolderOutlined,
-  CheckSquareOutlined,
   CloseOutlined,
 } from '@ant-design/icons'
 import './TableColumnConfig.css'
@@ -292,8 +291,9 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
 }
 
 /** 根据列配置过滤和排序 Table columns */
-export function applyColumnConfig<T>(
-  tableColumns: any[],
+// eslint-disable-next-line react-refresh/only-export-components
+export function applyColumnConfig(
+  tableColumns: unknown[],
   config: ColumnConfig[]
 ) {
   const visibleKeys = config.filter(c => c.visible).map(c => c.key)

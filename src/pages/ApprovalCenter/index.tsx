@@ -47,7 +47,7 @@ const currentNodeOptions = [
 ]
 
 /** 審批狀態 */
-const approvalStatusOptions = [
+const _approvalStatusOptions = [
   { label: '全部', value: 'all' },
   { label: '通過', value: 'approved' },
   { label: '駁回', value: 'rejected' },
@@ -56,7 +56,7 @@ const approvalStatusOptions = [
 
 const approvalTypeMap: Record<string, string> = { recharge: '充值', deduct: '扣款', transfer: '轉賬', merge: '合併', gift: '推廣贈送' }
 const flowStatusMap: Record<string, string> = { pending: '審批中', approved: '已通過', rejected: '已駁回', cancelled: '已撤銷' }
-const approvalStatusMap: Record<string, string> = { approved: '通過', rejected: '駁回', pending: '待審批' }
+const _approvalStatusMap: Record<string, string> = { approved: '通過', rejected: '駁回', pending: '待審批' }
 
 interface ApprovalRecord {
   key: string
@@ -168,9 +168,9 @@ export default function ApprovalCenter() {
   const { user, hasPermission } = useAuth()
   const [searchParams] = useSearchParams()
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [detailRecord, setDetailRecord] = useState<ApprovalRecord | null>(null)
+  const [detailRecord, _setDetailRecord] = useState<ApprovalRecord | null>(null)
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
-  const [approveRecord, setApproveRecord] = useState<ApprovalRecord | null>(null)
+  const [approveRecord, _setApproveRecord] = useState<ApprovalRecord | null>(null)
   const [form] = Form.useForm()
   const [searchForm] = Form.useForm<ApprovalFilters>()
   const [data, setData] = useState<ApprovalRecord[]>([])

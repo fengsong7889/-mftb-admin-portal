@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Button, Tooltip, message } from 'antd'
+import { Input, Button, Tooltip, message, Modal } from 'antd'
 import {
   UserOutlined,
   LockOutlined,
@@ -8,7 +8,6 @@ import {
   EyeOutlined,
   FormOutlined,
   SafetyOutlined,
-  CheckOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import BrandLogo from '../../components/BrandLogo'
@@ -177,6 +176,9 @@ export default function Login() {
   const [usernameError, setUsernameError] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
+  /** 账号被停用弹窗状态 */
+  const [accountDisabledVisible, setAccountDisabledVisible] = useState(false)
+
   const { login } = useAuth()
   const navigate = useNavigate()
 
@@ -245,7 +247,10 @@ export default function Login() {
       setLoading(false)
       if (result.success) {
         message.success('登錄成功')
-        navigate('/', { replace: true })
+        navigate(result.redirectPath || '/', { replace: true })
+      } else if (result.accountDisabled) {
+        // 账号被停用: 弹窗提醒（不显示 toast）
+        setAccountDisabledVisible(true)
       } else {
         message.error(result.message || '登錄失敗')
       }
@@ -464,6 +469,31 @@ export default function Login() {
           )}
         </div>
       </div>
+      {/* 账号被停用提醒弹窗 */}
+      <Modal
+        title={null}
+        open={accountDisabledVisible}
+        centered
+        closable={false}
+        maskClosable={false}
+        cancelButtonProps={{ style: { display: 'none' } }}
+        okText="我知道了"
+        onOk={() => setAccountDisabledVisible(false)}
+        styles={{
+          header: { display: 'none' },
+          body: { padding: '28px 24px 20px' },
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+            账号已被停用
+          </h3>
+          <p style={{ fontSize: 14, color: '#595959', marginBottom: 0 }}>
+            您的账号已被管理员停用，如需恢复请联系管理员。
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

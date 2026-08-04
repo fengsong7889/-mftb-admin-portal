@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Card, Select, Space, Tag, Empty, Form } from 'antd'
+import { Button, Card, Select, Tag, Empty, Form } from 'antd'
 import { SearchOutlined, ReloadOutlined, FireOutlined, WifiOutlined } from '@ant-design/icons'
 import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
 

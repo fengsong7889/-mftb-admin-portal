@@ -16,7 +16,8 @@ public enum ResultCode {
     PARAM_ERROR(400, "请求参数错误"),
     LOGIN_ERROR(1001, "账号或密码错误"),
     ACCOUNT_DISABLED(1002, "账号已被禁用"),
-    ACCOUNT_NOT_EXIST(1003, "账号不存在");
+    ACCOUNT_NOT_EXIST(1003, "账号不存在"),
+    SESSION_IDLE_TIMEOUT(1004, "您已长时间未操作，会话已过期");
 
     private final Integer code;
     private final String message;

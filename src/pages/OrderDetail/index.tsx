@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Button, Tag, Space, Descriptions, Card, Empty, Modal, message, Tabs, Spin, Result } from 'antd'
+import { Button, Tag, Descriptions, Card, Empty, Modal, message, Tabs, Spin, Result } from 'antd'
 import {
   ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined,
   ShopOutlined, FileTextOutlined, DollarOutlined,
@@ -414,7 +414,7 @@ function genOrder(
         if (!dateGroups.has(sp.date)) dateGroups.set(sp.date, [])
         dateGroups.get(sp.date)!.push(i)
       })
-      Array.from(dateGroups.entries()).forEach(([date, indices], di) => {
+      Array.from(dateGroups.entries()).forEach(([_date, indices], di) => {
         const dr = dateRegions[di] || dateRegions[0] || [Array.isArray(region) ? region[0] : region]
         const perR = Math.ceil(indices.length / dr.length)
         indices.forEach((slotIdx, i) => {

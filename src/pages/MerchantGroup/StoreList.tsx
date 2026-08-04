@@ -6,7 +6,6 @@ import {
   ReloadOutlined,
   PlusOutlined,
   ExportOutlined,
-  DeleteOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
@@ -66,7 +65,7 @@ export default function StoreList() {
 
   // 勾选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [selectedRows, setSelectedRows] = useState<StoreItem[]>([])
+  const [_selectedRows, setSelectedRows] = useState<StoreItem[]>([])
 
   // 从集团列表跳转带入的集团，用于搜索下拉框回显
   const presetGroupOptions = presetGroupCode

@@ -3,7 +3,6 @@ import { Table, Tag, Space, Select, Input, Button, DatePicker, message, Modal, C
 import {
   SearchOutlined,
   ExportOutlined,
-  EyeOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import { Line, Column } from '@ant-design/charts'
@@ -12,8 +11,6 @@ import type { ColumnsType } from 'antd/es/table'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   OrderReportItem,
-  TimeSlotReport,
-  DailyTrend,
   ReportApp,
   ReportChannel,
   ReportRegion,
@@ -33,7 +30,7 @@ const { RangePicker } = DatePicker
 
 export default function PromotionReportOrder() {
   const { user } = useAuth()
-  const [loading, setLoading] = useState(false)
+  const [loading, _setLoading] = useState(false)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | undefined>(undefined)
   const [orderNo, setOrderNo] = useState<string | undefined>(undefined)
   const [promotionName, setPromotionName] = useState<string | undefined>(undefined)

@@ -6,7 +6,6 @@ import type { EmployeeItem, EmployeePayload, PageResult, EmployeeQuery } from '.
 import type { RoleItem } from '../role'
 import type { DepartmentItem } from '../department'
 import type { PositionItem } from '../position'
-import type { MenuPermission } from '../../pages/Permission/types'
 
 const MOCK_PREFIX = 'mftb_mock_'
 const KEY_EMPLOYEES = `${MOCK_PREFIX}employees`

@@ -6,10 +6,8 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
-  EditOutlined,
   EyeOutlined,
   ExportOutlined,
-  DeleteOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
@@ -152,7 +150,7 @@ export default function HintConfig() {
   const [hintType, setHintType] = useState<string>('operation')
   const [form] = Form.useForm()
 
-  const handleAdd = () => {
+  const _handleAdd = () => {
     setEditingRecord(null)
     setHintType('operation')
     form.resetFields()

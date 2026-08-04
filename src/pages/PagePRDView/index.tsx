@@ -142,22 +142,22 @@ export default function PagePRDView() {
   }
 
   // 编辑模式下的通用更新方法
-  const updateField = (key: string, value: any) => {
+  const updateField = (key: string, value: unknown) => {
     setEditContent(prev => ({ ...prev, [key]: value }))
   }
 
   // 列表项增删
-  const addListItem = (key: string, defaultVal: any) => {
-    const list = (editContent as any)?.[key] || []
+  const addListItem = (key: string, defaultVal: unknown) => {
+    const list = (editContent as Record<string, unknown>)?.[key] || []
     updateField(key, [...list, defaultVal])
   }
   const removeListItem = (key: string, index: number) => {
-    const list = [...((editContent as any)?.[key] || [])]
+    const list = [...((editContent as Record<string, unknown>)?.[key] || [])]
     list.splice(index, 1)
     updateField(key, list)
   }
-  const updateListItem = (key: string, index: number, value: any) => {
-    const list = [...((editContent as any)?.[key] || [])]
+  const updateListItem = (key: string, index: number, value: unknown) => {
+    const list = [...((editContent as Record<string, unknown>)?.[key] || [])]
     list[index] = value
     updateField(key, list)
   }

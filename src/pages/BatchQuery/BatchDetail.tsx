@@ -102,7 +102,7 @@ const genDetailId = (i: number) => `MX20260616${String(i).padStart(4, '0')}`
 const SUB_TABLE_PAGE_SIZE = 5
 
 /** 分類型 Mock extra（列表 Mock 行兜底，保證對方集團等必填數據完整） */
-const mockExtraByType: Record<string, Record<string, any>> = {
+const mockExtraByType: Record<string, Record<string, unknown>> = {
   transfer: {
     direction: 'out',
     toGroupId: '20261298121913',
@@ -205,14 +205,14 @@ export default function BatchDetail() {
     return () => { cancelled = true }
   }, [batchNoParam, groupIdParam, fallbackRecord])
 
-  const extra = (record.extra || {}) as Record<string, any>
+  const extra = useMemo(() => (record.extra || {}) as Record<string, unknown>, [record.extra])
   const batchType = record.batchType
   const remark = extra.remark || (record.remark !== '--' ? record.remark : '')
   const typeTag = typeTagMap[batchType] || typeTagMap.recharge
 
   /** 營業額扣款門店（充值）：已扣金額取本批次該門店的扣款明細合計 */
   const deductStores: DeductStoreRow[] = useMemo(() =>
-    ((extra.deductStores as any[]) || []).map((s, i) => {
+    ((extra.deductStores as unknown[]) || []).map((s, i) => {
       const deducted = details
         ? details
           .filter(d => d.storeId === s.storeId && d.tradeType === '扣款')
@@ -229,7 +229,7 @@ export default function BatchDetail() {
 
   /** 欠款償還門店（合併） */
   const repayStores: RepayStoreRow[] = useMemo(() =>
-    ((extra.repayStores as any[]) || []).map((s, i) => ({
+    ((extra.repayStores as unknown[]) || []).map((s, i) => ({
       key: String(i),
       storeId: s.storeId,
       storeName: s.storeLabel?.replace(`(${s.storeId})`, '') || s.storeLabel || '',

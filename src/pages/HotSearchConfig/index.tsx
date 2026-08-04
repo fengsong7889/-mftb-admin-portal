@@ -1,13 +1,13 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Button, Space, Input, InputNumber, Select, Table, Tag, Modal, Form, DatePicker, TimePicker,
-  ColorPicker, Upload, Switch, Radio, Checkbox, message, Popover,
+  Button, Space, Input, InputNumber, Select, Table, Tag, Modal, Form, DatePicker,
+  ColorPicker, Upload, message, Popover,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, UploadOutlined,
-  EyeOutlined, TranslationOutlined, FireOutlined, PushpinOutlined, PushpinFilled,
+  EyeOutlined, TranslationOutlined, FireOutlined,
   SmileOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -15,7 +15,6 @@ import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-const { RangePicker: TimeRangePicker } = TimePicker
 
 /* ======================== 常量定义 ======================== */
 
@@ -52,7 +51,7 @@ const timeSlotOptions = [
 ]
 
 /** 人群 */
-const crowdOptions = [
+const _crowdOptions = [
   { label: '全部', value: 'all' },
   { label: '新用戶', value: 'newUser' },
   { label: '老用戶', value: 'oldUser' },
@@ -109,13 +108,13 @@ const mockLibWords = ['火鍋', '珍珠奶茶', '酸菜魚', '炸雞', '壽司',
 /* ======================== Map ======================== */
 
 const searchEntryMap: Record<string, string> = { home: '大首頁', takeaway: '外賣搜索', supermarket: '超市搜索', groupBuy: '團購搜索' }
-const terminalMap: Record<string, string> = { app: 'APP', wechatMini: '微信小程序', mpayMini: 'Mpay小應用', wechatH5: '微信H5' }
+const _terminalMap: Record<string, string> = { app: 'APP', wechatMini: '微信小程序', mpayMini: 'Mpay小應用', wechatH5: '微信H5' }
 const regionMap: Record<string, string> = { macau: '澳門', taipa: '氹仔', zhuhai: '珠海市' }
 const timeSlotMap: Record<string, string> = { allDay: '全時段', breakfast: '早餐', lunch: '午餐', afternoonTea: '下午茶', dinner: '晚餐', midnightSnack: '宵夜' }
-const crowdMap: Record<string, string> = { all: '全部', newUser: '新用戶', oldUser: '老用戶', vip: 'VIP用戶' }
+const _crowdMap: Record<string, string> = { all: '全部', newUser: '新用戶', oldUser: '老用戶', vip: 'VIP用戶' }
 const wordSourceMap: Record<string, string> = { custom: '自定義詞', hotSearchLib: '熱搜詞庫' }
 const promotionTypeMap: Record<string, string> = { merchant: '商家推廣', activity: '活動推廣', hotSearch: '熱搜推廣' }
-const jumpTypeMap: Record<string, string> = { none: '無跳轉', merchantPage: '商家頁', h5: 'H5鏈接', appPage: 'APP頁面' }
+const _jumpTypeMap: Record<string, string> = { none: '無跳轉', merchantPage: '商家頁', h5: 'H5鏈接', appPage: 'APP頁面' }
 const displayModeMap: Record<string, string> = { text: '文字', image: '圖片' }
 
 /* ======================== 接口 & Mock ======================== */

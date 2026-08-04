@@ -105,6 +105,8 @@ export default function EmployeeManagement() {
   const [editing, setEditing] = useState<EmployeeItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<EmployeeFormValues>()
+  // 每次打開新增弹窗时递增，强制 Modal 重建以彻底清除表单残留
+  const [createFormKey, setCreateFormKey] = useState(0)
   // 监听所选职位，带出对应职级展示
   const watchPositionId = Form.useWatch('positionId', form)
   // 监听所选职级序列，用于过滤职位选项
@@ -229,6 +231,7 @@ export default function EmployeeManagement() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
+    setCreateFormKey(prev => prev + 1)
     setEditModalVisible(true)
   }
 
@@ -300,12 +303,25 @@ export default function EmployeeManagement() {
     }
   }
 
-  /** 启用/停用 */
-  const handleToggleStatus = async (record: EmployeeItem) => {
-    const next = record.status === EMPLOYEE_STATUS.ENABLED ? EMPLOYEE_STATUS.DISABLED : EMPLOYEE_STATUS.ENABLED
-    await updateEmployeeStatus(record.id, next)
-    message.success(next === EMPLOYEE_STATUS.ENABLED ? '已啟用' : '已停用')
-    fetchList()
+  /** 启用/停用（带确认弹窗） */
+  const handleToggleStatus = (record: EmployeeItem) => {
+    const isDisabling = record.status === EMPLOYEE_STATUS.ENABLED
+    const action = isDisabling ? '停用' : '啟用'
+    Modal.confirm({
+      title: `確認${action}`,
+      content: isDisabling
+        ? `確定要停用員工「${record.name}」嗎？停用後該帳號將被強制下線且無法登錄。`
+        : `確定要啟用員工「${record.name}」嗎？`,
+      okText: '確定',
+      cancelText: '取消',
+      okButtonProps: { danger: isDisabling },
+      onOk: async () => {
+        const next = isDisabling ? EMPLOYEE_STATUS.DISABLED : EMPLOYEE_STATUS.ENABLED
+        await updateEmployeeStatus(record.id, next)
+        message.success(isDisabling ? '已停用' : '已啟用')
+        fetchList()
+      },
+    })
   }
 
   /** 删除 */
@@ -349,10 +365,24 @@ export default function EmployeeManagement() {
     { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
     { title: '職等', dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
     {
-      title: '功能角色',
+      title: '角色授權',
       dataIndex: 'functionRoleIds',
       key: 'functionRoleIds',
       render: (roleIds: number[]) => renderRoleTags(roleIds),
+    },
+    {
+      title: '部門授權',
+      dataIndex: 'departmentId',
+      key: 'deptPermission',
+      width: 110,
+      render: (_: unknown, record: EmployeeItem) => {
+        if (!record.departmentId) return <span style={{ color: '#8C8C8C' }}>未加入部門</span>
+        const dept = departments.find(d => d.id === record.departmentId)
+        const hasDeptPerm = dept?.permissions && dept.permissions.length > 0
+        return hasDeptPerm
+          ? <Tag color="success">已授權</Tag>
+          : <Tag color="default">未授權</Tag>
+      },
     },
     {
       title: '狀態',
@@ -482,8 +512,9 @@ export default function EmployeeManagement() {
         }}
       />
 
-      {/* 新增/编辑员工弹窗 */}
+      {/* 新增/编辑员工弹窗：createFormKey 变化时强制重建，确保新增时表单无残留数据 */}
       <Modal
+        key={editing ? 'edit' : `create-${createFormKey}`}
         title={editing ? '編輯員工' : '新增員工'}
         open={editModalVisible}
         onOk={handleSubmit}
@@ -492,11 +523,10 @@ export default function EmployeeManagement() {
         okText="保存"
         cancelText="取消"
         width={560}
-        destroyOnClose
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" autoComplete="off">
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
-            <Input placeholder="請輸入員工姓名" allowClear />
+            <Input placeholder="請輸入員工姓名" allowClear autoComplete="off" />
           </Form.Item>
           <Form.Item
             name="empId"
@@ -514,7 +544,7 @@ export default function EmployeeManagement() {
                 { min: 6, max: 32, message: '密碼長度為6-32位' },
               ]}
             >
-              <Input.Password placeholder="請輸入初始登錄密碼" />
+              <Input.Password placeholder="請輸入初始登錄密碼" autoComplete="new-password" />
             </Form.Item>
           )}
           <Form.Item name="departmentId" label="所屬部門" extra="部門在「組織管理」中維護，加入部門後自動獲得部門授權的菜單權限">
@@ -560,7 +590,7 @@ export default function EmployeeManagement() {
           </Form.Item>
           <Form.Item
             name="functionRoleIds"
-            label="功能角色"
+            label="角色授權"
             extra="綁定後員工按角色的菜單權限訪問系統，可稍後在「功能授權」中配置"
           >
             <Select

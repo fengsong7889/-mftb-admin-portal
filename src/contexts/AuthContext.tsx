@@ -1,7 +1,10 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { Modal } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import type { Role, MenuPermission } from '../pages/Permission/types'
-import { STORAGE_KEYS, CONTROLLED_MENU_KEYS } from '../pages/Permission/types'
-import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, resetUnauthorizedGuard } from '../api'
+import { STORAGE_KEYS, CONTROLLED_MENU_KEYS, resolveFirstAccessiblePath } from '../pages/Permission/types'
+import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, SESSION_CONFLICT_EVENT, FORCE_LOGOUT_EVENT, ACCOUNT_DISABLED_EVENT, resetUnauthorizedGuard } from '../api'
+import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 
 export interface UserInfo {
   username: string
@@ -24,7 +27,7 @@ export interface UserInfo {
 interface AuthContextType {
   isAuthenticated: boolean
   user: UserInfo | null
-  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>
+  login: (username: string, password: string) => Promise<{ success: boolean; message?: string; redirectPath?: string; accountDisabled?: boolean }>
   logout: () => void
   updateAvatar: (avatar: string) => void
   hasPermission: (permission: string) => boolean // 权限检查方法（支持 'action' 或 'menuKey:action'）
@@ -35,6 +38,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
   // 从 localStorage 初始化登录状态
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const saved = localStorage.getItem('is_authenticated')
@@ -44,6 +48,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('user_info')
     return saved ? JSON.parse(saved) : null
   })
+
+  /** 被顶下线弹窗状态 */
+  const [conflictInfo, setConflictInfo] = useState<SessionConflictDetail | null>(null)
+
+  /** 被强制下线弹窗状态 */
+  const [forceLogoutInfo, setForceLogoutInfo] = useState<ForceLogoutDetail | null>(null)
+
+  /** 账号被停用弹窗状态 */
+  const [accountDisabled, setAccountDisabled] = useState(false)
+
+  /** 標記是否正在處理被頂下線/強制下線彈窗，防止路由守衛提前跳轉 */
+  const pendingLogoutRef = useRef(false)
 
   /**
    * 监听登录失效事件（Token 过期 / 被清除 / 无效，由请求拦截器 401 触发）：
@@ -60,6 +76,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
     return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
+  }, [])
+
+  /**
+   * 清除登錄態的公共邏輯
+   */
+  const clearAuthState = useCallback(() => {
+    setIsAuthenticated(false)
+    setUser(null)
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem('is_authenticated')
+    localStorage.removeItem('user_info')
+  }, [])
+
+  /**
+   * 監聽被頂下線事件：賬號在其他設備登錄，先彈窗提醒，
+   * 等用戶點擊「我知道了」後再清除登錄態並跳轉登錄頁。
+   * 注意：此處不能立即 setIsAuthenticated(false)，否則路由守衛會
+   * 瞬間切換到 /login，導致 Modal 被 Login 頁面遮擋。
+   */
+  useEffect(() => {
+    const handleSessionConflict = (e: Event) => {
+      const detail = (e as CustomEvent<SessionConflictDetail>).detail
+      pendingLogoutRef.current = true
+      setConflictInfo(detail)
+      // 先清除 localStorage 中的 token，防止後續請求繼續攜帶失效 token
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem('is_authenticated')
+      localStorage.removeItem('user_info')
+    }
+    window.addEventListener(SESSION_CONFLICT_EVENT, handleSessionConflict)
+    return () => window.removeEventListener(SESSION_CONFLICT_EVENT, handleSessionConflict)
+  }, [])
+
+  /**
+   * 監聽被強制下線事件：管理員操作下線，先彈窗顯示操作人信息，
+   * 等用戶點擊「我知道了」後再清除登錄態並跳轉登錄頁。
+   */
+  useEffect(() => {
+    const handleForceLogout = (e: Event) => {
+      const detail = (e as CustomEvent<ForceLogoutDetail>).detail
+      pendingLogoutRef.current = true
+      setForceLogoutInfo(detail)
+      // 先清除 localStorage 中的 token
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem('is_authenticated')
+      localStorage.removeItem('user_info')
+    }
+    window.addEventListener(FORCE_LOGOUT_EVENT, handleForceLogout)
+    return () => window.removeEventListener(FORCE_LOGOUT_EVENT, handleForceLogout)
+  }, [])
+
+  /**
+   * 監聽账号被停用事件：在线时被管理员停用，先彈窗提醒，
+   * 等用戶點擊「我知道了」後再清除登錄態並跳轉登錄頁。
+   */
+  useEffect(() => {
+    const handleAccountDisabled = () => {
+      pendingLogoutRef.current = true
+      setAccountDisabled(true)
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem('is_authenticated')
+      localStorage.removeItem('user_info')
+    }
+    window.addEventListener(ACCOUNT_DISABLED_EVENT, handleAccountDisabled)
+    return () => window.removeEventListener(ACCOUNT_DISABLED_EVENT, handleAccountDisabled)
   }, [])
 
   /**
@@ -120,10 +201,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(TOKEN_KEY, result.token)
       localStorage.setItem('is_authenticated', 'true')
       localStorage.setItem('user_info', JSON.stringify(mappedUser))
-      return { success: true }
+      // 計算首個有權限的菜單路徑，供登錄後智能跳轉
+      const redirectPath = resolveFirstAccessiblePath(
+        mappedUser.role === 'admin',
+        (key) => mappedUser.permissions?.some(p => p.menuKey === key && p.actions.length > 0) ?? false,
+      )
+      return { success: true, redirectPath }
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : '登錄失敗'
-      return { success: false, message: msg }
+      // 账号被停用时返回特定标记，由登录页弹窗展示
+      const isAccountDisabled = msg.includes('账号已被停用') || msg.includes('已被禁用')
+      return { success: false, message: msg, accountDisabled: isAccountDisabled }
     }
   }, [])
 
@@ -221,10 +309,140 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, updateAvatar, hasPermission, hasMenuPermission, hasDataPermission }}>
       {children}
+      {/* 被顶下线提醒弹窗 */}
+      <Modal
+        title={null}
+        open={conflictInfo !== null}
+        centered
+        closable={false}
+        maskClosable={false}
+        cancelButtonProps={{ style: { display: 'none' } }}
+        okText="我知道了"
+        onOk={() => {
+          setConflictInfo(null)
+          clearAuthState()
+          navigate('/login', { replace: true })
+        }}
+        styles={{
+          header: { display: 'none' },
+          body: { padding: '28px 24px 20px' },
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+            账号已在其他设备登录
+          </h3>
+          <p style={{ fontSize: 14, color: '#595959', marginBottom: 16 }}>
+            您的账号已在另一台设备上登录，当前设备已被强制下线。
+          </p>
+          {conflictInfo && (
+            <div style={{
+              background: '#F5F5F5',
+              borderRadius: 8,
+              padding: '12px 16px',
+              textAlign: 'left',
+              fontSize: 13,
+              color: '#595959',
+            }}>
+              <div style={{ marginBottom: 6 }}>
+                <span style={{ color: '#8C8C8C' }}>登录 IP：</span>
+                <span style={{ color: '#262626', fontWeight: 500 }}>{conflictInfo.loginIp || '-'}</span>
+              </div>
+              <div>
+                <span style={{ color: '#8C8C8C' }}>登录地点：</span>
+                <span style={{ color: '#262626', fontWeight: 500 }}>{conflictInfo.loginLocation || '-'}</span>
+              </div>
+            </div>
+          )}
+          <p style={{ fontSize: 12, color: '#8C8C8C', marginTop: 16, marginBottom: 0 }}>
+            如非本人操作，请及时修改密码
+          </p>
+        </div>
+      </Modal>
+      {/* 被强制下线提醒弹窗 */}
+      <Modal
+        title={null}
+        open={forceLogoutInfo !== null}
+        centered
+        closable={false}
+        maskClosable={false}
+        cancelButtonProps={{ style: { display: 'none' } }}
+        okText="我知道了"
+        onOk={() => {
+          setForceLogoutInfo(null)
+          clearAuthState()
+          navigate('/login', { replace: true })
+        }}
+        styles={{
+          header: { display: 'none' },
+          body: { padding: '28px 24px 20px' },
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+            账号已被强制下线
+          </h3>
+          <p style={{ fontSize: 14, color: '#595959', marginBottom: 16 }}>
+            您的账号已被以下操作人强制下线，如有疑问请联系操作人：
+          </p>
+          {forceLogoutInfo && (
+            <div style={{
+              background: '#FFF7E6',
+              borderRadius: 8,
+              padding: '12px 16px',
+              textAlign: 'left',
+              fontSize: 13,
+              color: '#595959',
+              border: '1px solid #FFD591',
+            }}>
+              <div style={{ marginBottom: 6 }}>
+                <span style={{ color: '#8C8C8C' }}>操作人：</span>
+                <span style={{ color: '#262626', fontWeight: 500 }}>{forceLogoutInfo.operatorName || '-'}</span>
+              </div>
+              <div>
+                <span style={{ color: '#8C8C8C' }}>工号：</span>
+                <span style={{ color: '#262626', fontWeight: 500 }}>{forceLogoutInfo.operatorEmpId || '-'}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+      {/* 账号被停用提醒弹窗 */}
+      <Modal
+        title={null}
+        open={accountDisabled}
+        centered
+        closable={false}
+        maskClosable={false}
+        cancelButtonProps={{ style: { display: 'none' } }}
+        okText="我知道了"
+        onOk={() => {
+          setAccountDisabled(false)
+          clearAuthState()
+          navigate('/login', { replace: true })
+        }}
+        styles={{
+          header: { display: 'none' },
+          body: { padding: '28px 24px 20px' },
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+            账号已被停用
+          </h3>
+          <p style={{ fontSize: 14, color: '#595959', marginBottom: 0 }}>
+            您的账号已被管理员停用，如需恢复请联系管理员。
+          </p>
+        </div>
+      </Modal>
     </AuthContext.Provider>
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, TimePicker, Popover } from 'antd'
+import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, StarFilled } from '@ant-design/icons'
-import { AlgorithmType, TimeSlot, TIME_SLOT_OPTIONS, AppType, APP_OPTIONS } from './constants'
+import { AlgorithmType, APP_OPTIONS } from './constants'
 import { mockAlgorithmData } from './Algorithm/index'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, withAdFallback, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
@@ -90,17 +90,17 @@ export default function AlgorithmAdd() {
   const [orderCompletionDays, setOrderCompletionDays] = useState(30) // 订单完成率天数
   const [tooltipVisible, setTooltipVisible] = useState<Record<string, boolean>>({})
   const hideTimerRef = useRef<Record<string, NodeJS.Timeout>>({})
-  const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(initialType) // 从 URL 参数初始化
-  const [presaleMode, setPresaleMode] = useState(true) // false: 固定, true: 滚动
-  const [continuousPurchase, setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
-  const [merchantLimit, setMerchantLimit] = useState(false) // false: 不限制, true: 限制
+  const [selectedAlgorithmType, _setSelectedAlgorithmType] = useState<AlgorithmType | null>(initialType) // 从 URL 参数初始化
+  const [presaleMode, _setPresaleMode] = useState(true) // false: 固定, true: 滚动
+  const [continuousPurchase, _setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
+  const [merchantLimit, _setMerchantLimit] = useState(false) // false: 不限制, true: 限制
   const [selectedMerchants, setSelectedMerchants] = useState<string[]>([])
   // 盘活复苏 - 配送范围计算（4 个固定参数：短程/中程/远程/跨桥）
   const [reviveDeliveryRange, setReviveDeliveryRange] = useState<string[]>([])
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
-  const [regionLimit, setRegionLimit] = useState(true) // false: 不限制, true: 限制
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([])
-  const [isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
+  const [_regionLimit, _setRegionLimit] = useState(true) // false: 不限制, true: 限制
+  const [_selectedRegions, _setSelectedRegions] = useState<string[]>([])
+  const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
   // 新店广告 - 波浪计算配置（周期/间隔为默认值，后续如需调整仅改以下常量）
   /** 新店週期默認天數 */
@@ -171,18 +171,18 @@ export default function AlgorithmAdd() {
   }
 
   // 进入编辑模式
-  const handleEdit = () => {
+  const _handleEdit = () => {
     setIsEditing(true)
   }
 
   // 取消编辑
-  const handleCancelEdit = () => {
+  const _handleCancelEdit = () => {
     setIsEditing(false)
     form.resetFields()
   }
 
   // 打开商家选择弹窗
-  const handleOpenMerchantModal = () => {
+  const _handleOpenMerchantModal = () => {
     setMerchantModalVisible(true)
   }
 

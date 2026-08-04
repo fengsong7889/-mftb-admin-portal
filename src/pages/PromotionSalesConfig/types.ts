@@ -240,7 +240,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
         const totalSlots = 20 + Math.floor(pseudoRandom(seed + 4) * 30)
         const soldSlots = Math.floor(pseudoRandom(seed + 5) * totalSlots * 0.7)
         const startDay = 1 + Math.floor(pseudoRandom(seed + 6) * 10)
-        const endDay = startDay + 14 + Math.floor(pseudoRandom(seed + 7) * 16)
+        const _endDay = startDay + 14 + Math.floor(pseudoRandom(seed + 7) * 16)
 
         items.push({
           id: baseId + idCounter,

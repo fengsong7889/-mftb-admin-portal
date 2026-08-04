@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Input, Button, Tag, Empty, Card, Tabs } from 'antd'
+import { useState, useEffect, useRef } from 'react'
+import { Input, Tag, Empty, Card, Tabs } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import { Line, Column, Area } from '@ant-design/charts'
+import { Line, Column } from '@ant-design/charts'
 import {
   SearchOutlined,
   PlusOutlined,
@@ -215,7 +215,7 @@ export default function Home() {
   const getMenuInfo = (key: string) => allMenus.find((m) => m.key === key)
 
   const getLineData = () => {
-    const result: any[] = []
+    const result: unknown[] = []
     orderTrendData.forEach(item => {
       result.push({ date: item.date, value: item.delivery, type: '外賣訂單' })
       result.push({ date: item.date, value: item.groupBuy, type: '團購訂單' })
@@ -260,7 +260,7 @@ export default function Home() {
     },
   }
 
-  const areaConfig = {
+  const _areaConfig = {
     data: userGrowthData,
     xField: 'date',
     yField: 'users',

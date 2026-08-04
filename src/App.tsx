@@ -8,6 +8,7 @@ import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import MenuPermissionGuard from './components/MenuPermissionGuard'
+import { useIdleTimeout } from './hooks/useIdleTimeout'
 import './App.css'
 
 /* 懒加载所有页面组件，避免启动时一次性加载所有模块 */
@@ -50,6 +51,7 @@ const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStra
 const EmployeeManagement = lazy(() => import('./pages/Permission/Employee'))
 const OrganizationManagement = lazy(() => import('./pages/Permission/Organization'))
 const PositionManagement = lazy(() => import('./pages/Permission/Position'))
+const LoginLog = lazy(() => import('./pages/LoginLog'))
 const RoleManagement = lazy(() => import('./pages/Permission/RoleManagement'))
 const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
 const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
@@ -97,6 +99,9 @@ function PageLoading() {
 /** 需要认证的路由布局 */
 function AuthenticatedLayout() {
   const [collapsed, setCollapsed] = useState(false)
+
+  // 空闲超时自动登出
+  useIdleTimeout()
 
   return (
     <Layout className="app-layout">
@@ -150,6 +155,7 @@ function AuthenticatedLayout() {
               <Route path="/employee-management" element={<EmployeeManagement />} />
               <Route path="/organization-management" element={<OrganizationManagement />} />
               <Route path="/position-management" element={<PositionManagement />} />
+              <Route path="/login-log" element={<LoginLog />} />
               <Route path="/role-management" element={<RoleManagement />} />
               <Route path="/function-permission" element={<FunctionPermission />} />
               <Route path="/data-permission" element={<DataPermission />} />

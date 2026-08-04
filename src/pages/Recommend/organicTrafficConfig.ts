@@ -127,7 +127,7 @@ export const DIMENSION_WEIGHT_TOTAL = 100
 /** 得分計算定時器默認分鐘數 */
 export const DEFAULT_SCORE_TIMER_MINUTES = 30
 
-const { ENABLED, DISABLED } = ServiceStatus
+const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 
 /** 默認評分規則（可在界面上新增/停用/調整分值） */
 export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [

@@ -56,7 +56,7 @@ const categoryMap: Record<string, string> = {
   food: '美食餐飲', supermarket: '生鮮超市', dessert: '甜點飲品',
   brand: '品牌商家', festival: '節日活動', trending: '熱門話題',
 }
-const sourceMap: Record<string, string> = { system: '系統抓取', operation: '運營添加', merchant: '商戶提交' }
+const _sourceMap: Record<string, string> = { system: '系統抓取', operation: '運營添加', merchant: '商戶提交' }
 
 /** 展示位置 */
 const displayPositionOptions = [

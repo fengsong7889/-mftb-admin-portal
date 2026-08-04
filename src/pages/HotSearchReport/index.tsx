@@ -1,4 +1,4 @@
-import {useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Button, Input, Select, DatePicker, Table, Form, Card, Row, Col, Statistic } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -6,7 +6,6 @@ import {
   ReloadOutlined,
   ExportOutlined,
   ArrowUpOutlined,
-  ArrowDownOutlined,
 } from '@ant-design/icons'
 import { Line, Column, Pie, Area } from '@ant-design/charts'
 import { useColumnConfig } from '../../hooks/useColumnConfig'

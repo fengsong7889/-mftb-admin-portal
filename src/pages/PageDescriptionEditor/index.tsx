@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Form, Input, message, Space, Card, Tag, Breadcrumb } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import PRDEditor from '../../components/PRDEditor'
 import { getPagePRD } from '../../components/PageDescriptions'
-import { getCustomTips, saveCustomTips, deleteCustomTips, mergeTips, type CustomPageTips } from '../../utils/customTipsStorage'
+import { getCustomTips, saveCustomTips, deleteCustomTips, type CustomPageTips } from '../../utils/customTipsStorage'
 import './index.css'
 
 export default function PageDescriptionEditor() {
@@ -14,7 +14,7 @@ export default function PageDescriptionEditor() {
   const [pageTitle, setPageTitle] = useState('')
   const [pageModule, setPageModule] = useState('')
   const [customTips, setCustomTips] = useState<CustomPageTips | null>(null)
-  const [pagePrd, setPagePrd] = useState<any>(null)
+  const [pagePrd, setPagePrd] = useState<Record<string, unknown>>(null)
   const [loading, setLoading] = useState(false)
   const [prdContent, setPrdContent] = useState<{
     description?: string
@@ -97,7 +97,7 @@ export default function PageDescriptionEditor() {
   }
 
   // 恢复默认
-  const handleReset = () => {
+  const _handleReset = () => {
     const pagePrd = getPagePRD(targetPath)
     
     // 清空PRD结构化内容

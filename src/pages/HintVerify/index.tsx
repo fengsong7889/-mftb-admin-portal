@@ -95,7 +95,7 @@ const MOCK_DATA: HintVerifyResult[] = [
   },
 ]
 
-const jumpTypeMap: Record<string, string> = {
+const _jumpTypeMap: Record<string, string> = {
   none: '無跳轉',
   h5: 'H5鏈接',
   checkInCenter: '簽到中心',

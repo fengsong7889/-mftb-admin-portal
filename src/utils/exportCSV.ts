@@ -10,7 +10,7 @@ export interface ExportColumn {
   /** 對應 dataSource 中的 key */
   dataIndex: string | string[]
   /** 自定義渲染函數（可選） */
-  render?: (value: any, record: any) => string
+  render?: (value: unknown, record: unknown) => string
 }
 
 /**
@@ -19,7 +19,7 @@ export interface ExportColumn {
 export function exportToCSV(
   filename: string,
   columns: ExportColumn[],
-  dataSource: any[],
+  dataSource: unknown[],
 ) {
   // 構建表頭
   const headers = columns.map(col => col.title)

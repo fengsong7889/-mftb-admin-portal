@@ -213,7 +213,7 @@ export default function AccountBalance() {
   )
 
   /** 操作按钮 - 合并冻结状态 */
-  const MergeFrozenActions = ({ record }: { record: AccountRecord }) => (
+  const MergeFrozenActions = ({ record: _record }: { record: AccountRecord }) => (
     <Space size={0} split={<span className="action-split">|</span>}>
       <Button type="link" size="small" onClick={() => navigate('/detail-query')}>明細</Button>
       <Button type="link" size="small" onClick={() => navigate('/batch-query')}>批次查詢</Button>

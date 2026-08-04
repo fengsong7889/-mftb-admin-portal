@@ -1,4 +1,4 @@
-import { AppType, RecommendChannel, AlgorithmType, Region, ServiceStatus, OrderStatus, RecallDimension, RankingStage, BidMode, TimeSlot } from './constants'
+import { AppType, RecommendChannel, AlgorithmType, Region, ServiceStatus, RecallDimension, RankingStage, TimeSlot } from './constants'
 
 // ---- 召回层类型 ----
 
@@ -21,7 +21,7 @@ export interface RecallSource {
   name: string
   type: string
   dimension: RecallDimension
-  config: Record<string, any>
+  config: Record<string, unknown>
   strategyCount?: number
   status: ServiceStatus
 }
@@ -47,7 +47,7 @@ export interface RerankRule {
   id: number
   name: string
   type: 'diversity' | 'scatter' | 'business' | 'traffic'
-  config: Record<string, any>
+  config: Record<string, unknown>
   priority: number
   status: ServiceStatus
 }
@@ -58,7 +58,7 @@ export interface AdTypeStrategy {
   id: number
   algorithmType: AlgorithmType
   name: string
-  config: Record<string, any>
+  config: Record<string, unknown>
   app: AppType
   channel: RecommendChannel
   timeSlot: TimeSlot
@@ -87,7 +87,7 @@ export interface ABTest {
   name: string
   description: string
   trafficSplit: { control: number; experiment: number }
-  variables: Record<string, any>
+  variables: Record<string, unknown>
   startDate: string
   endDate: string
   status: 'running' | 'completed' | 'stopped'
@@ -158,7 +158,7 @@ export interface MerchantRule {
   id: number
   name: string
   type: 'newStore' | 'rating' | 'business' | 'region' | 'blacklist' | 'whitelist'
-  config: Record<string, any>
+  config: Record<string, unknown>
   status: ServiceStatus
 }
 
@@ -168,9 +168,9 @@ export interface UserProfile {
   id: number
   userId: string
   tags: {
-    basic: Record<string, any>
-    behavior: Record<string, any>
-    preference: Record<string, any>
+    basic: Record<string, unknown>
+    behavior: Record<string, unknown>
+    preference: Record<string, unknown>
   }
   browseHistory: string[]
   purchasePreference: {

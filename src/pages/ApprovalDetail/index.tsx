@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Tag, Input, Modal, Table, message } from 'antd'
 import {
   ArrowLeftOutlined,
-  CheckOutlined,
-  CloseOutlined,
   UndoOutlined,
   ExclamationCircleOutlined,
   FileImageOutlined,

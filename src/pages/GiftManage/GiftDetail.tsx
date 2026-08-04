@@ -55,7 +55,7 @@ export default function GiftDetail() {
 
   // 勾选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [selectedRows, setSelectedRows] = useState<GiftRecordItem[]>([])
+  const [_selectedRows, setSelectedRows] = useState<GiftRecordItem[]>([])
 
   // 搜索条件（已生效）
   const [groupId, setGroupId] = useState<number | undefined>()
@@ -172,7 +172,7 @@ export default function GiftDetail() {
     navigate(`/gift-add?${params.toString()}`)
   }
 
-  const handleDeduct = (record: GiftRecordItem) => {
+  const _handleDeduct = (record: GiftRecordItem) => {
     setCurrentRecord(record)
     deductForm.resetFields()
     setDeductModalVisible(true)

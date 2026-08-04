@@ -276,6 +276,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 登录日志
+  'login-log': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
   // 员工管理
   'employee-management': [
     { key: 'view', label: '查看' },
@@ -886,6 +891,7 @@ export const menuPermissionTree: PermissionModule[] = [
       { key: 'employee-management', name: '員工管理' },
       { key: 'organization-management', name: '組織管理' },
       { key: 'position-management', name: '職位管理' },
+      { key: 'login-log', name: '員工動態' },
     ],
   },
   {
@@ -955,6 +961,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'employee-management',
   'organization-management',
   'position-management',
+  'login-log',
   // 權限管理
   'role-management',
   'function-permission',
@@ -1038,10 +1045,40 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/employee-management': 'employee-management',
   '/organization-management': 'organization-management',
   '/position-management': 'position-management',
+  '/login-log': 'login-log',
   // 權限管理
   '/role-management': 'role-management',
   '/function-permission': 'function-permission',
   '/data-permission': 'data-permission',
+}
+
+/**
+ * 菜單 key → 路由路徑映射（從 ROUTE_MENU_KEY_MAP 反轉，每個菜單取第一個匹配的路徑）
+ * 用於登錄後智能跳轉：根據用戶權限找到第一個可訪問的菜單路徑
+ */
+export const MENU_KEY_PATH_MAP: Record<string, string> = {}
+for (const [route, menuKey] of Object.entries(ROUTE_MENU_KEY_MAP)) {
+  if (!(menuKey in MENU_KEY_PATH_MAP)) {
+    MENU_KEY_PATH_MAP[menuKey] = route
+  }
+}
+
+/**
+ * 根據用戶權限找到第一個可訪問的菜單路徑
+ * 按 CONTROLLED_MENU_KEYS 順序遍歷，返回第一個有權限的菜單對應的路徑
+ * admin 直接返回首頁；無任何權限時降級返回首頁
+ */
+export function resolveFirstAccessiblePath(
+  isAdmin: boolean,
+  hasMenuPermission: (menuKey: string) => boolean,
+): string {
+  if (isAdmin) return '/'
+  for (const key of CONTROLLED_MENU_KEYS) {
+    if (hasMenuPermission(key)) {
+      return MENU_KEY_PATH_MAP[key] || '/'
+    }
+  }
+  return '/'
 }
 
 /** localStorage Key */

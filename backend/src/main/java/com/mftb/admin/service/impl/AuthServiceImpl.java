@@ -11,12 +11,15 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,6 +30,7 @@ import java.util.Set;
 /**
  * 认证服务实现
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -36,9 +40,10 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final RoleService roleService;
     private final DepartmentService departmentService;
+    private final LoginLogService loginLogService;
 
     @Override
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
         // 查询用户
         SysUser user = sysUserMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername()));
@@ -55,6 +60,27 @@ public class AuthServiceImpl implements AuthService {
         }
         // 生成 Token
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());
+        // 提取客户端 IP（兼容代理）
+        String clientIp = resolveClientIp(httpRequest);
+        // 保存活跃 Token + 初始化最后活跃时间（单设备登录 & 空闲超时检测用）
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getId, user.getId())
+                        .set(SysUser::getActiveToken, token)
+                        .set(SysUser::getActiveLoginIp, clientIp)
+                        .set(SysUser::getLastActiveAt, LocalDateTime.now())
+                        // 清除可能存在的强制下线标记
+                        .set(SysUser::getForceLogoutOperator, null)
+                        .set(SysUser::getForceLogoutEmpId, null)
+                        .set(SysUser::getForceLogoutReason, null));
+        // 记录登录日志
+        try {
+            loginLogService.recordLogin(user.getId(), user.getUsername(), user.getEmpId(),
+                    user.getName(), user.getDepartmentId(), user.getDepartment(), httpRequest);
+        } catch (Exception e) {
+            // 日志记录失败不影响登录流程
+            log.warn("记录登录日志失败: {}", e.getMessage());
+        }
         return new LoginResponse(token, buildUserInfo(user));
     }
 
@@ -98,5 +124,23 @@ public class AuthServiceImpl implements AuthService {
             result.add(dto);
         });
         return result;
+    }
+
+    /**
+     * 提取客户端真实 IP（兼容 Nginx / CDN 等反向代理）
+     */
+    private String resolveClientIp(jakarta.servlet.http.HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // X-Forwarded-For 可能包含多个 IP，取第一个
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

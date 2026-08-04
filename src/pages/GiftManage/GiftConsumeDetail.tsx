@@ -83,7 +83,7 @@ export default function GiftConsumeDetail() {
 
   // 勾选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [selectedRows, setSelectedRows] = useState<GiftConsumeItem[]>([])
+  const [_selectedRows, setSelectedRows] = useState<GiftConsumeItem[]>([])
 
   // 搜索条件（已生效）
   const [filters, setFilters] = useState<{

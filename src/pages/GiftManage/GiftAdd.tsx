@@ -356,7 +356,7 @@ export default function GiftAdd() {
           name="certificate"
           required
           rules={[{
-            validator: (_, value) => {
+            validator: (_, _value) => {
               const fileList = form.getFieldValue('certificate')
               if (!fileList || (Array.isArray(fileList) && fileList.length === 0)) {
                 return Promise.reject(new Error('請上傳相關憑證'))

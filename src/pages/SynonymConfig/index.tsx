@@ -5,8 +5,6 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
-  DeleteOutlined,
-  EditOutlined,
   SwapOutlined,
   ImportOutlined,
   ExportOutlined,

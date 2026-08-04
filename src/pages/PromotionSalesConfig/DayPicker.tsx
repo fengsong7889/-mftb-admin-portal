@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Tag, Button, Space, Divider, message, Table, Empty, Modal, Select, Card, Form, Input, DatePicker } from 'antd'
+import { Tag, Button, Space, message, Table, Empty, Modal, Select, Card, Form } from 'antd'
 import {
   ShoppingCartOutlined,
   CalendarOutlined,
@@ -126,7 +126,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   // 查询条件状态
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
-  const [searchBD, setSearchBD] = useState<string | null>(null)
+  const [_searchBD, setSearchBD] = useState<string | null>(null)
 
   // 冲突弹窗状态
   const [conflictModalVisible, setConflictModalVisible] = useState(false)
@@ -318,7 +318,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     else { setSelectedDates([...selectedDates, dateStr].sort()) }
   }
 
-  const handleClear = () => setSelectedDates([])
+  const _handleClear = () => setSelectedDates([])
 
   // 加入购物车
   const handleAddToCart = () => {
@@ -630,7 +630,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                         setCartItems(prev => prev.map(item => {
                           if (item.key === record.cartKey) {
                             const newDates = item.dates.filter(d => d !== record.date)
-                            if (newDates.length === 0) return null as any
+                            if (newDates.length === 0) return null as unknown
                             return { ...item, dates: newDates, days: newDates.length }
                           }
                           return item

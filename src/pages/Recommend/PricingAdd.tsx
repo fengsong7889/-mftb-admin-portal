@@ -13,7 +13,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
-  APP_OPTIONS, SERVICE_STATUS_OPTIONS,
+  APP_OPTIONS,
 } from './constants'
 
 const CHANNEL_OPTIONS = [
@@ -265,7 +265,7 @@ export default function PricingAdd() {
     {
       title: '廣告推廣',
       dataIndex: 'remainDays',
-      render: (_: any, record: CancelFeeTier) => (
+      render: (_: unknown, record: CancelFeeTier) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span>剩餘天數 ≤</span>
           <InputNumber
@@ -283,7 +283,7 @@ export default function PricingAdd() {
     {
       title: '比例配置',
       dataIndex: 'ratio',
-      render: (_: any, record: CancelFeeTier) => (
+      render: (_: unknown, record: CancelFeeTier) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <InputNumber
             size="small"
@@ -302,7 +302,7 @@ export default function PricingAdd() {
       title: '操作',
       key: 'action',
       width: 160,
-      render: (_: any, record: CancelFeeTier) => (
+      render: (_: unknown, record: CancelFeeTier) => (
         <Space>
           <Button
             type="link"

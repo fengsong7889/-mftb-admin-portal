@@ -79,7 +79,7 @@ export function useColumnConfig(
     config, 
     configComponent, 
     columns: configuredColumns,
-    applyConfig: (tableColumns: any[]) => applyColumnConfig(tableColumns, config) 
+    applyConfig: (tableColumns: unknown[]) => applyColumnConfig(tableColumns, config) 
   }
 }
 

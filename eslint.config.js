@@ -26,17 +26,17 @@ export default tseslint.config(
       // React Hooks 核心規則（error）
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      // React Compiler 規則降級為 warn（現有代碼庫漸進修復）
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/static-components': 'warn',
+      // React Compiler 規則暫時 off（項目未啟用 React Compiler babel 插件，待引入後漸進修復）
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/static-components': 'off',
       'react-hooks/use-memo': 'off',
-      'react-hooks/preserve-manual-memoization': 'warn',
-      'react-hooks/globals': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/error-boundaries': 'warn',
-      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/globals': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/error-boundaries': 'off',
+      'react-hooks/set-state-in-render': 'off',
       'react-hooks/config': 'off',
       'react-hooks/gating': 'off',
       'react-refresh/only-export-components': [

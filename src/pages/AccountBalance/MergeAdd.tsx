@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider } from 'antd'
+import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -7,7 +7,6 @@ import {
   FileImageOutlined,
   FilePdfOutlined,
   AccountBookOutlined,
-  DollarOutlined,
   FileProtectOutlined,
   EditOutlined,
   MergeCellsOutlined,
@@ -86,7 +85,7 @@ export default function MergeAdd() {
   const [sourceGroupId, setSourceGroupId] = useState<string | undefined>(undefined)
   const [targetBrand, setTargetBrand] = useState<string | undefined>(undefined)
   const [targetGroupId, setTargetGroupId] = useState<string | undefined>(undefined)
-  const [certificateFiles, setCertificateFiles] = useState<any[]>([])
+  const [certificateFiles, setCertificateFiles] = useState<UploadFile[]>([])
   const [repayRows, setRepayRows] = useState<RepayStoreRow[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)

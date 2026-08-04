@@ -127,7 +127,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
     }
   }
 
-  const handleAllTimeChange = (e: any) => {
+  const handleAllTimeChange = (e: { target: { value: string } }) => {
     const checked = e.target.checked
     setAllTimeSelected(checked)
     if (checked) {
@@ -148,7 +148,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
     }
   }
 
-  const handleAllRegionChange = (e: any) => {
+  const handleAllRegionChange = (e: { target: { value: string } }) => {
     const checked = e.target.checked
     setAllRegionSelected(checked)
     if (checked) {

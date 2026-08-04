@@ -43,6 +43,11 @@ jwt:
   # Token 前缀
   prefix: "Bearer "
 
+# 会话空闲超时配置
+session:
+  # 空闲超时时间（毫秒），默认 30 分钟无操作自动登出
+  idle-timeout: ${SESSION_IDLE_TIMEOUT:1800000}
+
 logging:
   level:
     com.mftb.admin: ${LOG_LEVEL:debug}

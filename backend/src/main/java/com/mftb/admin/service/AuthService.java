@@ -3,6 +3,7 @@ package com.mftb.admin.service;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.UserInfoVO;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 认证服务
@@ -10,7 +11,7 @@ import com.mftb.admin.dto.UserInfoVO;
 public interface AuthService {
 
     /** 登录 */
-    LoginResponse login(LoginRequest request);
+    LoginResponse login(LoginRequest request, HttpServletRequest httpRequest);
 
     /** 获取当前登录用户信息 */
     UserInfoVO getCurrentUser(String username);

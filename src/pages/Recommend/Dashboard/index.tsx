@@ -3,7 +3,7 @@ import { Card, Col, Row, Statistic, Table, Select, Tag, Space } from 'antd'
 import { RiseOutlined, FundOutlined, EyeOutlined, DollarOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import { Line, Column } from '@ant-design/charts'
 import AppTabs from '../components/AppTabs'
-import { AppType, Region, REGION_OPTIONS } from '../constants'
+import { AppType } from '../constants'
 
 const { Option } = Select
 
@@ -100,7 +100,7 @@ export default function Dashboard() {
     { 
       title: '預算/已消耗', 
       key: 'budget',
-      render: (_: any, record: RunningAd) => (
+      render: (_: unknown, record: RunningAd) => (
         <span>
           <span style={{ color: '#999' }}>MOP {record.budget.toLocaleString()}</span>
           {' / '}
@@ -186,7 +186,7 @@ export default function Dashboard() {
     },
     label: {
       position: 'top',
-      formatter: (v: any) => `MOP ${(v.revenue / 1000).toFixed(0)}k`,
+      formatter: (v: Record<string, number>) => `MOP ${(v.revenue / 1000).toFixed(0)}k`,
     },
     xAxis: {
       label: {
@@ -199,7 +199,7 @@ export default function Dashboard() {
       },
     },
     tooltip: {
-      formatter: (v: any) => ({
+      formatter: (v: Record<string, number>) => ({
         name: '廣告營收',
         value: `MOP ${v.revenue.toLocaleString()}`,
       }),
@@ -214,7 +214,7 @@ export default function Dashboard() {
     color: ['#1677ff', '#722ed1', '#52c41a'],
     label: {
       position: 'top',
-      formatter: (v: any) => `MOP ${(v.revenue / 1000).toFixed(0)}k`,
+      formatter: (v: Record<string, number>) => `MOP ${(v.revenue / 1000).toFixed(0)}k`,
     },
     yAxis: {
       label: {
@@ -222,7 +222,7 @@ export default function Dashboard() {
       },
     },
     tooltip: {
-      formatter: (v: any) => ({
+      formatter: (v: Record<string, number>) => ({
         name: '廣告營收',
         value: `MOP ${v.revenue.toLocaleString()}`,
       }),

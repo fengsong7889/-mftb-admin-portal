@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Form, Input, Select, Button, Upload, message, InputNumber, Tag } from 'antd'
+import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -95,7 +95,7 @@ export default function TransferAdd() {
   const [form] = Form.useForm()
   const [transferAmount, setTransferAmount] = useState<number>(0)
   const [targetGroupId, setTargetGroupId] = useState<string | undefined>(undefined)
-  const [certificateFiles, setCertificateFiles] = useState<any[]>([])
+  const [certificateFiles, setCertificateFiles] = useState<UploadFile[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')

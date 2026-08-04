@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getPagePRD, buildPrdKey, type PagePRD } from './PageDescriptions'
 import { getCustomTips, mergeTips } from '../utils/customTipsStorage'
@@ -312,7 +312,7 @@ const randomFreePos = () => {
 export default function PetMascot() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { hasPermission } = useAuth()
+  const { hasPermission: _hasPermission } = useAuth()
   const [pos, setPos] = useState({ x: window.innerWidth - 110, y: window.innerHeight - 180 })
   const [isDragging, setIsDragging] = useState(false)
   const [showBubble, setShowBubble] = useState(false)
@@ -376,10 +376,10 @@ export default function PetMascot() {
   const customTips = getCustomTips(prdKey)
 
   // 合并默认和自定义提示
-  const currentPrd: PagePRD | null = defaultPrd ? {
+  const currentPrd: PagePRD | null = useMemo(() => defaultPrd ? {
     ...defaultPrd,
     ...mergeTips(defaultPrd, customTips),
-  } : null
+  } : null, [defaultPrd, customTips])
 
   // 路由变化时显示页面提示
   useEffect(() => {
@@ -391,7 +391,7 @@ export default function PetMascot() {
       const timer = setTimeout(() => setShowBubble(false), 5000)
       return () => clearTimeout(timer)
     }
-  }, [prdKey])
+  }, [currentPrd, defaultPrd])
 
   useEffect(() => {
     posRef.current = pos

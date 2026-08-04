@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Form, Input, Button, Card, Space, Divider } from 'antd'
+import { Form, Input, Button, Card, Divider } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import './PRDEditor.css'
 
@@ -13,13 +13,13 @@ interface PRDContent {
 
 interface PRDEditorProps {
   initialContent?: PRDContent
-  defaultPRD?: any
+  defaultPRD?: Record<string, unknown>
   onChange?: (content: PRDContent) => void
 }
 
 export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDEditorProps) {
   const [form] = Form.useForm()
-  const [content, setContent] = useState<PRDContent>(initialContent || {})
+  const [_content, setContent] = useState<PRDContent>(initialContent || {})
 
   useEffect(() => {
     if (initialContent) {
@@ -34,7 +34,7 @@ export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDE
     } else if (defaultPRD) {
       // 从默认PRD中转换features格式（如果默认是字符串数组，转换为对象数组）
       const features = Array.isArray(defaultPRD.features)
-        ? defaultPRD.features.map((f: any) => {
+        ? (defaultPRD.features as unknown[]).map((f: unknown) => {
             if (typeof f === 'string') {
               return { label: f, desc: '' }
             }
@@ -43,7 +43,7 @@ export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDE
         : []
       
       const searchConditions = Array.isArray(defaultPRD.searchConditions)
-        ? defaultPRD.searchConditions.map((s: any) => {
+        ? (defaultPRD.searchConditions as unknown[]).map((s: unknown) => {
             if (typeof s === 'string') {
               return { label: s, desc: '' }
             }
@@ -61,12 +61,12 @@ export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDE
     }
   }, [initialContent, defaultPRD, form])
 
-  const handleFormChange = (_: any, allValues: any) => {
+  const handleFormChange = (_: unknown, allValues: Record<string, any>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const newContent: PRDContent = {
       description: allValues.description,
-      features: allValues.features?.filter((f: any) => f?.label?.trim()) || [],
-      searchConditions: allValues.searchConditions?.filter((s: any) => s?.label?.trim()) || [],
-      fields: allValues.fields?.filter((f: any) => f?.label?.trim()) || [],
+      features: (allValues.features as Array<{ label: string; desc: string }> | undefined)?.filter((f: { label: string; desc: string }) => f?.label?.trim()) || [],
+      searchConditions: (allValues.searchConditions as Array<{ label: string; desc: string }> | undefined)?.filter((s: { label: string; desc: string }) => s?.label?.trim()) || [],
+      fields: (allValues.fields as Array<{ label: string; desc: string }> | undefined)?.filter((f: { label: string; desc: string }) => f?.label?.trim()) || [],
       actions: allValues.actions?.filter((a: string) => a?.trim()) || [],
     }
     setContent(newContent)
@@ -113,7 +113,7 @@ export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDE
                   <div className="field-desc">說明</div>
                   <div className="field-action">操作</div>
                 </div>
-                {fields.map((field, index) => (
+                {fields.map((field, _index) => (
                   <div key={field.key} className="field-row">
                     <Form.Item
                       {...field}
@@ -171,7 +171,7 @@ export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDE
                   <div className="field-desc">說明</div>
                   <div className="field-action">操作</div>
                 </div>
-                {fields.map((field, index) => (
+                {fields.map((field, _index) => (
                   <div key={field.key} className="field-row">
                     <Form.Item
                       {...field}
@@ -228,7 +228,7 @@ export default function PRDEditor({ initialContent, defaultPRD, onChange }: PRDE
                   <div className="field-desc">說明</div>
                   <div className="field-action">操作</div>
                 </div>
-                {fields.map((field, index) => (
+                {fields.map((field, _index) => (
                   <div key={field.key} className="field-row">
                     <Form.Item
                       {...field}

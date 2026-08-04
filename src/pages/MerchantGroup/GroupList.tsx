@@ -6,7 +6,6 @@ import {
   ReloadOutlined,
   PlusOutlined,
   ExportOutlined,
-  DeleteOutlined,
 } from '@ant-design/icons'
 import { exportToCSV } from '../../utils/exportCSV'
 import { useNavigate } from 'react-router-dom'
@@ -49,7 +48,7 @@ export default function GroupList() {
 
   // 勾选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [selectedRows, setSelectedRows] = useState<MerchantGroupItem[]>([])
+  const [_selectedRows, setSelectedRows] = useState<MerchantGroupItem[]>([])
 
   // 编辑弹窗
   const [modalOpen, setModalOpen] = useState(false)

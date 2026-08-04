@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Space, Tag, Tooltip, message, Modal, Input, Select, Popconfirm } from 'antd'
+import { Button, Space, Tag, Tooltip, message, Modal, Input, Popconfirm } from 'antd'
 import {
   ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, ExpandOutlined,
-  SaveOutlined, UndoOutlined, EditOutlined, EyeOutlined, PlusOutlined,
+  SaveOutlined, UndoOutlined, EditOutlined, EyeOutlined,
   DeleteOutlined, DragOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -20,6 +20,7 @@ import {
   Handle,
   type NodeProps,
   type Node,
+  type NodeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -276,8 +277,8 @@ const initialEdges = [
 /* ===== localStorage 键名 ===== */
 const STORAGE_KEY = 'algorithm-flow-node-positions'
 const NODE_DATA_KEY = 'algorithm-flow-node-data'
-const CUSTOM_NODES_KEY = 'algorithm-flow-custom-nodes'
-const CUSTOM_EDGES_KEY = 'algorithm-flow-custom-edges'
+const _CUSTOM_NODES_KEY = 'algorithm-flow-custom-nodes'
+const _CUSTOM_EDGES_KEY = 'algorithm-flow-custom-edges'
 
 /* ===== 节点面板配置 ===== */
 const NODE_PALETTE = [
@@ -338,15 +339,15 @@ function FlowEditor() {
   const [editingNode, setEditingNode] = useState<{ id: string; label: string; desc: string } | null>(null)
 
   // 节点选择变化
-  const handleSelectionChange = useCallback((params: any) => {
+  const handleSelectionChange = useCallback((params: { nodes: Node[] }) => {
     const nodes = params.nodes || []
     setSelectedIds(nodes.map((n: Node) => n.id))
   }, [])
 
   // 节点拖动后标记变更
-  const handleNodesChange = useCallback((changes: any) => {
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
     onNodesChange(changes)
-    const dragChanges = changes.filter((c: any) => c.type === 'position' && c.dragging === false)
+    const dragChanges = changes.filter((c: NodeChange) => c.type === 'position' && c.dragging === false)
     if (dragChanges.length > 0) setHasChanges(true)
   }, [onNodesChange])
 

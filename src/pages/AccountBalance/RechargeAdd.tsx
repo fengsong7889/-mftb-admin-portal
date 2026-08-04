@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider } from 'antd'
+import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -103,8 +103,8 @@ export default function RechargeAdd() {
   const [bankAmount, setBankAmount] = useState<number>(0)
   const [revenueAmount, setRevenueAmount] = useState<number>(0)
   const [deductRows, setDeductRows] = useState<DeductStoreRow[]>([])
-  const [contractFiles, setContractFiles] = useState<any[]>([])
-  const [paymentFiles, setPaymentFiles] = useState<any[]>([])
+  const [contractFiles, setContractFiles] = useState<UploadFile[]>([])
+  const [paymentFiles, setPaymentFiles] = useState<UploadFile[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
@@ -276,7 +276,7 @@ export default function RechargeAdd() {
   }
 
   /** 渲染文件列表 */
-  const renderFileList = (files: any[], setFiles: (f: any[]) => void) => (
+  const renderFileList = (files: UploadFile[], setFiles: (f: UploadFile[]) => void) => (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
       {files.map((file) => (
         <div key={file.uid} style={{

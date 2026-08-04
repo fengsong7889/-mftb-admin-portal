@@ -3,7 +3,7 @@ import { Button, Space, Table, Tag, Card, Tabs, Modal, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, SERVICE_STATUS_OPTIONS, AppType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS, ALGO_CARD_COLOR_MAP } from '../constants'
+import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '../constants'
 import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, withAdFallback, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '../../../hooks/useCardOrder'
@@ -77,7 +77,7 @@ const TYPE_LABEL: Record<AlgorithmType, string> = {
   [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
 } as Record<AlgorithmType, string>
 
-const TYPE_COLOR: Record<AlgorithmType, string> = {
+const _TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: 'gold',
   [AlgorithmType.NEW_STORE_AD]: 'green',
   [AlgorithmType.HOT_REVIVE_AD]: 'volcano',
@@ -93,21 +93,21 @@ const TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.PRODUCT_PROMO]: 'red',
 } as Record<AlgorithmType, string>
 
-const CHANNEL_LABEL: Record<RecommendChannel, string> = {
+const _CHANNEL_LABEL: Record<RecommendChannel, string> = {
   [RecommendChannel.HOME]: '美食外賣',
   [RecommendChannel.DELIVERY]: '美食外賣',
   [RecommendChannel.SUPERMARKET]: '超市百貨',
   [RecommendChannel.GROUP_BUY]: '團購到店',
 }
 
-const PLACEMENT_LABEL: Record<PlacementInterface, string> = {
+const _PLACEMENT_LABEL: Record<PlacementInterface, string> = {
   [PlacementInterface.HOME]: '大首頁-Feed',
   [PlacementInterface.DELIVERY]: '外賣頻道-Feed',
   [PlacementInterface.SUPERMARKET]: '超市頻道-Feed',
   [PlacementInterface.GROUP_BUY]: '團購頻道-Feed',
 }
 
-const TIME_SLOT_LABEL: Record<string, string> = {
+const _TIME_SLOT_LABEL: Record<string, string> = {
   allDay: '全天',
   breakfast: '早餐(06:00-09:00)',
   lunch: '午餐(11:00-14:00)',
@@ -116,6 +116,7 @@ const TIME_SLOT_LABEL: Record<string, string> = {
   nightSnack: '夜宵(20:00-02:00)',
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const mockAlgorithmData: AlgorithmRecord[] = [
   // 無敵星星 - 8条
   { id: 1, name: '無敵星星-美食外賣閃蜂版', code: 'ALG_STAR_001', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
@@ -243,7 +244,7 @@ export default function Algorithm() {
   }, [])
 
   // 统计每种广告类型的算法数量
-  const typeCountMap = useMemo(() => {
+  const _typeCountMap = useMemo(() => {
     const map: Record<number, number> = {}
     dataList.forEach(item => {
       map[item.type] = (map[item.type] || 0) + 1

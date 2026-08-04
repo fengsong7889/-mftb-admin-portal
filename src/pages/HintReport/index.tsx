@@ -1,4 +1,4 @@
-import {useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Button, Input, Select, DatePicker, Table, Form, Card, Row, Col, Statistic } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -6,7 +6,6 @@ import {
   ReloadOutlined,
   ExportOutlined,
   ArrowUpOutlined,
-  ArrowDownOutlined,
 } from '@ant-design/icons'
 import { Line, Column, Pie } from '@ant-design/charts'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -89,7 +88,7 @@ const sourceData = [
 ]
 
 // 品牌对比数据
-const brandData = [
+const _brandData = [
   { brand: 'mFood', showCount: 9850, clickCount: 1342, clickRate: 13.62 },
   { brand: '閃蜂', value: 6520, clickCount: 898, clickRate: 13.77 },
 ]

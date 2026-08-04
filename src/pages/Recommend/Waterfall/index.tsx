@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, DatePicker, Tabs } from 'antd'
-const { RangePicker } = DatePicker
+import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, Tabs, type UploadFile } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import BrandTag from '../../../components/BrandTag'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, LayoutOutlined, ArrowLeftOutlined, AppstoreOutlined, WalletOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, WalletOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   AppType, 
@@ -13,7 +12,6 @@ import {
   Region,
   APP_OPTIONS,
   SERVICE_STATUS_OPTIONS,
-  RECOMMEND_CHANNEL_OPTIONS,
   ALGORITHM_TYPE_OPTIONS,
   REGION_OPTIONS,
   ALGO_CARD_COLOR_MAP,
@@ -286,7 +284,7 @@ export default function Waterfall() {
   const groupBuyCardOrder = useCardOrder('waterfall-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy)
 
   // 各算法类型对应的记录数
-  const typeCountMap = useMemo(() => {
+  const _typeCountMap = useMemo(() => {
     const map: Record<number, number> = {}
     dataList.forEach(item => {
       map[item.algorithmType] = (map[item.algorithmType] || 0) + 1
@@ -344,15 +342,15 @@ export default function Waterfall() {
   
   // 算法选择相关状态
   const [algorithmType, setAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
-  const [algorithmOptions, setAlgorithmOptions] = useState<any[]>([])
+  const [algorithmOptions, setAlgorithmOptions] = useState<UploadFile[]>([])
   const [continuousPurchase, setContinuousPurchase] = useState<string>('notSupport')
-  const [merchantLimit, setMerchantLimit] = useState<'limited' | 'unlimited'>('unlimited')
+  const [merchantLimit, _setMerchantLimit] = useState<'limited' | 'unlimited'>('unlimited')
   const [selectedMerchants, setSelectedMerchants] = useState<number[]>([])
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
-  const [regionLimit, setRegionLimit] = useState<'limited' | 'unlimited'>('unlimited')
+  const [regionLimit, _setRegionLimit] = useState<'limited' | 'unlimited'>('unlimited')
   
   // 搜索处理
-  const handleSearch = (values: any) => {
+  const handleSearch = (values: Record<string, unknown>) => {
     // 基礎範圍：當前選中的廣告類型 + 當前業務類型（tab）允許的業務頻道
     const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
     let result = dataList.filter(item =>

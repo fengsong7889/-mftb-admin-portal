@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, Fragment } from 'react'
-import { Button, Form, Input, InputNumber, Select, Space, Card, message, Divider, Tag, DatePicker, Switch, Radio, Modal, Checkbox, Table, Tree, Upload } from 'antd'
+import { useState, useEffect, useMemo } from 'react'
+import { Button, Form, InputNumber, Select, Space, message, Divider, Tag, DatePicker, Switch, Modal, Checkbox, Table, Tree, Upload } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
 import {
   ArrowLeftOutlined,
@@ -23,11 +23,9 @@ import {
   RecommendChannel, 
   AlgorithmType,
   Region,
-  TimeSlot,
   ServiceStatus,
   APP_OPTIONS,
   REGION_OPTIONS,
-  SERVICE_STATUS_OPTIONS,
   ALGORITHM_TYPE_OPTIONS,
 } from '../constants'
 import dayjs from 'dayjs'
@@ -74,7 +72,7 @@ const ALGORITHM_OPTIONS = [
 ]
 
 // Mock数据 - 从瀑布流策略读取启用的广告位
-const mockEnabledPositions = [1, 5, 8, 9, 12, 15, 18]
+const _mockEnabledPositions = [1, 5, 8, 9, 12, 15, 18]
 
 // Mock数据 - 广告位关联的算法
 const mockPositionAlgorithm = [
@@ -88,7 +86,7 @@ const mockPositionAlgorithm = [
 ]
 
 // Mock数据 - 盤活復蘇广告位关联的算法
-const mockRevivePositionAlgorithm = [
+const _mockRevivePositionAlgorithm = [
   { position: 1, algorithmId: 2001, algorithmName: '盤活復蘇-首頁版' },
   { position: 5, algorithmId: 2002, algorithmName: '盤活復蘇-外賣版' },
   { position: 8, algorithmId: 2003, algorithmName: '盤活復蘇-團購版' },
@@ -99,7 +97,7 @@ const mockRevivePositionAlgorithm = [
 ]
 
 // 业务频道 → 展示页面选项映射
-const CHANNEL_PAGE_OPTIONS: Record<number, { label: string; value: string }[]> = {
+const _CHANNEL_PAGE_OPTIONS: Record<number, { label: string; value: string }[]> = {
   [RecommendChannel.DELIVERY]: [
     { label: '大首頁-Feed', value: 'home' },
     { label: '外賣頻道-Feed', value: 'delivery' },
@@ -263,7 +261,7 @@ function WaterfallAddGeneral() {
   // 区域计价配置
   const [selectedRegions, setSelectedRegions] = useState<Region[]>([])
   const [regionPricingConfigs, setRegionPricingConfigs] = useState<RegionPricingConfig[]>([])
-  const [newRegionSelect, setNewRegionSelect] = useState<Region | undefined>(undefined) // 新增区域选择器
+  const [_newRegionSelect, _setNewRegionSelect] = useState<Region | undefined>(undefined) // 新增区域选择器
   
   // 商圈选择弹窗
   const [regionSelectModalVisible, setRegionSelectModalVisible] = useState(false)
@@ -311,7 +309,7 @@ function WaterfallAddGeneral() {
   }, [])
   
   // 盘活复苏 - 按天定价配置
-  const [dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
+  const [_dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
   
   // 显示广告位的条件（已移除廣告位選擇）
   const canShowPositions = false
@@ -492,7 +490,7 @@ function WaterfallAddGeneral() {
   }, [urlId, urlAlgorithmType, form])
 
   // 自定义美化 Switch
-  const CustomSwitch = ({
+  const _CustomSwitch = ({
     checked,
     onChange,
     leftText,

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { Button, Form, Input, Select, Space, message, Card, Table, Tag, Badge, Switch, Popover, Modal, InputNumber } from 'antd'
+import { Button, Form, Input, Select, Space, message, Card, Table, Tag, Badge, Switch, Popover, Modal } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined } from '@ant-design/icons'
@@ -121,7 +121,7 @@ export default function PromotionSlotConfigAdd() {
   }
 
   // 批量添加范围位置
-  const handleAddRange = () => {
+  const _handleAddRange = () => {
     if (rangeStart === null || rangeEnd === null || rangeStart > rangeEnd) {
       message.warning('請輸入有效的位置範圍')
       return
@@ -326,7 +326,7 @@ export default function PromotionSlotConfigAdd() {
       key: 'action',
       width: 180,
       align: 'center' as const,
-      render: (_: any, record: SlotAlgorithm) => (
+      render: (_: unknown, record: SlotAlgorithm) => (
         <Space size={4}>
           <Button
             type="link"

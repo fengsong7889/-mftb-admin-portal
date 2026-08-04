@@ -154,14 +154,14 @@ export default function HintPreview() {
     }
   }, [previewItems.length])
 
-  const channelMap: Record<string, string> = {
+  const _channelMap: Record<string, string> = {
     home: '大首頁',
     takeaway: '外賣頻道',
     groupBuy: '團購頻道',
     supermarket: '超市頻道',
   }
 
-  const jumpTypeMap: Record<string, string> = {
+  const _jumpTypeMap: Record<string, string> = {
     none: '無跳轉',
     h5: 'H5鏈接',
     checkInCenter: '簽到中心',

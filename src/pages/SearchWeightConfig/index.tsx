@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, Tooltip, message } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import {
@@ -96,8 +96,8 @@ interface InterventionRecord {
 }
 
 const channelMap: Record<string, string> = { home: '大首頁', takeaway: '外賣頻道', groupBuy: '團購頻道', supermarket: '超市頻道' }
-const adjustMethodMap: Record<string, string> = { discount: '分數打折', deduction: '固定扣分', fixedBoost: '固定加分', percentBoost: '分數加成' }
-const adjustMethodColorMap: Record<string, string> = { discount: 'orange', deduction: 'red', fixedBoost: 'green', percentBoost: 'blue' }
+const _adjustMethodMap: Record<string, string> = { discount: '分數打折', deduction: '固定扣分', fixedBoost: '固定加分', percentBoost: '分數加成' }
+const _adjustMethodColorMap: Record<string, string> = { discount: 'orange', deduction: 'red', fixedBoost: 'green', percentBoost: 'blue' }
 
 /** 格式化調整數值顯示 */
 const formatAdjustValue = (method: string, value: number): string => {
@@ -139,7 +139,7 @@ const formatDemoteTiers = (tiers: DemoteTier[]): string => {
 }
 
 /** 根據干預方向篩選調整方式選項 */
-const getMethodOptionsByDirection = (direction: 'boost' | 'demote') => {
+const _getMethodOptionsByDirection = (direction: 'boost' | 'demote') => {
   if (direction === 'boost') {
     return [
       { label: '固定加分', value: 'fixedBoost' },
@@ -436,7 +436,7 @@ export default function SearchWeightConfig() {
   const [dataSource, setDataSource] = useState<InterventionRecord[]>(mockData)
 
   /** 新增加分 */
-  const handleAddBoost = () => {
+  const _handleAddBoost = () => {
     setEditingRecord(null)
     setModalDirection('boost')
     setCurrentAdjustMethod('fixedBoost')
@@ -448,7 +448,7 @@ export default function SearchWeightConfig() {
   }
 
   /** 新增減分 */
-  const handleAddDemote = () => {
+  const _handleAddDemote = () => {
     setEditingRecord(null)
     setModalDirection('demote')
     setCurrentAdjustMethod('discount')
@@ -549,7 +549,7 @@ export default function SearchWeightConfig() {
   }
 
   /** 調整方式變更 */
-  const handleAdjustMethodChange = (value: string) => {
+  const _handleAdjustMethodChange = (value: string) => {
     setCurrentAdjustMethod(value)
     form.setFieldValue('adjustValue', undefined)
   }
@@ -568,7 +568,7 @@ export default function SearchWeightConfig() {
   }
 
   /** 加分梯队 - 更新 */
-  const handleUpdateBoostTier = (index: number, field: keyof BoostTier, value: any) => {
+  const handleUpdateBoostTier = (index: number, field: keyof BoostTier, value: unknown) => {
     const newTiers = [...boostTiers]
     newTiers[index] = { ...newTiers[index], [field]: value }
     setBoostTiers(newTiers)
@@ -588,7 +588,7 @@ export default function SearchWeightConfig() {
   }
 
   /** 减分梯队 - 更新 */
-  const handleUpdateDemoteTier = (index: number, field: keyof DemoteTier, value: any) => {
+  const handleUpdateDemoteTier = (index: number, field: keyof DemoteTier, value: unknown) => {
     const newTiers = [...demoteTiers]
     newTiers[index] = { ...newTiers[index], [field]: value }
     setDemoteTiers(newTiers)
@@ -622,7 +622,7 @@ export default function SearchWeightConfig() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  const adjustValueConfig = getAdjustValueConfig(currentAdjustMethod)
+  const _adjustValueConfig = getAdjustValueConfig(currentAdjustMethod)
 
   const columns: TableColumnsType<InterventionRecord> = [
     {

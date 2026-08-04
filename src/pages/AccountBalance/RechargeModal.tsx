@@ -9,8 +9,8 @@ import {
   Button,
   Upload,
   message,
-  InputNumber,
   Tooltip,
+  type UploadFile,
 } from 'antd'
 import {
   CloseOutlined,
@@ -55,12 +55,12 @@ interface RechargeModalProps {
 
 export default function RechargeModal({ open, onClose, record }: RechargeModalProps) {
   const [form] = Form.useForm()
-  const [groupId, setGroupId] = useState<string>('')
+  const [_groupId, setGroupId] = useState<string>('')
   const [directAmount, setDirectAmount] = useState<string>('')
   const [actualPayMethod, setActualPayMethod] = useState<string>('corporate')
   const [actualAmount, setActualAmount] = useState<string>('')
   const [bankAmount, setBankAmount] = useState<string>('')
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadFile[]>([])
   const [remark, setRemark] = useState('')
 
   /** 弹窗打开时回填数据 */
@@ -106,7 +106,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
   }
 
   /** 模拟文件上传 */
-  const handleUpload = (info: any) => {
+  const handleUpload = (info: { file: { status?: string; name: string }; fileList: UploadFile[] }) => {
     const newFile = {
       uid: info.file?.uid || Date.now().toString(),
       name: info.file?.name || `憑證_${uploadedFiles.length + 1}.png`,

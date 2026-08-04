@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Checkbox, Progress, Alert, message, Input, Select, Modal } from 'antd'
+import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Alert, message, Select, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { SaveOutlined, WarningOutlined, EditOutlined, DeleteOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { SaveOutlined, EditOutlined, DeleteOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 
 /** 頻道類型（業務頻道，大首頁作為混排聚合層不在此列） */
 type DimensionChannelType = 'takeaway' | 'supermarket' | 'groupBuy'
@@ -238,7 +238,7 @@ export default function GlobalConfig() {
     setMixingPriority(prev => ({ ...prev, [field]: value }))
   }
 
-  const updateTimePeriod = (periodKey: TimePeriodKey, field: keyof TimePeriodItem, value: any) => {
+  const updateTimePeriod = (periodKey: TimePeriodKey, field: keyof TimePeriodItem, value: unknown) => {
     setMixingPriority(prev => ({
       ...prev,
       timePeriodList: prev.timePeriodList.map(item =>

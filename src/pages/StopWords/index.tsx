@@ -52,7 +52,7 @@ export default function StopWords() {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: StopWord) => (
+      render: (_: unknown, record: StopWord) => (
         <Space size="small">
           <Button
             type="link"

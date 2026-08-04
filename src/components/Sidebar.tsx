@@ -12,15 +12,12 @@ import {
   SwapOutlined,
   AuditOutlined,
   CheckCircleOutlined,
-  FundOutlined,
   DatabaseOutlined,
   ScissorOutlined,
   FontSizeOutlined,
-  EyeOutlined,
   FireOutlined,
   BarChartOutlined,
   LineChartOutlined,
-  PlusOutlined,
   AimOutlined,
   ReadOutlined,
   HomeOutlined,
@@ -31,32 +28,22 @@ import {
   StopOutlined,
   SafetyCertificateOutlined,
   AppstoreOutlined,
-  OrderedListOutlined,
   PieChartOutlined,
-  BlockOutlined,
   GiftOutlined,
-  TagOutlined,
   DashboardOutlined,
   TeamOutlined,
   ShopOutlined,
-  ToolOutlined,
   MoneyCollectOutlined,
-  SoundOutlined,
   CrownOutlined,
-  CarOutlined,
-  BulbOutlined,
   LockOutlined,
   FileTextOutlined,
-  FileFilled,
-  StarOutlined,
-  ProfileOutlined,
-  BranchesOutlined,
   ShoppingFilled,
   RedEnvelopeOutlined,
   UserOutlined,
   ApartmentOutlined,
   IdcardOutlined,
   SolutionOutlined,
+  ScheduleOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -106,6 +93,7 @@ const keyToPath: Record<string, string> = {
   'employee-management': '/employee-management',
   'organization-management': '/organization-management',
   'position-management': '/position-management',
+  'login-log': '/login-log',
   // 權限管理
   'role-management': '/role-management',
   'function-permission': '/function-permission',
@@ -492,6 +480,11 @@ const menuItems: MenuItem[] = [
         icon: <IdcardOutlined />,
         label: '職位管理',
       },
+      {
+        key: 'login-log',
+        icon: <ScheduleOutlined />,
+        label: '員工動態',
+      },
     ],
   },
   {
@@ -548,7 +541,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const { hasMenuPermission } = useAuth()
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [pwdValue, setPwdValue] = useState('')
-  const [pendingKey, setPendingKey] = useState<string>('')
+  const [_pendingKey, setPendingKey] = useState<string>('')
 
   /** 按當前登錄人權限過濾後的可見菜單 */
   const visibleMenuItems = useMemo(

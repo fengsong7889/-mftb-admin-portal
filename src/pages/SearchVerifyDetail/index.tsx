@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Card, Tabs, Button, Tag, Table, Alert, Divider, Space,
+  Card, Tabs, Button, Table, Alert, Divider,
 } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
@@ -287,7 +287,7 @@ const Thermometer = ({ score, maxScore, dimension, color }: ThermometerProps) =>
     // 延遲啟動動畫
     const timer = setTimeout(() => {
       const startAngle = -60
-      const endAngle = 240
+      const _endAngle = 240
       const totalAngle = 300
       const targetAngle = startAngle + (totalAngle * pct) / 100
       
@@ -327,7 +327,7 @@ const Thermometer = ({ score, maxScore, dimension, color }: ThermometerProps) =>
   
   // 角度計算 (從-60度到240度，共300度)
   const startAngle = -60
-  const endAngle = 240
+  const _endAngle = 240
   const totalAngle = 300
   const currentAngle = animatedAngle
   

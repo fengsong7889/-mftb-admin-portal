@@ -7,7 +7,7 @@ import type { TableColumnsType } from 'antd'
 import {
   PlusOutlined, SearchOutlined, ShopOutlined,
   UserOutlined, GlobalOutlined, DollarOutlined, ReloadOutlined,
-  RocketOutlined, GiftOutlined, ShoppingOutlined, AppstoreOutlined, SettingOutlined,
+  RocketOutlined, GiftOutlined, ShoppingOutlined, AppstoreOutlined,
 } from '@ant-design/icons'
 import { Tabs } from 'antd'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -76,7 +76,7 @@ type ChannelConfig = Record<Biz, BizConfig>
 const bizOptions: { label: string; value: Biz }[] = [
   { label: '外賣', value: 'takeaway' }, { label: '團購', value: 'groupBuy' }, { label: '超市', value: 'supermarket' },
 ]
-const bizMap: Record<Biz, string> = { takeaway: '外賣', supermarket: '超市', groupBuy: '團購' }
+const _bizMap: Record<Biz, string> = { takeaway: '外賣', supermarket: '超市', groupBuy: '團購' }
 const appChannelMap: Record<AppChannelType, string> = { all: '全部', flashBee: '閃蜂', mFood: 'mFood' }
 const appChannelColorMap: Record<AppChannelType, string> = { all: 'blue', flashBee: 'orange', mFood: 'green' }
 const boostMethodMap: Record<BoostMethod, string> = { fixed: '固定加分', weight_multiply: '權重×倍數' }
@@ -397,10 +397,10 @@ export default function DimensionStrategy() {
   }
 
   /* ---- 廣告加分梯队操作 ---- */
-  const handleAddAdBoostTier = () => {
+  const _handleAddAdBoostTier = () => {
     setAdBoostTiers([...adBoostTiers, { boostType: 'amount_match', boostValue: 1 }])
   }
-  const handleRemoveAdBoostTier = (index: number) => {
+  const _handleRemoveAdBoostTier = (index: number) => {
     if (adBoostTiers.length <= 1) return
     const newTiers = [...adBoostTiers]
     newTiers.splice(index, 1)
@@ -448,7 +448,7 @@ export default function DimensionStrategy() {
   }
 
   /* ---- 更新函數 ---- */
-  const updateSF = (key: string, field: keyof StoreFactor, val: unknown) =>
+  const _updateSF = (key: string, field: keyof StoreFactor, val: unknown) =>
     updateBiz(p => ({ ...p, storeFactors: p.storeFactors.map(r => r.key === key ? { ...r, [field]: val } : r) }))
   const updateUF = (key: string, fieldKey: string, val: number | null) =>
     updateBiz(p => ({ ...p, userFactors: p.userFactors.map(r => r.key === key ? { ...r, fields: r.fields.map(f => f.key === fieldKey ? { ...f, value: val ?? 0 } : f) } : r) }))

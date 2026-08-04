@@ -11,11 +11,9 @@ import {
   ReportApp,
   ReportChannel,
   ReportRegion,
-  ReportRecommendType,
   REPORT_APP_LABEL,
   REPORT_CHANNEL_LABEL,
   REPORT_REGION_LABEL,
-  REPORT_RECOMMEND_TYPE_LABEL,
   REPORT_RECOMMEND_TYPE_COLOR,
 } from '../types'
 import { mockRecommendTypeCompare, mockDailyTrends } from '../mockData'
@@ -207,11 +205,11 @@ export default function PromotionReportCompare() {
       },
     },
     label: {
-      content: (data: any) => data.type,
+      content: (data: Record<string, string>) => data.type,
     },
     color: ['#faad14', '#52c41a', '#1890ff', '#722ed1'],
     tooltip: {
-      formatter: (data: any) => ({
+      formatter: (data: Record<string, string>) => ({
         name: data.type,
         value: `CPC: MOP ${data.cpc}<br/>CVR: ${data.cvr}%<br/>消耗: MOP ${data.cost.toLocaleString()}`,
       }),

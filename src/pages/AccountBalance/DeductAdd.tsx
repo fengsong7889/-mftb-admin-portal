@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Popover } from 'antd'
+import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Popover, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -48,7 +48,7 @@ function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; su
 }
 
 /** 扣款方式選項 */
-const deductMethodOptions = [
+const _deductMethodOptions = [
   { label: '消費扣款', value: 'consume' },
   { label: '充值批次扣款', value: 'batch' },
   { label: '賬戶扣款', value: 'account' },
@@ -147,7 +147,7 @@ export default function DeductAdd() {
   /** 充值批次選項：該集團的充值批次 */
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([])
   const [deductAmount, setDeductAmount] = useState<number>(0)
-  const [certificateFiles, setCertificateFiles] = useState<any[]>([])
+  const [certificateFiles, setCertificateFiles] = useState<UploadFile[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')

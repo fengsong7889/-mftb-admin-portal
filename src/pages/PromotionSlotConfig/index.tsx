@@ -48,6 +48,7 @@ const PROMOTION_NAMES = [
 ]
 
 /** Mock数据 - 24条，閃蜂和mFood各12条 */
+// eslint-disable-next-line react-refresh/only-export-components
 export const mockData: WaterfallSlotConfig[] = (() => {
   const businessChannels = ['food', 'supermarket', 'groupBuy']
   const pageLocations: Record<string, string> = {

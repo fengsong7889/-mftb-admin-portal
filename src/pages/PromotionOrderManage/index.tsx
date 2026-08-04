@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
+import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Popover, TreeSelect } from 'antd'
 import BrandTag from '../../components/BrandTag'
 import { fetchAdOrders, withAdFallback, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
 const { RangePicker } = DatePicker
@@ -135,7 +135,7 @@ const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
   [RecommendType.TRAFFIC_AD]: '📊',
 }
 
-const RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
+const _RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
   [RecommendType.INVINCIBLE_STAR]: 'gold',
   [RecommendType.REVITALIZATION_AD]: 'green',
   [RecommendType.NEW_STORE_AD]: 'blue',
@@ -568,8 +568,8 @@ export default function PromotionOrderManage() {
     storeName: '',
     region: undefined as Region | undefined,
     status: undefined as OrderStatus | undefined,
-    orderTimeRange: undefined as [any, any] | undefined,
-    promoTimeRange: undefined as [any, any] | undefined,
+    orderTimeRange: undefined as [string, string] | undefined,
+    promoTimeRange: undefined as [string, string] | undefined,
   })
 
   // 根据 orderType 过滤对应类型的订单
@@ -838,7 +838,7 @@ export default function PromotionOrderManage() {
   }
 
   // 新增订单
-  const handleAdd = () => {
+  const _handleAdd = () => {
     message.info('新增訂單功能開發中')
     // TODO: 实现新增订单逻辑
   }

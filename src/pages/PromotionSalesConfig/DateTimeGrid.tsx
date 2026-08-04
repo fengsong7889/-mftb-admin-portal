@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Radio, Modal, TreeSelect, Input, Form } from 'antd'
+import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Modal, Form } from 'antd'
 import {
   CalendarOutlined,
   ShopOutlined,
@@ -17,7 +17,7 @@ import {
   type InventoryItem,
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
-import { Region, REGION_TREE_DATA, AREA_TO_REGIONS, AREA_PARENT_VALUES, AlgorithmType } from '../Recommend/constants'
+import { Region, AlgorithmType } from '../Recommend/constants'
 
 interface CartItem {
   key: string
@@ -42,7 +42,7 @@ interface RegionCombination {
 }
 
 /** Mock数据 - 组合商圈 */
-const MOCK_REGION_COMBINATIONS: RegionCombination[] = [
+const _MOCK_REGION_COMBINATIONS: RegionCombination[] = [
   {
     id: 1,
     name: '澳門區域組合',
@@ -98,7 +98,7 @@ const ALGORITHM_BRAND_MAP: Record<string, string> = {
 }
 
 /** BD选项 */
-const BD_OPTIONS = [
+const _BD_OPTIONS = [
   { label: '張偉', value: 'bd-001' },
   { label: '李娜', value: 'bd-002' },
   { label: '王強', value: 'bd-003' },
@@ -169,15 +169,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [selectedCells, setSelectedCells] = useState<Array<{date: string; regionKey: Region | string; mealSlotKey: string}>>([])
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedRegion, setSelectedRegion] = useState<Region | string | undefined>(undefined)
-  const [selectedCombination, setSelectedCombination] = useState<number | undefined>(undefined)
-  const [regionMode, setRegionMode] = useState<'single' | 'combination'>('single')
+  const [_selectedRegion, _setSelectedRegion] = useState<Region | string | undefined>(undefined)
+  const [_selectedCombination, _setSelectedCombination] = useState<number | undefined>(undefined)
+  const [_regionMode, _setRegionMode] = useState<'single' | 'combination'>('single')
   const pageSize = 7
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [isSoldOutModalVisible, setIsSoldOutModalVisible] = useState(false)
   const [soldOutDetails, setSoldOutDetails] = useState<Array<{date: string; regionName: string; mealSlot: string}>>([])
-  const [selectedStore, setSelectedStore] = useState<string | undefined>(undefined)
+  const [_selectedStore, _setSelectedStore] = useState<string | undefined>(undefined)
   const [currentTime, setCurrentTime] = useState(Date.now())
 
   // 倒计时：每秒更新当前时间
@@ -204,7 +204,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchDate, setSearchDate] = useState<Dayjs | null>(null)
-  const [searchBD, setSearchBD] = useState<string | null>(null)
+  const [_searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [isConflictModalVisible, setIsConflictModalVisible] = useState(false)
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
@@ -242,7 +242,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   }
 
   // 门店名称变更处理：自动带出BD，并检查购物车冲突
-  const handleStoreChange = (value: string | null) => {
+  const _handleStoreChange = (value: string | null) => {
     if (hasCartItems && value !== searchStoreName) {
       setPendingAction(() => {
         setSearchStoreName(value)
@@ -348,7 +348,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 查看订单
   const handleViewOrder = () => {
     setIsSuccessModalVisible(false)
-    const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === inventoryItem.algorithmType)?.name || ''
+    const _typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === inventoryItem.algorithmType)?.name || ''
     navigate('/promotion-order-manage')
   }
 
@@ -385,7 +385,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const totalPages = Math.ceil(allDates.length / pageSize)
 
   // 单个时段价格（使用固定总时段数48，不随选择变化）
-  const slotPrice = useMemo(() => {
+  const _slotPrice = useMemo(() => {
     // 固定使用48个时段作为基准（去除凌晨0-6点的12个不可售时段，实际36个）
     const totalAvailableSlots = 36
     return calcSlotPrice(inventoryItem.dailyPrice, totalAvailableSlots)
@@ -423,7 +423,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     // 统计各状态的数量
     const availableCount = slotStates.filter(s => s === TimeSlotStatus.AVAILABLE).length
     const soldOutCount = slotStates.filter(s => s === TimeSlotStatus.SOLD_OUT).length
-    const unavailableCount = slotStates.filter(s => s === TimeSlotStatus.UNAVAILABLE).length
+    const _unavailableCount = slotStates.filter(s => s === TimeSlotStatus.UNAVAILABLE).length
     
     // 【修改逻辑】如果有售罄时段且无可用时段，显示为"售罄"
     if (soldOutCount > 0 && availableCount === 0) {

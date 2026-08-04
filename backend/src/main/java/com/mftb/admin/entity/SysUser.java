@@ -68,6 +68,24 @@ public class SysUser {
     /** 状态: 1=启用 0=停用 */
     private Integer status;
 
+    /** 最后活跃时间 (空闲超时检测用) */
+    private LocalDateTime lastActiveAt;
+
+    /** 当前活跃 JWT Token（单设备登录校验） */
+    private String activeToken;
+
+    /** 当前活跃设备登录 IP（被顶下线时展示给旧设备） */
+    private String activeLoginIp;
+
+    /** 强制下线操作人姓名 */
+    private String forceLogoutOperator;
+
+    /** 强制下线操作人工号 */
+    private String forceLogoutEmpId;
+
+    /** 强制下线原因: operator=管理员操作, account_disabled=账号被停用 */
+    private String forceLogoutReason;
+
     /** 最后更新人 */
     private String updatedBy;
 

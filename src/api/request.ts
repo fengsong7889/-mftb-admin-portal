@@ -23,9 +23,32 @@ export const SILENT_HEADER = 'X-Request-Silent'
 const SUCCESS_CODE = 200
 /** 未认证状态码 */
 const UNAUTHORIZED_CODE = 401
+/** 空闲超时状态码（后端检测用户长时间无操作后返回） */
+const SESSION_IDLE_TIMEOUT_CODE = 1004
 
 /** 登录失效全局事件: AuthContext 监听后清除 React 登录态, 触发路由守卫跳回登录页 */
 export const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized'
+
+/** 被顶下线全局事件: 账号在其他设备登录, 携带登录设备信息 */
+export const SESSION_CONFLICT_EVENT = 'auth:session-conflict'
+
+/** 被强制下线全局事件: 管理员操作下线, 携带操作人信息 */
+export const FORCE_LOGOUT_EVENT = 'auth:force-logout'
+
+/** 账号被停用全局事件: 登录时或在线时被停用 */
+export const ACCOUNT_DISABLED_EVENT = 'auth:account-disabled'
+
+/** 被顶下线事件详情 */
+export interface SessionConflictDetail {
+  loginIp: string
+  loginLocation: string
+}
+
+/** 被强制下线事件详情 */
+export interface ForceLogoutDetail {
+  operatorName: string
+  operatorEmpId: string
+}
 
 /** 并发请求同时返回 401 时只处理一次, 登录成功后通过 resetUnauthorizedGuard 重置 */
 let unauthorizedHandled = false
@@ -69,11 +92,36 @@ request.interceptors.response.use(
       return res.data as never
     }
     const silent = response.config?.headers?.[SILENT_HEADER] === '1'
-    // 未认证: 无论是否静默都清除登录态并跳转登录页（静默仅抑制普通错误提示,
-    // 登录失效必须强制登出, 否则启动刷新用户信息失败时用户会留在系统内反复查询失败）
+    // 未认证: 区分「被顶下线」与「普通 Token 过期」
     if (res.code === UNAUTHORIZED_CODE) {
-      handleUnauthorized()
+      const data = res.data as { reason?: string; loginIp?: string; loginLocation?: string; operatorName?: string; operatorEmpId?: string } | null
+      if (data?.reason === 'SESSION_CONFLICT') {
+        // 被顶下线: 发送带设备信息的事件, 由 AuthContext 弹窗展示
+        window.dispatchEvent(
+          new CustomEvent(SESSION_CONFLICT_EVENT, {
+            detail: { loginIp: data.loginIp || '', loginLocation: data.loginLocation || '' } as SessionConflictDetail,
+          })
+        )
+      } else if (data?.reason === 'FORCE_LOGOUT') {
+        // 被管理员强制下线: 发送带操作人信息的事件, 由 AuthContext 弹窗展示
+        window.dispatchEvent(
+          new CustomEvent(FORCE_LOGOUT_EVENT, {
+            detail: { operatorName: data.operatorName || '', operatorEmpId: data.operatorEmpId || '' } as ForceLogoutDetail,
+          })
+        )
+      } else if (data?.reason === 'ACCOUNT_DISABLED') {
+        // 账号被停用: 发送事件, 由 AuthContext 或登录页弹窗展示
+        window.dispatchEvent(new CustomEvent(ACCOUNT_DISABLED_EVENT))
+        handleUnauthorized()
+      } else {
+        handleUnauthorized()
+      }
       return Promise.reject(new Error(res.message || '登录校验已过期，请重新登录'))
+    }
+    // 空闲超时: 后端检测到用户长时间无操作，强制登出并提示
+    if (res.code === SESSION_IDLE_TIMEOUT_CODE) {
+      handleUnauthorized(res.message || '您已长时间未操作，会话已过期')
+      return Promise.reject(new Error(res.message))
     }
     // 其它业务错误: 弹出提示（除非调用方声明静默）
     if (!silent) {
@@ -104,13 +152,13 @@ request.interceptors.response.use(
  * 清除本地登录信息, 提示用户, 并通知 AuthContext 同步清除 React 登录态,
  * 由路由守卫将用户带回登录页。并发 401 只处理一次。
  */
-function handleUnauthorized() {
+function handleUnauthorized(customMessage?: string) {
   if (unauthorizedHandled) return
   unauthorizedHandled = true
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem('is_authenticated')
   localStorage.removeItem('user_info')
-  message.error('登录校验已过期，请重新登录')
+  message.error(customMessage || '登录校验已过期，请重新登录')
   // 通知 AuthContext 清除 React 状态（isAuthenticated），路由守卫自动跳回登录页
   window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
   // 兜底: HashRouter 场景下直接跳转登录页

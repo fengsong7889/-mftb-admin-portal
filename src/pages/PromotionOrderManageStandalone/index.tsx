@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, Card, message, Popover, TreeSelect } from 'antd'
+import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Popover, TreeSelect } from 'antd'
 const { RangePicker } = DatePicker
-import { SearchOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { SearchOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import BrandTag from '../../components/BrandTag'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -137,7 +137,7 @@ const RECOMMEND_TYPE_ICON: Record<RecommendType, string> = {
   [RecommendType.POPULAR_MERCHANT]: '🏆',
 }
 
-const RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
+const _RECOMMEND_TYPE_COLOR: Record<RecommendType, string> = {
   [RecommendType.INVINCIBLE_STAR]: 'gold',
   [RecommendType.REVITALIZATION_AD]: 'green',
   [RecommendType.NEW_STORE_AD]: 'blue',
@@ -327,7 +327,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.MERCHANT,
     operatorId: 'S30011',
     operatorName: '黑沙環旗艦店',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '212',
     orderNo: 'ORD20260723212',
@@ -351,7 +354,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.STAFF,
     operatorId: 'EMP00425',
     operatorName: '張偉强',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '213',
     orderNo: 'ORD20260723213',
@@ -375,7 +381,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.MERCHANT,
     operatorId: 'S30005',
     operatorName: '氹仔美食店',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '214',
     orderNo: 'ORD20260723214',
@@ -402,7 +411,10 @@ const mockOrders: OrderItem[] = [
     cancelTime: '2026-07-19 15:20:00',
     cancelOperatorId: 'EMP00512',
     cancelOperatorName: '陳志明',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '215',
     orderNo: 'ORD20260723215',
@@ -429,7 +441,10 @@ const mockOrders: OrderItem[] = [
     cancelTime: '2026-07-18 10:05:00',
     cancelOperatorId: 'EMP00337',
     cancelOperatorName: '李家俊',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '1',
     orderNo: 'ORD20250705001',
@@ -1260,7 +1275,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.MERCHANT,
     operatorId: 'S30001',
     operatorName: '黑沙環新店',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '202',
     orderNo: 'ORD20250719202',
@@ -1284,7 +1302,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.STAFF,
     operatorId: 'EMP00425',
     operatorName: '張偉强',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '203',
     orderNo: 'ORD20250718203',
@@ -1307,7 +1328,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.MERCHANT,
     operatorId: 'S30003',
     operatorName: '新馬路旗艦店',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '204',
     orderNo: 'ORD20250717204',
@@ -1331,7 +1355,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.STAFF,
     operatorId: 'EMP00178',
     operatorName: '王美玲',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '205',
     orderNo: 'ORD20250716205',
@@ -1355,7 +1382,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.MERCHANT,
     operatorId: 'S30005',
     operatorName: '新馬路總店',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '206',
     orderNo: 'ORD20250715206',
@@ -1379,7 +1409,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.STAFF,
     operatorId: 'EMP0086',
     operatorName: '陳小明',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '207',
     orderNo: 'ORD20250714207',
@@ -1402,7 +1435,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.MERCHANT,
     operatorId: 'S30007',
     operatorName: '港珠澳大橋店',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '208',
     orderNo: 'ORD20250713208',
@@ -1426,7 +1462,10 @@ const mockOrders: OrderItem[] = [
     operatorType: OrderOperatorType.STAFF,
     operatorId: 'EMP00312',
     operatorName: '林志偉',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '209',
     orderNo: 'ORD20250712209',
@@ -1453,7 +1492,10 @@ const mockOrders: OrderItem[] = [
     cancelTime: '2025-07-12 14:30:00',
     cancelOperatorId: 'EMP00512',
     cancelOperatorName: '陳志明',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
   {
     id: '210',
     orderNo: 'ORD20250711210',
@@ -1480,7 +1522,10 @@ const mockOrders: OrderItem[] = [
     cancelTime: '2025-07-11 20:00:00',
     cancelOperatorId: 'EMP00337',
     cancelOperatorName: '李家俊',
-  } as any,
+      originalPrice: 0,
+    discountPrice: 0,
+    actualPrice: 0,
+  },
 ]
 
 export default function PromotionOrderManage() {
@@ -1493,19 +1538,18 @@ export default function PromotionOrderManage() {
 
   // 訂單數據：後端可用時無敵星星以真實數據為準，其他類型保留演示數據
   const [orders, setOrders] = useState<OrderItem[]>(mockOrders)
-  const loadOrders = () => {
-    withAdFallback(() => fetchAdOrders({ page: 1, size: 200 }), () => null)
-      .then(res => {
-        if (!res) return
-        const realRows = res.records.map(toOrderItem)
-        const mockRows = mockOrders.filter(o => o.recommendType !== RecommendType.INVINCIBLE_STAR)
-        setOrders([...realRows, ...mockRows])
-      })
-      .catch(() => {})
-  }
   useEffect(() => {
+    const loadOrders = () => {
+      withAdFallback(() => fetchAdOrders({ page: 1, size: 200 }), () => null)
+        .then(res => {
+          if (!res) return
+          const realRows = res.records.map(toOrderItem)
+          const mockRows = mockOrders.filter(o => o.recommendType !== RecommendType.INVINCIBLE_STAR)
+          setOrders([...realRows, ...mockRows])
+        })
+        .catch(() => {})
+    }
     loadOrders()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [filters, setFilters] = useState({
@@ -1517,9 +1561,9 @@ export default function PromotionOrderManage() {
     algorithmKeyword: '',  // 算法名称/ID搜索关键字
     region: undefined as Region | undefined,
     status: undefined as OrderStatus | undefined,
-    orderTimeRange: undefined as [any, any] | undefined,
-    promoTimeRange: undefined as [any, any] | undefined,
-    refundTimeRange: undefined as [any, any] | undefined,
+    orderTimeRange: undefined as [string, string] | undefined,
+    promoTimeRange: undefined as [string, string] | undefined,
+    refundTimeRange: undefined as [string, string] | undefined,
     operatorKeyword: '',   // 下单人搜索关键字
     refundOperatorKeyword: '', // 退款人搜索关键字
     cancelOperatorKeyword: '', // 取消人搜索关键字
@@ -1820,7 +1864,7 @@ export default function PromotionOrderManage() {
       title: '優惠金額',
       key: 'discount',
       width: 120,
-      render: (_: any, record: OrderItem) => (
+      render: (_: unknown, record: OrderItem) => (
         <span style={{ color: '#fa8c16' }}>
           -${record.originalPrice - record.actualPrice}
         </span>
@@ -1868,7 +1912,7 @@ export default function PromotionOrderManage() {
       title: '退款人',
       key: 'refundOperator',
       width: 160,
-      render: (_: any, record: OrderItem) => {
+      render: (_: unknown, record: OrderItem) => {
         if (!record.refundOperatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
         return (
           <Space direction="vertical" size={0}>
@@ -1891,7 +1935,7 @@ export default function PromotionOrderManage() {
       title: '取消人',
       key: 'cancelOperator',
       width: 160,
-      render: (_: any, record: OrderItem) => {
+      render: (_: unknown, record: OrderItem) => {
         if (!record.cancelOperatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
         return (
           <Space direction="vertical" size={0}>
@@ -1912,7 +1956,7 @@ export default function PromotionOrderManage() {
       title: '下單人',
       key: 'operator',
       width: 160,
-      render: (_: any, record: OrderItem) => {
+      render: (_: unknown, record: OrderItem) => {
         if (!record.operatorType || !record.operatorId) return <span style={{ color: '#bfbfbf' }}>-</span>
         return (
           <Space direction="vertical" size={0}>
@@ -1966,7 +2010,7 @@ export default function PromotionOrderManage() {
   }
 
   // 新增订单
-  const handleAdd = () => {
+  const _handleAdd = () => {
     message.info('新增訂單功能開發中')
     // TODO: 实现新增订单逻辑
   }
