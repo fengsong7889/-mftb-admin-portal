@@ -146,18 +146,6 @@ UPDATE sys_user SET
 WHERE username = 'admin';
 
 -- ============================================================
--- 八、种子数据 - 更多员工
--- ============================================================
-
--- 密码统一为 BCrypt 加密的 "123456" (占位, DataInitializer 会自动重置)
-INSERT INTO sys_user (username, password, name, emp_id, avatar, role, department_id, department, position_id, position, job_level, status, function_roles) VALUES
-('zhangsan', '$2a$10$placeholder', '張三', 'EMP002', 'pikachu-default', 'guest', 2, '技術部', 1, '高級工程師', 'T7', 1, '[2]'),
-('lisi',     '$2a$10$placeholder', '李四', 'EMP003', 'pikachu-default', 'guest', 2, '技術部', 2, '中級工程師', 'T5', 1, '[2]'),
-('wangwu',   '$2a$10$placeholder', '王五', 'EMP004', 'pikachu-default', 'guest', 3, '運營部', 6, '運營專員',   'P3', 1, '[2]'),
-('zhaoliu',  '$2a$10$placeholder', '趙六', 'EMP005', 'pikachu-default', 'guest', 4, '財務部', NULL, NULL,      NULL, 0, '[3]')
-ON DUPLICATE KEY UPDATE name = VALUES(name), emp_id = VALUES(emp_id);
-
--- ============================================================
 -- 完成
 -- ============================================================
 

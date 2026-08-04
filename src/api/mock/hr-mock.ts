@@ -46,11 +46,7 @@ const SEED_POSITIONS: PositionItem[] = [
 ]
 
 const SEED_EMPLOYEES: EmployeeItem[] = [
-  { id: 1, username: 'admin', name: '系統管理員', empId: 'EMP001', role: 'admin', departmentId: 1, department: '集團總部', positionId: 8, position: '總監', sequence: 'M', jobLevel: 'M7', status: 1, functionRoleIds: [1], createdAt: '2025-01-01 00:00:00' },
-  { id: 2, username: 'zhangsan', name: '張三', empId: 'EMP002', role: 'guest', departmentId: 2, department: '技術部', positionId: 1, position: '高級工程師', sequence: 'T', jobLevel: 'T7', status: 1, functionRoleIds: [2], createdAt: '2025-01-15 10:30:00' },
-  { id: 3, username: 'lisi', name: '李四', empId: 'EMP003', role: 'guest', departmentId: 2, department: '技術部', positionId: 2, position: '中級工程師', sequence: 'T', jobLevel: 'T5', status: 1, functionRoleIds: [2], createdAt: '2025-02-01 14:00:00' },
-  { id: 4, username: 'wangwu', name: '王五', empId: 'EMP004', role: 'guest', departmentId: 3, department: '運營部', positionId: 6, position: '運營專員', sequence: 'P', jobLevel: 'P3', status: 1, functionRoleIds: [2], createdAt: '2025-03-10 09:00:00' },
-  { id: 5, username: 'zhaoliu', name: '趙六', empId: 'EMP005', role: 'guest', departmentId: 4, department: '財務部', positionId: null, position: undefined, jobLevel: undefined, status: 0, functionRoleIds: [3], createdAt: '2025-04-01 16:00:00' },
+  { id: 1, username: 'MF00001', name: '系統管理員', empId: 'MF00001', role: 'admin', departmentId: 1, department: '集團總裁辦', positionId: 8, position: '總監', sequence: 'M', jobLevel: 'M7', status: 1, functionRoleIds: [1], createdAt: '2025-01-01 00:00:00' },
 ]
 
 function initMockData() {
