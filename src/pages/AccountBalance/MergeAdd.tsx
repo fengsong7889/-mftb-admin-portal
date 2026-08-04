@@ -17,7 +17,7 @@ import {
   PayCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { fetchFinAccounts, fetchFinDebts, submitMergeApply, withFinanceFallback } from '../../api/finance'
+import { fetchFinAccounts, fetchFinDebts, submitMergeApply } from '../../api/finance'
 import type { FinAccount, MergeApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
@@ -260,16 +260,7 @@ export default function MergeAdd() {
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
-      const flowNo = await withFinanceFallback(
-        () => submitMergeApply(payload),
-        () => mockSubmitApproval({
-          approvalType: 'merge',
-          groupId: sourceGroupId,
-          groupName: sourceAccount?.groupName || '',
-          brand: sourceBrand || 'mFood',
-          extra: { ...payload },
-        }),
-      )
+      const flowNo = await submitMergeApply(payload)
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)

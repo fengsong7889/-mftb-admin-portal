@@ -472,7 +472,7 @@ export default function NewStoreDayPicker() {
 
                 {/* 订单结算：赠送天数抵扣 */}
                 <Card size="small" title="訂單結算">
-                  <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>剩餘贈送天數</span>
                     <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftInfo.remainingDays} 天</span>
                   </div>
@@ -523,7 +523,7 @@ export default function NewStoreDayPicker() {
             </div>
           </div>
         </div>
-        <div style={{ background: '#fafafa', padding: 16, borderRadius: 4 }}>
+        <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>推廣天數合計：</span><span style={{ fontWeight: 600 }}>{selectedDates.length} 天</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>贈送天數抵扣：</span><span style={{ fontWeight: 600 }}>-{selectedDates.length} 天</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>實付金額：</span><span style={{ fontWeight: 700 }}>$0</span></div>

@@ -11,7 +11,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
-import { fetchFinWriteoffReconcile, withFinanceFallback } from '../../api/finance'
+import { fetchFinWriteoffReconcile } from '../../api/finance'
 import type { FinReconcileQuery, FinReconcileResult, FinReconcileSummary } from '../../api/finance'
 
 const { RangePicker } = DatePicker
@@ -288,10 +288,7 @@ export default function WriteoffReconcile() {
     const query = buildQuery()
     setLoading(true)
     try {
-      const res = await withFinanceFallback<FinReconcileResult>(
-        () => fetchFinWriteoffReconcile(query),
-        () => mockFetchReconcile(query),
-      )
+      const res = await fetchFinWriteoffReconcile(query)
       const start = (query.page! - 1) * query.size!
       setData((res.records ?? []).map((r, i) => ({
         ...r,

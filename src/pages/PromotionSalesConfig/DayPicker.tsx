@@ -650,7 +650,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
         {/* 费用结算 */}
         <Card size="small" title="費用結算">
-          <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>推廣金餘額</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
           </div>
@@ -699,7 +699,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             ))}</tbody>
           </table>
         </div>
-        <div style={{ background: '#fafafa', padding: 16, borderRadius: 4 }}>
+        <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>訂單金額（原價）：</span><span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>訂單優惠：</span><span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>實付金額：</span><span style={{ fontWeight: 700 }}>${cartSummary.totalSale}</span></div>

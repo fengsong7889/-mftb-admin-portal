@@ -9,7 +9,7 @@ import {
 import BrandTag from '../../components/BrandTag'
 import { getBatchRecordByKey } from '../../utils/approvalStore'
 import type { BatchStoreRecord } from '../../utils/approvalStore'
-import { fetchFinBatchDetail, fetchFinDetails, withFinanceFallback } from '../../api/finance'
+import { fetchFinBatchDetail, fetchFinDetails } from '../../api/finance'
 import type { FinBatch, FinDetail } from '../../api/finance'
 
 /** 批次類型標題映射（僅充值/轉賬/合併生成批次，扣款不生成批次） */
@@ -185,10 +185,7 @@ export default function BatchDetail() {
     if (!batchNoParam) return
     let cancelled = false
     const load = async () => {
-      const batch = await withFinanceFallback<FinBatch | null>(
-        () => fetchFinBatchDetail(batchNoParam, groupIdParam || undefined),
-        () => null,
-      )
+      const batch = await fetchFinBatchDetail(batchNoParam, groupIdParam || undefined).catch(() => null)
       if (cancelled) return
       if (!batch) {
         setRecord(fallbackRecord())
@@ -196,10 +193,7 @@ export default function BatchDetail() {
         return
       }
       setRecord({ ...batch, key: `${batch.batchNo}-${batch.groupId}` } as BatchStoreRecord)
-      const rows = await withFinanceFallback<{ records: FinDetail[] } | null>(
-        () => fetchFinDetails({ page: 1, size: 200, batchNo: batchNoParam, groupId: groupIdParam || undefined }),
-        () => null,
-      )
+      const rows = await fetchFinDetails({ page: 1, size: 200, batchNo: batchNoParam, groupId: groupIdParam || undefined }).catch(() => null)
       if (!cancelled) setDetails(rows?.records ?? [])
     }
     void load()

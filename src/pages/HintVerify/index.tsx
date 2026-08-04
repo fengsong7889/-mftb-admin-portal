@@ -433,7 +433,7 @@ export default function HintVerify() {
             prefix={<SearchOutlined />} size="large" allowClear style={{ marginBottom: 16 }} />
           <div style={{
             width: '100%', height: 320,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)',
             borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 16, marginBottom: 16,
           }}>

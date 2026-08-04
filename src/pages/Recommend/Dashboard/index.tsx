@@ -363,7 +363,7 @@ export default function Dashboard() {
             {/* 模拟地图展示 */}
             <div style={{ 
               height: 300, 
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)',
               borderRadius: 8,
               display: 'flex',
               alignItems: 'center',

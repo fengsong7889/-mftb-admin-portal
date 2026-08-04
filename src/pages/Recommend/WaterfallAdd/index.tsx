@@ -30,7 +30,7 @@ import {
 } from '../constants'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
-import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, withAdFallback, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest } from '../../../api/adPromotion'
+import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest } from '../../../api/adPromotion'
 import { fetchStores } from '../../../api/store'
 
 /** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
@@ -334,78 +334,25 @@ function WaterfallAddGeneral() {
 
   /** 加载启用中的算法库，作为算法下拉选项 */
   useEffect(() => {
-    void withAdFallback(
-      async () => {
-        const res = await fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED })
+    fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED })
+      .then(res => {
         const opts = (res.records ?? []).map(a => ({
           id: a.id ?? 0,
           name: a.algoName,
           app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
         }))
         if (opts.length > 0) setAlgorithmSelectOptions(opts)
-      },
-      () => { /* 后端不可用：保留演示选项 */ },
-    ).catch(() => { /* 静默请求：错误不阻断页面 */ })
+      })
+      .catch(() => { /* 静默请求：错误不阻断页面 */ })
   }, [])
 
-  // 编辑/详情模式下加载数据（无敌星星接入后端计价详情，后端不可用时降级演示数据）
+  // 编辑/详情模式下加载数据
   useEffect(() => {
     if (!urlId) return
     const isStar = (urlAlgorithmType ?? AlgorithmType.INVINCIBLE_STAR) === AlgorithmType.INVINCIBLE_STAR
-
-    /** 演示数据回填（原有 mock 逻辑） */
-    const loadMock = () => {
-      const mockRecord = {
-        id: Number(urlId),
-        algorithmId: 1,
-        app: AppType.SHANFENG,
-        channel: RecommendChannel.DELIVERY,
-        algorithmType: urlAlgorithmType || AlgorithmType.INVINCIBLE_STAR,
-        presaleDays: 7,
-        merchantLimit: false,
-        dailyPrice: urlAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? 100 : undefined,
-      }
-      form.setFieldsValue({
-        algorithmId: mockRecord.algorithmId,
-        app: mockRecord.app,
-        channel: mockRecord.channel,
-      })
-      setSelectedApp(mockRecord.app)
-      setSelectedChannel(mockRecord.channel)
-      if (mockRecord.algorithmType) {
-        setSelectedAlgorithmType(mockRecord.algorithmType)
-      }
-      setPresaleDays(mockRecord.presaleDays)
-      setMerchantLimit(mockRecord.merchantLimit)
-      if (mockRecord.dailyPrice) {
-        setDailyPrice(mockRecord.dailyPrice)
-      }
-      // 填充一条商圈计价配置 mock 数据
-      const isRevive = mockRecord.algorithmType === AlgorithmType.HOT_REVIVE_AD
-      const mockRegionConfig: RegionPricingConfig = {
-        region: Region.KOKSAA,
-        regionLabel: '黑沙環區',
-        pricing: isRevive
-          ? { fullDay: 100 }
-          : { fullDay: 120, breakfast: 80, lunch: 150, afternoon: 90, dinner: 180, night: 60 },
-        discountEnabled: true,
-        discounts: isRevive
-          ? {}
-          : { breakfast: 8, lunch: 9, dinner: 8 },
-        limitedTimeDiscount: false,
-        discountDateRange: undefined,
-        dailySalesLimit: 2,
-      }
-      setSelectedRegions([Region.KOKSAA])
-      setRegionPricingConfigs([mockRegionConfig])
-    }
-
-    if (!isStar) {
-      loadMock()
-      return
-    }
-    void withAdFallback(
-      async () => {
+    if (!isStar) return
+    ;(async () => {
+      try {
         const detail = await fetchAdPricingDetail(Number(urlId))
         const app = (brandToAppType(detail.brand) ?? AppType.SHANFENG) as AppType
         form.setFieldsValue({
@@ -484,9 +431,8 @@ function WaterfallAddGeneral() {
         })
         setSelectedRegions(finalConfigs.map(c => c.region))
         setRegionPricingConfigs(finalConfigs)
-      },
-      loadMock,
-    ).catch(() => { /* 静默请求：错误不阻断页面 */ })
+      } catch { /* 静默请求 */ }
+    })()
   }, [urlId, urlAlgorithmType, form])
 
   // 自定义美化 Switch
@@ -791,12 +737,11 @@ function WaterfallAddGeneral() {
             return { region: c.region, dailyPrice: c.pricing.fullDay ?? sum }
           }),
         }
-        await withAdFallback(
-          () => isEditMode
-            ? updateAdPricing(Number(urlId), payload)
-            : createAdPricing(payload),
-          () => Promise.resolve({ algoId, presaleDays } as unknown as AdPricingStar),
-        )
+        if (isEditMode) {
+          await updateAdPricing(Number(urlId), payload)
+        } else {
+          await createAdPricing(payload)
+        }
         message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
         navigate(`/promotion-waterfall?type=${AlgorithmType.INVINCIBLE_STAR}`)
         return
@@ -2007,11 +1952,11 @@ function WaterfallAddGeneral() {
             <h4 style={{ marginBottom: 12 }}>權重配置</h4>
             <div style={{ background: '#fafafa', padding: 16, borderRadius: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                <div style={{ padding: 12, background: '#fff', borderRadius: 4 }}>
+                <div style={{ padding: 12, background: '#fff', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>銷量權重</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#1890ff' }}>0.35</div>
                 </div>
-                <div style={{ padding: 12, background: '#fff', borderRadius: 4 }}>
+                <div style={{ padding: 12, background: '#fff', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>評分權重</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#52c41a' }}>0.25</div>
                 </div>

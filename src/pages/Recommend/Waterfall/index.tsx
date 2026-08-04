@@ -19,7 +19,7 @@ import {
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
 import { mockAlgorithmData, type AlgorithmRecord } from '../Algorithm'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, withAdFallback, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
 
@@ -128,123 +128,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.PRODUCT_PROMO]: 'red',
 }
 
-// Mock数据 - 瀑布流坑位配置（每個業務類型 Tab 下，無敵星星/盤活復蘇/人氣商家各 15 条）
-const generateMockData = (): WaterfallSlotConfig[] => {
-  const data: WaterfallSlotConfig[] = []
-  const apps = [AppType.SHANFENG, AppType.MFOOD]
-  const algorithms = [
-    { id: 1, name: '無敵星星-首頁版', type: AlgorithmType.INVINCIBLE_STAR },
-    { id: 2, name: '新店廣告-外賣版', type: AlgorithmType.NEW_STORE_AD },
-    { id: 3, name: '盤活復蘇-團購版', type: AlgorithmType.HOT_REVIVE_AD },
-    { id: 4, name: '獨家商家-超市版', type: AlgorithmType.EXCLUSIVE_MERCHANT },
-    { id: 5, name: '流量廣告-全渠道', type: AlgorithmType.TRAFFIC_AD },
-    { id: 6, name: '猜你喜歡-主力版', type: AlgorithmType.GUESS_YOU_LIKE },
-    { id: 7, name: '自然流量-默認', type: AlgorithmType.ORGANIC_TRAFFIC },
-    { id: 8, name: '搜索算法-綜合版', type: AlgorithmType.SEARCH_ALGORITHM },
-    { id: 9, name: '人氣商家-首頁版', type: AlgorithmType.POPULAR_MERCHANT_KA },
-  ]
-  const users = ['admin', 'operator', 'user001', 'user002']
-
-  // 推广名称虚拟数据
-  const promotionNames = [
-    '无敌星星国庆推广',
-    '新店广告中秋特惠',
-    '盘活广告双十一狂欢',
-    '独家商家周年庆',
-    '流量广告圣诞特卖',
-    '猜你喜欢新年推荐',
-    '自然流量春季大促',
-    '搜索算法开学季',
-    '无敌星星情人节专场',
-    '新店广告夏季清凉',
-    '盘活广告秋季美食',
-    '独家商家冬季暖锅',
-    '流量广告周末特惠',
-    '猜你喜欢月末冲刺',
-    '自然流量节日庆典',
-    '搜索算法品牌周',
-  ]
-
-  let id = 1
-  
-  // 使用固定种子生成可预期的数据（避免每次刷新数据不同）
-  const pseudoRandom = (seed: number) => {
-    const x = Math.sin(seed) * 10000
-    return x - Math.floor(x)
-  }
-  
-  // 按「算法類型 × 業務類型 Tab」定向生成，保證每個 Tab 下各類型默認恰好 15 條（不被 Tab 的 bizChannel 過濾拆散）
-  const typeConfigs = [
-    { type: AlgorithmType.INVINCIBLE_STAR, algorithm: algorithms[0], count: 15, bizType: 'delivery' },
-    { type: AlgorithmType.HOT_REVIVE_AD, algorithm: algorithms[2], count: 15, bizType: 'delivery' },
-    { type: AlgorithmType.POPULAR_MERCHANT_KA, algorithm: algorithms[8], count: 15, bizType: 'delivery' },
-    { type: AlgorithmType.INVINCIBLE_STAR, algorithm: algorithms[0], count: 15, bizType: 'groupBuy' },
-    { type: AlgorithmType.HOT_REVIVE_AD, algorithm: algorithms[2], count: 15, bizType: 'groupBuy' },
-  ]
-  let globalIndex = 0
-  for (const cfg of typeConfigs) {
-    for (let j = 0; j < cfg.count; j++) {
-      const i = globalIndex
-      const seed = i * 100
-      const date = new Date()
-      date.setDate(date.getDate() - Math.floor(i / 2))
-      const dateStr = date.toISOString().split('T')[0]
-      
-      const app = apps[Math.floor(pseudoRandom(seed + 1) * apps.length)]
-      // 展示頁面與業務頻道按所屬業務類型 Tab 定向分配，確保不跨 Tab 流失
-      const channel = cfg.bizType === 'groupBuy'
-        ? (pseudoRandom(seed + 2) > 0.5 ? RecommendChannel.HOME : RecommendChannel.GROUP_BUY)
-        : [RecommendChannel.HOME, RecommendChannel.DELIVERY, RecommendChannel.SUPERMARKET][Math.floor(pseudoRandom(seed + 2) * 3)]
-      const bizChannel = cfg.bizType === 'groupBuy'
-        ? 'groupBuy'
-        : (channel === RecommendChannel.HOME
-          ? ['food', 'supermarket'][Math.floor(pseudoRandom(seed + 30) * 2)]
-          : CHANNEL_TO_BIZ[channel])
-      const slotPosition = 1 + Math.floor(pseudoRandom(seed + 3) * 10)
-      const algorithm = cfg.algorithm
-      const status = j < 10 ? ServiceStatus.ENABLED : ServiceStatus.DISABLED
-      const user = users[Math.floor(pseudoRandom(seed + 6) * users.length)]
-      const promotionName = promotionNames[i % promotionNames.length]
-      
-      const hour = 8 + Math.floor(pseudoRandom(seed + 7) * 12)
-      const minute = Math.floor(pseudoRandom(seed + 8) * 60)
-      
-      data.push({
-        id: id++,
-        adId: `AD${String(id).padStart(6, '0')}`,
-        promotionName,
-        app,
-        channel,
-        bizChannel,
-        slotPosition,
-        region: [Region.KOKSAA, Region.COSTA, Region.SANMA, Region.FAHUA, Region.AIRPORT][Math.floor(pseudoRandom(seed + 8) * 5)],
-        algorithmId: algorithm.id,
-        algorithmName: algorithm.name,
-        algorithmType: algorithm.type,
-        salesStartDate: `2024-01-${String(1 + Math.floor(pseudoRandom(seed + 10) * 15)).padStart(2, '0')}`,
-        salesEndDate: `2024-01-${String(16 + Math.floor(pseudoRandom(seed + 11) * 15)).padStart(2, '0')}`,
-        purchaseLimit: pseudoRandom(seed + 12) > 0.5 ? { days: 7, quantity: 3 + Math.floor(pseudoRandom(seed + 13) * 5) } : undefined,
-        purchaseInterval: pseudoRandom(seed + 14) > 0.5 ? 1 + Math.floor(pseudoRandom(seed + 15) * 5) : undefined,
-        merchantLimit: pseudoRandom(seed + 16) > 0.5 ? 'limited' : 'unlimited',
-        merchantIds: pseudoRandom(seed + 17) > 0.5 ? [100 + Math.floor(pseudoRandom(seed + 18) * 50), 100 + Math.floor(pseudoRandom(seed + 19) * 50)] : undefined,
-        regionLimit: pseudoRandom(seed + 20) > 0.5 ? 'limited' : 'unlimited',
-        regionIds: pseudoRandom(seed + 21) > 0.5 ? [1, 2, 3].slice(0, 1 + Math.floor(pseudoRandom(seed + 22) * 3)) : undefined,
-        status,
-        updatedBy: user,
-        updatedAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
-        createdAt: `${dateStr} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
-      })
-      globalIndex++
-    }
-  }
-
-  // 按更新时间倒序排列（最新的在前面）
-  return data.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-}
-
-const mockData: WaterfallSlotConfig[] = generateMockData()
-
-/** 後端計價配置 → 定價列表行（id 取負數以避免與 mock 衝突，真實配置ID = -id） */
+/** 後端計價配置 → 定價列表行 */
 const toPricingRow = (vo: AdPricingStar): WaterfallSlotConfig => ({
   id: -(vo.id ?? 0),
   adId: `PR${String(vo.id ?? 0).padStart(6, '0')}`,
@@ -272,8 +156,8 @@ export default function Waterfall() {
   const [searchForm] = Form.useForm()
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(urlType) // null = 卡片选择页
   const [bizTypeTab, setBizTypeTab] = useState<string>('delivery') // 外賣到家 / 團購到店
-  const [dataList, setDataList] = useState<WaterfallSlotConfig[]>(mockData)
-  const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>(mockData)
+  const [dataList, setDataList] = useState<WaterfallSlotConfig[]>([])
+  const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>([])
   const [modalVisible, setModalVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [editingRecord, setEditingRecord] = useState<WaterfallSlotConfig | null>(null)
@@ -293,27 +177,22 @@ export default function Waterfall() {
     return map
   }, [dataList])
 
-  /** 加載定價列表（無敵星星接入後端真實數據，後端不可用時降級到本地演示數據） */
+  /** 加載定價列表 */
   useEffect(() => {
     let mounted = true
-    void withAdFallback(
-      async () => {
-        const res = await fetchAdPricingList({ page: 1, size: 200 })
-        const realRows = (res.records ?? []).map(toPricingRow)
-        // 後端可用時，無敵星星定價以真實數據為準，其他類型暫保留演示數據
-        return [...realRows, ...mockData.filter(m => m.algorithmType !== AlgorithmType.INVINCIBLE_STAR)]
-      },
-      () => mockData,
-    ).then(list => {
-      if (!mounted) return
-      setDataList(list)
-      if (urlType != null) {
-        const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
-        setFilteredData(list.filter(item => item.algorithmType === urlType && allowed.includes(item.bizChannel ?? '')))
-      } else {
-        setFilteredData(list)
-      }
-    })
+    fetchAdPricingList({ page: 1, size: 200 })
+      .then(res => {
+        if (!mounted) return
+        const list = (res.records ?? []).map(toPricingRow)
+        setDataList(list)
+        if (urlType != null) {
+          const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
+          setFilteredData(list.filter(item => item.algorithmType === urlType && allowed.includes(item.bizChannel ?? '')))
+        } else {
+          setFilteredData(list)
+        }
+      })
+      .catch(() => {})
     return () => { mounted = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

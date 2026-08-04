@@ -24,7 +24,6 @@ import {
   placeAdStarOrder,
   lockAdCells,
   unlockAdCells,
-  withAdFallback,
   type AdInventoryCell,
   type AdInventoryVO,
 } from '../../api/adPromotion'
@@ -281,10 +280,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 规则6：选择门店后过滤掉对该商家屏蔽的算法（无法选择）
   useEffect(() => {
     if (inventoryItem.algorithmType !== AlgorithmType.INVINCIBLE_STAR) return
-    withAdFallback(
-      () => fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, status: 1, storeCode: searchStoreName || undefined }),
-      () => null,
-    ).then(res => {
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, status: 1, storeCode: searchStoreName || undefined })
+    .then(res => {
       if (!res) return
       const meta: Record<string, { apiId: number }> = {}
       const brandOverrides: Record<string, string> = {}
@@ -400,7 +397,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const loadMerchantBalance = (groupCode?: string, uiBrand?: string | null) => {
     const backendBrand = uiBrand ? UI_TO_BACKEND_BRAND[uiBrand] : undefined
     if (!groupCode || !backendBrand) return
-    withAdFallback(() => fetchFinAccounts({ groupId: groupCode, brand: backendBrand }), () => null)
+    fetchFinAccounts({ groupId: groupCode, brand: backendBrand })
       .then(res => {
         if (res && res.records.length > 0) setMerchantBalance(res.records[0].virtualBalance)
       })
@@ -411,7 +408,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const applyAlgorithmMeta = (value: string | null) => {
     const apiId = value ? algorithmMetaMap[value]?.apiId : undefined
     if (apiId) {
-      withAdFallback(() => fetchAdPricingActive(apiId), () => null)
+      fetchAdPricingActive(apiId)
         .then(p => {
           if (!p) return
           setCurrentAlgorithmRefundEnabled(p.refundEnabled === 1)
@@ -505,10 +502,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     if (apiId) {
       try {
         const store = storeMap[searchStoreName]
-        const inv = await withAdFallback(
-          () => fetchAdInventory(apiId, store?.storeCode, store?.groupCode),
-          () => null,
-        )
+        const inv = await fetchAdInventory(apiId, store?.storeCode, store?.groupCode).catch(() => null)
         if (inv) {
           setInventoryData(inv)
           const tiers = parseDiscountTiers(inv.discountTiers)
@@ -1504,7 +1498,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           <div style={{ 
             padding: '12px 16px', 
             marginBottom: 12, 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)',
             borderRadius: 6,
             display: 'flex',
             justifyContent: 'space-between',
@@ -1623,7 +1617,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           </table>
         </div>
 
-        <div style={{ background: '#fafafa', padding: 16, borderRadius: 4 }}>
+        <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ color: '#595959' }}>訂單金額（原價）：</span>
             <span style={{ fontWeight: 600 }}>${cartItems.reduce((sum, item) => sum + item.originalPrice, 0)}</span>

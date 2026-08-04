@@ -11,7 +11,6 @@ import {
   fetchAdOrderDetail,
   fetchAdPricingActive,
   refundAdOrder,
-  withAdFallback,
   brandToAppType,
   type AdOrderDetail,
 } from '../../api/adPromotion'
@@ -700,7 +699,7 @@ export default function OrderDetail() {
       discountTiers: { minSlots: number; discount: number }[]
     } | undefined
     try {
-      const p = await withAdFallback(() => fetchAdPricingActive(detail.algoId), () => null)
+      const p = await fetchAdPricingActive(detail.algoId).catch(() => null)
       if (p) {
         pricing = {
           cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers),

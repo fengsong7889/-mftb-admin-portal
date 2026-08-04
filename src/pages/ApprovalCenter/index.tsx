@@ -14,7 +14,7 @@ import BrandTag from '../../components/BrandTag'
 import { useAuth } from '../../contexts/AuthContext'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { getApprovalRecords, updateApprovalRecord } from '../../utils/approvalStore'
-import { fetchFinApprovals, cancelFinApproval, withFinanceFallback } from '../../api/finance'
+import { fetchFinApprovals, cancelFinApproval } from '../../api/finance'
 import type { FinApprovalQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
@@ -84,23 +84,6 @@ interface ApprovalRecord {
   rejectReason: string
 }
 
-const mockData: ApprovalRecord[] = [
-  { key: '13', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'TG202607170000', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 10:00:00', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '14', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'TG202607170001', approvalType: 'gift', applicant: '朱棣(002)', applyTime: '2026-07-17 11:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-07-17 12:20:00', bizApproveStatus: 'approved', opsApprover: '劉邦(000)', opsApproveTime: '2026-07-17 14:30:00', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '1', groupId: '1001', groupName: '廣州酒家', brand: 'flashBee', flowNo: 'CZ202601160000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '2', groupId: '1002', groupName: '1mFood', brand: 'mFood', flowNo: 'KK202601160000', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '混合支付營業額佔比太高' },
-  { key: '3', groupId: '1003', groupName: '海底撈', brand: 'flashBee', flowNo: 'ZZ202601160000', approvalType: 'transfer', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'rejected', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '營收不足以抵扣該營業額支付' },
-  { key: '4', groupId: '1004', groupName: '麥當勞', brand: 'mFood', flowNo: 'HB202601160000', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '5', groupId: '1005', groupName: '星巴克', brand: 'flashBee', flowNo: 'CZ202601160001', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '6', groupId: '1006', groupName: '肯德基', brand: 'mFood', flowNo: 'KK202601160001', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '7', groupId: '1007', groupName: '必勝客', brand: 'flashBee', flowNo: 'ZZ202601160001', approvalType: 'transfer', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'approved', rejectReason: '' },
-  { key: '8', groupId: '1008', groupName: '漢堡王', brand: 'mFood', flowNo: 'CZ202601160002', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '9', groupId: '1009', groupName: '必勝客旗艦店', brand: 'flashBee', flowNo: 'HB202601160001', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '朱棟(004)', finApproveTime: '2026-01-16 14:30:22', finApproveStatus: 'approved', flowStatus: 'cancelled', rejectReason: '' },
-  { key: '10', groupId: '1010', groupName: '喜茶', brand: 'mFood', flowNo: 'KK202601160002', approvalType: 'deduct', applicant: '朱棣(002)', applyTime: '2026-01-16 09:16:21', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-16 09:16:21', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-16 10:20:15', opsApproveStatus: 'approved', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '11', groupId: '1011', groupName: '奈雪的茶', brand: 'flashBee', flowNo: 'CZ202601170000', approvalType: 'recharge', applicant: '朱棣(002)', applyTime: '2026-01-17 10:20:00', bizApprover: '朱元璋(001)', bizApproveTime: '--', bizApproveStatus: 'pending', opsApprover: '--', opsApproveTime: '--', opsApproveStatus: 'pending', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'pending', rejectReason: '' },
-  { key: '12', groupId: '1012', groupName: '真功夫', brand: 'mFood', flowNo: 'HB202601180000', approvalType: 'merge', applicant: '朱棣(002)', applyTime: '2026-01-18 08:30:00', bizApprover: '朱元璋(001)', bizApproveTime: '2026-01-18 09:45:00', bizApproveStatus: 'approved', opsApprover: '朱標(003)', opsApproveTime: '2026-01-18 11:20:00', opsApproveStatus: 'rejected', finApprover: '--', finApproveTime: '--', finApproveStatus: 'pending', flowStatus: 'rejected', rejectReason: '品牌合併不符合規範' },
-]
-
 /** 搜索區篩選條件 */
 interface ApprovalFilters {
   groupId?: string
@@ -145,15 +128,6 @@ function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boole
   if (query.applyFrom && r.applyTime.slice(0, 10) < query.applyFrom) return false
   if (query.applyTo && r.applyTime.slice(0, 10) > query.applyTo) return false
   return true
-}
-
-/** 後端不可用時的降級查詢：localStorage 記錄 + 演示數據本地篩選分頁 */
-function mockFetchApprovals(query: FinApprovalQuery) {
-  const all = [...(getApprovalRecords() as ApprovalRecord[]), ...mockData]
-  const filtered = all.filter(r => matchesApprovalQuery(r, query))
-  const page = query.page || 1
-  const size = query.size || 10
-  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
 }
 
 /** 推廣贈送（TG）審批暫為前端流程：後端查詢結果需合併本地贈送審批記錄 */
@@ -213,17 +187,13 @@ export default function ApprovalCenter() {
     applyTo: filters.applyTime?.[1]?.format('YYYY-MM-DD'),
   }), [filters, pagination])
 
-  /** 加載審批列表（後端不可用時降級到本地記錄；贈送 TG 流程為前端記錄，按流程編號去重後合併展示） */
+  /** 加載審批列表（贈送 TG 流程為前端記錄，按流程編號去重後合併展示） */
   const loadApprovals = useCallback(async () => {
     const query = buildQuery()
     setLoading(true)
     try {
-      const res = await withFinanceFallback(
-        () => fetchFinApprovals(query),
-        () => mockFetchApprovals(query),
-      )
+      const res = await fetchFinApprovals(query)
       const records = (res.records ?? []) as ApprovalRecord[]
-      // 後端查詢不含本地 TG 贈送流程，需補充合併；降級查詢已包含，去重後不重複追加
       const extraGifts = localGiftApprovals(query)
         .filter(g => !records.some(r => r.flowNo === g.flowNo))
       setData([...extraGifts, ...records])
@@ -292,10 +262,7 @@ export default function ApprovalCenter() {
         if (record.approvalType === 'gift') {
           updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' })
         } else {
-          await withFinanceFallback(
-            () => cancelFinApproval(record.flowNo),
-            () => updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' }),
-          )
+          await cancelFinApproval(record.flowNo)
         }
         message.success('撤銷成功')
         await loadApprovals()
@@ -474,19 +441,19 @@ export default function ApprovalCenter() {
             <Input placeholder="請輸入集團名稱" allowClear />
           </Form.Item>
           <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="全部" options={brandOptions} />
+            <Select placeholder="全部" allowClear options={brandOptions} />
           </Form.Item>
           <Form.Item label="審批類型" name="approvalType">
-            <Select placeholder="全部" options={approvalTypeOptions} />
+            <Select placeholder="全部" allowClear options={approvalTypeOptions} />
           </Form.Item>
           <Form.Item label="流程編號" name="flowNo">
             <Input placeholder="請輸入流程編號" allowClear />
           </Form.Item>
           <Form.Item label="流程狀態" name="flowStatus">
-            <Select placeholder="全部" options={flowStatusOptions} />
+            <Select placeholder="全部" allowClear options={flowStatusOptions} />
           </Form.Item>
           <Form.Item label="當前節點" name="currentNode">
-            <Select placeholder="全部" options={currentNodeOptions} />
+            <Select placeholder="全部" allowClear options={currentNodeOptions} />
           </Form.Item>
           <Form.Item label="申請時間" name="applyTime">
             <RangePicker placeholder={['開始時間', '結束時間']} />

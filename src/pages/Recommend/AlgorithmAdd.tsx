@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, StarFilled } from '@ant-design/icons'
 import { AlgorithmType, APP_OPTIONS } from './constants'
 import { mockAlgorithmData } from './Algorithm/index'
-import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, withAdFallback, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
+import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import './WeightSlider.css'
 
@@ -142,27 +142,17 @@ export default function AlgorithmAdd() {
     setWaveNodes(prev => prev.map(n => ({ ...n, ranges: [] })))
   }
 
-  // 编辑模式或详情模式下加载默认数据（后端不可用时降级到本地演示数据）
+  // 编辑模式或详情模式下加载默认数据
   useEffect(() => {
     if (!algorithmIdParam) return
-    void withAdFallback(
-      async () => {
-        const detail = await fetchAdAlgorithmDetail(Number(algorithmIdParam))
+    fetchAdAlgorithmDetail(Number(algorithmIdParam))
+      .then(detail => {
         form.setFieldsValue({
           name: detail.algoName,
           brand: brandToAppType(detail.brand),
         })
-      },
-      () => {
-        const record = mockAlgorithmData.find(item => item.id === Number(algorithmIdParam))
-        if (record) {
-          form.setFieldsValue({
-            name: record.name,
-            brand: record.brand,
-          })
-        }
-      },
-    ).catch(() => { /* 静默请求：错误不阻断页面 */ })
+      })
+      .catch(() => { /* 静默请求：错误不阻断页面 */ })
   }, [algorithmIdParam, form])
 
   // 返回算法列表页
@@ -236,12 +226,11 @@ export default function AlgorithmAdd() {
           merchantExposureStrategy: values.merchantExposureStrategy,
         },
       }
-      await withAdFallback(
-        () => isEditMode
-          ? updateAdAlgorithm(Number(algorithmIdParam), payload)
-          : createAdAlgorithm(payload),
-        () => Promise.resolve({ algoCode: '', algoName: payload.algoName, algoType: payload.algoType }),
-      )
+      if (isEditMode) {
+        await updateAdAlgorithm(Number(algorithmIdParam), payload)
+      } else {
+        await createAdAlgorithm(payload)
+      }
       message.success(isEditMode ? '算法更新成功' : '算法新增成功')
       setIsEditing(false)
       navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)

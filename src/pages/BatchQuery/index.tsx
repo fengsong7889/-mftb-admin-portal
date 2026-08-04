@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { getBatchRecords } from '../../utils/approvalStore'
-import { fetchFinBatches, withFinanceFallback } from '../../api/finance'
+import { fetchFinBatches } from '../../api/finance'
 import type { FinBatch, FinBatchQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
@@ -206,10 +206,7 @@ export default function BatchQuery() {
     const query = buildQuery()
     setLoading(true)
     try {
-      const res = await withFinanceFallback<{ records: FinBatch[]; total: number }>(
-        () => fetchFinBatches(query),
-        () => mockFetchBatches(query),
-      )
+      const res = await fetchFinBatches(query)
       const start = (query.page! - 1) * query.size!
       setData((res.records ?? []).map((r, i) => ({
         key: `${r.batchNo}-${r.groupId}`,

@@ -16,7 +16,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { submitRechargeApply, withFinanceFallback } from '../../api/finance'
+import { submitRechargeApply } from '../../api/finance'
 import type { RechargeApplyPayload } from '../../api/finance'
 import { fetchStoreBdOptions, fetchStoresByGroupCode } from '../../api/store'
 import type { OptionItem } from '../../api/types'
@@ -238,16 +238,7 @@ export default function RechargeAdd() {
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
-      const flowNo = await withFinanceFallback(
-        () => submitRechargeApply(payload),
-        () => mockSubmitApproval({
-          approvalType: 'recharge',
-          groupId: payload.groupId,
-          groupName: payload.groupName,
-          brand: payload.brand,
-          extra: { ...payload },
-        }),
-      )
+      const flowNo = await submitRechargeApply(payload)
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)

@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '../constants'
-import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, withAdFallback, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
+import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '../../../hooks/useCardOrder'
 import BrandTag from '../../../components/BrandTag'
@@ -225,20 +225,17 @@ export default function Algorithm() {
     initialType ? filterByBusinessType(dataList.filter(item => item.type === initialType)) : dataList
   )
 
-  /** 加載算法列表（後端不可用時降級到本地演示數據） */
+  /** 加載算法列表 */
   useEffect(() => {
     let mounted = true
-    void withAdFallback(
-      async () => {
-        const res = await fetchAdAlgorithms({ page: 1, size: 500 })
-        return (res.records ?? []).map(toAlgorithmRecord)
-      },
-      () => mockAlgorithmData,
-    ).then(list => {
-      if (!mounted) return
-      setDataList(list)
-      setFilteredData(initialType ? filterByBusinessType(list.filter(item => item.type === initialType)) : list)
-    })
+    fetchAdAlgorithms({ page: 1, size: 500 })
+      .then(res => {
+        if (!mounted) return
+        const list = (res.records ?? []).map(toAlgorithmRecord)
+        setDataList(list)
+        setFilteredData(initialType ? filterByBusinessType(list.filter(item => item.type === initialType)) : list)
+      })
+      .catch(() => {})
     return () => { mounted = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -280,10 +277,7 @@ export default function Algorithm() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await withAdFallback(
-            () => updateAdAlgorithmStatus(record.id, newStatus),
-            () => { /* 後端不可用：僅更新本地狀態 */ },
-          )
+          await updateAdAlgorithmStatus(record.id, newStatus)
         } catch (err) {
           message.error((err as Error).message || `${actionText}失敗`)
           return
@@ -305,10 +299,7 @@ export default function Algorithm() {
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await withAdFallback(
-            () => deleteAdAlgorithm(record.id),
-            () => { /* 後端不可用：僅更新本地狀態 */ },
-          )
+          await deleteAdAlgorithm(record.id)
         } catch (err) {
           message.error((err as Error).message || '刪除失敗')
           return

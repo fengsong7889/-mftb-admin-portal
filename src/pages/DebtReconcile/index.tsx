@@ -14,7 +14,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions, isShanfeng } from '../../constants/brand'
 import type { DebtStoreRecord } from '../../utils/approvalStore'
-import { fetchFinDebts, withFinanceFallback } from '../../api/finance'
+import { fetchFinDebts } from '../../api/finance'
 import type { FinDebtBrandStats, FinDebtPageResult, FinDebtQuery } from '../../api/finance'
 import { getAllDebtBills } from './mockBills'
 
@@ -209,10 +209,7 @@ export default function DebtReconcile() {
     const query = buildQuery()
     setLoading(true)
     try {
-      const res = await withFinanceFallback<FinDebtPageResult>(
-        () => fetchFinDebts(query),
-        () => mockFetchDebts(query),
-      )
+      const res = await fetchFinDebts(query)
       setData((res.records ?? []).map(r => ({
         ...r,
         key: r.billNo,

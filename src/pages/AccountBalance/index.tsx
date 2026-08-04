@@ -16,7 +16,6 @@ import {
   fetchFinAccounts,
   freezeFinAccount,
   unfreezeFinAccount,
-  withFinanceFallback,
 } from '../../api/finance'
 import type { FinAccount, FinAccountQuery } from '../../api/finance'
 
@@ -38,50 +37,7 @@ const statusMap: Record<string, { text: string; color: string }> = {
 /** 账户记录（后端 FinAccountVO，Mock 降级时结构一致） */
 type AccountRecord = FinAccount & { key?: string }
 
-/** 后端不可用时的降级演示数据（保留原有 Mock，凍結/解凍在会话内生效） */
-const mockData: AccountRecord[] = [
-  { key: '1', groupId: 'G10001', groupName: '美味集團有限公司', brand: 'mFood', virtualBalance: 128560.50, actualBalance: 120000.00, status: 'normal' },
-  { key: '2', groupId: 'G10002', groupName: '閃蜂科技有限公司', brand: 'flashBee', virtualBalance: 89230.75, actualBalance: 85000.00, status: 'normal' },
-  { key: '3', groupId: 'G10003', groupName: '鮮味餐飲集團', brand: 'mFood', virtualBalance: 45600.00, actualBalance: 45000.00, status: 'frozen' },
-  { key: '4', groupId: 'G10004', groupName: '速達物流有限公司', brand: 'flashBee', virtualBalance: 23100.30, actualBalance: 22000.00, status: 'mergeFrozen' },
-  { key: '5', groupId: 'G10005', groupName: '金龍餐飲管理公司', brand: 'mFood', virtualBalance: 567890.00, actualBalance: 560000.00, status: 'normal' },
-  { key: '6', groupId: 'G10006', groupName: '星輝餐飲集團', brand: 'flashBee', virtualBalance: 0.00, actualBalance: 0.00, status: 'mergeFrozen' },
-  { key: '7', groupId: 'G10007', groupName: '佳味食品科技有限公司', brand: 'mFood', virtualBalance: 345200.80, actualBalance: 340000.00, status: 'normal' },
-  { key: '8', groupId: 'G10008', groupName: '鵬程餐飲有限公司', brand: 'mFood', virtualBalance: 78900.00, actualBalance: 75000.00, status: 'frozen' },
-  { key: '9', groupId: 'G10009', groupName: '雲端科技餐飲集團', brand: 'flashBee', virtualBalance: 112400.60, actualBalance: 110000.00, status: 'normal' },
-  { key: '10', groupId: 'G10010', groupName: '合眾餐飲管理有限公司', brand: 'mFood', virtualBalance: 90560.25, actualBalance: 88000.00, status: 'normal' },
-  { key: '11', groupId: 'G10011', groupName: '星辰飲食集團', brand: 'flashBee', virtualBalance: 135600.80, actualBalance: 130000.00, status: 'normal' },
-  { key: '12', groupId: 'G10012', groupName: '萬象餐飲控股有限公司', brand: 'mFood', virtualBalance: 98750.50, actualBalance: 95000.00, status: 'normal' },
-]
-
 /** 格式化金额 */
-const formatAmount = (val: number) => {
-  return val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-/** 降級數據源（會話內可變，凍結/解凍後同步狀態） */
-let mockAccounts: AccountRecord[] = mockData.map(r => ({ ...r }))
-
-/** 降級查詢：本地篩選 + 分頁 */
-function mockFetchAccounts(query: FinAccountQuery) {
-  const filtered = mockAccounts.filter(r => {
-    if (query.groupId && !r.groupId.includes(query.groupId)) return false
-    if (query.groupName && !r.groupName.includes(query.groupName)) return false
-    if (query.brand && query.brand !== 'all' && r.brand !== query.brand) return false
-    if (query.status && query.status !== 'all' && r.status !== query.status) return false
-    return true
-  })
-  const page = query.page ?? 1
-  const size = query.size ?? 10
-  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length }
-}
-
-/** 降級狀態變更 */
-function mockUpdateAccountStatus(groupId: string, status: string) {
-  mockAccounts = mockAccounts.map(r => (r.groupId === groupId ? { ...r, status } : r))
-}
-
-/** 搜索篩選條件 */
 interface AccountFilters {
   groupId?: string
   groupName?: string
@@ -100,15 +56,12 @@ export default function AccountBalance() {
   const [filters, setFilters] = useState<AccountFilters>({})
   const [pagination, setPagination] = useState({ page: 1, size: 10 })
 
-  /** 加載賬戶列表（後端不可用時降級到本地演示數據） */
+  /** 加載賬戶列表 */
   const loadAccounts = useCallback(async () => {
     const query: FinAccountQuery = { ...filters, page: pagination.page, size: pagination.size }
     setLoading(true)
     try {
-      const res = await withFinanceFallback(
-        () => fetchFinAccounts(query),
-        () => mockFetchAccounts(query),
-      )
+      const res = await fetchFinAccounts(query)
       setData(res.records ?? [])
       setTotal(res.total ?? 0)
     } finally {
@@ -142,10 +95,7 @@ export default function AccountBalance() {
       cancelText: '取消',
       okButtonProps: { danger: true },
       onOk: async () => {
-        await withFinanceFallback(
-          () => freezeFinAccount(record.groupId, record.brand),
-          () => mockUpdateAccountStatus(record.groupId, 'frozen'),
-        )
+        await freezeFinAccount(record.groupId, record.brand)
         message.success(`已凍結「${record.groupName}」賬戶`)
         await loadAccounts()
       },
@@ -160,10 +110,7 @@ export default function AccountBalance() {
       okText: '確定解凍',
       cancelText: '取消',
       onOk: async () => {
-        await withFinanceFallback(
-          () => unfreezeFinAccount(record.groupId, record.brand),
-          () => mockUpdateAccountStatus(record.groupId, 'normal'),
-        )
+        await unfreezeFinAccount(record.groupId, record.brand)
         message.success(`已解凍「${record.groupName}」賬戶`)
         await loadAccounts()
       },

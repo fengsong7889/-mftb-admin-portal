@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { fetchFinAccounts, fetchFinBatches, submitDeductApply, withFinanceFallback } from '../../api/finance'
+import { fetchFinAccounts, fetchFinBatches, submitDeductApply } from '../../api/finance'
 import type { DeductApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
@@ -252,16 +252,7 @@ export default function DeductAdd() {
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
-      const flowNo = await withFinanceFallback(
-        () => submitDeductApply(payload),
-        () => mockSubmitApproval({
-          approvalType: 'deduct',
-          groupId: groupIdParam,
-          groupName: groupNameParam,
-          brand: brandParam,
-          extra: { ...payload },
-        }),
-      )
+      const flowNo = await submitDeductApply(payload)
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)

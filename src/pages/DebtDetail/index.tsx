@@ -23,7 +23,6 @@ import {
   addFinDebtRepayment,
   deleteFinDebtRepayment,
   fetchFinDebtDetail,
-  withFinanceFallback,
 } from '../../api/finance'
 import type { DebtRepaymentPayload, FinDebtBill, FinDebtRepayment } from '../../api/finance'
 import { getAllDebtBills } from '../DebtReconcile/mockBills'
@@ -195,10 +194,7 @@ export default function DebtDetail() {
   const loadBill = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await withFinanceFallback<FinDebtBill | null>(
-        () => fetchFinDebtDetail(billNoParam),
-        () => fallbackBill(),
-      )
+      const res = await fetchFinDebtDetail(billNoParam).catch(() => null)
       const target = res || fallbackBill()
       setBill(target)
       setData(toRows(target?.repayments))

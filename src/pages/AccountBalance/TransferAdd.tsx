@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { fetchFinAccounts, submitTransferApply, withFinanceFallback } from '../../api/finance'
+import { fetchFinAccounts, submitTransferApply } from '../../api/finance'
 import type { FinAccount, TransferApplyPayload } from '../../api/finance'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 
@@ -166,16 +166,7 @@ export default function TransferAdd() {
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
-      const flowNo = await withFinanceFallback(
-        () => submitTransferApply(payload),
-        () => mockSubmitApproval({
-          approvalType: 'transfer',
-          groupId: groupIdParam,
-          groupName: groupNameParam,
-          brand: brandParam,
-          extra: { ...payload },
-        }),
-      )
+      const flowNo = await submitTransferApply(payload)
       setSubmittedFlowNo(flowNo)
       setCountdown(5)
       setSuccessVisible(true)

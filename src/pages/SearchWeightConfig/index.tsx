@@ -911,7 +911,7 @@ export default function SearchWeightConfig() {
                 {boostTiers.map((tier, index) => (
                   <div key={index} style={{ 
                     border: '1px solid #d9d9d9', 
-                    borderRadius: 4, 
+                    borderRadius: 8,
                     padding: 12, 
                     marginBottom: 8,
                     background: '#fafafa'
@@ -996,7 +996,7 @@ export default function SearchWeightConfig() {
                 {demoteTiers.map((tier, index) => (
                   <div key={index} style={{ 
                     border: '1px solid #d9d9d9', 
-                    borderRadius: 4, 
+                    borderRadius: 8,
                     padding: 12, 
                     marginBottom: 8,
                     background: '#fafafa'

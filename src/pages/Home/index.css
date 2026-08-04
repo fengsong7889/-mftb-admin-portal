@@ -20,7 +20,7 @@
 }
 
 .home-welcome--animated {
-  background: linear-gradient(135deg, #E8720C 0%, #f5576c 50%, #f093fb 100%);
+  background: linear-gradient(135deg, #E8720C 0%, #F39C12 50%, #FFB347 100%);
   background-size: 200% 200%;
   animation: gradientShift 8s ease infinite;
 }

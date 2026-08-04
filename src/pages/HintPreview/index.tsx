@@ -610,7 +610,7 @@ export default function HintPreview() {
           <div style={{
             width: '100%',
             height: 400,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)',
             borderRadius: 8,
             position: 'relative',
             display: 'flex',

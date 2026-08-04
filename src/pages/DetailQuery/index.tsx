@@ -13,7 +13,7 @@ import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { BIZ_CHANNEL_LABEL_MAP } from '../../constants/bizChannel'
 import { getDetailRecords } from '../../utils/approvalStore'
-import { fetchFinDetails, withFinanceFallback } from '../../api/finance'
+import { fetchFinDetails } from '../../api/finance'
 import type { FinDetail, FinDetailQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
@@ -255,10 +255,7 @@ export default function DetailQuery() {
     const query = buildQuery()
     setLoading(true)
     try {
-      const res = await withFinanceFallback<{ records: FinDetail[]; total: number }>(
-        () => fetchFinDetails(query),
-        () => mockFetchDetails(query),
-      )
+      const res = await fetchFinDetails(query)
       const start = (query.page! - 1) * query.size!
       setData((res.records ?? []).map((r, i) => ({
         key: r.detailId,

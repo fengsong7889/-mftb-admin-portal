@@ -1222,7 +1222,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           <div style={{ 
             padding: '12px 16px', 
             marginBottom: 12, 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)',
             borderRadius: 6,
             display: 'flex',
             justifyContent: 'space-between',
@@ -1350,7 +1350,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
           </table>
         </div>
 
-        <div style={{ background: '#fafafa', padding: 16, borderRadius: 4 }}>
+        <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ color: '#595959' }}>訂單金額（原價）：</span>
             <span style={{ fontWeight: 600 }}>${cartItems.reduce((sum, item) => sum + item.originalPrice, 0)}</span>

@@ -256,7 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         if (!res.ok || stopped) return
 
-        const result = await res.json() as { code: number; message: string; data?: { loginIp?: string } }
+        const result = await res.json() as { code: number; message: string; data?: { loginIp?: string; operatorName?: string; operatorEmpId?: string } }
         if (stopped) return
 
         if (result.code === 200) return // 会话正常
@@ -271,10 +271,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result.code === 401) {
           const msg = result.message || ''
           if (msg.includes('管理员')) {
-            // 被管理员强制下线
+            // 被管理员强制下线：从响应中提取操作人信息
+            const operatorName = result.data?.operatorName || ''
+            const operatorEmpId = result.data?.operatorEmpId || ''
             window.dispatchEvent(
               new CustomEvent<ForceLogoutDetail>(FORCE_LOGOUT_EVENT, {
-                detail: { operatorName: '管理员', operatorEmpId: '' },
+                detail: { operatorName, operatorEmpId },
               })
             )
           } else if (msg.includes('其他设备')) {

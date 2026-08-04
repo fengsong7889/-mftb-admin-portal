@@ -21,7 +21,6 @@ import {
   approveFinApproval,
   rejectFinApproval,
   cancelFinApproval,
-  withFinanceFallback,
 } from '../../api/finance'
 import type { FinApproval } from '../../api/finance'
 
@@ -547,10 +546,7 @@ export default function ApprovalDetail() {
     const load = async () => {
       if (!flowNo) return
       try {
-        const record = await withFinanceFallback<FinApproval | null>(
-          () => fetchFinApprovalDetail(flowNo),
-          () => null,
-        )
+        const record = await fetchFinApprovalDetail(flowNo).catch(() => null)
         if (!cancelled) setData(record ? toDetailData(record) : fallbackDetail())
       } catch {
         // 流程不存在等業務錯誤：保留降級展示
@@ -573,10 +569,7 @@ export default function ApprovalDetail() {
           // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；贈送 TG 流程為前端記錄，直接本地審批
           const result = type === 'gift'
             ? approveCurrentNode(flowNo)
-            : await withFinanceFallback(
-              () => approveFinApproval(flowNo),
-              () => approveCurrentNode(flowNo),
-            )
+            : await approveFinApproval(flowNo)
           if (result) {
             message.success(result.finished
               ? `${result.nodeName}通過，流程全部節點審批完成，${type === 'gift' ? '贈送天數已寫入贈送明細' : '數據已寫入批次查詢'}`
@@ -608,13 +601,7 @@ export default function ApprovalDetail() {
       // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；贈送 TG 流程直接本地駁回
       const rejectedNode = type === 'gift'
         ? rejectCurrentNode(flowNo, rejectReason)
-        : await withFinanceFallback<string | null>(
-          async () => {
-            await rejectFinApproval(flowNo, rejectReason)
-            return null
-          },
-          () => rejectCurrentNode(flowNo, rejectReason),
-        )
+        : (await rejectFinApproval(flowNo, rejectReason), null)
       message.success(rejectedNode
         ? `已在「${rejectedNode}」節點駁回，流程已結束`
         : '審批駁回成功')
@@ -638,10 +625,7 @@ export default function ApprovalDetail() {
       if (type === 'gift') {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
       } else {
-        await withFinanceFallback(
-          () => cancelFinApproval(flowNo),
-          () => updateApprovalRecord(flowNo, { flowStatus: 'cancelled' }),
-        )
+        await cancelFinApproval(flowNo)
       }
       message.success('申請已撤銷')
       setShowRevokeModal(false)
