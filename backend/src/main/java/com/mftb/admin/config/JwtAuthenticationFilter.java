@@ -74,16 +74,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
+                // ── 强制下线标记检测（独立于 activeToken，因为强制下线会将 activeToken 置为 null）──
+                if (user.getForceLogoutOperator() != null) {
+                    // 被管理员强制下线 → 返回操作人信息
+                    writeForceLogoutResponse(response, user.getForceLogoutOperator(), user.getForceLogoutEmpId());
+                    return;
+                }
+
                 // ── 单设备登录校验: 检查 Token 是否为当前活跃 Token ──
                 if (user.getActiveToken() != null && !token.equals(user.getActiveToken())) {
-                    // Token 不匹配: 检查强制下线原因
                     if ("account_disabled".equals(user.getForceLogoutReason())) {
                         // 账号被停用 → 返回 ACCOUNT_DISABLED
                         writeAccountDisabledResponse(response);
-                        return;
-                    } else if (user.getForceLogoutOperator() != null) {
-                        // 被管理员强制下线 → 返回操作人信息
-                        writeForceLogoutResponse(response, user.getForceLogoutOperator(), user.getForceLogoutEmpId());
                         return;
                     } else {
                         // 被其他设备登录顶下线 → 返回 SESSION_CONFLICT

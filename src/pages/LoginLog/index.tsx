@@ -8,6 +8,7 @@ import type { DepartmentItem } from '../../api/department'
 import { fetchLoginLogs, forceLogout, deleteLoginLog } from '../../api/loginLog'
 import type { LoginLogRecord } from '../../api/loginLog'
 import { exportToCSV } from '../../utils/exportCSV'
+import { useAuth } from '../../contexts/AuthContext'
 
 const { RangePicker } = DatePicker
 
@@ -57,6 +58,7 @@ function formatDuration(seconds: number | null): string {
 
 /** 員工動態頁面 */
 export default function LoginLog() {
+  const { user } = useAuth()
   const [searchForm] = Form.useForm()
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,7 +66,6 @@ export default function LoginLog() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [now, setNow] = useState(new Date()) // 用於實時更新在線時長
   // 全选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
@@ -81,12 +82,6 @@ export default function LoginLog() {
     }).catch(() => {
       // 部門加載失敗不影響主流程
     })
-  }, [])
-
-  /** 每分鐘更新當前時間（用於在線時長計算） */
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000)
-    return () => clearInterval(timer)
   }, [])
 
   /** 加載數據 */
@@ -216,12 +211,9 @@ export default function LoginLog() {
       { title: '所屬部門', dataIndex: 'departmentName' },
       { title: '登錄時間', dataIndex: 'loginTime' },
       { title: '退出時間', dataIndex: 'logoutTime', render: (v: string | null) => v || '' },
-      { title: '在線時長', dataIndex: 'duration', render: (v: number | null, record: LoginLogRecord) => {
-        if (record.logoutTime != null && v != null) return formatDuration(v)
-        const loginMs = new Date(record.loginTime).getTime()
-        const nowMs = new Date().getTime()
-        const seconds = Math.floor((nowMs - loginMs) / 1000)
-        return seconds > 0 ? formatDuration(seconds) : ''
+      { title: '在線時長', dataIndex: 'duration', render: (v: number | null) => {
+        // 統一使用後端計算的 duration（避免前端解析 loginTime 的時區歧義）
+        return v != null ? formatDuration(v) : ''
       }},
       { title: '狀態', dataIndex: 'logoutReason', render: (_: unknown, record: LoginLogRecord) => {
         if (record.logoutTime == null) return '在線'
@@ -310,25 +302,11 @@ export default function LoginLog() {
       dataIndex: 'duration',
       key: 'duration',
       width: 130,
-      render: (val: number | null, record: LoginLogRecord) => {
-        // 已退出：使用記錄的 duration
-        if (record.logoutTime != null && val != null) {
-          return formatDuration(val)
-        }
-        // 在線中：從登錄時間計算到當前時間（使用 now 狀態觸發重新渲染）
-        const loginMs = new Date(record.loginTime).getTime()
-        const nowMs = now.getTime()
-        const seconds = Math.floor((nowMs - loginMs) / 1000)
-        return seconds > 0 ? formatDuration(seconds) : '-'
+      render: (val: number | null) => {
+        // 統一使用後端計算的 duration（避免前端解析 loginTime 的時區歧義）
+        return val != null ? formatDuration(val) : '-'
       },
-      sorter: (a, b) => {
-        const getDuration = (item: LoginLogRecord) => {
-          if (item.logoutTime != null && item.duration != null) return item.duration
-          const loginMs = new Date(item.loginTime).getTime()
-          return Math.floor((now.getTime() - loginMs) / 1000)
-        }
-        return getDuration(a) - getDuration(b)
-      },
+      sorter: (a, b) => (a.duration ?? 0) - (b.duration ?? 0),
     },
     {
       title: '狀態',
@@ -355,7 +333,7 @@ export default function LoginLog() {
       fixed: 'right',
       render: (_: unknown, record: LoginLogRecord) => (
         <>
-          {record.logoutTime == null && (
+          {record.logoutTime == null && user?.role === 'admin' && (
             <Button type="link" danger size="small" onClick={() => handleForceLogout(record)}>
               下線
             </Button>
