@@ -98,8 +98,8 @@ export default function AlgorithmAdd() {
   // 盘活复苏 - 配送范围计算（4 个固定参数：短程/中程/远程/跨桥）
   const [reviveDeliveryRange, setReviveDeliveryRange] = useState<string[]>([])
   const [merchantModalVisible, setMerchantModalVisible] = useState(false)
-  const [_regionLimit, _setRegionLimit] = useState(true) // false: 不限制, true: 限制
-  const [_selectedRegions, _setSelectedRegions] = useState<string[]>([])
+  const [regionLimit, _setRegionLimit] = useState(true) // false: 不限制, true: 限制
+  const [selectedRegions, _setSelectedRegions] = useState<string[]>([])
   const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
   // 新店广告 - 波浪计算配置（周期/间隔为默认值，后续如需调整仅改以下常量）

@@ -2,9 +2,9 @@ import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button, Space, Input, InputNumber, Select, Table, Tag, Modal, Form, DatePicker,
-  ColorPicker, Upload, message, Popover,
+  ColorPicker, Upload, message, Popover, Radio,
 } from 'antd'
-import type { TableColumnsType } from 'antd'
+import type { TableColumnsType, RadioChangeEvent } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, UploadOutlined,
   EyeOutlined, TranslationOutlined, FireOutlined,
@@ -650,7 +650,7 @@ export default function HotSearchConfig() {
             <Form.Item label="展示模式" name="displayMode" style={{ flex: 1 }}>
               <Radio.Group options={displayModeOptions} optionType="button" buttonStyle="solid"
                 disabled={!!editingRecord}
-                onChange={(e) => setDisplayMode(e.target.value)} />
+                onChange={(e: RadioChangeEvent) => setDisplayMode(e.target.value as string)} />
             </Form.Item>
             <Form.Item label="詞來源" name="wordSource" rules={[{ required: true }]} style={{ flex: 1 }}>
               <Select options={wordSourceOptions} disabled={!!editingRecord} onChange={(v) => {

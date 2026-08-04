@@ -8,6 +8,7 @@ import {
   SwapOutlined,
   ImportOutlined,
   ExportOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 

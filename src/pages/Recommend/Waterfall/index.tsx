@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, Tabs, type UploadFile } from 'antd'
+import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, Tabs } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import BrandTag from '../../../components/BrandTag'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, WalletOutlined } from '@ant-design/icons'
@@ -17,7 +17,7 @@ import {
   ALGO_CARD_COLOR_MAP,
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
-import { mockAlgorithmData } from '../Algorithm'
+import { mockAlgorithmData, type AlgorithmRecord } from '../Algorithm'
 import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, withAdFallback, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
@@ -342,7 +342,7 @@ export default function Waterfall() {
   
   // 算法选择相关状态
   const [algorithmType, setAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
-  const [algorithmOptions, setAlgorithmOptions] = useState<UploadFile[]>([])
+  const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmRecord[]>([])
   const [continuousPurchase, setContinuousPurchase] = useState<string>('notSupport')
   const [merchantLimit, _setMerchantLimit] = useState<'limited' | 'unlimited'>('unlimited')
   const [selectedMerchants, setSelectedMerchants] = useState<number[]>([])
@@ -360,12 +360,12 @@ export default function Waterfall() {
     
     // 配置ID搜索
     if (values.adId) {
-      result = result.filter(item => item.adId?.includes(values.adId))
+      result = result.filter(item => item.adId?.includes(String(values.adId)))
     }
     
     // 瀑布流名称搜索
     if (values.promotionName) {
-      result = result.filter(item => item.promotionName?.includes(values.promotionName))
+      result = result.filter(item => item.promotionName?.includes(String(values.promotionName)))
     }
     
     // 業務频道搜索

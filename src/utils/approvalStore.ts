@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 審批數據共享存儲（localStorage）
  * 充值/轉賬/扣款/合併/推廣贈送等頁面提交後，數據進入審批中心
@@ -33,7 +34,7 @@ export interface ApprovalRecord {
   flowStatus: string // pending | approved | rejected | cancelled
   rejectReason: string
   // 擴展數據（不同類型存不同字段）
-  extra?: Record<string, unknown>
+  extra?: Record<string, any>
 }
 
 /** 舊版預設審批人（已廢棄，僅用於存量數據清洗） */
@@ -199,7 +200,7 @@ export interface BatchStoreRecord {
   applicant: string
   bd: string
   remark: string
-  extra?: Record<string, unknown> // 明細頁展示數據
+  extra?: Record<string, any> // 明細頁展示數據
 }
 
 /** 獲取所有批次記錄 */
@@ -259,7 +260,7 @@ function writeApprovedRecords(record: ApprovalRecord, tradeTime: string): void {
  * 審批未通過/被駁回的申請不會寫入；後端不可用時由 gift API 自動降級寫入本地 Mock 贈送數據
  */
 function writeGiftApprovedRecord(record: ApprovalRecord): void {
-  const extra = (record.extra || {}) as Record<string, unknown>
+  const extra = (record.extra || {}) as Record<string, any>
   void createGiftRecord({
     groupId: Number(extra.groupId) || 0,
     storeId: Number(extra.storeId) || 0,
@@ -279,7 +280,7 @@ function writeGiftApprovedRecord(record: ApprovalRecord): void {
  * @returns 本次生成的批次號（未生成時返回空字符串）
  */
 function writeBatchRecords(record: ApprovalRecord, tradeTime: string): string {
-  const extra = (record.extra || {}) as Record<string, unknown>
+  const extra = (record.extra || {}) as Record<string, any>
   const batchNo = generateBatchNo()
   const base = {
     batchNo,
@@ -487,7 +488,7 @@ function parseStoreLabel(label: string): { storeId: string; storeName: string } 
  * 充值/轉賬/合併審批通過後，寫入對應交易明細（與批次明細頁流水口徑一致）
  */
 function writeFlowDetailRecords(record: ApprovalRecord, tradeTime: string, batchNo: string): void {
-  const extra = (record.extra || {}) as Record<string, unknown>
+  const extra = (record.extra || {}) as Record<string, any>
   const rows: DetailStoreRecord[] = []
   let seq = 0
   const push = (row: Omit<DetailStoreRecord, 'key' | 'detailId' | 'tradeTime' | 'flowNo' | 'batchNo'> & { batchNo?: string }) => {
@@ -521,7 +522,7 @@ function writeFlowDetailRecords(record: ApprovalRecord, tradeTime: string, batch
       remark: extra.remark || '--',
     })
     // 營業額支付：按門店寫入充值批次扣款明細
-    ;((extra.deductStores as unknown[]) || []).forEach(s => {
+    ;((extra.deductStores as any[]) || []).forEach(s => {
       const { storeId, storeName } = parseStoreLabel(s.storeLabel || '')
       push({
         ...groupBase,
@@ -564,7 +565,7 @@ function writeFlowDetailRecords(record: ApprovalRecord, tradeTime: string, batch
     // 欠款償還/合併轉出入按註銷集團的綜合實收比例同步變動實收賬戶
     const mergeRatio = getGroupActualRatio(record.groupId)
     // 欠款償還門店（註銷集團）
-    ;((extra.repayStores as unknown[]) || []).forEach(s => {
+    ;((extra.repayStores as any[]) || []).forEach(s => {
       const { storeId, storeName } = parseStoreLabel(s.storeLabel || '')
       push({
         ...groupBase,
@@ -613,7 +614,7 @@ function writeFlowDetailRecords(record: ApprovalRecord, tradeTime: string, batch
  * - 實收變動：每條明細按所扣批次的實收比例同步扣減實收賬戶，純贈送批次顯示 --
  */
 function writeDeductDetailRecords(record: ApprovalRecord, tradeTime: string): void {
-  const extra = (record.extra || {}) as Record<string, unknown>
+  const extra = (record.extra || {}) as Record<string, any>
   const method = (extra.deductMethod as string) || 'account'
   const amount = Number(extra.deductAmount) || 0
   const changeType = method === 'consume'
@@ -763,11 +764,11 @@ const round2 = (n: number) => Math.round(n * 100) / 100
  *   還款渠道=轉移結算的記錄，備註該筆欠款已轉移
  */
 function writeDebtRecords(record: ApprovalRecord, tradeTime: string, batchNo: string): void {
-  const extra = (record.extra || {}) as Record<string, unknown>
+  const extra = (record.extra || {}) as Record<string, any>
   const loanDate = tradeTime.slice(0, 10)
 
   if (record.approvalType === 'recharge') {
-    const stores = (extra.deductStores as unknown[]) || []
+    const stores = (extra.deductStores as any[]) || []
     if (!extra.isActual || stores.length === 0) return
     const rows: DebtStoreRecord[] = stores.map((s, i) => {
       const { storeId, storeName } = parseStoreLabel(s.storeLabel || '')
@@ -797,7 +798,7 @@ function writeDebtRecords(record: ApprovalRecord, tradeTime: string, batchNo: st
   } else if (record.approvalType === 'merge') {
     const targetGroupName = (extra.targetGroupName as string) || ''
     // 1. 存續集團每個欠款償還門店生成一條新欠款單
-    const newRows: DebtStoreRecord[] = ((extra.repayStores as unknown[]) || []).map((s, i) => {
+    const newRows: DebtStoreRecord[] = ((extra.repayStores as any[]) || []).map((s, i) => {
       const { storeId, storeName } = parseStoreLabel(s.storeLabel || '')
       const amount = Number(s.amount) || 0
       return {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Form, Input, message, Space, Card, Tag, Breadcrumb } from 'antd'
@@ -14,7 +15,7 @@ export default function PageDescriptionEditor() {
   const [pageTitle, setPageTitle] = useState('')
   const [pageModule, setPageModule] = useState('')
   const [customTips, setCustomTips] = useState<CustomPageTips | null>(null)
-  const [pagePrd, setPagePrd] = useState<Record<string, unknown>>(null)
+  const [pagePrd, setPagePrd] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(false)
   const [prdContent, setPrdContent] = useState<{
     description?: string
@@ -159,7 +160,7 @@ export default function PageDescriptionEditor() {
         </div>
         <PRDEditor
           initialContent={prdContent}
-          defaultPRD={pagePrd}
+          defaultPRD={pagePrd || undefined}
           onChange={setPrdContent}
         />
       </Card>

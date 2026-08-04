@@ -49,7 +49,7 @@ const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: st
   { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: '商品折扣秒殺活動，智能促銷匹配' },
 ]
 
-interface AlgorithmRecord {
+export interface AlgorithmRecord {
   id: number
   name: string
   code: string

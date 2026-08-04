@@ -161,7 +161,7 @@ export default function HintPreview() {
     supermarket: '超市頻道',
   }
 
-  const _jumpTypeMap: Record<string, string> = {
+  const jumpTypeMap: Record<string, string> = {
     none: '無跳轉',
     h5: 'H5鏈接',
     checkInCenter: '簽到中心',

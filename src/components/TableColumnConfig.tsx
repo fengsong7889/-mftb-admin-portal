@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react'
 import { Drawer, Checkbox, Button, Space } from 'antd'
 import {
@@ -293,7 +294,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
 /** 根据列配置过滤和排序 Table columns */
 // eslint-disable-next-line react-refresh/only-export-components
 export function applyColumnConfig(
-  tableColumns: unknown[],
+  tableColumns: any[],
   config: ColumnConfig[]
 ) {
   const visibleKeys = config.filter(c => c.visible).map(c => c.key)

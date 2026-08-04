@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 前端導出 CSV 工具函數
  * 導出的 CSV 可直接用 Excel 打開
@@ -10,7 +11,7 @@ export interface ExportColumn {
   /** 對應 dataSource 中的 key */
   dataIndex: string | string[]
   /** 自定義渲染函數（可選） */
-  render?: (value: unknown, record: unknown) => string
+  render?: (value: any, record: any) => string
 }
 
 /**
@@ -19,7 +20,7 @@ export interface ExportColumn {
 export function exportToCSV(
   filename: string,
   columns: ExportColumn[],
-  dataSource: unknown[],
+  dataSource: any[],
 ) {
   // 構建表頭
   const headers = columns.map(col => col.title)

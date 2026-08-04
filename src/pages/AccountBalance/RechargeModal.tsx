@@ -106,7 +106,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
   }
 
   /** 模拟文件上传 */
-  const handleUpload = (info: { file: { status?: string; name: string }; fileList: UploadFile[] }) => {
+  const handleUpload = (info: { file: { status?: string; name: string; uid?: string }; fileList: UploadFile[] }) => {
     const newFile = {
       uid: info.file?.uid || Date.now().toString(),
       name: info.file?.name || `憑證_${uploadedFiles.length + 1}.png`,
