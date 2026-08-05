@@ -77,7 +77,9 @@ public class FinDetailServiceImpl implements FinDetailService {
         }
         wrapper.orderByDesc(FinDetail::getTradeTime).orderByDesc(FinDetail::getId);
 
-        Page<FinDetail> result = detailMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
+        long p = PageResult.normalizePage(query.getPage());
+        long sz = PageResult.normalizeSize(query.getSize());
+        Page<FinDetail> result = detailMapper.selectPage(new Page<>(p, sz), wrapper);
         List<FinDetailVO> records = result.getRecords().stream().map(FinDetailVO::from).toList();
         return new PageResult<>(records, result.getTotal());
     }

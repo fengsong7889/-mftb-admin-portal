@@ -3,6 +3,7 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.LoginLogVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.SysLoginLog;
@@ -10,10 +11,12 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysLoginLogMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.LoginLogService;
+import com.mftb.admin.util.NetworkUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +24,10 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 员工登录日志服务实现
@@ -42,7 +49,7 @@ public class LoginLogServiceImpl implements LoginLogService {
     public void recordLogin(Long userId, String username, String empId, String employeeName,
                             Long departmentId, String departmentName, HttpServletRequest request) {
         // 先将该用户之前的「在线」记录标记为超时退出
-        markUserTimeout(userId);
+        markTimeout(userId);
 
         // 写入新的登录记录
         SysLoginLog logEntry = new SysLoginLog();
@@ -53,7 +60,7 @@ public class LoginLogServiceImpl implements LoginLogService {
         logEntry.setDepartmentId(departmentId);
         logEntry.setDepartmentName(departmentName);
         logEntry.setLoginTime(LocalDateTime.now());
-        logEntry.setIpAddress(getClientIp(request));
+        logEntry.setIpAddress(NetworkUtils.getClientIp(request));
         logEntry.setUserAgent(truncate(request != null ? request.getHeader("User-Agent") : null, 500));
         loginLogMapper.insert(logEntry);
         log.info("记录登录日志: userId={}, username={}", userId, username);
@@ -79,6 +86,7 @@ public class LoginLogServiceImpl implements LoginLogService {
 
     @Override
     @Transactional
+    @Scheduled(fixedRate = 60000) // 每 60 秒执行一次，由定时任务驱动而非每次请求触发
     public void markTimeoutSessions() {
         // 使用空闲超时阈值标记离线会话
         LocalDateTime threshold = LocalDateTime.now().minus(Duration.ofMillis(sessionIdleTimeout));
@@ -88,10 +96,20 @@ public class LoginLogServiceImpl implements LoginLogService {
                 new LambdaQueryWrapper<SysLoginLog>()
                         .isNull(SysLoginLog::getLogoutTime));
 
+        if (onlineSessions.isEmpty()) {
+            return;
+        }
+
+        // 批量加载所有相关用户，避免 N+1 查询
+        Set<Long> userIds = onlineSessions.stream()
+                .map(SysLoginLog::getUserId)
+                .collect(Collectors.toSet());
+        Map<Long, SysUser> userMap = sysUserMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(SysUser::getId, Function.identity(), (a, b) -> a));
+
         int marked = 0;
         for (SysLoginLog session : onlineSessions) {
-            // 通过 userId 查询该用户的最后活跃时间
-            SysUser user = sysUserMapper.selectById(session.getUserId());
+            SysUser user = userMap.get(session.getUserId());
             if (user == null) {
                 // 用户不存在，直接标记超时
                 session.setLogoutTime(LocalDateTime.now());
@@ -103,12 +121,10 @@ public class LoginLogServiceImpl implements LoginLogService {
 
             // 判断用户是否仍然活跃：lastActiveAt 在阈值之内说明用户仍在操作
             if (user.getLastActiveAt() != null && user.getLastActiveAt().isAfter(threshold)) {
-                // 用户仍在线，跳过
                 continue;
             }
 
             // 用户确实已不活跃，标记为超时退出
-            // logoutTime 取 lastActiveAt + 超时阈值（即实际超时发生的时刻），若无 lastActiveAt 则取 loginTime + 阈值
             LocalDateTime actualTimeout = user.getLastActiveAt() != null
                     ? user.getLastActiveAt().plus(Duration.ofMillis(sessionIdleTimeout))
                     : session.getLoginTime().plus(Duration.ofMillis(sessionIdleTimeout));
@@ -126,9 +142,8 @@ public class LoginLogServiceImpl implements LoginLogService {
     @Override
     public PageResult<LoginLogVO> list(long page, long size, String keyword, Long departmentId,
                                        String status, LocalDate startDate, LocalDate endDate) {
-        // 查询前先标记超时会话
-        markTimeoutSessions();
-
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<SysLoginLog> wrapper = new LambdaQueryWrapper<>();
 
         // 关键词过滤（工号/姓名）
@@ -196,7 +211,7 @@ public class LoginLogServiceImpl implements LoginLogService {
         // 1. 查询登录日志记录
         SysLoginLog logEntry = loginLogMapper.selectById(loginLogId);
         if (logEntry == null || logEntry.getLogoutTime() != null) {
-            throw new RuntimeException("该用户已不在线");
+            throw new BusinessException("该用户已不在线");
         }
 
         // 2. 更新登录日志: 标记为强制下线
@@ -221,18 +236,18 @@ public class LoginLogServiceImpl implements LoginLogService {
     public void deleteById(Long id) {
         SysLoginLog logEntry = loginLogMapper.selectById(id);
         if (logEntry == null) {
-            throw new RuntimeException("记录不存在");
+            throw new BusinessException("记录不存在");
         }
         // 在线中的记录不允许直接删除
         if (logEntry.getLogoutTime() == null) {
-            throw new RuntimeException("该用户当前在线，请先强制下线后再删除");
+            throw new BusinessException("该用户当前在线，请先强制下线后再删除");
         }
         loginLogMapper.deleteById(id);
         log.info("删除登录日志: id={}, empId={}", id, logEntry.getEmpId());
     }
 
     /** 将用户之前的在线记录标记为超时退出 */
-    private void markUserTimeout(Long userId) {
+    private void markTimeout(Long userId) {
         LocalDateTime now = LocalDateTime.now();
         loginLogMapper.update(null,
                 new LambdaUpdateWrapper<SysLoginLog>()
@@ -240,23 +255,6 @@ public class LoginLogServiceImpl implements LoginLogService {
                         .isNull(SysLoginLog::getLogoutTime)
                         .set(SysLoginLog::getLogoutTime, now)
                         .set(SysLoginLog::getLogoutReason, "timeout"));
-    }
-
-    /** 获取客户端真实IP */
-    private String getClientIp(HttpServletRequest request) {
-        if (request == null) return null;
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        // 多级代理取第一个
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 
     /** 截断字符串 */

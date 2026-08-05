@@ -28,7 +28,7 @@ const { RangePicker } = DatePicker
 
 /** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 */
 type DishLayout = 'grid' | 'carousel'
-const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: '大圖拼列', carousel: '階梯輪播' }
+const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: '大圖拼列（1大2小）', carousel: '階梯輪播' }
 
 /** 預覽用 Mock 餐品（與銷售定價預覽一致，bg 為餐品底圖漸變） */
 const PREVIEW_DISHES = [

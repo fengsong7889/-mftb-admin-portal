@@ -1,5 +1,6 @@
 package com.mftb.admin.dto;
 
+import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
 import lombok.Data;
@@ -92,6 +93,20 @@ public class AdOrderDetailVO extends AdOrderVO {
             item.setOriginalPrice(entity.getOriginalPrice());
             item.setSalePrice(entity.getSalePrice());
             item.setRefundPrice(entity.getRefundPrice());
+            item.setDeliveryStatus(entity.getDeliveryStatus());
+            return item;
+        }
+
+        /** 新店广告明细（无商圈/餐段/定价维度） */
+        public static Item from(AdOrderItemNewStore entity) {
+            Item item = new Item();
+            item.setId(entity.getId());
+            item.setBizDate(entity.getBizDate());
+            item.setRegion(null);
+            item.setMealSlot(null);
+            item.setOriginalPrice(BigDecimal.ZERO);
+            item.setSalePrice(BigDecimal.ZERO);
+            item.setRefundPrice(BigDecimal.ZERO);
             item.setDeliveryStatus(entity.getDeliveryStatus());
             return item;
         }

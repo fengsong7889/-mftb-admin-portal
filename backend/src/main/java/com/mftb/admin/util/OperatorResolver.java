@@ -29,25 +29,32 @@ public class OperatorResolver {
 
     /** 当前登录人显示名: 优先姓名, 无姓名时回退登录账号 */
     public String currentOperatorName() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            return null;
-        }
-        String username = String.valueOf(authentication.getPrincipal());
-        SysUser user = sysUserMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
-        return user != null && StringUtils.hasText(user.getName()) ? user.getName() : username;
+        SysUser user = currentUser();
+        return user != null && StringUtils.hasText(user.getName()) ? user.getName() : extractUsername();
     }
 
-    /** 当前登录用户实体, 未登录返回 null */
+    /** 当前登录用户实体, 未登录返回 null（优先复用 Filter 已查的缓存，避免重复查库） */
     public SysUser currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
             return null;
         }
+        // 优先从 details 获取 JwtAuthenticationFilter 已缓存的用户实体
+        if (authentication.getDetails() instanceof SysUser cached) {
+            return cached;
+        }
         String username = String.valueOf(authentication.getPrincipal());
         return sysUserMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+    }
+
+    /** 从 SecurityContext 提取登录账号 */
+    private String extractUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
+        }
+        return String.valueOf(authentication.getPrincipal());
     }
 
     /** 审批中心展示用签名: 姓名(工号), 无工号时仅姓名 */

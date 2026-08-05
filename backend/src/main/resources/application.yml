@@ -22,7 +22,8 @@ mybatis-plus:
   type-aliases-package: com.mftb.admin.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 开发环境用 StdOutImpl，生产环境通过环境变量设置为 NoLoggingImpl 或 Slf4jImpl
+    log-impl: ${MYBATIS_LOG_IMPL:org.apache.ibatis.logging.stdout.StdOutImpl}
   global-config:
     db-config:
       # 主键自增
@@ -34,8 +35,8 @@ mybatis-plus:
 
 # JWT 配置
 jwt:
-  # 密钥（生产环境通过环境变量注入更安全的密钥）
-  secret: ${JWT_SECRET:mftb-admin-jwt-secret-key-please-change-in-production-2024}
+  # 密钥（必须通过环境变量 JWT_SECRET 注入，禁止使用默认值）
+  secret: ${JWT_SECRET}
   # Token 有效期（毫秒）默认 24 小时
   expiration: 86400000
   # Token 请求头名称
@@ -47,6 +48,10 @@ jwt:
 session:
   # 空闲超时时间（毫秒），默认 30 分钟无操作自动登出
   idle-timeout: ${SESSION_IDLE_TIMEOUT:1800000}
+
+# CORS 跨域配置
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
 
 logging:
   level:

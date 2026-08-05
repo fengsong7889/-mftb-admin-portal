@@ -52,6 +52,8 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, Integer status) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(SysUser::getUsername, keyword)

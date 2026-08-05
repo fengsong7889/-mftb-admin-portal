@@ -9,12 +9,14 @@ import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdOrder;
+import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
+import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
@@ -54,6 +56,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderMapper orderMapper;
     private final AdOrderItemStarMapper itemMapper;
     private final AdOrderItemReviveMapper reviveItemMapper;
+    private final AdOrderItemNewStoreMapper newStoreItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
@@ -67,6 +70,8 @@ public class AdOrderServiceImpl implements AdOrderService {
     public PageResult<AdOrderVO> page(long page, long size, String orderNo, Integer algoType,
                                       String groupCode, String storeCode, Integer status,
                                       String startDate, String endDate) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdOrder> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(orderNo)) wrapper.like(AdOrder::getOrderNo, orderNo);
         if (algoType != null) wrapper.eq(AdOrder::getAlgoType, algoType);
@@ -90,7 +95,13 @@ public class AdOrderServiceImpl implements AdOrderService {
         AdOrder order = require(orderNo);
         AdOrderDetailVO vo = AdOrderDetailVO.from(AdOrderVO.from(order));
         fillSummaries(List.of(vo));
-        if (isRevive(order)) {
+        if (isNewStore(order)) {
+            List<AdOrderItemNewStore> items = newStoreItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemNewStore>()
+                            .eq(AdOrderItemNewStore::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemNewStore::getBizDate));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        } else if (isRevive(order)) {
             List<AdOrderItemRevive> items = reviveItemMapper.selectList(
                     new LambdaQueryWrapper<AdOrderItemRevive>()
                             .eq(AdOrderItemRevive::getOrderId, order.getId())
@@ -114,6 +125,25 @@ public class AdOrderServiceImpl implements AdOrderService {
         AdOrder order = require(orderNo);
         if (order.getStatus() == null || order.getStatus() > 2) {
             throw new BusinessException("當前訂單狀態不可退款");
+        }
+
+        // 新店广告退款: 仅标记明细 deliveryStatus=3，无推广金回补（实付为 0）
+        if (isNewStore(order)) {
+            List<AdOrderItemNewStore> items = newStoreItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemNewStore>()
+                            .eq(AdOrderItemNewStore::getOrderId, order.getId())
+                            .in(AdOrderItemNewStore::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemNewStore item : items) {
+                item.setDeliveryStatus(3);
+                newStoreItemMapper.updateById(item);
+            }
+            order.setStatus(4);
+            order.setUpdatedBy(operatorResolver.currentOperatorName());
+            orderMapper.updateById(order);
+            return detail(orderNo);
         }
 
         // 退款开关校验（按订单所属算法类型取对应计价配置）
@@ -212,9 +242,12 @@ public class AdOrderServiceImpl implements AdOrderService {
         if (records.isEmpty()) {
             return;
         }
-        List<Long> starOrderIds = records.stream().filter(r -> !isReviveType(r.getAlgoType()))
+        List<Long> starOrderIds = records.stream()
+                .filter(r -> !isReviveType(r.getAlgoType()) && !isNewStoreType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> reviveOrderIds = records.stream().filter(r -> isReviveType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        List<Long> newStoreOrderIds = records.stream().filter(r -> isNewStoreType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         Map<Long, List<AdOrderItemStar>> byOrder = starOrderIds.isEmpty() ? Map.of()
                 : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
@@ -224,7 +257,20 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : reviveItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemRevive>()
                         .in(AdOrderItemRevive::getOrderId, reviveOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemRevive::getOrderId));
+        Map<Long, List<AdOrderItemNewStore>> newStoreByOrder = newStoreOrderIds.isEmpty() ? Map.of()
+                : newStoreItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemNewStore>()
+                        .in(AdOrderItemNewStore::getOrderId, newStoreOrderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemNewStore::getOrderId));
         for (AdOrderVO vo : records) {
+            if (isNewStoreType(vo.getAlgoType())) {
+                List<AdOrderItemNewStore> items = newStoreByOrder.getOrDefault(vo.getId(), List.of());
+                vo.setRegions(new ArrayList<>());   // 新店广告无商圈
+                vo.setMealSlots(new ArrayList<>()); // 新店广告无餐段
+                vo.setPurchaseDays(items.stream().map(AdOrderItemNewStore::getBizDate)
+                        .filter(java.util.Objects::nonNull).distinct().sorted()
+                        .map(Object::toString).toList());
+                continue;
+            }
             if (isReviveType(vo.getAlgoType())) {
                 List<AdOrderItemRevive> items = reviveByOrder.getOrDefault(vo.getId(), List.of());
                 vo.setRegions(items.stream().map(AdOrderItemRevive::getRegion)
@@ -282,6 +328,15 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private static boolean isReviveType(Integer algoType) {
         return algoType != null && algoType == 3;
+    }
+
+    /** 新店广告订单（algo_type=2） */
+    private static boolean isNewStore(AdOrder order) {
+        return isNewStoreType(order.getAlgoType());
+    }
+
+    private static boolean isNewStoreType(Integer algoType) {
+        return algoType != null && algoType == 2;
     }
 
     /**

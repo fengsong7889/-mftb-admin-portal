@@ -63,7 +63,9 @@ public class FinBatchServiceImpl implements FinBatchService {
         }
         wrapper.orderByDesc(FinBatch::getTradeTime).orderByDesc(FinBatch::getId);
 
-        Page<FinBatch> result = batchMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
+        long p = PageResult.normalizePage(query.getPage());
+        long sz = PageResult.normalizeSize(query.getSize());
+        Page<FinBatch> result = batchMapper.selectPage(new Page<>(p, sz), wrapper);
         List<FinBatchVO> records = result.getRecords().stream().map(FinBatchVO::from).toList();
         return new PageResult<>(records, result.getTotal());
     }

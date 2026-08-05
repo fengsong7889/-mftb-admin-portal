@@ -39,6 +39,8 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
 
     @Override
     public PageResult<AdPricingStarVO> page(long page, long size, Long algoId, String brand, Integer status) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdPricingStar> wrapper = new LambdaQueryWrapper<>();
         if (algoId != null) wrapper.eq(AdPricingStar::getAlgoId, algoId);
         if (StringUtils.hasText(brand)) wrapper.eq(AdPricingStar::getBrand, brand);

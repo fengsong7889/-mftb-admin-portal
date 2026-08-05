@@ -59,8 +59,10 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
                 .lt(query.getCreatedTo() != null, BizMerchantGroup::getCreatedAt, query.createdToTime());
         wrapper.orderByAsc(BizMerchantGroup::getId);
 
+        long p = PageResult.normalizePage(query.getPage());
+        long sz = PageResult.normalizeSize(query.getSize());
         Page<BizMerchantGroup> pageResult =
-                groupMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
+                groupMapper.selectPage(new Page<>(p, sz), wrapper);
 
         // 统计各集团门店数量
         Map<Long, Long> storeCountMap = getStoreCountMap();

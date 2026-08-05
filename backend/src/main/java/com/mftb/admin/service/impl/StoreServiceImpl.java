@@ -18,6 +18,7 @@ import com.mftb.admin.mapper.BizStoreBdMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.StoreService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,6 +52,7 @@ public class StoreServiceImpl implements StoreService {
     private final SysUserMapper userMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<StoreVO> list(StoreQuery query) {
@@ -88,7 +90,9 @@ public class StoreServiceImpl implements StoreService {
                 .lt(query.getCreatedTo() != null, BizStore::getCreatedAt, query.createdToTime());
         wrapper.orderByAsc(BizStore::getId);
 
-        Page<BizStore> pageResult = storeMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
+        long p = PageResult.normalizePage(query.getPage());
+        long sz = PageResult.normalizeSize(query.getSize());
+        Page<BizStore> pageResult = storeMapper.selectPage(new Page<>(p, sz), wrapper);
 
         List<StoreVO> records = pageResult.getRecords().stream()
                 .map(s -> {
@@ -140,8 +144,9 @@ public class StoreServiceImpl implements StoreService {
             wrapper.and(w -> w.like(BizStore::getStoreCode, kw)
                     .or().like(BizStore::getStoreName, kw));
         }
-        wrapper.orderByAsc(BizStore::getStoreCode).last("LIMIT " + OPTION_LIMIT);
-        return storeMapper.selectList(wrapper).stream()
+        wrapper.orderByAsc(BizStore::getStoreCode);
+        Page<BizStore> page = storeMapper.selectPage(new Page<>(1, OPTION_LIMIT, false), wrapper);
+        return page.getRecords().stream()
                 .map(s -> new OptionVO(s.getStoreCode(), s.getStoreCode() + " - " + s.getStoreName()))
                 .toList();
     }
@@ -364,14 +369,10 @@ public class StoreServiceImpl implements StoreService {
     }
 
     /**
-     * 生成下一个门店ID: 取当前最大 MD 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除门店的编号)
+     * 生成下一个门店ID: 通过 BizSeqService 行锁保证并发不重号
      */
     private String generateStoreCode() {
-        Integer maxSeq = jdbcTemplate.queryForObject(
-                "SELECT IFNULL(MAX(CAST(SUBSTRING(store_code, 3) AS UNSIGNED)), 0) FROM biz_store "
-                        + "WHERE store_code REGEXP '^MD[0-9]+$'",
-                Integer.class);
-        return String.format("%s%05d", STORE_CODE_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+        return bizSeqService.nextStoreCode();
     }
 
     private void requireGroupExists(Long groupId) {

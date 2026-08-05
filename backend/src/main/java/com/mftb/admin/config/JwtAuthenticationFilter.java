@@ -1,12 +1,12 @@
 package com.mftb.admin.config;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.common.Result;
-import com.mftb.admin.common.ResultCode;
+import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.AuthService;
 import com.mftb.admin.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -14,17 +14,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,14 +36,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final SysUserMapper sysUserMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AuthService authService;
+    private final ObjectMapper objectMapper;
 
     private static final String HEADER = "Authorization";
     private static final String PREFIX = "Bearer ";
-
-    /** 空闲超时时间（毫秒），默认 30 分钟 */
-    @Value("${session.idle-timeout:1800000}")
-    private long idleTimeout;
 
     /** 活跃时间更新节流间隔（毫秒），默认 5 分钟，避免每次请求都写库 */
     private static final long UPDATE_THROTTLE_MS = 5 * 60 * 1000L;
@@ -68,58 +62,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
             String username = jwtUtil.getUsername(token);
 
-            // ── 查询用户信息 ──
+            // 查询用户信息（用于会话校验和 SecurityContext 缓存）
             SysUser user = sysUserMapper.selectOne(
-                    new LambdaQueryWrapper<SysUser>()
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser>()
                             .eq(SysUser::getUsername, username));
 
-            if (user != null) {
-                // ── 账号停用检测: 账号被停用但 Token 仍存在 ──
-                if (user.getStatus() != null && user.getStatus() == 0) {
-                    writeAccountDisabledResponse(response);
-                    return;
-                }
-
-                // ── 强制下线标记检测（独立于 activeToken，因为强制下线会将 activeToken 置为 null）──
-                if (user.getForceLogoutOperator() != null) {
-                    // 被管理员强制下线 → 返回操作人信息
-                    writeForceLogoutResponse(response, user.getForceLogoutOperator(), user.getForceLogoutEmpId());
-                    return;
-                }
-
-                // ── 单设备登录校验: 检查 Token 是否为当前活跃 Token ──
-                if (user.getActiveToken() != null && !token.equals(user.getActiveToken())) {
-                    if ("account_disabled".equals(user.getForceLogoutReason())) {
-                        // 账号被停用 → 返回 ACCOUNT_DISABLED
-                        writeAccountDisabledResponse(response);
-                        return;
-                    } else {
-                        // 被其他设备登录顶下线 → 返回 SESSION_CONFLICT
-                        writeSessionConflictResponse(response, user.getActiveLoginIp());
-                        return;
-                    }
-                }
-
-                // ── 空闲超时检测 ──
-                if (user.getLastActiveAt() != null) {
-                    long idleMs = java.time.Duration.between(user.getLastActiveAt(), LocalDateTime.now()).toMillis();
-                    if (idleMs > idleTimeout) {
-                        // 空闲超时 → 返回 1004，前端触发登出
-                        writeIdleTimeoutResponse(response);
-                        return;
-                    }
-                }
+            // 复用 AuthService 公共会话校验
+            SessionCheckResult check = authService.checkSession(token, username, user);
+            if (!check.isPassed()) {
+                writeSessionCheckResponse(response, check);
+                return;
             }
 
-            // ── 认证通过，写入 SecurityContext ──
+            // 认证通过，写入 SecurityContext
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
                             username, null,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                            Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER")));
+            // 将用户实体存入 details，供 OperatorResolver 等下游复用，避免重复查库
+            authentication.setDetails(user);
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // ── 节流更新 last_active_at（每 5 分钟最多写库一次）──
+            // 节流更新 last_active_at（每 5 分钟最多写库一次）
             throttleUpdateLastActive(username);
         }
         filterChain.doFilter(request, response);
@@ -147,46 +111,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    /** 返回空闲超时响应（HTTP 200 + 业务码 1004） */
-    private void writeIdleTimeoutResponse(HttpServletResponse response) throws IOException {
+    /** 根据 SessionCheckResult 写入统一的 JSON 响应 */
+    private void writeSessionCheckResponse(HttpServletResponse response, SessionCheckResult check) throws IOException {
         response.setStatus(200);
         response.setContentType("application/json;charset=UTF-8");
-        Result<Void> result = Result.error(ResultCode.SESSION_IDLE_TIMEOUT);
-        response.getWriter().write(objectMapper.writeValueAsString(result));
-    }
-
-    /** 返回账号被停用响应（HTTP 200 + 业务码 401 + ACCOUNT_DISABLED 原因） */
-    private void writeAccountDisabledResponse(HttpServletResponse response) throws IOException {
-        response.setStatus(200);
-        response.setContentType("application/json;charset=UTF-8");
-        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
-        data.put("reason", "ACCOUNT_DISABLED");
-        Result<java.util.Map<String, Object>> result = new Result<>(401, "您的账号已被停用，请联系管理员", data);
-        response.getWriter().write(objectMapper.writeValueAsString(result));
-    }
-
-    /** 返回被强制下线响应（HTTP 200 + 业务码 401 + FORCE_LOGOUT 原因） */
-    private void writeForceLogoutResponse(HttpServletResponse response, String operatorName, String operatorEmpId) throws IOException {
-        response.setStatus(200);
-        response.setContentType("application/json;charset=UTF-8");
-        // 构建包含操作人信息的响应
-        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
-        data.put("reason", "FORCE_LOGOUT");
-        data.put("operatorName", operatorName);
-        data.put("operatorEmpId", operatorEmpId);
-        Result<java.util.Map<String, Object>> result = new Result<>(401, "您的账号已被管理员强制下线", data);
-        response.getWriter().write(objectMapper.writeValueAsString(result));
-    }
-
-    /** 返回被顶下线响应（HTTP 200 + 业务码 401 + SESSION_CONFLICT 原因） */
-    private void writeSessionConflictResponse(HttpServletResponse response, String loginIp) throws IOException {
-        response.setStatus(200);
-        response.setContentType("application/json;charset=UTF-8");
-        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
-        data.put("reason", "SESSION_CONFLICT");
-        data.put("loginIp", loginIp != null ? loginIp : "");
-        data.put("loginLocation", ""); // 预留: 后续可接入 IP 地理位置库
-        Result<java.util.Map<String, Object>> result = new Result<>(401, "您的账号已在其他设备登录", data);
+        Result<?> result = check.getData() != null
+                ? new Result<>(check.getCode(), check.getMessage(), check.getData())
+                : Result.error(check.getCode(), check.getMessage());
         response.getWriter().write(objectMapper.writeValueAsString(result));
     }
 

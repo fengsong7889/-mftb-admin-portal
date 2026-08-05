@@ -50,6 +50,8 @@ public class GiftServiceImpl implements GiftService {
 
     @Override
     public PageResult<GiftRecordVO> listRecords(long page, long size, Long groupId, Long storeId, String brand, String adType) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<BizGiftRecord> wrapper = new LambdaQueryWrapper<>();
         if (groupId != null) wrapper.eq(BizGiftRecord::getGroupId, groupId);
         if (storeId != null) wrapper.eq(BizGiftRecord::getStoreId, storeId);
@@ -150,6 +152,8 @@ public class GiftServiceImpl implements GiftService {
                                                   String brand, String adType, String tradeType,
                                                   String giftId, String orderNo, String algorithmId,
                                                   String startDate, String endDate) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<BizGiftConsume> wrapper = new LambdaQueryWrapper<>();
         if (groupId != null) wrapper.eq(BizGiftConsume::getGroupId, groupId);
         if (storeId != null) wrapper.eq(BizGiftConsume::getStoreId, storeId);

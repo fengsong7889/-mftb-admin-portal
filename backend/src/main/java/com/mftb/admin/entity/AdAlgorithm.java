@@ -19,7 +19,7 @@ public class AdAlgorithm {
     @TableId
     private Long id;
 
-    /** 算法编码（系统生成，如 ALG_STAR_001） */
+    /** 算法编码（系统生成，如 WD00001） */
     private String algoCode;
 
     /** 算法名称 */

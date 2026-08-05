@@ -31,6 +31,11 @@ public class BizSeqService {
     public static final String PREFIX_DEBT = "QK";
     /** 广告订单 */
     public static final String PREFIX_AD_ORDER = "GD";
+    /** 门店编号 */
+    public static final String PREFIX_STORE = "MD";
+
+    /** 门店编号等非日期维度的固定 dateKey */
+    private static final String FIXED_DATE_KEY = "00000000";
 
     private static final DateTimeFormatter DATE_KEY = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -52,6 +57,21 @@ public class BizSeqService {
         }
         // 表内序号从 1 开始计数，编号序号从 0000 起
         return prefix + dateKey + String.format("%04d", current - 1);
+    }
+
+    /**
+     * 生成门店编号（并发安全，行锁保证不重号）
+     *
+     * @return 如 MD00001
+     */
+    public String nextStoreCode() {
+        bizSeqMapper.initSeq(PREFIX_STORE, FIXED_DATE_KEY);
+        bizSeqMapper.increaseSeq(PREFIX_STORE, FIXED_DATE_KEY);
+        Integer current = bizSeqMapper.selectCurrentValue(PREFIX_STORE, FIXED_DATE_KEY);
+        if (current == null) {
+            throw new BusinessException("门店编号生成失败");
+        }
+        return String.format("%s%05d", PREFIX_STORE, current);
     }
 
     /** 按审批类型取流程编号前缀 */

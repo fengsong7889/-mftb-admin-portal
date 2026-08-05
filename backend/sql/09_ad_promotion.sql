@@ -18,7 +18,7 @@
 -- ============================================================
 CREATE TABLE IF NOT EXISTS biz_ad_algorithm (
     id                  BIGINT       PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
-    algo_code           VARCHAR(32)  NOT NULL                   COMMENT '算法编码(系统生成, 如 ALG_STAR_001)',
+    algo_code           VARCHAR(32)  NOT NULL                   COMMENT '算法编码(系统生成, 如 WD00001)',
     algo_name           VARCHAR(128) NOT NULL                   COMMENT '算法名称',
     algo_type           TINYINT      NOT NULL                   COMMENT '算法类型: 1=无敌星星 2=新店广告 3=盘活复苏 4=独家商家 ...',
     brand               VARCHAR(64)                             COMMENT '所属品牌: flashBee=闪蜂 / mFood',
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS biz_ad_day_lock_revive (
 -- 八、盘活复苏初始数据（幂等: 仅当不存在时插入）
 -- ============================================================
 INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, slot_count, params, status, remark, updated_by)
-SELECT 'ALG_REVIVE_001', '盤活復蘇-團購版', 3, 'flashBee', 4, 4, 10,
+SELECT 'PH00001', '盤活復蘇-團購版', 3, 'flashBee', 4, 4, 10,
        JSON_OBJECT(
            'recallDimension', 1,
            'rankingStage', 2,
@@ -258,14 +258,14 @@ SELECT 'ALG_REVIVE_001', '盤活復蘇-團購版', 3, 'flashBee', 4, 4, 10,
            'purchaseLimitDays', 180
        ),
        1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'ALG_REVIVE_001') t);
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'PH00001') t);
 
 -- ============================================================
 -- 六、初始数据（幂等: 仅当不存在时插入）
 -- 预置 1 条无敌星星算法示例, 便于端到端验证（后续可通过「算法库」菜单维护）
 -- ============================================================
 INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, slot_count, params, status, remark, updated_by)
-SELECT 'ALG_STAR_001', '無敵星星-首頁黃金展位', 1, 'flashBee', 1, 1, 5,
+SELECT 'WD00001', '無敵星星-首頁黃金展位', 1, 'flashBee', 1, 1, 5,
        JSON_OBJECT(
            'recallDimension', 1,
            'rankingStage', 2,
@@ -275,5 +275,5 @@ SELECT 'ALG_STAR_001', '無敵星星-首頁黃金展位', 1, 'flashBee', 1, 1, 5
            'purchaseLimitDays', 12
        ),
        1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'ALG_STAR_001') t);
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'WD00001') t);
 

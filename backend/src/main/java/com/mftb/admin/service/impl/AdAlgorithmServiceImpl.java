@@ -1,5 +1,6 @@
 package com.mftb.admin.service.impl;
 
+import cn.hutool.extra.pinyin.PinyinUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
@@ -25,8 +26,6 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 推广算法库服务实现
@@ -34,9 +33,6 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class AdAlgorithmServiceImpl implements AdAlgorithmService {
-
-    /** 算法编码尾部数字序号 */
-    private static final Pattern CODE_SEQ = Pattern.compile("(\\d+)$");
 
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingStarService pricingService;
@@ -48,6 +44,8 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Override
     public PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
                                           Integer channel, Integer status, String keyword, String storeCode) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdAlgorithm> wrapper = new LambdaQueryWrapper<>();
         if (algoType != null) wrapper.eq(AdAlgorithm::getAlgoType, algoType);
         if (StringUtils.hasText(brand)) wrapper.eq(AdAlgorithm::getBrand, brand);
@@ -123,7 +121,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Override
     public AdAlgorithmVO create(AdAlgorithmRequest request) {
         AdAlgorithm entity = new AdAlgorithm();
-        entity.setAlgoCode(generateCode());
+        entity.setAlgoCode(generateCode(request.getAlgoName(), request.getAlgoType()));
         applyRequest(entity, request);
         if (entity.getStatus() == null) {
             entity.setStatus(1);
@@ -182,23 +180,70 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         entity.setRemark(request.getRemark());
     }
 
-    /** 生成算法编码: ALG + 5位序号（忽略种子数据的非数字后缀） */
-    private String generateCode() {
-        List<AdAlgorithm> all = algorithmMapper.selectList(
-                new LambdaQueryWrapper<AdAlgorithm>().select(AdAlgorithm::getAlgoCode));
-        int maxSeq = 0;
-        for (AdAlgorithm algo : all) {
-            if (!StringUtils.hasText(algo.getAlgoCode())) {
-                continue;
-            }
-            Matcher matcher = CODE_SEQ.matcher(algo.getAlgoCode());
-            if (matcher.find()) {
-                try {
-                    maxSeq = Math.max(maxSeq, Integer.parseInt(matcher.group(1)));
-                } catch (NumberFormatException ignored) {
-                }
+    /**
+     * 生成算法编码：拼音首字母前缀 + 5位自增序号（每个算法模块独立排序）
+     * <p>
+     * 规则：
+     * 1. 取算法名称前2个汉字的拼音首字母作为前缀（如「無敵星星」→ WD）
+     * 2. 若不同 algoType 模块前缀冲突，追加第3个字的首字母（如 WDG）
+     * 3. 仍冲突则追加 algoType 数字（如 WD1）
+     * 4. 序号取同前缀下最大序号 +1，格式 %05d
+     */
+    private String generateCode(String algoName, Integer algoType) {
+        String prefix = buildPrefix(algoName, algoType);
+        int maxSeq = maxSeqForPrefix(prefix);
+        return prefix + String.format("%05d", maxSeq + 1);
+    }
+
+    /** 根据算法名称构建编码前缀 */
+    private String buildPrefix(String algoName, Integer algoType) {
+        if (!StringUtils.hasText(algoName) || algoName.length() < 2) {
+            return "ALG";
+        }
+        String two = PinyinUtil.getFirstLetter(algoName.substring(0, 2), "").toUpperCase();
+        // 检查是否与不同 algoType 模块冲突
+        List<AdAlgorithm> existing = algorithmMapper.selectList(
+                new LambdaQueryWrapper<AdAlgorithm>()
+                        .select(AdAlgorithm::getAlgoCode, AdAlgorithm::getAlgoType)
+                        .likeRight(AdAlgorithm::getAlgoCode, two)
+                        .ne(AdAlgorithm::getAlgoType, algoType)
+                        .last("LIMIT 1"));
+        if (existing.isEmpty()) {
+            return two;
+        }
+        // 冲突 → 追加第3个字符的首字母
+        if (algoName.length() >= 3) {
+            String third = PinyinUtil.getFirstLetter(algoName.substring(2, 3), "").toUpperCase();
+            String three = two + third;
+            List<AdAlgorithm> existing3 = algorithmMapper.selectList(
+                    new LambdaQueryWrapper<AdAlgorithm>()
+                            .select(AdAlgorithm::getAlgoCode, AdAlgorithm::getAlgoType)
+                            .likeRight(AdAlgorithm::getAlgoCode, three)
+                            .ne(AdAlgorithm::getAlgoType, algoType)
+                            .last("LIMIT 1"));
+            if (existing3.isEmpty()) {
+                return three;
             }
         }
-        return String.format("ALG%05d", maxSeq + 1);
+        // 仍冲突 → 追加 algoType 数字
+        return two + algoType;
+    }
+
+    /** 查询指定前缀下的最大序号 */
+    private int maxSeqForPrefix(String prefix) {
+        List<AdAlgorithm> all = algorithmMapper.selectList(
+                new LambdaQueryWrapper<AdAlgorithm>()
+                        .select(AdAlgorithm::getAlgoCode)
+                        .likeRight(AdAlgorithm::getAlgoCode, prefix));
+        int maxSeq = 0;
+        for (AdAlgorithm algo : all) {
+            if (!StringUtils.hasText(algo.getAlgoCode())) continue;
+            String suffix = algo.getAlgoCode().substring(prefix.length());
+            try {
+                maxSeq = Math.max(maxSeq, Integer.parseInt(suffix));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return maxSeq;
     }
 }

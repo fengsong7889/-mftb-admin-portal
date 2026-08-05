@@ -4,27 +4,21 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
+import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.dto.UserInfoVO;
-import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.util.JwtUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 认证接口
@@ -37,7 +31,6 @@ public class AuthController {
     private final AuthService authService;
     private final LoginLogService loginLogService;
     private final JwtUtil jwtUtil;
-    private final SysUserMapper sysUserMapper;
 
     /** 登录 */
     @PostMapping("/login")
@@ -86,8 +79,7 @@ public class AuthController {
 
     /**
      * 轻量级会话状态检查（供前端轮询）
-     * 不经过 JWT Filter 的冲突检测，由本方法自行校验，
-     * 返回具体异常原因以便前端主动弹窗提醒。
+     * 复用 AuthService.checkSession 公共校验逻辑
      */
     @GetMapping("/check")
     public Result<?> check(HttpServletRequest request) {
@@ -100,30 +92,11 @@ public class AuthController {
             return Result.error(ResultCode.UNAUTHORIZED);
         }
         String username = jwtUtil.getUsername(token);
-        SysUser user = sysUserMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
-        if (user == null) {
-            return Result.error(ResultCode.UNAUTHORIZED);
-        }
-        // 账号停用
-        if (user.getStatus() != null && user.getStatus() == 0) {
-            return Result.error(ResultCode.ACCOUNT_DISABLED);
-        }
-        // 被管理员强制下线
-        if (user.getForceLogoutOperator() != null) {
-            Map<String, String> data = new HashMap<>();
-            data.put("operatorName", user.getForceLogoutOperator());
-            data.put("operatorEmpId", user.getForceLogoutEmpId() != null ? user.getForceLogoutEmpId() : "");
-            return new Result<>(401, "您的账号已被管理员强制下线", data);
-        }
-        // 被其他设备登录顶下线：返回新登录设备的 IP
-        if (StringUtils.hasText(user.getActiveToken()) && !token.equals(user.getActiveToken())) {
-            if ("account_disabled".equals(user.getForceLogoutReason())) {
-                return Result.error(ResultCode.ACCOUNT_DISABLED);
-            }
-            Map<String, String> data = new HashMap<>();
-            data.put("loginIp", user.getActiveLoginIp() != null ? user.getActiveLoginIp() : "");
-            return new Result<>(401, "您的账号已在其他设备登录", data);
+        SessionCheckResult check = authService.checkSession(token, username, null);
+        if (!check.isPassed()) {
+            return check.getData() != null
+                    ? new Result<>(check.getCode(), check.getMessage(), check.getData())
+                    : Result.error(check.getCode(), check.getMessage());
         }
         return Result.success();
     }

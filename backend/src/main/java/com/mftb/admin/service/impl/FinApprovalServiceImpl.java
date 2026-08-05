@@ -121,7 +121,9 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         }
         wrapper.orderByDesc(FinApproval::getApplyTime).orderByDesc(FinApproval::getId);
 
-        Page<FinApproval> result = approvalMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
+        long p = PageResult.normalizePage(query.getPage());
+        long sz = PageResult.normalizeSize(query.getSize());
+        Page<FinApproval> result = approvalMapper.selectPage(new Page<>(p, sz), wrapper);
         List<FinApprovalVO> records = result.getRecords().stream().map(FinApprovalVO::from).toList();
         return new PageResult<>(records, result.getTotal());
     }

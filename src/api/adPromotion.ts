@@ -590,6 +590,43 @@ export function unlockAdReviveCells(data: AdReviveOrderRequest) {
   return request.post<unknown, void>('/ad/sales/revive/unlock', data, SILENT)
 }
 
+
+/* ==================== 廣告銷售（新店廣告: 贈送天數查詢 + 下單） ==================== */
+
+/** 新店廣告庫存（贈送天數余額）查詢結果 */
+export interface AdNewStoreInventoryVO {
+  algoId: number
+  algoName: string
+  brand: string
+  storeCode: string
+  storeName: string
+  totalGiftDays: number
+  usedGiftDays: number
+  remainingGiftDays: number
+  expireDate: string
+}
+
+/** 新店廣告下單請求（贈送天數全額抵扣，實付 $0） */
+export interface AdNewStoreOrderRequest {
+  algoId: number
+  groupCode: string
+  storeCode: string
+  bdEmpId?: string
+  remark?: string
+  giftDays: number
+  cells: { bizDate: string }[]
+}
+
+/** 查詢新店廣告贈送天數余額 */
+export function fetchAdNewStoreInventory(algoId: number, storeCode: string) {
+  return request.get<unknown, AdNewStoreInventoryVO>("/ad/sales/newstore/inventory", { params: { algoId, storeCode }, ...SILENT })
+}
+
+/** 提交新店廣告訂單（贈送天數全額抵扣） */
+export function placeAdNewStoreOrder(data: AdNewStoreOrderRequest) {
+  return request.post<unknown, AdOrder>("/ad/sales/newstore/order", data, SILENT)
+}
+
 /* ==================== 瀑布流策略 ==================== */
 
 /**

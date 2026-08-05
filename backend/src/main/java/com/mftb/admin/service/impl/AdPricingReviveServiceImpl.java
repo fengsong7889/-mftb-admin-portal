@@ -42,6 +42,8 @@ public class AdPricingReviveServiceImpl implements AdPricingReviveService {
 
     @Override
     public PageResult<AdPricingReviveVO> page(long page, long size, Long algoId, String brand, Integer status) {
+        page = PageResult.normalizePage(page);
+        size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdPricingRevive> wrapper = new LambdaQueryWrapper<>();
         if (algoId != null) wrapper.eq(AdPricingRevive::getAlgoId, algoId);
         if (StringUtils.hasText(brand)) wrapper.eq(AdPricingRevive::getBrand, brand);

@@ -9,6 +9,7 @@ import com.mftb.admin.dto.FinDebtBillVO;
 import com.mftb.admin.dto.FinDebtPageVO;
 import com.mftb.admin.dto.FinDebtQuery;
 import com.mftb.admin.dto.FinDebtRepaymentVO;
+import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.FinDebtBill;
 import com.mftb.admin.entity.FinDebtRepayment;
 import com.mftb.admin.mapper.FinDebtBillMapper;
@@ -44,8 +45,10 @@ public class FinDebtServiceImpl implements FinDebtService {
 
     @Override
     public FinDebtPageVO page(FinDebtQuery query) {
+        long p = PageResult.normalizePage(query.getPage());
+        long sz = PageResult.normalizeSize(query.getSize());
         Page<FinDebtBill> result = billMapper.selectPage(
-                new Page<>(query.getPage(), query.getSize()), buildWrapper(query, true));
+                new Page<>(p, sz), buildWrapper(query, true));
 
         FinDebtPageVO vo = new FinDebtPageVO();
         vo.setRecords(result.getRecords().stream().map(FinDebtBillVO::from).toList());

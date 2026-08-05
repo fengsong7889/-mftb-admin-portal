@@ -6,6 +6,7 @@ import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.MenuPermissionDTO;
+import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.dto.UserInfoVO;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -14,8 +15,10 @@ import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.util.JwtUtil;
+import com.mftb.admin.util.NetworkUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -42,6 +45,10 @@ public class AuthServiceImpl implements AuthService {
     private final DepartmentService departmentService;
     private final LoginLogService loginLogService;
 
+    /** 空闲超时时间（毫秒），与 JwtAuthenticationFilter 保持一致 */
+    @Value("${session.idle-timeout:1800000}")
+    private long idleTimeout;
+
     @Override
     public LoginResponse login(LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
         // 查询用户
@@ -61,7 +68,7 @@ public class AuthServiceImpl implements AuthService {
         // 生成 Token
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());
         // 提取客户端 IP（兼容代理）
-        String clientIp = resolveClientIp(httpRequest);
+        String clientIp = NetworkUtils.getClientIp(httpRequest);
         // 保存活跃 Token + 初始化最后活跃时间（单设备登录 & 空闲超时检测用）
         sysUserMapper.update(null,
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
@@ -94,6 +101,50 @@ public class AuthServiceImpl implements AuthService {
         return buildUserInfo(user);
     }
 
+    @Override
+    public SessionCheckResult checkSession(String token, String username, SysUser user) {
+        if (user == null) {
+            user = sysUserMapper.selectOne(
+                    new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+        }
+        if (user == null) {
+            return SessionCheckResult.fail(ResultCode.UNAUTHORIZED.getCode(), "账号不存在", null);
+        }
+        // 账号停用
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("reason", "ACCOUNT_DISABLED");
+            return SessionCheckResult.fail(401, "您的账号已被停用，请联系管理员", data);
+        }
+        // 强制下线
+        if (user.getForceLogoutOperator() != null) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("reason", "FORCE_LOGOUT");
+            data.put("operatorName", user.getForceLogoutOperator());
+            data.put("operatorEmpId", user.getForceLogoutEmpId());
+            return SessionCheckResult.fail(401, "您的账号已被管理员强制下线", data);
+        }
+        // 单设备登录冲突
+        if (user.getActiveToken() != null && !token.equals(user.getActiveToken())) {
+            if ("account_disabled".equals(user.getForceLogoutReason())) {
+                return SessionCheckResult.fail(ResultCode.ACCOUNT_DISABLED.getCode(), "账号已被停用", null);
+            }
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("reason", "SESSION_CONFLICT");
+            data.put("loginIp", user.getActiveLoginIp() != null ? user.getActiveLoginIp() : "");
+            data.put("loginLocation", "");
+            return SessionCheckResult.fail(401, "您的账号已在其他设备登录", data);
+        }
+        // 空闲超时
+        if (user.getLastActiveAt() != null) {
+            long idleMs = java.time.Duration.between(user.getLastActiveAt(), LocalDateTime.now()).toMillis();
+            if (idleMs > idleTimeout) {
+                return SessionCheckResult.fail(ResultCode.SESSION_IDLE_TIMEOUT.getCode(), "您已长时间未操作，会话已过期", null);
+            }
+        }
+        return SessionCheckResult.ok();
+    }
+
     /** 构建用户信息: 合并「绑定角色」与「所在部门」授权的菜单权限 */
     private UserInfoVO buildUserInfo(SysUser user) {
         UserInfoVO vo = UserInfoVO.from(user);
@@ -124,23 +175,5 @@ public class AuthServiceImpl implements AuthService {
             result.add(dto);
         });
         return result;
-    }
-
-    /**
-     * 提取客户端真实 IP（兼容 Nginx / CDN 等反向代理）
-     */
-    private String resolveClientIp(jakarta.servlet.http.HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        // X-Forwarded-For 可能包含多个 IP，取第一个
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 }

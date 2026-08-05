@@ -320,15 +320,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
 
     /** 某批次上已发生的扣减合计（绝对值） */
     private BigDecimal deductedAmount(String batchNo) {
-        List<FinDetail> details = detailMapper.selectList(
-                new LambdaQueryWrapper<FinDetail>()
-                        .eq(FinDetail::getBatchNo, batchNo)
-                        .lt(FinDetail::getVirtualChange, BigDecimal.ZERO));
-        BigDecimal total = BigDecimal.ZERO;
-        for (FinDetail detail : details) {
-            total = total.add(FinExtras.nonNull(detail.getVirtualChange()).abs());
-        }
-        return total;
+        return detailMapper.sumDeductedByBatchNo(batchNo);
     }
 
     /* ==================== 广告消费 ==================== */

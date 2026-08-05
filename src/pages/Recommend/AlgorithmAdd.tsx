@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, Plu
 import { AlgorithmType, APP_OPTIONS } from './constants'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
+import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
 import './WeightSlider.css'
 
 /** 广告类型标签映射 */
@@ -458,7 +459,10 @@ export default function AlgorithmAdd() {
                   <AppstoreOutlined style={{ fontSize: 15, color: '#52C41A' }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 2 }}>商家展示樣式</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>商家展示樣式</span>
+                    <PopularLayoutPreviewModal />
+                  </div>
                   <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '18px' }}>
                     未指定的位置默認為小圖模式。可選擇手動指定或系統自動計算分配方式。
                   </div>

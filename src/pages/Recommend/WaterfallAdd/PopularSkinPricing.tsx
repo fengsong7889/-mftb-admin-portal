@@ -36,6 +36,7 @@ import {
   ServiceStatus,
   APP_OPTIONS,
 } from '../constants'
+import PopularLayoutPreviewModal from '../../../components/PopularLayoutPreviewModal'
 
 // Mock数据 - 人氣商家可選算法列表
 const ALGORITHM_OPTIONS = [
@@ -114,7 +115,7 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   id: skinIdSeed++,
   name: '',
   price: undefined,
-  dishLayouts: ['grid'],
+  dishLayouts: ['grid', 'carousel'],
   borderType: 'image',
   borderColor: '#FF4D4F',
   borderImage: null,
@@ -626,6 +627,7 @@ export default function PopularSkinPricing() {
                 {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價' : '新增定價'}
               </h2>
               <span style={{ fontSize: 14, color: '#595959' }}>🏆 人氣商家</span>
+              <PopularLayoutPreviewModal />
             </div>
           </div>
         </div>
@@ -772,12 +774,11 @@ export default function PopularSkinPricing() {
                   <div style={fieldLabelStyle}>{requiredMark}菜品展示佈局</div>
                   <Checkbox.Group
                     value={skin.dishLayouts}
-                    disabled={isDetailMode}
-                    onChange={vals => updateSkin(skin.id, { dishLayouts: vals as DishLayout[] })}
+                    disabled
                     options={DISH_LAYOUT_OPTIONS}
                   />
                   <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4, lineHeight: '16px' }}>
-                    可多選，配置該皮膚支持的佈局；風格不售賣給商家，何時展示哪種佈局、在瀑布流第幾個位置展示，由系統配置瀑布流策略時決定
+                    布局样式暂时不允许自由选择，商家购买后，由系統配置瀑布流策略時決定商家展示什么风格的大图模式
                   </div>
                 </div>
                 <div>
@@ -1044,21 +1045,57 @@ export default function PopularSkinPricing() {
         open={!!previewSkin}
         title={`皮膚預覽${previewSkin?.name.trim() ? `：${previewSkin.name}` : ''}`}
         footer={null}
-        width={720}
+        width={620}
         onCancel={() => setPreviewSkin(null)}
       >
         {previewSkin && (
-          <div style={{ background: '#F5F5F5', borderRadius: 8, padding: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: '#F5F5F5', borderRadius: 8, padding: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* 小圖模式 */}
-              <div style={{ maxWidth: 520 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>小圖模式</div>
-                <div style={previewCardStyle(previewSkin)}>
-                  {previewBorderOverlay(previewSkin)}
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {previewStoreLogo(76)}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {previewInfoBlock()}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>📱 小圖模式</div>
+                {/* 瀑布流上下文：上方鄰卡（模糊淡化） */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f0f0f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🍜</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>老友記茶餐廳</div>
+                          <div style={{ fontSize: 10, color: '#8C8C8C', marginTop: 3 }}>★4.2 月售 866</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* 當前卡片 + 「您的門店」標籤 */}
+                  <div style={{ position: 'relative' }}>
+                    <span style={{
+                      position: 'absolute', top: -9, right: 10, zIndex: 1,
+                      fontSize: 10, color: '#fff', fontWeight: 600,
+                      background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                      borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
+                      boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
+                    }}>您的門店</span>
+                    <div style={previewCardStyle(previewSkin)}>
+                      {previewBorderOverlay(previewSkin)}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {previewStoreLogo(76)}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {previewInfoBlock()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* 下方鄰卡（模糊淡化） */}
+                  <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f0f0f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>☕</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>街角咖啡</div>
+                          <div style={{ fontSize: 10, color: '#8C8C8C', marginTop: 3 }}>★4.6 月售 1024</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1067,7 +1104,7 @@ export default function PopularSkinPricing() {
               {/* 大圖模式：左側豎版主圖 + 右側店鋪信息/優惠券/品牌說/商品列 */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>大圖模式</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>🖼️ 大圖模式</span>
                   {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
                   {previewSkin.dishLayouts.length > 1 && previewSkin.dishLayouts.map((layout, idx) => {
                     const isActive = idx === Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)
@@ -1086,34 +1123,70 @@ export default function PopularSkinPricing() {
                     )
                   })}
                 </div>
-                <div style={previewCardStyle(previewSkin)}>
-                  {previewBorderOverlay(previewSkin)}
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
-                    {previewSkin.bigImage
-                      ? (
-                        <div style={{ width: 130, flexShrink: 0, alignSelf: 'stretch' }}>
-                          <img src={previewSkin.bigImage} alt="主圖" style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                {/* 瀑布流上下文：上方鄰卡（模糊淡化） */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f0f0f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🍜</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>老友記茶餐廳</div>
+                          <div style={{ fontSize: 10, color: '#8C8C8C', marginTop: 3 }}>★4.2 月售 866</div>
                         </div>
-                      )
-                      : (
-                        <div style={{
-                          width: 130, flexShrink: 0, alignSelf: 'stretch', borderRadius: 8,
-                          border: '1px dashed #d9d9d9', background: '#fafafa',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 11, color: '#8C8C8C', textAlign: 'center', padding: 8,
-                        }}>未上傳主圖</div>
-                      )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {previewInfoBlock()}
-                      {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
-                      {previewSkin.dishLayouts.length === 0 && (
-                        <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>未選擇菜品展示佈局</div>
-                      )}
-                      {(() => {
-                        const layout = previewSkin.dishLayouts[Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)]
-                        if (!layout) return null
-                        return layout === 'grid' ? renderDishGrid() : renderDishCarousel()
-                      })()}
+                      </div>
+                    </div>
+                  </div>
+                  {/* 當前卡片 + 「您的門店」標籤 */}
+                  <div style={{ position: 'relative' }}>
+                    <span style={{
+                      position: 'absolute', top: -9, right: 10, zIndex: 1,
+                      fontSize: 10, color: '#fff', fontWeight: 600,
+                      background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                      borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
+                      boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
+                    }}>您的門店</span>
+                    <div style={previewCardStyle(previewSkin)}>
+                      {previewBorderOverlay(previewSkin)}
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+                        {previewSkin.bigImage
+                          ? (
+                            <div style={{ width: 130, flexShrink: 0, alignSelf: 'stretch' }}>
+                              <img src={previewSkin.bigImage} alt="主圖" style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                            </div>
+                          )
+                          : (
+                            <div style={{
+                              width: 130, flexShrink: 0, alignSelf: 'stretch', borderRadius: 8,
+                              border: '1px dashed #d9d9d9', background: '#fafafa',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 11, color: '#8C8C8C', textAlign: 'center', padding: 8,
+                            }}>未上傳主圖</div>
+                          )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {previewInfoBlock()}
+                          {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
+                          {previewSkin.dishLayouts.length === 0 && (
+                            <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>未選擇菜品展示佈局</div>
+                          )}
+                          {(() => {
+                            const layout = previewSkin.dishLayouts[Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)]
+                            if (!layout) return null
+                            return layout === 'grid' ? renderDishGrid() : renderDishCarousel()
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* 下方鄰卡（模糊淡化） */}
+                  <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0f0f0' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f0f0f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>☕</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>街角咖啡</div>
+                          <div style={{ fontSize: 10, color: '#8C8C8C', marginTop: 3 }}>★4.6 月售 1024</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

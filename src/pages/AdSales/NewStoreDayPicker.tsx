@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Tag, Button, Space, message, Empty, Modal, Select, Card, Form } from 'antd'
+import { Tag, Button, Space, message, Empty, Modal, Select, Card, Form, Spin } from 'antd'
 import {
   CalendarOutlined,
   SearchOutlined,
@@ -11,6 +11,9 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { fetchAdAlgorithms, fetchAdNewStoreInventory, placeAdNewStoreOrder } from '../../api/adPromotion'
+import type { AdNewStoreInventoryVO } from '../../api/adPromotion'
+import { fetchStores } from '../../api/store'
 
 // 中文星期映射
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
@@ -42,122 +45,120 @@ function AnimatedNumber({ value, suffix }: { value: number; suffix?: string }) {
   return <>{animated.toLocaleString()}{suffix && <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 2 }}>{suffix}</span>}</>
 }
 
-/** Mock数据 - 店铺列表（含BD信息） */
-const MOCK_STORES = [
-  { id: '10001', name: '威尼斯人酒店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10002', name: '皇朝廣場店', bd: 'bd-002', bdName: '李娜' },
-  { id: '10003', name: '黑馬仕美食街', bd: 'bd-003', bdName: '王強' },
-  { id: '10004', name: '新葡京旗艦店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10005', name: '官也街老店', bd: 'bd-004', bdName: '劉敏' },
-]
-
-/** 店铺下拉选项（展示ID） */
-const STORE_OPTIONS = MOCK_STORES.map(s => ({
-  label: `${s.name}（ID：${s.id}）`,
-  value: s.id,
-}))
-
-/** BD选项 */
-const BD_OPTIONS = [
-  { label: '張偉', value: 'bd-001' },
-  { label: '李娜', value: 'bd-002' },
-  { label: '王強', value: 'bd-003' },
-  { label: '劉敏', value: 'bd-004' },
-]
-
-/** 新店廣告算法选项 */
-const NEW_STORE_ALGORITHM_OPTIONS = [
-  { label: '新店廣告-外賣版', value: 'new_store_delivery' },
-  { label: '新店廣告-超市版', value: 'new_store_market' },
-]
-
-/** 算法 → 品牌映射（选择算法后自动带出品牌） */
-const ALGORITHM_BRAND_MAP: Record<string, string> = {
-  new_store_delivery: 'mfood',
-  new_store_market: 'shanfeng',
-}
-
-/** 门店赠送天数记录（来源：贈送管理菜單的贈送數據） */
-interface GiftDaysRecord {
-  totalDays: number      // 贈送總天數
-  usedDays: number       // 已使用天數
-  expireDate: string     // 贈送有效期止
-}
-
-/** Mock数据 - 各门店新店廣告贈送天數（10003 无赠送记录） */
-const MOCK_GIFT_DAYS: Record<string, GiftDaysRecord> = {
-  '10001': { totalDays: 30, usedDays: 12, expireDate: dayjs().add(90, 'day').format('YYYY-MM-DD') },
-  '10002': { totalDays: 15, usedDays: 15, expireDate: dayjs().add(30, 'day').format('YYYY-MM-DD') },
-  '10004': { totalDays: 60, usedDays: 20, expireDate: dayjs().add(150, 'day').format('YYYY-MM-DD') },
-  '10005': { totalDays: 10, usedDays: 0, expireDate: dayjs().add(45, 'day').format('YYYY-MM-DD') },
-}
+// algorithm/store/BD options from backend
 
 export default function NewStoreDayPicker() {
   const navigate = useNavigate()
 
   // 查询条件状态
-  const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
+  const [searchAlgorithm, setSearchAlgorithm] = useState<number | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
-  const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
+  const [searchStoreCode, setSearchStoreCode] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
-  const [queriedStoreId, setQueriedStoreId] = useState<string | null>(null)
+  const [queriedStoreCode, setQueriedStoreCode] = useState<string | null>(null)
+  const [queriedGroupCode, setQueriedGroupCode] = useState<string | null>(null)
 
-  // 各门店已额外消耗的赠送天数（本地提交订单后累加）
-  const [extraUsedDays, setExtraUsedDays] = useState<Record<string, number>>({})
+  const [algorithmOptions, setAlgorithmOptions] = useState<{ label: string; value: number; brand?: string }[]>([])
+  const [storeOptions, setStoreOptions] = useState<{ label: string; value: string }[]>([])
+  const [fetchedStores, setFetchedStores] = useState<{ storeCode: string; storeName: string; id?: number; bdList?: { bdEmpId: string; bdName?: string }[] }[]>([])
+  const [bdOptions, setBdOptions] = useState<{ label: string; value: string }[]>([])
+  const [inventory, setInventory] = useState<AdNewStoreInventoryVO | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  // 日期选择状态
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [currentMonth, setCurrentMonth] = useState<Dayjs>(dayjs())
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [lastSubmitDays, setLastSubmitDays] = useState(0)
 
-  // 当前查询门店的赠送天数信息
+  useEffect(() => {
+    fetchAdAlgorithms({ algoType: 2, status: 1, size: 100 }).then(res => {
+      setAlgorithmOptions(
+        (res.records || []).map(a => ({ label: a.algoName, value: a.id!, brand: a.brand }))
+      )
+    }).catch(() => {})
+  }, [])
+
   const giftInfo = useMemo(() => {
-    if (!queriedStoreId) return null
-    const record = MOCK_GIFT_DAYS[queriedStoreId]
-    if (!record) return null
-    const usedDays = record.usedDays + (extraUsedDays[queriedStoreId] || 0)
+    if (!inventory) return null
     return {
-      totalDays: record.totalDays,
-      usedDays,
-      remainingDays: Math.max(0, record.totalDays - usedDays),
-      expireDate: record.expireDate,
+      totalDays: inventory.totalGiftDays,
+      usedDays: inventory.usedGiftDays,
+      remainingDays: inventory.remainingGiftDays,
+      expireDate: inventory.expireDate || '',
     }
-  }, [queriedStoreId, extraUsedDays])
+  }, [inventory])
 
-  const queriedStore = MOCK_STORES.find(s => s.id === queriedStoreId)
+  const queriedStoreName = inventory?.storeName || queriedStoreCode
 
-  // 算法名称变更处理：自动带出品牌
-  const handleAlgorithmChange = (value: string | null) => {
+  const handleAlgorithmChange = (value: number | null) => {
     setSearchAlgorithm(value)
-    setSearchBrand(value ? ALGORITHM_BRAND_MAP[value] || null : null)
+    const algo = algorithmOptions.find(a => a.value === value)
+    setSearchBrand(algo?.brand || null)
+    // 切换算法时清空门店和BD
+    setSearchStoreCode(null)
+    setSearchBD(null)
+    setStoreOptions([])
+    setBdOptions([])
+    setFetchedStores([])
+    if (algo?.brand) {
+      fetchStores({ brand: algo.brand, size: 200 }).then(res => {
+        const records = res.records || []
+        setStoreOptions(
+          records.map(s => ({ label: `${s.storeName}（${s.storeCode}）`, value: s.storeCode }))
+        )
+        setFetchedStores(
+          records.map(s => ({ storeCode: s.storeCode, storeName: s.storeName, id: s.id, bdList: s.bdList || [] }))
+        )
+      }).catch(() => {})
+    }
   }
 
-  // 门店名称变更处理：自动带出BD
   const handleStoreChange = (value: string | null) => {
-    setSearchStoreName(value)
-    const store = MOCK_STORES.find(s => s.id === value)
-    setSearchBD(store ? store.bd : null)
+    setSearchStoreCode(value)
+    setSearchBD(null)
+    setBdOptions([])
+    if (value) {
+      const store = fetchedStores.find(s => s.storeCode === value)
+      if (store?.bdList && store.bdList.length > 0) {
+        const opts = store.bdList.map(bd => ({
+          label: bd.bdName ? `${bd.bdName}（${bd.bdEmpId}）` : bd.bdEmpId,
+          value: bd.bdEmpId,
+        }))
+        setBdOptions(opts)
+        // 只有一个BD时自动选中
+        if (opts.length === 1) {
+          setSearchBD(opts[0].value)
+        }
+      }
+    }
   }
 
-  // 查询：必须选择算法名称、品牌、门店名称
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
-    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
-    if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
-    setQueriedStoreId(searchStoreName)
+    if (!searchStoreCode) { message.warning('請選擇門店名稱'); return }
+    setQueriedStoreCode(searchStoreCode)
     setSelectedDates([])
     setCurrentMonth(dayjs())
     setHasSearched(true)
+    setLoading(true)
+    try {
+      const data = await fetchAdNewStoreInventory(searchAlgorithm, searchStoreCode)
+      setInventory(data)
+    } catch {
+      setInventory(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // 重置查询条件
   const handleReset = () => {
     setSearchAlgorithm(null); setSearchBrand(null)
-    setSearchStoreName(null); setSearchBD(null)
-    setQueriedStoreId(null); setSelectedDates([])
+    setSearchStoreCode(null); setSearchBD(null)
+    setQueriedStoreCode(null); setQueriedGroupCode(null)
+    setSelectedDates([]); setInventory(null)
     setHasSearched(false)
   }
 
@@ -247,15 +248,29 @@ export default function NewStoreDayPicker() {
     setIsConfirmModalVisible(true)
   }
 
-  // 确认支付：扣减赠送天数
-  const handleConfirmPayment = () => {
-    if (!queriedStoreId) return
-    const days = selectedDates.length
-    setExtraUsedDays(prev => ({ ...prev, [queriedStoreId]: (prev[queriedStoreId] || 0) + days }))
-    setLastSubmitDays(days)
-    setSelectedDates([])
-    setIsConfirmModalVisible(false)
-    setIsSuccessModalVisible(true)
+  const handleConfirmPayment = async () => {
+    if (!queriedStoreCode || !searchAlgorithm || !inventory) return
+    setSubmitting(true)
+    try {
+      await placeAdNewStoreOrder({
+        algoId: searchAlgorithm,
+        groupCode: queriedGroupCode || '',
+        storeCode: queriedStoreCode,
+        bdEmpId: searchBD || undefined,
+        giftDays: selectedDates.length,
+        cells: selectedDates.map(d => ({ bizDate: d })),
+      })
+      setLastSubmitDays(selectedDates.length)
+      setSelectedDates([])
+      setIsConfirmModalVisible(false)
+      setIsSuccessModalVisible(true)
+      const data = await fetchAdNewStoreInventory(searchAlgorithm, queriedStoreCode)
+      setInventory(data)
+    } catch {
+      message.error('下單失敗，請重試')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleViewOrder = () => {
@@ -281,19 +296,19 @@ export default function NewStoreDayPicker() {
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
           <Form.Item label="算法名稱">
             <Select placeholder="請選擇算法" value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={NEW_STORE_ALGORITHM_OPTIONS} />
+              options={algorithmOptions} />
           </Form.Item>
           <Form.Item label="所屬品牌">
             <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
-              options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
+              options={[{ label: '閃蜂', value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} disabled />
           </Form.Item>
           <Form.Item label="門店名稱">
-            <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
+            <Select placeholder="支持ID和名稱搜索" value={searchStoreCode} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
           </Form.Item>
           <Form.Item label="歸屬BD">
             <Select placeholder="選擇門店後自動帶出" value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
               filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
-              options={BD_OPTIONS} />
+              options={bdOptions} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -304,6 +319,7 @@ export default function NewStoreDayPicker() {
         </Form>
       </div>
 
+      <Spin spinning={loading}>
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
           <Empty description="請先選擇算法名稱、所屬品牌、門店名稱，點擊查詢後展示該門店的新店剩餘推廣天數" image={Empty.PRESENTED_IMAGE_SIMPLE} />
@@ -327,7 +343,7 @@ export default function NewStoreDayPicker() {
             title={<Space><GiftOutlined style={{ color: '#E8720C' }} /><span>新店剩餘推廣天數</span><span style={{ fontSize: 12, fontWeight: 400, color: '#8c8c8c' }}>（天數來源：贈送管理菜單）</span></Space>}
             style={{ marginBottom: 16 }}
           >
-            <div key={queriedStoreId} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <div key={queriedStoreCode} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
               {[
                 { label: '贈送總天數', value: <AnimatedNumber value={giftInfo.totalDays} suffix="天" />, icon: <GiftOutlined />, color: '#1890ff', bg: '#E6F7FF' },
                 { label: '已使用天數', value: <AnimatedNumber value={giftInfo.usedDays} suffix="天" />, icon: <CheckCircleOutlined />, color: '#E8720C', bg: '#FFF7E6' },
@@ -500,6 +516,7 @@ export default function NewStoreDayPicker() {
           )}
         </>
       )}
+      </Spin>
 
       {/* 确认订单弹窗 */}
       <Modal title="確認訂單" open={isConfirmModalVisible} onOk={handleConfirmPayment} onCancel={() => setIsConfirmModalVisible(false)}
@@ -509,7 +526,7 @@ export default function NewStoreDayPicker() {
           <div style={{ background: '#fafafa', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
             <div style={{ display: 'flex', marginBottom: 8 }}>
               <span style={{ color: '#8c8c8c', whiteSpace: 'nowrap' }}>推廣門店：</span>
-              <span style={{ fontWeight: 600 }}>{queriedStore ? `${queriedStore.name}（ID：${queriedStore.id}）` : '-'}</span>
+              <span style={{ fontWeight: 600 }}>{queriedStoreCode ? `${queriedStoreName}（${queriedStoreCode}）` : '-'}</span>
             </div>
             <div style={{ display: 'flex', marginBottom: 8 }}>
               <span style={{ color: '#8c8c8c', whiteSpace: 'nowrap' }}>推廣類型：</span>
