@@ -347,7 +347,7 @@ export default function Algorithm() {
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
       render: (v: ServiceStatus) => (
-        <Tag color={v === ServiceStatus.ENABLED ? 'green' : 'default'}>
+        <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
           {v === ServiceStatus.ENABLED ? '啟用' : '停用'}
         </Tag>
       ),

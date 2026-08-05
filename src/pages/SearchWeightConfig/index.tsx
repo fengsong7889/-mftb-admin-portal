@@ -680,7 +680,7 @@ export default function SearchWeightConfig() {
       key: 'status',
       width: 80,
       render: (v: string) =>
-        v === 'active' ? <Tag color="green">生效</Tag> : <Tag color="red">失效</Tag>,
+        v === 'active' ? <Tag color="success">生效</Tag> : <Tag color="default">失效</Tag>,
     },
     {
       title: '操作人',
@@ -1159,9 +1159,9 @@ export default function SearchWeightConfig() {
               <div>
                 <span style={{ color: '#999' }}>狀態：</span>
                 {detailRecord.status === 'active' ? (
-                  <Tag color="green">生效</Tag>
+                  <Tag color="success">生效</Tag>
                 ) : (
-                  <Tag color="red">失效</Tag>
+                  <Tag color="default">失效</Tag>
                 )}
               </div>
               <div>

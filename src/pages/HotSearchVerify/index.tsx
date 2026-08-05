@@ -120,7 +120,7 @@ export default function HotSearchVerify() {
     { title: '來源', dataIndex: 'source', width: 100 },
     {
       title: '狀態', dataIndex: 'status', width: 80,
-      render: (v: string) => <Tag color={v === 'active' ? 'green' : 'default'}>{v === 'active' ? '生效中' : '已停用'}</Tag>,
+      render: (v: string) => <Tag color={v === 'active' ? 'success' : 'default'}>{v === 'active' ? '生效中' : '已停用'}</Tag>,
     },
   ]
 

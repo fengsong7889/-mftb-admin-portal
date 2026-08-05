@@ -528,7 +528,7 @@ export default function HotSearchConfig() {
         />
       )
     },
-    { title: '狀態', dataIndex: 'status', key: 'status', width: 65, render: (v: string) => v === 'active' ? <Tag color="green">啟用</Tag> : <Tag color="default">停用</Tag> },
+    { title: '狀態', dataIndex: 'status', key: 'status', width: 65, render: (v: string) => v === 'active' ? <Tag color="success">啟用</Tag> : <Tag color="default">停用</Tag> },
     {
       title: '操作', key: 'action', width: 160, fixed: 'right',
       render: (_: unknown, record: HotSearchRecord) => (
@@ -1084,7 +1084,7 @@ export default function HotSearchConfig() {
                 </div>
                 <div>
                   <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>状态</div>
-                  <div>{detailRecord.status === 'active' ? <Tag color="green">啟用</Tag> : <Tag color="default">停用</Tag>}</div>
+                  <div>{detailRecord.status === 'active' ? <Tag color="success">啟用</Tag> : <Tag color="default">停用</Tag>}</div>
                 </div>
                 <div>
                   <div style={{ color: '#666', fontSize: 12, marginBottom: 4 }}>最后更新</div>

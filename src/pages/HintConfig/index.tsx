@@ -287,8 +287,8 @@ export default function HintConfig() {
       key: 'status',
       width: 80,
       render: (v: string) => v === 'active'
-        ? <Tag color="green">生效</Tag>
-        : <Tag color="red">失效</Tag>,
+        ? <Tag color="success">生效</Tag>
+        : <Tag color="default">失效</Tag>,
     },
     {
       title: '操作',
@@ -488,7 +488,7 @@ export default function HintConfig() {
               <div><span style={{ color: '#999' }}>展示區域：</span>{detailRecord.region.map(r => regionMap[r]).join('、')}</div>
               <div><span style={{ color: '#999' }}>展示終端：</span>{detailRecord.terminal.map(t => terminalMap[t]).join('、')}</div>
               <div><span style={{ color: '#999' }}>生效時間：</span>{detailRecord.effectStartDate} - {detailRecord.effectEndDate}</div>
-              <div><span style={{ color: '#999' }}>狀態：</span>{detailRecord.status === 'active' ? <Tag color="green">生效</Tag> : <Tag color="red">失效</Tag>}</div>
+              <div><span style={{ color: '#999' }}>狀態：</span>{detailRecord.status === 'active' ? <Tag color="success">生效</Tag> : <Tag color="default">失效</Tag>}</div>
               <div><span style={{ color: '#999' }}>最後更新人：</span>{detailRecord.lastUpdater}</div>
               <div><span style={{ color: '#999' }}>最後更新時間：</span>{detailRecord.lastUpdateTime}</div>
               {detailRecord.jumpType && detailRecord.jumpType !== 'none' && (

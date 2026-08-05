@@ -274,7 +274,7 @@ export default function HotSearchLibrary() {
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 70,
-      render: (v: string) => v === 'active' ? <Tag color="green">生效</Tag> : <Tag color="default">停用</Tag>,
+      render: (v: string) => v === 'active' ? <Tag color="success">生效</Tag> : <Tag color="default">停用</Tag>,
     },
     {
       title: '添加人', dataIndex: 'addedBy', key: 'addedBy', width: 140, ellipsis: true,

@@ -392,7 +392,7 @@ export default function PromotionSlotConfigAdd() {
       width: 80,
       align: 'center',
       render: (v: number) => (
-        <Tag color={v === 1 ? 'green' : 'default'}>
+        <Tag color={v === 1 ? 'success' : 'default'}>
           {v === 1 ? '啟用' : '停用'}
         </Tag>
       ),

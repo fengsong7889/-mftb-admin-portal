@@ -486,7 +486,7 @@ export default function SynonymConfig() {
               placeholder="請選擇適用的業務場景"
             />
           </Form.Item>
-          <Form.Item label="是否啟用" name="status" valuePropName="checked">
+          <Form.Item label="狀態" name="status" valuePropName="checked">
             <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />
           </Form.Item>
           <Form.Item label="備註" name="remark">

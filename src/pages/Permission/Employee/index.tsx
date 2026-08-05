@@ -418,7 +418,7 @@ export default function EmployeeManagement() {
       render: (value: number) => (
         value === EMPLOYEE_STATUS.ENABLED
           ? <Tag color="success">啟用</Tag>
-          : <Tag color="warning">停用</Tag>
+          : <Tag color="default">停用</Tag>
       ),
     },
     {

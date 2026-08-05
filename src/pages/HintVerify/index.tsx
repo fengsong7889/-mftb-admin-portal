@@ -105,9 +105,9 @@ const _jumpTypeMap: Record<string, string> = {
 }
 
 const statusMap: Record<string, { color: string; text: string }> = {
-  active: { color: 'green', text: '生效中' },
+  active: { color: 'success', text: '生效中' },
   inactive: { color: 'default', text: '已停用' },
-  expired: { color: 'red', text: '已過期' },
+  expired: { color: 'error', text: '已過期' },
 }
 
 // ============================

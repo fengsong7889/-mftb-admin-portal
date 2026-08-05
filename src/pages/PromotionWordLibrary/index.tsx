@@ -188,15 +188,11 @@ export default function PromotionWordLibrary() {
       title: '狀態',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
-      render: (status: string, record) => (
-        <Switch
-          size="small"
-          checked={status === 'active'}
-          checkedChildren="啟用"
-          unCheckedChildren="停用"
-          onChange={() => handleToggleStatus(record)}
-        />
+      width: 80,
+      render: (status: string) => (
+        <Tag color={status === 'active' ? 'success' : 'default'}>
+          {status === 'active' ? '啟用' : '停用'}
+        </Tag>
       ),
     },
     {
@@ -323,7 +319,7 @@ export default function PromotionWordLibrary() {
               ))}
             </Radio.Group>
           </Form.Item>
-          <Form.Item label="是否啟用" name="status" valuePropName="checked">
+          <Form.Item label="狀態" name="status" valuePropName="checked">
             <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />
           </Form.Item>
           <Form.Item label="備註" name="remark">

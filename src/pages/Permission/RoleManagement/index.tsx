@@ -238,7 +238,7 @@ export default function RoleManagement() {
       render: (value: number) => (
         value === ROLE_STATUS.ENABLED
           ? <Tag color="success">啟用</Tag>
-          : <Tag color="warning">停用</Tag>
+          : <Tag color="default">停用</Tag>
       ),
     },
     {
