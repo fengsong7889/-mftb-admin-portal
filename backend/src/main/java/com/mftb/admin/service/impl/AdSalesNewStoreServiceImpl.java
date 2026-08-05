@@ -138,7 +138,7 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
         }
 
         // 3. 有效期校验
-        String expireDate = giftRecordMapper.selectList(
+        LocalDate expireDate = giftRecordMapper.selectList(
                 new LambdaQueryWrapper<BizGiftRecord>()
                         .eq(BizGiftRecord::getStoreId, store.getId())
                         .eq(BizGiftRecord::getAdType, GIFT_AD_TYPE)
