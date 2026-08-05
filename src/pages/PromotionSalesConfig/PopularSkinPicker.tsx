@@ -502,7 +502,7 @@ export default function PopularSkinPicker() {
           </Form.Item>
           <Form.Item label="所屬品牌">
             <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
-              options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
+              options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

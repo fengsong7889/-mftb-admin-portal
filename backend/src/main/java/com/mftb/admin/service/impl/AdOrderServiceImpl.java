@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdOrderDetailVO;
 import com.mftb.admin.dto.AdOrderVO;
+import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdOrder;
+import com.mftb.admin.entity.AdOrderItemHot;
 import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
@@ -16,12 +18,14 @@ import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
+import com.mftb.admin.mapper.AdOrderItemHotMapper;
 import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
+import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.FinAccountService;
@@ -57,10 +61,12 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderItemStarMapper itemMapper;
     private final AdOrderItemReviveMapper reviveItemMapper;
     private final AdOrderItemNewStoreMapper newStoreItemMapper;
+    private final AdOrderItemHotMapper hotItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
+    private final AdPricingHotService hotPricingService;
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
@@ -107,6 +113,13 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .eq(AdOrderItemRevive::getOrderId, order.getId())
                             .orderByAsc(AdOrderItemRevive::getBizDate)
                             .orderByAsc(AdOrderItemRevive::getRegion));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        } else if (isHot(order)) {
+            List<AdOrderItemHot> items = hotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemHot>()
+                            .eq(AdOrderItemHot::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemHot::getBizDate)
+                            .orderByAsc(AdOrderItemHot::getSkinName));
             items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
         } else {
             List<AdOrderItemStar> items = itemMapper.selectList(
@@ -155,6 +168,12 @@ public class AdOrderServiceImpl implements AdOrderService {
                 refundEnabled = pricing.getRefundEnabled();
                 cancelFeeTiersJson = pricing.getCancelFeeTiers();
             }
+        } else if (isHot(order)) {
+            AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
         } else {
             AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
             if (pricing != null) {
@@ -191,6 +210,25 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放库存（仅统计活跃明细）
                 reviveItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isHot(order)) {
+            List<AdOrderItemHot> items = hotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemHot>()
+                            .eq(AdOrderItemHot::getOrderId, order.getId())
+                            .in(AdOrderItemHot::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemHot item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3); // 已退款 → 释放格子（退款后可再购）
+                hotItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else {
@@ -243,11 +281,14 @@ public class AdOrderServiceImpl implements AdOrderService {
             return;
         }
         List<Long> starOrderIds = records.stream()
-                .filter(r -> !isReviveType(r.getAlgoType()) && !isNewStoreType(r.getAlgoType()))
+                .filter(r -> !isReviveType(r.getAlgoType()) && !isNewStoreType(r.getAlgoType())
+                        && !isHotType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> reviveOrderIds = records.stream().filter(r -> isReviveType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> newStoreOrderIds = records.stream().filter(r -> isNewStoreType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        List<Long> hotOrderIds = records.stream().filter(r -> isHotType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         Map<Long, List<AdOrderItemStar>> byOrder = starOrderIds.isEmpty() ? Map.of()
                 : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
@@ -261,6 +302,10 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : newStoreItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemNewStore>()
                         .in(AdOrderItemNewStore::getOrderId, newStoreOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemNewStore::getOrderId));
+        Map<Long, List<AdOrderItemHot>> hotByOrder = hotOrderIds.isEmpty() ? Map.of()
+                : hotItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemHot>()
+                        .in(AdOrderItemHot::getOrderId, hotOrderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemHot::getOrderId));
         for (AdOrderVO vo : records) {
             if (isNewStoreType(vo.getAlgoType())) {
                 List<AdOrderItemNewStore> items = newStoreByOrder.getOrDefault(vo.getId(), List.of());
@@ -280,6 +325,18 @@ public class AdOrderServiceImpl implements AdOrderService {
                 vo.setPurchaseDays(items.stream().map(AdOrderItemRevive::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
                         .map(Object::toString).toList());
+                continue;
+            }
+            if (isHotType(vo.getAlgoType())) {
+                List<AdOrderItemHot> items = hotByOrder.getOrDefault(vo.getId(), List.of());
+                vo.setRegions(new ArrayList<>());   // 人气商家无商圈
+                vo.setMealSlots(new ArrayList<>()); // 人气商家无餐段
+                // 購買日期/皮膚列表：明細去重排序，供列表展示
+                vo.setPurchaseDays(items.stream().map(AdOrderItemHot::getBizDate)
+                        .filter(java.util.Objects::nonNull).distinct().sorted()
+                        .map(Object::toString).toList());
+                vo.setSkinNames(items.stream().map(AdOrderItemHot::getSkinName)
+                        .filter(java.util.Objects::nonNull).distinct().sorted().toList());
                 continue;
             }
             List<AdOrderItemStar> items = byOrder.getOrDefault(vo.getId(), List.of());
@@ -337,6 +394,15 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private static boolean isNewStoreType(Integer algoType) {
         return algoType != null && algoType == 2;
+    }
+
+    /** 人气商家订单（algo_type=5） */
+    private static boolean isHot(AdOrder order) {
+        return isHotType(order.getAlgoType());
+    }
+
+    private static boolean isHotType(Integer algoType) {
+        return algoType != null && algoType == 5;
     }
 
     /**

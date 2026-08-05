@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmVO;
+import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
@@ -16,6 +17,7 @@ import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
+import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.util.JsonUtils;
@@ -37,6 +39,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
+    private final AdPricingHotService hotPricingService;
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
@@ -79,6 +82,13 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
         if (algorithm != null && algorithm.getAlgoType() != null && algorithm.getAlgoType() == 3) {
             AdPricingReviveVO pricing = revivePricingService.activeByAlgo(algoId);
+            if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {
+                return false;
+            }
+            blockMerchant = pricing.getBlockMerchant();
+            blockListJson = pricing.getBlockList();
+        } else if (algorithm != null && algorithm.getAlgoType() != null && algorithm.getAlgoType() == 5) {
+            AdPricingHotVO pricing = hotPricingService.activeByAlgo(algoId);
             if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {
                 return false;
             }

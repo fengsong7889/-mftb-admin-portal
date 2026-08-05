@@ -3,6 +3,7 @@ import { Button, Form, Input, Select, Space, message, Table, Tag, Badge, Switch,
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined, AppstoreOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import BrandTag from '../components/BrandTag'
 import {
   fetchAdAlgorithms, fetchWaterfallDetail, createWaterfall, updateWaterfall,
   withAdFallback,
@@ -49,6 +50,7 @@ interface SlotAlgorithm {
   algorithmId: number
   algorithmName: string
   algorithmType: number
+  brand?: string
   status: 1 | 2
 }
 
@@ -57,11 +59,12 @@ interface AlgorithmOption {
   label: string
   value: number
   type: number
+  brand?: string
 }
 
 /** 算法库不可用时的降级选项（当前仅无敌星星接入数据库） */
 const MOCK_ALGORITHM_OPTIONS: AlgorithmOption[] = [
-  { label: '無敵星星-首頁黃金展位', value: 1, type: 1 },
+  { label: '無敵星星-首頁黃金展位', value: 1, type: 1, brand: 'flashBee' },
 ]
 
 export default function PromotionSlotConfigAdd() {
@@ -86,6 +89,8 @@ export default function PromotionSlotConfigAdd() {
   /** 算法库选项（来自「算法库」已启用算法） */
   const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmOption[]>(MOCK_ALGORITHM_OPTIONS)
   const [saving, setSaving] = useState(false)
+  /** 弹窗中当前选中算法的品牌 */
+  const [selectedAlgoBrand, setSelectedAlgoBrand] = useState<string | undefined>(undefined)
   /** 自然流量兜底算法ID（未配置坑位統一讀取該算法數據） */
   const [naturalAlgoId, setNaturalAlgoId] = useState<number | undefined>(undefined)
 
@@ -104,6 +109,7 @@ export default function PromotionSlotConfigAdd() {
             label: a.algoName,
             value: a.id as number,
             type: a.algoType,
+            brand: a.brand as string | undefined,
           })))
         }
       })
@@ -133,6 +139,7 @@ export default function PromotionSlotConfigAdd() {
         algorithmId: s.algoId,
         algorithmName: s.algoName ?? '',
         algorithmType: s.algoType ?? 1,
+        brand: undefined,
         status: (s.status === 2 ? 2 : 1) as 1 | 2,
       })))
     }).catch(() => message.error('加载瀑布流配置失败'))
@@ -143,6 +150,7 @@ export default function PromotionSlotConfigAdd() {
   const handleAddSlot = () => {
     addForm.resetFields()
     setSelectedAlgoType(null)
+    setSelectedAlgoBrand(undefined)
     setSelectedPositions([])
     setEditingPosition(null)
     setIsAddModalVisible(true)
@@ -189,6 +197,7 @@ export default function PromotionSlotConfigAdd() {
                 algorithmId: selectedAlgo.value,
                 algorithmName: selectedAlgo.label,
                 algorithmType: selectedAlgo.type,
+                brand: selectedAlgo.brand,
               }
             : item)
           .sort((a, b) => a.position - b.position))
@@ -200,6 +209,7 @@ export default function PromotionSlotConfigAdd() {
           algorithmId: selectedAlgo.value,
           algorithmName: selectedAlgo.label,
           algorithmType: selectedAlgo.type,
+          brand: selectedAlgo.brand,
           status: 1 as const,
         }))
         setSlotAlgorithms(prev => [...prev, ...newSlots].sort((a, b) => a.position - b.position))
@@ -231,6 +241,7 @@ export default function PromotionSlotConfigAdd() {
     addForm.resetFields()
     addForm.setFieldsValue({ algorithmId: record.algorithmId })
     setSelectedAlgoType(record.algorithmType)
+    setSelectedAlgoBrand(record.brand)
     setSelectedPositions([record.position])
     setEditingPosition(record.position)
     setIsAddModalVisible(true)
@@ -390,6 +401,13 @@ export default function PromotionSlotConfigAdd() {
       render: (v: number) => (
         <Tag color={ALGO_TYPE_COLOR[v] ?? 'default'}>{ALGO_TYPE_LABEL[v] ?? `類型${v}`}</Tag>
       ),
+    },
+    {
+      title: '所屬品牌',
+      dataIndex: 'brand',
+      key: 'brand',
+      width: 100,
+      render: (v: string) => v ? <BrandTag value={v} /> : '-',
     },
     {
       title: '狀態',
@@ -736,6 +754,7 @@ export default function PromotionSlotConfigAdd() {
               onChange={(value) => {
                 const algo = algorithmOptions.find(a => a.value === value)
                 setSelectedAlgoType(algo ? algo.type : null)
+                setSelectedAlgoBrand(algo ? algo.brand : undefined)
               }}
             />
           </Form.Item>
@@ -746,6 +765,13 @@ export default function PromotionSlotConfigAdd() {
               placeholder="請先選擇算法名稱"
               style={{ color: selectedAlgoType !== null ? '#333' : '#bfbfbf' }}
             />
+          </Form.Item>
+          <Form.Item label="所屬品牌">
+            {selectedAlgoBrand ? (
+              <BrandTag value={selectedAlgoBrand} />
+            ) : (
+              <span style={{ color: '#bfbfbf' }}>請先選擇算法名稱</span>
+            )}
           </Form.Item>
           <Form.Item label={
             <span>

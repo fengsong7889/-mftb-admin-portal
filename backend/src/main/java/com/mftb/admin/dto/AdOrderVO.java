@@ -35,6 +35,8 @@ public class AdOrderVO {
     private List<String> mealSlots;
     /** 購買日期列表（盤活復蘇按天售賣，明細 biz_date 去重排序） */
     private List<String> purchaseDays;
+    /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
+    private List<String> skinNames;
     private Integer itemCount;
     private BigDecimal originalAmount;
     private BigDecimal discountAmount;

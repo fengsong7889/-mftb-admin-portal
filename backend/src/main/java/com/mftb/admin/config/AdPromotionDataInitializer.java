@@ -18,7 +18,8 @@ import java.util.Map;
 /**
  * 广告推广模块数据初始化器: 启动时自动创建 biz_ad_* 表并写入种子数据
  * <p>
- * 对应脚本 backend/sql/09_ad_promotion.sql、backend/sql/13_waterfall_strategy.sql
+ * 对应脚本 backend/sql/09_ad_promotion.sql、backend/sql/13_waterfall_strategy.sql、
+ * backend/sql/15_hot_merchant_ad.sql
  */
 @Slf4j
 @Component
@@ -28,7 +29,8 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     /** 启动时自动执行的初始化脚本（classpath 下，幂等可重复执行） */
     private static final List<String> INIT_SCRIPTS = List.of(
             "09_ad_promotion.sql",
-            "13_waterfall_strategy.sql");
+            "13_waterfall_strategy.sql",
+            "15_hot_merchant_ad.sql");
 
     private final JdbcTemplate jdbcTemplate;
 

@@ -239,7 +239,7 @@ export default function Waterfall() {
   
   // 搜索处理
   const handleSearch = (values: Record<string, unknown>) => {
-    // 基礎範圍：當前選中的廣告類型 + 當前業務類型（tab）允許的業務頻道
+    // 基礎範圏：當前選中的廣告類型 + 當前業務類型（tab）允許的業務頻道
     const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
     let result = dataList.filter(item =>
       (selectedAlgorithmType == null || item.algorithmType === selectedAlgorithmType) &&
@@ -274,6 +274,9 @@ export default function Waterfall() {
     setFilteredData(result)
   }
 
+  // 弹窗中选算法后自动带出品牌
+  const [modalAlgoBrand, setModalAlgoBrand] = useState<string | undefined>(undefined)
+
   // 重置搜索
   const handleReset = () => {
     searchForm.resetFields()
@@ -302,6 +305,7 @@ export default function Waterfall() {
         algorithmName: selectedAlgorithm.algoName,
         algorithmType: selectedAlgorithm.algoType,
       })
+      setModalAlgoBrand(selectedAlgorithm.brand as string | undefined)
       // TODO: 从算法配置中加载continuousPurchase等参数默认值
       setContinuousPurchase('notSupport')
     }
@@ -317,6 +321,7 @@ export default function Waterfall() {
       setEditingRecord(null)
       setAlgorithmType(undefined)
       setAlgorithmOptions([])
+      setModalAlgoBrand(undefined)
     } catch (error) {
       console.error('表单验证失败:', error)
     }
@@ -709,6 +714,7 @@ export default function Waterfall() {
           setEditingRecord(null)
           setAlgorithmType(undefined)
           setAlgorithmOptions([])
+          setModalAlgoBrand(undefined)
         }}
         width={1100}
         okText="確定"
@@ -776,6 +782,14 @@ export default function Waterfall() {
                   })()
                 }
               />
+            </Form.Item>
+
+            <Form.Item label="所屬品牌">
+              {modalAlgoBrand ? (
+                <BrandTag value={modalAlgoBrand} />
+              ) : (
+                <span style={{ color: '#bfbfbf' }}>請先選擇算法名稱</span>
+              )}
             </Form.Item>
           </Card>
 

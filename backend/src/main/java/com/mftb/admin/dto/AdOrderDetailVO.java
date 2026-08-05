@@ -1,5 +1,6 @@
 package com.mftb.admin.dto;
 
+import com.mftb.admin.entity.AdOrderItemHot;
 import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
@@ -41,6 +42,8 @@ public class AdOrderDetailVO extends AdOrderVO {
         vo.setOperatorName(order.getOperatorName());
         vo.setRegions(order.getRegions());
         vo.setMealSlots(order.getMealSlots());
+        vo.setPurchaseDays(order.getPurchaseDays());
+        vo.setSkinNames(order.getSkinNames());
         vo.setItemCount(order.getItemCount());
         vo.setOriginalAmount(order.getOriginalAmount());
         vo.setDiscountAmount(order.getDiscountAmount());
@@ -64,6 +67,8 @@ public class AdOrderDetailVO extends AdOrderVO {
         private LocalDate bizDate;
         private Integer region;
         private String mealSlot;
+        /** 皮肤名称（人气商家明细） */
+        private String skinName;
         private BigDecimal originalPrice;
         private BigDecimal salePrice;
         private BigDecimal refundPrice;
@@ -107,6 +112,21 @@ public class AdOrderDetailVO extends AdOrderVO {
             item.setOriginalPrice(BigDecimal.ZERO);
             item.setSalePrice(BigDecimal.ZERO);
             item.setRefundPrice(BigDecimal.ZERO);
+            item.setDeliveryStatus(entity.getDeliveryStatus());
+            return item;
+        }
+
+        /** 人气商家明细（皮肤 x 日期，无商圈/餐段维度） */
+        public static Item from(AdOrderItemHot entity) {
+            Item item = new Item();
+            item.setId(entity.getId());
+            item.setBizDate(entity.getBizDate());
+            item.setRegion(null);
+            item.setMealSlot(null);
+            item.setSkinName(entity.getSkinName());
+            item.setOriginalPrice(entity.getOriginalPrice());
+            item.setSalePrice(entity.getSalePrice());
+            item.setRefundPrice(entity.getRefundPrice());
             item.setDeliveryStatus(entity.getDeliveryStatus());
             return item;
         }
