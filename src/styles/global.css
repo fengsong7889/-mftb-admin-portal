@@ -119,3 +119,15 @@ body {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(350%); }
 }
+
+/* 隐藏 InputNumber 上下箭头，释放内部空间 */
+.no-spinner-input .ant-input-number-handler-wrap {
+  display: none !important;
+}
+.no-spinner-input .ant-input-number-input-wrap {
+  width: 100%;
+}
+.no-spinner-input .ant-input-number-input {
+  padding: 0 !important;
+  text-align: left;
+}

@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, StarFilled } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, HolderOutlined, EyeOutlined, PictureOutlined } from '@ant-design/icons'
 import { AlgorithmType, APP_OPTIONS } from './constants'
-import { mockAlgorithmData } from './Algorithm/index'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import './WeightSlider.css'
@@ -40,15 +39,6 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.GOLDEN_SIGNBOARD]: '🏅',
   [AlgorithmType.PRODUCT_PROMO]: '🎯',
 }
-
-/** 猜你喜歡：評價檔位（對應 APP 評價界面 1~5 星），正數加分、負數減分 */
-const RATING_LEVELS = [
-  { stars: 1, label: '非常差', color: '#FF4D4F', fieldName: 'reviewScore1', defaultScore: -5 },
-  { stars: 2, label: '差', color: '#FAAD14', fieldName: 'reviewScore2', defaultScore: -3 },
-  { stars: 3, label: '一般', color: '#8C8C8C', fieldName: 'reviewScore3', defaultScore: 0 },
-  { stars: 4, label: '滿意', color: '#52C41A', fieldName: 'reviewScore4', defaultScore: 3 },
-  { stars: 5, label: '非常滿意', color: '#E8720C', fieldName: 'reviewScore5', defaultScore: 5 },
-]
 
 /** 店鋪等級配置（獨家商家保障單量 / 品牌商家保障流量共用）：等級 / 標籤 / 標籤色 / 默認值 */
 const STORE_LEVEL_BLOCK_OPTIONS = [
@@ -102,6 +92,59 @@ export default function AlgorithmAdd() {
   const [selectedRegions, _setSelectedRegions] = useState<string[]>([])
   const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
+  /** 人氣商家 - 展示佈局類型 */
+  type PopularLayoutType = 'small' | 'grid' | 'carousel'
+  const POPULAR_LAYOUT_OPTIONS: { value: PopularLayoutType; label: string; icon: string; color: string; desc: string }[] = [
+    { value: 'small', label: '小圖模式', icon: '📱', color: '#1890FF', desc: '緊湊卡片，適合快速瀏覽' },
+    { value: 'grid', label: '大圖拼列（1大2小）', icon: '🖼️', color: '#52C41A', desc: '左側大圖 + 右側2張小圖' },
+    { value: 'carousel', label: '階梯輪播', icon: '🎠', color: '#722ED1', desc: '餐品卡片階梯堆疊輪播' },
+  ]
+  const POPULAR_LAYOUT_LABEL: Record<PopularLayoutType, string> = { small: '小圖模式', grid: '大圖拼列', carousel: '階梯輪播' }
+  const POPULAR_LAYOUT_COLOR: Record<PopularLayoutType, string> = { small: '#1890FF', grid: '#52C41A', carousel: '#722ED1' }
+  /** 人氣商家 - 展示樣式配置 */
+  type LayoutMode = 'manual' | 'auto'
+  interface ManualRule { id: number; position: number; layout: PopularLayoutType }
+  let ruleIdSeed = Date.now()
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('manual')
+  // 指定模式：指定第幾個商家用什么樣式，未指定的默認小圖
+  const [manualRules, setManualRules] = useState<ManualRule[]>([
+    { id: ruleIdSeed++, position: 4, layout: 'grid' },
+    { id: ruleIdSeed++, position: 7, layout: 'carousel' },
+  ])
+  // 系統計算模式：有序閉環循環（A→間隔x→B→間隔y→C→間隔z→回到A）
+  interface AutoLayoutItem { id: number; type: PopularLayoutType; interval: number }
+  const [autoLayouts, setAutoLayouts] = useState<AutoLayoutItem[]>([
+    { id: ruleIdSeed++, type: 'grid', interval: 3 },
+    { id: ruleIdSeed++, type: 'carousel', interval: 4 },
+  ])
+  /** 可用的大圖樣式（排除小圖） */
+  const bigLayoutOptions = POPULAR_LAYOUT_OPTIONS.filter(o => o.value !== 'small')
+  /** 根據配置生成最終展示序列（用於提交） */
+  const layoutSequence = useMemo(() => {
+    if (layoutMode === 'manual') {
+      const maxPos = manualRules.length > 0 ? Math.max(...manualRules.map(r => r.position)) : 0
+      if (maxPos === 0) return ['small']
+      const seq: PopularLayoutType[] = []
+      for (let i = 1; i <= maxPos; i++) {
+        const rule = manualRules.find(r => r.position === i)
+        seq.push(rule ? rule.layout : 'small')
+      }
+      return seq
+    } else {
+      // auto 模式：有序閉環循環
+      if (autoLayouts.length === 0) return ['small']
+      const cycleLen = autoLayouts.reduce((sum, item) => sum + item.interval, 0)
+      const seq: PopularLayoutType[] = []
+      let pos = 1
+      for (const item of autoLayouts) {
+        seq.push(item.type)
+        for (let j = 1; j < item.interval; j++) { seq.push('small'); pos++ }
+        pos++
+      }
+      return seq
+    }
+  }, [layoutMode, manualRules, autoLayouts])
+
   // 新店广告 - 波浪计算配置（周期/间隔为默认值，后续如需调整仅改以下常量）
   /** 新店週期默認天數 */
   const NEW_STORE_CYCLE_DAYS = 60
@@ -151,6 +194,37 @@ export default function AlgorithmAdd() {
           name: detail.algoName,
           brand: brandToAppType(detail.brand),
         })
+        // 解析 params JSON 字符串，回填算法特有参数
+        if (detail.params) {
+          try {
+            const p = typeof detail.params === 'string' ? JSON.parse(detail.params) : detail.params
+            // 人气商家：回填展示布局配置
+            if (p.layoutMode) {
+              setLayoutMode(p.layoutMode as LayoutMode)
+            }
+            if (Array.isArray(p.manualRules) && p.manualRules.length > 0) {
+              setManualRules(p.manualRules.map((r: ManualRule) => ({ ...r, id: ruleIdSeed++ })))
+            }
+            if (Array.isArray(p.autoLayouts) && p.autoLayouts.length > 0) {
+              setAutoLayouts(p.autoLayouts.map((r: AutoLayoutItem) => ({ ...r, id: ruleIdSeed++ })))
+            }
+            // 兼容旧格式
+            if (!p.layoutMode && Array.isArray(p.layoutSequence) && p.layoutSequence.length > 0) {
+              setLayoutMode('manual')
+              const rules: ManualRule[] = p.layoutSequence.map((t: PopularLayoutType, i: number) => t !== 'small' ? { id: ruleIdSeed++, position: i + 1, layout: t } : null).filter(Boolean) as ManualRule[]
+              setManualRules(rules)
+            }
+            // 回填数据一致性校验定时器
+            if (p.consistencyCheckInterval) {
+              form.setFieldsValue({ consistencyCheckInterval: p.consistencyCheckInterval })
+            }
+            // 回填商家状态计算
+            if (p.statusOpen !== undefined) form.setFieldsValue({ statusOpen: p.statusOpen })
+            if (p.statusRest !== undefined) form.setFieldsValue({ statusRest: p.statusRest })
+            if (p.statusOverwhelmed !== undefined) form.setFieldsValue({ statusOverwhelmed: p.statusOverwhelmed })
+            if (p.statusClosed !== undefined) form.setFieldsValue({ statusClosed: p.statusClosed })
+          } catch { /* params 解析失敗保持默認值 */ }
+        }
       })
       .catch(() => { /* 静默请求：错误不阻断页面 */ })
   }, [algorithmIdParam, form])
@@ -212,6 +286,11 @@ export default function AlgorithmAdd() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      // 人气商家：校验
+      if (Number(algorithmTypeParam) === AlgorithmType.POPULAR_MERCHANT_KA && layoutMode === 'manual' && manualRules.some(r => r.position < 1)) {
+        message.error('商家位置至少為 1')
+        return
+      }
       const payload: AdAlgorithmRequest = {
         algoName: values.name,
         algoType: Number(algorithmTypeParam),
@@ -224,6 +303,18 @@ export default function AlgorithmAdd() {
           regionLimit,
           regions: selectedRegions,
           merchantExposureStrategy: values.merchantExposureStrategy,
+          ...(selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? {
+            layoutMode,
+            manualRules: layoutMode === 'manual' ? manualRules.map(({ position, layout }) => ({ position, layout })) : [],
+            autoLayouts: layoutMode === 'auto' ? autoLayouts.map(({ type, interval }) => ({ type, interval })) : [],
+          } : {
+            // 非人氣商家：商家狀態計算 + 數據一致性校驗定時器
+            consistencyCheckInterval: values.consistencyCheckInterval,
+            statusOpen: values.statusOpen ?? true,
+            statusRest: values.statusRest ?? false,
+            statusOverwhelmed: values.statusOverwhelmed ?? false,
+            statusClosed: values.statusClosed ?? false,
+          }),
         },
       }
       if (isEditMode) {
@@ -345,24 +436,188 @@ export default function AlgorithmAdd() {
           </div>
 
 
-          {/* 人气商家：仅显示商家状态计算定时器 */}
-          {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? (
+          {/* ===== 人氣商家：商家展示樣式 + 數據一致性校驗 ===== */}
+          {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA && (
+            <>
+            {/* 數據一致性校驗定時器 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>定時器:</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>每</span>
-                <Form.Item name="merchantStatusTimer" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
-                  <InputNumber
-                    min={1}
-                    max={60}
-                    placeholder="分鐘"
-                    style={{ width: 70 }}
-                  />
+                <Form.Item name="consistencyCheckInterval" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
+                  <InputNumber min={1} max={1440} placeholder="分鐘" style={{ width: 70 }} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘計算切換大小圖模式</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘校驗數據一致性</span>
               </div>
             </div>
-          ) : (
+            {/* 商家展示樣式配置 */}
+            <div style={{ marginBottom: 16 }}>
+              {/* 標題區 */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #f6ffed, #e6f7ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #b7eb8f' }}>
+                  <AppstoreOutlined style={{ fontSize: 15, color: '#52C41A' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 2 }}>商家展示樣式</div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '18px' }}>
+                    未指定的位置默認為小圖模式。可選擇手動指定或系統自動計算分配方式。
+                  </div>
+                </div>
+              </div>
+
+              {/* 模式切換 */}
+              <div style={{ display: 'flex', gap: 0, marginBottom: 14 }}>
+                {([
+                  { value: 'manual' as LayoutMode, label: '指定風格', desc: '指定第幾個商家用什么樣式' },
+                  { value: 'auto' as LayoutMode, label: '系統計算', desc: '設定間隔，系統自動分配' },
+                ]).map(m => (
+                  <div key={m.value}
+                    onClick={() => !isDetailMode && setLayoutMode(m.value)}
+                    style={{
+                      flex: 1, padding: '10px 14px', borderRadius: 8, cursor: isDetailMode ? 'default' : 'pointer',
+                      border: layoutMode === m.value ? '1px solid #52C41A' : '1px solid #f0f0f0',
+                      background: layoutMode === m.value ? '#f6ffed' : '#fafafa',
+                      transition: 'all 0.2s',
+                    }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: layoutMode === m.value ? '#52C41A' : '#595959' }}>{m.label}</div>
+                    <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>{m.desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ===== 指定模式 ===== */}
+              {layoutMode === 'manual' && (
+                <div style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#595959' }}>指定規則（未指定的位置默認小圖）</span>
+                    {!isDetailMode && (
+                      <Button type="dashed" size="small" icon={<PlusOutlined style={{ fontSize: 11 }} />}
+                        onClick={() => setManualRules(prev => [...prev, { id: ruleIdSeed++, position: 1, layout: 'grid' }])}
+                        style={{ fontSize: 12, borderRadius: 4 }}
+                      >添加規則</Button>
+                    )}
+                  </div>
+                  {manualRules.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#bfbfbf', fontSize: 13 }}>
+                      尚未設定規則，所有商家默認展示小圖模式
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {manualRules.map((rule, idx) => (
+                        <div key={rule.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          background: '#fff', borderRadius: 6, padding: '8px 12px', border: '1px solid #f0f0f0',
+                        }}>
+                          <span style={{ fontSize: 13, color: '#595959' }}>第</span>
+                          <InputNumber min={1} max={999} value={rule.position} disabled={isDetailMode}
+                            onChange={v => v && setManualRules(prev => prev.map(r => r.id === rule.id ? { ...r, position: v } : r))}
+                            style={{ width: 60 }} size="small" />
+                          <span style={{ fontSize: 13, color: '#595959' }}>個商家展示</span>
+                          <Select value={rule.layout} disabled={isDetailMode} style={{ width: 170 }} size="small"
+                            onChange={v => setManualRules(prev => prev.map(r => r.id === rule.id ? { ...r, layout: v } : r))}
+                            options={POPULAR_LAYOUT_OPTIONS.filter(o => o.value !== 'small').map(o => ({ label: `${o.icon} ${o.label}`, value: o.value }))}
+                          />
+                          {!isDetailMode && (
+                            <Button type="text" size="small" danger
+                              onClick={() => setManualRules(prev => prev.filter(r => r.id !== rule.id))}
+                              style={{ marginLeft: 'auto', width: 26, height: 26, padding: 0, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}
+                            ><DeleteOutlined /></Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== 系統計算模式：有序閉環循環 ===== */}
+              {layoutMode === 'auto' && (
+                <div style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#595959', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>配置循環鏈：樣式按順序出現，間隔小圖填充，最後一個回到第一個形成閉環</span>
+                    {!isDetailMode && (
+                      <Button type="dashed" size="small" icon={<PlusOutlined style={{ fontSize: 11 }} />}
+                        onClick={() => {
+                          const used = new Set(autoLayouts.map(a => a.type))
+                          const next = bigLayoutOptions.find(o => !used.has(o.value))
+                          if (next) setAutoLayouts(prev => [...prev, { id: ruleIdSeed++, type: next.value, interval: 3 }])
+                        }}
+                        disabled={autoLayouts.length >= bigLayoutOptions.length}
+                        style={{ fontSize: 12, borderRadius: 4 }}
+                      >添加樣式</Button>
+                    )}
+                  </div>
+
+                  {autoLayouts.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#bfbfbf', fontSize: 13 }}>
+                      尚未添加樣式，所有商家默認展示小圖模式
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {autoLayouts.map((item, idx) => {
+                        const opt = POPULAR_LAYOUT_OPTIONS.find(o => o.value === item.type)!
+                        return (
+                          <div key={item.id}>
+                            {/* 連接線 */}
+                            {idx > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 20, height: 18 }}>
+                                <div style={{ width: 1, height: '100%', background: '#d9d9d9' }} />
+                              </div>
+                            )}
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              background: '#fff', borderRadius: 8, padding: '10px 14px',
+                              border: `1px solid ${opt.color}33`,
+                            }}>
+                              {/* 序號 */}
+                              <div style={{
+                                width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                                background: opt.color, color: '#fff',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 12, fontWeight: 700,
+                              }}>{idx + 1}</div>
+                              {/* 樣式選擇 */}
+                              <Select value={item.type} disabled={isDetailMode} style={{ width: 170 }} size="small"
+                                onChange={v => setAutoLayouts(prev => prev.map(a => a.id === item.id ? { ...a, type: v } : a))}
+                                options={bigLayoutOptions.map(o => ({ label: `${o.icon} ${o.label}`, value: o.value }))}
+                              />
+                              <span style={{ fontSize: 13, color: '#595959' }}>出現後，間隔</span>
+                              <InputNumber min={1} max={999} value={item.interval} disabled={isDetailMode}
+                                onChange={v => v && setAutoLayouts(prev => prev.map(a => a.id === item.id ? { ...a, interval: v } : a))}
+                                style={{ width: 60 }} size="small" />
+                              <span style={{ fontSize: 13, color: '#595959' }}>個商家再展示下一個</span>
+                              {!isDetailMode && (
+                                <Button type="text" size="small" danger
+                                  onClick={() => setAutoLayouts(prev => prev.filter(a => a.id !== item.id))}
+                                  style={{ marginLeft: 'auto', width: 26, height: 26, padding: 0, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}
+                                ><DeleteOutlined /></Button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {/* 閉環指示 */}
+                      {autoLayouts.length > 1 && (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 20, height: 18 }}>
+                            <div style={{ width: 1, height: '100%', background: '#d9d9d9' }} />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 4, fontSize: 12, color: '#8c8c8c', fontStyle: 'italic' }}>
+                            <span style={{ fontSize: 14 }}>↻</span>
+                            循環閉環：第 {autoLayouts.length + 1} 個樣式重新從第 1 個開始（循環週期 {autoLayouts.reduce((s, a) => s + a.interval, 0)} 個商家）
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            </>
+          )}
+
+          {/* ===== 其他算法：商家狀態計算 + 數據一致性校驗 ===== */}
+          {selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && (
             <>
           {/* 商家状态计算 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -407,72 +662,32 @@ export default function AlgorithmAdd() {
             <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>用戶興趣得分規則</div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
-                按用戶行為對店鋪累計興趣得分（用戶 × 店鋪 維度）：收藏、下單分別加分；差評對應減分；得分按滾動窗口計算，超過有效期的行為分數自動失效
+                收藏店鋪和下單店鋪的得分由用戶端記錄並賦予，此處僅配置得分有效期，獲取最近多少天的數據分數
               </div>
-
-              {/* 收藏店鋪得分 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>收藏店鋪得分:</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>用戶收藏店鋪即 +</span>
-                <Form.Item name="favoriteScore" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
-                  <InputNumber min={1} max={100} precision={0} style={{ width: 80 }} addonAfter="分" disabled={isDetailMode} />
-                </Form.Item>
-                <Form.Item name="favoriteCancelDeduct" noStyle valuePropName="checked" initialValue={true}>
-                  <Checkbox disabled={isDetailMode}>取消收藏時扣回對應分數</Checkbox>
-                </Form.Item>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（店鋪僅有收藏 / 取消收藏兩種狀態，收藏態計分一次，不重複叠加）</span>
-              </div>
-
-              {/* 下單店鋪得分（不區分訂單類型） */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>下單店鋪得分:</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>用戶每下一筆訂單 +</span>
-                <Form.Item name="orderScore" noStyle initialValue={10} rules={[{ required: true, message: '請輸入' }]}>
-                  <InputNumber min={1} max={100} precision={0} style={{ width: 80 }} addonAfter="分" disabled={isDetailMode} />
-                </Form.Item>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（用戶下單即代表喜歡該店鋪，不區分配送 / 自取等訂單類型）</span>
-              </div>
-
-              {/* 訂單評價得分（五檔星級加減分，卡片樣式與品牌商家「店鋪等級保障流量」一致） */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0, paddingTop: 34 }}>訂單評價得分:</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-                    {RATING_LEVELS.map(({ stars, label, color, fieldName, defaultScore }) => (
-                      <div key={stars} style={{
-                        background: '#fff',
-                        border: `1px solid ${color}33`,
-                        borderTop: `3px solid ${color}`,
-                        borderRadius: 8,
-                        padding: '12px 12px 14px',
-                        textAlign: 'center',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                          <span style={{
-                            padding: '0 12px', height: 24, lineHeight: '24px', borderRadius: 12,
-                            fontSize: 13, fontWeight: 700, color: '#fff',
-                            background: color, display: 'inline-block', whiteSpace: 'nowrap',
-                          }}>{label}</span>
-                        </div>
-                        <div style={{ marginBottom: 8 }}>
-                          {[1, 2, 3, 4, 5].map(n => (
-                            <StarFilled key={n} style={{ fontSize: 14, color: n <= stars ? color : '#d9d9d9', marginRight: 1 }} />
-                          ))}
-                        </div>
-                        <Form.Item name={fieldName} noStyle initialValue={defaultScore} rules={[{ required: true, message: '請輸入' }]}>
-                          <InputNumber min={-100} max={100} precision={0} style={{ width: '100%' }} addonAfter="分" disabled={isDetailMode} />
-                        </Form.Item>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c', lineHeight: '20px' }}>
-                    訂單完成後用戶給予的評價會動態調整得分：正數加分、負數減分、0 不加減分；即使訂單已完成，差評仍會對應減分。
-                    評價加減分以對應訂單為錨點：評價時訂單仍在得分有效期內則生效，並隨該訂單到期一併失效；訂單已超出有效期後再評價，不再計分
-                  </div>
+          
+              {/* 收藏店鋪得分 + 下單店鋪得分（並排只讀展示） */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>收藏店鋪得分:</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#1890FF' }}>
+                    <Form.Item name="favoriteScore" noStyle initialValue={5}>
+                      <InputNumber min={1} max={100} precision={0} style={{ width: 40, border: 'none', background: 'transparent', padding: 0, fontWeight: 700, color: '#1890FF', fontSize: 15 }} className="no-spinner-input" disabled />
+                    </Form.Item>
+                  </span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>分</span>
                 </div>
+                <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>下單店鋪得分:</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#52C41A' }}>
+                    <Form.Item name="orderScore" noStyle initialValue={10}>
+                      <InputNumber min={1} max={100} precision={0} style={{ width: 40, border: 'none', background: 'transparent', padding: 0, fontWeight: 700, color: '#52C41A', fontSize: 15 }} className="no-spinner-input" disabled />
+                    </Form.Item>
+                  </span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>分</span>
+                </div>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（數據來源，業務側配置）</span>
               </div>
-
+          
               {/* 得分有效期 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>得分有效期:</span>
@@ -480,7 +695,7 @@ export default function AlgorithmAdd() {
                 <Form.Item name="scoreValidDays" noStyle initialValue={30} rules={[{ required: true, message: '請輸入' }]}>
                   <InputNumber min={1} max={365} precision={0} style={{ width: 80 }} addonAfter="天" disabled={isDetailMode} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>內的收藏 / 下單 / 評價行為</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>內的收藏 / 下單行為數據</span>
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>（滾動窗口，超期行為分數自動失效，保證推薦反映用戶近期偏好）</span>
               </div>
             </div>
@@ -496,7 +711,7 @@ export default function AlgorithmAdd() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>推送閾值:</span>
                 <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>當店鋪興趣得分 ≥</span>
-                <Form.Item name="pushThreshold" noStyle initialValue={20} rules={[{ required: true, message: '請輸入' }]}>
+                <Form.Item name="pushThreshold" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
                   <InputNumber min={1} max={9999} precision={0} style={{ width: 100 }} addonAfter="分" disabled={isDetailMode} />
                 </Form.Item>
                 <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>時，推送至瀑布流「猜你喜歡」區域展示</span>
@@ -542,7 +757,6 @@ export default function AlgorithmAdd() {
                       options={[
                         { label: '輪詢計算', value: 'random' },
                         { label: '加權隨機（輪盤賭）', value: 'weightedRandom' },
-                        { label: '分數優先＋曝光衰減', value: 'scoreDecay' },
                       ]}
                       disabled={isDetailMode}
                     />
@@ -587,22 +801,6 @@ export default function AlgorithmAdd() {
                       >
                         <QuestionCircleOutlined style={{ color: '#d46b08', cursor: 'pointer', fontSize: 13 }} />
                       </Popover>
-                    </div>
-                  </div>
-                )}
-
-                {/* 分數優先＋曝光衰減說明 */}
-                {merchantExposureStrategy === 'scoreDecay' && (
-                  <div style={{ marginTop: 16, padding: '12px 16px', background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 6 }}>
-                    <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
-                      每次用戶請求到達時，展示當前興趣得分最高的達標店鋪；展示後對該店鋪的曝光得分臨時乘以衰減係數（冷卻），下一次請求時次高分店鋪頂上，實現「高分優先、輪流曝光」，避免單一店鋪霸屏。冷卻僅影響曝光排序，不改變真實興趣得分。
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>曝光衰減係數:</span>
-                      <Form.Item name="exposureDecayFactor" noStyle initialValue={0.7} rules={[{ required: true, message: '請輸入' }]}>
-                        <InputNumber min={0.1} max={0.9} step={0.1} style={{ width: 90 }} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>（每曝光一次，曝光得分 × 係數；係數越小輪換越快，冷卻僅當日生效，次日自動恢復原始得分）</span>
                     </div>
                   </div>
                 )}

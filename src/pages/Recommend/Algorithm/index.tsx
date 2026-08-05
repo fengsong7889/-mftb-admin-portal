@@ -116,74 +116,6 @@ const _TIME_SLOT_LABEL: Record<string, string> = {
   nightSnack: '夜宵(20:00-02:00)',
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const mockAlgorithmData: AlgorithmRecord[] = [
-  // 無敵星星 - 8条
-  { id: 1, name: '無敵星星-美食外賣閃蜂版', code: 'ALG_STAR_001', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 2, name: '無敵星星-美食外賣閃蜂版B', code: 'ALG_STAR_002', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 3, name: '無敵星星-超市百貨閃蜂版', code: 'ALG_STAR_003', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 4, name: '無敵星星-團購到店閃蜂版', code: 'ALG_STAR_004', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 5, name: '無敵星星-美食外賣mFood版', code: 'ALG_STAR_005', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 6, name: '無敵星星-美食外賣mFood版B', code: 'ALG_STAR_006', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 7, name: '無敵星星-超市百貨mFood版', code: 'ALG_STAR_007', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 8, name: '無敵星星-團購到店mFood版', code: 'ALG_STAR_008', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  // 盤活復蘇 - 7条
-  { id: 9, name: '盤活復蘇-美食外賣閃蜂版', code: 'ALG_REV_001', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 10, name: '盤活復蘇-美食外賣閃蜂版B', code: 'ALG_REV_002', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 11, name: '盤活復蘇-超市百貨閃蜂版', code: 'ALG_REV_003', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 12, name: '盤活復蘇-團購到店閃蜂版', code: 'ALG_REV_004', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 13, name: '盤活復蘇-美食外賣mFood版', code: 'ALG_REV_005', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 14, name: '盤活復蘇-美食外賣mFood版B', code: 'ALG_REV_006', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 15, name: '盤活復蘇-超市百貨mFood版', code: 'ALG_REV_007', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  // 團購到店 - 無敵星星
-  { id: 16, name: '無敵星星-團購到店閃蜂版', code: 'ALG_STAR_009', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 17, name: '無敵星星-團購到店mFood版', code: 'ALG_STAR_010', type: AlgorithmType.INVINCIBLE_STAR, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
-  // 團購到店 - 盤活復蘇
-  { id: 18, name: '盤活復蘇-團購到店閃蜂版', code: 'ALG_REV_008', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 19, name: '盤活復蘇-團購到店mFood版', code: 'ALG_REV_009', type: AlgorithmType.HOT_REVIVE_AD, channel: RecommendChannel.GROUP_BUY, placementInterface: PlacementInterface.GROUP_BUY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  // 新店廣告 - 6条
-  { id: 20, name: '新店廣告-美食外賣閃蜂版', code: 'ALG_NEW_001', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 21, name: '新店廣告-美食外賣閃蜂版B', code: 'ALG_NEW_002', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 22, name: '新店廣告-超市百貨閃蜂版', code: 'ALG_NEW_003', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 23, name: '新店廣告-美食外賣mFood版', code: 'ALG_NEW_004', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 24, name: '新店廣告-美食外賣mFood版B', code: 'ALG_NEW_005', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
-  { id: 25, name: '新店廣告-超市百貨mFood版', code: 'ALG_NEW_006', type: AlgorithmType.NEW_STORE_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  // 人氣商家 - 6条
-  { id: 26, name: '人氣商家-美食外賣閃蜂版', code: 'ALG_KA_001', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 27, name: '人氣商家-美食外賣閃蜂版B', code: 'ALG_KA_002', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 28, name: '人氣商家-超市百貨閃蜂版', code: 'ALG_KA_003', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 29, name: '人氣商家-美食外賣mFood版', code: 'ALG_KA_004', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 30, name: '人氣商家-美食外賣mFood版B', code: 'ALG_KA_005', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 31, name: '人氣商家-超市百貨mFood版', code: 'ALG_KA_006', type: AlgorithmType.POPULAR_MERCHANT_KA, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
-  // 獨家商家 - 6条
-  { id: 32, name: '獨家商家-美食外賣閃蜂版', code: 'ALG_EXC_001', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 33, name: '獨家商家-美食外賣閃蜂版B', code: 'ALG_EXC_002', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 34, name: '獨家商家-超市百貨閃蜂版', code: 'ALG_EXC_003', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 2 },
-  { id: 35, name: '獨家商家-美食外賣mFood版', code: 'ALG_EXC_004', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 36, name: '獨家商家-美食外賣mFood版B', code: 'ALG_EXC_005', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 37, name: '獨家商家-超市百貨mFood版', code: 'ALG_EXC_006', type: AlgorithmType.EXCLUSIVE_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 1 },
-  // 品牌商家(KA) - 4条
-  { id: 38, name: '品牌商家-美食外賣閃蜂版', code: 'ALG_BRD_001', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 39, name: '品牌商家-美食外賣mFood版', code: 'ALG_BRD_002', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 40, name: '品牌商家-超市百貨閃蜂版', code: 'ALG_BRD_003', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 41, name: '品牌商家-超市百貨mFood版', code: 'ALG_BRD_004', type: AlgorithmType.BRAND_MERCHANT, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 1 },
-  // 點金廣告 - 4条
-  { id: 42, name: '點金廣告-美食外賣閃蜂版', code: 'ALG_GLD_001', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 3 },
-  { id: 43, name: '點金廣告-美食外賣mFood版', code: 'ALG_GLD_002', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  { id: 44, name: '點金廣告-超市百貨閃蜂版', code: 'ALG_GLD_003', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.DISABLED, slotCount: 1 },
-  { id: 45, name: '點金廣告-超市百貨mFood版', code: 'ALG_GLD_004', type: AlgorithmType.GOLD_AD, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 2 },
-  // 自然流量 - 4条
-  { id: 46, name: '自然流量-美食外賣閃蜂版', code: 'ALG_ORG_001', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 47, name: '自然流量-美食外賣mFood版', code: 'ALG_ORG_002', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 48, name: '自然流量-超市百貨閃蜂版', code: 'ALG_ORG_003', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 49, name: '自然流量-超市百貨mFood版', code: 'ALG_ORG_004', type: AlgorithmType.ORGANIC_TRAFFIC, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 0 },
-  // 猜你喜歡 - 4条
-  { id: 50, name: '猜你喜歡-美食外賣閃蜂版', code: 'ALG_GYL_001', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.HOME, placementInterface: PlacementInterface.HOME, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 51, name: '猜你喜歡-美食外賣mFood版', code: 'ALG_GYL_002', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.DELIVERY, placementInterface: PlacementInterface.DELIVERY, brand: AppType.MFOOD, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 52, name: '猜你喜歡-超市百貨閃蜂版', code: 'ALG_GYL_003', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.SHANFENG, status: ServiceStatus.ENABLED, slotCount: 0 },
-  { id: 53, name: '猜你喜歡-超市百貨mFood版', code: 'ALG_GYL_004', type: AlgorithmType.GUESS_YOU_LIKE, channel: RecommendChannel.SUPERMARKET, placementInterface: PlacementInterface.SUPERMARKET, brand: AppType.MFOOD, status: ServiceStatus.DISABLED, slotCount: 0 },
-]
-
 /** 後端算法 VO → 前端列表記錄 */
 const toAlgorithmRecord = (vo: AdAlgorithm): AlgorithmRecord => ({
   id: vo.id ?? 0,
@@ -207,7 +139,7 @@ export default function Algorithm() {
   const initialType = typeParam ? Number(typeParam) as AlgorithmType : null
   const [selectedType, setSelectedType] = useState<AlgorithmType | null>(initialType)
   const [businessType, setBusinessType] = useState<'delivery' | 'groupBuy'>(tabParam || 'delivery')
-  const [dataList, setDataList] = useState<AlgorithmRecord[]>(mockAlgorithmData)
+  const [dataList, setDataList] = useState<AlgorithmRecord[]>([])
 
   // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
   const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery)

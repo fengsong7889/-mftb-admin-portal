@@ -18,8 +18,7 @@ import {
   ALGO_CARD_COLOR_MAP,
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
-import { mockAlgorithmData, type AlgorithmRecord } from '../Algorithm'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, brandToAppType, type AdPricingStar } from '../../../api/adPromotion'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
 
@@ -177,20 +176,23 @@ export default function Waterfall() {
     return map
   }, [dataList])
 
-  /** 加載定價列表（無敵星星 + 盤活復蘇並行拉取後合併） */
+  /** 加載定價列表（無敵星星 + 盤活復蘇並行拉取後合併）+ 算法列表 */
   useEffect(() => {
     let mounted = true
     Promise.all([
       fetchAdPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
       fetchAdRevivePricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
+      fetchAdAlgorithms({ page: 1, size: 500 }).catch(() => ({ records: [] as AdAlgorithm[], total: 0 })),
     ])
-      .then(([starRes, reviveRes]) => {
+      .then(([starRes, reviveRes, algoRes]) => {
         if (!mounted) return
         const list = [
           ...(starRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.INVINCIBLE_STAR)),
           ...(reviveRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.HOT_REVIVE_AD)),
         ]
         setDataList(list)
+        // 缓存全量算法列表供新增/编辑弹窗筛选
+        setAllAlgorithms(algoRes.records ?? [])
         if (urlType != null) {
           const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
           setFilteredData(list.filter(item => item.algorithmType === urlType && allowed.includes(item.bizChannel ?? '')))
@@ -227,7 +229,8 @@ export default function Waterfall() {
   
   // 算法选择相关状态
   const [algorithmType, setAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
-  const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmRecord[]>([])
+  const [allAlgorithms, setAllAlgorithms] = useState<AdAlgorithm[]>([])
+  const [algorithmOptions, setAlgorithmOptions] = useState<AdAlgorithm[]>([])
   const [continuousPurchase, setContinuousPurchase] = useState<string>('notSupport')
   const [merchantLimit, _setMerchantLimit] = useState<'limited' | 'unlimited'>('unlimited')
   const [selectedMerchants, setSelectedMerchants] = useState<number[]>([])
@@ -284,8 +287,8 @@ export default function Waterfall() {
   // 算法类型变化
   const handleAlgorithmTypeChange = (type: AlgorithmType) => {
     setAlgorithmType(type)
-    const availableAlgorithms = mockAlgorithmData.filter(
-      alg => alg.type === type && alg.status === ServiceStatus.ENABLED
+    const availableAlgorithms = allAlgorithms.filter(
+      alg => alg.algoType === type && alg.status === ServiceStatus.ENABLED
     )
     setAlgorithmOptions(availableAlgorithms)
     form.setFieldsValue({ algorithmId: undefined })
@@ -293,11 +296,11 @@ export default function Waterfall() {
 
   // 算法选择变化
   const handleAlgorithmChange = (algorithmId: number) => {
-    const selectedAlgorithm = mockAlgorithmData.find(alg => alg.id === algorithmId)
+    const selectedAlgorithm = allAlgorithms.find(alg => alg.id === algorithmId)
     if (selectedAlgorithm) {
       form.setFieldsValue({
-        algorithmName: selectedAlgorithm.name,
-        algorithmType: selectedAlgorithm.type,
+        algorithmName: selectedAlgorithm.algoName,
+        algorithmType: selectedAlgorithm.algoType,
       })
       // TODO: 从算法配置中加载continuousPurchase等参数默认值
       setContinuousPurchase('notSupport')
@@ -749,7 +752,7 @@ export default function Waterfall() {
             >
               <Select 
                 placeholder="請先選擇廣告類型" 
-                options={algorithmOptions.map(alg => ({ label: alg.name, value: alg.id }))}
+                options={algorithmOptions.map(alg => ({ label: alg.algoName, value: alg.id }))}
                 onChange={handleAlgorithmChange}
                 disabled={!algorithmType}
               />

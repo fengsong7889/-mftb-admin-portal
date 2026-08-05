@@ -97,6 +97,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeVO update(Long id, EmployeeRequest request) {
         SysUser user = requireUser(id);
+        String oldName = user.getName();
+        String oldDept = user.getDepartment();
         user.setName(request.getName());
         // 工号即登录账号, 由系统生成后不允许修改
         applyDepartment(user, request.getDepartmentId());
@@ -110,6 +112,10 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
+
+        // 姓名或部门变更时，同步更新登录日志中该员工的快照字段
+        syncLoginLogSnapshot(user, oldName, oldDept);
+
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
     }
 
@@ -220,6 +226,29 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setJobLevel(position.getJobLevel());
         // 职等强制跟随职位配置的职等，不允许员工单独设置不同的职等
         user.setRank(position.getRank());
+    }
+
+    /**
+     * 当员工姓名或部门发生变更时，同步更新该员工在登录日志中的快照字段，
+     * 确保员工动态页面展示的姓名/部门与最新信息一致。
+     */
+    private void syncLoginLogSnapshot(SysUser user, String oldName, String oldDept) {
+        boolean nameChanged = !java.util.Objects.equals(oldName, user.getName());
+        boolean deptChanged = !java.util.Objects.equals(oldDept, user.getDepartment());
+        if (!nameChanged && !deptChanged) {
+            return;
+        }
+        LambdaUpdateWrapper<SysLoginLog> wrapper = new LambdaUpdateWrapper<SysLoginLog>()
+                .eq(SysLoginLog::getUserId, user.getId());
+        if (nameChanged) {
+            wrapper.set(SysLoginLog::getEmployeeName, user.getName());
+        }
+        if (deptChanged) {
+            wrapper.set(SysLoginLog::getDepartmentName, user.getDepartment());
+        }
+        sysLoginLogMapper.update(null, wrapper);
+        log.info("同步登录日志快照: userId={}, nameChanged={}, deptChanged={}",
+                user.getId(), nameChanged, deptChanged);
     }
 
     private SysUser requireUser(Long id) {

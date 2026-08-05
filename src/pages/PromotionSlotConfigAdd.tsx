@@ -89,6 +89,12 @@ export default function PromotionSlotConfigAdd() {
   /** 自然流量兜底算法ID（未配置坑位統一讀取該算法數據） */
   const [naturalAlgoId, setNaturalAlgoId] = useState<number | undefined>(undefined)
 
+  /** 自然流量兜底算法選項：只展示算法庫中「自然流量」類型（algoType=7）的算法 */
+  const naturalAlgoOptions = useMemo(
+    () => algorithmOptions.filter(a => a.type === 7),
+    [algorithmOptions],
+  )
+
   /** 加载可选算法: 来自算法库已启用算法（当前仅无敌星星接入） */
   useEffect(() => {
     fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
@@ -684,7 +690,7 @@ export default function PromotionSlotConfigAdd() {
                 optionFilterProp="label"
                 style={{ width: 240, flexShrink: 0 }}
                 disabled={isDetailMode}
-                options={algorithmOptions.map(a => ({ label: a.label, value: a.value }))}
+                options={naturalAlgoOptions.map(a => ({ label: a.label, value: a.value }))}
               />
             </div>
 
