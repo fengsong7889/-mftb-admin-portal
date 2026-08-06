@@ -43,7 +43,7 @@ public class SecurityConfig {
     }
 
     /** CORS 允许的域名（逗号分隔），通过环境变量 CORS_ALLOWED_ORIGINS 注入 */
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://fengsong7889.github.io}")
     private String allowedOrigins;
 
     /** 白名单: 无需认证即可访问 */
