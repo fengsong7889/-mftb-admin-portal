@@ -466,6 +466,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
 
         int created = 0;
+        int updated = 0;
         for (Map.Entry<String, String[]> entry : menus.entrySet()) {
             String menuKey = entry.getKey();
             String name = entry.getValue()[0];
@@ -473,10 +474,8 @@ public class DataInitializer implements CommandLineRunner {
             int sort = Integer.parseInt(entry.getValue()[2]);
 
             Long existing = queryMenuIdByKey(menuKey);
-            if (existing != null) {
-                continue;
-            }
 
+            // 计算正确的 parentId
             Long parentId = null;
             if (parentKey != null) {
                 parentId = queryMenuIdByKey(parentKey);
@@ -484,6 +483,29 @@ public class DataInitializer implements CommandLineRunner {
                     log.warn("种子菜单 [{}]: 父菜单 [{}] 不存在, 跳过", menuKey, parentKey);
                     continue;
                 }
+            }
+
+            if (existing != null) {
+                // 更新名称/排序/parentId 与种子数据不一致的记录 (修复 resolveMenuId 占位数据)
+                Map<String, Object> row = jdbcTemplate.queryForList(
+                        "SELECT name, parent_id, sort_order FROM sys_menu WHERE id = ?", existing)
+                        .stream().findFirst().orElse(null);
+                if (row != null) {
+                    String curName = (String) row.get("name");
+                    Number curParentRaw = (Number) row.get("parent_id");
+                    Long curParentId = curParentRaw != null ? curParentRaw.longValue() : null;
+                    int curSort = ((Number) row.get("sort_order")).intValue();
+                    boolean needUpdate = !name.equals(curName)
+                            || !java.util.Objects.equals(curParentId, parentId)
+                            || curSort != sort;
+                    if (needUpdate) {
+                        jdbcTemplate.update(
+                                "UPDATE sys_menu SET name = ?, parent_id = ?, sort_order = ? WHERE id = ?",
+                                name, parentId, sort, existing);
+                        updated++;
+                    }
+                }
+                continue;
             }
 
             if (parentId != null) {
@@ -501,6 +523,9 @@ public class DataInitializer implements CommandLineRunner {
         }
         if (created > 0) {
             log.info("已种子化 {} 个系统菜单到 sys_menu", created);
+        }
+        if (updated > 0) {
+            log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
         }
     }
 

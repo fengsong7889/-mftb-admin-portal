@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from 'react'
-import { Table, Button, Input, Tag, Space, Tooltip, message, Modal, Form, Select, Switch, Popconfirm } from 'antd'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { Table, Button, Input, Tag, Space, Tooltip, message, Modal, Form, Select, Switch, AutoComplete } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Key } from 'react'
 import {
@@ -18,6 +18,9 @@ import {
   EyeInvisibleOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { fetchMenuTree, createMenu, updateMenu, updateMenuStatus, deleteMenu } from '../../api/menu'
+import type { MenuVO, MenuPayload } from '../../api/menu'
+import { renderMenuIcon, getMenuIconOptions } from '../../components/MenuIcon'
 
 /** ────── 类型定义 ────── */
 interface MenuItem {
@@ -33,6 +36,12 @@ interface MenuItem {
   children?: MenuItem[]
 }
 
+/** ────── 前后端类型映射 ────── */
+const TYPE_TO_NUM: Record<string, number> = { directory: 1, menu: 2, button: 3 }
+const NUM_TO_TYPE: Record<number, string> = { 1: 'directory', 2: 'menu', 3: 'button' }
+const STATUS_TO_NUM: Record<string, number> = { enabled: 1, disabled: 0 }
+const NUM_TO_STATUS: Record<number, string> = { 1: 'enabled', 0: 'disabled' }
+
 /** ────── 类型常量 ────── */
 const MENU_TYPE_MAP = {
   directory: { label: '目錄', color: 'blue' },
@@ -46,163 +55,31 @@ const MENU_TYPE_OPTIONS = [
   { label: '按鈕', value: 'button' },
 ]
 
-/** ────── 模拟数据（从 Sidebar menuItems 提取） ────── */
-const generateMockData = (): MenuItem[] => [
-  {
-    id: 'home', parentId: '0', name: '首頁', menuKey: 'home', path: '/',
-    icon: 'HomeOutlined', type: 'menu', sortOrder: 1, status: 'enabled',
-  },
-  {
-    id: 'merchant_group', parentId: '0', name: '商戶集團管理', menuKey: 'merchant_group', path: '',
-    icon: 'ShopOutlined', type: 'directory', sortOrder: 2, status: 'enabled',
-    children: [
-      { id: 'merchant-group-list', parentId: 'merchant_group', name: '集團管理', menuKey: 'merchant-group-list', path: '/merchant-group-list', icon: 'ShopOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-      { id: 'store-list', parentId: 'merchant_group', name: '門店管理', menuKey: 'store-list', path: '/store-list', icon: 'ShopOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-    ],
-  },
-  {
-    id: 'merchant_promotion', parentId: '0', name: '商家推广工具', menuKey: 'merchant_promotion', path: '',
-    icon: 'CrownOutlined', type: 'directory', sortOrder: 3, status: 'enabled',
-    children: [
-      { id: 'promotion-dashboard', parentId: 'merchant_promotion', name: '數據看板', menuKey: 'promotion-dashboard', path: '/promotion-dashboard', icon: 'PieChartOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-      { id: 'promotion-algorithm', parentId: 'merchant_promotion', name: '算法库', menuKey: 'promotion-algorithm', path: '/promotion-algorithm', icon: 'AppstoreOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-      { id: 'promotion-slot-config', parentId: 'merchant_promotion', name: '瀑布流策略', menuKey: 'promotion-slot-config', path: '/promotion-slot-config', icon: 'ColumnHeightOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-      { id: 'promotion-waterfall', parentId: 'merchant_promotion', name: '銷售定價', menuKey: 'promotion-waterfall', path: '/promotion-waterfall', icon: 'WalletOutlined', type: 'menu', sortOrder: 4, status: 'enabled' },
-      {
-        id: 'gift-manage', parentId: 'merchant_promotion', name: '贈送管理', menuKey: 'gift-manage', path: '',
-        icon: 'GiftOutlined', type: 'directory', sortOrder: 5, status: 'enabled',
-        children: [
-          { id: 'gift-detail', parentId: 'gift-manage', name: '推廣贈送', menuKey: 'gift-detail', path: '/gift-detail', icon: 'RedEnvelopeOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'gift-consume-detail', parentId: 'gift-manage', name: '消費明細', menuKey: 'gift-consume-detail', path: '/gift-consume-detail', icon: 'FileTextOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-        ],
-      },
-      { id: 'ad-sales', parentId: 'merchant_promotion', name: '廣告銷售', menuKey: 'ad-sales', path: '/ad-sales', icon: 'ShoppingFilled', type: 'menu', sortOrder: 6, status: 'enabled' },
-      { id: 'promotion-word-library', parentId: 'merchant_promotion', name: '詞庫管理', menuKey: 'promotion-word-library', path: '/promotion-word-library', icon: 'ReadOutlined', type: 'menu', sortOrder: 7, status: 'enabled' },
-    ],
-  },
-  {
-    id: 'promotion-tool', parentId: '0', name: '推广通', menuKey: 'promotion-tool', path: '',
-    icon: 'ThunderboltOutlined', type: 'directory', sortOrder: 4, status: 'enabled',
-    children: [
-      { id: 'promotion-sales-config', parentId: 'promotion-tool', name: '店鋪推廣', menuKey: 'promotion-sales-config', path: '/promotion-sales-config', icon: 'ShoppingFilled', type: 'menu', sortOrder: 1, status: 'enabled' },
-      {
-        id: 'promotion-report-group', parentId: 'promotion-tool', name: '報表分析', menuKey: 'promotion-report-group', path: '',
-        icon: 'BarChartOutlined', type: 'directory', sortOrder: 2, status: 'enabled',
-        children: [
-          { id: 'promotion-report-overview', parentId: 'promotion-report-group', name: '數據概覽', menuKey: 'promotion-report-overview', path: '/promotion-report-overview', icon: 'DashboardOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'promotion-report-order', parentId: 'promotion-report-group', name: '訂單效果報表', menuKey: 'promotion-report-order', path: '/promotion-report-order', icon: 'LineChartOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-          { id: 'promotion-report-compare', parentId: 'promotion-report-group', name: '推薦類型對比', menuKey: 'promotion-report-compare', path: '/promotion-report-compare', icon: 'PieChartOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'search', parentId: '0', name: '搜索管理', menuKey: 'search', path: '',
-    icon: 'SearchOutlined', type: 'directory', sortOrder: 5, status: 'enabled',
-    children: [
-      {
-        id: 'search-config-new', parentId: 'search', name: '搜索配置', menuKey: 'search-config-new', path: '',
-        icon: 'SettingOutlined', type: 'directory', sortOrder: 1, status: 'enabled',
-        children: [
-          { id: 'global-config', parentId: 'search-config-new', name: '全局配置', menuKey: 'global-config', path: '/global-config', icon: 'GlobalOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'channel-strategy', parentId: 'search-config-new', name: '維度策略', menuKey: 'channel-strategy', path: '/channel-strategy', icon: 'ThunderboltOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-        ],
-      },
-      {
-        id: 'search-guide', parentId: 'search', name: '搜索引導', menuKey: 'search-guide', path: '',
-        icon: 'AimOutlined', type: 'directory', sortOrder: 2, status: 'enabled',
-        children: [
-          { id: 'hint-config', parentId: 'search-guide', name: '底紋配置', menuKey: 'hint-config', path: '/hint-config', icon: 'FontSizeOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'hot-search-config', parentId: 'search-guide', name: '熱搜配置', menuKey: 'hot-search-config', path: '/hot-search-config', icon: 'FireOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-          { id: 'search-weight-config', parentId: 'search-guide', name: '權重干預', menuKey: 'search-weight-config', path: '/search-weight-config', icon: 'ColumnHeightOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-        ],
-      },
-      {
-        id: 'search-library', parentId: 'search', name: '搜索詞庫', menuKey: 'search-library', path: '',
-        icon: 'ReadOutlined', type: 'directory', sortOrder: 3, status: 'enabled',
-        children: [
-          { id: 'word-segmentation', parentId: 'search-library', name: '分詞詞庫', menuKey: 'word-segmentation', path: '/word-segmentation', icon: 'ScissorOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'synonym-config', parentId: 'search-library', name: '同義詞庫', menuKey: 'synonym-config', path: '/synonym-config', icon: 'SwapOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-          { id: 'hot-search-library', parentId: 'search-library', name: '熱搜詞庫', menuKey: 'hot-search-library', path: '/hot-search-library', icon: 'FireOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-          { id: 'stop-words', parentId: 'search-library', name: '停用詞庫', menuKey: 'stop-words', path: '/stop-words', icon: 'StopOutlined', type: 'menu', sortOrder: 4, status: 'enabled' },
-        ],
-      },
-      {
-        id: 'search-verify-group', parentId: 'search', name: '效果校驗', menuKey: 'search-verify-group', path: '',
-        icon: 'SafetyCertificateOutlined', type: 'directory', sortOrder: 4, status: 'enabled',
-        children: [
-          { id: 'search-verify', parentId: 'search-verify-group', name: '搜索校驗', menuKey: 'search-verify', path: '/search-verify', icon: 'SearchOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'hint-verify', parentId: 'search-verify-group', name: '底紋校驗', menuKey: 'hint-verify', path: '/hint-verify', icon: 'FontSizeOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-          { id: 'hot-search-verify', parentId: 'search-verify-group', name: '熱搜校驗', menuKey: 'hot-search-verify', path: '/hot-search-verify', icon: 'FireOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-        ],
-      },
-      {
-        id: 'report', parentId: 'search', name: '報表統計', menuKey: 'report', path: '',
-        icon: 'BarChartOutlined', type: 'directory', sortOrder: 5, status: 'enabled',
-        children: [
-          { id: 'hint-report', parentId: 'report', name: '底紋報表', menuKey: 'hint-report', path: '/hint-report', icon: 'LineChartOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'hot-search-report', parentId: 'report', name: '熱搜報表', menuKey: 'hot-search-report', path: '/hot-search-report', icon: 'LineChartOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'finance', parentId: '0', name: '財務管理', menuKey: 'finance', path: '',
-    icon: 'MoneyCollectOutlined', type: 'directory', sortOrder: 6, status: 'enabled',
-    children: [
-      {
-        id: 'promotion', parentId: 'finance', name: '推廣金管理', menuKey: 'promotion', path: '',
-        icon: 'WalletOutlined', type: 'directory', sortOrder: 1, status: 'enabled',
-        children: [
-          { id: 'account-balance', parentId: 'promotion', name: '賬戶餘額', menuKey: 'account-balance', path: '/account-balance', icon: 'AccountBookOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'batch-query', parentId: 'promotion', name: '批次查詢', menuKey: 'batch-query', path: '/batch-query', icon: 'SearchOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-          { id: 'detail-query', parentId: 'promotion', name: '明細查詢', menuKey: 'detail-query', path: '/detail-query', icon: 'FileSearchOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-        ],
-      },
-      {
-        id: 'merchant-reconcile', parentId: 'finance', name: '商戶通對賬', menuKey: 'merchant-reconcile', path: '',
-        icon: 'AuditOutlined', type: 'directory', sortOrder: 2, status: 'enabled',
-        children: [
-          { id: 'writeoff-reconcile', parentId: 'merchant-reconcile', name: '充消對賬', menuKey: 'writeoff-reconcile', path: '/writeoff-reconcile', icon: 'AuditOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-          { id: 'debt-reconcile', parentId: 'merchant-reconcile', name: '欠款對賬', menuKey: 'debt-reconcile', path: '/debt-reconcile', icon: 'CheckCircleOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-        ],
-      },
-      {
-        id: 'approval', parentId: 'finance', name: '審批管理', menuKey: 'approval', path: '',
-        icon: 'CheckCircleOutlined', type: 'directory', sortOrder: 3, status: 'enabled',
-        children: [
-          { id: 'approval-center', parentId: 'approval', name: '審批中心', menuKey: 'approval-center', path: '/approval-center', icon: 'AuditOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'hr', parentId: '0', name: '集團人事', menuKey: 'hr', path: '',
-    icon: 'TeamOutlined', type: 'directory', sortOrder: 7, status: 'enabled',
-    children: [
-      { id: 'employee-management', parentId: 'hr', name: '員工管理', menuKey: 'employee-management', path: '/employee-management', icon: 'UserOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-      { id: 'organization-management', parentId: 'hr', name: '組織管理', menuKey: 'organization-management', path: '/organization-management', icon: 'ApartmentOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-      { id: 'position-management', parentId: 'hr', name: '職位管理', menuKey: 'position-management', path: '/position-management', icon: 'IdcardOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-      { id: 'login-log', parentId: 'hr', name: '員工動態', menuKey: 'login-log', path: '/login-log', icon: 'ScheduleOutlined', type: 'menu', sortOrder: 4, status: 'enabled' },
-    ],
-  },
-  {
-    id: 'permission', parentId: '0', name: '權限管理', menuKey: 'permission', path: '',
-    icon: 'LockOutlined', type: 'directory', sortOrder: 8, status: 'enabled',
-    children: [
-      { id: 'role-management', parentId: 'permission', name: '角色管理', menuKey: 'role-management', path: '/role-management', icon: 'SolutionOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-      { id: 'function-permission', parentId: 'permission', name: '功能授權', menuKey: 'function-permission', path: '/function-permission', icon: 'AppstoreOutlined', type: 'menu', sortOrder: 2, status: 'enabled' },
-      { id: 'data-permission', parentId: 'permission', name: '數據授權', menuKey: 'data-permission', path: '/data-permission', icon: 'DatabaseOutlined', type: 'menu', sortOrder: 3, status: 'enabled' },
-    ],
-  },
-  {
-    id: 'system-config', parentId: '0', name: '系統配置', menuKey: 'system-config', path: '',
-    icon: 'SettingOutlined', type: 'directory', sortOrder: 9, status: 'enabled',
-    children: [
-      { id: 'menu-config', parentId: 'system-config', name: '菜單配置', menuKey: 'menu-config', path: '/menu-config', icon: 'MenuOutlined', type: 'menu', sortOrder: 1, status: 'enabled' },
-    ],
-  },
-]
+/** ────── 后端 VO → 前端 MenuItem 转换 ────── */
+const voToItem = (vo: MenuVO): MenuItem => ({
+  id: String(vo.id),
+  parentId: vo.parentId != null ? String(vo.parentId) : '0',
+  name: vo.name,
+  menuKey: vo.menuKey,
+  path: vo.path || '',
+  icon: vo.icon || '',
+  type: (NUM_TO_TYPE[vo.type] || 'menu') as MenuItem['type'],
+  sortOrder: vo.sort ?? 0,
+  status: (NUM_TO_STATUS[vo.status] || 'enabled') as MenuItem['status'],
+  children: vo.children?.map(voToItem),
+})
+
+/** ────── 前端 MenuItem → 后端 Payload 转换 ────── */
+const itemToPayload = (item: MenuItem, parentId?: string): MenuPayload => ({
+  parentId: parentId != null ? Number(parentId) : (item.parentId !== '0' ? Number(item.parentId) : null),
+  menuKey: item.menuKey,
+  name: item.name,
+  path: item.path || undefined,
+  icon: item.icon || undefined,
+  type: TYPE_TO_NUM[item.type] ?? 2,
+  sort: item.sortOrder,
+  status: STATUS_TO_NUM[item.status] ?? 1,
+})
 
 /** ────── 扁平化树数据 ────── */
 const flattenTree = (data: MenuItem[]): MenuItem[] => {
@@ -218,7 +95,8 @@ const flattenTree = (data: MenuItem[]): MenuItem[] => {
 
 /** ────── 主组件 ────── */
 export default function MenuConfig() {
-  const [data, setData] = useState<MenuItem[]>(generateMockData)
+  const [data, setData] = useState<MenuItem[]>([])
+  const [loading, setLoading] = useState(false)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editForm] = Form.useForm()
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
@@ -231,6 +109,27 @@ export default function MenuConfig() {
   const [editing, setEditing] = useState<MenuItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [modalForm] = Form.useForm()
+
+  // 行勾选（导出用）
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [selectedRows, setSelectedRows] = useState<MenuItem[]>([])
+
+  /** 当前弹窗选择的图标（用于预览） */
+  const currentIcon = Form.useWatch('icon', modalForm)
+
+  /** 加载菜单数据 */
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const tree = await fetchMenuTree()
+      setData(tree.map(voToItem))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  /** 初始化加载 */
+  useEffect(() => { loadData() }, [loadData])
 
   /** 获取所有菜单 key */
   const allKeys = useMemo(() => {
@@ -313,22 +212,26 @@ export default function MenuConfig() {
   const handleSave = async (id: string) => {
     try {
       const values = await editForm.validateFields()
-      const updateItem = (items: MenuItem[]): MenuItem[] => {
-        return items.map((item) => {
-          if (item.id === id) {
-            return { ...item, ...values }
-          }
+      // 找到当前行数据
+      const findItem = (items: MenuItem[]): MenuItem | undefined => {
+        for (const item of items) {
+          if (item.id === id) return item
           if (item.children) {
-            return { ...item, children: updateItem(item.children) }
+            const found = findItem(item.children)
+            if (found) return found
           }
-          return item
-        })
+        }
+        return undefined
       }
-      setData(updateItem(data))
-      setEditingKey(null)
+      const record = findItem(data)
+      if (!record) return
+      const updated = { ...record, ...values }
+      await updateMenu(Number(id), itemToPayload(updated))
       message.success('保存成功')
+      setEditingKey(null)
+      loadData()
     } catch {
-      // validation failed
+      // validation failed or API error
     }
   }
 
@@ -339,28 +242,41 @@ export default function MenuConfig() {
   }
 
   /** 上移/下移 */
-  const handleMove = (id: string, direction: 'up' | 'down') => {
-    const moveInList = (items: MenuItem[]): MenuItem[] => {
-      const idx = items.findIndex((i) => i.id === id)
-      if (idx !== -1) {
-        const newItems = [...items]
-        const targetIdx = direction === 'up' ? idx - 1 : idx + 1
-        if (targetIdx >= 0 && targetIdx < newItems.length) {
-          ;[newItems[idx], newItems[targetIdx]] = [newItems[targetIdx], newItems[idx]]
-          newItems.forEach((item, i) => { item.sortOrder = i + 1 })
-          return newItems
-        }
-        return items
-      }
-      return items.map((item) => {
+  const handleMove = async (id: string, direction: 'up' | 'down') => {
+    // 找到同级列表
+    const findSiblings = (items: MenuItem[]): MenuItem[] | null => {
+      for (const item of items) {
         if (item.children) {
-          return { ...item, children: moveInList(item.children) }
+          const idx = item.children.findIndex((c) => c.id === id)
+          if (idx !== -1) return item.children
+          const deeper = findSiblings(item.children)
+          if (deeper) return deeper
         }
-        return item
-      })
+      }
+      // 检查顶层
+      const topIdx = items.findIndex((c) => c.id === id)
+      if (topIdx !== -1) return items
+      return null
     }
-    setData(moveInList(data))
-    message.success(direction === 'up' ? '已上移' : '已下移')
+    const siblings = findSiblings(data)
+    if (!siblings) return
+    const idx = siblings.findIndex((i) => i.id === id)
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= siblings.length) {
+      message.warning(direction === 'up' ? '已經是最前面' : '已經是最後面')
+      return
+    }
+    // 交换排序
+    const current = siblings[idx]
+    const target = siblings[targetIdx]
+    try {
+      await updateMenu(Number(current.id), { ...itemToPayload(current), sort: target.sortOrder })
+      await updateMenu(Number(target.id), { ...itemToPayload(target), sort: current.sortOrder })
+      message.success(direction === 'up' ? '已上移' : '已下移')
+      loadData()
+    } catch {
+      // API error
+    }
   }
 
   /** 切换状态（带确认弹窗） */
@@ -372,20 +288,10 @@ export default function MenuConfig() {
       content: `確定要${actionText}菜單「${record.name}」嗎？`,
       okText: '確認',
       cancelText: '取消',
-      onOk: () => {
-        const toggle = (items: MenuItem[]): MenuItem[] => {
-          return items.map((item) => {
-            if (item.id === record.id) {
-              return { ...item, status: newStatus }
-            }
-            if (item.children) {
-              return { ...item, children: toggle(item.children) }
-            }
-            return item
-          })
-        }
-        setData(toggle(data))
+      onOk: async () => {
+        await updateMenuStatus(Number(record.id), STATUS_TO_NUM[newStatus])
         message.success(`已${actionText}菜單「${record.name}」`)
+        loadData()
       },
     })
   }
@@ -398,29 +304,57 @@ export default function MenuConfig() {
     setModalVisible(true)
   }
 
+  /** 打开弹窗编辑（完整字段，含图标修改） */
+  const handleOpenModalEdit = (record: MenuItem) => {
+    setEditing(record)
+    modalForm.setFieldsValue({
+      name: record.name,
+      menuKey: record.menuKey,
+      path: record.path,
+      parentId: record.parentId,
+      type: record.type,
+      icon: record.icon,
+      sortOrder: record.sortOrder,
+      status: record.status,
+    })
+    setModalVisible(true)
+  }
+
   /** 弹窗提交 */
   const handleModalSubmit = async () => {
     try {
       const values = await modalForm.validateFields()
       setSubmitting(true)
-      // Mock: 模拟保存
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      const payload: MenuPayload = {
+        parentId: values.parentId === '0' || values.parentId === 0 ? null : Number(values.parentId),
+        menuKey: values.menuKey,
+        name: values.name,
+        path: values.path || undefined,
+        icon: values.icon || undefined,
+        type: TYPE_TO_NUM[values.type] ?? 2,
+        sort: values.sortOrder ? Number(values.sortOrder) : 0,
+        status: values.status === 'enabled' ? 1 : 0,
+      }
       if (editing) {
+        await updateMenu(Number(editing.id), payload)
         message.success('菜單信息已更新')
       } else {
+        await createMenu(payload)
         message.success('菜單創建成功')
       }
       setModalVisible(false)
+      loadData()
     } catch {
-      // validation failed
+      // validation failed or API error
     } finally {
       setSubmitting(false)
     }
   }
 
-  /** 导出 */
+  /** 导出（优先导出勾选数据，未勾选时导出当前列表全部） */
   const handleExport = () => {
-    const allItems = flattenTree(filteredData)
+    const source = selectedRows.length > 0 ? selectedRows : filteredData
+    const allItems = flattenTree(source)
     if (allItems.length === 0) {
       message.warning('當前無數據可導出')
       return
@@ -444,6 +378,13 @@ export default function MenuConfig() {
     a.download = '菜單配置.csv'
     a.click()
     URL.revokeObjectURL(url)
+    message.success(`已導出 ${allItems.length} 條數據${selectedRows.length > 0 ? '（勾選數據）' : ''}`)
+  }
+
+  /** 行勾选变化 */
+  const handleRowSelectChange = (keys: Key[], rows: MenuItem[]) => {
+    setSelectedRowKeys(keys)
+    setSelectedRows(rows)
   }
 
   /** 判断是否在行内编辑中 */
@@ -514,10 +455,18 @@ export default function MenuConfig() {
       title: '圖標',
       dataIndex: 'icon',
       key: 'icon',
-      width: 140,
-      render: (icon: string) => (
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{icon}</span>
-      ),
+      width: 200,
+      render: (icon: string) => {
+        const node = renderMenuIcon(icon)
+        return node ? (
+          <Space size={8}>
+            <span style={{ fontSize: 15, color: '#595959' }}>{node}</span>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{icon}</span>
+          </Space>
+        ) : (
+          <span style={{ fontSize: 12, color: '#BFBFBF' }}>{icon || '—'}</span>
+        )
+      },
     },
     {
       title: '類型',
@@ -545,7 +494,7 @@ export default function MenuConfig() {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 260,
       align: 'center',
       fixed: 'right',
       render: (_: unknown, record) => {
@@ -560,6 +509,7 @@ export default function MenuConfig() {
         return (
           <Space size={4}>
             <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
+            <Button type="link" size="small" onClick={() => handleOpenModalEdit(record)}>設置</Button>
             <Tooltip title="上移">
               <Button type="link" size="small" icon={<ArrowUpOutlined />} onClick={() => handleMove(record.id, 'up')} />
             </Tooltip>
@@ -642,6 +592,11 @@ export default function MenuConfig() {
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+          {selectedRowKeys.length > 0 && (
+            <span style={{ fontSize: 12, color: '#8C8C8C', alignSelf: 'center' }}>
+              已選 {selectedRowKeys.length} 項
+            </span>
+          )}
           <Button
             icon={allExpanded ? <ShrinkOutlined /> : <ExpandAltOutlined />}
             onClick={handleToggleExpandAll}
@@ -666,6 +621,11 @@ export default function MenuConfig() {
           pagination={false}
           size="middle"
           scroll={{ x: 1100 }}
+          loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: handleRowSelectChange,
+          }}
           {...expandConfig}
         />
       </Form>
@@ -707,8 +667,23 @@ export default function MenuConfig() {
           <Form.Item name="type" label="菜單類型" rules={[{ required: true, message: '請選擇菜單類型' }]}>
             <Select placeholder="請選擇菜單類型" options={MENU_TYPE_OPTIONS} />
           </Form.Item>
-          <Form.Item name="icon" label="圖標名稱">
-            <Input placeholder="例如：SettingOutlined" allowClear maxLength={100} />
+          <Form.Item
+            name="icon"
+            label="圖標"
+            extra={currentIcon ? (
+              <Space size={6} style={{ marginTop: 4 }}>
+                <span style={{ fontSize: 15, color: '#595959' }}>{renderMenuIcon(currentIcon) ?? <span style={{ fontSize: 12, color: '#FF4D4F' }}>未識別圖標</span>}</span>
+                <span style={{ fontSize: 12, color: '#8C8C8C' }}>{currentIcon}</span>
+              </Space>
+            ) : null}
+          >
+            <AutoComplete
+              placeholder="選擇或輸入圖標名稱，如 SettingOutlined"
+              allowClear
+              showSearch
+              filterOption={(input, option) => String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+              options={getMenuIconOptions()}
+            />
           </Form.Item>
           <Form.Item name="sortOrder" label="排序">
             <Input placeholder="數字越小越靠前" allowClear />

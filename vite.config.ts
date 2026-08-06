@@ -18,7 +18,7 @@ export default defineConfig({
     proxy: {
       // 将 /api 请求代理到后端 Spring Boot 服务
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },

@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Input, Tag, Empty, Card, Tabs } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { Line, Column } from '@ant-design/charts'
+import { fetchMenuTree } from '../../api/menu'
+import type { MenuVO } from '../../api/menu'
 import {
   SearchOutlined,
   PlusOutlined,
@@ -154,13 +156,40 @@ function useCountUp(target: number, duration = 1200) {
   return value
 }
 
+/** 递归收集菜单 key → 名称映射（与数据库实时同步） */
+const collectMenuNames = (menus: MenuVO[], map: Record<string, string>) => {
+  menus.forEach((m) => {
+    map[m.menuKey] = m.name
+    if (m.children?.length) collectMenuNames(m.children, map)
+  })
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [menuNameMap, setMenuNameMap] = useState<Record<string, string>>({})
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  /** 加载后端菜单名称（菜单配置修改后实时同步） */
+  useEffect(() => {
+    let cancelled = false
+    fetchMenuTree().then((tree) => {
+      if (!cancelled) {
+        const map: Record<string, string> = {}
+        collectMenuNames(tree, map)
+        setMenuNameMap(map)
+      }
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  /** 合并后端菜单名称后的可用菜单列表 */
+  const menuList = useMemo(() => (
+    allMenus.map((m) => (menuNameMap[m.key] ? { ...m, label: menuNameMap[m.key] } : m))
+  ), [menuNameMap])
 
   // 数字动画
   const orderDelivery = useCountUp(165)
@@ -197,7 +226,7 @@ export default function Home() {
   }
 
   const filteredMenus = searchText
-    ? allMenus.filter((m) => m.label.includes(searchText) || m.group.includes(searchText))
+    ? menuList.filter((m) => m.label.includes(searchText) || m.group.includes(searchText))
     : []
 
   const addFavorite = (key: string) => {
@@ -212,7 +241,7 @@ export default function Home() {
     setFavorites(favorites.filter((k) => k !== key))
   }
 
-  const getMenuInfo = (key: string) => allMenus.find((m) => m.key === key)
+  const getMenuInfo = (key: string) => menuList.find((m) => m.key === key)
 
   const getLineData = () => {
     const result: unknown[] = []

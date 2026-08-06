@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Layout, Menu, message, Modal, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import BrandLogo from './BrandLogo'
 import { useAuth } from '../contexts/AuthContext'
+import { fetchMenuTree } from '../api/menu'
+import type { MenuVO } from '../api/menu'
+import { renderMenuIcon } from './MenuIcon'
+import type { ReactNode } from 'react'
 import {
   AccountBookOutlined,
   WalletOutlined,
@@ -531,6 +535,88 @@ interface SidebarProps {
   collapsed: boolean
 }
 
+/** 菜单 key → 图标组件 映射（后端 icon 字段为空时按 key 匹配保持现有图标样式） */
+const keyToIcon: Record<string, ReactNode> = {
+  'home': <HomeOutlined />,
+  'merchant_group': <ShopOutlined />,
+  'merchant-group-list': <ShopOutlined />,
+  'store-list': <ShopOutlined />,
+  'merchant_promotion': <CrownOutlined />,
+  'promotion-dashboard': <PieChartOutlined />,
+  'promotion-algorithm': <AppstoreOutlined />,
+  'promotion-slot-config': <ColumnHeightOutlined />,
+  'promotion-waterfall': <WalletOutlined />,
+  'gift-manage': <GiftOutlined />,
+  'gift-detail': <RedEnvelopeOutlined />,
+  'gift-consume-detail': <FileTextOutlined />,
+  'ad-sales': <ShoppingFilled />,
+  'promotion-word-library': <ReadOutlined />,
+  'promotion-tool': <ThunderboltOutlined />,
+  // 兼容后端种子数据中的下划线命名（推廣通顶级菜单）
+  'promotion_tool': <ThunderboltOutlined />,
+  'promotion-sales-config': <ShoppingFilled />,
+  'promotion-report-group': <BarChartOutlined />,
+  'promotion-report-overview': <DashboardOutlined />,
+  'promotion-report-order': <LineChartOutlined />,
+  'promotion-report-compare': <PieChartOutlined />,
+  'search': <SearchOutlined />,
+  'search-config-new': <SettingOutlined />,
+  'global-config': <GlobalOutlined />,
+  'channel-strategy': <ThunderboltOutlined />,
+  'search-guide': <AimOutlined />,
+  'hint-config': <FontSizeOutlined />,
+  'hot-search-config': <FireOutlined />,
+  'search-weight-config': <ColumnHeightOutlined />,
+  'search-library': <ReadOutlined />,
+  'word-segmentation': <ScissorOutlined />,
+  'synonym-config': <SwapOutlined />,
+  'hot-search-library': <FireOutlined />,
+  'stop-words': <StopOutlined />,
+  'search-verify-group': <SafetyCertificateOutlined />,
+  'search-verify': <SearchOutlined />,
+  'hint-verify': <FontSizeOutlined />,
+  'hot-search-verify': <FireOutlined />,
+  'report': <BarChartOutlined />,
+  'hint-report': <LineChartOutlined />,
+  'hot-search-report': <LineChartOutlined />,
+  'finance': <MoneyCollectOutlined />,
+  'promotion': <WalletOutlined />,
+  'account-balance': <AccountBookOutlined />,
+  'batch-query': <SearchOutlined />,
+  'detail-query': <FileSearchOutlined />,
+  'merchant-reconcile': <AuditOutlined />,
+  'writeoff-reconcile': <AuditOutlined />,
+  'debt-reconcile': <CheckCircleOutlined />,
+  'approval': <CheckCircleOutlined />,
+  'approval-center': <AuditOutlined />,
+  'hr': <TeamOutlined />,
+  'employee-management': <UserOutlined />,
+  'organization-management': <ApartmentOutlined />,
+  'position-management': <IdcardOutlined />,
+  'login-log': <ScheduleOutlined />,
+  'permission': <LockOutlined />,
+  'role-management': <SolutionOutlined />,
+  'function-permission': <AppstoreOutlined />,
+  'data-permission': <DatabaseOutlined />,
+  'system-config': <SettingOutlined />,
+  'menu-config': <MenuOutlined />,
+}
+
+/** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */
+const buildMenuItemsFromVO = (menus: MenuVO[]): MenuItem[] => {
+  return menus
+    .filter((m) => m.status === 1)
+    .map((m) => {
+      const children = m.children?.length ? buildMenuItemsFromVO(m.children) : undefined
+      return {
+        key: m.menuKey,
+        icon: renderMenuIcon(m.icon) ?? keyToIcon[m.menuKey],
+        label: m.name,
+        ...(children && children.length > 0 ? { children } : {}),
+      } as MenuItem
+    })
+}
+
 /** 按菜單權限遞歸過濾菜單：受控叶子菜單無授權則隱藏；父菜單子項全部隱藏時一併隱藏 */
 const filterMenusByPermission = (
   items: MenuItem[],
@@ -557,12 +643,24 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [pwdValue, setPwdValue] = useState('')
   const [_pendingKey, setPendingKey] = useState<string>('')
+  const [menuTree, setMenuTree] = useState<MenuVO[] | null>(null)
 
-  /** 按當前登錄人權限過濾後的可見菜單 */
-  const visibleMenuItems = useMemo(
-    () => filterMenusByPermission(menuItems, hasMenuPermission),
-    [hasMenuPermission],
-  )
+  /** 加载后端菜单树（名称/层级/排序与数据库实时同步）；加载失败时降级使用内置菜单 */
+  useEffect(() => {
+    let cancelled = false
+    fetchMenuTree().then((tree) => {
+      if (!cancelled) {
+        setMenuTree(tree.length > 0 ? tree : null)
+      }
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  /** 按當前登錄人權限過濾後的可見菜單（优先后端菜单树，降级内置菜单） */
+  const visibleMenuItems = useMemo(() => {
+    const items = menuTree ? buildMenuItemsFromVO(menuTree) : menuItems
+    return filterMenusByPermission(items, hasMenuPermission)
+  }, [menuTree, hasMenuPermission])
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
