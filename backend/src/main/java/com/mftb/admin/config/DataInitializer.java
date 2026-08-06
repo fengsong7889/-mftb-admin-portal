@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -126,6 +127,7 @@ public class DataInitializer implements CommandLineRunner {
         backfillUserSequence();
         migrateRoleMenuTable();
         migrateDepartmentMenuTable();
+        seedSystemMenus();
     }
 
     /** 回填存量员工的职级序列快照 (仅处理空值, 可重复执行) */
@@ -385,6 +387,129 @@ public class DataInitializer implements CommandLineRunner {
         Long menuId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         log.info("已为权限菜单标识 [{}] 自动创建占位菜单 (id={})", key, menuId);
         return menuId;
+    }
+
+    /** 种子系统菜单: 确保前端定义的所有菜单在 sys_menu 中存在 (幂等) */
+    private void seedSystemMenus() {
+        // key -> [name, parentKey|null, sort]
+        Map<String, String[]> menus = new LinkedHashMap<>();
+        // ── 顶级菜单 ──
+        menus.put("home",                new String[]{"首頁",            null,  "1"});
+        menus.put("merchant_group",      new String[]{"商戶集團管理",     null,  "2"});
+        menus.put("merchant_promotion",  new String[]{"商家推廣工具",      null,  "3"});
+        menus.put("promotion_tool",      new String[]{"推廣通",           null,  "4"});
+        menus.put("search",              new String[]{"搜索管理",          null,  "5"});
+        menus.put("finance",             new String[]{"財務管理",          null,  "6"});
+        menus.put("hr",                  new String[]{"集團人事",          null,  "7"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "8"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "9"});
+        // ── 商戶集團管理 ──
+        menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
+        menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
+        // ── 商家推廣工具 ──
+        menus.put("promotion-dashboard", new String[]{"數據看板",         "merchant_promotion", "1"});
+        menus.put("promotion-algorithm", new String[]{"算法庫",           "merchant_promotion", "2"});
+        menus.put("promotion-slot-config", new String[]{"瀑布流策略",     "merchant_promotion", "3"});
+        menus.put("promotion-waterfall", new String[]{"銷售定價",         "merchant_promotion", "4"});
+        menus.put("gift-manage",         new String[]{"贈送管理",         "merchant_promotion", "5"});
+        menus.put("ad-sales",            new String[]{"廣告銷售",         "merchant_promotion", "6"});
+        menus.put("promotion-word-library", new String[]{"詞庫管理",     "merchant_promotion", "7"});
+        // ── 商家推廣工具 > 贈送管理 ──
+        menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});
+        menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
+        // ── 推廣通 ──
+        menus.put("promotion-sales-config", new String[]{"店鋪推廣",     "promotion_tool",     "1"});
+        menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "2"});
+        menus.put("promotion-report-overview", new String[]{"數據概覽",  "promotion-report-group", "1"});
+        menus.put("promotion-report-order", new String[]{"訂單效果報表", "promotion-report-group", "2"});
+        menus.put("promotion-report-compare", new String[]{"推薦類型對比", "promotion-report-group", "3"});
+        // ── 搜索管理 ──
+        menus.put("search-config-new",   new String[]{"搜索配置",         "search",             "1"});
+        menus.put("global-config",       new String[]{"全局配置",         "search-config-new",  "1"});
+        menus.put("channel-strategy",    new String[]{"維度策略",         "search-config-new",  "2"});
+        menus.put("search-guide",        new String[]{"搜索引導",         "search",             "2"});
+        menus.put("hint-config",         new String[]{"底紋配置",         "search-guide",       "1"});
+        menus.put("hot-search-config",   new String[]{"熱搜配置",         "search-guide",       "2"});
+        menus.put("search-weight-config", new String[]{"權重干預",       "search-guide",       "3"});
+        menus.put("search-library",      new String[]{"搜索詞庫",         "search",             "3"});
+        menus.put("word-segmentation",   new String[]{"分詞詞庫",         "search-library",     "1"});
+        menus.put("synonym-config",      new String[]{"同義詞庫",         "search-library",     "2"});
+        menus.put("hot-search-library",  new String[]{"熱搜詞庫",         "search-library",     "3"});
+        menus.put("stop-words",          new String[]{"停用詞庫",         "search-library",     "4"});
+        menus.put("search-verify-group", new String[]{"效果校驗",         "search",             "4"});
+        menus.put("search-verify",       new String[]{"搜索校驗",         "search-verify-group", "1"});
+        menus.put("hint-verify",         new String[]{"底紋校驗",         "search-verify-group", "2"});
+        menus.put("hot-search-verify",   new String[]{"熱搜校驗",         "search-verify-group", "3"});
+        menus.put("report",              new String[]{"報表統計",          "search",             "5"});
+        menus.put("hint-report",         new String[]{"底紋報表",         "report",             "1"});
+        menus.put("hot-search-report",   new String[]{"熱搜報表",         "report",             "2"});
+        // ── 財務管理 ──
+        menus.put("promotion",           new String[]{"推廣金管理",       "finance",            "1"});
+        menus.put("account-balance",     new String[]{"賬戶餘額",         "promotion",          "1"});
+        menus.put("batch-query",         new String[]{"批次查詢",         "promotion",          "2"});
+        menus.put("detail-query",        new String[]{"明細查詢",         "promotion",          "3"});
+        menus.put("merchant-reconcile",  new String[]{"商戶通對賬",       "finance",            "2"});
+        menus.put("writeoff-reconcile",  new String[]{"充消對賬",         "merchant-reconcile", "1"});
+        menus.put("debt-reconcile",      new String[]{"欠款對賬",         "merchant-reconcile", "2"});
+        menus.put("approval",            new String[]{"審批管理",          "finance",            "3"});
+        menus.put("approval-center",     new String[]{"審批中心",         "approval",           "1"});
+        // ── 集團人事 ──
+        menus.put("employee-management", new String[]{"員工管理",         "hr",                 "1"});
+        menus.put("organization-management", new String[]{"組織管理",     "hr",                 "2"});
+        menus.put("position-management", new String[]{"職位管理",         "hr",                 "3"});
+        menus.put("login-log",           new String[]{"員工動態",         "hr",                 "4"});
+        // ── 權限管理 ──
+        menus.put("role-management",     new String[]{"角色管理",         "permission",         "1"});
+        menus.put("function-permission", new String[]{"功能授權",         "permission",         "2"});
+        menus.put("data-permission",     new String[]{"數據授權",         "permission",         "3"});
+        // ── 系統配置 ──
+        menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
+
+        int created = 0;
+        for (Map.Entry<String, String[]> entry : menus.entrySet()) {
+            String menuKey = entry.getKey();
+            String name = entry.getValue()[0];
+            String parentKey = entry.getValue()[1];
+            int sort = Integer.parseInt(entry.getValue()[2]);
+
+            Long existing = queryMenuIdByKey(menuKey);
+            if (existing != null) {
+                continue;
+            }
+
+            Long parentId = null;
+            if (parentKey != null) {
+                parentId = queryMenuIdByKey(parentKey);
+                if (parentId == null) {
+                    log.warn("种子菜单 [{}]: 父菜单 [{}] 不存在, 跳过", menuKey, parentKey);
+                    continue;
+                }
+            }
+
+            if (parentId != null) {
+                jdbcTemplate.update(
+                        "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, status, deleted) "
+                                + "VALUES (?, ?, ?, 2, ?, 1, 0)",
+                        parentId, menuKey, name, sort);
+            } else {
+                jdbcTemplate.update(
+                        "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, status, deleted) "
+                                + "VALUES (NULL, ?, ?, 1, ?, 1, 0)",
+                        menuKey, name, sort);
+            }
+            created++;
+        }
+        if (created > 0) {
+            log.info("已种子化 {} 个系统菜单到 sys_menu", created);
+        }
+    }
+
+    /** 根据 menu_key 查询菜单ID (不存在返回 null) */
+    private Long queryMenuIdByKey(String menuKey) {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
+                Long.class, menuKey);
+        return ids.isEmpty() ? null : ids.get(0);
     }
 
     /** 若密码非合法 BCrypt 值(如 SQL 占位符), 则重置为默认密码的加密值 */

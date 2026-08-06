@@ -15,6 +15,7 @@ import com.mftb.admin.service.RoleService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 /**
  * 功能角色服务实现
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RoleServiceImpl implements RoleService {
@@ -208,7 +210,7 @@ public class RoleServiceImpl implements RoleService {
         }
     }
 
-    /** 根据 menuKey 获取菜单ID, 不存在时抛出业务异常 */
+    /** 根据 menuKey 获取菜单ID, 不存在时自动创建占位菜单 */
     private Long resolveMenuId(String menuKey) {
         List<Long> ids = jdbcTemplate.queryForList(
                 "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
@@ -216,7 +218,13 @@ public class RoleServiceImpl implements RoleService {
         if (!ids.isEmpty()) {
             return ids.get(0);
         }
-        throw new BusinessException("菜单标识不存在: " + menuKey);
+        jdbcTemplate.update(
+                "INSERT INTO sys_menu (parent_id, menu_key, name, type, status, deleted, sort_order) "
+                        + "VALUES (NULL, ?, ?, 2, 1, 0, 0)",
+                menuKey, menuKey);
+        Long menuId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        log.warn("角色权限保存时发现菜单 [{}] 不存在, 已自动创建占位菜单 (id={})", menuKey, menuId);
+        return menuId;
     }
 
     private RoleVO toVO(SysRole role, Long userCount, List<MenuPermissionDTO> permissions) {
