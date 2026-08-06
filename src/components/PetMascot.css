@@ -47,15 +47,10 @@
   opacity: 1;
 }
 
-/* ========== 閑置躲藏（僅在右側或底部躲藏，只露一點頭） ========== */
+/* ========== 閑置躲藏（僅在右側邊緣躲藏，只露一點頭） ========== */
 /* 傾斜 45° 躲入右邊框：頭斜朝左上，露出頭部探出（角度需與 TSX 的 DOCK_TILT_DEG 保持一致） */
 .pet-mascot-wrapper.docked-right {
   transform: rotate(-45deg);
-}
-
-/* 貼下邊緣躲藏：不旋轉，僅露出頭頂 */
-.pet-mascot-wrapper.docked-bottom {
-  transform: none;
 }
 
 .pet-mascot-wrapper.docked {
@@ -77,7 +72,7 @@
 
 @keyframes petPeek {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-2px); }
 }
 
 .pet-body {
@@ -101,12 +96,8 @@
 }
 
 @keyframes petFloat {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  15% { transform: translateY(-6px) rotate(-1.2deg); }
-  35% { transform: translateY(-9px) rotate(0.5deg); }
-  55% { transform: translateY(-4px) rotate(0deg); }
-  75% { transform: translateY(-7px) rotate(-0.6deg); }
-  90% { transform: translateY(-2px) rotate(0.3deg); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 @keyframes shadowPulse {

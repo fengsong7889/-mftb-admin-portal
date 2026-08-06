@@ -265,10 +265,8 @@ const expressions: Expression[] = [
 
 /** 長時間無交互後躲藏起來的等待時長（毫秒） */
 const IDLE_DOCK_DELAY = 60000
-/** 躲藏後露出的頭部寬度（px，左右傾斜躲藏時使用） */
+/** 躲藏後露出的頭部寬度（px，右側傾斜躲藏時使用） */
 const DOCK_PEEK = 50
-/** 貼下邊緣躲藏時露出的高度（px） */
-const EDGE_PEEK = 22
 /** 躲藏後自動跳出的最短/最長等待時長（毫秒，兩者間隨機） */
 const DOCK_AUTO_POP_MIN = 20000
 const DOCK_AUTO_POP_MAX = 40000
@@ -279,13 +277,12 @@ const BODY_WIDTH = 36
 const BODY_HEIGHT = 57
 
 /**
- * 躲藏位置：只允許在右側或底部躲藏
+ * 躲藏位置：只允許在右側邊緣躲藏（取消底部躲藏，避免跳躍浮動過大）
  * - right：貼右邊緣，傾斜 45° 只露頭
- * - bottom：貼下邊緣，只露頭頂
  */
-type HideSpot = 'right' | 'bottom'
+type HideSpot = 'right'
 
-const HIDE_SPOTS: HideSpot[] = ['right', 'bottom']
+const HIDE_SPOTS: HideSpot[] = ['right']
 
 /** 隨機挑一個躲藏位置（避免連續躲同一個地方） */
 const randomHideSpot = (exclude?: HideSpot | null): HideSpot => {
@@ -293,20 +290,15 @@ const randomHideSpot = (exclude?: HideSpot | null): HideSpot => {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
-/** 從躲藏位置跳出來時，只出現在右側邊緣或底部邊緣（不會出現在屏幕中間） */
+/** 從躲藏位置跳出來時，只出現在右側邊緣（不會出現在屏幕中間或底部） */
 const randomFreePos = () => {
   const w = window.innerWidth
   const h = window.innerHeight
   const margin = 24
   const maxX = w - BODY_WIDTH - margin
   const maxY = h - BODY_HEIGHT - margin
-  const spots = [
-    // 右側邊緣：隨機高度
-    () => ({ x: maxX, y: Math.round(maxY * (0.1 + Math.random() * 0.8)) }),
-    // 底部邊緣：隨機橫向位置
-    () => ({ x: Math.round(maxX * (0.1 + Math.random() * 0.8)), y: maxY }),
-  ]
-  return spots[Math.floor(Math.random() * spots.length)]()
+  // 右側邊緣：隨機高度
+  return { x: maxX, y: Math.round(maxY * (0.1 + Math.random() * 0.8)) }
 }
 
 export default function PetMascot() {
@@ -495,22 +487,14 @@ export default function PetMascot() {
     window.addEventListener('mouseup', onUp)
   }, [resetIdleTimer])
 
-  // 根據躲藏位置計算蜜蜂的座標（僅支持右側/底部躲藏）
+  // 根據躲藏位置計算蜜蜂的座標（僅支持右側躲藏）
   const dockInfo = (() => {
     if (!hideSpot) return { x: pos.x, y: pos.y, cls: '' }
     const w = window.innerWidth
-    const h = window.innerHeight
     const tiltRad = (DOCK_TILT_DEG * Math.PI) / 180
     // 傾斜 45° 後露出 DOCK_PEEK 寬的頭部所需的偏移量
     const halfExtent = (BODY_WIDTH / 2) * Math.cos(tiltRad) + (BODY_HEIGHT / 2) * Math.sin(tiltRad)
-    const midX = (w - BODY_WIDTH) / 2
-    switch (hideSpot) {
-      case 'right':
-        return { x: w - DOCK_PEEK + halfExtent - BODY_WIDTH / 2, y: pos.y, cls: 'docked-right' }
-      case 'bottom':
-      default:
-        return { x: midX, y: h - EDGE_PEEK, cls: 'docked-bottom' }
-    }
+    return { x: w - DOCK_PEEK + halfExtent - BODY_WIDTH / 2, y: pos.y, cls: 'docked-right' }
   })()
 
   return (
