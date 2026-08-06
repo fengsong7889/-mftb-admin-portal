@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, Switch, Radio, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -8,6 +8,14 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import {
+  fetchWordLibraryList,
+  createWordLibraryItem,
+  updateWordLibraryItem,
+  toggleWordLibraryStatus,
+  deleteWordLibraryItem,
+} from '../../api/wordLibrary'
+import type { WordLibraryItem } from '../../api/wordLibrary'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -27,11 +35,11 @@ const CHANNEL_LABEL: Record<string, string> = {
   groupBuy: '團購到店',
 }
 
-/** 状态选项 */
+/** 状态选项 — 值对应后端 1=啟用 2=停用 */
 const statusOptions = [
   { label: '全部', value: 'all' },
-  { label: '啟用', value: 'active' },
-  { label: '停用', value: 'inactive' },
+  { label: '啟用', value: 1 },
+  { label: '停用', value: 2 },
 ]
 
 /** 频道选项 */
@@ -42,52 +50,45 @@ const channelFilterOptions = [
   { label: '團購到店', value: 'groupBuy' },
 ]
 
-/* ──────────── 类型定义 ──────────── */
-
-interface WordRecord {
-  key: string
-  id: number
-  word: string
-  channel: string
-  status: 'active' | 'inactive'
-  matchCount: number
-  updatedBy: string
-  updateTime: string
-  remark: string
-}
-
-/* ──────────── Mock 数据 ──────────── */
-
-const mockData: WordRecord[] = [
-  { key: '1', id: 1, word: '牛肉面', channel: 'takeaway', status: 'active', matchCount: 12580, updatedBy: '張曉明(E10023)', updateTime: '2026-07-28 10:30:00', remark: '核心品類詞' },
-  { key: '2', id: 2, word: '奶茶', channel: 'supermarket', status: 'active', matchCount: 23450, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-27 15:20:00', remark: '飲品品類' },
-  { key: '3', id: 3, word: '火鍋', channel: 'takeaway', status: 'active', matchCount: 8920, updatedBy: '王建華(E10067)', updateTime: '2026-07-26 09:15:00', remark: '' },
-  { key: '4', id: 4, word: '火爆牛肉面套餐', channel: 'takeaway', status: 'active', matchCount: 3260, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-25 14:00:00', remark: '商家上傳菜品提取' },
-  { key: '5', id: 5, word: '珍珠奶茶', channel: 'takeaway', status: 'active', matchCount: 7840, updatedBy: '張曉明(E10023)', updateTime: '2026-07-24 11:45:00', remark: '' },
-  { key: '6', id: 6, word: '麻辣火鍋', channel: 'takeaway', status: 'active', matchCount: 5120, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-23 16:30:00', remark: '辣味火鍋' },
-  { key: '7', id: 7, word: '牛肉', channel: 'supermarket', status: 'active', matchCount: 18760, updatedBy: '王建華(E10067)', updateTime: '2026-07-22 08:20:00', remark: '高頻食材' },
-  { key: '8', id: 8, word: '珍珠', channel: 'takeaway', status: 'active', matchCount: 6430, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-21 13:10:00', remark: '奶茶配料' },
-  { key: '9', id: 9, word: '豆腐', channel: 'supermarket', status: 'active', matchCount: 4210, updatedBy: '張曉明(E10023)', updateTime: '2026-07-20 10:00:00', remark: '批量導入' },
-  { key: '10', id: 10, word: '麻辣', channel: 'takeaway', status: 'active', matchCount: 15320, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-19 15:30:00', remark: '高頻口味' },
-  { key: '11', id: 11, word: '燒烤', channel: 'takeaway', status: 'active', matchCount: 9870, updatedBy: '王建華(E10067)', updateTime: '2026-07-18 09:20:00', remark: '' },
-  { key: '12', id: 12, word: '紅燒', channel: 'takeaway', status: 'inactive', matchCount: 2340, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-17 14:15:00', remark: '使用頻率低，已停用' },
-  { key: '13', id: 13, word: 'KFC', channel: 'takeaway', status: 'active', matchCount: 4560, updatedBy: '張曉明(E10023)', updateTime: '2026-07-16 10:30:00', remark: '品牌簡稱' },
-  { key: '14', id: 14, word: '麥當勞', channel: 'takeaway', status: 'active', matchCount: 6780, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-15 11:00:00', remark: '' },
-  { key: '15', id: 15, word: '買一送一', channel: 'groupBuy', status: 'active', matchCount: 8920, updatedBy: '王建華(E10067)', updateTime: '2026-07-14 08:45:00', remark: '常見營銷詞' },
-  { key: '16', id: 16, word: '限時優惠', channel: 'supermarket', status: 'active', matchCount: 5430, updatedBy: '陳美琪(E10089)', updateTime: '2026-07-13 16:20:00', remark: '' },
-  { key: '17', id: 17, word: '早餐', channel: 'takeaway', status: 'active', matchCount: 11230, updatedBy: '張曉明(E10023)', updateTime: '2026-07-12 09:30:00', remark: '時段場景詞' },
-  { key: '18', id: 18, word: '夜宵', channel: 'takeaway', status: 'active', matchCount: 7650, updatedBy: '李婉婷(E10045)', updateTime: '2026-07-11 14:00:00', remark: '' },
-  { key: '19', id: 19, word: '下午茶', channel: 'groupBuy', status: 'inactive', matchCount: 1890, updatedBy: '王建華(E10067)', updateTime: '2026-07-10 11:15:00', remark: '使用頻率低' },
-]
-
 /* ──────────── 组件 ──────────── */
 
 export default function PromotionWordLibrary() {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingRecord, setEditingRecord] = useState<WordRecord | null>(null)
+  const [editingRecord, setEditingRecord] = useState<WordLibraryItem | null>(null)
   const [form] = Form.useForm()
-  const [data, setData] = useState<WordRecord[]>(mockData)
+  const [searchForm] = Form.useForm()
+  const [data, setData] = useState<WordLibraryItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  /* ---- 数据加载 ---- */
+  const loadData = useCallback(async (p = page, ps = pageSize) => {
+    setLoading(true)
+    try {
+      const values = searchForm.getFieldsValue()
+      const params: Record<string, unknown> = { page: p, size: ps }
+      if (values.keyword) params.keyword = values.keyword
+      if (values.status && values.status !== 'all') params.status = values.status
+      if (values.channel && values.channel !== 'all') params.channel = values.channel
+      if (values.updatedBy) params.updatedBy = values.updatedBy
+      if (values.remark) params.remark = values.remark
+      if (values.dateRange?.[0]) params.startDate = values.dateRange[0].format('YYYY-MM-DD')
+      if (values.dateRange?.[1]) params.endDate = values.dateRange[1].format('YYYY-MM-DD')
+      const res = await fetchWordLibraryList(params as Parameters<typeof fetchWordLibraryList>[0])
+      setData(res.records)
+      setTotal(res.total)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, searchForm])
+
+  useEffect(() => {
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ---- 列配置 ---- */
   const columnMeta = useMemo(() => [
@@ -106,6 +107,17 @@ export default function PromotionWordLibrary() {
   ])
 
   /* ---- 事件处理 ---- */
+  const handleSearch = () => {
+    setPage(1)
+    loadData(1, pageSize)
+  }
+
+  const handleReset = () => {
+    searchForm.resetFields()
+    setPage(1)
+    loadData(1, pageSize)
+  }
+
   const handleAdd = () => {
     setEditingRecord(null)
     form.resetFields()
@@ -113,45 +125,65 @@ export default function PromotionWordLibrary() {
     setIsModalOpen(true)
   }
 
-  const handleEdit = (record: WordRecord) => {
+  const handleEdit = (record: WordLibraryItem) => {
     setEditingRecord(record)
     form.setFieldsValue({
-      ...record,
-      status: record.status === 'active',
+      word: record.word,
+      channel: record.channel,
+      status: record.status === 1,
+      remark: record.remark,
     })
     setIsModalOpen(true)
   }
 
-  const handleDelete = (record: WordRecord) => {
+  const handleDelete = (record: WordLibraryItem) => {
     Modal.confirm({
       title: '確認刪除',
       content: `確定要刪除詞條「${record.word}」嗎？刪除後將不再參與推薦匹配。`,
       okText: '確定',
       cancelText: '取消',
       okButtonProps: { danger: true },
-      onOk: () => {
-        setData(prev => prev.filter(item => item.id !== record.id))
+      onOk: async () => {
+        await deleteWordLibraryItem(record.id)
         message.success('刪除成功')
+        loadData()
       },
     })
   }
 
-  const handleToggleStatus = (record: WordRecord) => {
-    const newStatus = record.status === 'active' ? 'inactive' : 'active'
-    const actionText = newStatus === 'active' ? '啟用' : '停用'
-    setData(prev =>
-      prev.map(item =>
-        item.id === record.id ? { ...item, status: newStatus } : item
-      )
-    )
-    message.success(`已${actionText}詞條「${record.word}」`)
+  const handleToggleStatus = (record: WordLibraryItem) => {
+    const actionText = record.status === 1 ? '停用' : '啟用'
+    const confirmTitle = record.status === 1
+      ? `確定要停用詞條「${record.word}」嗎？停用後將不再參與推薦匹配。`
+      : `確定要啟用詞條「${record.word}」嗎？`
+    Modal.confirm({
+      title: confirmTitle,
+      okText: '確定',
+      cancelText: '取消',
+      onOk: async () => {
+        await toggleWordLibraryStatus(record.id)
+        message.success(`已${actionText}詞條「${record.word}」`)
+        loadData()
+      },
+    })
   }
 
-  const handleSave = () => {
-    form.validateFields().then(() => {
-      message.success(editingRecord ? '編輯成功' : '新增成功')
-      setIsModalOpen(false)
-    })
+  const handleSave = async () => {
+    const values = await form.validateFields()
+    const payload = {
+      word: values.word,
+      channel: values.channel,
+      status: values.status ? 1 : 2,
+      remark: values.remark,
+    }
+    if (editingRecord) {
+      await updateWordLibraryItem(editingRecord.id, payload)
+    } else {
+      await createWordLibraryItem(payload)
+    }
+    message.success(editingRecord ? '編輯成功' : '新增成功')
+    setIsModalOpen(false)
+    loadData()
   }
 
   const handleExport = () => {
@@ -159,7 +191,7 @@ export default function PromotionWordLibrary() {
   }
 
   /* ---- 表格列定义 ---- */
-  const columns: TableColumnsType<WordRecord> = [
+  const columns: TableColumnsType<WordLibraryItem> = [
     {
       title: '詞條',
       dataIndex: 'word',
@@ -189,9 +221,9 @@ export default function PromotionWordLibrary() {
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (status: string) => (
-        <Tag color={status === 'active' ? 'success' : 'default'}>
-          {status === 'active' ? '啟用' : '停用'}
+      render: (status: number) => (
+        <Tag color={status === 1 ? 'success' : 'default'}>
+          {status === 1 ? '啟用' : '停用'}
         </Tag>
       ),
     },
@@ -213,7 +245,7 @@ export default function PromotionWordLibrary() {
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
           <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === 'active' ? '停用' : '啟用'}
+            {record.status === 1 ? '停用' : '啟用'}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
         </Space>
@@ -221,33 +253,33 @@ export default function PromotionWordLibrary() {
     },
   ]
 
-  /* ---- 统计数字 ---- */
-  // (统计文字已移除)
-
   return (
     <div className="content-area">
       {/* 查询区域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="詞條關鍵詞">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="詞條關鍵詞" name="keyword">
             <Input placeholder="請輸入關鍵詞" allowClear />
           </Form.Item>
-          <Form.Item label="狀態">
+          <Form.Item label="狀態" name="status">
             <Select options={statusOptions} defaultValue="all" placeholder="全部" allowClear />
           </Form.Item>
-          <Form.Item label="所屬頻道">
+          <Form.Item label="所屬頻道" name="channel">
             <Select options={channelFilterOptions} defaultValue="all" placeholder="全部" allowClear />
           </Form.Item>
-          <Form.Item label="更新時間">
+          <Form.Item label="更新時間" name="dateRange">
             <RangePicker />
           </Form.Item>
-          <Form.Item label="備註">
+          <Form.Item label="最後更新人" name="updatedBy">
+            <Input placeholder="請輸入更新人" allowClear />
+          </Form.Item>
+          <Form.Item label="備註" name="remark">
             <Input placeholder="請輸入備註關鍵詞" allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>
@@ -266,22 +298,28 @@ export default function PromotionWordLibrary() {
 
       {/* 列表区域 */}
       <div className="table-section">
-        <Table<WordRecord>
+        <Table<WordLibraryItem>
           columns={applyConfig(columns)}
           dataSource={data}
           rowKey="id"
+          loading={loading}
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
           }}
           pagination={{
-            total: data.length,
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            current: page,
+            pageSize,
+            total,
+            showTotal: (t) => `共 ${t} 條`,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
-            defaultPageSize: 10,
             showQuickJumper: true,
+            onChange: (p, ps) => {
+              setPage(p)
+              setPageSize(ps)
+              loadData(p, ps)
+            },
           }}
           size="middle"
           bordered={false}

@@ -28,11 +28,13 @@ public class BizDataInitializer implements CommandLineRunner {
         createStoreBdTableIfAbsent();
         createGiftRecordTableIfAbsent();
         createGiftConsumeTableIfAbsent();
+        createWordLibraryTableIfAbsent();
         migrateLegacyGroupCodes();
         migrateLegacyStoreCodes();
         migrateLegacyBizChannels();
         seedMerchantGroups();
         seedStores();
+        seedWordLibrary();
     }
 
     /** 存量集团ID迁移: 非 JT+6位数字 格式的编号按 id 顺序重编为 JT 序列 */
@@ -273,6 +275,89 @@ public class BizDataInitializer implements CommandLineRunner {
         }
         if (inserted > 0) {
             log.info("已写入 {} 条门店种子数据", inserted);
+        }
+    }
+
+    /** 推广词库表 */
+    private void createWordLibraryTableIfAbsent() {
+        if (!tableExists("prom_word_library")) {
+            jdbcTemplate.execute(
+                    "CREATE TABLE prom_word_library ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                            + "word VARCHAR(128) NOT NULL COMMENT '词条', "
+                            + "channel VARCHAR(32) NOT NULL COMMENT '所属频道: takeaway/supermarket/groupBuy', "
+                            + "status TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1=啟用 2=停用', "
+                            + "match_count INT NOT NULL DEFAULT 0 COMMENT '匹配次数', "
+                            + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
+                            + "updated_time DATETIME NULL COMMENT '最后更新时间', "
+                            + "remark VARCHAR(500) NULL COMMENT '备注', "
+                            + "deleted TINYINT DEFAULT 0 COMMENT '逻辑删除: 0=未删除 1=已删除', "
+                            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                            + "UNIQUE KEY uk_word_channel (word, channel), "
+                            + "KEY idx_word_channel (channel), "
+                            + "KEY idx_word_status (status), "
+                            + "KEY idx_word_updated_by (updated_by)"
+                            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推广词库表'");
+            log.info("已自动创建推广词库表 prom_word_library");
+        }
+        migrateWordLibraryUniqueIndex();
+    }
+
+    /** 为存量推广词库表补充唯一索引: 先清理重复数据(保留id最小), 再建立唯一索引 */
+    private void migrateWordLibraryUniqueIndex() {
+        Integer indexCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prom_word_library' AND INDEX_NAME = 'uk_word_channel'",
+                Integer.class);
+        if (indexCount != null && indexCount > 0) {
+            return;
+        }
+        int removed = jdbcTemplate.update(
+                "DELETE w1 FROM prom_word_library w1 "
+                        + "JOIN prom_word_library w2 ON w1.word = w2.word AND w1.channel = w2.channel AND w1.id > w2.id "
+                        + "WHERE w1.deleted = 0 AND w2.deleted = 0");
+        if (removed > 0) {
+            log.info("已清理 {} 条重复推广词库数据", removed);
+        }
+        jdbcTemplate.execute(
+                "ALTER TABLE prom_word_library ADD UNIQUE KEY uk_word_channel (word, channel)");
+        log.info("已为推广词库表建立唯一索引 uk_word_channel");
+    }
+
+    /** 推广词库种子数据 (按 word+channel 幂等) */
+    private void seedWordLibrary() {
+        String[][] words = {
+                {"牛肉面", "takeaway", "1", "核心品類詞"},
+                {"奶茶", "supermarket", "1", "飲品品類"},
+                {"火鍋", "takeaway", "1", ""},
+                {"火爆牛肉面套餐", "takeaway", "1", "商家上傳菜品提取"},
+                {"珍珠奶茶", "takeaway", "1", ""},
+                {"麻辣火鍋", "takeaway", "1", "辣味火鍋"},
+                {"牛肉", "supermarket", "1", "高頻食材"},
+                {"珍珠", "takeaway", "1", "奶茶配料"},
+                {"豆腐", "supermarket", "1", "批量導入"},
+                {"麻辣", "takeaway", "1", "高頻口味"},
+                {"燒烤", "takeaway", "1", ""},
+                {"紅燒", "takeaway", "2", "使用頻率低，已停用"},
+                {"KFC", "takeaway", "1", "品牌簡稱"},
+                {"麥當勞", "takeaway", "1", ""},
+                {"買一送一", "groupBuy", "1", "常見營銷詞"},
+                {"限時優惠", "supermarket", "1", ""},
+                {"早餐", "takeaway", "1", "時段場景詞"},
+                {"夜宵", "takeaway", "1", ""},
+                {"下午茶", "groupBuy", "2", "使用頻率低"},
+        };
+        int inserted = 0;
+        for (String[] w : words) {
+            inserted += jdbcTemplate.update(
+                    "INSERT INTO prom_word_library (word, channel, status, match_count, updated_by, updated_time, remark) "
+                            + "SELECT ?, ?, ?, FLOOR(1000 + RAND() * 20000), '系統初始化', NOW(), ? FROM DUAL "
+                            + "WHERE NOT EXISTS (SELECT 1 FROM prom_word_library WHERE word = ? AND channel = ? AND deleted = 0)",
+                    w[0], w[1], Integer.parseInt(w[2]), w[3], w[0], w[1]);
+        }
+        if (inserted > 0) {
+            log.info("已写入 {} 条推广词库种子数据", inserted);
         }
     }
 

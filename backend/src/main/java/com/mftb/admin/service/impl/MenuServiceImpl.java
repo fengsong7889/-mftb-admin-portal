@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.MenuRequest;
 import com.mftb.admin.dto.MenuVO;
@@ -10,6 +11,7 @@ import com.mftb.admin.service.MenuService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 /**
  * 系统菜单配置服务实现
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MenuServiceImpl implements MenuService {
@@ -94,23 +97,34 @@ public class MenuServiceImpl implements MenuService {
         SysMenu menu = requireMenu(id);
         validateParent(request.getParentId(), id);
         requireMenuKeyUnique(request.getMenuKey(), id);
-        menu.setParentId(normalizeParentId(request.getParentId()));
-        menu.setMenuKey(request.getMenuKey().trim());
-        menu.setName(request.getName().trim());
-        menu.setPath(StringUtils.hasText(request.getPath()) ? request.getPath().trim() : null);
-        menu.setComponent(StringUtils.hasText(request.getComponent()) ? request.getComponent().trim() : null);
-        menu.setIcon(StringUtils.hasText(request.getIcon()) ? request.getIcon().trim() : null);
-        menu.setType(request.getType());
+
+        String name = request.getName().trim();
+        String menuKey = request.getMenuKey().trim();
+        log.info("更新菜单 id={}, menuKey={}, name={}", id, menuKey, name);
+
+        LambdaUpdateWrapper<SysMenu> updateWrapper = new LambdaUpdateWrapper<SysMenu>()
+                .eq(SysMenu::getId, id)
+                .set(SysMenu::getParentId, normalizeParentId(request.getParentId()))
+                .set(SysMenu::getMenuKey, menuKey)
+                .set(SysMenu::getName, name)
+                .set(SysMenu::getPath, StringUtils.hasText(request.getPath()) ? request.getPath().trim() : null)
+                .set(SysMenu::getComponent, StringUtils.hasText(request.getComponent()) ? request.getComponent().trim() : null)
+                .set(SysMenu::getIcon, StringUtils.hasText(request.getIcon()) ? request.getIcon().trim() : null)
+                .set(SysMenu::getType, request.getType())
+                .set(SysMenu::getActions, JsonUtils.toJson(CollectionUtils.isEmpty(request.getActions()) ? List.of() : request.getActions()))
+                .set(SysMenu::getUpdatedBy, operatorResolver.currentOperatorName());
         if (request.getSort() != null) {
-            menu.setSort(request.getSort());
+            updateWrapper.set(SysMenu::getSort, request.getSort());
         }
-        menu.setActions(JsonUtils.toJson(CollectionUtils.isEmpty(request.getActions()) ? List.of() : request.getActions()));
         if (request.getStatus() != null) {
-            menu.setStatus(request.getStatus());
+            updateWrapper.set(SysMenu::getStatus, request.getStatus());
         }
-        menu.setUpdatedBy(operatorResolver.currentOperatorName());
-        sysMenuMapper.updateById(menu);
-        return MenuVO.from(menu);
+        int affected = sysMenuMapper.update(null, updateWrapper);
+        log.info("更新菜单 id={}, 影响行数={}", id, affected);
+
+        // 重新查询返回最新数据
+        SysMenu updated = requireMenu(id);
+        return MenuVO.from(updated);
     }
 
     @Override
