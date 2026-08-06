@@ -6,22 +6,29 @@ import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.dto.RoleRequest;
 import com.mftb.admin.dto.RoleVO;
 import com.mftb.admin.entity.SysRole;
+import com.mftb.admin.entity.SysRoleMenu;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysRoleMapper;
+import com.mftb.admin.mapper.SysRoleMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 功能角色服务实现
@@ -31,8 +38,10 @@ import java.util.Set;
 public class RoleServiceImpl implements RoleService {
 
     private final SysRoleMapper sysRoleMapper;
+    private final SysRoleMenuMapper sysRoleMenuMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public List<RoleVO> list() {
@@ -46,22 +55,28 @@ public class RoleServiceImpl implements RoleService {
                 countMap.merge(roleId, 1L, Long::sum);
             }
         }
-        return roles.stream().map(role -> toVO(role, countMap.getOrDefault(role.getId(), 0L))).toList();
+        Map<Long, List<MenuPermissionDTO>> permissionsMap = loadPermissionsMap(
+                roles.stream().map(SysRole::getId).toList());
+        return roles.stream()
+                .map(role -> toVO(role, countMap.getOrDefault(role.getId(), 0L),
+                        permissionsMap.getOrDefault(role.getId(), List.of())))
+                .toList();
     }
 
     @Override
+    @Transactional
     public RoleVO create(RoleRequest request) {
         SysRole role = new SysRole();
         role.setName(request.getName());
         // code 唯一约束, 自动生成
         role.setCode("role_" + System.currentTimeMillis());
         role.setDescription(request.getDescription());
-        role.setPermissions(JsonUtils.toJson(request.getPermissions() == null ? List.of() : request.getPermissions()));
         role.setStatus(1);
         role.setDeleted(0);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.insert(role);
-        return toVO(role, 0L);
+        saveRoleMenus(role.getId(), request.getPermissions());
+        return toVO(role, 0L, loadPermissions(role.getId()));
     }
 
     @Override
@@ -71,15 +86,14 @@ public class RoleServiceImpl implements RoleService {
         role.setDescription(request.getDescription());
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.updateById(role);
-        return toVO(role, null);
+        return toVO(role, null, loadPermissions(role.getId()));
     }
 
     @Override
+    @Transactional
     public void updatePermissions(Long id, List<MenuPermissionDTO> permissions) {
-        SysRole role = requireRole(id);
-        role.setPermissions(JsonUtils.toJson(permissions == null ? List.of() : permissions));
-        role.setUpdatedBy(operatorResolver.currentOperatorName());
-        sysRoleMapper.updateById(role);
+        requireRole(id);
+        saveRoleMenus(id, permissions);
     }
 
     @Override
@@ -95,6 +109,9 @@ public class RoleServiceImpl implements RoleService {
     public void delete(Long id) {
         requireRole(id);
         sysRoleMapper.deleteById(id);
+        // 清理角色菜单关联
+        sysRoleMenuMapper.delete(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id));
         // 从所有员工的绑定中移除该角色
         List<SysUser> users = sysUserMapper.selectList(null);
         for (SysUser user : users) {
@@ -144,15 +161,19 @@ public class RoleServiceImpl implements RoleService {
         if (roleIds == null || roleIds.isEmpty()) {
             return List.of();
         }
-        List<SysRole> roles = sysRoleMapper.selectList(
-                new LambdaQueryWrapper<SysRole>().in(SysRole::getId, roleIds).eq(SysRole::getStatus, 1));
+        String inClause = roleIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT m.menu_key, rm.actions "
+                        + "FROM sys_role_menu rm "
+                        + "JOIN sys_menu m ON rm.menu_id = m.id "
+                        + "WHERE rm.role_id IN (" + inClause + ") "
+                        + "AND m.status = 1 AND m.deleted = 0");
         // 按 menuKey 合并操作集合
         Map<String, Set<String>> merged = new LinkedHashMap<>();
-        for (SysRole role : roles) {
-            for (MenuPermissionDTO perm : JsonUtils.parsePermissions(role.getPermissions())) {
-                merged.computeIfAbsent(perm.getMenuKey(), k -> new LinkedHashSet<>())
-                        .addAll(perm.getActions() == null ? List.of() : perm.getActions());
-            }
+        for (Map<String, Object> row : rows) {
+            String menuKey = (String) row.get("menu_key");
+            List<String> actions = JsonUtils.parseStringList((String) row.get("actions"));
+            merged.computeIfAbsent(menuKey, k -> new LinkedHashSet<>()).addAll(actions);
         }
         List<MenuPermissionDTO> result = new ArrayList<>();
         merged.forEach((menuKey, actions) -> {
@@ -164,18 +185,92 @@ public class RoleServiceImpl implements RoleService {
         return result;
     }
 
-    private RoleVO toVO(SysRole role, Long userCount) {
+    /** 保存角色菜单权限: 先清空再批量写入 */
+    private void saveRoleMenus(Long roleId, List<MenuPermissionDTO> permissions) {
+        sysRoleMenuMapper.delete(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
+        if (CollectionUtils.isEmpty(permissions)) {
+            return;
+        }
+        for (MenuPermissionDTO perm : permissions) {
+            if (!StringUtils.hasText(perm.getMenuKey())) {
+                continue;
+            }
+            Long menuId = resolveMenuId(perm.getMenuKey().trim());
+            if (menuId == null) {
+                continue;
+            }
+            SysRoleMenu relation = new SysRoleMenu();
+            relation.setRoleId(roleId);
+            relation.setMenuId(menuId);
+            relation.setActions(JsonUtils.toJson(perm.getActions()));
+            sysRoleMenuMapper.insert(relation);
+        }
+    }
+
+    /** 根据 menuKey 获取菜单ID, 不存在时抛出业务异常 */
+    private Long resolveMenuId(String menuKey) {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
+                Long.class, menuKey);
+        if (!ids.isEmpty()) {
+            return ids.get(0);
+        }
+        throw new BusinessException("菜单标识不存在: " + menuKey);
+    }
+
+    private RoleVO toVO(SysRole role, Long userCount, List<MenuPermissionDTO> permissions) {
         RoleVO vo = new RoleVO();
         vo.setId(role.getId());
         vo.setName(role.getName());
         vo.setDescription(role.getDescription());
         vo.setStatus(role.getStatus());
-        vo.setPermissions(JsonUtils.parsePermissions(role.getPermissions()));
+        vo.setPermissions(permissions == null ? List.of() : permissions);
         vo.setUserCount(userCount);
         vo.setCreatedAt(role.getCreatedAt());
         vo.setUpdatedBy(role.getUpdatedBy());
         vo.setUpdatedAt(role.getUpdatedAt());
         return vo;
+    }
+
+    /** 从 sys_role_menu + sys_menu 加载角色权限 */
+    private List<MenuPermissionDTO> loadPermissions(Long roleId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT m.menu_key, rm.actions "
+                        + "FROM sys_role_menu rm "
+                        + "JOIN sys_menu m ON rm.menu_id = m.id "
+                        + "WHERE rm.role_id = ? AND m.deleted = 0",
+                roleId);
+        List<MenuPermissionDTO> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            MenuPermissionDTO dto = new MenuPermissionDTO();
+            dto.setMenuKey((String) row.get("menu_key"));
+            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            result.add(dto);
+        }
+        return result;
+    }
+
+    /** 批量加载多个角色权限, 按 roleId 分组 */
+    private Map<Long, List<MenuPermissionDTO>> loadPermissionsMap(List<Long> roleIds) {
+        Map<Long, List<MenuPermissionDTO>> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(roleIds)) {
+            return result;
+        }
+        String inClause = roleIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT rm.role_id, m.menu_key, rm.actions "
+                        + "FROM sys_role_menu rm "
+                        + "JOIN sys_menu m ON rm.menu_id = m.id "
+                        + "WHERE rm.role_id IN (" + inClause + ") AND m.deleted = 0");
+        for (Map<String, Object> row : rows) {
+            Long roleId = ((Number) row.get("role_id")).longValue();
+            MenuPermissionDTO dto = new MenuPermissionDTO();
+            dto.setMenuKey((String) row.get("menu_key"));
+            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            result.computeIfAbsent(roleId, k -> new ArrayList<>()).add(dto);
+        }
+        return result;
     }
 
     private SysRole requireRole(Long id) {

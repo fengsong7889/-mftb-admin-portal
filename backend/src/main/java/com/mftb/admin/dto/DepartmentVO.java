@@ -1,7 +1,6 @@
 package com.mftb.admin.dto;
 
 import com.mftb.admin.entity.SysDepartment;
-import com.mftb.admin.util.JsonUtils;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -32,7 +31,8 @@ public class DepartmentVO {
     /** 最后更新时间 */
     private LocalDateTime updatedAt;
 
-    public static DepartmentVO from(SysDepartment dept, String parentName, Long userCount) {
+    public static DepartmentVO from(SysDepartment dept, String parentName, Long userCount,
+                                     List<MenuPermissionDTO> permissions) {
         DepartmentVO vo = new DepartmentVO();
         vo.setId(dept.getId());
         vo.setCode(dept.getCode());
@@ -42,7 +42,7 @@ public class DepartmentVO {
         vo.setLeader(dept.getLeader());
         vo.setStatus(dept.getStatus());
         vo.setSort(dept.getSort());
-        vo.setPermissions(JsonUtils.parsePermissions(dept.getPermissions()));
+        vo.setPermissions(permissions == null ? List.of() : permissions);
         vo.setUserCount(userCount);
         vo.setCreatedAt(dept.getCreatedAt());
         vo.setUpdatedBy(dept.getUpdatedBy());

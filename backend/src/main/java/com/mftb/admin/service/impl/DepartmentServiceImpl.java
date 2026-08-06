@@ -6,8 +6,10 @@ import com.mftb.admin.dto.DepartmentRequest;
 import com.mftb.admin.dto.DepartmentVO;
 import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.entity.SysDepartment;
+import com.mftb.admin.entity.SysDepartmentMenu;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysDepartmentMapper;
+import com.mftb.admin.mapper.SysDepartmentMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.util.JsonUtils;
@@ -16,12 +18,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 集团组织架构-部门服务实现
@@ -31,6 +36,7 @@ import java.util.Objects;
 public class DepartmentServiceImpl implements DepartmentService {
 
     private final SysDepartmentMapper sysDepartmentMapper;
+    private final SysDepartmentMenuMapper sysDepartmentMenuMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
@@ -54,8 +60,12 @@ public class DepartmentServiceImpl implements DepartmentService {
                 countMap.merge(user.getDepartmentId(), 1L, Long::sum);
             }
         }
+        Map<Long, List<MenuPermissionDTO>> permissionsMap = loadPermissionsMap(
+                departments.stream().map(SysDepartment::getId).toList());
         return departments.stream()
-                .map(d -> DepartmentVO.from(d, nameMap.get(d.getParentId()), countMap.getOrDefault(d.getId(), 0L)))
+                .map(d -> DepartmentVO.from(d, nameMap.get(d.getParentId()),
+                        countMap.getOrDefault(d.getId(), 0L),
+                        permissionsMap.getOrDefault(d.getId(), List.of())))
                 .toList();
     }
 
@@ -77,7 +87,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         dept.setDeleted(0);
         dept.setUpdatedBy(operatorResolver.currentOperatorName());
         sysDepartmentMapper.insert(dept);
-        return DepartmentVO.from(dept, null, 0L);
+        return DepartmentVO.from(dept, null, 0L, List.of());
     }
 
     @Override
@@ -105,7 +115,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         sysDepartmentMapper.updateById(dept);
         // 同步更新该部门下员工的部门名称快照
         syncUserDepartmentName(id, dept.getName());
-        return DepartmentVO.from(dept, null, null);
+        return DepartmentVO.from(dept, null, null, loadPermissions(dept.getId()));
     }
 
     @Override
@@ -117,11 +127,10 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     @Override
+    @Transactional
     public void updatePermissions(Long id, List<MenuPermissionDTO> permissions) {
-        SysDepartment dept = requireDept(id);
-        dept.setPermissions(JsonUtils.toJson(permissions == null ? List.of() : permissions));
-        dept.setUpdatedBy(operatorResolver.currentOperatorName());
-        sysDepartmentMapper.updateById(dept);
+        requireDept(id);
+        saveDeptMenus(id, permissions);
     }
 
     @Override
@@ -134,6 +143,9 @@ public class DepartmentServiceImpl implements DepartmentService {
             throw new BusinessException("该部门存在下级部门，请先删除下级部门");
         }
         sysDepartmentMapper.deleteById(id);
+        // 清理部门菜单关联
+        sysDepartmentMenuMapper.delete(
+                new LambdaQueryWrapper<SysDepartmentMenu>().eq(SysDepartmentMenu::getDeptId, id));
         // 解绑该部门下的员工
         List<SysUser> users = sysUserMapper.selectList(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getDepartmentId, id));
@@ -153,7 +165,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         if (dept == null || dept.getStatus() == null || dept.getStatus() != 1) {
             return List.of();
         }
-        return JsonUtils.parsePermissions(dept.getPermissions());
+        return loadPermissions(deptId);
     }
 
     /**
@@ -165,6 +177,80 @@ public class DepartmentServiceImpl implements DepartmentService {
                         + "WHERE code REGEXP '^MT[0-9]+$'",
                 Integer.class);
         return String.format("%s%05d", DEPT_CODE_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+    }
+
+    /** 保存部门菜单权限: 先清空再批量写入 */
+    private void saveDeptMenus(Long deptId, List<MenuPermissionDTO> permissions) {
+        sysDepartmentMenuMapper.delete(
+                new LambdaQueryWrapper<SysDepartmentMenu>().eq(SysDepartmentMenu::getDeptId, deptId));
+        if (CollectionUtils.isEmpty(permissions)) {
+            return;
+        }
+        for (MenuPermissionDTO perm : permissions) {
+            if (!StringUtils.hasText(perm.getMenuKey())) {
+                continue;
+            }
+            Long menuId = resolveMenuId(perm.getMenuKey().trim());
+            if (menuId == null) {
+                continue;
+            }
+            SysDepartmentMenu relation = new SysDepartmentMenu();
+            relation.setDeptId(deptId);
+            relation.setMenuId(menuId);
+            relation.setActions(JsonUtils.toJson(perm.getActions()));
+            sysDepartmentMenuMapper.insert(relation);
+        }
+    }
+
+    /** 根据 menuKey 获取菜单ID, 不存在时抛出业务异常 */
+    private Long resolveMenuId(String menuKey) {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
+                Long.class, menuKey);
+        if (!ids.isEmpty()) {
+            return ids.get(0);
+        }
+        throw new BusinessException("菜单标识不存在: " + menuKey);
+    }
+
+    /** 从 sys_department_menu + sys_menu 加载部门权限 */
+    private List<MenuPermissionDTO> loadPermissions(Long deptId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT m.menu_key, dm.actions "
+                        + "FROM sys_department_menu dm "
+                        + "JOIN sys_menu m ON dm.menu_id = m.id "
+                        + "WHERE dm.dept_id = ? AND m.deleted = 0",
+                deptId);
+        List<MenuPermissionDTO> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            MenuPermissionDTO dto = new MenuPermissionDTO();
+            dto.setMenuKey((String) row.get("menu_key"));
+            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            result.add(dto);
+        }
+        return result;
+    }
+
+    /** 批量加载多个部门权限, 按 deptId 分组 */
+    private Map<Long, List<MenuPermissionDTO>> loadPermissionsMap(List<Long> deptIds) {
+        Map<Long, List<MenuPermissionDTO>> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(deptIds)) {
+            return result;
+        }
+        String inClause = deptIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT dm.dept_id, m.menu_key, dm.actions "
+                        + "FROM sys_department_menu dm "
+                        + "JOIN sys_menu m ON dm.menu_id = m.id "
+                        + "WHERE dm.dept_id IN (" + inClause + ") AND m.deleted = 0");
+        for (Map<String, Object> row : rows) {
+            Long deptId = ((Number) row.get("dept_id")).longValue();
+            MenuPermissionDTO dto = new MenuPermissionDTO();
+            dto.setMenuKey((String) row.get("menu_key"));
+            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            result.computeIfAbsent(deptId, k -> new ArrayList<>()).add(dto);
+        }
+        return result;
     }
 
     /** 部门名称变更后同步员工表的部门名称快照 */

@@ -331,6 +331,13 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 菜單配置
+  'menu-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
   // 系统模板
   'system-template': [
     { key: 'view', label: '查看' },
@@ -904,6 +911,13 @@ export const menuPermissionTree: PermissionModule[] = [
       { key: 'data-permission', name: '數據授權' },
     ],
   },
+  {
+    key: 'system-config',
+    name: '系統配置',
+    children: [
+      { key: 'menu-config', name: '菜單配置' },
+    ],
+  },
 ]
 
 /**
@@ -967,6 +981,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'role-management',
   'function-permission',
   'data-permission',
+  // 系統配置
+  'menu-config',
 ]
 
 /**
@@ -1051,6 +1067,8 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/role-management': 'role-management',
   '/function-permission': 'function-permission',
   '/data-permission': 'data-permission',
+  // 系統配置
+  '/menu-config': 'menu-config',
 }
 
 /**

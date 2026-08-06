@@ -44,6 +44,7 @@ import {
   IdcardOutlined,
   SolutionOutlined,
   ScheduleOutlined,
+  MenuOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -154,6 +155,8 @@ const keyToPath: Record<string, string> = {
   'promotion-report-compare': '/promotion-report-compare',
   // 推广通(父菜单,无需映射)
   // 'promotion-tool': '/promotion-tool',
+  // 系统配置
+  'menu-config': '/menu-config',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -506,6 +509,18 @@ const menuItems: MenuItem[] = [
         key: 'data-permission',
         icon: <DatabaseOutlined />,
         label: '數據授權',
+      },
+    ],
+  },
+  {
+    key: 'system-config',
+    icon: <SettingOutlined />,
+    label: '系統配置',
+    children: [
+      {
+        key: 'menu-config',
+        icon: <MenuOutlined />,
+        label: '菜單配置',
       },
     ],
   },
