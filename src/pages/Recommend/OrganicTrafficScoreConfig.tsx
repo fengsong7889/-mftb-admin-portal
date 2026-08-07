@@ -1,17 +1,18 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Popover } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
 import {
-  ScoreDimension, ScoreMode,
+  ScoreDimension, ScoreMode, TierDirection, CalcCycle,
   SCORE_DIMENSION_ICON, SCORE_DIMENSION_COLOR,
   SCORE_MODE_COLOR,
   DEFAULT_DIMENSION_WEIGHT, DIMENSION_WEIGHT_TOTAL,
-  DEFAULT_SCORE_TIMER_MINUTES, DEFAULT_ORGANIC_SCORE_RULES,
+  DEFAULT_ORGANIC_SCORE_RULES,
   RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
-  type OrganicScoreRule, type RangeScores,
+  TIER_DIRECTION_LABEL, CALC_CYCLE_LABEL,
+  type OrganicScoreRule, type RangeScores, type ScoreTier,
 } from './organicTrafficConfig'
 
 /** 數值計數動畫（1200ms，遵循數據指標統計卡標準） */
@@ -60,14 +61,19 @@ interface RuleFormValues {
   statDays?: number
   /** 配送範圍分層分數（僅配送範圍規則使用） */
   rangeScores?: RangeScores
+  /** 梯度檔位（僅 mode=TIERED 時使用） */
+  tiers?: ScoreTier[]
+  /** 計算周期（僅 mode=TIERED 時使用） */
+  calcCycle?: CalcCycle
   status: ServiceStatus
 }
 
 /** 判斷是否為配送範圍規則（需配置短程/中程/遠程/跨橋分數，不需要分值字段） */
 const isDeliveryRange = (id?: string) => !!id && id.startsWith('PLT_02')
 
-/** 判斷是否需要統計天數（僅訂單、好評、差評等時效性指標需要） */
-const needsStatDays = (id?: string) => {
+/** 判斷是否需要統計天數（訂單、好評、差評、梯度計分等時效性指標需要） */
+const needsStatDays = (mode?: ScoreMode, id?: string) => {
+  if (mode === ScoreMode.TIERED) return true
   if (!id) return false
   return ['STO_02A', 'STO_02B', 'STO_03'].includes(id)
 }
@@ -103,6 +109,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     [ScoreMode.DECAY]: t('organicTrafficScore.modeDecay'),
     [ScoreMode.RULE_DEDUCTION]: t('organicTrafficScore.modeRuleDeduction'),
     [ScoreMode.AMOUNT_MULTIPLIER]: t('organicTrafficScore.modeAmountMultiplier'),
+    [ScoreMode.TIERED]: '梯度計分',
   }
   /** 配送範圍分層標籤（依賴 t） */
   const RANGE_LABEL: Record<keyof RangeScores, string> = {
@@ -117,9 +124,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     { label: MODE_LABEL[ScoreMode.DECAY], value: ScoreMode.DECAY },
     { label: MODE_LABEL[ScoreMode.RULE_DEDUCTION], value: ScoreMode.RULE_DEDUCTION },
     { label: MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
+    { label: MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
   ]
   const [dimensionWeight, setDimensionWeight] = useState<Record<ScoreDimension, number>>(DEFAULT_DIMENSION_WEIGHT)
-  const [timerMinutes, setTimerMinutes] = useState<number>(DEFAULT_SCORE_TIMER_MINUTES)
 
   // 維度切換與表格內篩選（避免所有維度平鋪導致頁面過長）
   const [activeDimension, setActiveDimension] = useState<ScoreDimension>(ScoreDimension.COMMERCIAL)
@@ -136,6 +143,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [ruleForm] = Form.useForm<RuleFormValues>()
   /** 監聽彈窗內計分方式，金額倍率時分值字段填倍率 */
   const ruleFormMode = Form.useWatch('mode', ruleForm)
+  /** 梯度檔位本地狀態（彈窗內編輯） */
+  const [tierRows, setTierRows] = useState<ScoreTier[]>([])
 
   /** 權重總和（用於校驗提示） */
   const weightTotal = useMemo(
@@ -187,8 +196,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       score: 50,
       statDays: undefined,
       rangeScores: undefined,
+      tiers: undefined,
+      calcCycle: CalcCycle.NIGHTLY,
       status: ServiceStatus.ENABLED,
     })
+    setTierRows([])
     setModalOpen(true)
   }
 
@@ -203,14 +215,25 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       score: record.score,
       statDays: record.statDays,
       rangeScores: record.rangeScores,
+      tiers: record.tiers,
+      calcCycle: record.calcCycle,
       status: record.status,
     })
+    setTierRows(record.tiers || [])
     setModalOpen(true)
   }
 
   /** 保存評分項（新增或編輯） */
   const handleSaveRule = async () => {
     const values = await ruleForm.validateFields()
+    // 梯度計分模式時，將 tierRows 寫入 tiers
+    if (values.mode === ScoreMode.TIERED) {
+      if (tierRows.length === 0) {
+        message.warning('請至少配置一個梯度檔位')
+        return
+      }
+      values.tiers = [...tierRows]
+    }
     if (editingRule) {
       setRules(prev => prev.map(r => r.id === editingRule.id ? { ...r, ...values } : r))
       message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
@@ -285,6 +308,45 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     {
       title: t('organicTrafficScore.colScore'), dataIndex: 'score', key: 'score', width: 130,
       render: (v: number, record) => {
+        // 梯度計分規則：顯示「梯度配置 (N档)」+ hover 彈出詳細檔位表
+        if (record.mode === ScoreMode.TIERED && record.tiers?.length) {
+          return (
+            <Popover
+              title={<span style={{ fontSize: 13, fontWeight: 600 }}>{record.name} · 梯度配置</span>}
+              content={
+                <div style={{ minWidth: 260 }}>
+                  {record.calcCycle && (
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>
+                      計算周期：{CALC_CYCLE_LABEL[record.calcCycle]}
+                      {record.calcCycle === CalcCycle.NIGHTLY && record.statDays ? `（過去 ${record.statDays} 天）` : ''}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {record.tiers.map((tier: ScoreTier, idx: number) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '4px 8px', borderRadius: 4,
+                        background: tier.score >= 0 ? '#f6ffed' : '#fff2f0',
+                      }}>
+                        <span style={{ fontSize: 12, color: '#595959' }}>
+                          {TIER_DIRECTION_LABEL[tier.direction]} {tier.threshold} 單
+                        </span>
+                        <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 13, color: tier.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
+                          {tier.score >= 0 ? '+' : ''}{tier.score} 分
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              }
+              trigger="hover"
+            >
+              <Button type="link" size="small" style={{ padding: '0 4px', fontSize: 12 }}>
+                梯度配置 ({record.tiers.length}档)
+              </Button>
+            </Popover>
+          )
+        }
         if (record.rangeScores) {
           return (
             <Popover
@@ -478,7 +540,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         })}
       </div>
 
-      {/* 維度權重與定時器配置：單行 4 列緊湊佈局 */}
+      {/* 維度權重配置：單行 3 列緊湊佈局（已移除得分重算定時器） */}
       <div style={{
         padding: '14px 20px', background: '#fff', border: '1px solid #f0f0f0',
         borderRadius: 8, marginBottom: 16,
@@ -490,7 +552,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             {`${t('organicTrafficScore.currentTotal', { total: weightTotal })}${weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}）`}`}
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {DIMENSION_ORDER.map(dimension => (
             <div key={dimension}>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{DIM_LABEL[dimension]}</div>
@@ -505,18 +567,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               />
             </div>
           ))}
-          <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('organicTrafficScore.scoreRecalcTimer')}</div>
-            <InputNumber
-              value={timerMinutes}
-              min={1}
-              max={1440}
-              addonAfter={t('organicTrafficScore.minutesUnit')}
-              style={{ width: '100%' }}
-              disabled={readOnly}
-              onChange={val => setTimerMinutes(val ?? DEFAULT_SCORE_TIMER_MINUTES)}
-            />
-          </div>
         </div>
       </div>
 
@@ -594,7 +644,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           <Form.Item label={t('organicTrafficScore.scoringMode')} name="mode" rules={[{ required: true, message: t('organicTrafficScore.scoringModeRequired') }]}>
             <Select options={MODE_OPTIONS} placeholder={t('organicTrafficScore.selectScoringMode')} />
           </Form.Item>
-          {!isDeliveryRange(editingRule?.id) && (
+          {!isDeliveryRange(editingRule?.id) && ruleFormMode !== ScoreMode.TIERED && (
             <Form.Item
               label={t('organicTrafficScore.score')}
               name="score"
@@ -605,6 +655,105 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             >
               <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder={t('organicTrafficScore.scorePlaceholder')} />
             </Form.Item>
+          )}
+          {/* 梯度計分配置：計算周期 + 檔位編輯器 */}
+          {ruleFormMode === ScoreMode.TIERED && (
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12 }}>梯度計分配置</div>
+              {/* 計算周期 */}
+              <Form.Item label="計算周期" name="calcCycle" style={{ marginBottom: 12 }}>
+                <Select
+                  options={[
+                    { label: '每晚統計（滾動 N 天）', value: CalcCycle.NIGHTLY },
+                    { label: '按當天計算', value: CalcCycle.DAILY },
+                  ]}
+                  placeholder="選擇計算周期"
+                />
+              </Form.Item>
+              {/* 統計天數（僅每晚統計時顯示） */}
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.calcCycle !== cur.calcCycle}>
+                {({ getFieldValue }) =>
+                  getFieldValue('calcCycle') === CalcCycle.NIGHTLY ? (
+                    <Form.Item label="統計天數" name="statDays" style={{ marginBottom: 12 }}>
+                      <InputNumber min={1} max={365} style={{ width: '100%' }} placeholder="如 30" addonAfter="天" />
+                    </Form.Item>
+                  ) : null
+                }
+              </Form.Item>
+              {/* 梯度檔位編輯器 */}
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#595959', marginBottom: 8 }}>梯度檔位</div>
+              {tierRows.length === 0 && (
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {tierRows.map((tier, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', background: '#fff', borderRadius: 6,
+                    border: '1px solid #f0f0f0',
+                  }}>
+                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                    <Select
+                      value={tier.direction}
+                      style={{ width: 90 }}
+                      size="small"
+                      onChange={val => {
+                        const next = [...tierRows]
+                        next[idx] = { ...next[idx], direction: val }
+                        setTierRows(next)
+                      }}
+                      options={[
+                        { label: '少於', value: TierDirection.LESS_THAN },
+                        { label: '超過', value: TierDirection.MORE_THAN },
+                      ]}
+                    />
+                    <InputNumber
+                      value={tier.threshold}
+                      min={0}
+                      size="small"
+                      style={{ width: 90 }}
+                      placeholder="閾值"
+                      onChange={val => {
+                        const next = [...tierRows]
+                        next[idx] = { ...next[idx], threshold: val ?? 0 }
+                        setTierRows(next)
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>單</span>
+                    <span style={{ fontSize: 12, color: '#595959' }}>→</span>
+                    <InputNumber
+                      value={tier.score}
+                      size="small"
+                      style={{ width: 80 }}
+                      placeholder="分值"
+                      onChange={val => {
+                        const next = [...tierRows]
+                        next[idx] = { ...next[idx], score: val ?? 0 }
+                        setTierRows(next)
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>分</span>
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      style={{ marginLeft: 'auto' }}
+                      onClick={() => setTierRows(prev => prev.filter((_, i) => i !== idx))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                block
+                onClick={() => setTierRows(prev => [...prev, { threshold: 0, direction: TierDirection.LESS_THAN, score: 0 }])}
+              >
+                新增檔位
+              </Button>
+            </div>
           )}
           {isDeliveryRange(editingRule?.id) && (
             <div style={{ marginBottom: 16 }}>
@@ -625,7 +774,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               </div>
             </div>
           )}
-          {(editingRule ? needsStatDays(editingRule.id) : false) && (
+          {(editingRule ? needsStatDays(editingRule.mode, editingRule.id) : ruleFormMode === ScoreMode.TIERED ? false : false) && (
             <Form.Item
               label={t('organicTrafficScore.statDays')}
               name="statDays"

@@ -26,6 +26,24 @@ export enum ScoreMode {
   RULE_DEDUCTION = 3,
   /** 金額倍率：得分 = 金額 × 倍率（分值字段填倍率） */
   AMOUNT_MULTIPLIER = 4,
+  /** 梯度計分：按閾值分檔，不同區間對應不同分值 */
+  TIERED = 5,
+}
+
+/** 梯度比較方向 */
+export enum TierDirection {
+  /** 少於閾值 */
+  LESS_THAN = 'LESS_THAN',
+  /** 超過閾值 */
+  MORE_THAN = 'MORE_THAN',
+}
+
+/** 計算周期 */
+export enum CalcCycle {
+  /** 每晚統計（滾動 N 天） */
+  NIGHTLY = 'NIGHTLY',
+  /** 按當天計算 */
+  DAILY = 'DAILY',
 }
 
 export const SCORE_DIMENSION_LABEL: Record<ScoreDimension, string> = {
@@ -59,6 +77,7 @@ export const SCORE_MODE_LABEL: Record<ScoreMode, string> = {
   [ScoreMode.DECAY]: '衰減函數',
   [ScoreMode.RULE_DEDUCTION]: '規則減分',
   [ScoreMode.AMOUNT_MULTIPLIER]: '金額倍率',
+  [ScoreMode.TIERED]: '梯度計分',
 }
 
 export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
@@ -66,6 +85,7 @@ export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
   [ScoreMode.DECAY]: 'purple',
   [ScoreMode.RULE_DEDUCTION]: 'red',
   [ScoreMode.AMOUNT_MULTIPLIER]: 'gold',
+  [ScoreMode.TIERED]: 'cyan',
 }
 
 export const SCORE_MODE_OPTIONS = [
@@ -73,7 +93,18 @@ export const SCORE_MODE_OPTIONS = [
   { label: SCORE_MODE_LABEL[ScoreMode.DECAY], value: ScoreMode.DECAY },
   { label: SCORE_MODE_LABEL[ScoreMode.RULE_DEDUCTION], value: ScoreMode.RULE_DEDUCTION },
   { label: SCORE_MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
+  { label: SCORE_MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
 ]
+
+export const TIER_DIRECTION_LABEL: Record<TierDirection, string> = {
+  [TierDirection.LESS_THAN]: '少於',
+  [TierDirection.MORE_THAN]: '超過',
+}
+
+export const CALC_CYCLE_LABEL: Record<CalcCycle, string> = {
+  [CalcCycle.NIGHTLY]: '每晚統計',
+  [CalcCycle.DAILY]: '按當天計算',
+}
 
 /** 配送範圍分層分數（短程 / 中程 / 遠程 / 跨橋） */
 export interface RangeScores {
@@ -96,6 +127,16 @@ export const RANGE_SCORE_LABELS: Record<keyof RangeScores, string> = {
 }
 export const DEFAULT_RANGE_SCORES: RangeScores = { short: 80, medium: 60, long: 40, crossBridge: 20 }
 
+/** 梯度檔位 */
+export interface ScoreTier {
+  /** 閾值 */
+  threshold: number
+  /** 比較方向：少於 / 超過 */
+  direction: TierDirection
+  /** 該檔位對應分值（正=加分，負=扣分） */
+  score: number
+}
+
 /** 單條評分規則 */
 export interface OrganicScoreRule {
   id: string
@@ -109,6 +150,10 @@ export interface OrganicScoreRule {
   statDays?: number
   /** 配送範圍分層分數（僅配送範圍規則使用） */
   rangeScores?: RangeScores
+  /** 梯度檔位（僅 mode=TIERED 時使用） */
+  tiers?: ScoreTier[]
+  /** 計算周期（僅 mode=TIERED 時使用） */
+  calcCycle?: CalcCycle
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
@@ -123,9 +168,6 @@ export const DEFAULT_DIMENSION_WEIGHT: Record<ScoreDimension, number> = {
 
 /** 維度權重總和校驗值 */
 export const DIMENSION_WEIGHT_TOTAL = 100
-
-/** 得分計算定時器默認分鐘數 */
-export const DEFAULT_SCORE_TIMER_MINUTES = 30
 
 const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 
@@ -149,7 +191,18 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'STO_01', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
   { id: 'STO_02A', dimension: ScoreDimension.STORE, name: '好評得分', description: '統計天數內好評數量加分，好評越多得分越高', mode: ScoreMode.RULE_BONUS, score: 100, statDays: 30, status: ENABLED, builtin: true },
   { id: 'STO_02B', dimension: ScoreDimension.STORE, name: '差評得分', description: '統計天數內差評數量扣分，差評越多扣分越多', mode: ScoreMode.RULE_DEDUCTION, score: -100, statDays: 30, status: ENABLED, builtin: true },
-  { id: 'STO_03', dimension: ScoreDimension.STORE, name: '店鋪銷量', description: '統計天數內銷量達標固定加分；超出部分按訂單數 × 倍率加分；需達起步訂單數後才開始計算；僅統計已完成有效訂單，已取消 / 退款訂單不計', mode: ScoreMode.RULE_BONUS, score: 100, statDays: 30, status: ENABLED, builtin: true },
+  { id: 'STO_03', dimension: ScoreDimension.STORE, name: '店鋪銷量', description: '每晚統計過去30天有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, statDays: 30, calcCycle: CalcCycle.NIGHTLY, tiers: [
+    { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 },
+    { threshold: 100, direction: TierDirection.LESS_THAN, score: 40 },
+    { threshold: 200, direction: TierDirection.LESS_THAN, score: 60 },
+    { threshold: 500, direction: TierDirection.LESS_THAN, score: 80 },
+    { threshold: 500, direction: TierDirection.MORE_THAN, score: 100 },
+  ], status: ENABLED, builtin: true },
+  { id: 'STO_03B', dimension: ScoreDimension.STORE, name: '當天訂單超量扣分', description: '按當天計算，訂單超過閾值按梯度扣分，防止刷單', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.DAILY, tiers: [
+    { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
+    { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
+    { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
+  ], status: ENABLED, builtin: true },
   { id: 'STO_04', dimension: ScoreDimension.STORE, name: '出餐速度', description: '平均出餐時長越短得分越高，店鋪自身效率指標', mode: ScoreMode.DECAY, score: 90, status: ENABLED, builtin: true },
   { id: 'STO_05', dimension: ScoreDimension.STORE, name: '拒絕訂單', description: '商家拒絕訂單按次扣分', mode: ScoreMode.RULE_DEDUCTION, score: -80, status: ENABLED, builtin: true },
   { id: 'STO_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '超出承諾出餐時長的訂單按佔比扣分', mode: ScoreMode.RULE_DEDUCTION, score: -70, status: ENABLED, builtin: true },
