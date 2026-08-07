@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Card, Input, Button, Select, Space, Tag, Table, Row, Col, Form, Modal,
 } from 'antd'
@@ -8,38 +9,6 @@ import {
   FontSizeOutlined, EnvironmentOutlined, WifiOutlined,
 } from '@ant-design/icons'
 import BrandTag from '../../components/BrandTag'
-
-// ============================
-// 常量定义
-// ============================
-
-const CHANNELS = [
-  { key: 'home', label: '大首頁' },
-  { key: 'takeaway', label: '外賣頻道' },
-  { key: 'groupBuy', label: '團購頻道' },
-  { key: 'supermarket', label: '超市頻道' },
-]
-
-const BRAND_OPTIONS = [
-  { label: 'mFood', value: 'mFood' },
-  { label: '閃蜂', value: 'flashBee' },
-]
-
-const REGION_OPTIONS = [
-  { label: '澳門半島', value: 'macau' },
-  { label: '氹仔路半島', value: 'taipa' },
-  { label: '珠海市', value: 'zhuhai' },
-  { label: '橫琴粵深度合作區', value: 'hengqin' },
-]
-
-const TIME_SLOT_OPTIONS = [
-  { label: '全時段', value: 'allDay' },
-  { label: '早餐', value: 'breakfast' },
-  { label: '午餐', value: 'lunch' },
-  { label: '下午茶', value: 'afternoonTea' },
-  { label: '晚餐', value: 'dinner' },
-  { label: '宵夜', value: 'midnightSnack' },
-]
 
 // ============================
 // 類型定義
@@ -104,12 +73,6 @@ const _jumpTypeMap: Record<string, string> = {
   takeawayChannel: '外賣頻道',
 }
 
-const statusMap: Record<string, { color: string; text: string }> = {
-  active: { color: 'success', text: '生效中' },
-  inactive: { color: 'default', text: '已停用' },
-  expired: { color: 'error', text: '已過期' },
-}
-
 // ============================
 // 地圖位置列表
 // ============================
@@ -129,6 +92,7 @@ const MAP_LOCATIONS = [
 // ============================
 
 export default function HintVerify() {
+  const { t } = useTranslation()
   const [channel, setChannel] = useState('home')
   const [brand, setBrand] = useState('mFood')
   const [region, setRegion] = useState('macau')
@@ -147,6 +111,40 @@ export default function HintVerify() {
   const [currentHintIndex, setCurrentHintIndex] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const statusMap: Record<string, { color: string; text: string }> = {
+    active: { color: 'success', text: t('dict.status.activeLong') },
+    inactive: { color: 'default', text: t('hintVerify.inactiveStatus') },
+    expired: { color: 'error', text: t('dict.status.expired') },
+  }
+
+  const brandOptions = [
+    { label: 'mFood', value: 'mFood' },
+    { label: '閃蜂', value: 'flashBee' },
+  ]
+
+  const channelOptions = [
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawayChannel'), value: 'takeaway' },
+    { label: t('dict.channel.groupBuyChannel'), value: 'groupBuy' },
+    { label: t('dict.channel.supermarketChannel'), value: 'supermarket' },
+  ]
+
+  const regionOptions = [
+    { label: t('dict.region.macauPeninsula'), value: 'macau' },
+    { label: t('dict.region.taipaPeninsula'), value: 'taipa' },
+    { label: t('dict.region.zhuhai'), value: 'zhuhai' },
+    { label: t('dict.region.hengqin'), value: 'hengqin' },
+  ]
+
+  const timeSlotOptions = [
+    { label: t('dict.timeSlot.allDay'), value: 'allDay' },
+    { label: t('dict.timeSlot.breakfast'), value: 'breakfast' },
+    { label: t('dict.timeSlot.lunch'), value: 'lunch' },
+    { label: t('dict.timeSlot.afternoonTea'), value: 'afternoonTea' },
+    { label: t('dict.timeSlot.dinner'), value: 'dinner' },
+    { label: t('dict.timeSlot.midnightSnack'), value: 'midnightSnack' },
+  ]
 
   const handleMapConfirm = () => {
     if (selectedLocation) {
@@ -192,23 +190,23 @@ export default function HintVerify() {
   const currentHint = results[currentHintIndex]
 
   const columns: TableColumnsType<HintVerifyResult> = [
-    { title: '底紋ID', dataIndex: 'hintId', width: 110 },
+    { title: t('hintVerify.colHintId'), dataIndex: 'hintId', width: 110 },
     {
-      title: '底紋詞', dataIndex: 'hintWord', width: 160,
+      title: t('hintVerify.colHintWord'), dataIndex: 'hintWord', width: 160,
       render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '優先級', dataIndex: 'priority', width: 80, align: 'center',
+      title: t('hintVerify.colPriority'), dataIndex: 'priority', width: 80, align: 'center',
       render: (v: number) => <Tag color="gold">{v}</Tag>,
       sorter: (a, b) => a.priority - b.priority,
       defaultSortOrder: 'ascend',
     },
-    { title: '所屬品牌', dataIndex: 'brand', width: 80, render: (v: string) => <BrandTag value={v} /> },
-    { title: '區域', dataIndex: 'region', width: 100 },
-    { title: '人群', dataIndex: 'crowd', width: 90 },
-    { title: '生效時間', dataIndex: 'effectDate', width: 190 },
+    { title: t('hintVerify.colBrand'), dataIndex: 'brand', width: 80, render: (v: string) => <BrandTag value={v} /> },
+    { title: t('hintVerify.colRegion'), dataIndex: 'region', width: 100 },
+    { title: t('hintVerify.colCrowd'), dataIndex: 'crowd', width: 90 },
+    { title: t('hintVerify.colEffectDate'), dataIndex: 'effectDate', width: 190 },
     {
-      title: '狀態', dataIndex: 'status', width: 80,
+      title: t('hintVerify.colStatus'), dataIndex: 'status', width: 80,
       render: (v: string) => <Tag color={statusMap[v]?.color}>{statusMap[v]?.text}</Tag>,
     },
   ]
@@ -224,10 +222,10 @@ export default function HintVerify() {
           <FontSizeOutlined style={{ fontSize: 20, color: '#1890ff' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-              底紋校驗
+              {t('hintVerify.title')}
             </h2>
             <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-              校驗底紋詞在不同頻道、區域、人群下的展示效果
+              {t('hintVerify.desc')}
             </div>
           </div>
         </div>
@@ -235,49 +233,49 @@ export default function HintVerify() {
 
       {/* 篩選條件 */}
       <Card
-        title={<Space><FontSizeOutlined style={{ color: '#1890ff' }} /><span>底紋校驗條件</span></Space>}
+        title={<Space><FontSizeOutlined style={{ color: '#1890ff' }} /><span>{t('hintVerify.condTitle')}</span></Space>}
         style={{ marginBottom: 12, borderRadius: 8 }}
         bodyStyle={{ padding: '16px 24px' }}
       >
         <Form layout="vertical">
           <Row gutter={16}>
             <Col span={6}>
-              <Form.Item label="搜索頻道" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintVerify.channelLabel')} style={{ marginBottom: 12 }}>
                 <Select value={channel} onChange={setChannel}
-                  options={CHANNELS.map(c => ({ label: c.label, value: c.key }))} />
+                  options={channelOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="所屬品牌" style={{ marginBottom: 12 }}>
-                <Select value={brand} onChange={setBrand} options={BRAND_OPTIONS} />
+              <Form.Item label={t('hintVerify.brandLabel')} style={{ marginBottom: 12 }}>
+                <Select value={brand} onChange={setBrand} options={brandOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="展示區域" style={{ marginBottom: 12 }}>
-                <Select value={region} onChange={setRegion} options={REGION_OPTIONS} />
+              <Form.Item label={t('hintVerify.regionLabel')} style={{ marginBottom: 12 }}>
+                <Select value={region} onChange={setRegion} options={regionOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="展示時段" style={{ marginBottom: 12 }}>
-                <Select value={timeSlot} onChange={setTimeSlot} options={TIME_SLOT_OPTIONS} />
+              <Form.Item label={t('hintVerify.timeSlotLabel')} style={{ marginBottom: 12 }}>
+                <Select value={timeSlot} onChange={setTimeSlot} options={timeSlotOptions} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={6}>
-              <Form.Item label="用戶（可選）" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintVerify.userLabel')} style={{ marginBottom: 12 }}>
                 <Input value={userId} onChange={e => setUserId(e.target.value)}
-                  placeholder="輸入用戶ID或手機號" allowClear />
+                  placeholder={t('hintVerify.userPlaceholder')} allowClear />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="地圖踩點" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintVerify.mapLabel')} style={{ marginBottom: 12 }}>
                 <Input
                   value={`${location.name}（${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}）`}
                   readOnly
                   prefix={<EnvironmentOutlined style={{ color: '#1890ff' }} />}
                   style={{ cursor: 'pointer' }}
-                  placeholder="點擊選擇位置"
+                  placeholder={t('hintVerify.mapPlaceholder')}
                   onClick={() => setIsMapModalOpen(true)}
                 />
               </Form.Item>
@@ -286,9 +284,9 @@ export default function HintVerify() {
               <Form.Item label="&nbsp;" style={{ marginBottom: 12 }}>
                 <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Button type="primary" icon={<EyeOutlined />} onClick={handleSearch}>
-                    校驗底紋
+                    {t('hintVerify.verifyBtn')}
                   </Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                  <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
                 </Space>
               </Form.Item>
             </Col>
@@ -341,7 +339,7 @@ export default function HintVerify() {
                     transition: 'top 0.5s ease-in-out',
                   }}>
                     <span style={{ fontSize: 14, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {currentHint?.hintWord || '請輸入搜索關鍵詞'}
+                      {currentHint?.hintWord || t('hintVerify.searchPlaceholder')}
                     </span>
                   </div>
                   {/* 下一個詞 */}
@@ -371,11 +369,11 @@ export default function HintVerify() {
               {/* 當前底紋詞信息 */}
               {currentHint && (
                 <div style={{ background: '#FAFAFA', padding: 16, borderRadius: 12, border: '1px solid #F0F0F0' }}>
-                  <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>當前底紋配置</div>
+                  <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>{t('hintVerify.currentHintConfig')}</div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff', marginBottom: 8 }}>{currentHint.hintWord}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <Tag color="blue">ID: {currentHint.hintId}</Tag>
-                    <Tag color="gold">優先級 {currentHint.priority}</Tag>
+                    <Tag color="gold">{t('hintVerify.priorityTag', { priority: currentHint.priority })}</Tag>
                   </div>
                 </div>
               )}
@@ -387,8 +385,8 @@ export default function HintVerify() {
             <Card
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>📋 底紋配置詳情</span>
-                  <Tag color="blue">共 {results.length} 個配置</Tag>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>📋 {t('hintVerify.detailTitle')}</span>
+                  <Tag color="blue">{t('hintVerify.totalConfig', { count: results.length })}</Tag>
                 </div>
               }
               style={{ borderRadius: 8 }}
@@ -398,7 +396,7 @@ export default function HintVerify() {
                 dataSource={results}
                 pagination={{
                   pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'],
-                  showQuickJumper: true, showTotal: (total) => `共 ${total} 條`,
+                  showQuickJumper: true, showTotal: (total) => t('common.total', { count: total }),
                 }}
                 size="small"
                 rowKey="hintId"
@@ -411,25 +409,25 @@ export default function HintVerify() {
       {!searched && (
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#bbb' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>💡</div>
-          <div style={{ fontSize: 15 }}>請設置篩選條件後，點擊「校驗底紋」查看底紋詞配置</div>
+          <div style={{ fontSize: 15 }}>{t('hintVerify.emptyTip')}</div>
         </div>
       )}
 
       {/* 地圖選點彈窗 */}
       <Modal
-        title={<div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>🗺️ 地圖踩點</div>}
+        title={<div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>🗺️ {t('hintVerify.mapTitle')}</div>}
         open={isMapModalOpen}
         onCancel={() => setIsMapModalOpen(false)}
         width={700}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '12px 0' }}>
-            <Button onClick={() => setIsMapModalOpen(false)}>取消</Button>
-            <Button type="primary" onClick={handleMapConfirm} disabled={!selectedLocation}>確認選擇</Button>
+            <Button onClick={() => setIsMapModalOpen(false)}>{t('common.cancel')}</Button>
+            <Button type="primary" onClick={handleMapConfirm} disabled={!selectedLocation}>{t('hintVerify.confirmSelect')}</Button>
           </div>
         }
       >
         <div style={{ padding: '12px 0' }}>
-          <Input placeholder="搜索位置名稱" value={mapSearchText} onChange={e => setMapSearchText(e.target.value)}
+          <Input placeholder={t('hintVerify.mapSearchPlaceholder')} value={mapSearchText} onChange={e => setMapSearchText(e.target.value)}
             prefix={<SearchOutlined />} size="large" allowClear style={{ marginBottom: 16 }} />
           <div style={{
             width: '100%', height: 320,
@@ -439,16 +437,16 @@ export default function HintVerify() {
           }}>
             <div style={{ textAlign: 'center' }}>
               <EnvironmentOutlined style={{ fontSize: 48, marginBottom: 12 }} />
-              <div style={{ fontSize: 14, opacity: 0.9 }}>地圖區域（模擬）</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>{t('hintVerify.mapArea')}</div>
               {selectedLocation && (
                 <div style={{ marginTop: 12, padding: 10, background: 'rgba(255,255,255,0.2)', borderRadius: 8 }}>
                   <div style={{ fontWeight: 600 }}>📍 {selectedLocation.name}</div>
-                  <div style={{ fontSize: 13 }}>緯度: {selectedLocation.lat.toFixed(4)} | 經度: {selectedLocation.lng.toFixed(4)}</div>
+                  <div style={{ fontSize: 13 }}>{t('hintVerify.mapLat', { lat: selectedLocation.lat.toFixed(4), lng: selectedLocation.lng.toFixed(4) })}</div>
                 </div>
               )}
             </div>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: '#666' }}>熱門位置（點擊選擇）</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: '#666' }}>{t('hintVerify.mapHotTitle')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
             {MAP_LOCATIONS
               .filter(loc => !mapSearchText || loc.name.includes(mapSearchText))
@@ -465,7 +463,7 @@ export default function HintVerify() {
                       <span style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>📍 {loc.name}</span>
                       <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</span>
                     </div>
-                    {selectedLocation?.name === loc.name && <Tag color="blue">已選擇</Tag>}
+                    {selectedLocation?.name === loc.name && <Tag color="blue">{t('hintVerify.mapSelected')}</Tag>}
                   </div>
                 </div>
               ))}

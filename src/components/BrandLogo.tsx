@@ -9,6 +9,7 @@
  *  - 橙色漸變主色：延續品牌色 #E8720C → #FFB347
  */
 import type { CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface BrandLogoProps {
   /** 圖標尺寸，默認 24 */
@@ -20,6 +21,7 @@ interface BrandLogoProps {
 }
 
 export default function BrandLogo({ size = 24, className, style }: BrandLogoProps) {
+  const { t } = useTranslation()
   const uid = Math.random().toString(36).slice(2, 8)
   const gradId = `mftb-logo-grad-${uid}`
   const coreId = `mftb-logo-core-${uid}`
@@ -31,7 +33,7 @@ export default function BrandLogo({ size = 24, className, style }: BrandLogoProp
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       style={{ display: 'block', flexShrink: 0, ...style }}
-      aria-label="MFTB 搜廣推系統"
+      aria-label={t('app.logoMain')}
     >
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">

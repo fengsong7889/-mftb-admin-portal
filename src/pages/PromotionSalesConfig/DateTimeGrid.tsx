@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, Tag, Space, message, Empty, DatePicker, Button, Table, Select, Modal, Form } from 'antd'
 import {
   CalendarOutlined,
@@ -105,16 +106,10 @@ const _BD_OPTIONS = [
   { label: '劉敏', value: 'bd-004' },
 ]
 
-// 时段定义（早餐/午餐/下午茶/晚餐/夜宵）
-const MEAL_TIME_SLOTS = [
-  { key: 'breakfast', label: '早餐', timeRange: '07:00-10:00', slots: [14, 15, 16, 17, 18, 19] },
-  { key: 'lunch', label: '午餐', timeRange: '11:00-14:00', slots: [22, 23, 24, 25, 26, 27] },
-  { key: 'afternoon', label: '下午茶', timeRange: '14:00-17:00', slots: [28, 29, 30, 31, 32, 33] },
-  { key: 'dinner', label: '晚餐', timeRange: '17:00-21:00', slots: [34, 35, 36, 37, 38, 39, 40, 41] },
-  { key: 'supper', label: '夜宵', timeRange: '21:00-02:00', slots: [42, 43, 44, 45, 46, 47, 0, 1, 2, 3] },
-]
+// MEAL_TIME_SLOTS 定义移入组件内部以使用 t() 翻譯 labels
+// 在组件内部通过 useMemo 创建
 
-/** 商圈列表（表格行） */
+/** 商圈列表（表格行）—— name 仅作 fallback，实际展示用组件内翻译 */
 const REGION_LIST = [
   { key: Region.KOKSAA, name: '黑沙環區' },
   { key: Region.COSTA, name: '高士德區' },
@@ -129,7 +124,7 @@ const REGION_LIST = [
   { key: Region.HACS, name: '黑沙灘區' },
 ]
 
-const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+// WEEKDAY_LABELS 移入组件内部以使用 t() 翻譯
 
 /** 时段锁定时长（秒），调整此值即可同步更新倒计时、过期释放、弹窗提示 */
 const LOCK_DURATION_SECONDS = 60
@@ -160,7 +155,40 @@ function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
 }
 
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
+  const { t } = useTranslation('adSales')
   const navigate = useNavigate()
+  // 时段定义（含翻译）
+  const MEAL_TIME_SLOTS = useMemo(() => [
+    { key: 'breakfast', label: t('breakfast'), timeRange: '07:00-10:00', slots: [14, 15, 16, 17, 18, 19] },
+    { key: 'lunch', label: t('lunch'), timeRange: '11:00-14:00', slots: [22, 23, 24, 25, 26, 27] },
+    { key: 'afternoon', label: t('afternoon'), timeRange: '14:00-17:00', slots: [28, 29, 30, 31, 32, 33] },
+    { key: 'dinner', label: t('dinner'), timeRange: '17:00-21:00', slots: [34, 35, 36, 37, 38, 39, 40, 41] },
+    { key: 'supper', label: t('supper'), timeRange: '21:00-02:00', slots: [42, 43, 44, 45, 46, 47, 0, 1, 2, 3] },
+  ], [t])
+
+  // 星期标签（含翻译）
+  const WEEKDAY_LABELS = t('weekdayFull', { returnObjects: true }) as string[]
+
+  // 商圈名称翻译映射
+  const REGION_NAME_MAP: Record<number, string> = useMemo(() => ({
+    [Region.KOKSAA]: t('regionKOKSAA'),
+    [Region.COSTA]: t('regionCOSTA'),
+    [Region.SANMA]: t('regionSANMA'),
+    [Region.SANWONG]: t('regionSANWONG'),
+    [Region.HKM]: t('regionHKM'),
+    [Region.FAHUA]: t('regionFAHUA'),
+    [Region.AIRPORT]: t('regionAIRPORT'),
+    [Region.LHOTEL]: t('regionLHOTEL'),
+    [Region.RHOTEL]: t('regionRHOTEL'),
+    [Region.UM]: t('regionUM'),
+    [Region.HACS]: t('regionHACS'),
+  }), [t])
+
+  // 翻译后的商圈列表
+  const translatedRegionList = useMemo(() =>
+    REGION_LIST.map(r => ({ ...r, name: REGION_NAME_MAP[Number(r.key)] || r.name })),
+  [REGION_NAME_MAP])
+
   // 当前库存项的可售天数（盘活复苏 150 天，其他 12 天）
   const sellableDays = getSellableDays(inventoryItem.algorithmType)
   const [selectedDates, setSelectedDates] = useState<Dayjs[]>([])
@@ -194,7 +222,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     if (expiredItems.length > 0) {
       setCartItems(prev => prev.filter(item => currentTime - item.lockTime < LOCK_DURATION_MS))
       expiredItems.forEach(item => {
-        message.info(`${item.date} ${item.regionName} ${item.mealSlot} 鎖定已到期，自動釋放`)
+        message.info(`${item.date} ${item.regionName} ${item.mealSlot} ${t('lockExpired')}`)
       })
     }
   }, [currentTime, cartItems])
@@ -277,7 +305,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     // 清空购物车
     setCartItems([])
     setHasSearched(false)
-    message.success('已清空已選商圈、時段，請重新查詢')
+    message.success(t('clearedRegionSlot'))
   }
 
   // 取消切换
@@ -288,8 +316,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
   // 查询：必须选择算法名称（品牌已自动带出）
   const handleSearch = () => {
-    if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
-    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
+    if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
+    if (!searchBrand) { message.warning(t('selectBrand')); return }
     setHasSearched(true)
     // 自动选中第一个可用日期
     if (allDates.length > 0) {
@@ -355,7 +383,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 继续购买
   const handleContinuePurchase = () => {
     setIsSuccessModalVisible(false)
-    message.success('繼續購買')
+    message.success(t('continueBuy'))
   }
 
   // 生成所有日期列表（从当天开始，不展示已过去的日期）
@@ -501,7 +529,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const handleMealSlotClick = (date: Dayjs, mealSlot: typeof MEAL_TIME_SLOTS[0], regionKey: Region | string) => {
     const status = getMealSlotStatus(date, mealSlot)
     if (status.status !== 'available') {
-      message.info('該時段暫不可購買')
+      message.info(t('dateNotForSale'))
       return
     }
     const dateStr = date.format('YYYY-MM-DD')
@@ -518,9 +546,9 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
           <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-            <Form.Item label="算法名稱">
+            <Form.Item label={t('algoNameLabel')}>
               <Select
-                placeholder="請輸入搜索"
+                placeholder={t('algoSearchPlaceholder')}
                 value={searchAlgorithm}
                 onChange={handleAlgorithmChange}
                 allowClear
@@ -538,20 +566,20 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ]}
               />
             </Form.Item>
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('brandLabel')}>
               <Select
-                placeholder="選擇算法後自動帶出"
+                placeholder={t('brandAutoHint')}
                 value={searchBrand}
                 onChange={(v) => setSearchBrand(v)}
                 allowClear
                 disabled
                 options={[
-                  { label: '閃蜂', value: 'shanfeng' },
+                  { label: t('flashBee'), value: 'shanfeng' },
                   { label: 'mFood', value: 'mfood' },
                 ]}
               />
             </Form.Item>
-            <Form.Item label="選擇日期">
+            <Form.Item label={t('selectDateLabel')}>
               <DatePicker
                 value={searchDate}
                 onChange={(date) => setSearchDate(date)}
@@ -561,8 +589,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common:reset')}</Button>
               </div>
             </Form.Item>
           </Form>
@@ -570,31 +598,31 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
       {/* 购物车冲突提醒弹窗 */}
       <Modal
-        title="提示"
+        title={t('switchConfirmTitle')}
         open={isConflictModalVisible}
         onOk={handleConfirmSwitch}
         onCancel={handleCancelSwitch}
-        okText="確認切換"
-        cancelText="取消"
+        okText={t('switchConfirmOk')}
+        cancelText={t('common:cancel')}
         okButtonProps={{ danger: true }}
       >
         <div style={{ padding: '8px 0' }}>
           <p style={{ marginBottom: 12, fontSize: 14, color: '#262626' }}>
-            您當前已有加購數據，同一訂單僅支持選擇相同算法的廣告位。
+            {t('switchWarnLine1')}
           </p>
           <p style={{ marginBottom: 0, fontSize: 13, color: '#595959' }}>
-            切換算法後，已選的商圈、時段將被清空。您可以：
+            {t('dtgSwitchWarnLine2')}
           </p>
           <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#595959' }}>
-            <li>確認切換：清空已選商圈、時段，重新查詢</li>
-            <li>取消：保留當前選擇，先完成下單後再選擇其他算法</li>
+            <li>{t('switchOption1')}</li>
+            <li>{t('switchOption2')}</li>
           </ul>
         </div>
       </Modal>
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
-          <Empty description="請先選擇所屬品牌、算法名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description={t('dtgSearchFirstHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
       <div style={{ display: 'flex', gap: 16 }}>
@@ -656,10 +684,10 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         {date.format('MM-DD')}
                       </span>
                       {presale ? (
-                        <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                        <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
                       ) : (
                         <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
-                          {isToday ? '今天' : WEEKDAY_LABELS[date.day()]}
+                          {isToday ? t('today') : WEEKDAY_LABELS[date.day()]}
                         </span>
                       )}
                     </div>
@@ -682,7 +710,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         {/* 表格 - 仅展示 activeDate */}
         {!activeDate ? (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-            <Empty description="請在上方選擇日期，點擊日期即可多選" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <Empty description={t('selectDateHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           </div>
         ) : (
           <div>
@@ -698,7 +726,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   color: '#333',
                   width: 120,
                 }}>
-                  商圈
+                  {t('cartColRegion')}
                 </th>
                 {MEAL_TIME_SLOTS.map(meal => (
                   <th 
@@ -720,7 +748,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
             {/* 数据行 - 商圈为行 */}
             <tbody>
-              {REGION_LIST.map(region => {
+              {translatedRegionList.map(region => {
                 return (
                   <tr key={region.key}>
                     {/* 商圈名称列 */}
@@ -803,7 +831,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                             if (isAvailable) {
                               handleMealSlotClick(activeDate, meal, region.key)
                             } else {
-                              message.info('該時段暫不可購買')
+                              message.info(t('dateNotForSale'))
                             }
                           }}
                           style={{ 
@@ -826,25 +854,25 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           <div style={{ marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                             {status === 'available' && (
                               isSelected
-                                ? <Tag color="#E8720C" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>已選擇</Tag>
-                                : <Tag color="success" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>可購買</Tag>
+                                ? <Tag color="#E8720C" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>{t('selectedTag')}</Tag>
+                                : <Tag color="success" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>{t('availableTag')}</Tag>
                             )}
                             {status === 'locked' && (
                               <>
-                                <Tag color="#722ed1" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>已鎖定</Tag>
+                                <Tag color="#722ed1" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>{t('lockedTag')}</Tag>
                                 <span>
                                   <span style={{ fontSize: 14, fontWeight: 700, color: '#ff4d4f' }}>
                                     {remainingSeconds}
                                   </span>
-                                  <span style={{ fontSize: 9, color: '#ff7875' }}>秒</span>
+                                  <span style={{ fontSize: 9, color: '#ff7875' }}>{t('secondUnit')}</span>
                                 </span>
                               </>
                             )}
                             {status === 'soldOut' && (
-                              <Tag color="error" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>已售罄</Tag>
+                              <Tag color="error" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>{t('soldOutTag')}</Tag>
                             )}
                             {status === 'unavailable' && (
-                              <Tag color="default" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>不可售</Tag>
+                              <Tag color="default" style={{ fontSize: 10, padding: '0 3px', lineHeight: '16px' }}>{t('unavailableTag')}</Tag>
                             )}
                           </div>
 
@@ -862,7 +890,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           {/* 原价横杠 / 无折扣 */}
                           {(isAvailable || isLockedStatus) && (
                             hasNoDiscount ? (
-                              <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 1 }}>無折扣</div>
+                              <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 1 }}>{t('noDiscount')}</div>
                             ) : (
                               <div style={{ fontSize: 10, color: '#bfbfbf', textDecoration: 'line-through', marginBottom: 1 }}>
                                 ${inventoryItem.dailyPrice}
@@ -872,11 +900,11 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           {/* 库存 */}
                           {(isAvailable || isLockedStatus) && (
                             <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 1 }}>
-                              庫存：<span style={{ color: mockInventory <= 5 ? '#ff4d4f' : '#595959', fontWeight: mockInventory <= 5 ? 600 : 400 }}>{mockInventory}</span>
+                              {t('inventoryLabel')}：<span style={{ color: mockInventory <= 5 ? '#ff4d4f' : '#595959', fontWeight: mockInventory <= 5 ? 600 : 400 }}>{mockInventory}</span>
                             </div>
                           )}
                           {isSoldOut && (
-                            <div style={{ fontSize: 10, color: '#bfbfbf', marginBottom: 1 }}>庫存：0</div>
+                            <div style={{ fontSize: 10, color: '#bfbfbf', marginBottom: 1 }}>{t('inventoryLabel')}：0</div>
                           )}
                           {!isAvailable && !isSoldOut && !isLockedStatus && (
                             <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 2 }}>--</div>
@@ -898,7 +926,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       {/* 右侧：当前所选 + 已选时段 + 费用结算 */}
       <div style={{ width: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* 当前所选 - 按日期统筹展示 */}
-        <Card size="small" title={<Space><CalendarOutlined /><span>當前所選</span></Space>}>
+        <Card size="small" title={<Space><CalendarOutlined /><span>{t('adSales.currentSelection')}</span></Space>}>
           {selectedCells.length > 0 ? (
             <div>
               {/* 按日期分组展示所有选中的格子 */}
@@ -921,7 +949,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                   cells.forEach(cell => {
                     const meal = MEAL_TIME_SLOTS.find(m => m.key === cell.mealSlotKey)
                     if (!meal) return
-                    const regionName = REGION_LIST.find(r => r.key === cell.regionKey)?.name || '-'
+                    const regionName = translatedRegionList.find(r => r.key === cell.regionKey)?.name || '-'
                     const statuses = generateTimeSlotStatuses(inventoryItem.id + Number(cell.regionKey), dateStr)
                     const availableSlots = meal.slots.filter(slotIndex => statuses[slotIndex] === TimeSlotStatus.AVAILABLE)
                     if (availableSlots.length === 0) return
@@ -990,7 +1018,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                       border: '1px solid #ffe58f',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     }}>
-                      <span style={{ fontSize: 13, color: '#595959' }}>多時段折扣</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('multiSlotDiscount')}</span>
                       {(() => {
                         // 汇总所有日期的时段数（按格子数计算，每个格子=1个时段）
                         // 购物车已有的格子数
@@ -1007,7 +1035,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         return discount ? (
                           <Tag color="orange" style={{ fontSize: 13, fontWeight: 600 }}>{discount.label}</Tag>
                         ) : (
-                          <span style={{ fontSize: 13, color: '#bfbfbf' }}>無折扣</span>
+                          <span style={{ fontSize: 13, color: '#bfbfbf' }}>{t('noDiscount')}</span>
                         )
                       })()}
                     </div>
@@ -1024,7 +1052,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         selectedCells.forEach(cell => {
                           const meal = MEAL_TIME_SLOTS.find(m => m.key === cell.mealSlotKey)
                           if (!meal) return
-                          const regionName = REGION_LIST.find(r => r.key === cell.regionKey)?.name || '-'
+                          const regionName = translatedRegionList.find(r => r.key === cell.regionKey)?.name || '-'
                           const dateStr = cell.date
                           const statuses = generateTimeSlotStatuses(inventoryItem.id + Number(cell.regionKey), dateStr)
                           const availableSlots = meal.slots.filter(slotIndex => statuses[slotIndex] === TimeSlotStatus.AVAILABLE)
@@ -1054,7 +1082,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                         })
                         
                         if (allItems.length === 0) {
-                          message.warning('所選日期該時段暫無可售庫存')
+                          message.warning(t('noStockForSlot'))
                           return
                         }
                         
@@ -1097,21 +1125,21 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                       }}
                       style={{ height: 40, fontSize: 15, background: '#fa8c16', borderColor: '#fa8c16' }}
                     >
-                      確認加購（{datePreviews.length} 個日期 · {selectedCells.length} 個時段）
+                      {t('confirmAddCart', { dates: datePreviews.length, slots: selectedCells.length })}
                     </Button>
                   </>
                 )
               })()}
             </div>
           ) : (
-            <Empty description="請點擊表格中的時段格子選擇商圈和時段" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <Empty description={t('clickSlotHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           )}
         </Card>
 
         {/* 已选商圈，时段 */}
         <Card 
           size="small" 
-          title="已選商圈，時段"
+          title={t('selectedRegionSlots')}
         >
           <div style={{ 
             fontSize: 11, 
@@ -1119,16 +1147,16 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             marginBottom: 12,
             lineHeight: 1.4,
           }}>
-            (已加購的時段會被鎖定，鎖定狀態下其他商家無法購買，如需解除需手動移除)
+            {t('lockWarning')}
           </div>
           <Table<CartItem>
             dataSource={cartItems}
             pagination={false}
             size="small"
-            locale={{ emptyText: <Empty description="暫無已選時段" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+            locale={{ emptyText: <Empty description={t('noSelectedSlots')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
             columns={[
               {
-                title: '日期',
+                title: t('cartColDate'),
                 dataIndex: 'date',
                 key: 'date',
                 width: 110,
@@ -1137,7 +1165,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ),
               },
               {
-                title: '商圈',
+                title: t('cartColRegion'),
                 dataIndex: 'regionName',
                 key: 'regionName',
                 width: 70,
@@ -1146,7 +1174,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ),
               },
               {
-                title: '門店',
+                title: t('cartColStore'),
                 dataIndex: 'storeName',
                 key: 'storeName',
                 width: 90,
@@ -1155,7 +1183,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ),
               },
               {
-                title: '時段',
+                title: t('cartColSlot'),
                 dataIndex: 'mealSlot',
                 key: 'mealSlot',
                 width: 70,
@@ -1164,7 +1192,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ),
               },
               {
-                title: '售價',
+                title: t('cartColPrice'),
                 dataIndex: 'salePrice',
                 key: 'salePrice',
                 width: 80,
@@ -1174,23 +1202,23 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 ),
               },
               {
-                title: '鎖定時間',
+                title: t('cartColLockTime'),
                 key: 'countdown',
                 width: 100,
                 align: 'center' as const,
                 render: (_, record) => {
                   const remaining = Math.max(0, LOCK_DURATION_SECONDS - Math.floor((currentTime - record.lockTime) / 1000))
-                  if (remaining <= 0) return <span style={{ fontSize: 11, color: '#bfbfbf' }}>已釋放</span>
+                  if (remaining <= 0) return <span style={{ fontSize: 11, color: '#bfbfbf' }}>{t('lockReleased')}</span>
                   return (
                     <span style={{ fontSize: 12 }}>
                       <span style={{ fontWeight: 700, color: remaining <= 10 ? '#ff4d4f' : '#fa8c16' }}>{remaining}</span>
-                      <span style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 2 }}>秒</span>
+                      <span style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 2 }}>{t('secondUnit')}</span>
                     </span>
                   )
                 },
               },
               {
-                title: '操作',
+                title: t('common:action'),
                 key: 'action',
                 width: 60,
                 align: 'center' as const,
@@ -1203,10 +1231,10 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                     style={{ padding: 0, fontSize: 12 }}
                     onClick={() => {
                       setCartItems(prev => prev.filter(item => item.key !== record.key))
-                      message.success('已移除')
+                      message.success(t('removed'))
                     }}
                   >
-                    移除
+                    {t('remove')}
                   </Button>
                 ),
               },
@@ -1217,7 +1245,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         {/* 费用结算 */}
         <Card 
           size="small" 
-          title="費用結算"
+          title={t('settlementTitle')}
         >
           {/* 推广金余额 */}
           <div style={{ 
@@ -1230,7 +1258,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             alignItems: 'center',
           }}>
             <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>
-              推廣金餘額
+              {t('promoBalance')}
             </span>
             <span style={{ 
               fontSize: 22, 
@@ -1261,13 +1289,13 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 <thead>
                   <tr style={{ background: '#fafafa' }}>
                     <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>
-                      訂單金額（原價）
+                      {t('orderOriginal')}
                     </th>
                     <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>
-                      訂單優惠
+                      {t('orderDiscount')}
                     </th>
                     <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>
-                      實付總額
+                      {t('totalPayable')}
                     </th>
                   </tr>
                 </thead>
@@ -1307,7 +1335,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
               fontWeight: 600,
             }}
           >
-            訂單支付
+            {t('payButton')}
           </Button>
         </Card>
       </div>
@@ -1316,24 +1344,24 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
       {/* 支付确认弹窗 */}
       <Modal
-        title="確認訂單"
+        title={t('confirmOrder')}
         open={isPaymentModalVisible}
         onOk={handleConfirmPayment}
         onCancel={() => setIsPaymentModalVisible(false)}
-        okText="確定支付"
-        cancelText="取消"
+        okText={t('confirmPay')}
+        cancelText={t('common:cancel')}
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
         width={600}
       >
         <div style={{ marginBottom: 16 }}>
-          <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>購買明細：</h4>
+          <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
-                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>日期</th>
-                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>商圈</th>
-                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>時段</th>
-                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right' }}>售價</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>{t('cartColDate')}</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>{t('cartColRegion')}</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>{t('cartColSlot')}</th>
+                <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right' }}>{t('cartColPrice')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1353,11 +1381,11 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#595959' }}>訂單金額（原價）：</span>
+            <span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span>
             <span style={{ fontWeight: 600 }}>${cartItems.reduce((sum, item) => sum + item.originalPrice, 0)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-            <span>訂單優惠（含多時段折扣）：</span>
+            <span>{t('orderDiscountMulti')}</span>
             <span style={{ fontWeight: 600 }}>
               {(() => {
                 const grouped: Record<string, CartItem[]> = {}
@@ -1377,7 +1405,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-            <span style={{ fontWeight: 600 }}>實付金額：</span>
+            <span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span>
             <span style={{ fontWeight: 700 }}>
               {(() => {
                 const grouped: Record<string, CartItem[]> = {}
@@ -1400,15 +1428,15 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
       {/* 支付成功弹窗 */}
       <Modal
-        title="購買成功"
+        title={t('purchaseSuccess')}
         open={isSuccessModalVisible}
         onCancel={() => setIsSuccessModalVisible(false)}
         footer={[
           <Button key="view" type="primary" onClick={handleViewOrder}>
-            查看訂單
+            {t('viewOrder')}
           </Button>,
           <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>
-            繼續購買
+            {t('continueBuy')}
           </Button>,
         ]}
         width={400}
@@ -1416,7 +1444,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
           <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>
-            恭喜！購買成功
+            {t('successMessage')}
           </p>
           <div style={{ 
             background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)',
@@ -1425,7 +1453,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             marginBottom: 16,
           }}>
             <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>
-              已扣除推廣金
+              {t('deductedPromo')}
             </p>
             <p style={{ 
               fontSize: 36, 
@@ -1445,21 +1473,21 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         title={
           <Space>
             <span style={{ fontSize: 18 }}>⚠️</span>
-            <span style={{ color: '#ff4d4f', fontWeight: 600 }}>部分時段已售罄</span>
+            <span style={{ color: '#ff4d4f', fontWeight: 600 }}>{t('partialSoldOut')}</span>
           </Space>
         }
         open={isSoldOutModalVisible}
         onCancel={() => setIsSoldOutModalVisible(false)}
         footer={[
           <Button key="ok" type="primary" onClick={() => setIsSoldOutModalVisible(false)} style={{ background: '#fa8c16', borderColor: '#fa8c16', minWidth: 100 }}>
-            我知道了
+            {t('gotIt')}
           </Button>
         ]}
         width={460}
       >
         <div style={{ padding: '8px 0' }}>
           <p style={{ fontSize: 14, color: '#262626', marginBottom: 12, lineHeight: 1.6 }}>
-            以下時段在提交過程中已被其他商家搶購，已自動為您剔除，剩餘時段已成功加購。
+            {t('soldOutExplain')}
           </p>
           <div style={{ 
             background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 8, 
@@ -1483,7 +1511,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             ))}
           </div>
           <p style={{ fontSize: 13, color: '#ff4d4f', margin: 0, fontWeight: 500 }}>
-            ⏰ 剩餘時段已為您鎖定，請在 <span style={{ fontWeight: 700, fontSize: 16, color: '#ff4d4f', background: '#fff2f0', padding: '1px 6px', borderRadius: 4, border: '1px solid #ffccc7' }}>{LOCK_DURATION_SECONDS >= 60 ? `${LOCK_DURATION_SECONDS / 60} 分鐘內` : `${LOCK_DURATION_SECONDS} 秒內`}</span> 完成支付，逾期系統將自動釋放鎖定時段供其他商家選購。
+            {t('lockExpiryWarning', { count: LOCK_DURATION_SECONDS >= 60 ? LOCK_DURATION_SECONDS / 60 : LOCK_DURATION_SECONDS, unit: LOCK_DURATION_SECONDS >= 60 ? '分鐘' : '秒' })}
           </p>
         </div>
       </Modal>
@@ -1493,14 +1521,14 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         title={
           <Space>
             <span style={{ fontSize: 18 }}>⏳</span>
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>該日期尚未開售</span>
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('notYetOnSale')}</span>
           </Space>
         }
         open={!!presaleInfo}
         onCancel={() => setPresaleInfo(null)}
         footer={[
           <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
-            我知道了
+            {t('gotIt')}
           </Button>,
         ]}
         width={420}
@@ -1511,11 +1539,11 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
               background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
               padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
             }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>⏰ 開售時間：</span>
+              <span style={{ fontSize: 13, color: '#595959' }}>{t('saleTimeLabel')}</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
             </div>
             <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
-              每日 {PRESALE_OPEN_HOUR}:00 會放出新一天的可購買日期，請屆時再來搶購。
+              {t('dailyReleaseHint', { hour: PRESALE_OPEN_HOUR })}
             </p>
           </div>
         )}

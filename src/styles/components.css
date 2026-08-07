@@ -1521,6 +1521,44 @@
   position: relative;
   border: 1px solid rgba(255, 255, 255, 0.3); /* 玻璃边框 */
 }
+
+/* 登录页右上角国家 & 语言选择器 */
+.login-locale-corner {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+}
+.login-locale-corner .login-locale-select .ant-select-selector {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 6px !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  font-size: 11px !important;
+  height: 26px !important;
+  min-width: 70px;
+  padding: 0 6px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.login-locale-corner .login-locale-select .ant-select-selector:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+.login-locale-corner .login-locale-select .ant-select-selection-item {
+  color: rgba(255, 255, 255, 0.75) !important;
+  font-size: 11px !important;
+  line-height: 24px !important;
+}
+.login-locale-corner .login-locale-select .ant-select-arrow {
+  color: rgba(255, 255, 255, 0.4) !important;
+  font-size: 10px;
+}
+.login-locale-corner .login-locale-select .ant-select-open .ant-select-selector {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(243, 156, 18, 0.5) !important;
+}
 .login-title-v2 {
   text-align: center;
   margin-bottom: 22px;

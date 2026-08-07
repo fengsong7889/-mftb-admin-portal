@@ -1,4 +1,5 @@
 import { useState , useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message, Switch } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -14,29 +15,6 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
-
-/** 同義詞類型 */
-const synonymTypeOptions = [
-  { label: '全部', value: 'all' },
-  { label: '雙向同義', value: 'bidirectional' },
-  { label: '單向同義', value: 'unidirectional' },
-]
-
-/** 狀態選項 */
-const statusOptions = [
-  { label: '全部', value: 'all' },
-  { label: '生效中', value: 'active' },
-  { label: '已停用', value: 'inactive' },
-]
-
-/** 業務場景 */
-const scenarioOptions = [
-  { label: '全部', value: 'all' },
-  { label: '外賣搜索', value: 'takeaway' },
-  { label: '超市搜索', value: 'supermarket' },
-  { label: '團購搜索', value: 'groupBuy' },
-  { label: '通用搜索', value: 'general' },
-]
 
 interface SynonymRecord {
   key: string
@@ -200,6 +178,7 @@ const mockData: SynonymRecord[] = [
 ]
 
 export default function SynonymConfig() {
+  const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<SynonymRecord | null>(null)
   const [form] = Form.useForm()
@@ -225,28 +204,28 @@ export default function SynonymConfig() {
 
   const handleDelete = (record: SynonymRecord) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除同義詞組「${record.mainWord}」嗎？刪除後該組同義詞將不再參與搜索匹配。`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('synonymConfig.deleteTitle'),
+      content: t('synonymConfig.deleteContent', { word: record.mainWord }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
-      onOk: () => message.success('刪除成功'),
+      onOk: () => message.success(t('common.deleteSuccess')),
     })
   }
 
   const handleBatchDelete = () => {
     if (selectedRowKeys.length === 0) {
-      message.warning('請先選擇要刪除的同義詞組')
+      message.warning(t('synonymConfig.batchDeleteWarning'))
       return
     }
     Modal.confirm({
-      title: '批量刪除',
-      content: `確定要刪除選中的 ${selectedRowKeys.length} 條同義詞組嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('synonymConfig.batchDeleteTitle'),
+      content: t('synonymConfig.batchDeleteContent', { count: selectedRowKeys.length }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
-        message.success(`已刪除 ${selectedRowKeys.length} 條`)
+        message.success(t('synonymConfig.batchDeleteDone', { count: selectedRowKeys.length }))
         setSelectedRowKeys([])
       },
     })
@@ -254,14 +233,14 @@ export default function SynonymConfig() {
 
   const handleSave = () => {
     form.validateFields().then(() => {
-      message.success(editingRecord ? '編輯成功' : '新增成功')
+      message.success(editingRecord ? t('common.updateSuccess') : t('common.addSuccess'))
       setIsModalOpen(false)
     })
   }
 
   const handleToggleStatus = (record: SynonymRecord) => {
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
-    const actionText = newStatus === 'active' ? '啟用' : '停用'
+    const actionText = newStatus === 'active' ? t('common.enable') : t('common.disable')
     
     // 更新数据
     setData(prevData =>
@@ -272,19 +251,39 @@ export default function SynonymConfig() {
       )
     )
     
-    message.success(`已${actionText}同義詞組「${record.mainWord}」`)
+    message.success(t('synonymConfig.toggled', { word: record.mainWord, action: actionText }))
   }
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'mainWord', title: '主詞' },
-    { key: 'synonymWords', title: '同義詞' },
-    { key: 'type', title: '類型' },
-    { key: 'scenario', title: '業務場景' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updateTime', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'mainWord', title: t('synonymConfig.colMainWord') },
+    { key: 'synonymWords', title: t('synonymConfig.colSynonymWords') },
+    { key: 'type', title: t('synonymConfig.colType') },
+    { key: 'scenario', title: t('synonymConfig.colScenario') },
+    { key: 'status', title: t('synonymConfig.colStatus') },
+    { key: 'updatedBy', title: t('synonymConfig.colUpdatedBy') },
+    { key: 'updateTime', title: t('synonymConfig.colUpdateTime') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const synonymTypeOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.synonymType.bidirectional'), value: 'bidirectional' },
+    { label: t('dict.synonymType.unidirectional'), value: 'unidirectional' },
+  ]
+
+  const statusOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.status.activeLong'), value: 'active' },
+    { label: t('dict.status.inactive'), value: 'inactive' },
+  ]
+
+  const scenarioOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.scenario.takeaway'), value: 'takeaway' },
+    { label: t('dict.scenario.supermarket'), value: 'supermarket' },
+    { label: t('dict.scenario.groupBuy'), value: 'groupBuy' },
+    { label: t('dict.scenario.general'), value: 'general' },
+  ]
 
   const { configComponent, applyConfig } = useColumnConfig('synonym-config', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const }
@@ -294,14 +293,14 @@ export default function SynonymConfig() {
 
   const columns: TableColumnsType<SynonymRecord> = [
     {
-      title: '主詞',
+      title: t('synonymConfig.colMainWord'),
       dataIndex: 'mainWord',
       key: 'mainWord',
       width: 120,
       render: (val: string) => <span style={{ fontWeight: 600, color: '#2D3436' }}>{val}</span>,
     },
     {
-      title: '同義詞',
+      title: t('synonymConfig.colSynonymWords'),
       dataIndex: 'synonymWords',
       key: 'synonymWords',
       width: 280,
@@ -314,47 +313,47 @@ export default function SynonymConfig() {
       ),
     },
     {
-      title: '類型',
+      title: t('synonymConfig.colType'),
       dataIndex: 'type',
       key: 'type',
       width: 100,
       render: (type: string) => (
         <Tag color={type === 'bidirectional' ? 'blue' : 'green'} icon={<SwapOutlined />}>
-          {type === 'bidirectional' ? '雙向' : '單向'}
+          {type === 'bidirectional' ? t('dict.synonymType.bidirectional') : t('dict.synonymType.unidirectional')}
         </Tag>
       ),
     },
     {
-      title: '業務場景',
+      title: t('synonymConfig.colScenario'),
       dataIndex: 'scenario',
       key: 'scenario',
       width: 100,
     },
     {
-      title: '狀態',
+      title: t('synonymConfig.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       render: (status: string) => (
         <Tag color={status === 'active' ? 'success' : 'default'}>
-          {status === 'active' ? '生效中' : '已停用'}
+          {status === 'active' ? t('dict.status.activeLong') : t('dict.status.inactive')}
         </Tag>
       ),
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
-    { title: '最後更新時間', dataIndex: 'updateTime', key: 'updateTime', width: 170 },
+    { title: t('synonymConfig.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
+    { title: t('synonymConfig.colUpdateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 170 },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 160,
       fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
           <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === 'active' ? '停用' : '啟用'}
+            {record.status === 'active' ? t('common.disable') : t('common.enable')}
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -365,25 +364,25 @@ export default function SynonymConfig() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="主詞/同義詞">
-            <Input placeholder="請輸入關鍵詞" allowClear />
+          <Form.Item label={t('synonymConfig.searchMainWord')}>
+            <Input placeholder={t('synonymConfig.searchMainWordPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="同義詞類型">
-            <Select placeholder="全部" allowClear options={synonymTypeOptions} defaultValue="all" />
+          <Form.Item label={t('synonymConfig.searchType')}>
+            <Select placeholder={t('common.all')} allowClear options={synonymTypeOptions} defaultValue="all" />
           </Form.Item>
-          <Form.Item label="業務場景">
-            <Select placeholder="全部" allowClear options={scenarioOptions} defaultValue="all" />
+          <Form.Item label={t('synonymConfig.searchScenario')}>
+            <Select placeholder={t('common.all')} allowClear options={scenarioOptions} defaultValue="all" />
           </Form.Item>
-          <Form.Item label="狀態">
-            <Select placeholder="全部" allowClear options={statusOptions} defaultValue="all" />
+          <Form.Item label={t('synonymConfig.searchStatus')}>
+            <Select placeholder={t('common.all')} allowClear options={statusOptions} defaultValue="all" />
           </Form.Item>
-          <Form.Item label="更新時間">
+          <Form.Item label={t('synonymConfig.searchUpdateTime')}>
             <RangePicker />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -392,16 +391,16 @@ export default function SynonymConfig() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button icon={<DeleteOutlined />} danger onClick={handleBatchDelete}>批量刪除</Button>
-          <Button className="btn-import" icon={<ImportOutlined />}>批量導入</Button>
-          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          <Button icon={<DeleteOutlined />} danger onClick={handleBatchDelete}>{t('common.batchDelete')}</Button>
+          <Button className="btn-import" icon={<ImportOutlined />}>{t('common.batchImport')}</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>{t('common.export')}</Button>
           <span style={{ color: '#999', fontSize: 13 }}>
-            共 <b style={{ color: '#E8720C' }}>{data.length}</b> 組同義詞
-            {selectedRowKeys.length > 0 && <span>，已選 <b>{selectedRowKeys.length}</b> 條</span>}
+            {t('synonymConfig.totalPrefix')} <b style={{ color: '#E8720C' }}>{data.length}</b> {t('synonymConfig.totalSuffix')}
+            {selectedRowKeys.length > 0 && <span>，{t('common.selectedCount', { count: selectedRowKeys.length })}</span>}
           </span>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增同義詞</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>{t('synonymConfig.addSynonym')}</Button>
           {configComponent}
         </div>
       </div>
@@ -418,7 +417,7 @@ export default function SynonymConfig() {
           pagination={{
             total: mockData.length,
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 10,
@@ -432,65 +431,65 @@ export default function SynonymConfig() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingRecord ? '編輯同義詞組' : '新增同義詞組'}
+        title={editingRecord ? t('synonymConfig.editTitle') : t('synonymConfig.addTitle')}
         open={isModalOpen}
         onOk={handleSave}
         onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={580}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
-            label="主詞"
+            label={t('synonymConfig.mainWordLabel')}
             name="mainWord"
-            rules={[{ required: true, message: '請輸入主詞' }]}
-            tooltip="主詞為同義詞組的核心詞，搜索時優先匹配"
+            rules={[{ required: true, message: t('synonymConfig.mainWordRequired') }]}
+            tooltip={t('synonymConfig.mainWordTooltip')}
           >
-            <Input placeholder="請輸入主詞（如：漢堡）" />
+            <Input placeholder={t('synonymConfig.mainWordPlaceholder')} />
           </Form.Item>
           <Form.Item
-            label="同義詞"
+            label={t('synonymConfig.synonymLabel')}
             name="synonymWords"
-            rules={[{ required: true, message: '請輸入同義詞' }]}
-            tooltip="多個同義詞用頓號「、」或逗號分隔"
+            rules={[{ required: true, message: t('synonymConfig.synonymRequired') }]}
+            tooltip={t('synonymConfig.synonymTooltip')}
           >
             <TextArea
-              placeholder="請輸入同義詞，多個同義詞用頓號「、」分隔（如：汉堡、堡包、漢堡包、burger）"
+              placeholder={t('synonymConfig.synonymPlaceholder')}
               rows={3}
               showCount
               maxLength={500}
             />
           </Form.Item>
           <Form.Item
-            label="同義詞類型"
+            label={t('synonymConfig.typeLabel')}
             name="type"
-            rules={[{ required: true, message: '請選擇類型' }]}
+            rules={[{ required: true, message: t('synonymConfig.typeRequired') }]}
           >
             <Select
               options={[
-                { label: '雙向同義 — A搜到B，B也搜到A', value: 'bidirectional' },
-                { label: '單向同義 — 搜A可匹配B，搜B不匹配A', value: 'unidirectional' },
+                { label: t('synonymConfig.typeOptionBidirectional'), value: 'bidirectional' },
+                { label: t('synonymConfig.typeOptionUnidirectional'), value: 'unidirectional' },
               ]}
-              placeholder="請選擇同義詞類型"
+              placeholder={t('synonymConfig.typePlaceholder')}
             />
           </Form.Item>
           <Form.Item
-            label="業務場景"
+            label={t('synonymConfig.scenarioLabel')}
             name="scenario"
-            rules={[{ required: true, message: '請選擇業務場景' }]}
+            rules={[{ required: true, message: t('synonymConfig.scenarioRequired') }]}
           >
             <Select
               options={scenarioOptions.filter(o => o.value !== 'all')}
-              placeholder="請選擇適用的業務場景"
+              placeholder={t('synonymConfig.scenarioPlaceholder')}
             />
           </Form.Item>
-          <Form.Item label="狀態" name="status" valuePropName="checked">
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />
+          <Form.Item label={t('synonymConfig.statusLabel')} name="status" valuePropName="checked">
+            <Switch checkedChildren={t('synonymConfig.switchEnable')} unCheckedChildren={t('synonymConfig.switchDisable')} defaultChecked />
           </Form.Item>
-          <Form.Item label="備註" name="remark">
-            <TextArea placeholder="請輸入備註說明（選填）" rows={2} maxLength={200} />
+          <Form.Item label={t('synonymConfig.remarkLabel')} name="remark">
+            <TextArea placeholder={t('synonymConfig.remarkPlaceholder')} rows={2} maxLength={200} />
           </Form.Item>
         </Form>
       </Modal>

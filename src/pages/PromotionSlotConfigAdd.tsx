@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Select, Space, message, Table, Tag, Badge, Switch, Popover, Modal } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -13,23 +14,23 @@ import { mockData } from './PromotionSlotConfig/index'
 
 /** 品牌选项（与后端 brand 枚举对齐） */
 const APP_OPTIONS = [
-  { label: '閃蜂', value: 'flashBee' },
-  { label: 'mFood', value: 'mFood' },
+  { labelKey: 'common:flashBee', value: 'flashBee' },
+  { labelKey: 'recommend:appMfood', value: 'mFood' },
 ]
 
 /** 品牌标签 */
-const APP_LABEL: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFood' }
+const APP_LABEL: Record<string, string> = { flashBee: 'common:flashBee', mFood: 'recommend:appMfood' }
 
 /** 算法类型标签（与算法库 algo_type 枚举对齐） */
 const ALGO_TYPE_LABEL: Record<number, string> = {
-  1: '無敵星星',
-  2: '新店廣告',
-  3: '盤活復蘇',
-  4: '獨家商家',
-  5: '流量廣告',
-  6: '猜你喜歡',
-  7: '自然流量',
-  10: '人氣商家',
+  1: 'recommend:algoInvincibleStar',
+  2: 'recommend:algoNewStoreAd',
+  3: 'recommend:algoHotReviveAd',
+  4: 'recommend:algoExclusiveMerchant',
+  5: 'recommend:algoTrafficAd',
+  6: 'recommend:algoGuessYouLike',
+  7: 'recommend:algoOrganicTraffic',
+  10: 'recommend:algoPopularMerchant',
 }
 
 /** 算法类型颜色 */
@@ -64,10 +65,11 @@ interface AlgorithmOption {
 
 /** 算法库不可用时的降级选项（当前仅无敌星星接入数据库） */
 const MOCK_ALGORITHM_OPTIONS: AlgorithmOption[] = [
-  { label: '無敵星星-首頁黃金展位', value: 1, type: 1, brand: 'flashBee' },
+  { label: 'algoInvincibleStar', value: 1, type: 1, brand: 'flashBee' },
 ]
 
 export default function PromotionSlotConfigAdd() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editIdParam = searchParams.get('id') || ''
@@ -99,6 +101,9 @@ export default function PromotionSlotConfigAdd() {
     () => algorithmOptions.filter(a => a.type === 7),
     [algorithmOptions],
   )
+
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tAlgoTypeLabel = useCallback((v: number) => ALGO_TYPE_LABEL[v] ? t(ALGO_TYPE_LABEL[v]) : t('promotionSlotConfig:algoTypeFallback', { type: v }), [t])
 
   /** 加载可选算法: 来自算法库已启用算法（当前仅无敌星星接入） */
   useEffect(() => {
@@ -142,7 +147,7 @@ export default function PromotionSlotConfigAdd() {
         brand: undefined,
         status: (s.status === 2 ? 2 : 1) as 1 | 2,
       })))
-    }).catch(() => message.error('加载瀑布流配置失败'))
+    }).catch(() => message.error(t('promotionSlotConfig:loadFailed')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editIdParam])
 
@@ -181,7 +186,7 @@ export default function PromotionSlotConfigAdd() {
     try {
       const values = await addForm.validateFields()
       if (selectedPositions.length === 0) {
-        message.warning('請至少選擇一個展示位置')
+        message.warning(t('promotionSlotConfig:selectAtLeastOnePos'))
         return
       }
       const selectedAlgo = algorithmOptions.find(a => a.value === values.algorithmId)
@@ -201,7 +206,7 @@ export default function PromotionSlotConfigAdd() {
               }
             : item)
           .sort((a, b) => a.position - b.position))
-        message.success(`已更新 ${selectedPositions[0]}號位 為 ${selectedAlgo.label}`)
+        message.success(t('promotionSlotConfig:updateSlotSuccess', { pos: selectedPositions[0], name: selectedAlgo.label }))
       } else {
         // 新增场景: 一个算法可配置在多个坑位
         const newSlots: SlotAlgorithm[] = selectedPositions.map(pos => ({
@@ -213,7 +218,7 @@ export default function PromotionSlotConfigAdd() {
           status: 1 as const,
         }))
         setSlotAlgorithms(prev => [...prev, ...newSlots].sort((a, b) => a.position - b.position))
-        message.success(`已新增 ${selectedAlgo.label} 至 ${selectedPositions.map(p => `${p}號位`).join('、')}`)
+        message.success(t('promotionSlotConfig:addSlotSuccess', { name: selectedAlgo.label, positions: selectedPositions.map(p => t('promotionSlotConfig:posNum', { pos: p })).join('、') }))
       }
       setIsAddModalVisible(false)
     } catch (error) {
@@ -224,14 +229,14 @@ export default function PromotionSlotConfigAdd() {
   // 删除坑位配置（删除后该坑位回归自然流量）
   const handleDeleteSlot = (record: SlotAlgorithm) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除${record.position}號位配置嗎？刪除後該坑位將讀取自然流量數據。`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common:confirmDelete'),
+      content: t('promotionSlotConfig:deleteSlotConfirm', { pos: record.position }),
+      okText: t('common:confirm'),
+      cancelText: t('common:cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
         setSlotAlgorithms(prev => prev.filter(item => item.position !== record.position))
-        message.success(`已刪除 ${record.position}號位 配置`)
+        message.success(t('promotionSlotConfig:deleteSlotSuccess', { pos: record.position }))
       },
     })
   }
@@ -250,19 +255,19 @@ export default function PromotionSlotConfigAdd() {
   // 切换启用/停用状态
   const handleToggleStatus = (record: SlotAlgorithm) => {
     const newStatus: 1 | 2 = record.status === 1 ? 2 : 1
-    const actionText = newStatus === 1 ? '啟用' : '停用'
+    const actionText = newStatus === 1 ? t('common:enable') : t('common:disable')
     Modal.confirm({
-      title: `確認${actionText}`,
-      content: `確定要${actionText}「${record.algorithmName}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('promotionSlotConfig:confirmToggleTitle', { action: actionText }),
+      content: t('promotionSlotConfig:confirmToggleContent', { action: actionText, name: record.algorithmName }),
+      okText: t('common:confirm'),
+      cancelText: t('common:cancel'),
       onOk: () => {
         setSlotAlgorithms(prev =>
           prev.map(item =>
             item.position === record.position ? { ...item, status: newStatus } : item
           )
         )
-        message.success(`已${actionText} ${record.algorithmName}`)
+        message.success(t('promotionSlotConfig:toggleSuccess', { action: actionText, name: record.algorithmName }))
       },
     })
   }
@@ -287,7 +292,7 @@ export default function PromotionSlotConfigAdd() {
     setSlotAlgorithms(reordered)
     setDragIndex(null)
     setDragOverIndex(null)
-    message.success(`已將「${moved.algorithmName}」移動至 ${index + 1}號位`)
+    message.success(t('promotionSlotConfig:moveSuccess', { name: moved.algorithmName, pos: index + 1 }))
   }, [dragIndex, slotAlgorithms])
 
   const handleDragEnd = useCallback(() => {
@@ -309,8 +314,8 @@ export default function PromotionSlotConfigAdd() {
   // 手机模型标题
   const phoneTitle = useMemo(() => {
     const app = form.getFieldValue('app') as string | undefined
-    const appName = app ? APP_LABEL[app] || app : '閃蜂'
-    return `瀑布流預覽-${appName}`
+    const appName = app ? app : 'flashBee'
+    return t('promotionSlotConfig:waterfallPreview', { appName: t(APP_LABEL[appName] || 'common:flashBee') })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, slotAlgorithms])
 
@@ -337,7 +342,7 @@ export default function PromotionSlotConfigAdd() {
       } else {
         await createWaterfall(request)
       }
-      message.success('保存成功')
+      message.success(t('promotionSlotConfig:saveSuccessMsg'))
       navigate('/promotion-slot-config')
     } catch (error) {
       console.error('保存失败:', error)
@@ -366,15 +371,15 @@ export default function PromotionSlotConfigAdd() {
 
   const columns: ColumnsType<SlotAlgorithm> = [
     {
-      title: '展示位置',
+      title: t('promotionSlotConfig:colPosition'),
       dataIndex: 'position',
       key: 'position',
       width: 100,
       align: 'center',
-      render: (v: number) => <Tag color="green">{v}號位</Tag>,
+      render: (v: number) => <Tag color="green">{t('promotionSlotConfig:posNum', { pos: v })}</Tag>,
     },
     {
-      title: '算法ID',
+      title: t('promotionSlotConfig:colAlgoId'),
       dataIndex: 'algorithmId',
       key: 'algorithmId',
       width: 100,
@@ -386,7 +391,7 @@ export default function PromotionSlotConfigAdd() {
       ),
     },
     {
-      title: '算法名稱',
+      title: t('promotionSlotConfig:colAlgoName'),
       dataIndex: 'algorithmName',
       key: 'algorithmName',
       width: 180,
@@ -394,35 +399,35 @@ export default function PromotionSlotConfigAdd() {
       render: (text: string) => <strong>{text}</strong>,
     },
     {
-      title: '算法類型',
+      title: t('promotionSlotConfig:colAlgoType'),
       dataIndex: 'algorithmType',
       key: 'algorithmType',
       width: 110,
       render: (v: number) => (
-        <Tag color={ALGO_TYPE_COLOR[v] ?? 'default'}>{ALGO_TYPE_LABEL[v] ?? `類型${v}`}</Tag>
+        <Tag color={ALGO_TYPE_COLOR[v] ?? 'default'}>{tAlgoTypeLabel(v)}</Tag>
       ),
     },
     {
-      title: '所屬品牌',
+      title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
       render: (v: string) => v ? <BrandTag value={v} /> : '-',
     },
     {
-      title: '狀態',
+      title: t('promotionSlotConfig:colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       align: 'center',
       render: (v: number) => (
         <Tag color={v === 1 ? 'success' : 'default'}>
-          {v === 1 ? '啟用' : '停用'}
+          {v === 1 ? t('promotionSlotConfig:enabled') : t('promotionSlotConfig:disabled')}
         </Tag>
       ),
     },
     ...(!isDetailMode ? [{
-      title: '操作',
+      title: t('common:colAction'),
       key: 'action',
       width: 260,
       align: 'center' as const,
@@ -436,7 +441,7 @@ export default function PromotionSlotConfigAdd() {
             disabled={index <= 0}
             onClick={() => handleMoveSlot(record, -1)}
           >
-            上移
+            {t('promotionSlotConfig:moveUp')}
           </Button>
           <Button
             type="link"
@@ -444,7 +449,7 @@ export default function PromotionSlotConfigAdd() {
             disabled={index === slotAlgorithms.length - 1}
             onClick={() => handleMoveSlot(record, 1)}
           >
-            下移
+            {t('promotionSlotConfig:moveDown')}
           </Button>
           <Button
             type="link"
@@ -453,13 +458,13 @@ export default function PromotionSlotConfigAdd() {
             style={record.status === 2 ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
-            {record.status === 1 ? '停用' : '啟用'}
+            {record.status === 1 ? t('promotionSlotConfig:disabled') : t('promotionSlotConfig:enabled')}
           </Button>
           <Button type="link" size="small" onClick={() => handleEditSlot(record)}>
-            編輯
+            {t('common:edit')}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
-            刪除
+            {t('common:delete')}
           </Button>
         </Space>
         )
@@ -491,10 +496,10 @@ export default function PromotionSlotConfigAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isDetailMode ? '瀑布流詳情' : isEditMode ? '編輯瀑布流配置' : '新增瀑布流配置'}
+              {isDetailMode ? t('promotionSlotConfig:slotConfigDetail') : isEditMode ? t('promotionSlotConfig:editSlotConfig') : t('promotionSlotConfig:addSlotConfig')}
             </h2>
           </div>
         </div>
@@ -505,26 +510,26 @@ export default function PromotionSlotConfigAdd() {
         <div style={cardShellStyle}>
           {cardTitle(
             <MobileOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
-            '#e6f7ff', '#1890ff', '基礎信息',
+            '#e6f7ff', '#1890ff', t('promotionSlotConfig:basicInfo'),
             undefined,
-            '保存後生成配置ID，供 APP 引用展示瀑布流',
+            t('promotionSlotConfig:saveHint'),
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             <Form.Item
-              label="瀑布流名稱"
+              label={t('promotionSlotConfig:waterfallNameLabel')}
               name="promotionName"
-              rules={[{ required: true, message: '請輸入瀑布流名稱' }]}
+              rules={[{ required: true, message: t('promotionSlotConfig:enterWaterfallName') }]}
               style={{ marginBottom: 0 }}
             >
-              <Input placeholder="請輸入瀑布流名稱" allowClear />
+              <Input placeholder={t('promotionSlotConfig:enterWaterfallName')} allowClear />
             </Form.Item>
             <Form.Item
-              label="所屬品牌"
+              label={t('common:brand')}
               name="app"
-              rules={[{ required: true, message: '請選擇所屬品牌' }]}
+              rules={[{ required: true, message: t('common:selectBrand') }]}
               style={{ marginBottom: 0 }}
             >
-              <Select placeholder="請選擇所屬品牌" options={APP_OPTIONS} />
+              <Select placeholder={t('common:selectBrand')} options={tAppOptions} />
             </Form.Item>
           </div>
         </div>
@@ -569,7 +574,7 @@ export default function PromotionSlotConfigAdd() {
                 {phoneTitle}
               </div>
               <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: 1.5 }}>
-                僅預覽已配置坑位，未配置坑位展示自然流量數據
+                {t('promotionSlotConfig:previewHint')}
               </div>
             </div>
 
@@ -580,7 +585,7 @@ export default function PromotionSlotConfigAdd() {
             }}>
               {slotAlgorithms.filter(item => item.status === 1).length === 0 && (
                 <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 13, padding: '24px 0' }}>
-                  暫無已配置坑位
+                  {t('promotionSlotConfig:noConfiguredSlot')}
                 </div>
               )}
               {slotAlgorithms.filter(item => item.status === 1).map((item, index) => (
@@ -609,12 +614,12 @@ export default function PromotionSlotConfigAdd() {
                         <HolderOutlined style={{ color: '#bfbfbf', fontSize: 14, cursor: 'grab' }} />
                       )}
                       <Badge
-                        count={`${item.position}號位`}
+                        count={t('promotionSlotConfig:posNum', { pos: item.position })}
                         style={{ backgroundColor: '#1890ff' }}
                       />
                     </div>
                     <Tag color={ALGO_TYPE_COLOR[item.algorithmType] ?? 'default'}>
-                      {ALGO_TYPE_LABEL[item.algorithmType] ?? `類型${item.algorithmType}`}
+                      {ALGO_TYPE_LABEL[item.algorithmType] ? t(ALGO_TYPE_LABEL[item.algorithmType]) : t('promotionSlotConfig:algoTypeFallback', { type: item.algorithmType })}
                     </Tag>
                   </div>
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
@@ -631,7 +636,7 @@ export default function PromotionSlotConfigAdd() {
           <div style={cardShellStyle}>
             {cardTitle(
               <AppstoreOutlined style={{ fontSize: 14, color: '#fa8c16' }} />,
-              '#fff7e6', '#fa8c16', '展示位算法列表',
+              '#fff7e6', '#fa8c16', t('promotionSlotConfig:slotAlgoList'),
               undefined,
               !isDetailMode ? (
                 <Space size={16}>
@@ -639,13 +644,13 @@ export default function PromotionSlotConfigAdd() {
                     新增
                   </Button>
                   <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>過濾用戶不喜歡</span>
+                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('promotionSlotConfig:filterDislike')}</span>
                     <Switch
                       size="small"
                       checked={filterDislike}
                       onChange={(checked) => {
                         setFilterDislike(checked)
-                        message.info(checked ? '已開啟過濾用戶不喜歡' : '已關閉過濾用戶不喜歡')
+                        message.info(checked ? t('promotionSlotConfig:filterDislikeOn') : t('promotionSlotConfig:filterDislikeOff'))
                       }}
                       style={{ marginLeft: 8 }}
                       disabled={isDetailMode}
@@ -653,7 +658,7 @@ export default function PromotionSlotConfigAdd() {
                     <Popover
                       content={
                         <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>
-                          開啟後，用戶進入 APP 時，若推廣商家是用戶此前標記為「不喜歡」的商家，系統將自動過濾，不再向該用戶展示此商家。
+                          {t('promotionSlotConfig:filterDislikePopover')}
                         </div>
                       }
                       trigger="hover"
@@ -681,12 +686,12 @@ export default function PromotionSlotConfigAdd() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#391085' }}>自然流量兜底算法</span>
-                  <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>未配置坑位生效</Tag>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#391085' }}>{t('promotionSlotConfig:naturalFallback')}</span>
+                  <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>{t('promotionSlotConfig:unconfiguredSlotEffective')}</Tag>
                   <Popover
                     content={
                       <div style={{ maxWidth: 320, fontSize: 12, lineHeight: '20px', color: '#595959' }}>
-                        瀑布流中未配置廣告算法的坑位，統一讀取該算法計算出來的數據。用戶不斷下滑時會刷到幾百、幾千個未配置坑位，由自然流量兜底，無需逐坑位人工配置。自然流量坑位不出現在左側手機預覽和下方坑位列表中。
+                        {t('promotionSlotConfig:naturalFallbackPopover')}
                       </div>
                     }
                     trigger="hover"
@@ -696,13 +701,13 @@ export default function PromotionSlotConfigAdd() {
                   </Popover>
                 </div>
                 <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>
-                  下方列表未覆蓋的坑位，統一展示該算法的數據
+                  {t('promotionSlotConfig:naturalFallbackHint')}
                 </div>
               </div>
               <Select
                 value={naturalAlgoId}
                 onChange={(val) => setNaturalAlgoId(val)}
-                placeholder="請選擇兜底算法"
+                placeholder={t('promotionSlotConfig:selectFallbackAlgo')}
                 allowClear
                 showSearch
                 optionFilterProp="label"
@@ -720,7 +725,7 @@ export default function PromotionSlotConfigAdd() {
                 pageSize: 10,
                 showSizeChanger: true,
                 pageSizeOptions: ['10', '20', '50'],
-                showTotal: (total) => `共 ${total} 條`,
+                showTotal: (total) => t('common:total', { count: total }),
               }}
               size="small"
               scroll={{ y: 540 }}
@@ -731,23 +736,23 @@ export default function PromotionSlotConfigAdd() {
 
       {/* 新增坑位弹窗 */}
       <Modal
-        title={editingPosition !== null ? `編輯${editingPosition}號位配置` : '新增坑位配置'}
+        title={editingPosition !== null ? t('promotionSlotConfig:editPosConfig', { pos: editingPosition }) : t('promotionSlotConfig:addPosConfig')}
         open={isAddModalVisible}
         onOk={handleConfirmAddSlot}
         onCancel={() => setIsAddModalVisible(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common:confirm')}
+        cancelText={t('common:cancel')}
         okButtonProps={{ style: { background: '#E8720C', borderColor: '#E8720C' } }}
         width={900}
       >
         <Form form={addForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
-            label="算法名稱"
+            label={t('promotionSlotConfig:colAlgoName')}
             name="algorithmId"
-            rules={[{ required: true, message: '請選擇算法名稱' }]}
+            rules={[{ required: true, message: t('promotionSlotConfig:selectAlgo') }]}
           >
             <Select
-              placeholder="請選擇算法（來自算法庫已啟用算法）"
+              placeholder={t('promotionSlotConfig:selectAlgoPlaceholder')}
               showSearch
               optionFilterProp="label"
               options={algorithmOptions.map(a => ({ label: a.label, value: a.value }))}
@@ -758,26 +763,26 @@ export default function PromotionSlotConfigAdd() {
               }}
             />
           </Form.Item>
-          <Form.Item label="算法類型">
+          <Form.Item label={t('promotionSlotConfig:colAlgoType')}>
             <Input
-              value={selectedAlgoType !== null ? (ALGO_TYPE_LABEL[selectedAlgoType] ?? `類型${selectedAlgoType}`) : ''}
+              value={selectedAlgoType !== null ? tAlgoTypeLabel(selectedAlgoType) : ''}
               disabled
-              placeholder="請先選擇算法名稱"
+              placeholder={t('promotionSlotConfig:selectAlgoFirst')}
               style={{ color: selectedAlgoType !== null ? '#333' : '#bfbfbf' }}
             />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label={t('common:brand')}>
             {selectedAlgoBrand ? (
               <BrandTag value={selectedAlgoBrand} />
             ) : (
-              <span style={{ color: '#bfbfbf' }}>請先選擇算法名稱</span>
+              <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectAlgoFirst')}</span>
             )}
           </Form.Item>
           <Form.Item label={
             <span>
-              展示位置
+              {t('promotionSlotConfig:displayPosition')}
               <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400, marginLeft: 8 }}>
-                已選 {selectedPositions.length} 個位置
+                {t('promotionSlotConfig:selectedPosCount', { count: selectedPositions.length })}
               </span>
               <Select
                 value={totalPositions}
@@ -785,10 +790,10 @@ export default function PromotionSlotConfigAdd() {
                 size="small"
                 style={{ width: 90, marginLeft: 12, fontSize: 12 }}
                 options={[
-                  { label: '前 100 個', value: 100 },
-                  { label: '前 200 個', value: 200 },
-                  { label: '前 300 個', value: 300 },
-                  { label: '前 500 個', value: 500 },
+                  { label: t('promotionSlotConfig:topN', { count: 100 }), value: 100 },
+                  { label: t('promotionSlotConfig:topN', { count: 200 }), value: 200 },
+                  { label: t('promotionSlotConfig:topN', { count: 300 }), value: 300 },
+                  { label: t('promotionSlotConfig:topN', { count: 500 }), value: 500 },
                 ]}
               />
             </span>
@@ -827,7 +832,7 @@ export default function PromotionSlotConfigAdd() {
                         fontWeight: isSelected ? 600 : 400, 
                         color: isSelected ? '#E8720C' : isOccupied ? '#bfbfbf' : '#333' 
                       }}>
-                        {pos}號位
+                        {t('promotionSlotConfig:posNum', { pos })}
                       </div>
                     </div>
                   )
@@ -845,7 +850,7 @@ export default function PromotionSlotConfigAdd() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>
-                  已選坑位統計（{selectedPositions.length} 個）
+                  {t('promotionSlotConfig:slotStats', { count: selectedPositions.length })}
                 </span>
                 {selectedPositions.length > 0 && editingPosition === null && (
                   <Button 
@@ -853,7 +858,7 @@ export default function PromotionSlotConfigAdd() {
                     onClick={clearAllPositions} 
                     style={{ fontSize: 12, padding: '0 8px', height: 22 }}
                   >
-                    清空全部
+                    {t('promotionSlotConfig:clearAll')}
                   </Button>
                 )}
               </div>
@@ -873,13 +878,13 @@ export default function PromotionSlotConfigAdd() {
                       color="orange"
                       style={{ margin: 0, fontSize: 12 }}
                     >
-                      {pos}號位
+                      {t('promotionSlotConfig:posNum', { pos })}
                     </Tag>
                   ))}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '12px 0', color: '#bfbfbf', fontSize: 13 }}>
-                  暫未選擇位置，請在上方網格中點擊選擇
+                  {t('promotionSlotConfig:noPosSelected')}
                 </div>
               )}
             </div>
@@ -890,8 +895,8 @@ export default function PromotionSlotConfigAdd() {
       {/* 底部操作按钮（详情模式下隐藏） */}
       {!isDetailMode && (
         <div className="form-footer">
-          <Button onClick={handleBack}>取消</Button>
-          <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>保存</Button>
+          <Button onClick={handleBack}>{t('common:cancel')}</Button>
+          <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>{t('common:save')}</Button>
         </div>
       )}
     </div>

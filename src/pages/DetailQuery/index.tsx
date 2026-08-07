@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -18,75 +19,7 @@ import type { FinDetail, FinDetailQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
-/** 业务频道选项（值＝明細存儲的頻道文本） */
-const channelOptions = [
-  { label: '全部', value: 'all' },
-  ...Object.values(BIZ_CHANNEL_LABEL_MAP).map(label => ({ label, value: label })),
-]
-
-/** 交易类型选项（值＝明細存储/展示的交易类型文本；退款由后端将正数消费明细映射展示） */
-const tradeTypeOptions = [
-  { label: '全部', value: 'all' },
-  { label: '充值', value: '充值' },
-  { label: '扣款', value: '扣款' },
-  { label: '消費', value: '消費' },
-  { label: '退款', value: '退款' },
-  { label: '轉入', value: '轉入' },
-  { label: '轉出', value: '轉出' },
-]
-
-/**
- * 变动类别选项（分组）
- * - 交易類型=扣款：消費扣款展示所選消費類型枚舉；充值批次扣款/賬戶扣款展示對應方式名稱
- * - 交易類型=消費：展示商家消費的廣告類型（如無敵星星、盤活復蘇）
- */
-const changeTypeOptions = [
-  { label: '全部', value: 'all' },
-  {
-    label: '賬戶變動',
-    options: [
-      { label: '充值', value: '充值' },
-      { label: '充值批次扣款', value: '充值批次扣款' },
-      { label: '賬戶扣款', value: '賬戶扣款' },
-      { label: '欠款償還', value: '欠款償還' },
-      { label: '轉賬轉出', value: '轉賬轉出' },
-      { label: '轉賬轉入', value: '轉賬轉入' },
-      { label: '合併轉出', value: '合併轉出' },
-      { label: '合併轉入', value: '合併轉入' },
-    ],
-  },
-  {
-    label: '消費扣款（消費類型）',
-    options: [
-      { label: 'POS機維修', value: 'POS機維修' },
-      { label: '巴士廣告', value: '巴士廣告' },
-      { label: '百貨精選', value: '百貨精選' },
-      { label: '復蘇盤活', value: '復蘇盤活' },
-      { label: '基礎套餐', value: '基礎套餐' },
-      { label: '機器檢測', value: '機器檢測' },
-      { label: '機器維修', value: '機器維修' },
-      { label: '金牌套餐', value: '金牌套餐' },
-      { label: '精選套餐', value: '精選套餐' },
-      { label: '免費入駐', value: '免費入駐' },
-      { label: '企業套餐', value: '企業套餐' },
-      { label: '升級套餐', value: '升級套餐' },
-      { label: '團購套餐', value: '團購套餐' },
-      { label: '小紅書廣告', value: '小紅書廣告' },
-      { label: '專業套餐', value: '專業套餐' },
-    ],
-  },
-  {
-    label: '消費（廣告類型）',
-    options: [
-      { label: '無敵星星', value: '無敵星星' },
-      { label: '盤活復蘇', value: '盤活復蘇' },
-      { label: '點金廣告', value: '點金廣告' },
-      { label: '人氣商家', value: '人氣商家' },
-      { label: '金字招牌', value: '金字招牌' },
-      { label: '商品促銷', value: '商品促銷' },
-    ],
-  },
-]
+/** 筛选选项在组件内按语言构造；选项 value/label 为业务数据（数据库中文），保持不翻译 */
 
 /** 交易类型 Tag 颜色 */
 const tradeTypeColor: Record<string, string> = {
@@ -222,7 +155,74 @@ function mockFetchDetails(query: FinDetailQuery) {
 
 export default function DetailQuery() {
   // 菜单权限：detail-query
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
+
+  /** 業務頻道選項（值＝明細存儲的頻道文本） */
+  const channelOptions = [
+    { label: t('common.all'), value: 'all' },
+    ...Object.values(BIZ_CHANNEL_LABEL_MAP).map(label => ({ label, value: label })),
+  ]
+
+  /** 交易類型選項（值＝明細存儲/展示的交易類型文本；退款由後端將正數消費明細映射展示） */
+  const tradeTypeOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: '充值', value: '充值' },
+    { label: '扣款', value: '扣款' },
+    { label: '消費', value: '消費' },
+    { label: '退款', value: '退款' },
+    { label: '轉入', value: '轉入' },
+    { label: '轉出', value: '轉出' },
+  ]
+
+  /** 變動類別選項（分組，選項值為業務數據） */
+  const changeTypeOptions = [
+    { label: t('common.all'), value: 'all' },
+    {
+      label: t('detailQuery.changeGroupAccount'),
+      options: [
+        { label: '充值', value: '充值' },
+        { label: '充值批次扣款', value: '充值批次扣款' },
+        { label: '賬戶扣款', value: '賬戶扣款' },
+        { label: '欠款償還', value: '欠款償還' },
+        { label: '轉賬轉出', value: '轉賬轉出' },
+        { label: '轉賬轉入', value: '轉賬轉入' },
+        { label: '合併轉出', value: '合併轉出' },
+        { label: '合併轉入', value: '合併轉入' },
+      ],
+    },
+    {
+      label: t('detailQuery.changeGroupConsumeType'),
+      options: [
+        { label: 'POS機維修', value: 'POS機維修' },
+        { label: '巴士廣告', value: '巴士廣告' },
+        { label: '百貨精選', value: '百貨精選' },
+        { label: '復蘇盤活', value: '復蘇盤活' },
+        { label: '基礎套餐', value: '基礎套餐' },
+        { label: '機器檢測', value: '機器檢測' },
+        { label: '機器維修', value: '機器維修' },
+        { label: '金牌套餐', value: '金牌套餐' },
+        { label: '精選套餐', value: '精選套餐' },
+        { label: '免費入駐', value: '免費入駐' },
+        { label: '企業套餐', value: '企業套餐' },
+        { label: '升級套餐', value: '升級套餐' },
+        { label: '團購套餐', value: '團購套餐' },
+        { label: '小紅書廣告', value: '小紅書廣告' },
+        { label: '專業套餐', value: '專業套餐' },
+      ],
+    },
+    {
+      label: t('detailQuery.changeGroupAdType'),
+      options: [
+        { label: '無敵星星', value: '無敵星星' },
+        { label: '盤活復蘇', value: '盤活復蘇' },
+        { label: '點金廣告', value: '點金廣告' },
+        { label: '人氣商家', value: '人氣商家' },
+        { label: '金字招牌', value: '金字招牌' },
+        { label: '商品促銷', value: '商品促銷' },
+      ],
+    },
+  ]
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [searchForm] = Form.useForm<DetailFilters>()
   const [data, setData] = useState<DetailRow[]>([])
@@ -300,30 +300,30 @@ export default function DetailQuery() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'index', title: '序號' },
-    { key: 'detailId', title: '明細ID' },
-    { key: 'groupId', title: '集團ID' },
-    { key: 'groupName', title: '集團名稱' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'storeId', title: '門店ID' },
-    { key: 'storeName', title: '門店名稱' },
-    { key: 'channel', title: '業務頻道' },
-    { key: 'tradeType', title: '交易類型' },
-    { key: 'changeType', title: '變動類別' },
-    { key: 'tradeTime', title: '交易時間' },
-    { key: 'virtualChange', title: '虛擬變動' },
-    { key: 'actualChange', title: '實收變動' },
-    { key: 'batchNo', title: '關聯批次號' },
-    { key: 'flowNo', title: '流程編號' },
-    { key: 'bd', title: '歸屬BD' },
-    { key: 'remark', title: '備註' },
-  ], [])
+    { key: 'index', title: t('common.colIndex') },
+    { key: 'detailId', title: t('common.colDetailId') },
+    { key: 'groupId', title: t('common.colGroupId') },
+    { key: 'groupName', title: t('common.colGroupName') },
+    { key: 'brand', title: t('common.colBrand') },
+    { key: 'storeId', title: t('common.colStoreId') },
+    { key: 'storeName', title: t('common.colStoreName') },
+    { key: 'channel', title: t('common.colChannel') },
+    { key: 'tradeType', title: t('common.colTradeType') },
+    { key: 'changeType', title: t('common.colChangeType') },
+    { key: 'tradeTime', title: t('common.colTradeTime') },
+    { key: 'virtualChange', title: t('detailQuery.colVirtualChangeShort') },
+    { key: 'actualChange', title: t('detailQuery.colActualChangeShort') },
+    { key: 'batchNo', title: t('common.colBatchNo') },
+    { key: 'flowNo', title: t('common.colFlowNo') },
+    { key: 'bd', title: t('common.colBd') },
+    { key: 'remark', title: t('detailQuery.colRemarkShort') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('detail-query', columnMeta)
 
   const columns: TableColumnsType<DetailRow> = [
     {
-      title: '序號',
+      title: t('common.colIndex'),
       dataIndex: 'index',
       key: 'index',
       width: 60,
@@ -331,26 +331,26 @@ export default function DetailQuery() {
       fixed: 'left',
     },
     {
-      title: '明細ID',
+      title: t('common.colDetailId'),
       dataIndex: 'detailId',
       key: 'detailId',
       width: 150,
       fixed: 'left',
     },
     {
-      title: '集團ID',
+      title: t('common.colGroupId'),
       dataIndex: 'groupId',
       key: 'groupId',
       width: 100,
     },
     {
-      title: '集團名稱',
+      title: t('common.colGroupName'),
       dataIndex: 'groupName',
       key: 'groupName',
       width: 120,
     },
     {
-      title: '所屬品牌',
+      title: t('common.colBrand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
@@ -359,7 +359,7 @@ export default function DetailQuery() {
       ),
     },
     {
-      title: '門店ID',
+      title: t('common.colStoreId'),
       dataIndex: 'storeId',
       key: 'storeId',
       width: 110,
@@ -367,7 +367,7 @@ export default function DetailQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '門店名稱',
+      title: t('common.colStoreName'),
       dataIndex: 'storeName',
       key: 'storeName',
       width: 160,
@@ -375,14 +375,14 @@ export default function DetailQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '業務頻道',
+      title: t('common.colChannel'),
       dataIndex: 'channel',
       key: 'channel',
       width: 90,
       align: 'center',
     },
     {
-      title: '交易類型',
+      title: t('common.colTradeType'),
       dataIndex: 'tradeType',
       key: 'tradeType',
       width: 90,
@@ -392,20 +392,20 @@ export default function DetailQuery() {
       ),
     },
     {
-      title: '變動類別',
+      title: t('common.colChangeType'),
       dataIndex: 'changeType',
       key: 'changeType',
       width: 140,
       align: 'center',
     },
     {
-      title: '交易時間',
+      title: t('common.colTradeTime'),
       dataIndex: 'tradeTime',
       key: 'tradeTime',
       width: 180,
     },
     {
-      title: '虛擬賬戶變動金額',
+      title: t('common.colVirtualChange'),
       dataIndex: 'virtualChange',
       key: 'virtualChange',
       width: 150,
@@ -413,7 +413,7 @@ export default function DetailQuery() {
       render: renderChange,
     },
     {
-      title: '實收賬戶變動金額',
+      title: t('common.colActualChange'),
       dataIndex: 'actualChange',
       key: 'actualChange',
       width: 150,
@@ -421,7 +421,7 @@ export default function DetailQuery() {
       render: renderChange,
     },
     {
-      title: '關聯批次號',
+      title: t('common.colBatchNo'),
       dataIndex: 'batchNo',
       key: 'batchNo',
       width: 150,
@@ -429,7 +429,7 @@ export default function DetailQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '流程編號',
+      title: t('common.colFlowNo'),
       dataIndex: 'flowNo',
       key: 'flowNo',
       width: 150,
@@ -437,7 +437,7 @@ export default function DetailQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '歸屬BD',
+      title: t('common.colBd'),
       dataIndex: 'bd',
       key: 'bd',
       width: 120,
@@ -445,7 +445,7 @@ export default function DetailQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '備註信息',
+      title: t('common.colRemark'),
       dataIndex: 'remark',
       key: 'remark',
       width: 220,
@@ -459,50 +459,50 @@ export default function DetailQuery() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="集團ID" name="groupId">
-            <Input placeholder="請輸入集團ID" allowClear />
+          <Form.Item label={t('common.colGroupId')} name="groupId">
+            <Input placeholder={t('detailQuery.groupIdPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱" name="groupName">
-            <Input placeholder="請輸入集團名稱" allowClear />
+          <Form.Item label={t('common.colGroupName')} name="groupName">
+            <Input placeholder={t('detailQuery.groupNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="全部" options={brandOptions} allowClear />
+          <Form.Item label={t('common.colBrand')} name="brand">
+            <Select placeholder={t('common.all')} options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="門店ID" name="storeId">
-            <Input placeholder="請輸入門店ID" allowClear />
+          <Form.Item label={t('common.colStoreId')} name="storeId">
+            <Input placeholder={t('detailQuery.storeIdPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="門店名稱" name="storeName">
-            <Input placeholder="請輸入門店名稱" allowClear />
+          <Form.Item label={t('common.colStoreName')} name="storeName">
+            <Input placeholder={t('detailQuery.storeNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="業務頻道" name="channel">
-            <Select placeholder="全部" options={channelOptions} allowClear />
+          <Form.Item label={t('common.colChannel')} name="channel">
+            <Select placeholder={t('common.all')} options={channelOptions} allowClear />
           </Form.Item>
-          <Form.Item label="交易類型" name="tradeType">
-            <Select placeholder="全部" options={tradeTypeOptions} allowClear />
+          <Form.Item label={t('common.colTradeType')} name="tradeType">
+            <Select placeholder={t('common.all')} options={tradeTypeOptions} allowClear />
           </Form.Item>
-          <Form.Item label="變動類別" name="changeType">
-            <Select placeholder="全部" options={changeTypeOptions} allowClear showSearch />
+          <Form.Item label={t('common.colChangeType')} name="changeType">
+            <Select placeholder={t('common.all')} options={changeTypeOptions} allowClear showSearch />
           </Form.Item>
-          <Form.Item label="交易時間" name="tradeTime">
+          <Form.Item label={t('common.colTradeTime')} name="tradeTime">
             <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm:ss"
-              placeholder={['開始時間', '結束時間']}
+              placeholder={[t('detailQuery.startTime'), t('detailQuery.endTime')]}
             />
           </Form.Item>
-          <Form.Item label="批次號" name="batchNo">
-            <Input placeholder="請輸入關聯批次號" allowClear />
+          <Form.Item label={t('detailQuery.batchNoLabel')} name="batchNo">
+            <Input placeholder={t('detailQuery.batchNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="流程編號" name="flowNo">
-            <Input placeholder="請輸入流程編號" allowClear />
+          <Form.Item label={t('common.colFlowNo')} name="flowNo">
+            <Input placeholder={t('detailQuery.flowNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="明細ID" name="detailId">
-            <Input placeholder="請輸入明細ID" allowClear />
+          <Form.Item label={t('common.colDetailId')} name="detailId">
+            <Input placeholder={t('detailQuery.detailIdPlaceholder')} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -513,7 +513,7 @@ export default function DetailQuery() {
         <div className="action-section-left">
           {hasPermission('detail-query:export') && (
             <Button className="btn-export" icon={<ExportOutlined />}>
-              導出
+              {t('common.export')}
             </Button>
           )}
         </div>
@@ -537,7 +537,7 @@ export default function DetailQuery() {
             current: pagination.page,
             pageSize: pagination.size,
             total,
-            showTotal: (t) => `共 ${t} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showQuickJumper: true,

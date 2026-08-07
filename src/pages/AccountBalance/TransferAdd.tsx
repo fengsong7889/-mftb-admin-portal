@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -45,11 +46,11 @@ function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; su
   return <>{prefix}{animated.toLocaleString()}{suffix}</>
 }
 
-/** 賬戶狀態文案/顏色映射 */
-const accountStatusMap: Record<string, { label: string; color: string }> = {
-  normal: { label: '正常', color: 'green' },
-  frozen: { label: '凍結', color: 'red' },
-  mergeFrozen: { label: '合併凍結', color: 'orange' },
+/** 賬戶狀態文案/顏色映射（label 為 i18n key） */
+const accountStatusMap: Record<string, { labelKey: string; color: string }> = {
+  normal: { labelKey: 'accountBalance.statusNormal', color: 'green' },
+  frozen: { labelKey: 'accountBalance.statusFrozen', color: 'red' },
+  mergeFrozen: { labelKey: 'accountBalance.statusMergeFrozen', color: 'orange' },
 }
 
 /** 数字金额转中文大写 */
@@ -86,6 +87,7 @@ function amountToChinese(num: number): string {
 }
 
 export default function TransferAdd() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const groupIdParam = searchParams.get('groupId') || ''
@@ -118,7 +120,7 @@ export default function TransferAdd() {
   const targetGroupOptions = accounts
     .filter(a => a.groupId !== groupIdParam)
     .map(a => ({
-      label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${accountStatusMap[a.status]?.label || a.status}）` : ''}`,
+      label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${t(accountStatusMap[a.status]?.labelKey || '') || a.status}）` : ''}`,
       value: a.groupId,
       disabled: a.status !== 'normal',
     }))
@@ -143,15 +145,15 @@ export default function TransferAdd() {
     try {
       await form.validateFields()
       if (!transferAmount || transferAmount <= 0) {
-        message.warning('請填寫轉賬金額')
+        message.warning(t('accountBalance.fillTransferAmount'))
         return
       }
       if (transferAmount > sourceVirtualBalance) {
-        message.warning('轉賬金額不能超過虛擬賬戶餘額')
+        message.warning(t('accountBalance.amountExceedBalance'))
         return
       }
       if (certificateFiles.length === 0) {
-        message.warning('請上傳相關憑證')
+        message.warning(t('accountBalance.uploadCertificate'))
         return
       }
       // 提交審批記錄
@@ -173,7 +175,7 @@ export default function TransferAdd() {
     } catch (err) {
       // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {
-        message.error(err instanceof Error && err.message ? err.message : '提交失败，请稍后重试')
+        message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
       }
     } finally {
       setSubmitting(false)
@@ -184,11 +186,11 @@ export default function TransferAdd() {
   const beforeUpload = (file: File) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
     if (!validTypes.includes(file.type)) {
-      message.error('僅支持 jpeg/jpg/png/PDF 格式')
+      message.error(t('accountBalance.onlyFormatError'))
       return Upload.LIST_IGNORE
     }
     if (file.size > 5 * 1024 * 1024) {
-      message.error('文件大小不能超過 5MB')
+      message.error(t('accountBalance.fileSizeExceed'))
       return Upload.LIST_IGNORE
     }
     return false
@@ -237,7 +239,7 @@ export default function TransferAdd() {
             onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
           >
             <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-            <span>上傳</span>
+            <span>{t('accountBalance.upload')}</span>
           </div>
         </Upload>
       )}
@@ -269,11 +271,11 @@ export default function TransferAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>賬戶轉賬</h2>
-              <Tag color="blue" style={{ fontSize: 11 }}>轉賬申請</Tag>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('accountBalance.transferTitle')}</h2>
+              <Tag color="blue" style={{ fontSize: 11 }}>{t('accountBalance.transferApplyTag')}</Tag>
             </div>
           </div>
         </div>
@@ -291,20 +293,20 @@ export default function TransferAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AccountBookOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>轉出集團</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.sourceGroup')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="轉出集團" name="sourceGroupId">
+            <Form.Item label={t('accountBalance.sourceGroup')} name="sourceGroupId">
               <Input disabled addonAfter={groupNameParam} />
             </Form.Item>
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('accountBalance.colBrand')}>
               <BrandTag value={brandParam} />
             </Form.Item>
-            <Form.Item label="賬戶狀態">
+            <Form.Item label={t('accountBalance.colStatus')}>
               <Tag color={accountStatusMap[sourceAccount?.status || 'normal']?.color || 'green'}>
-                {accountStatusMap[sourceAccount?.status || 'normal']?.label || '正常'}
+                {t(accountStatusMap[sourceAccount?.status || 'normal']?.labelKey || '') || t('accountBalance.statusNormal')}
               </Tag>
             </Form.Item>
           </div>
@@ -316,15 +318,15 @@ export default function TransferAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <SwapOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>轉入集團</span>
-            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>僅展示與轉出集團所屬品牌一致的集團，請確認轉入集團擁有相同的品牌標識</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.targetGroup')}</span>
+            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('accountBalance.targetGroupHint')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="轉入集團" name="targetGroupId" rules={[{ required: true, message: '請選擇轉入集團' }]}>
+            <Form.Item label={t('accountBalance.targetGroup')} name="targetGroupId" rules={[{ required: true, message: t('accountBalance.selectTargetGroup') }]}>
               <Select
-                placeholder={targetGroupOptions.length ? '請選擇轉入集團（同品牌）' : '暫無同品牌可轉入集團'}
+                placeholder={targetGroupOptions.length ? t('accountBalance.selectTargetGroupSameBrand') : t('accountBalance.noSameBrandGroup')}
                 options={targetGroupOptions}
                 showSearch
                 allowClear
@@ -332,15 +334,15 @@ export default function TransferAdd() {
                 filterOption={(input, option) => (option?.label ?? '').includes(input)}
               />
             </Form.Item>
-            <Form.Item label="所屬品牌">
-              {targetGroupId ? <BrandTag value={brandParam} /> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+            <Form.Item label={t('accountBalance.colBrand')}>
+              {targetGroupId ? <BrandTag value={brandParam} /> : <span style={{ color: '#BFBFBF', fontSize: 13 }}>{t('accountBalance.selectGroupToShow')}</span>}
             </Form.Item>
-            <Form.Item label="賬戶狀態">
+            <Form.Item label={t('accountBalance.colStatus')}>
               {targetGroupId
                 ? <Tag color={accountStatusMap[targetAccount?.status || 'normal']?.color || 'green'}>
-                    {accountStatusMap[targetAccount?.status || 'normal']?.label || '正常'}
+                    {t(accountStatusMap[targetAccount?.status || 'normal']?.labelKey || '') || t('accountBalance.statusNormal')}
                   </Tag>
-                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>{t('accountBalance.selectGroupToShow')}</span>}
             </Form.Item>
           </div>
         </div>
@@ -351,8 +353,8 @@ export default function TransferAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DollarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>轉賬金額</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>金額配置</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.transferAmountLabel')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.amountConfig')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -378,14 +380,14 @@ export default function TransferAdd() {
               <div style={{ fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
                 <AnimatedNumber value={sourceVirtualBalance} prefix="MOP " />
               </div>
-              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>轉出集團 · 虛擬賬戶餘額</div>
+              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{t('accountBalance.sourceVirtualBalanceLabel')}</div>
             </div>
           </div>
 
           {/* 转账金额输入 */}
-          <Form.Item label="轉賬金額" required style={{ marginBottom: transferAmount > 0 ? 4 : 16 }}>
+          <Form.Item label={t('accountBalance.transferAmountLabel')} required style={{ marginBottom: transferAmount > 0 ? 4 : 16 }}>
             <InputNumber
-              placeholder="請輸入轉賬金額"
+              placeholder={t('accountBalance.enterTransferAmount')}
               min={0}
               max={sourceVirtualBalance}
               precision={2}
@@ -410,15 +412,15 @@ export default function TransferAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileProtectOutlined style={{ fontSize: 14, color: '#722ed1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>相關憑證</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>憑證上傳</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.certificates')}</span>
+            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.certificateUpload')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>支持 jpeg/jpg/png/PDF</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportedFormatsShort')}</span>
           </div>
-          <Form.Item label="相關憑證" required style={{ marginBottom: 0 }}>
+          <Form.Item label={t('accountBalance.certificates')} required style={{ marginBottom: 0 }}>
             {renderFileList()}
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
-              限 jpeg/jpg/png/PDF 格式，5MB 內，最多可上傳 5 份
+              {t('accountBalance.certificateLimit')}
             </div>
           </Form.Item>
         </div>
@@ -429,7 +431,7 @@ export default function TransferAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>備註信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.remarkInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Form.Item name="remark" style={{ marginBottom: 0 }}>
@@ -437,7 +439,7 @@ export default function TransferAdd() {
               rows={4}
               maxLength={200}
               showCount
-              placeholder="本次轉賬相關說明，限制200字！"
+              placeholder={t('accountBalance.transferRemarkPlaceholder')}
               style={{ borderRadius: 8 }}
             />
           </Form.Item>
@@ -446,9 +448,9 @@ export default function TransferAdd() {
 
       {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>取消</Button>
+        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
-          提交申請
+          {t('accountBalance.submitApply')}
         </Button>
       </div>
 
@@ -475,13 +477,13 @@ export default function TransferAdd() {
               <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-              提交成功
+              {t('accountBalance.submitSuccessTitle')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
               {submittedFlowNo && (
-                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+                <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+              {t('accountBalance.submitSuccessDesc')}
             </p>
             <Button
               type="primary"
@@ -489,7 +491,7 @@ export default function TransferAdd() {
               onClick={() => navigate('/account-balance')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
-              返回列表{countdown > 0 && ` (${countdown}s)`}
+              {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}
             </Button>
           </div>
         </div>

@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   POSITION_RANK_OPTIONS,
-  POSITION_SEQUENCE,
-  POSITION_SEQUENCE_OPTIONS,
   POSITION_SEQUENCE_TAG_COLOR,
   createPosition,
   deletePosition,
@@ -34,7 +33,16 @@ interface PositionFormValues {
 }
 
 export default function PositionManagement() {
+  const { t } = useTranslation()
   const [dataSource, setDataSource] = useState<PositionItem[]>([])
+
+  /** 職級序列標籤（依賴 t，定義在組件內以便響應語言切換） */
+  const SEQ_LABEL: Record<string, string> = {
+    M: t('position.seqMgmt'),
+    T: t('position.seqTech'),
+    P: t('position.seqProf'),
+  }
+  const SEQUENCE_OPTIONS = Object.entries(SEQ_LABEL).map(([value, label]) => ({ value, label }))
   const [loading, setLoading] = useState(false)
   // 查询条件（点击查询后生效）
   const [keyword, setKeyword] = useState<string>()
@@ -148,10 +156,10 @@ export default function PositionManagement() {
     try {
       if (editing) {
         await updatePosition(editing.id, payload)
-        message.success('職位信息已更新')
+        message.success(t('position.updateSuccess'))
       } else {
         await createPosition(payload)
-        message.success('職位創建成功')
+        message.success(t('position.createSuccess'))
       }
       setEditModalVisible(false)
       fetchList()
@@ -166,7 +174,7 @@ export default function PositionManagement() {
   const handleDelete = async (record: PositionItem) => {
     try {
       await deletePosition(record.id)
-      message.success('職位已刪除')
+      message.success(t('common.deleteSuccess'))
       fetchList()
     } catch {
       // 错误提示由请求层统一处理
@@ -176,66 +184,66 @@ export default function PositionManagement() {
   /** 导出当前过滤后的列表数据 */
   const handleExport = () => {
     if (tableData.length === 0) {
-      message.warning('當前無數據可導出')
+      message.warning(t('position.noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '職位ID', dataIndex: 'id' },
-      { title: '職位名稱(中文)', dataIndex: 'name' },
-      { title: '職位名稱(英文)', dataIndex: 'nameEn' },
-      { title: '職級序列', dataIndex: 'sequence', render: (v: string) => POSITION_SEQUENCE[v] || v || '' },
-      { title: '職級', dataIndex: 'jobLevel' },
-      { title: '職等', dataIndex: 'rank' },
-      { title: '最後更新人', dataIndex: 'updatedBy' },
-      { title: '最後更新時間', dataIndex: 'updatedAt' },
+      { title: t('position.colId'), dataIndex: 'id' },
+      { title: t('position.colNameZh'), dataIndex: 'name' },
+      { title: t('position.colNameEn'), dataIndex: 'nameEn' },
+      { title: t('position.colSequence'), dataIndex: 'sequence', render: (v: string) => SEQ_LABEL[v] || v || '' },
+      { title: t('position.colJobLevel'), dataIndex: 'jobLevel' },
+      { title: t('position.colRank'), dataIndex: 'rank' },
+      { title: t('position.colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('position.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
-    exportToCSV('職位管理', exportColumns, tableData)
+    exportToCSV(t('position.pageTitle'), exportColumns, tableData)
   }
 
   const columns: TableColumnsType<PositionItem> = [
-    { title: '職位ID', dataIndex: 'id', key: 'id', width: 90 },
-    { title: '職位名稱(中文)', dataIndex: 'name', key: 'name', width: 160 },
-    { title: '職位名稱(英文)', dataIndex: 'nameEn', key: 'nameEn', width: 160, render: (v: string) => v || '-' },
+    { title: t('position.colId'), dataIndex: 'id', key: 'id', width: 90 },
+    { title: t('position.colNameZh'), dataIndex: 'name', key: 'name', width: 160 },
+    { title: t('position.colNameEn'), dataIndex: 'nameEn', key: 'nameEn', width: 160, render: (v: string) => v || '-' },
     {
-      title: '職級序列',
+      title: t('position.colSequence'),
       dataIndex: 'sequence',
       key: 'sequence',
       width: 120,
       render: (value: string) => (
-        <Tag color={POSITION_SEQUENCE_TAG_COLOR[value] || 'default'}>{POSITION_SEQUENCE[value] || value}</Tag>
+        <Tag color={POSITION_SEQUENCE_TAG_COLOR[value] || 'default'}>{SEQ_LABEL[value] || value}</Tag>
       ),
     },
-    { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 100 },
-    { title: '職等', dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('position.colJobLevel'), dataIndex: 'jobLevel', key: 'jobLevel', width: 100 },
+    { title: t('position.colRank'), dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
+    { title: t('position.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '最後更新時間',
+      title: t('position.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 140,
       render: (_, record) => (
         <Space size={4}>
           {hasPermission('position-management:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              編輯
+              {t('common.edit')}
             </Button>
           )}
           {hasPermission('position-management:delete') && (
             <Popconfirm
-              title="確認刪除"
-              description={`確定要刪除職位「${record.name}」嗎？`}
+              title={t('common.confirmDelete')}
+              description={t('position.confirmDeleteContent', { name: record.name })}
               onConfirm={() => handleDelete(record)}
-              okText="確認"
-              cancelText="取消"
+              okText={t('common.confirm')}
+              cancelText={t('common.cancel')}
             >
               <Button type="link" size="small" danger>
-                刪除
+                {t('common.delete')}
               </Button>
             </Popconfirm>
           )}
@@ -255,23 +263,23 @@ export default function PositionManagement() {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="職位名稱(中文)" name="keyword">
-            <Input placeholder="請輸入職位名稱" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('position.colNameZh')} name="keyword">
+            <Input placeholder={t('position.namePlaceholder')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="職級序列" name="sequence">
+          <Form.Item label={t('position.colSequence')} name="sequence">
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
-              options={POSITION_SEQUENCE_OPTIONS}
+              options={SEQUENCE_OPTIONS}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common.search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common.reset')}
               </Button>
             </div>
           </Form.Item>
@@ -281,12 +289,12 @@ export default function PositionManagement() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {hasPermission('position-management:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增
+              {t('common.add')}
             </Button>
           )}
           {configComponent}
@@ -305,51 +313,51 @@ export default function PositionManagement() {
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條數據`,
+          showTotal: (total) => t('common.total', { count: total }),
         }}
       />
 
       {/* 新增/编辑职位弹窗 */}
       <Modal
-        title={editing ? '編輯職位' : '新增職位'}
+        title={editing ? t('position.editTitle') : t('position.addTitle')}
         open={editModalVisible}
         onOk={handleSubmit}
         onCancel={() => setEditModalVisible(false)}
         confirmLoading={submitting}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={480}
         destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="職位名稱(中文)" rules={[{ required: true, message: '請輸入職位名稱' }]}>
-            <Input placeholder="例如：後端開發工程師" allowClear maxLength={50} />
+          <Form.Item name="name" label={t('position.colNameZh')} rules={[{ required: true, message: t('position.nameRequired') }]}>
+            <Input placeholder={t('position.nameZhPlaceholder')} allowClear maxLength={50} />
           </Form.Item>
-          <Form.Item name="nameEn" label="職位名稱(英文)">
-            <Input placeholder="例如：Backend Engineer" allowClear maxLength={100} />
+          <Form.Item name="nameEn" label={t('position.colNameEn')}>
+            <Input placeholder={t('position.nameEnPlaceholder')} allowClear maxLength={100} />
           </Form.Item>
-          <Form.Item name="sequence" label="職級序列" rules={[{ required: true, message: '請選擇職級序列' }]}>
+          <Form.Item name="sequence" label={t('position.colSequence')} rules={[{ required: true, message: t('position.seqRequired') }]}>
             <Select
-              placeholder="請選擇職級序列"
-              options={POSITION_SEQUENCE_OPTIONS}
+              placeholder={t('position.seqSelectPlaceholder')}
+              options={SEQUENCE_OPTIONS}
               onChange={handleSequenceChange}
             />
           </Form.Item>
           <Form.Item
             name="jobLevel"
-            label="職級"
-            rules={[{ required: true, message: '請選擇職級' }]}
-            extra="先選擇職級序列，再選擇對應職級"
+            label={t('position.colJobLevel')}
+            rules={[{ required: true, message: t('position.levelRequired') }]}
+            extra={t('position.levelExtra')}
           >
-            <Select placeholder="請選擇職級" options={jobLevelOptions} disabled={!sequence} />
+            <Select placeholder={t('position.levelPlaceholder')} options={jobLevelOptions} disabled={!sequence} />
           </Form.Item>
           <Form.Item
             name="rank"
-            label="職等"
-            rules={[{ required: true, message: '請選擇職等' }]}
-            extra="R1 最低，R5 最高"
+            label={t('position.colRank')}
+            rules={[{ required: true, message: t('position.rankRequired') }]}
+            extra={t('position.rankExtra')}
           >
-            <Select placeholder="請選擇職等" options={POSITION_RANK_OPTIONS} />
+            <Select placeholder={t('position.rankPlaceholder')} options={POSITION_RANK_OPTIONS} />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Form, Input, message, Space, Card, Tag, Breadcrumb } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
@@ -9,6 +10,7 @@ import { getCustomTips, saveCustomTips, deleteCustomTips, type CustomPageTips } 
 import './index.css'
 
 export default function PageDescriptionEditor() {
+  const { t } = useTranslation('common')
   const navigate = useNavigate()
   const location = useLocation()
   const [form] = Form.useForm()
@@ -71,7 +73,7 @@ export default function PageDescriptionEditor() {
         
         // 如果所有字段都为空,提示用户
         if (!tips.prdContent && !tips.tips) {
-          message.warning('請至少輸入一項內容後再保存')
+          message.warning(t('saveAtLeastOne'))
           setLoading(false)
           return
         }
@@ -79,7 +81,7 @@ export default function PageDescriptionEditor() {
         saveCustomTips(targetPath, tips)
         setCustomTips(tips)
         
-        message.success('保存成功！')
+        message.success(t('saveSuccess'))
         
         // 返回上一页
         setTimeout(() => {
@@ -87,13 +89,13 @@ export default function PageDescriptionEditor() {
         }, 500)
       } catch (error) {
         console.error('保存失败:', error)
-        message.error('保存失败，请重试')
+        message.error(t('saveFailedRetry'))
       } finally {
         setLoading(false)
       }
     }).catch(error => {
       console.error('表单验证失败:', error)
-      message.error('請檢查表單輸入')
+      message.error(t('checkFormInput'))
     })
   }
 
@@ -111,7 +113,7 @@ export default function PageDescriptionEditor() {
     deleteCustomTips(targetPath)
     setCustomTips(null)
     
-    message.success('已恢复为默认说明')
+    message.success(t('resetToDefault'))
   }
 
   // 返回上一页
@@ -124,9 +126,9 @@ export default function PageDescriptionEditor() {
       {/* 面包屑导航 */}
       <Breadcrumb style={{ marginBottom: 16 }}>
         <Breadcrumb.Item>
-          <span onClick={handleBack} style={{ cursor: 'pointer' }}>首页</span>
+          <span onClick={handleBack} style={{ cursor: 'pointer' }}>{t('homePage')}</span>
         </Breadcrumb.Item>
-        <Breadcrumb.Item>界面說明編輯</Breadcrumb.Item>
+        <Breadcrumb.Item>{t('uiDescEdit')}</Breadcrumb.Item>
       </Breadcrumb>
 
       {/* 页面标题 */}
@@ -134,20 +136,20 @@ export default function PageDescriptionEditor() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 20 }}>
-              🐝 編輯界面說明 - {pageTitle || '未知頁面'}
+              🐝 {t('editUiDesc')} - {pageTitle || t('unknownPage')}
             </h2>
             <div style={{ marginTop: 8, color: '#666', fontSize: 13 }}>
-              <span>所屬模塊：{pageModule || '-'}</span>
-              <span style={{ marginLeft: 16 }}>頁面路徑：{targetPath}</span>
-              {customTips && <Tag color="orange" style={{ marginLeft: 16 }}>已有自定義內容</Tag>}
+              <span>{t('moduleLabel')}{pageModule || '-'}</span>
+              <span style={{ marginLeft: 16 }}>{t('pagePathLabel')}{targetPath}</span>
+              {customTips && <Tag color="orange" style={{ marginLeft: 16 }}>{t('hasCustomContent')}</Tag>}
             </div>
           </div>
           <Space>
             <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
-              返回
+              {t('back')}
             </Button>
             <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={loading}>
-              保存
+              {t('save')}
             </Button>
           </Space>
         </div>
@@ -156,7 +158,7 @@ export default function PageDescriptionEditor() {
       {/* 编辑表单 - PRD需求文档编辑界面 */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>
-          結构化编辑PRD需求文档,分为菜单描述、功能说明、查询条件、字段说明、操作说明五个版块
+          {t('structuredEditHint')}
         </div>
         <PRDEditor
           initialContent={prdContent}
@@ -168,21 +170,21 @@ export default function PageDescriptionEditor() {
       {/* 小蜜蜂知识库内容 */}
       <Form form={form} layout="vertical">
         <Card 
-          title="💡 氣泡提示內容" 
+          title={t('bubbleTipContent')} 
           style={{ marginBottom: 16 }}
           extra={
             customTips?.tips && customTips.tips.length > 0 ? (
-              <Tag color="blue">已保存 {customTips.tips.length} 條</Tag>
+              <Tag color="blue">{t('savedCount', { count: customTips.tips.length })}</Tag>
             ) : null
           }
         >
           <Form.Item
             name="tips"
-            extra="每行一條氣泡提示內容,保存後會自動輪播展示"
+            extra={t('tipPerLineHint')}
           >
             <Input.TextArea
               rows={6}
-              placeholder={pagePrd?.tips?.join('\n') || '請輸入氣泡提示內容,每行一條...'}
+              placeholder={pagePrd?.tips?.join('\n') || t('bubblePlaceholder')}
               style={{ fontFamily: 'monospace', fontSize: 14 }}
             />
           </Form.Item>
@@ -194,13 +196,13 @@ export default function PageDescriptionEditor() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ color: '#999', fontSize: 12 }}>
             {customTips?.lastEdited && (
-              <span>上次編輯時間：{customTips.lastEdited}</span>
+              <span>{t('lastEditTime')}{customTips.lastEdited}</span>
             )}
           </div>
           <Space>
-            <Button onClick={handleBack}>取消</Button>
+            <Button onClick={handleBack}>{t('cancel')}</Button>
             <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={loading}>
-              保存並返回
+              {t('saveAndReturn')}
             </Button>
           </Space>
         </div>

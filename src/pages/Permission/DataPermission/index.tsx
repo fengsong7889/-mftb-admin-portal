@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Input, Modal, Popconfirm, Radio, Select, Space, Table, Tabs, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import type { DataAuthorization, DataTargetType } from '../types'
 import { DATA_TARGET_TYPE, STORAGE_KEYS, countryOptions, merchantOptions } from '../types'
 import { fetchRoles } from '../../../api/role'
@@ -88,6 +89,7 @@ interface AuthRow extends DataAuthorization {
 }
 
 export default function DataPermission() {
+  const { t } = useTranslation()
   // 功能权限校验（菜单 key: data-permission）
   const { user, hasPermission } = useAuth()
   const [roles, setRoles] = useState<RoleItem[]>([])
@@ -140,7 +142,7 @@ export default function DataPermission() {
         const role = roles.find(r => r.id === a.targetId)
         return {
           ...a,
-          targetName: role?.name ?? '（角色已刪除）',
+          targetName: role?.name ?? t('dataPermission.roleDeleted'),
           userCount: role?.userCount ?? 0,
         }
       }),
@@ -155,7 +157,7 @@ export default function DataPermission() {
         const dept = departments.find(d => d.id === a.targetId)
         return {
           ...a,
-          targetName: dept?.name ?? '（部門已刪除）',
+          targetName: dept?.name ?? t('dataPermission.deptDeleted'),
           parentName: dept?.parentName,
           userCount: dept?.userCount ?? 0,
         }
@@ -219,15 +221,15 @@ export default function DataPermission() {
   /** 保存授权（形成/更新一条授权数据） */
   const handleSave = () => {
     if (targetId == null) {
-      message.warning(activeTab === DATA_TARGET_TYPE.ROLE ? '請選擇要授權的角色' : '請選擇要授權的部門')
+      message.warning(activeTab === DATA_TARGET_TYPE.ROLE ? t('dataPermission.selectRole') : t('dataPermission.selectDept'))
       return
     }
     if (!country) {
-      message.warning('請選擇授權地區')
+      message.warning(t('dataPermission.selectCountry'))
       return
     }
     if (!allMerchants && selectedMerchants.length === 0) {
-      message.warning('請至少選擇一個商家')
+      message.warning(t('dataPermission.selectMerchant'))
       return
     }
     const duplicated = authorizations.some(a =>
@@ -237,7 +239,7 @@ export default function DataPermission() {
       a.country === country,
     )
     if (duplicated) {
-      message.warning('該對象在此地區已存在授權，請直接編輯原授權數據')
+      message.warning(t('dataPermission.duplicateAuth'))
       return
     }
     // 最后更新人：当前登录人（优先姓名）
@@ -250,7 +252,7 @@ export default function DataPermission() {
           : a,
       )
       saveAuthorizations(next)
-      message.success('授權已更新')
+      message.success(t('dataPermission.authUpdated'))
     } else {
       const record: DataAuthorization = {
         id: Date.now().toString(),
@@ -264,7 +266,7 @@ export default function DataPermission() {
         updatedAt,
       }
       saveAuthorizations([...authorizations, record])
-      message.success('授權已創建')
+      message.success(t('dataPermission.authCreated'))
     }
     setModalVisible(false)
   }
@@ -272,7 +274,7 @@ export default function DataPermission() {
   /** 删除授权 */
   const handleDelete = (record: AuthRow) => {
     saveAuthorizations(authorizations.filter(a => a.id !== record.id))
-    message.success('授權已刪除')
+    message.success(t('common.deleteSuccess'))
   }
 
   /** 授权地区列 */
@@ -284,23 +286,23 @@ export default function DataPermission() {
   const renderActions = (record: AuthRow) => (
     <Space size={4}>
       <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
-        詳情
+        {t('common.detail')}
       </Button>
       {hasPermission('data-permission:edit') && (
         <Button type="link" size="small" onClick={() => handleEdit(record)}>
-          編輯
+          {t('common.edit')}
         </Button>
       )}
       {hasPermission('data-permission:delete') && (
         <Popconfirm
-          title="確認刪除"
-          description={`確定要刪除「${record.targetName}」在「${COUNTRY_NAME_MAP[record.country] ?? record.country}」的數據授權嗎？`}
+          title={t('common.confirmDelete')}
+          description={t('dataPermission.confirmDeleteContent', { name: record.targetName, country: COUNTRY_NAME_MAP[record.country] ?? record.country })}
           onConfirm={() => handleDelete(record)}
-          okText="確認"
-          cancelText="取消"
+          okText={t('common.confirm')}
+          cancelText={t('common.cancel')}
         >
           <Button type="link" size="small" danger>
-            刪除
+            {t('common.delete')}
           </Button>
         </Popconfirm>
       )}
@@ -308,40 +310,40 @@ export default function DataPermission() {
   )
 
   const roleColumns: TableColumnsType<AuthRow> = [
-    { title: '角色名稱', dataIndex: 'targetName', key: 'targetName', width: 180 },
-    { title: '授權地區', dataIndex: 'country', key: 'country', width: 120, render: renderCountryTag },
-    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => `${v} 人` },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('dataPermission.colRoleName'), dataIndex: 'targetName', key: 'targetName', width: 180 },
+    { title: t('dataPermission.colCountry'), dataIndex: 'country', key: 'country', width: 120, render: renderCountryTag },
+    { title: t('dataPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => t('dataPermission.personCount', { count: v }) },
+    { title: t('dataPermission.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '最後更新時間',
+      title: t('dataPermission.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
-    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
+    { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
   const deptColumns: TableColumnsType<AuthRow> = [
-    { title: '部門名稱', dataIndex: 'targetName', key: 'targetName', width: 180 },
-    { title: '上級部門', dataIndex: 'parentName', key: 'parentName', width: 150, render: (v: string) => v || '-' },
-    { title: '授權地區', dataIndex: 'country', key: 'country', width: 120, render: renderCountryTag },
-    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => `${v} 人` },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('dataPermission.colDeptName'), dataIndex: 'targetName', key: 'targetName', width: 180 },
+    { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 150, render: (v: string) => v || '-' },
+    { title: t('dataPermission.colCountry'), dataIndex: 'country', key: 'country', width: 120, render: renderCountryTag },
+    { title: t('dataPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => t('dataPermission.personCount', { count: v }) },
+    { title: t('dataPermission.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '最後更新時間',
+      title: t('dataPermission.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
-    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
+    { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
   const merchantTableColumns: TableColumnsType<typeof merchantOptions[number]> = [
-    { title: '商家ID', dataIndex: 'id', key: 'id', width: 100 },
-    { title: '商家名稱', dataIndex: 'name', key: 'name', width: 200 },
-    { title: '註冊地址', dataIndex: 'address', key: 'address' },
+    { title: t('dataPermission.merchantId'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('dataPermission.merchantName'), dataIndex: 'name', key: 'name', width: 200 },
+    { title: t('dataPermission.merchantAddress'), dataIndex: 'address', key: 'address' },
   ]
 
   /** 列字段配置 */
@@ -361,7 +363,7 @@ export default function DataPermission() {
         <div className="action-section-right">
           {hasPermission('data-permission:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增
+              {t('common.add')}
             </Button>
           )}
           {type === DATA_TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
@@ -375,12 +377,12 @@ export default function DataPermission() {
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條數據`,
+          showTotal: (total) => t('common.total', { count: total }),
         }}
         locale={{
           emptyText: type === DATA_TARGET_TYPE.ROLE
-            ? '暫無授權數據，點擊「新增」為角色授權地區商家數據'
-            : '暫無授權數據，點擊「新增」為部門授權地區商家數據',
+            ? t('dataPermission.emptyRole')
+            : t('dataPermission.emptyDept'),
         }}
       />
     </div>
@@ -397,8 +399,8 @@ export default function DataPermission() {
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as DataTargetType)}
         items={[
-          { key: DATA_TARGET_TYPE.ROLE, label: '角色授權', children: renderTabContent(DATA_TARGET_TYPE.ROLE) },
-          { key: DATA_TARGET_TYPE.DEPARTMENT, label: '部門授權', children: renderTabContent(DATA_TARGET_TYPE.DEPARTMENT) },
+          { key: DATA_TARGET_TYPE.ROLE, label: t('dataPermission.tabRoleAuth'), children: renderTabContent(DATA_TARGET_TYPE.ROLE) },
+          { key: DATA_TARGET_TYPE.DEPARTMENT, label: t('dataPermission.tabDeptAuth'), children: renderTabContent(DATA_TARGET_TYPE.DEPARTMENT) },
         ]}
       />
 
@@ -406,26 +408,26 @@ export default function DataPermission() {
       <Modal
         title={
           editingId
-            ? `編輯數據授權 - ${editingName ?? ''}`
-            : (activeTab === DATA_TARGET_TYPE.ROLE ? '新增角色數據授權' : '新增部門數據授權')
+            ? t('dataPermission.editTitle', { name: editingName ?? '' })
+            : (activeTab === DATA_TARGET_TYPE.ROLE ? t('dataPermission.addRoleTitle') : t('dataPermission.addDeptTitle'))
         }
         open={modalVisible}
         onOk={handleSave}
         onCancel={() => setModalVisible(false)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={760}
         destroyOnClose
       >
         {/* 授权对象选择（编辑模式锁定） */}
         <div className="data-auth-target-bar">
           <span className="data-auth-label">
-            {activeTab === DATA_TARGET_TYPE.ROLE ? '授權角色：' : '授權部門：'}
+            {activeTab === DATA_TARGET_TYPE.ROLE ? t('dataPermission.targetRole') : t('dataPermission.targetDept')}
           </span>
           {activeTab === DATA_TARGET_TYPE.ROLE ? (
             <Select
               className="data-auth-target-select"
-              placeholder="請選擇角色"
+              placeholder={activeTab === DATA_TARGET_TYPE.ROLE ? t('dataPermission.selectRolePlaceholder') : t('dataPermission.selectDeptPlaceholder')}
               showSearch
               optionFilterProp="label"
               disabled={editingId != null}
@@ -439,7 +441,7 @@ export default function DataPermission() {
           ) : (
             <TreeSelect
               className="data-auth-target-select"
-              placeholder="請選擇部門"
+              placeholder={t('dataPermission.selectDeptPlaceholder')}
               showSearch
               treeDefaultExpandAll
               treeNodeFilterProp="title"
@@ -451,17 +453,17 @@ export default function DataPermission() {
           )}
           <Tag color={activeTab === DATA_TARGET_TYPE.ROLE ? 'blue' : 'purple'}>
             {activeTab === DATA_TARGET_TYPE.ROLE
-              ? '加入該角色的員工可查看所授權地區的商家數據'
-              : '進入該部門的人員可查看所授權地區的商家數據'}
+              ? t('dataPermission.roleTip')
+              : t('dataPermission.deptTip')}
           </Tag>
         </div>
 
         {/* 授权地区 + 商家范围 */}
         <div className="data-auth-field">
-          <span className="data-auth-label">授權地區：</span>
+          <span className="data-auth-label">{t('dataPermission.countryLabel')}</span>
           <Select
             className="data-auth-target-select"
-            placeholder="請選擇地區"
+            placeholder={t('dataPermission.countryPlaceholder')}
             showSearch
             optionFilterProp="label"
             value={country}
@@ -471,13 +473,13 @@ export default function DataPermission() {
         </div>
 
         <div className="data-auth-field">
-          <span className="data-auth-label">商家範圍：</span>
+          <span className="data-auth-label">{t('dataPermission.merchantScope')}</span>
           <Radio.Group
             value={allMerchants}
             onChange={(e) => setAllMerchants(e.target.value)}
             options={[
-              { value: true, label: '該地區全部商家（含後續新入駐商家）' },
-              { value: false, label: '指定商家' },
+              { value: true, label: t('dataPermission.allMerchants') },
+              { value: false, label: t('dataPermission.specifiedMerchants') },
             ]}
           />
         </div>
@@ -486,7 +488,7 @@ export default function DataPermission() {
         {!allMerchants && (
           <div className="data-auth-merchant-panel">
             <Input.Search
-              placeholder="搜索商家名稱、註冊地址"
+              placeholder={t('dataPermission.merchantSearchPlaceholder')}
               value={merchantSearchText}
               onChange={(e) => setMerchantSearchText(e.target.value)}
               allowClear
@@ -503,10 +505,10 @@ export default function DataPermission() {
                 onChange: (keys) => setSelectedMerchants(keys as string[]),
               }}
               scroll={{ y: 260 }}
-              locale={{ emptyText: country ? '該地區暫無商家' : '請先選擇授權地區' }}
+              locale={{ emptyText: country ? t('dataPermission.noMerchantInRegion') : t('dataPermission.selectCountryFirst') }}
             />
             <div className="data-auth-tip">
-              已選 {selectedMerchants.length} 個商家
+              {t('dataPermission.selectedMerchants', { count: selectedMerchants.length })}
             </div>
           </div>
         )}
@@ -514,7 +516,7 @@ export default function DataPermission() {
 
       {/* 授权详情弹窗 */}
       <Modal
-        title={`授權詳情 - ${detailRecord?.targetName ?? ''}`}
+        title={t('dataPermission.detailTitle', { name: detailRecord?.targetName ?? '' })}
         open={detailRecord != null}
         onCancel={() => setDetailRecord(null)}
         footer={null}
@@ -523,15 +525,15 @@ export default function DataPermission() {
         {detailRecord && (
           <>
             <div className="data-auth-field">
-              <span className="data-auth-label">授權地區：</span>
+              <span className="data-auth-label">{t('dataPermission.countryLabel')}</span>
               {renderCountryTag(detailRecord.country)}
             </div>
             <div className="data-auth-field">
-              <span className="data-auth-label">商家範圍：</span>
+              <span className="data-auth-label">{t('dataPermission.merchantScope')}</span>
               {detailRecord.allMerchants ? (
-                <Tag color="green">該地區全部商家（{detailMerchants.length} 家，含後續新入駐商家）</Tag>
+                <Tag color="green">{t('dataPermission.allMerchantsTag', { count: detailMerchants.length })}</Tag>
               ) : (
-                <Tag color="purple">指定商家（{detailMerchants.length} 家）</Tag>
+                <Tag color="purple">{t('dataPermission.specifiedMerchantsTag', { count: detailMerchants.length })}</Tag>
               )}
             </div>
             <Table
@@ -541,7 +543,7 @@ export default function DataPermission() {
               size="small"
               pagination={false}
               scroll={{ y: 320 }}
-              locale={{ emptyText: '該地區暫無商家' }}
+              locale={{ emptyText: t('dataPermission.noMerchantInRegion') }}
             />
           </>
         )}

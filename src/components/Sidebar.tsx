@@ -2,10 +2,12 @@ import { useMemo, useState, useEffect } from 'react'
 import { Layout, Menu, message, Modal, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import BrandLogo from './BrandLogo'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMenuTree } from '../api/menu'
 import type { MenuVO } from '../api/menu'
+import { translateMenuName } from '../i18n/menuNameEn'
 import { renderMenuIcon } from './MenuIcon'
 import type { ReactNode } from 'react'
 import {
@@ -161,6 +163,7 @@ const keyToPath: Record<string, string> = {
   // 'promotion-tool': '/promotion-tool',
   // 系统配置
   'menu-config': '/menu-config',
+'translation-manage': '/translation-manage',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -526,6 +529,11 @@ const menuItems: MenuItem[] = [
         icon: <MenuOutlined />,
         label: '菜單配置',
       },
+      {
+        key: 'translation-manage',
+        icon: <GlobalOutlined />,
+        label: '多語言配置',
+      },
     ],
   },
 
@@ -600,6 +608,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'data-permission': <DatabaseOutlined />,
   'system-config': <SettingOutlined />,
   'menu-config': <MenuOutlined />,
+'translation-manage': <GlobalOutlined />,
 }
 
 /** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */
@@ -615,6 +624,25 @@ const buildMenuItemsFromVO = (menus: MenuVO[]): MenuItem[] => {
         ...(children && children.length > 0 ? { children } : {}),
       } as MenuItem
     })
+}
+
+/** 遞歸翻譯菜單 label：英文模式按 menuKey 查映射表，未覆蓋回退中文 */
+const translateMenuItems = (items: MenuItem[]): MenuItem[] => {
+  return items
+    .map((item) => {
+      if (!item) return null
+      const withChildren = item as MenuItem & { children?: MenuItem[] }
+      // divider / 分組等無 label 項直接透傳
+      if (!('label' in item)) return item
+      return {
+        ...item,
+        label: translateMenuName(String(item.key), String(item.label)),
+        ...(withChildren.children && withChildren.children.length > 0
+          ? { children: translateMenuItems(withChildren.children) }
+          : {}),
+      } as MenuItem
+    })
+    .filter((item): item is MenuItem => item !== null)
 }
 
 /** 按菜單權限遞歸過濾菜單：受控叶子菜單無授權則隱藏；父菜單子項全部隱藏時一併隱藏 */
@@ -639,6 +667,7 @@ const filterMenusByPermission = (
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { t, i18n: i18nInstance } = useTranslation()
   const { hasMenuPermission } = useAuth()
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [pwdValue, setPwdValue] = useState('')
@@ -656,11 +685,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     return () => { cancelled = true }
   }, [])
 
-  /** 按當前登錄人權限過濾後的可見菜單（优先后端菜单树，降级内置菜单） */
+  /** 按當前登錄人權限過濾後的可見菜單（优先后端菜单树，降级内置菜单），語言變化時重算菜單名稱 */
   const visibleMenuItems = useMemo(() => {
     const items = menuTree ? buildMenuItemsFromVO(menuTree) : menuItems
-    return filterMenusByPermission(items, hasMenuPermission)
-  }, [menuTree, hasMenuPermission])
+    return filterMenusByPermission(translateMenuItems(items), hasMenuPermission)
+  }, [menuTree, hasMenuPermission, i18nInstance.language])
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
@@ -682,18 +711,18 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     if (path) {
       navigate(path)
     } else {
-      message.info('該功能模塊開發中，敬請期待')
+      message.info(t('sidebar.underDevelopment'))
     }
   }
 
   const handlePwdOk = () => {
     if (pwdValue === '9510') {
-      message.success('密碼驗證成功')
+      message.success(t('sidebar.pwdSuccess'))
       setPwdModalOpen(false)
       setPwdValue('')
       // 验证通过后可在此处添加跳转逻辑
     } else {
-      message.error('密碼錯誤，請重新輸入')
+      message.error(t('sidebar.pwdError'))
     }
   }
 
@@ -719,7 +748,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           <span className="logo-text">
             <span className="logo-text-row">
               <BrandLogo size={28} />
-              <span className="logo-text-main">MFTB搜廣推系統</span>
+              <span className="logo-text-main">{t('app.logoMain')}</span>
             </span>
             <span className="logo-text-sub">MFTB Search · Ads · Recommendation</span>
           </span>
@@ -735,12 +764,12 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         className="sidebar-menu"
       />
       <Modal
-        title="機密頁面，請輸入密碼訪問"
+        title={t('sidebar.secureTitle')}
         open={pwdModalOpen}
         onOk={handlePwdOk}
         onCancel={handlePwdCancel}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         afterOpenChange={(open) => {
           if (open) {
             const input = document.querySelector<HTMLInputElement>('.ant-modal input[type="password"]')
@@ -749,7 +778,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         }}
       >
         <Input.Password
-          placeholder="請輸入密碼訪問"
+          placeholder={t('sidebar.securePlaceholder')}
           value={pwdValue}
           onChange={(e) => setPwdValue(e.target.value)}
           onPressEnter={handlePwdOk}

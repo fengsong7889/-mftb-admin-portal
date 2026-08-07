@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react'
 import { Drawer, Checkbox, Button, Space } from 'antd'
+import { useTranslation } from 'react-i18next'
 import {
   SettingOutlined,
   ReloadOutlined,
@@ -42,6 +43,7 @@ function saveConfig(storageKey: string | undefined, config: ColumnConfig[]) {
 }
 
 export default function TableColumnConfig({ columns, onChange, storageKey }: TableColumnConfigProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ColumnConfig[]>(() => loadConfig(storageKey, columns))
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -154,14 +156,14 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
         icon={<SettingOutlined />}
         className="table-column-config-btn"
         onClick={() => setOpen(true)}
-        title="表格字段設置"
+        title={t('columnConfig.btnTitle')}
       />
 
       {/* 配置抽屉 */}
       <Drawer
         title={
           <div className="tcc-modal-title">
-            <span>表格字段排列</span>
+            <span>{t('columnConfig.title')}</span>
           </div>
         }
         open={open}
@@ -172,8 +174,8 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
         footer={
           <div className="tcc-footer">
             <Space>
-              <Button onClick={() => setOpen(false)}>取消</Button>
-              <Button type="primary" onClick={handleConfirm}>確認</Button>
+              <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+              <Button type="primary" onClick={handleConfirm}>{t('common.confirm')}</Button>
             </Space>
           </div>
         }
@@ -186,16 +188,16 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
             indeterminate={!allUnlockedVisible && unlockedVisible.length > 0}
             onChange={toggleSelectAll}
           >
-            全選
+            {t('columnConfig.selectAll')}
           </Checkbox>
           <Button type="link" icon={<ReloadOutlined />} onClick={handleReset} size="small">
-            重置
+            {t('columnConfig.reset')}
           </Button>
         </div>
 
         {/* 头部锁定区域 */}
         <div className="tcc-zone">
-          <div className="tcc-zone-label">頭部鎖定區域</div>
+          <div className="tcc-zone-label">{t('columnConfig.headZone')}</div>
           <div
             className={`tcc-zone-content ${headLocked.length === 0 ? 'tcc-zone-empty' : ''}`}
             onDragOver={(e) => handleDragOver(e, 'head', headLocked.length)}
@@ -203,7 +205,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
           >
             {headLocked.length === 0 ? (
               <div className="tcc-zone-placeholder">
-                + 該區域無字段，可拖拽字段至此
+                {t('columnConfig.zoneEmpty')}
               </div>
             ) : (
               headLocked.map((col) => (
@@ -220,7 +222,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
                   <Checkbox checked={col.visible} onChange={() => toggleVisible(col.key)}>
                     {col.title}
                   </Checkbox>
-                  <CloseOutlined className="tcc-unlock-btn" onClick={() => unlockField(col.key)} title="解除鎖定" />
+                  <CloseOutlined className="tcc-unlock-btn" onClick={() => unlockField(col.key)} title={t('columnConfig.unlock')} />
                 </div>
               ))
             )}
@@ -229,7 +231,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
 
         {/* 非锁定区域 */}
         <div className="tcc-zone">
-          <div className="tcc-zone-label">非鎖定區域</div>
+          <div className="tcc-zone-label">{t('columnConfig.unlockedZone')}</div>
           <div className="tcc-zone-content tcc-zone-main">
             {unlocked.map((col, idx) => (
               <div
@@ -255,7 +257,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
 
         {/* 尾部锁定区域 */}
         <div className="tcc-zone">
-          <div className="tcc-zone-label">尾部鎖定區域</div>
+          <div className="tcc-zone-label">{t('columnConfig.tailZone')}</div>
           <div
             className={`tcc-zone-content ${tailLocked.length === 0 ? 'tcc-zone-empty' : ''}`}
             onDragOver={(e) => handleDragOver(e, 'tail', tailLocked.length)}
@@ -263,7 +265,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
           >
             {tailLocked.length === 0 ? (
               <div className="tcc-zone-placeholder">
-                + 該區域無字段，可拖拽字段至此
+                {t('columnConfig.zoneEmpty')}
               </div>
             ) : (
               tailLocked.map((col) => (
@@ -280,7 +282,7 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
                   <Checkbox checked={col.visible} onChange={() => toggleVisible(col.key)}>
                     {col.title}
                   </Checkbox>
-                  <CloseOutlined className="tcc-unlock-btn" onClick={() => unlockField(col.key)} title="解除鎖定" />
+                  <CloseOutlined className="tcc-unlock-btn" onClick={() => unlockField(col.key)} title={t('columnConfig.unlock')} />
                 </div>
               ))
             )}

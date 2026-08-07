@@ -13,7 +13,7 @@
  *  - 售價按天計算（MOP/天）
  *  - 內置預覽：運營人員可查看所配置皮膚在小圖/大圖模式下的展示效果
  */
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Button, Checkbox, ColorPicker, Form, Input, InputNumber, Select, Space, Switch, Table, Upload, message, Modal } from 'antd'
 import type { UploadFile } from 'antd'
 import {
@@ -30,6 +30,7 @@ import {
   BarChartOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   AlgorithmType,
   RecommendChannel,
@@ -48,14 +49,14 @@ const ALGORITHM_OPTIONS = [
 
 /** 邊框方式 */
 const BORDER_TYPE_OPTIONS = [
-  { value: 'none', label: '無邊框' },
-  { value: 'color', label: '選擇配色' },
-  { value: 'image', label: '上傳邊框' },
+  { value: 'none', labelKey: 'recommend:popularSkin.borderNoneLabel' },
+  { value: 'color', labelKey: 'recommend:popularSkin.borderColorLabel' },
+  { value: 'image', labelKey: 'recommend:popularSkin.borderImageLabel' },
 ]
 
 /** 邊框配色預設色板 */
 const COLOR_PRESETS = [
-  { label: '推薦顏色', colors: ['#FF4D4F', '#E8720C', '#FAAD14', '#52C41A', '#1890FF', '#722ED1', '#EB2F96', '#13C2C2'] },
+  { labelKey: 'recommend:popularSkin.recommendedColors', colors: ['#FF4D4F', '#E8720C', '#FAAD14', '#52C41A', '#1890FF', '#722ED1', '#EB2F96', '#13C2C2'] },
 ]
 
 /** 可上傳圖片的字段 */
@@ -64,8 +65,8 @@ type SkinImageField = 'borderImage' | 'bigImage'
 /** 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播 */
 type DishLayout = 'grid' | 'carousel'
 const DISH_LAYOUT_OPTIONS = [
-  { value: 'grid', label: '大圖拼列（1大2小）' },
-  { value: 'carousel', label: '階梯輪播' },
+  { value: 'grid', labelKey: 'recommend:popularSkin.dishLayoutGridLabel' },
+  { value: 'carousel', labelKey: 'recommend:popularSkin.dishLayoutCarouselLabel' },
 ]
 
 /** 預覽用 Mock 餐品（麥當勞示意，bg 為餐品底圖漸變，铺滿整張卡片） */
@@ -166,6 +167,7 @@ const buildMockSkins = (): SkinItem[] => [
 ]
 
 export default function PopularSkinPricing() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlModule = searchParams.get('module') || 'delivery'
@@ -196,12 +198,27 @@ export default function PopularSkinPricing() {
   // 詳情圖（基礎信息卡片，與無敵星星/盤活復蘇保持一致）
   const [detailFileList, setDetailFileList] = useState<UploadFile[]>([])
 
+  // APP/頻道/邊框/菜品佈局選項（多語言，使用 labelKey 統一管理）
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tBorderTypeOptions = useMemo(
+    () => BORDER_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })),
+    [t],
+  )
+  const tDishLayoutOptions = useMemo(
+    () => DISH_LAYOUT_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })),
+    [t],
+  )
+  const tColorPresets = useMemo(
+    () => COLOR_PRESETS.map(p => ({ label: t(p.labelKey), colors: p.colors })),
+    [t],
+  )
+
   // 業務頻道選項（按模塊過濾，與銷售定價通用表單保持一致）
   const channelOptions = urlModule === 'groupBuy'
-    ? [{ label: '團購到店', value: RecommendChannel.GROUP_BUY }]
+    ? [{ label: t('recommend:channelGroupBuyName'), value: RecommendChannel.GROUP_BUY }]
     : [
-        { label: '美食外賣', value: RecommendChannel.DELIVERY },
-        { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+        { label: t('recommend:channelDeliveryName'), value: RecommendChannel.DELIVERY },
+        { label: t('recommend:channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
       ]
 
   // 編輯/詳情模式回填基礎信息
@@ -261,17 +278,17 @@ export default function PopularSkinPricing() {
   // 上傳皮膚圖片（本地預覽，不真正上傳）
   const handleUploadImage = (file: File, targetId: number, field: SkinImageField) => {
     if (!file.type.startsWith('image/')) {
-      message.error('僅支持上傳圖片文件')
+      message.error(t('recommend:popularSkin.uploadImageOnly'))
       return false
     }
     if (file.size > 5 * 1024 * 1024) {
-      message.error('圖片大小不能超過 5MB')
+      message.error(t('recommend:popularSkin.imageTooLarge'))
       return false
     }
     const reader = new FileReader()
     reader.onload = () => {
       updateSkin(targetId, { [field]: reader.result as string })
-      message.success('上傳成功')
+      message.success(t('recommend:popularSkin.uploadSuccess'))
     }
     reader.readAsDataURL(file)
     return false
@@ -300,15 +317,15 @@ export default function PopularSkinPricing() {
   // 刪除皮膚
   const handleRemoveSkin = (id: number) => {
     if (skins.length <= 1) {
-      message.warning('至少保留一款皮膚')
+      message.warning(t('recommend:popularSkin.keepOneSkin'))
       return
     }
     Modal.confirm({
-      title: '刪除皮膚',
-      content: '確定刪除該款皮膚嗎？刪除後不可恢復。',
-      okText: '刪除',
+      title: t('recommend:popularSkin.confirmDeleteSkinTitle'),
+      content: t('recommend:popularSkin.confirmDeleteSkinContent'),
+      okText: t('common:delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common:cancel'),
       onOk: () => {
         setSkins(prev => prev.filter(s => s.id !== id))
       },
@@ -325,25 +342,25 @@ export default function PopularSkinPricing() {
       const values = await form.validateFields()
       for (let i = 0; i < skins.length; i++) {
         const skin = skins[i]
-        const label = skin.name.trim() || `皮膚 ${i + 1}`
+        const label = skin.name.trim() || t('recommend:popularSkin.skinNameFallback', { index: i + 1 })
         if (!skin.name.trim()) {
-          message.error(`${label}：請填寫皮膚名稱`)
+          message.error(t('recommend:popularSkin.enterSkinName'))
           return
         }
         if (skin.dishLayouts.length === 0) {
-          message.error(`${label}：請至少選擇一種菜品展示佈局`)
+          message.error(t('recommend:popularSkin.selectOneDishLayout'))
           return
         }
         if (skin.borderType === 'image' && !skin.borderImage) {
-          message.error(`${label}：請上傳邊框圖`)
+          message.error(t('recommend:popularSkin.uploadBorderImage'))
           return
         }
         if (!skin.bigImage) {
-          message.error(`${label}：請上傳大圖模式圖片`)
+          message.error(t('recommend:popularSkin.uploadBigImage'))
           return
         }
         if (skin.price === undefined || skin.price <= 0) {
-          message.error(`${label}：請設置售價`)
+          message.error(t('recommend:popularSkin.setPrice'))
           return
         }
       }
@@ -352,13 +369,13 @@ export default function PopularSkinPricing() {
         for (let i = 0; i < gradients.length; i++) {
           const g = gradients[i]
           if (!g.days || !g.discount) {
-            message.error(`折扣梯度 ${i + 1}：請填寫完整的購買天數與折扣`)
+            message.error(t('recommend:popularSkin.completeDaysDiscount', { index: i + 1 }))
             return
           }
         }
       }
       setLoading(true)
-      message.success(isEditMode ? '編輯成功' : '新增成功')
+      message.success(isEditMode ? t('recommend:popularSkin.editSuccess') : t('recommend:popularSkin.addSuccess'))
       navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
     } catch {
       /* 表單校驗失敗，antd 自動提示 */
@@ -416,7 +433,7 @@ export default function PopularSkinPricing() {
           ? <img src={skin[field] as string} alt={emptyText} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           : isDetailMode
             // 詳情模式無圖時展示只讀占位，不出現上傳按鈕
-            ? <span style={{ fontSize: 11, color: '#BFBFBF' }}>暫無圖片</span>
+            ? <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('recommend:popularSkin.noImage')}</span>
             : (
               <>
                 <PlusOutlined style={{ fontSize: 14, color: '#8C8C8C' }} />
@@ -438,7 +455,7 @@ export default function PopularSkinPricing() {
   /** 上傳邊框圖時，以覆蓋層方式套在卡片外圍 */
   const previewBorderOverlay = (skin: SkinItem) => (
     skin.borderType === 'image' && skin.borderImage ? (
-      <img src={skin.borderImage} alt="邊框"
+      <img src={skin.borderImage} alt={t('recommend:popularSkin.borderImageLabel')}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', borderRadius: 12 }} />
     ) : null
   )
@@ -620,13 +637,13 @@ export default function PopularSkinPricing() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價' : '新增定價'}
+                {isDetailMode ? t('recommend:popularSkin.skinPricingDetail') : isEditMode ? t('recommend:popularSkin.skinPricingEdit') : t('recommend:popularSkin.skinPricingAdd')}
               </h2>
-              <span style={{ fontSize: 14, color: '#595959' }}>🏆 人氣商家</span>
+              <span style={{ fontSize: 14, color: '#595959' }}>🏆 {t('recommend:popularSkin.skinPopularMerchant')}</span>
               <PopularLayoutPreviewModal />
             </div>
           </div>
@@ -636,26 +653,26 @@ export default function PopularSkinPricing() {
       <Form form={form} layout="vertical" disabled={isDetailMode}>
         {/* 基礎信息 */}
         <div style={cardShellStyle}>
-          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', '基礎信息')}
+          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend:popularSkin.basicInfoTitle'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label="算法名稱" name="algorithmId" rules={[{ required: true, message: '請選擇算法' }]}>
+            <Form.Item label={t('common:algoNameLabel')} name="algorithmId" rules={[{ required: true, message: t('recommend:popularSkin.selectAlgorithm') }]}>
               <Select
-                placeholder="請選擇算法"
+                placeholder={t('recommend:popularSkin.selectAlgorithm')}
                 showSearch
                 optionFilterProp="label"
                 disabled={isEditMode || isDetailMode}
                 options={ALGORITHM_OPTIONS.map(alg => ({ label: alg.name, value: alg.id }))}
               />
             </Form.Item>
-            <Form.Item label="所屬品牌" name="app" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
-              <Select placeholder="請選擇" options={APP_OPTIONS} disabled={isEditMode || isDetailMode} />
+            <Form.Item label={t('recommend:popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend:popularSkin.selectApp') }]}>
+              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
             </Form.Item>
-            <Form.Item label="業務頻道" name="channel" rules={[{ required: true, message: '請選擇業務頻道' }]}>
-              <Select placeholder="請選擇" options={channelOptions} disabled={isEditMode || isDetailMode} />
+            <Form.Item label={t('recommend:popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend:popularSkin.selectChannel') }]}>
+              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={channelOptions} disabled={isEditMode || isDetailMode} />
             </Form.Item>
           </div>
           {/* 詳情圖：置於第二行，與算法名稱左對齊（與無敵星星/盤活復蘇保持一致） */}
-          <Form.Item label="詳情圖" style={{ marginBottom: 0, marginTop: 16 }}>
+          <Form.Item label={t('recommend:popularSkin.detailImageLabel')} style={{ marginBottom: 0, marginTop: 16 }}>
             <Upload
               disabled={isDetailMode}
               listType="picture-card"
@@ -666,7 +683,7 @@ export default function PopularSkinPricing() {
               {detailFileList.length < 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <PlusOutlined style={{ fontSize: 20 }} />
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:popularSkin.uploadDetailImage')}</span>
                 </div>
               )}
             </Upload>
@@ -675,9 +692,9 @@ export default function PopularSkinPricing() {
 
         {/* 銷售策略：預售天數（與無敵星星/盤活復蘇定價保持一致，限制廣告銷售可購買的天數範圍） */}
         <div style={cardShellStyle}>
-          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', '銷售策略')}
+          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', t('recommend:popularSkin.salesStrategyCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數:</span>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend:popularSkin.presaleDaysLabel')}</span>
             <InputNumber
               min={1}
               max={90}
@@ -685,11 +702,11 @@ export default function PopularSkinPricing() {
               value={presaleDays}
               disabled={isDetailMode}
               onChange={(value) => setPresaleDays(value || 7)}
-              addonAfter="天"
+              addonAfter={t('recommend:popularSkin.dayAddon')}
               style={{ width: 160 }}
             />
             <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
-              系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售；商家單次最多可購買未來 {presaleDays} 天內的皮膚推廣
+              {t('recommend:popularSkin.presaleDaysHint', { days: presaleDays })}
             </span>
           </div>
         </div>
@@ -697,9 +714,9 @@ export default function PopularSkinPricing() {
         {/* 皮膚列表 */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <SkinOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', '皮膚列表',
+            <SkinOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', t('recommend:popularSkin.skinListCard'),
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
-              小圖模式無需上傳圖片（由邊框自動組成），大圖模式需上傳左側豎版主圖
+              {t('recommend:popularSkin.skinListHint')}
             </span>,
             !isDetailMode && (
               <Button
@@ -709,7 +726,7 @@ export default function PopularSkinPricing() {
                 onClick={handleAddSkin}
                 style={{ borderRadius: 6 }}
               >
-                添加皮膚
+                {t('recommend:popularSkin.addSkin')}
               </Button>
             ),
           )}
@@ -729,23 +746,23 @@ export default function PopularSkinPricing() {
                   boxShadow: '0 2px 4px rgba(232,114,12,0.25)', marginRight: 8,
                 }}>{index + 1}</div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>
-                  皮膚套件
+                  {t('recommend:popularSkin.skinKit')}
                 </span>
                 <div style={{ flex: 1 }} />
                 <Button type="link" size="small" icon={<EyeOutlined />}
-                  onClick={() => setPreviewSkin(skin)}>預覽</Button>
+                  onClick={() => setPreviewSkin(skin)}>{t('recommend:popularSkin.skinPreview')}</Button>
                 {!isDetailMode && (
                   <Button type="link" danger size="small" icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveSkin(skin.id)}>刪除</Button>
+                    onClick={() => handleRemoveSkin(skin.id)}>{t('recommend:popularSkin.skinDelete')}</Button>
                 )}
               </div>
 
               {/* 第一行：名稱 / 售價 */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px', marginBottom: 14 }}>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}皮膚名稱</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.skinNameLabel')}</div>
                   <Input
-                    placeholder="請輸入皮膚名稱"
+                    placeholder={t('recommend:popularSkin.skinNamePh')}
                     value={skin.name}
                     maxLength={20}
                     allowClear
@@ -754,16 +771,16 @@ export default function PopularSkinPricing() {
                   />
                 </div>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}售價（按天計算）</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.skinPriceLabel')}</div>
                   <InputNumber
                     style={{ width: '100%' }}
                     min={1}
                     precision={0}
-                    placeholder="請輸入每天售價"
+                    placeholder={t('recommend:popularSkin.skinPricePh')}
                     value={skin.price}
                     disabled={isDetailMode}
                     onChange={v => updateSkin(skin.id, { price: v ?? undefined })}
-                    addonAfter="MOP/天"
+                    addonAfter={t('recommend:popularSkin.mopDayUnit')}
                   />
                 </div>
               </div>
@@ -771,44 +788,44 @@ export default function PopularSkinPricing() {
               {/* 第二行：菜品展示佈局 / 邊框 / 大圖主圖 */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px' }}>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}菜品展示佈局</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.dishLayoutLabel')}</div>
                   <Checkbox.Group
                     value={skin.dishLayouts}
                     disabled
-                    options={DISH_LAYOUT_OPTIONS}
+                    options={tDishLayoutOptions}
                   />
                   <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4, lineHeight: '16px' }}>
-                    布局样式暂时不允许自由选择，商家购买后，由系統配置瀑布流策略時決定商家展示什么风格的大图模式
+                    {t('recommend:popularSkin.dishLayoutHint')}
                   </div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ ...fieldLabelStyle, marginBottom: 0 }}>{requiredMark}邊框配置</span>
+                    <span style={{ ...fieldLabelStyle, marginBottom: 0 }}>{requiredMark}{t('recommend:popularSkin.borderConfigLabel')}</span>
                     <Select
                       style={{ width: 110, flexShrink: 0 }}
                       value={skin.borderType}
                       disabled={isDetailMode}
                       onChange={v => updateSkin(skin.id, { borderType: v })}
-                      options={BORDER_TYPE_OPTIONS}
+                      options={tBorderTypeOptions}
                     />
                   </div>
                   {skin.borderType === 'color' && (
                     <ColorPicker
                       value={skin.borderColor}
                       disabled={isDetailMode}
-                      presets={COLOR_PRESETS}
+                      presets={tColorPresets}
                       showText
                       onChange={c => updateSkin(skin.id, { borderColor: c.toHexString() })}
                     />
                   )}
-                  {skin.borderType === 'image' && renderUploadBox(skin, 'borderImage', 88, 88, '上傳邊框')}
+                  {skin.borderType === 'image' && renderUploadBox(skin, 'borderImage', 88, 88, t('recommend:popularSkin.uploadBorderText'))}
                 </div>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}大圖模式圖片</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.bigImageLabel')}</div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    {renderUploadBox(skin, 'bigImage', 88, 88, '上傳圖片')}
+                    {renderUploadBox(skin, 'bigImage', 88, 88, t('recommend:popularSkin.uploadImageText'))}
                     <div style={{ fontSize: 11, color: '#8C8C8C', lineHeight: '18px', paddingTop: 2 }}>
-                      大圖模式需上傳左側豎版主圖（3:4，5MB 以內）；小圖模式無需上傳
+                      {t('recommend:popularSkin.bigImageHint')}
                     </div>
                   </div>
                 </div>
@@ -820,7 +837,7 @@ export default function PopularSkinPricing() {
         {/* 購買多天折扣配置（梯度），參考盤活復蘇 */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <PercentageOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#F9F0FF', '購買多天折扣配置（梯度）',
+            <PercentageOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#F9F0FF', t('recommend:popularSkin.gradientDiscountTitle'),
             <>
               <Switch
                 size="small"
@@ -833,7 +850,7 @@ export default function PopularSkinPricing() {
                   }
                 }}
               />
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>商家購買多天時按以下梯度匹配折扣，所有皮膚通用</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:popularSkin.gradientDiscountHint')}</span>
             </>,
             gradientEnabled && !isDetailMode && (
               <Button
@@ -843,14 +860,14 @@ export default function PopularSkinPricing() {
                 onClick={handleAddGradient}
                 style={{ borderRadius: 6 }}
               >
-                添加梯度
+                {t('recommend:popularSkin.addGradient')}
               </Button>
             ),
           )}
           {gradientEnabled ? (
             gradients.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
-                暫無梯度配置，請點擊右上角“添加梯度”
+                {t('recommend:popularSkin.noGradientConfig')}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -859,33 +876,33 @@ export default function PopularSkinPricing() {
                     <span style={{
                       fontSize: 12, fontWeight: 600, color: '#722ED1', background: '#F9F0FF',
                       border: '1px solid #D3ADF7', borderRadius: 4, padding: '1px 8px', flexShrink: 0,
-                    }}>梯度 {index + 1}</span>
-                    <span style={{ fontSize: 13, color: '#595959' }}>購買天數≥</span>
+                    }}>{t('recommend:popularSkin.gradientN', { index: index + 1 })}</span>
+                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.purchaseDaysGe')}</span>
                     <InputNumber
                       min={1}
                       max={180}
                       precision={0}
-                      placeholder="天數"
+                      placeholder={t('recommend:daysPlaceholder')}
                       style={{ width: 90 }}
                       value={gradient.days || undefined}
                       disabled={isDetailMode}
                       onChange={value => handleUpdateGradient(index, 'days', value)}
                     />
-                    <span style={{ fontSize: 13, color: '#595959' }}>天，對應折扣：</span>
+                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.correspondingDiscount')}</span>
                     <InputNumber
                       min={1}
                       max={99}
                       precision={0}
-                      placeholder="折扣"
+                      placeholder={t('recommend:discountPlaceholder')}
                       style={{ width: 100 }}
-                      addonAfter="折"
+                      addonAfter={t('recommend:zheUnit')}
                       value={gradient.discount || undefined}
                       disabled={isDetailMode}
                       onChange={value => handleUpdateGradient(index, 'discount', value)}
                     />
                     <span style={{ fontSize: 12, color: '#8c8c8c' }}>
                       {gradient.days > 0 && gradient.discount > 0
-                        ? `示例：購買滿 ${gradient.days} 天，按原價的 ${gradient.discount}% 付款`
+                        ? t('recommend:popularSkin.gradientExample', { days: gradient.days, discount: gradient.discount })
                         : ''}
                     </span>
                     {!isDetailMode && (
@@ -896,24 +913,24 @@ export default function PopularSkinPricing() {
                         icon={<DeleteOutlined />}
                         style={{ marginLeft: 'auto' }}
                         onClick={() => handleRemoveGradient(index)}
-                      >刪除</Button>
+                      >{t('recommend:popularSkin.skinDelete')}</Button>
                     )}
                   </div>
                 ))}
               </div>
             )
           ) : (
-            <div style={{ fontSize: 13, color: '#8c8c8c' }}>未啟用梯度折扣，商家購買時一律按原價計算</div>
+            <div style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend:popularSkin.gradientDisabledHint')}</div>
           )}
         </div>
 
         {/* 訂單退款，退費比例配置（與無敵星星/盤活復蘇定價保持一致） */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#fff1f0', '訂單退款，退費比例配置',
-            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>商家退款時會計算距離訂單推廣開始時間，按剩餘天數匹配退費比例；匹配成功按規則執行，反之不扣費</span>,
+            <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#fff1f0', t('recommend:popularSkin.refundConfigTitle'),
+            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>{t('recommend:popularSkin.refundConfigHint')}</span>,
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
+              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend:popularSkin.allowRefund') : t('recommend:popularSkin.notAllowRefund')}</span>
               <Switch
                 size="small"
                 checked={refundEnabled}
@@ -932,12 +949,12 @@ export default function PopularSkinPricing() {
               size="small"
               columns={[
                 {
-                  title: '廣告推廣',
+                  title: t('recommend:popularSkin.adPromotionCol'),
                   dataIndex: 'maxDays',
                   width: 220,
                   render: (_, record: CancelFeeRule) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>剩餘天數 ≤</span>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:popularSkin.remainingDaysLe')}</span>
                       <InputNumber
                         disabled={isDetailMode}
                         min={0}
@@ -946,15 +963,15 @@ export default function PopularSkinPricing() {
                         onChange={(val) => {
                           setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, maxDays: val ?? 0 } : r))
                         }}
-                        addonAfter={record.maxDays === 999 ? '' : '天'}
-                        placeholder={record.maxDays === 999 ? '不限' : ''}
+                        addonAfter={record.maxDays === 999 ? '' : t('recommend:popularSkin.dayAddon')}
+                        placeholder={record.maxDays === 999 ? t('recommend:popularSkin.unlimitedPh') : ''}
                         style={{ flex: 1 }}
                       />
                     </div>
                   ),
                 },
                 {
-                  title: '比例配置',
+                  title: t('recommend:popularSkin.ratioConfigCol'),
                   dataIndex: 'feePercent',
                   width: 160,
                   render: (_, record: CancelFeeRule) => (
@@ -972,7 +989,7 @@ export default function PopularSkinPricing() {
                   ),
                 },
                 {
-                  title: '操作',
+                  title: t('recommend:popularSkin.opCol'),
                   width: 120,
                   align: 'center',
                   render: (_: unknown, record: CancelFeeRule) => {
@@ -989,7 +1006,7 @@ export default function PopularSkinPricing() {
                               setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
                             }}
                           >
-                            新增梯度
+                            {t('recommend:popularSkin.addTier')}
                           </Button>
                         )}
                         <Button
@@ -998,13 +1015,13 @@ export default function PopularSkinPricing() {
                           danger
                           onClick={() => {
                             if (cancelFeeRules.length <= 1) {
-                              message.warning('至少保留一條規則')
+                              message.warning(t('recommend:atLeastOneRule'))
                               return
                             }
                             setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
                           }}
                         >
-                          刪除
+                          {t('recommend:popularSkin.skinDelete')}
                         </Button>
                       </Space>
                     )
@@ -1018,24 +1035,24 @@ export default function PopularSkinPricing() {
               background: '#fafafa', borderRadius: 8,
               border: '1px dashed #d9d9d9',
             }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，商家退訂不退費用；開啟開關後可配置退費比例</span>
+              <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend:popularSkin.notAllowRefundHint')}</span>
             </div>
           )}
         </div>
 
         {/* 狀態設置 */}
         <div style={cardShellStyle}>
-          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, '#f6ffed', '狀態設置')}
+          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, '#f6ffed', t('recommend:popularSkin.statusSettingCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>狀態：</span>
+            <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.statusLabelColon')}</span>
             <Switch
               checked={status === ServiceStatus.ENABLED}
               disabled={isDetailMode}
               onChange={checked => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
-              checkedChildren="啟用"
-              unCheckedChildren="停用"
+              checkedChildren={t('recommend:popularSkin.statusEnabledText')}
+              unCheckedChildren={t('recommend:popularSkin.statusDisabledText')}
             />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>停用後該定價不再對商家開放購買</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:popularSkin.disableSkinHint')}</span>
           </div>
         </div>
       </Form>
@@ -1043,7 +1060,9 @@ export default function PopularSkinPricing() {
       {/* 皮膚預覽彈窗：模擬 APP 瀑布流卡片效果 */}
       <Modal
         open={!!previewSkin}
-        title={`皮膚預覽${previewSkin?.name.trim() ? `：${previewSkin.name}` : ''}`}
+        title={previewSkin?.name.trim()
+          ? t('recommend:popularSkin.skinPreviewModalTitleNamed', { name: previewSkin.name })
+          : t('recommend:popularSkin.skinPreviewModalTitle')}
         footer={null}
         width={620}
         onCancel={() => setPreviewSkin(null)}
@@ -1053,7 +1072,7 @@ export default function PopularSkinPricing() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* 小圖模式 */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>📱 小圖模式</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('recommend:popularSkin.smallMode')}</div>
                 {/* 瀑布流上下文：上方鄰卡（模糊淡化） */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
@@ -1075,7 +1094,7 @@ export default function PopularSkinPricing() {
                       background: 'linear-gradient(135deg, #E8720C, #F59432)',
                       borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
                       boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-                    }}>您的門店</span>
+                    }}>{t('recommend:popularSkin.yourStoreBadge')}</span>
                     <div style={previewCardStyle(previewSkin)}>
                       {previewBorderOverlay(previewSkin)}
                       <div style={{ display: 'flex', gap: 10 }}>
@@ -1104,7 +1123,7 @@ export default function PopularSkinPricing() {
               {/* 大圖模式：左側豎版主圖 + 右側店鋪信息/優惠券/品牌說/商品列 */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>🖼️ 大圖模式</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend:popularSkin.bigMode')}</span>
                   {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
                   {previewSkin.dishLayouts.length > 1 && previewSkin.dishLayouts.map((layout, idx) => {
                     const isActive = idx === Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)
@@ -1119,7 +1138,7 @@ export default function PopularSkinPricing() {
                           border: `1px solid ${isActive ? '#E8720C' : 'transparent'}`,
                           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
-                      >{DISH_LAYOUT_OPTIONS.find(o => o.value === layout)?.label}</span>
+                      >{tDishLayoutOptions.find(o => o.value === layout)?.label}</span>
                     )
                   })}
                 </div>
@@ -1144,14 +1163,14 @@ export default function PopularSkinPricing() {
                       background: 'linear-gradient(135deg, #E8720C, #F59432)',
                       borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
                       boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-                    }}>您的門店</span>
+                    }}>{t('recommend:popularSkin.yourStoreBadge')}</span>
                     <div style={previewCardStyle(previewSkin)}>
                       {previewBorderOverlay(previewSkin)}
                       <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
                         {previewSkin.bigImage
                           ? (
                             <div style={{ width: 130, flexShrink: 0, alignSelf: 'stretch' }}>
-                              <img src={previewSkin.bigImage} alt="主圖" style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                              <img src={previewSkin.bigImage} alt={t('recommend:popularSkin.bigImageAlt')} style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
                             </div>
                           )
                           : (
@@ -1160,13 +1179,13 @@ export default function PopularSkinPricing() {
                               border: '1px dashed #d9d9d9', background: '#fafafa',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: 11, color: '#8C8C8C', textAlign: 'center', padding: 8,
-                            }}>未上傳主圖</div>
+                            }}>{t('recommend:popularSkin.noBigImage')}</div>
                           )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {previewInfoBlock()}
                           {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
                           {previewSkin.dishLayouts.length === 0 && (
-                            <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>未選擇菜品展示佈局</div>
+                            <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>{t('recommend:popularSkin.noDishLayout')}</div>
                           )}
                           {(() => {
                             const layout = previewSkin.dishLayouts[Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)]
@@ -1192,12 +1211,12 @@ export default function PopularSkinPricing() {
                 </div>
                 {/* 風格分配說明 */}
                 <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
-                  💡 大圖模式風格由系統隨機分配，在皮膚支持的風格間自動切換展示，商家無需選擇；在瀑布流第幾個位置以大圖模式展示，同樣由系統策略決定
+                  {t('recommend:popularSkin.layoutAssignHint')}
                 </div>
               </div>
             </div>
             <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 12 }}>
-              店鋪名稱、評分、商品圖與優惠信息為示意數據，實際以商家數據自動生成為準
+              {t('recommend:popularSkin.previewDataHint')}
             </div>
           </div>
         )}
@@ -1206,9 +1225,9 @@ export default function PopularSkinPricing() {
       {/* 底部操作欄：統一為「取消 + 保存」，詳情模式隱藏（返回走頂部按鈕） */}
       {!isDetailMode && (
         <div className="form-footer">
-          <Button onClick={handleBack}>取消</Button>
+          <Button onClick={handleBack}>{t('common:cancel')}</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleSubmit}>
-            保存
+            {t('common:save')}
           </Button>
         </div>
       )}

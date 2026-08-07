@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Tag, message, Input } from 'antd'
 import { ArrowLeftOutlined, EditOutlined, SaveOutlined, UndoOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
@@ -15,6 +16,7 @@ const sectionTitle: React.CSSProperties = { fontSize: 15, color: '#262626', marg
 const titleBar: React.CSSProperties = { display: 'inline-block', width: 4, height: 16, background: '#E8720C', borderRadius: 2 }
 
 export default function PagePRDView() {
+  const { t } = useTranslation('common')
   const location = useLocation()
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
@@ -114,7 +116,7 @@ export default function PagePRDView() {
     saveCustomTips(targetPath, tips)
     setCustomTips(tips)
     setIsEditing(false)
-    message.success('保存成功！')
+    message.success(t('saveSuccess'))
   }
 
   // 取消
@@ -139,7 +141,7 @@ export default function PagePRDView() {
       })
       setEditTips(defaultPrd.tips?.join('\n') || '')
     }
-    message.success('已恢复为默认说明')
+    message.success(t('resetToDefault'))
   }
 
   // 编辑模式下的通用更新方法
@@ -196,33 +198,33 @@ export default function PagePRDView() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}
-            >返回</Button>
+            >{t('back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                🐝 {isEditing ? '編輯界面說明' : '界面需求說明'}
+                🐝 {isEditing ? t('editUiDescTitle') : t('uiRequirementDesc')}
               </h2>
               <span style={{ fontSize: 14, color: '#595959' }}>
-                - {displayPrd?.title || '頁面'}
+                - {displayPrd?.title || t('pageLabel')}
               </span>
-              {customTips && !isEditing && <Tag color="orange">自定義</Tag>}
-              {isEditing && <Tag color="blue">編輯中</Tag>}
+              {customTips && !isEditing && <Tag color="orange">{t('customTag')}</Tag>}
+              {isEditing && <Tag color="blue">{t('editingTag')}</Tag>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {isEditing && (
-              <Button danger icon={<UndoOutlined />} onClick={handleReset}>恢復默認</Button>
+              <Button danger icon={<UndoOutlined />} onClick={handleReset}>{t('resetDefault')}</Button>
             )}
             {isEditing ? (
               <>
-                <Button onClick={handleCancelEdit} style={{ borderRadius: 8, height: 36, padding: '0 18px' }}>取消</Button>
+                <Button onClick={handleCancelEdit} style={{ borderRadius: 8, height: 36, padding: '0 18px' }}>{t('cancel')}</Button>
                 <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}
                   style={{
                     backgroundColor: '#E8720C', borderColor: '#E8720C',
                     borderRadius: 8, height: 36, padding: '0 18px',
                     boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                   }}
-                >保存</Button>
+                >{t('save')}</Button>
               </>
             ) : hasPermission('edit') ? (
               <Button type="primary" icon={<EditOutlined />} onClick={handleStartEdit}
@@ -231,7 +233,7 @@ export default function PagePRDView() {
                   borderRadius: 8, height: 36, padding: '0 18px',
                   boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 }}
-              >編輯說明</Button>
+              >{t('editDesc')}</Button>
             ) : null}
           </div>
         </div>
@@ -242,23 +244,23 @@ export default function PagePRDView() {
         <div style={{ background: '#fff', borderRadius: 8, padding: '24px 28px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           {/* 模块路径 */}
           <div style={{ marginBottom: 20, padding: '10px 16px', background: '#FFF7ED', borderRadius: 8, borderLeft: '3px solid #E8720C' }}>
-            <span style={{ color: '#999', fontSize: 12 }}>所屬模塊：</span>
+            <span style={{ color: '#999', fontSize: 12 }}>{t('modulePathLabel')}</span>
             <span style={{ color: '#333', fontSize: 14, fontWeight: 500 }}>{displayPrd?.module || '-'}</span>
             <span style={{ color: '#ccc', margin: '0 12px' }}>|</span>
-            <span style={{ color: '#999', fontSize: 12 }}>頁面路徑：</span>
+            <span style={{ color: '#999', fontSize: 12 }}>{t('pagePathLabel2')}</span>
             <span style={{ color: '#666', fontSize: 13 }}>{targetPath}</span>
           </div>
 
           {/* 功能描述 */}
           {(isEditing || displayPrd?.description) && (
             <div style={editSectionWrap}>
-              <h4 style={sectionTitle}><span style={titleBar} />功能描述</h4>
+              <h4 style={sectionTitle}><span style={titleBar} />{t('funcDesc')}</h4>
               {isEditing ? (
                 <Input.TextArea
                   autoSize={{ minRows: 2, maxRows: 8 }}
                   value={editContent?.description || ''}
                   onChange={e => updateField('description', e.target.value)}
-                  placeholder="輸入功能描述..."
+                  placeholder={t('funcDescPlaceholder')}
                   style={{ fontSize: 14, color: '#555', lineHeight: 1.9, border: '1px solid #d9d9d9', borderRadius: 6, padding: '8px 12px' }}
                 />
               ) : (
@@ -271,16 +273,16 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.features && displayPrd.features.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />功能要點
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('features', { label: '', desc: '' })} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('funcPoints')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('features', { label: '', desc: '' })} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {(editContent?.features || []).map((f, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                       <span style={{ color: '#999', fontSize: 13, marginTop: 6, minWidth: 20 }}>{i + 1}.</span>
-                      <Input value={f.label} onChange={e => updateListItem('features', i, { ...f, label: e.target.value })} placeholder="名稱" style={{ flex: 1 }} />
-                      <Input value={f.desc} onChange={e => updateListItem('features', i, { ...f, desc: e.target.value })} placeholder="說明" style={{ flex: 2 }} />
+                      <Input value={f.label} onChange={e => updateListItem('features', i, { ...f, label: e.target.value })} placeholder={t('namePlaceholder')} style={{ flex: 1 }} />
+                      <Input value={f.desc} onChange={e => updateListItem('features', i, { ...f, desc: e.target.value })} placeholder={t('descPlaceholder')} style={{ flex: 2 }} />
                       <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('features', i)} />
                     </div>
                   ))}
@@ -299,17 +301,17 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.fields && displayPrd.fields.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />字段說明
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('fields', { label: '', desc: '' })} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('fieldDesc')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('fields', { label: '', desc: '' })} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                  <thead><tr style={{ background: '#FAFAFA' }}><th style={thStyle}>字段名稱</th><th style={thStyle}>說明</th><th style={{ ...thStyle, width: 40 }} /></tr></thead>
+                  <thead><tr style={{ background: '#FAFAFA' }}><th style={thStyle}>{t('fieldName')}</th><th style={thStyle}>{t('fieldExplain')}</th><th style={{ ...thStyle, width: 40 }} /></tr></thead>
                   <tbody>
                     {(editContent?.fields || []).map((f, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}>
-                        <td style={editTd}><Input value={f.label} onChange={e => updateListItem('fields', i, { ...f, label: e.target.value })} placeholder="字段名稱" /></td>
-                        <td style={editTd}><Input value={f.desc} onChange={e => updateListItem('fields', i, { ...f, desc: e.target.value })} placeholder="說明" /></td>
+                        <td style={editTd}><Input value={f.label} onChange={e => updateListItem('fields', i, { ...f, label: e.target.value })} placeholder={t('fieldPlaceholder')} /></td>
+                        <td style={editTd}><Input value={f.desc} onChange={e => updateListItem('fields', i, { ...f, desc: e.target.value })} placeholder={t('descPlaceholder')} /></td>
                         <td style={editTd}><Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('fields', i)} /></td>
                       </tr>
                     ))}
@@ -317,7 +319,7 @@ export default function PagePRDView() {
                 </table>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                  <thead><tr style={{ background: '#FAFAFA' }}><th style={thStyle}>字段名稱</th><th style={thStyle}>說明</th></tr></thead>
+                  <thead><tr style={{ background: '#FAFAFA' }}><th style={thStyle}>{t('fieldName')}</th><th style={thStyle}>{t('fieldExplain')}</th></tr></thead>
                   <tbody>{(displayPrd?.fields || []).map((f, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid #F0F0F0' }}><td style={tdLabel}>{f?.label}</td><td style={tdValue}>{f?.desc}</td></tr>
                   ))}</tbody>
@@ -330,15 +332,15 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.actions && displayPrd.actions.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />操作說明
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('actions', '')} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('operationDesc')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('actions', '')} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {(editContent?.actions || []).map((a, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ color: '#999', fontSize: 13 }}>•</span>
-                      <Input value={a} onChange={e => updateListItem('actions', i, e.target.value)} placeholder="操作說明" style={{ flex: 1 }} />
+                      <Input value={a} onChange={e => updateListItem('actions', i, e.target.value)} placeholder={t('opPlaceholder')} style={{ flex: 1 }} />
                       <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('actions', i)} />
                     </div>
                   ))}
@@ -357,23 +359,23 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.interaction && displayPrd.interaction.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />交互說明
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('interaction', '')} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('interactionDesc')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('interaction', '')} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {(editContent?.interaction || []).map((t, i) => (
+                  {(editContent?.interaction || []).map((item, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ color: '#999', fontSize: 13 }}>•</span>
-                      <Input value={t} onChange={e => updateListItem('interaction', i, e.target.value)} placeholder="交互說明" style={{ flex: 1 }} />
+                      <Input value={item} onChange={e => updateListItem('interaction', i, e.target.value)} placeholder={t('interactPlaceholder')} style={{ flex: 1 }} />
                       <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('interaction', i)} />
                     </div>
                   ))}
                 </div>
               ) : (
                 <ul style={{ paddingLeft: 22, margin: 0 }}>
-                  {(displayPrd?.interaction || []).map((t, i) => (
-                    <li key={i} style={{ fontSize: 14, color: '#555', lineHeight: 2.2 }}>{t}</li>
+                  {(displayPrd?.interaction || []).map((item, i) => (
+                    <li key={i} style={{ fontSize: 14, color: '#555', lineHeight: 2.2 }}>{item}</li>
                   ))}
                 </ul>
               )}
@@ -384,15 +386,15 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.rules && displayPrd.rules.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />取值規則
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('rules', '')} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('valueRule')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('rules', '')} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {(editContent?.rules || []).map((r, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ color: '#999', fontSize: 13 }}>•</span>
-                      <Input value={r} onChange={e => updateListItem('rules', i, e.target.value)} placeholder="取值規則" style={{ flex: 1 }} />
+                      <Input value={r} onChange={e => updateListItem('rules', i, e.target.value)} placeholder={t('valueRulePlaceholder')} style={{ flex: 1 }} />
                       <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('rules', i)} />
                     </div>
                   ))}
@@ -411,15 +413,15 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.formulas && displayPrd.formulas.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />公式計算
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('formulas', '')} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('formulaCalc')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('formulas', '')} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {(editContent?.formulas || []).map((f, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ color: '#999', fontSize: 13 }}>•</span>
-                      <Input value={f} onChange={e => updateListItem('formulas', i, e.target.value)} placeholder="公式" style={{ flex: 1, fontFamily: 'monospace' }} />
+                      <Input value={f} onChange={e => updateListItem('formulas', i, e.target.value)} placeholder={t('formula')} style={{ flex: 1, fontFamily: 'monospace' }} />
                       <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('formulas', i)} />
                     </div>
                   ))}
@@ -438,15 +440,15 @@ export default function PagePRDView() {
           {(isEditing || (displayPrd?.notes && displayPrd.notes.length > 0)) && (
             <div style={editSectionWrap}>
               <h4 style={sectionTitle}>
-                <span style={titleBar} />注意事項
-                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('notes', '')} style={{ fontSize: 12, marginLeft: 4 }}>添加</Button>}
+                <span style={titleBar} />{t('notesLabel')}
+                {isEditing && <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addListItem('notes', '')} style={{ fontSize: 12, marginLeft: 4 }}>{t('addField')}</Button>}
               </h4>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {(editContent?.notes || []).map((n, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ color: '#999', fontSize: 13 }}>•</span>
-                      <Input value={n} onChange={e => updateListItem('notes', i, e.target.value)} placeholder="注意事項" style={{ flex: 1 }} />
+                      <Input value={n} onChange={e => updateListItem('notes', i, e.target.value)} placeholder={t('notesPlaceholder')} style={{ flex: 1 }} />
                       <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeListItem('notes', i)} />
                     </div>
                   ))}
@@ -464,13 +466,13 @@ export default function PagePRDView() {
           {/* 智能提示 */}
           {(isEditing || (displayPrd?.tips && displayPrd.tips.length > 0)) && (
             <div style={{ marginBottom: 16 }}>
-              <h4 style={sectionTitle}><span style={titleBar} />智能提示</h4>
+              <h4 style={sectionTitle}><span style={titleBar} />{t('smartTips')}</h4>
               {isEditing ? (
                 <textarea
                   rows={4}
                   value={editTips}
                   onChange={e => setEditTips(e.target.value)}
-                  placeholder="每行一條氣泡提示內容，保存後自動輪播展示..."
+                  placeholder={t('smartTipPlaceholder')}
                   style={{
                     width: '100%', fontFamily: 'monospace', fontSize: 13,
                     padding: '8px 12px', border: '1px solid #d9d9d9', borderRadius: 6,
@@ -494,7 +496,7 @@ export default function PagePRDView() {
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)', textAlign: 'center',
         }}>
           <p style={{ fontSize: 48, margin: '0 0 16px' }}>🐝</p>
-          <p style={{ fontSize: 16, color: '#999' }}>當前頁面暫無需求說明</p>
+          <p style={{ fontSize: 16, color: '#999' }}>{t('noRequirementDesc')}</p>
         </div>
       )}
     </div>

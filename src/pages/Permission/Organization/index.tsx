@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -17,11 +18,6 @@ import { fetchEmployees } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
 import { exportToCSV } from '../../../utils/exportCSV'
 import './index.css'
-
-const statusOptions = [
-  { value: DEPT_STATUS.ENABLED, label: '有效' },
-  { value: DEPT_STATUS.DISABLED, label: '無效' },
-]
 
 /** 新增/编辑表单值 */
 interface DepartmentFormValues {
@@ -87,6 +83,14 @@ function collectDescendantIds(list: DepartmentItem[], rootId: number): Set<numbe
 }
 
 export default function OrganizationManagement() {
+  const { t } = useTranslation()
+
+  /** 狀態選項（依賴 t，定義在組件內以便響應語言切換） */
+  const STATUS_OPTIONS = [
+    { value: DEPT_STATUS.ENABLED, label: t('organization.statusValid') },
+    { value: DEPT_STATUS.DISABLED, label: t('organization.statusInvalid') },
+  ]
+
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
   // 左侧树选中的部门（过滤右侧表格）
@@ -260,10 +264,10 @@ export default function OrganizationManagement() {
     try {
       if (editing) {
         await updateDepartment(editing.id, payload)
-        message.success('部門信息已更新')
+        message.success(t('organization.updateSuccess'))
       } else {
         await createDepartment(payload)
-        message.success('部門創建成功')
+        message.success(t('organization.createSuccess'))
       }
       setEditModalVisible(false)
       fetchList()
@@ -279,7 +283,7 @@ export default function OrganizationManagement() {
     const next = record.status === DEPT_STATUS.ENABLED ? DEPT_STATUS.DISABLED : DEPT_STATUS.ENABLED
     try {
       await updateDepartmentStatus(record.id, next)
-      message.success(next === DEPT_STATUS.ENABLED ? '部門已啟用' : '部門已停用')
+      message.success(next === DEPT_STATUS.ENABLED ? t('organization.enabled') : t('organization.disabled'))
       fetchList()
     } catch {
       // 错误提示由请求层统一处理
@@ -290,7 +294,7 @@ export default function OrganizationManagement() {
   const handleDelete = async (record: DepartmentItem) => {
     try {
       await deleteDepartment(record.id)
-      message.success('部門已刪除')
+      message.success(t('common.deleteSuccess'))
       if (selectedDeptId === record.id) {
         setSelectedDeptId(undefined)
       }
@@ -303,63 +307,63 @@ export default function OrganizationManagement() {
   /** 导出当前过滤后的列表数据 */
   const handleExport = () => {
     if (tableData.length === 0) {
-      message.warning('當前無數據可導出')
+      message.warning(t('organization.noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '部門狀態', dataIndex: 'status', render: (v: number) => v === DEPT_STATUS.ENABLED ? '有效' : '無效' },
-      { title: '部門編碼', dataIndex: 'code' },
-      { title: '部門名稱', dataIndex: 'name' },
-      { title: '部門對接人', dataIndex: 'leader' },
-      { title: '上級部門', dataIndex: 'parentName' },
-      { title: '在編人數', dataIndex: 'userCount' },
+      { title: t('organization.colDeptStatus'), dataIndex: 'status', render: (v: number) => v === DEPT_STATUS.ENABLED ? t('organization.statusValid') : t('organization.statusInvalid') },
+      { title: t('organization.colDeptCode'), dataIndex: 'code' },
+      { title: t('organization.colDeptName'), dataIndex: 'name' },
+      { title: t('organization.colLeader'), dataIndex: 'leader' },
+      { title: t('organization.colParentDept'), dataIndex: 'parentName' },
+      { title: t('organization.colUserCount'), dataIndex: 'userCount' },
     ]
-    exportToCSV('組織管理', exportColumns, tableData)
+    exportToCSV(t('organization.pageTitle'), exportColumns, tableData)
   }
 
   const columns: TableColumnsType<DepartmentItem> = [
     {
-      title: '部門狀態',
+      title: t('organization.colDeptStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 90,
       render: (value: number) => (
         value === DEPT_STATUS.ENABLED
-          ? <Tag color="success">有效</Tag>
-          : <Tag color="error">無效</Tag>
+          ? <Tag color="success">{t('organization.statusValid')}</Tag>
+          : <Tag color="error">{t('organization.statusInvalid')}</Tag>
       ),
     },
-    { title: '部門編碼', dataIndex: 'code', key: 'code', width: 140 },
-    { title: '部門名稱', dataIndex: 'name', key: 'name', width: 180 },
-    { title: '部門對接人', dataIndex: 'leader', key: 'leader', width: 130, render: (v: string) => v || '-' },
-    { title: '上級部門', dataIndex: 'parentName', key: 'parentName', width: 160, render: (v: string) => v || '-' },
-    { title: '在編人數', dataIndex: 'userCount', key: 'userCount', width: 100 },
+    { title: t('organization.colDeptCode'), dataIndex: 'code', key: 'code', width: 140 },
+    { title: t('organization.colDeptName'), dataIndex: 'name', key: 'name', width: 180 },
+    { title: t('organization.colLeader'), dataIndex: 'leader', key: 'leader', width: 130, render: (v: string) => v || '-' },
+    { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 160, render: (v: string) => v || '-' },
+    { title: t('organization.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 100 },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 180,
       render: (_, record) => (
         <Space size={4}>
           {hasPermission('organization-management:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              編輯
+              {t('common.edit')}
             </Button>
           )}
           {hasPermission('organization-management:edit') && (
             <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-              {record.status === DEPT_STATUS.ENABLED ? '停用' : '啟用'}
+              {record.status === DEPT_STATUS.ENABLED ? t('common.disable') : t('common.enable')}
             </Button>
           )}
           {hasPermission('organization-management:delete') && (
             <Popconfirm
-              title="確認刪除"
-              description={`確定要刪除部門「${record.name}」嗎？`}
+              title={t('common.confirmDelete')}
+              description={t('organization.confirmDeleteContent', { name: record.name })}
               onConfirm={() => handleDelete(record)}
-              okText="確認"
-              cancelText="取消"
+              okText={t('common.confirm')}
+              cancelText={t('common.cancel')}
             >
               <Button type="link" size="small" danger>
-                刪除
+                {t('common.delete')}
               </Button>
             </Popconfirm>
           )}
@@ -381,7 +385,7 @@ export default function OrganizationManagement() {
       <div className="org-tree-panel">
         <h3 className="org-tree-panel-title">
           <ApartmentOutlined className="org-tree-panel-title-icon" />
-          組織架構
+          {t('organization.orgStructure')}
         </h3>
         <Tree
           treeData={treeData}
@@ -399,22 +403,22 @@ export default function OrganizationManagement() {
         {/* 搜索区 */}
         <div className="search-section">
           <Form form={searchForm} layout="inline">
-            <Form.Item label="部門名稱/編碼" name="keyword">
-              <Input placeholder="請輸入部門名稱或編碼" allowClear onPressEnter={handleSearch} />
+            <Form.Item label={t('organization.searchDeptNameCode')} name="keyword">
+              <Input placeholder={t('organization.nameCodePlaceholder')} allowClear onPressEnter={handleSearch} />
             </Form.Item>
-            <Form.Item label="部門對接人" name="leader">
-              <Input placeholder="請輸入部門對接人" allowClear onPressEnter={handleSearch} />
+            <Form.Item label={t('organization.searchLeader')} name="leader">
+              <Input placeholder={t('organization.leaderPlaceholder')} allowClear onPressEnter={handleSearch} />
             </Form.Item>
-            <Form.Item label="部門狀態" name="status">
-              <Select placeholder="全部" allowClear options={statusOptions} />
+            <Form.Item label={t('organization.searchDeptStatus')} name="status">
+              <Select placeholder={t('common.all')} allowClear options={STATUS_OPTIONS} />
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                  查詢
+                  {t('common.search')}
                 </Button>
                 <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                  重置
+                  {t('common.reset')}
                 </Button>
               </div>
             </Form.Item>
@@ -424,12 +428,12 @@ export default function OrganizationManagement() {
         {/* 操作区 */}
         <div className="action-section">
           <div className="action-section-left">
-            <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+            <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
           </div>
           <div className="action-section-right">
             {hasPermission('organization-management:create') && (
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                新增
+                {t('common.add')}
               </Button>
             )}
             {configComponent}
@@ -448,48 +452,48 @@ export default function OrganizationManagement() {
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (t) => `共 ${t} 條數據`,
+            showTotal: (total) => t('common.total', { count: total }),
           }}
         />
       </div>
 
       {/* 新增/编辑部门弹窗 */}
       <Modal
-        title={editing ? '編輯部門' : '新增部門'}
+        title={editing ? t('organization.editTitle') : t('organization.addTitle')}
         open={editModalVisible}
         onOk={handleSubmit}
         onCancel={() => setEditModalVisible(false)}
         confirmLoading={submitting}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={520}
         destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="parentId" label="上級部門" extra="不選擇則作為頂級部門">
+          <Form.Item name="parentId" label={t('organization.parentDeptLabel')} extra={t('organization.parentDeptExtra')}>
             <TreeSelect
               treeData={buildTreeData(departments, editing?.id)}
-              placeholder="請選擇上級部門"
+              placeholder={t('organization.parentDeptPlaceholder')}
               allowClear
               treeDefaultExpandAll
               showSearch
               treeNodeFilterProp="title"
             />
           </Form.Item>
-          <Form.Item name="name" label="部門名稱" rules={[{ required: true, message: '請輸入部門名稱' }]}>
-            <Input placeholder="請輸入部門名稱" allowClear />
+          <Form.Item name="name" label={t('organization.deptNameLabel')} rules={[{ required: true, message: t('organization.deptNameRequired') }]}>
+            <Input placeholder={t('organization.deptNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item name="leader" label="部門對接人">
+          <Form.Item name="leader" label={t('organization.leaderLabel')}>
             <Select
-              placeholder="請選擇部門對接人"
+              placeholder={t('organization.leaderPlaceholderModal')}
               allowClear
               showSearch
               optionFilterProp="label"
               options={employees.map(emp => ({ value: emp.name, label: `${emp.name}（${emp.empId}）` }))}
             />
           </Form.Item>
-          <Form.Item name="sort" label="排序" extra="數字越小越靠前">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="請輸入排序值" />
+          <Form.Item name="sort" label={t('organization.sortLabel')} extra={t('organization.sortExtra')}>
+            <InputNumber min={0} style={{ width: '100%' }} placeholder={t('organization.sortPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>

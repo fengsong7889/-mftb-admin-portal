@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Form, InputNumber, Select, Space, message, Divider, Tag, DatePicker, Switch, Modal, Checkbox, Table, Tree, Upload } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
 import {
@@ -26,6 +27,7 @@ import {
   ServiceStatus,
   APP_OPTIONS,
   REGION_OPTIONS,
+  REGION_LABEL_KEY,
   REGION_TREE_DATA,
   AREA_TO_REGIONS,
   ALGORITHM_TYPE_OPTIONS,
@@ -116,21 +118,15 @@ const _CHANNEL_PAGE_OPTIONS: Record<number, { label: string; value: string }[]> 
 
 // 时段枚举
 const TIME_SLOTS = [
-  { key: 'fullDay', label: '全時段' },
-  { key: 'breakfast', label: '早餐' },
-  { key: 'lunch', label: '午餐' },
-  { key: 'afternoon', label: '下午茶' },
-  { key: 'dinner', label: '晚餐' },
-  { key: 'night', label: '宵夜' },
+  { key: 'fullDay', labelKey: 'recommend.fullDaySlot' },
+  { key: 'breakfast', labelKey: 'recommend.breakfastSlot' },
+  { key: 'lunch', labelKey: 'recommend.lunchSlot' },
+  { key: 'afternoon', labelKey: 'recommend.afternoonTeaSlot' },
+  { key: 'dinner', labelKey: 'recommend.dinnerSlot' },
+  { key: 'night', labelKey: 'recommend.lateNightSlot' },
 ]
 
-// 商圈选择树形数据：直接引用全局统一商圈数据（含珠海区域），与门店所在区域等模块保持一致
-const regionTreeData = REGION_TREE_DATA.map(area => ({
-  key: String(area.value),
-  title: area.title,
-  value: area.value as string | number,
-  children: (area.children ?? []).map(c => ({ key: String(c.value), title: c.title, value: c.value as string | number })),
-}))
+// 商圈选择树形数据：在组件内翻译 titleKey
 
 // 区域计价配置接口
 interface RegionPricingConfig {
@@ -192,6 +188,16 @@ export default function WaterfallAdd() {
 
 /** 通用銷售定價表單（無敵星星/盤活復蘇等） */
 function WaterfallAddGeneral() {
+  const { t } = useTranslation()
+
+  /** 翻譯後的商圈樹形數據 */
+  const regionTreeData = useMemo(() => REGION_TREE_DATA.map(area => ({
+    key: String(area.value),
+    title: t(area.titleKey),
+    value: area.value as string | number,
+    children: (area.children ?? []).map(c => ({ key: String(c.value), title: t(c.titleKey), value: c.value as string | number })),
+  })), [t])
+
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlAlgorithmType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
@@ -203,12 +209,14 @@ function WaterfallAddGeneral() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+
   // 根据模块过滤业务频道选项
   const channelOptions = urlModule === 'groupBuy'
-    ? [{ label: '團購到店', value: RecommendChannel.GROUP_BUY }]
+    ? [{ label: t('recommend.channelGroupBuyName'), value: RecommendChannel.GROUP_BUY }]
     : [
-        { label: '美食外賣', value: RecommendChannel.DELIVERY },
-        { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
+        { label: t('recommend.channelDeliveryName'), value: RecommendChannel.DELIVERY },
+        { label: t('recommend.channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
       ]
 
   // 基础信息
@@ -371,7 +379,7 @@ function WaterfallAddGeneral() {
             const price = Number(rp.dailyPrice) || 0
             return {
               region: rp.region as Region,
-              regionLabel: REGION_OPTIONS.find(o => o.value === rp.region)?.label ?? String(rp.region),
+              regionLabel: (REGION_LABEL_KEY[rp.region as number] ? t(REGION_LABEL_KEY[rp.region as number]) : String(rp.region)),
               pricing: { fullDay: price, breakfast: price / 5, lunch: price / 5, afternoon: price / 5, dinner: price / 5, night: price / 5 },
               discountEnabled: false,
               discounts: {},
@@ -430,7 +438,7 @@ function WaterfallAddGeneral() {
           const price = Number(rp.dailyPrice) || 0
           return {
             region: rp.region as Region,
-            regionLabel: REGION_OPTIONS.find(o => o.value === rp.region)?.label ?? String(rp.region),
+            regionLabel: (REGION_LABEL_KEY[rp.region as number] ? t(REGION_LABEL_KEY[rp.region as number]) : String(rp.region)),
             pricing: { fullDay: price, breakfast: price / 5, lunch: price / 5, afternoon: price / 5, dinner: price / 5, night: price / 5 },
             discountEnabled: false,
             discounts: {},
@@ -560,7 +568,7 @@ function WaterfallAddGeneral() {
   // 添加区域计价配置
   const handleAddRegionConfig = (region: Region, label: string) => {
     if (regionPricingConfigs.find(c => c.region === region)) {
-      message.warning('該區域已添加計價配置')
+      message.warning(t('recommend.districtAlreadyAdded'))
       return
     }
     
@@ -582,10 +590,10 @@ function WaterfallAddGeneral() {
   const handleRemoveRegionConfig = (region: Region) => {
     if (regionPricingConfigs.length === 1) {
       Modal.confirm({
-        title: '删除确认',
-        content: '这是最后一个商圈配置，删除后需要重新选择商圈。是否继续？',
-        okText: '确认删除',
-        cancelText: '取消',
+        title: t('recommend.confirmDeleteTitle'),
+        content: t('recommend.confirmDeleteLastDistrict'),
+        okText: t('recommend.confirmDeleteBtn'),
+        cancelText: t('common:cancel'),
         okButtonProps: { danger: true },
         onOk: () => {
           setRegionPricingConfigs([])
@@ -728,7 +736,7 @@ function WaterfallAddGeneral() {
       if (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR) {
         const algoId = (selectedAlgorithmInfo?.id ?? values.algorithmId) as number | undefined
         if (!algoId) {
-          message.error('請選擇算法')
+          message.error(t('recommend.selectAlgo'))
           return
         }
         const payload: AdPricingStarRequest = {
@@ -779,7 +787,7 @@ function WaterfallAddGeneral() {
         } else {
           await createAdPricing(payload)
         }
-        message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
+        message.success(isEditMode ? t('recommend.pricingUpdated') : t('recommend.pricingSaved'))
         navigate(`/promotion-waterfall?type=${AlgorithmType.INVINCIBLE_STAR}`)
         return
       }
@@ -787,7 +795,7 @@ function WaterfallAddGeneral() {
       if (selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD) {
         const algoId = (selectedAlgorithmInfo?.id ?? values.algorithmId) as number | undefined
         if (!algoId) {
-          message.error('請選擇算法')
+          message.error(t('recommend.selectAlgo'))
           return
         }
         const payload: AdPricingReviveRequest = {
@@ -818,7 +826,7 @@ function WaterfallAddGeneral() {
         } else {
           await createAdRevivePricing(payload)
         }
-        message.success(isEditMode ? '定價配置已更新' : '定價配置已保存')
+        message.success(isEditMode ? t('recommend.pricingUpdated') : t('recommend.pricingSaved'))
         navigate(`/promotion-waterfall?type=${AlgorithmType.HOT_REVIVE_AD}`)
         return
       }
@@ -841,12 +849,12 @@ function WaterfallAddGeneral() {
         status,
       }
 
-      message.success('新增成功')
+      message.success(t('recommend.addSuccessMsg'))
       navigate(`/promotion-waterfall?type=${selectedAlgorithmType}`)
     } catch (error) {
       // 表单校验失败不提示（antd 已标红），接口业务错误提示后端返回信息
       if (error instanceof Error) {
-        message.error(error.message || '保存失敗')
+        message.error(error.message || t('recommend.saveFailed'))
       }
     } finally {
       setLoading(false)
@@ -913,7 +921,7 @@ function WaterfallAddGeneral() {
   const handleConfirmMerchants = () => {
     setSelectedMerchants(tempSelectedMerchants)
     setMerchantModalVisible(false)
-    message.success(`已選擇 ${tempSelectedMerchants.length} 個商家`)
+    message.success(t('recommend.merchantsSelectedCount', { count: tempSelectedMerchants.length }))
   }
 
   // 删除已选商家
@@ -946,15 +954,15 @@ function WaterfallAddGeneral() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {isDetailMode ? '定價詳情' : isEditMode ? '編輯定價' : '新增定價'}
+                {isDetailMode ? t('recommend.pricingDetailTitle') : isEditMode ? t('recommend.editPricingTitle') : t('recommend.addPricingTitle')}
               </h2>
               {urlAlgorithmType != null && (
                 <span style={{ fontSize: 14, color: '#595959' }}>
-                  {TYPE_ICON[urlAlgorithmType]} {ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.label || ''}
+                  {TYPE_ICON[urlAlgorithmType]} {(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.labelKey ? t(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)!.labelKey) : '')}
                 </span>
               )}
             </div>
@@ -971,18 +979,18 @@ function WaterfallAddGeneral() {
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基礎信息</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.basicInfo')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <Form.Item 
-                label="算法名稱"
+                label={t('recommend.algoName')}
                 name="algorithmId" 
-                rules={[{ required: true, message: '請選擇算法' }]}
+                rules={[{ required: true, message: t('recommend.selectAlgo') }]}
               >
                 <Select 
                   disabled={isEditMode || isDetailMode}
-                  placeholder="請選擇算法"
+                  placeholder={t('recommend.selectAlgo')}
                   showSearch
                   optionFilterProp="label"
                   options={algorithmSelectOptions.map(alg => ({
@@ -1004,26 +1012,26 @@ function WaterfallAddGeneral() {
               </Form.Item>
 
               <Form.Item 
-                label="所屬品牌" 
+                label={t('common:brand')} 
                 name="app" 
-                rules={[{ required: true, message: '請選擇所屬品牌' }]}
+                rules={[{ required: true, message: t('common:selectBrand') }]}
               >
                 <Select 
                   disabled={isEditMode || isDetailMode}
-                  placeholder="請選擇所屬品牌" 
-                  options={APP_OPTIONS}
+                  placeholder={t('common:selectBrand')} 
+                  options={tAppOptions}
                   onChange={(value) => setSelectedApp(value)}
                 />
               </Form.Item>
 
               <Form.Item 
-                label="業務頻道" 
+                label={t('common:channel')} 
                 name="channel" 
-                rules={[{ required: true, message: '請選擇業務頻道' }]}
+                rules={[{ required: true, message: t('common:selectChannel') }]}
               >
                 <Select 
                   disabled={isEditMode || isDetailMode}
-                  placeholder="請選擇業務頻道" 
+                  placeholder={t('common:selectChannel')} 
                   options={channelOptions}
                   onChange={(value) => {
                     setSelectedChannel(value)
@@ -1035,7 +1043,7 @@ function WaterfallAddGeneral() {
             </div>
             {/* 單圖類型：詳情圖置於第二行，與算法名稱左對齊 */}
             {isSingleImageType && (
-              <Form.Item label="詳情圖" style={{ marginBottom: 0, marginTop: 16 }}>
+              <Form.Item label={t('recommend.detailImage')} style={{ marginBottom: 0, marginTop: 16 }}>
                 <Upload
                   disabled={isDetailMode}
                   listType="picture-card"
@@ -1046,7 +1054,7 @@ function WaterfallAddGeneral() {
                   {coverFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadDetailImage')}</span>
                     </div>
                   )}
                 </Upload>
@@ -1061,11 +1069,11 @@ function WaterfallAddGeneral() {
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <PictureOutlined style={{ fontSize: 14, color: '#52c41a' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>推廣圖片</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.promoImage')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
-              <Form.Item label="詳情圖">
+              <Form.Item label={t('recommend.detailImage')}>
                 <Upload
                   listType="picture-card"
                   fileList={coverFileList}
@@ -1075,12 +1083,12 @@ function WaterfallAddGeneral() {
                   {coverFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadDetailImage')}</span>
                     </div>
                   )}
                 </Upload>
               </Form.Item>
-              <Form.Item label="詳情圖">
+              <Form.Item label={t('recommend.detailImage')}>
                 <Upload
                   listType="picture-card"
                   fileList={detailFileList}
@@ -1090,12 +1098,12 @@ function WaterfallAddGeneral() {
                   {detailFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳詳情圖</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadDetailImage')}</span>
                     </div>
                   )}
                 </Upload>
               </Form.Item>
-              <Form.Item label="宣傳圖">
+              <Form.Item label={t('recommend.promoImageLabel')}>
                 <Upload
                   listType="picture-card"
                   fileList={promoFileList}
@@ -1105,7 +1113,7 @@ function WaterfallAddGeneral() {
                   {promoFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>上傳宣傳圖</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadPromoImage')}</span>
                     </div>
                   )}
                 </Upload>
@@ -1121,8 +1129,8 @@ function WaterfallAddGeneral() {
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <SettingOutlined style={{ fontSize: 14, color: '#1890ff' }} />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>選擇廣告位</span>
-                <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>必填</Tag>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.selectAdPosition')}</span>
+                <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('common:required')}</Tag>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
               </div>
               <div style={{ background: '#fafafa', borderRadius: 6, padding: 12 }}>
@@ -1163,13 +1171,13 @@ function WaterfallAddGeneral() {
                 <div style={{ marginTop: 12, padding: '10px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                   <Space size="middle">
                     <div style={{ fontSize: 12, color: '#595959', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: '#8c8c8c' }}>算法ID:</span>
+                      <span style={{ color: '#8c8c8c' }}>{t('recommend.algoIdLabel')}</span>
                       <code style={{ background: '#fff', padding: '2px 8px', borderRadius: 4 }}>
                         {String(selectedAlgorithmInfo.id).padStart(6, '0')}
                       </code>
                     </div>
                     <div style={{ fontSize: 12, color: '#595959', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: '#8c8c8c' }}>算法名稱:</span>
+                      <span style={{ color: '#8c8c8c' }}>{t('recommend.algoNameLabelColon')}</span>
                       <strong style={{ color: '#262626' }}>
                         {selectedAlgorithmInfo.name}
                       </strong>
@@ -1181,7 +1189,7 @@ function WaterfallAddGeneral() {
                       onClick={() => setAlgorithmRuleModalVisible(true)}
                       style={{ padding: 0 }}
                     >
-                      查看算法规则
+                      {t('recommend.viewAlgoRules')}
                     </Button>
                   </Space>
                 </div>
@@ -1196,24 +1204,24 @@ function WaterfallAddGeneral() {
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>銷售策略</span>
-                <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>策略配置</Tag>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.salesStrategy')}</span>
+                <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('recommend.strategyConfigTag')}</Tag>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
               </div>
               {/* 预售天数 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>預售天數:</span>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.preSaleDaysLabel')}</span>
                   <InputNumber
                     min={1}
                     max={90}
                     value={presaleDays}
                     onChange={(value) => setPresaleDays(value || 7)}
-                    addonAfter="天"
+                    addonAfter={t('recommend.dayAddon')}
                     style={{ width: 160 }}
                   />
                   <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
-                    系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售
+                    {t('recommend.preSaleDaysTipDynamic', { days: presaleDays })}
                   </span>
                 </div>
               </div>
@@ -1221,12 +1229,12 @@ function WaterfallAddGeneral() {
               {/* 屏蔽商家：Switch + 选择商家 + 备注 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>屏蔽商家:</span>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.blockMerchantsLabel')}</span>
                   <Switch 
                     checked={merchantLimit}
                     onChange={(checked) => setMerchantLimit(checked)}
-                    checkedChildren="屏蔽"
-                    unCheckedChildren="不屏蔽"
+                    checkedChildren={t('recommend.blockOn')}
+                    unCheckedChildren={t('recommend.blockOff')}
                   />
                 </div>
                 {merchantLimit && (
@@ -1236,7 +1244,7 @@ function WaterfallAddGeneral() {
                       onClick={handleOpenMerchantModal}
                       type={selectedMerchants.length > 0 ? 'default' : 'default'}
                     >
-                      {selectedMerchants.length > 0 ? '管理商家' : '選擇商家'}
+                      {selectedMerchants.length > 0 ? t('recommend.manageMerchants') : t('recommend.selectMerchant')}
                     </Button>
                     {selectedMerchants.length > 0 && (
                       <Space size={4} wrap>
@@ -1253,7 +1261,7 @@ function WaterfallAddGeneral() {
                         ))}
                         {selectedMerchants.length > 3 && (
                           <Tag color="blue" style={{ margin: 0, cursor: 'pointer' }} onClick={handleOpenMerchantModal}>
-                            +{selectedMerchants.length - 3} 更多
+                            +{selectedMerchants.length - 3} {t('recommend.moreCount', { count: selectedMerchants.length - 3 })}
                           </Tag>
                         )}
                       </Space>
@@ -1261,7 +1269,7 @@ function WaterfallAddGeneral() {
                   </div>
                 )}
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                  被屏蔽的商家，無法購買該算法廣告，並且商家在購買界面無法查詢到該算法，對商家不可見。
+                  {t('recommend.blockMerchantTip')}
                 </span>
               </div>
 
@@ -1269,7 +1277,7 @@ function WaterfallAddGeneral() {
               {!isReviveAlgorithm && (
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>可售時段:</span>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.sellableTimeSlots')}</span>
                   <Switch 
                     checked={!onlySellTimeSlots.includes('fullDay')}
                     onChange={(checked) => {
@@ -1281,14 +1289,14 @@ function WaterfallAddGeneral() {
                         setOnlySellTimeSlots(['fullDay'])
                       }
                     }}
-                    checkedChildren="指定"
-                    unCheckedChildren="全部"
+                    checkedChildren={t('recommend.designate')}
+                    unCheckedChildren={t('recommend.allTimeSlots')}
                   />
                 </div>
                 {/* 指定时显示5个时段勾选 */}
                 {!onlySellTimeSlots.includes('fullDay') && (
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: 12, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
-                    {TIME_SLOTS.filter(t => t.key !== 'fullDay').map(slot => (
+                    {TIME_SLOTS.filter(s => s.key !== 'fullDay').map(slot => (
                       <Checkbox
                         key={slot.key}
                         checked={onlySellTimeSlots.includes(slot.key)}
@@ -1302,7 +1310,7 @@ function WaterfallAddGeneral() {
                           setOnlySellTimeSlots(next)
                         }}
                       >
-                        {slot.label}
+                        {t(slot.labelKey)}
                       </Checkbox>
                     ))}
                   </div>
@@ -1316,10 +1324,10 @@ function WaterfallAddGeneral() {
               <div style={{ textAlign: 'center', padding: '32px 0', color: '#8c8c8c' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
                 <div style={{ fontSize: 15, fontWeight: 500, color: '#595959', marginBottom: 6 }}>
-                  暫未開通
+                  {t('recommend.notAvailableTitle')}
                 </div>
                 <div style={{ fontSize: 13 }}>
-                  當前廣告類型暫不支持廣告位選擇，僅「無敵星星」和「盤活復蘇」類型可用
+                  {t('recommend.notAvailableHint')}
                 </div>
               </div>
             </div>
@@ -1332,8 +1340,8 @@ function WaterfallAddGeneral() {
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <FundOutlined style={{ fontSize: 14, color: '#722ed1' }} />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>商圈計價配置</span>
-                <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>分區定價</Tag>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.districtPricingConfig')}</span>
+                <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('recommend.zonePricingTag')}</Tag>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                 <Button 
                   type="primary" 
@@ -1345,12 +1353,12 @@ function WaterfallAddGeneral() {
                   }}
                   style={{ borderRadius: 6 }}
                 >
-                  選擇商圈
+                  {t('recommend.selectDistrictBtn')}
                 </Button>
               </div>
               {regionPricingConfigs.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
-                  請選擇商圈並點擊"新增"按鈕添加計價配置
+                  {t('recommend.districtEmptyHint')}
                 </div>
               ) : (
                 <>
@@ -1363,17 +1371,17 @@ function WaterfallAddGeneral() {
                         {config.regionLabel}
                       </Tag>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 13, color: '#595959' }}>每天銷售個數:</span>
+                        <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.dailySalesCount')}</span>
                         <InputNumber
                           min={1}
                           max={999}
                           value={config.dailySalesLimit}
                           onChange={(value) => handleUpdateRegionDailySalesLimit(config.region, value)}
-                          addonAfter="個"
+                          addonAfter={t('recommend.dailySalesUnit')}
                           style={{ width: 140 }}
                         />
                         <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                          基於商家所在位置所歸屬的區域進行限制，每天允許 {config.dailySalesLimit} 個商家購買
+                          {t('recommend.dailySalesHint', { count: config.dailySalesLimit })}
                         </span>
                       </div>
                     </div>
@@ -1384,7 +1392,7 @@ function WaterfallAddGeneral() {
                         onClick={() => handleReplaceRegion(config.region)}
                         style={{ fontSize: 12, color: '#1890FF', padding: '2px 6px' }}
                       >
-                        更換
+                        {t('recommend.replace')}
                       </Button>
                       <Button 
                         type="text" 
@@ -1393,7 +1401,7 @@ function WaterfallAddGeneral() {
                         onClick={() => handleRemoveRegionConfig(config.region)}
                         style={{ fontSize: 12, padding: '2px 6px' }}
                       >
-                        刪除
+                        {t('common:delete')}
                       </Button>
                     </div>
                   </div>
@@ -1403,15 +1411,15 @@ function WaterfallAddGeneral() {
                     // 盤活復蘇：按天计价
                     <div style={{ width: '100%' }}>
                       <Form.Item
-                        label="每天售價"
+                        label={t('recommend.dailyPriceLabel')}
                         style={{ marginBottom: 0, maxWidth: 500 }}
                       >
                         <InputNumber
                           min={0}
                           precision={2}
-                          placeholder="請輸入每天售價"
+                          placeholder={t('recommend.dailyPricePh')}
                           style={{ width: '100%' }}
-                          addonAfter="MOP/天"
+                          addonAfter={t('recommend.mopPerDay')}
                           value={config.pricing['fullDay']}
                           onChange={(value) => handleUpdateRegionPricing(config.region, 'fullDay', value)}
                         />
@@ -1423,16 +1431,15 @@ function WaterfallAddGeneral() {
                       {TIME_SLOTS.map(slot => (
                         <Form.Item
                           key={slot.key}
-                          label={`${slot.label}售價`}
+                          label={`${t(slot.labelKey)}${t('recommend.slotPriceSuffix')}`}
                           style={{ marginBottom: 0 }}
                         >
                           <InputNumber
                             min={0}
                             precision={2}
-                            placeholder={`請輸入${slot.label}售價`}
+                            placeholder={t('recommend.slotPricePh', { slot: t(slot.labelKey) })}
                             style={{ width: '100%' }}
                             addonAfter="MOP"
-                            value={config.pricing[slot.key]}
                             onChange={(value) => handleUpdateRegionPricing(config.region, slot.key, value)}
                           />
                         </Form.Item>
@@ -1444,13 +1451,13 @@ function WaterfallAddGeneral() {
                   {!isReviveAlgorithm && (
                     <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: config.discountEnabled ? 12 : 0 }}>
-                    <span style={{ fontSize: 13, color: '#595959' }}>时段折扣配置:</span>
+                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotDiscountConfig')}</span>
                     <Switch 
                       checked={config.discountEnabled} 
                       onChange={(checked) => handleToggleRegionDiscount(config.region, checked)}
                       size="small"
                     />
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>單獨購買時段可享受的折扣</span>
+                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.slotDiscountHint')}</span>
                   </div>
 
                   {/* 时段折扣配置 */}
@@ -1458,14 +1465,14 @@ function WaterfallAddGeneral() {
                     <>
                       {/* 限时折扣开关 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: config.limitedTimeDiscount ? 12 : 16 }}>
-                        <span style={{ fontSize: 13, color: '#595959' }}>長期打折:</span>
+                        <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.longTermDiscount')}</span>
                         <Switch 
                           checked={config.limitedTimeDiscount} 
                           onChange={(checked) => handleToggleLimitedTimeDiscount(config.region, checked)}
                           size="small"
                         />
                         <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                          {config.limitedTimeDiscount ? '在指定周期内执行打折' : '限時打折'}
+                          {config.limitedTimeDiscount ? t('recommend.executeInPeriod') : t('recommend.limitedTimeDiscountLabel')}
                         </span>
                       </div>
 
@@ -1473,12 +1480,12 @@ function WaterfallAddGeneral() {
                       {config.limitedTimeDiscount && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
                           <Form.Item
-                            label="折扣周期"
+                            label={t('recommend.discountPeriod')}
                             style={{ marginBottom: 0 }}
                           >
                             <DatePicker.RangePicker
                               style={{ width: '100%' }}
-                              placeholder={['開始日期', '結束日期']}
+                              placeholder={[t('common:startDate'), t('common:endDate')]}
                               value={config.discountDateRange}
                               onChange={(dates) => handleUpdateDiscountDateRange(config.region, dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
                             />
@@ -1492,18 +1499,18 @@ function WaterfallAddGeneral() {
                         return (
                         <Form.Item
                           key={slot.key}
-                          label={`${slot.label}折扣`}
+                          label={`${t(slot.labelKey)}${t('recommend.zheUnit')}`}
                           style={{ marginBottom: 0 }}
                         >
                           {isDetailMode && (discountValue === null || discountValue === undefined) ? (
-                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: '#fafafa', border: '1px solid #e8eaed', borderRadius: 6, color: '#8c8c8c' }}>無折扣</div>
+                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: '#fafafa', border: '1px solid #e8eaed', borderRadius: 6, color: '#8c8c8c' }}>{t('recommend.noDiscount')}</div>
                           ) : (
                             <InputNumber
                               min={1}
                               max={100}
-                              placeholder={`請輸入${slot.label}折扣`}
+                              placeholder={t('recommend.slotDiscountPh', { slot: t(slot.labelKey) })}
                               style={{ width: '100%' }}
-                              addonAfter="折"
+                              addonAfter={t('recommend.zheUnit')}
                               value={discountValue}
                               onChange={(value) => handleUpdateRegionDiscount(config.region, slot.key, value)}
                             />
@@ -1527,7 +1534,7 @@ function WaterfallAddGeneral() {
             <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {/* 购买多天折扣配置（梯度） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>購買多天折扣配置（梯度）</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend.multiDayDiscount')}</span>
                 <Switch 
                   checked={gradientEnabled}
                   onChange={(checked) => {
@@ -1538,7 +1545,7 @@ function WaterfallAddGeneral() {
                   }}
                   size="small"
                 />
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.matchDiscountTip')}</span>
                 {gradientEnabled && (
                   <Button 
                     type="primary" 
@@ -1547,36 +1554,36 @@ function WaterfallAddGeneral() {
                     onClick={handleAddGradient}
                     style={{ borderRadius: 6, marginLeft: 'auto' }}
                   >
-                    添加梯度
+                    {t('recommend.addGradient')}
                   </Button>
                 )}
               </div>
               {gradientEnabled && (
                 gradients.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
-                    暫無梯度配置，請點擊右上角"添加梯度"
+                    {t('recommend.noGradientConfig')}
                   </div>
                 ) : (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   {gradients.map((gradient, index) => (
                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
-                      <Tag color="blue">梯度 {index + 1}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>購買天數≥</span>
+                      <Tag color="blue">{t('recommend.gradientN', { index: index + 1 })}</Tag>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.purchaseDaysGe')}</span>
                       <InputNumber
                         min={1}
                         max={30}
-                        placeholder="天數"
+                        placeholder={t('recommend.daysPlaceholder')}
                         style={{ width: 80 }}
                         value={gradient.count}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
-                      <span style={{ fontSize: 13, color: '#595959' }}>天，對應折扣：</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.dayUnit')}{t('recommend.correspondingDiscount')}</span>
                       <InputNumber
                         min={1}
                         max={100}
-                        placeholder="折扣"
+                        placeholder={t('recommend.discountPlaceholder')}
                         style={{ width: 80 }}
-                        addonAfter="折"
+                        addonAfter={t('recommend.zheUnit')}
                         value={gradient.discount}
                         onChange={(value) => handleUpdateGradient(index, 'discount', value)}
                       />
@@ -1602,7 +1609,7 @@ function WaterfallAddGeneral() {
                   <BarChartOutlined style={{ fontSize: 14, color: '#13c2c2' }} />
                 </div>
                 <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>
-                  時段個數折扣配置（梯度）
+                  {t('recommend.slotCountDiscountTitle')}
                 </span>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                 <Switch 
@@ -1616,7 +1623,7 @@ function WaterfallAddGeneral() {
                   size="small"
                 />
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                  購買多個時段匹配以下折扣。注意：當時段配置了折扣，則優先按時段折扣價計算；示例：早餐原價100，折扣價80，午餐原價200，無折扣，購買2個時段打6折；那麼就是（80+200）*0.6=168
+                  {t('recommend.slotCountDiscountHint')}
                 </span>
                 {gradientEnabled && (
                   <Button 
@@ -1626,36 +1633,36 @@ function WaterfallAddGeneral() {
                     onClick={handleAddGradient}
                     style={{ borderRadius: 6 }}
                   >
-                    添加梯度
+                    {t('recommend.addGradient')}
                   </Button>
                 )}
               </div>
               {gradientEnabled ? (
                 gradients.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
-                    暫無梯度配置，請點擊右上角"添加梯度"
+                    {t('recommend.noGradientConfig')}
                   </div>
                 ) : (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   {gradients.map((gradient, index) => (
                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
-                      <Tag color="blue">梯度 {index + 1}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>時段個數≥</span>
+                      <Tag color="blue">{t('recommend.gradientN', { index: index + 1 })}</Tag>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotCountGe')}</span>
                       <InputNumber
                         min={1}
                         max={6}
-                        placeholder="時段個數"
+                        placeholder={t('recommend.daysPlaceholder')}
                         style={{ width: 80 }}
                         value={gradient.count}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
-                      <span style={{ fontSize: 13, color: '#595959' }}>個時段，對應折扣：</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotCountUnit')}{t('recommend.correspondingDiscount')}</span>
                       <InputNumber
                         min={1}
                         max={100}
-                        placeholder="折扣"
+                        placeholder={t('recommend.discountPlaceholder')}
                         style={{ width: 80 }}
-                        addonAfter="折"
+                        addonAfter={t('recommend.zheUnit')}
                         value={gradient.discount}
                         onChange={(value) => handleUpdateGradient(index, 'discount', value)}
                       />
@@ -1675,12 +1682,12 @@ function WaterfallAddGeneral() {
 
           {/* 商圈选择弹窗 */}
           <Modal
-            title={replacingRegion ? '更換商圈' : '選擇商圈'}
+            title={replacingRegion ? t('recommend.replaceDistrict') : t('recommend.selectDistrictTitle')}
             open={regionSelectModalVisible}
             onCancel={() => { setRegionSelectModalVisible(false); setReplacingRegion(null) }}
             onOk={() => {
               if (!selectedRegionNode) {
-                message.warning('請選擇一個區域或商圈')
+                message.warning(t('recommend.selectRegionWarning'))
                 return
               }
               // 商圈节点 value 即 Region 枚举值（全局统一数据）；选区域（父节点）时取其首个子商圈
@@ -1690,7 +1697,7 @@ function WaterfallAddGeneral() {
               } else {
                 const first = AREA_TO_REGIONS[selectedRegionNode.value]?.[0]
                 if (!first) {
-                  message.warning('無法識別所選區域，請重新選擇')
+                  message.warning(t('recommend.regionUnrecognized'))
                   return
                 }
                 regionValue = first
@@ -1699,7 +1706,7 @@ function WaterfallAddGeneral() {
               // 更换商圈模式
               if (replacingRegion) {
                 if (regionPricingConfigs.find(c => c.region === regionValue && c.region !== replacingRegion)) {
-                  message.warning('該商圈已添加計價配置')
+                  message.warning(t('recommend.districtAlreadyAdded'))
                   return
                 }
                 setRegionPricingConfigs(configs => configs.map(c => 
@@ -1710,26 +1717,26 @@ function WaterfallAddGeneral() {
                 setSelectedRegions(regions => regions.map(r => r === replacingRegion ? regionValue : r))
                 setReplacingRegion(null)
                 setRegionSelectModalVisible(false)
-                message.success('商圈已更換')
+                message.success(t('recommend.districtReplaced'))
                 return
               }
               
               if (regionPricingConfigs.find(c => c.region === regionValue)) {
-                message.warning('該商圈已添加計價配置')
+                message.warning(t('recommend.districtAlreadyAdded'))
                 return
               }
               handleAddRegionConfig(regionValue, selectedRegionNode.title)
               setRegionSelectModalVisible(false)
             }}
-            okText="確認"
-            cancelText="取消"
+            okText={t('common:confirm')}
+            cancelText={t('common:cancel')}
             width={800}
           >
             <div style={{ display: 'flex', gap: 16, padding: '8px 0' }}>
               {/* 左侧树形结构 */}
               <div style={{ width: 240, flexShrink: 0 }}>
                 <div style={{ marginBottom: 8, fontSize: 13, color: '#8c8c8c' }}>
-                  請選擇區域或商圈：
+                  {t('recommend.selectRegionOrDistrict')}
                 </div>
                 <Tree
                   treeData={regionTreeData}
@@ -1749,9 +1756,9 @@ function WaterfallAddGeneral() {
                 />
                 {selectedRegionNode && (
                   <div style={{ marginTop: 8, padding: '8px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
-                    <span style={{ fontSize: 12, color: '#595959' }}>已選擇：</span>
+                    <span style={{ fontSize: 12, color: '#595959' }}>{t('recommend.selectedLabel')}</span>
                     <Tag color="green">{selectedRegionNode.title}</Tag>
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>({selectedRegionNode.level === 1 ? '區域' : '商圈'})</span>
+                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>({selectedRegionNode.level === 1 ? t('recommend.regionLabel') : t('recommend.districtLabel')})</span>
                   </div>
                 )}
               </div>
@@ -1786,11 +1793,11 @@ function WaterfallAddGeneral() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>訂單退款，退費比例配置</span>
-          <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>商家退款時會計算距離訂單推廣開始時間，按剩餘天數匹配退費比例；匹配成功按規則執行，反之不扣費</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.refundConfig')}</span>
+          <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>{t('recommend.refundConfigDesc')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
+            <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend.allowRefund') : t('recommend.denyRefund')}</span>
             <Switch
               size="small"
               checked={refundEnabled}
@@ -1808,12 +1815,12 @@ function WaterfallAddGeneral() {
           size="small"
           columns={[
             {
-              title: '廣告推廣',
+              title: t('recommend.adPromotionCol'),
               dataIndex: 'maxDays',
               width: 220,
               render: (_, record: { id: number; maxDays: number; feePercent: number }) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>剩餘天數 ≤</span>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.remainingDaysLE')}</span>
                   <InputNumber
                     disabled={isDetailMode}
                     min={0}
@@ -1822,15 +1829,15 @@ function WaterfallAddGeneral() {
                     onChange={(val) => {
                       setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, maxDays: val ?? 0 } : r))
                     }}
-                    addonAfter={record.maxDays === 999 ? '' : '天'}
-                    placeholder={record.maxDays === 999 ? '不限' : ''}
+                    addonAfter={record.maxDays === 999 ? '' : t('recommend.dayUnit')}
+                    placeholder={record.maxDays === 999 ? t('common:all') : ''}
                     style={{ flex: 1 }}
                   />
                 </div>
               ),
             },
             {
-              title: '比例配置',
+              title: t('recommend.ratioConfigCol'),
               dataIndex: 'feePercent',
               width: 160,
               render: (_, record: { id: number; maxDays: number; feePercent: number }) => (
@@ -1848,7 +1855,7 @@ function WaterfallAddGeneral() {
               ),
             },
             {
-              title: '操作',
+              title: t('common:action'),
               width: 120,
               align: 'center',
               render: (_: unknown, record: { id: number; maxDays: number; feePercent: number }) => {
@@ -1866,7 +1873,7 @@ function WaterfallAddGeneral() {
                           setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
                         }}
                       >
-                        新增梯度
+                        {t('recommend.addTier')}
                       </Button>
                     )}
                     <Button
@@ -1875,13 +1882,13 @@ function WaterfallAddGeneral() {
                       danger
                       onClick={() => {
                         if (cancelFeeRules.length <= 1) {
-                          message.warning('至少保留一條規則')
+                          message.warning(t('recommend.atLeastOneRule'))
                           return
                         }
                         setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
                       }}
                     >
-                      刪除
+                      {t('common:delete')}
                     </Button>
                   </Space>
                 )
@@ -1895,7 +1902,7 @@ function WaterfallAddGeneral() {
             background: '#fafafa', borderRadius: 8,
             border: '1px dashed #d9d9d9',
           }}>
-            <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置退費比例</span>
+            <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.denyRefundTip')}</span>
           </div>
         )}
       </div>
@@ -1903,19 +1910,19 @@ function WaterfallAddGeneral() {
       {/* 狀態設置 */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>狀態設置</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.statusSetting')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, color: '#595959' }}>狀態：</span>
+          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.statusLabelColon')}</span>
           <Switch
             checked={status === ServiceStatus.ENABLED}
             disabled={isDetailMode}
             onChange={(checked) => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
-            checkedChildren="啟用"
-            unCheckedChildren="停用"
+            checkedChildren={t('recommend.enableLabel')}
+            unCheckedChildren={t('recommend.disableLabel')}
           />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>停用後該定價不再對商家開放購買</span>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.disablePricingHint')}</span>
         </div>
       </div>
 
@@ -1923,7 +1930,7 @@ function WaterfallAddGeneral() {
       {!isDetailMode && (
       <div className="form-footer">
         <Button onClick={handleBack}>
-          取消
+          {t('common:cancel')}
         </Button>
         <Button
           type="primary"
@@ -1931,7 +1938,7 @@ function WaterfallAddGeneral() {
           onClick={handleSubmit}
           loading={loading}
         >
-          保存
+          {t('common:save')}
         </Button>
       </div>
       )}
@@ -1941,14 +1948,14 @@ function WaterfallAddGeneral() {
         title={
           <Space>
             <FileTextOutlined />
-            <span>算法规则配置</span>
+            <span>{t('recommend.algoRuleConfig')}</span>
           </Space>
         }
         open={algorithmRuleModalVisible}
         onCancel={() => setAlgorithmRuleModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setAlgorithmRuleModalVisible(false)}>
-            關閉
+            {t('common:close')}
           </Button>
         ]}
         width={800}
@@ -1957,52 +1964,52 @@ function WaterfallAddGeneral() {
           <div>
             <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 6 }}>
               <Space>
-                <span style={{ color: '#8c8c8c' }}>算法ID:</span>
+                <span style={{ color: '#8c8c8c' }}>{t('recommend.algoIdLabel')}</span>
                 <code style={{ background: '#fff', padding: '2px 8px', borderRadius: 4 }}>
                   {String(selectedAlgorithmInfo.id).padStart(6, '0')}
                 </code>
-                <span style={{ color: '#8c8c8c', marginLeft: 16 }}>算法名稱:</span>
+                <span style={{ color: '#8c8c8c', marginLeft: 16 }}>{t('recommend.algoNameLabelColon')}</span>
                 <strong>{selectedAlgorithmInfo.name}</strong>
               </Space>
             </div>
 
             <Divider style={{ margin: '16px 0' }} />
 
-            <h4 style={{ marginBottom: 12 }}>規則參數配置</h4>
+            <h4 style={{ marginBottom: 12 }}>{t('recommend.ruleParamConfig')}</h4>
             <div style={{ background: '#fafafa', padding: 16, borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#fff', borderBottom: '2px solid #d9d9d9' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>參數名稱</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>參數值</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>說明</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.paramNameCol')}</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.paramValueCol')}</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.descCol')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '8px 12px', fontSize: 13 }}>匹配策略</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.matchStrategyRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>weighted_score</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>加權評分匹配</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.weightedScoreMatch')}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '8px 12px', fontSize: 13 }}>召回數量</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.recallCountRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>100</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>初始召回商品數</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.initialRecallItems')}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '8px 12px', fontSize: 13 }}>精排閾值</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.fineRankThresholdRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>0.75</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>精排過濾閾值</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.fineRankFilterThreshold')}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '8px 12px', fontSize: 13 }}>重排策略</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.rerankStrategyRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>diversity_boost</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>多樣性提升重排</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.diversityBoostRerank')}</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '8px 12px', fontSize: 13 }}>打散規則</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.scatterRuleRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>category_interval=3</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>同類目間隔3個</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.categoryInterval3')}</td>
                   </tr>
                 </tbody>
               </table>
@@ -2010,23 +2017,23 @@ function WaterfallAddGeneral() {
 
             <Divider style={{ margin: '16px 0' }} />
 
-            <h4 style={{ marginBottom: 12 }}>權重配置</h4>
+            <h4 style={{ marginBottom: 12 }}>{t('recommend.weightConfigTitle')}</h4>
             <div style={{ background: '#fafafa', padding: 16, borderRadius: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
                 <div style={{ padding: 12, background: '#fff', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>銷量權重</div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.salesWeight')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#1890ff' }}>0.35</div>
                 </div>
                 <div style={{ padding: 12, background: '#fff', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>評分權重</div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.ratingWeight')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#52c41a' }}>0.25</div>
                 </div>
                 <div style={{ padding: 12, background: '#fff', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>距離權重</div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.distanceWeight')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#faad14' }}>0.20</div>
                 </div>
                 <div style={{ padding: 12, background: '#fff', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>轉化權重</div>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.conversionWeight')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#f5222d' }}>0.20</div>
                 </div>
               </div>
@@ -2042,36 +2049,36 @@ function WaterfallAddGeneral() {
             <div style={{ width: 24, height: 24, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>選擇屏蔽商家</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>{t('recommend.selectBlockMerchant')}</span>
           </div>
         }
         open={merchantModalVisible}
         onCancel={() => setMerchantModalVisible(false)}
         width={800}
         onOk={handleConfirmMerchants}
-        okText="確認選擇"
-        cancelText="取消"
+        okText={t('recommend.confirmSelectMerchants')}
+        cancelText={t('common:cancel')}
         destroyOnClose
       >
         {/* 查询条件 */}
         <div className="search-section">
           <Form form={merchantSearchForm} layout="inline" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <Form.Item label="集團" name="groupKeyword">
+            <Form.Item label={t('recommend.groupLabel')} name="groupKeyword">
               <Select
                 showSearch
                 allowClear
-                placeholder="支持集團ID及名稱搜索"
+                placeholder={t('recommend.groupSearchPh')}
                 options={groupOptions}
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
               />
             </Form.Item>
-            <Form.Item label="門店" name="storeKeyword">
+            <Form.Item label={t('recommend.storeLabel')} name="storeKeyword">
               <Select
                 showSearch
                 allowClear
-                placeholder="支持門店ID及名稱搜索"
+                placeholder={t('recommend.storeSearchPh')}
                 options={storeOptions}
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
@@ -2080,8 +2087,8 @@ function WaterfallAddGeneral() {
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
-                <Button type="primary" onClick={handleMerchantSearch}>查詢</Button>
-                <Button onClick={handleMerchantSearchReset}>重置</Button>
+                <Button type="primary" onClick={handleMerchantSearch}>{t('common:search')}</Button>
+                <Button onClick={handleMerchantSearchReset}>{t('common:reset')}</Button>
               </div>
             </Form.Item>
           </Form>
@@ -2091,7 +2098,7 @@ function WaterfallAddGeneral() {
         {tempSelectedMerchants.length > 0 && (
           <div style={{ marginBottom: 12, padding: '6px 12px', background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: '#52c41a', fontWeight: 500 }}>
-              已選擇 {tempSelectedMerchants.length} 個商家
+              {t('recommend.merchantsSelectedCount', { count: tempSelectedMerchants.length })}
             </span>
             <Space size={4} wrap>
               {tempSelectedMerchants.slice(0, 5).map(m => (
@@ -2106,7 +2113,7 @@ function WaterfallAddGeneral() {
                 </Tag>
               ))}
               {tempSelectedMerchants.length > 5 && (
-                <Tag color="blue" style={{ margin: 0 }}>+{tempSelectedMerchants.length - 5} 更多</Tag>
+                <Tag color="blue" style={{ margin: 0 }}>+{tempSelectedMerchants.length - 5} {t('recommend.moreCount', { count: tempSelectedMerchants.length - 5 })}</Tag>
               )}
             </Space>
           </div>
@@ -2120,7 +2127,7 @@ function WaterfallAddGeneral() {
             pageSize: 10,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common:total', { count: total }),
             size: 'small',
           }}
           size="small"
@@ -2136,25 +2143,25 @@ function WaterfallAddGeneral() {
           }}
           columns={[
             {
-              title: '集團ID',
+              title: t('common:colGroupId'),
               dataIndex: 'groupId',
               key: 'groupId',
               width: 100,
             },
             {
-              title: '集團名稱',
+              title: t('common:colGroupName'),
               dataIndex: 'groupName',
               key: 'groupName',
               width: 140,
             },
             {
-              title: '門店ID',
+              title: t('common:colStoreId'),
               dataIndex: 'storeId',
               key: 'storeId',
               width: 100,
             },
             {
-              title: '門店名稱',
+              title: t('common:colStoreName'),
               dataIndex: 'storeName',
               key: 'storeName',
             },

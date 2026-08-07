@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Popover, TreeSelect } from 'antd'
 const { RangePicker } = DatePicker
 import { SearchOutlined, ExportOutlined, ArrowLeftOutlined, ShoppingCartOutlined } from '@ant-design/icons'
@@ -18,16 +19,6 @@ enum OrderStatus {
   REFUNDED = 6,
 }
 
-// 订单状态标签
-const ORDER_STATUS_MAP: Record<OrderStatus, { label: string; color: string }> = {
-  [OrderStatus.PENDING_PROMOTION]: { label: '待推廣', color: 'blue' },
-  [OrderStatus.PROMOTING]: { label: '推廣中', color: 'green' },
-  [OrderStatus.PROMOTED]: { label: '已完成', color: 'purple' },
-  [OrderStatus.CANCELLED]: { label: '已取消', color: 'red' },
-  [OrderStatus.ABORTED]: { label: '已中止', color: 'orange' },
-  [OrderStatus.REFUNDED]: { label: '已退款', color: 'red' },
-}
-
 import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
 import { AlgorithmType } from '../Recommend/constants'
 import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
@@ -38,22 +29,11 @@ enum AppType {
   MFOOD = 2,
 }
 
-const APP_LABEL: Record<AppType, string> = {
-  [AppType.SHANFENG]: BRAND_SHANFENG_LABEL,
-  [AppType.MFOOD]: 'mFood',
-}
-
 // 业务频道枚举
 enum RecommendChannel {
   DELIVERY = 2,
   GROUP_BUY = 3,
   SUPERMARKET = 4,
-}
-
-const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.DELIVERY]: '美食外賣',
-  [RecommendChannel.GROUP_BUY]: '團購到店',
-  [RecommendChannel.SUPERMARKET]: '超市百貨',
 }
 
 // 商圈枚举（与地圖規劃商圈数据一致）
@@ -71,53 +51,11 @@ enum Region {
   HACS = 11,          // 黑沙灘區
 }
 
-const REGION_LABEL: Record<number, string> = {
-  [Region.KOKSAA]: '黑沙環區',
-  [Region.COSTA]: '高士德區',
-  [Region.SANMA]: '新馬路區',
-  [Region.SANWONG]: '新皇朝區',
-  [Region.HKM]: '港珠澳區',
-  [Region.FAHUA]: '花城市區',
-  [Region.AIRPORT]: '北安機場',
-  [Region.LHOTEL]: '左酒店區',
-  [Region.RHOTEL]: '右酒店區',
-  [Region.UM]: '澳大專區',
-  [Region.HACS]: '黑沙灘區',
-}
-
-/** 商圈树形数据（一级：区域，二级：商圈） */
-const REGION_TREE_DATA = [
-  {
-    value: 'macau_area',
-    title: '澳門區域',
-    selectable: true,
-    children: [
-      { value: Region.KOKSAA, title: '黑沙環區' },
-      { value: Region.COSTA, title: '高士德區' },
-      { value: Region.SANMA, title: '新馬路區' },
-      { value: Region.SANWONG, title: '新皇朝區' },
-      { value: Region.HKM, title: '港珠澳區' },
-    ],
-  },
-  {
-    value: 'taipa_area',
-    title: '氹仔區域',
-    selectable: true,
-    children: [
-      { value: Region.FAHUA, title: '花城市區' },
-      { value: Region.AIRPORT, title: '北安機場' },
-      { value: Region.LHOTEL, title: '左酒店區' },
-      { value: Region.RHOTEL, title: '右酒店區' },
-      { value: Region.UM, title: '澳大專區' },
-      { value: Region.HACS, title: '黑沙灘區' },
-    ],
-  },
-]
-
 // 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致）
 type RecommendType = AlgorithmType
 const RecommendType = AlgorithmType
 
+// 推薦類型中文名（URL 參數協議：AdSales 跳轉時傳入中文名，與語言無關）
 const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
   [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
@@ -252,11 +190,92 @@ function toOrderItem(vo: AdOrder): OrderItem {
 
 export default function PromotionOrderManage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const orderType = searchParams.get('type') || ''
   // 来源标识：从「廣告銷售」(ad-sales) 进入则返回广告销售，否则返回「店鋪推廣」
   const fromSource = searchParams.get('from') || ''
   const backPath = fromSource === 'ad-sales' ? '/ad-sales' : '/promotion-sales-config'
+
+  // 枚舉標籤（依賴 t，定義在組件內以便響應語言切換）
+  const statusLabel = (v: OrderStatus) => {
+    const map: Partial<Record<OrderStatus, { label: string; color: string }>> = {
+      [OrderStatus.PENDING_PROMOTION]: { label: t('promotionOrderManage.statusPending'), color: 'blue' },
+      [OrderStatus.PROMOTING]: { label: t('promotionOrderManage.statusPromoting'), color: 'green' },
+      [OrderStatus.PROMOTED]: { label: t('promotionOrderManage.statusCompleted'), color: 'purple' },
+      [OrderStatus.CANCELLED]: { label: t('promotionOrderManage.statusCancelled'), color: 'red' },
+      [OrderStatus.ABORTED]: { label: t('promotionOrderManage.statusAborted'), color: 'orange' },
+      [OrderStatus.REFUNDED]: { label: t('promotionOrderManage.statusRefunded'), color: 'red' },
+    }
+    return map[v] || { label: String(v), color: 'default' }
+  }
+  const appLabel = (v: AppType) => (v === AppType.SHANFENG ? t('common.flashBee') : 'mFood')
+  const channelLabel = (v: RecommendChannel) => ({
+    [RecommendChannel.DELIVERY]: t('promotionOrderManage.chDelivery'),
+    [RecommendChannel.GROUP_BUY]: t('promotionOrderManage.chGroupBuy'),
+    [RecommendChannel.SUPERMARKET]: t('promotionOrderManage.chSupermarket'),
+  }[v])
+  const regionLabel = (v: Region) => {
+    const map: Record<number, string> = {
+      [Region.KOKSAA]: t('promotionOrderManage.regionKoksaa'),
+      [Region.COSTA]: t('promotionOrderManage.regionCosta'),
+      [Region.SANMA]: t('promotionOrderManage.regionSanma'),
+      [Region.SANWONG]: t('promotionOrderManage.regionSanwong'),
+      [Region.HKM]: t('promotionOrderManage.regionHkm'),
+      [Region.FAHUA]: t('promotionOrderManage.regionFahua'),
+      [Region.AIRPORT]: t('promotionOrderManage.regionAirport'),
+      [Region.LHOTEL]: t('promotionOrderManage.regionLhotel'),
+      [Region.RHOTEL]: t('promotionOrderManage.regionRhotel'),
+      [Region.UM]: t('promotionOrderManage.regionUm'),
+      [Region.HACS]: t('promotionOrderManage.regionHacs'),
+    }
+    return map[v] || String(v)
+  }
+  const recommendTypeLabel = (v: RecommendType) => {
+    const map: Partial<Record<RecommendType, string>> = {
+      [RecommendType.INVINCIBLE_STAR]: t('promotionReport.recTypeInvincibleStar'),
+      [RecommendType.HOT_REVIVE_AD]: t('promotionReport.recTypeHotRevive'),
+      [RecommendType.NEW_STORE_AD]: t('promotionReport.recTypeNewStore'),
+      [RecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
+      [RecommendType.POPULAR_MERCHANT_KA]: t('promotionOrderManage.recTypePopular'),
+    }
+    return map[v] || String(v)
+  }
+
+  // 商圈樹形數據（title 依賴 t，定義在組件內）
+  const regionTreeData = [
+    {
+      value: 'macau_area',
+      title: t('promotionOrderManage.areaMacau'),
+      selectable: true,
+      children: [
+        { value: Region.KOKSAA, title: t('promotionOrderManage.regionKoksaa') },
+        { value: Region.COSTA, title: t('promotionOrderManage.regionCosta') },
+        { value: Region.SANMA, title: t('promotionOrderManage.regionSanma') },
+        { value: Region.SANWONG, title: t('promotionOrderManage.regionSanwong') },
+        { value: Region.HKM, title: t('promotionOrderManage.regionHkm') },
+      ],
+    },
+    {
+      value: 'taipa_area',
+      title: t('promotionOrderManage.areaTaipa'),
+      selectable: true,
+      children: [
+        { value: Region.FAHUA, title: t('promotionOrderManage.regionFahua') },
+        { value: Region.AIRPORT, title: t('promotionOrderManage.regionAirport') },
+        { value: Region.LHOTEL, title: t('promotionOrderManage.regionLhotel') },
+        { value: Region.RHOTEL, title: t('promotionOrderManage.regionRhotel') },
+        { value: Region.UM, title: t('promotionOrderManage.regionUm') },
+        { value: Region.HACS, title: t('promotionOrderManage.regionHacs') },
+      ],
+    },
+  ]
+
+  // URL 參數為中文類型名（AdSales 傳入），反查枚舉值用於過濾
+  const orderTypeKey = useMemo(() => {
+    const entry = Object.entries(RECOMMEND_TYPE_LABEL).find(([, label]) => label === orderType)
+    return entry ? (Number(entry[0]) as RecommendType) : undefined
+  }, [orderType])
 
   // 訂單數據：直接調用後端 API
   const [orders, setOrders] = useState<OrderItem[]>([])
@@ -293,9 +312,8 @@ export default function PromotionOrderManage() {
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       // 按URL参数中的订单类型过滤
-      if (orderType) {
-        const typeName = RECOMMEND_TYPE_LABEL[order.recommendType]
-        if (typeName !== orderType) return false
+      if (orderTypeKey !== undefined && order.recommendType !== orderTypeKey) {
+        return false
       }
       if (filters.orderNo && !order.orderNo.includes(filters.orderNo)) {
         return false
@@ -353,35 +371,35 @@ export default function PromotionOrderManage() {
 
   // 列配置元数据
   const columnMeta = useMemo(() => [
-    { key: 'orderNo', title: '訂單編號' },
-    { key: 'groupInfo', title: '集團ID/集團名稱' },
-    { key: 'storeInfo', title: '門店ID/門店名稱' },
-    { key: 'algorithmInfo', title: '算法ID/算法名稱' },
-    { key: 'app', title: '所屬品牌' },
-    { key: 'channel', title: '業務頻道' },
-    { key: 'region', title: '所屬商圈' },
-    { key: 'purchaseContent', title: orderType === '無敵星星' ? '購買時段' : (orderType === '盤活復蘇' || orderType === '新店廣告') ? '推廣天數' : orderType === '人氣商家' ? '皮膚套件/推廣天數' : '購買內容' },
+    { key: 'orderNo', title: t('promotionOrderManage.colOrderNo') },
+    { key: 'groupInfo', title: t('promotionOrderManage.colGroupInfo') },
+    { key: 'storeInfo', title: t('promotionOrderManage.colStoreInfo') },
+    { key: 'algorithmInfo', title: t('promotionOrderManage.colAlgorithmInfo') },
+    { key: 'app', title: t('common.colBrand') },
+    { key: 'channel', title: t('common.colChannel') },
+    { key: 'region', title: t('promotionOrderManage.colRegion') },
+    { key: 'purchaseContent', title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colSkinDays') : t('promotionOrderManage.purchaseContent') },
     ...(orderType !== '新店廣告' ? [
-      { key: 'originalPrice', title: '訂單金額' },
-      { key: 'discount', title: '優惠金額' },
-      { key: 'actualPrice', title: '實付推廣金額' },
+      { key: 'originalPrice', title: t('promotionOrderManage.colOrderAmount') },
+      { key: 'discount', title: t('promotionOrderManage.colDiscount') },
+      { key: 'actualPrice', title: t('promotionOrderManage.colActualPay') },
     ] : []),
-    { key: 'status', title: '訂單狀態' },
+    { key: 'status', title: t('promotionOrderManage.colOrderStatus') },
     ...(orderType === '新店廣告' ? [
-      { key: 'cancelOperator', title: '取消人' },
-      { key: 'cancelTime', title: '取消時間' },
+      { key: 'cancelOperator', title: t('promotionOrderManage.colCancelOperator') },
+      { key: 'cancelTime', title: t('promotionOrderManage.colCancelTime') },
     ] : orderType === '人氣商家' ? [
-      { key: 'refundOperator', title: '退款人' },
-      { key: 'refundTime', title: '退款時間' },
+      { key: 'refundOperator', title: t('promotionOrderManage.colRefundOperator') },
+      { key: 'refundTime', title: t('promotionOrderManage.colRefundTime') },
     ] : [
-      { key: 'refundAmount', title: '退款推廣金額' },
-      { key: 'refundOperator', title: '退款人' },
-      { key: 'refundTime', title: '退款時間' },
+      { key: 'refundAmount', title: t('promotionOrderManage.colRefundAmount') },
+      { key: 'refundOperator', title: t('promotionOrderManage.colRefundOperator') },
+      { key: 'refundTime', title: t('promotionOrderManage.colRefundTime') },
     ]),
-    { key: 'operator', title: '下單人' },
-    { key: 'orderTime', title: '下單時間' },
-    { key: 'action', title: '操作' },
-  ], [orderType])
+    { key: 'operator', title: t('promotionOrderManage.colOperator') },
+    { key: 'orderTime', title: t('promotionOrderManage.colOrderTime') },
+    { key: 'action', title: t('common.colAction') },
+  ], [orderType, t])
 
   const { configComponent, applyConfig } = useColumnConfig('promotion-order-manage', columnMeta, [
     { key: 'orderNo', visible: true, locked: 'head' as const },
@@ -391,14 +409,14 @@ export default function PromotionOrderManage() {
   // 表格列定义
   const columns: ColumnsType<OrderItem> = [
     {
-      title: '訂單編號',
+      title: t('promotionOrderManage.colOrderNo'),
       dataIndex: 'orderNo',
       key: 'orderNo',
       width: 180,
       fixed: 'left',
     },
     {
-      title: '集團ID/集團名稱',
+      title: t('promotionOrderManage.colGroupInfo'),
       key: 'groupInfo',
       width: 180,
       render: (_, record) => (
@@ -409,7 +427,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '門店ID/門店名稱',
+      title: t('promotionOrderManage.colStoreInfo'),
       key: 'storeInfo',
       width: 180,
       render: (_, record) => (
@@ -420,7 +438,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '算法ID/算法名稱',
+      title: t('promotionOrderManage.colAlgorithmInfo'),
       key: 'algorithmInfo',
       width: 180,
       render: (_, record) => (
@@ -431,7 +449,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '所屬品牌',
+      title: t('common.colBrand'),
       dataIndex: 'app',
       key: 'app',
       width: 100,
@@ -440,14 +458,14 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '業務頻道',
+      title: t('common.colChannel'),
       dataIndex: 'channel',
       key: 'channel',
       width: 120,
-      render: (channel: RecommendChannel) => CHANNEL_LABEL[channel],
+      render: (channel: RecommendChannel) => channelLabel(channel),
     },
     {
-      title: '所屬商圈',
+      title: t('promotionOrderManage.colRegion'),
       dataIndex: 'region',
       key: 'region',
       width: 220,
@@ -462,7 +480,7 @@ export default function PromotionOrderManage() {
           <Space direction="vertical" size={4}>
             {regions.map((r, index) => (
               <Tag key={index} color="blue" style={{ margin: 0 }}>
-                {REGION_LABEL[r]}
+                {regionLabel(r)}
               </Tag>
             ))}
           </Space>
@@ -472,18 +490,18 @@ export default function PromotionOrderManage() {
           <Space direction="vertical" size={2}>
             {visibleRegions.map((r, index) => (
               <Tag key={index} color="blue" style={{ margin: 0 }}>
-                {REGION_LABEL[r]}
+                {regionLabel(r)}
               </Tag>
             ))}
             {hasMore && (
               <Popover
                 content={allContent}
-                title="全部所屬商圈"
+                title={t('promotionOrderManage.allRegions')}
                 trigger="click"
                 placement="bottomLeft"
               >
                 <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
-                  +{hiddenRegions.length} 更多
+                  {t('promotionOrderManage.moreLabel', { count: hiddenRegions.length })}
                 </Button>
               </Popover>
             )}
@@ -492,7 +510,7 @@ export default function PromotionOrderManage() {
       },
     },
     {
-      title: orderType === '無敵星星' ? '購買時段' : (orderType === '盤活復蘇' || orderType === '新店廣告') ? '推廣天數' : orderType === '人氣商家' ? '皮膚套件/推廣天數' : '購買內容',
+      title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colSkinDays') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
       width: 220,
       render: (_, record) => {
@@ -507,22 +525,22 @@ export default function PromotionOrderManage() {
                   <Tag key={index} color="green" style={{ margin: 0 }}>
                     {date}
                   </Tag>
-                )) : <span style={{ fontSize: 12, color: '#8c8c8c' }}>具體投放日期請查看訂單詳情</span>}
+                )) : <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('promotionOrderManage.viewDatesTip')}</span>}
               </Space>
             )
 
             return (
               <Popover
                 content={dateContent}
-                title="推廣日期明細"
+                title={t('promotionOrderManage.dateDetailTitle')}
                 trigger="click"
                 placement="bottomLeft"
               >
                 <Space size={4} style={{ cursor: 'pointer' }}>
                   {record.skinName && <Tag color="geekblue" style={{ margin: 0 }}>{record.skinName}</Tag>}
-                  <Tag color="green" style={{ margin: 0 }}>{days}天</Tag>
+                  <Tag color="green" style={{ margin: 0 }}>{t('promotionOrderManage.daysUnit', { count: days })}</Tag>
                   <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12, color: '#1890ff' }}>
-                    查看
+                    {t('promotionOrderManage.view')}
                   </Button>
                 </Space>
               </Popover>
@@ -557,12 +575,12 @@ export default function PromotionOrderManage() {
               {hasMore && (
                 <Popover
                   content={slotContent}
-                  title="全部購買時段"
+                  title={t('promotionOrderManage.allSlots')}
                   trigger="click"
                   placement="bottomLeft"
                 >
                   <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
-                    +{hiddenSlots.length} 更多
+                    {t('promotionOrderManage.moreLabel', { count: hiddenSlots.length })}
                   </Button>
                 </Popover>
               )}
@@ -574,14 +592,14 @@ export default function PromotionOrderManage() {
     },
     // 新店廣告：無金額字段，跳過
     ...(orderType !== '新店廣告' ? [{
-      title: '訂單金額',
+      title: t('promotionOrderManage.colOrderAmount'),
       dataIndex: 'originalPrice',
       key: 'originalPrice',
       width: 120,
       render: (price: number) => `$${price}`,
     },
     {
-      title: '優惠金額',
+      title: t('promotionOrderManage.colDiscount'),
       key: 'discount',
       width: 120,
       render: (_: unknown, record: OrderItem) => (
@@ -591,7 +609,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: '實付推廣金額',
+      title: t('promotionOrderManage.colActualPay'),
       dataIndex: 'actualPrice',
       key: 'actualPrice',
       width: 120,
@@ -601,7 +619,7 @@ export default function PromotionOrderManage() {
     }
     ] : []),
     {
-      title: '訂單狀態',
+      title: t('promotionOrderManage.colOrderStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
@@ -612,13 +630,13 @@ export default function PromotionOrderManage() {
         if (!keepCancelDisplay && (status === OrderStatus.CANCELLED || status === OrderStatus.ABORTED)) {
           displayStatus = OrderStatus.REFUNDED
         }
-        const { label, color } = ORDER_STATUS_MAP[displayStatus]
+        const { label, color } = statusLabel(displayStatus)
         return <Tag color={color}>{label}</Tag>
       },
     },
     // 退款推廣金額 - 僅無敵星星和盤活復蘇顯示，放在訂單狀態後面
     ...(orderType !== '新店廣告' && orderType !== '人氣商家' ? [{
-      title: '退款推廣金額',
+      title: t('promotionOrderManage.colRefundAmount'),
       dataIndex: 'refundAmount',
       key: 'refundAmount',
       width: 120,
@@ -629,7 +647,7 @@ export default function PromotionOrderManage() {
     }] : []),
     // 退款人 - 無敵星星/盤活復蘇/人氣商家顯示
     ...(orderType !== '新店廣告' ? [{
-      title: '退款人',
+      title: t('promotionOrderManage.colRefundOperator'),
       key: 'refundOperator',
       width: 160,
       render: (_: unknown, record: OrderItem) => {
@@ -644,7 +662,7 @@ export default function PromotionOrderManage() {
     }] : []),
     // 退款時間 - 無敵星星/盤活復蘇/人氣商家顯示
     ...(orderType !== '新店廣告' ? [{
-      title: '退款時間',
+      title: t('promotionOrderManage.colRefundTime'),
       dataIndex: 'refundTime',
       key: 'refundTime',
       width: 160,
@@ -652,7 +670,7 @@ export default function PromotionOrderManage() {
     }] : []),
     // 取消人 - 僅新店廣告顯示
     ...(orderType === '新店廣告' ? [{
-      title: '取消人',
+      title: t('promotionOrderManage.colCancelOperator'),
       key: 'cancelOperator',
       width: 160,
       render: (_: unknown, record: OrderItem) => {
@@ -666,14 +684,14 @@ export default function PromotionOrderManage() {
       },
     },
     {
-      title: '取消時間',
+      title: t('promotionOrderManage.colCancelTime'),
       dataIndex: 'cancelTime',
       key: 'cancelTime',
       width: 160,
       render: (time: string | undefined) => time || <span style={{ color: '#bfbfbf' }}>-</span>,
     }] : []),
     {
-      title: '下單人',
+      title: t('promotionOrderManage.colOperator'),
       key: 'operator',
       width: 160,
       render: (_: unknown, record: OrderItem) => {
@@ -687,13 +705,13 @@ export default function PromotionOrderManage() {
       },
     },
     {
-      title: '下單時間',
+      title: t('promotionOrderManage.colOrderTime'),
       dataIndex: 'orderTime',
       key: 'orderTime',
       width: 160,
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 100,
       fixed: 'right',
@@ -703,7 +721,7 @@ export default function PromotionOrderManage() {
           size="small"
           onClick={() => navigate(`/order-detail?id=${record.id}&type=${encodeURIComponent(orderType)}${fromSource ? `&from=${encodeURIComponent(fromSource)}` : ''}`)}
         >
-          詳情
+          {t('promotionOrderManage.detail')}
         </Button>
       ),
     },
@@ -731,13 +749,13 @@ export default function PromotionOrderManage() {
 
   // 新增订单
   const _handleAdd = () => {
-    message.info('新增訂單功能開發中')
+    message.info(t('common.underDev'))
     // TODO: 实现新增订单逻辑
   }
 
   // 导出订单
   const handleExport = () => {
-    message.success('導出成功')
+    message.success(t('common.exportSuccess'))
     // TODO: 实现导出逻辑
   }
 
@@ -768,12 +786,12 @@ export default function PromotionOrderManage() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common.back')}</Button>
             {/* 分隔线 */}
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             {/* 标题区 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>訂單列表</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('promotionOrderManage.orderListTitle')}</h2>
               {orderType && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,
@@ -781,11 +799,10 @@ export default function PromotionOrderManage() {
                   border: '1px solid #FFD591', borderRadius: 4,
                   fontSize: 13, color: '#E8720C', fontWeight: 500,
                 }}>
-                  {(() => {
-                    const typeKey = Number(Object.entries(RECOMMEND_TYPE_LABEL).find(([_, label]) => label === orderType)?.[0]) as RecommendType
-                    return <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_ICON[typeKey]}</span>
-                  })()}
-                  {orderType}
+                  {orderTypeKey !== undefined && (
+                    <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_ICON[orderTypeKey]}</span>
+                  )}
+                  {orderTypeKey !== undefined ? recommendTypeLabel(orderTypeKey) : orderType}
                 </div>
               )}
             </div>
@@ -799,54 +816,54 @@ export default function PromotionOrderManage() {
               boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex', alignItems: 'center', gap: 6,
-            }}>購買廣告</Button>
+            }}>{t('promotionOrderManage.buyAd')}</Button>
         </div>
       </div>
 
       {/* 搜索区域 */}
       <div className="search-section">
         <Form layout="inline">
-            <Form.Item label="訂單編號">
+            <Form.Item label={t('promotionOrderManage.colOrderNo')}>
               <Input
-                placeholder="請輸入訂單編號"
+                placeholder={t('promotionOrderManage.orderNoPlaceholder')}
                 allowClear
                 value={filters.orderNo}
                 onChange={e => setFilters({ ...filters, orderNo: e.target.value })}
               />
             </Form.Item>
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('common.colBrand')}>
               <Select
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 value={filters.app}
                 onChange={value => setFilters({ ...filters, app: value })}
                 options={Object.values(AppType)
                   .filter(v => typeof v === 'number')
                   .map(app => ({
-                    label: APP_LABEL[app],
+                    label: appLabel(app),
                     value: app,
                   }))}
               />
             </Form.Item>
-            <Form.Item label="業務頻道">
+            <Form.Item label={t('common.colChannel')}>
               <Select
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 value={filters.channel}
                 onChange={value => setFilters({ ...filters, channel: value })}
                 options={Object.values(RecommendChannel)
                   .filter(v => typeof v === 'number')
                   .map(channel => ({
-                    label: CHANNEL_LABEL[channel],
+                    label: channelLabel(channel),
                     value: channel,
                   }))}
               />
             </Form.Item>
-            <Form.Item label="集團ID/名稱">
+            <Form.Item label={t('promotionOrderManage.colGroupSearch')}>
               <Select
                 showSearch
                 allowClear
-                placeholder="支持ID和名稱搜索查詢"
+                placeholder={t('promotionOrderManage.placeholderIdName')}
                 optionFilterProp="label"
                 value={filters.groupInfo}
                 onChange={val => setFilters({ ...filters, groupInfo: val })}
@@ -858,11 +875,11 @@ export default function PromotionOrderManage() {
                 style={{ width: '100%' }}
               />
             </Form.Item>
-            <Form.Item label="門店ID/名稱">
+            <Form.Item label={t('promotionOrderManage.colStoreSearch')}>
               <Select
                 showSearch
                 allowClear
-                placeholder="支持ID和名稱搜索查詢"
+                placeholder={t('promotionOrderManage.placeholderIdName')}
                 optionFilterProp="label"
                 value={filters.storeInfo}
                 onChange={val => setFilters({ ...filters, storeInfo: val })}
@@ -876,11 +893,11 @@ export default function PromotionOrderManage() {
                 style={{ width: '100%' }}
               />
             </Form.Item>
-            <Form.Item label="算法名稱">
+            <Form.Item label={t('promotionOrderManage.colAlgoName')}>
               <Select
                 showSearch
                 allowClear
-                placeholder="支持ID或名稱查詢"
+                placeholder={t('promotionOrderManage.placeholderIdName')}
                 value={filters.algorithmKeyword || undefined}
                 onChange={value => setFilters({ ...filters, algorithmKeyword: value || '' })}
                 filterOption={(input, option) => {
@@ -900,22 +917,22 @@ export default function PromotionOrderManage() {
                 }
               />
             </Form.Item>
-            <Form.Item label="推廣商圈">
+            <Form.Item label={t('promotionOrderManage.colPromoRegion')}>
               <TreeSelect
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 showSearch
                 treeDefaultExpandAll
                 treeNodeFilterProp="title"
                 value={filters.region}
                 onChange={value => setFilters({ ...filters, region: value })}
-                treeData={REGION_TREE_DATA}
+                treeData={regionTreeData}
                 style={{ width: '100%' }}
               />
             </Form.Item>
-            <Form.Item label="訂單狀態">
+            <Form.Item label={t('promotionOrderManage.colOrderStatus')}>
               <Select
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 value={filters.status}
                 onChange={value => setFilters({ ...filters, status: value })}
@@ -934,65 +951,65 @@ export default function PromotionOrderManage() {
                     return status !== OrderStatus.CANCELLED && status !== OrderStatus.ABORTED
                   })
                   .map(status => ({
-                    label: ORDER_STATUS_MAP[status as OrderStatus].label,
+                    label: statusLabel(status as OrderStatus).label,
                     value: status,
                   }))}
               />
             </Form.Item>
-            <Form.Item label="下單時間">
+            <Form.Item label={t('promotionOrderManage.colOrderTime')}>
               <RangePicker style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item label="推廣時間">
+            <Form.Item label={t('promotionOrderManage.colPromoTime')}>
               <RangePicker style={{ width: '100%' }} />
             </Form.Item>
             {orderType !== '新店廣告' && (
               <>
-                <Form.Item label="退款人">
+                <Form.Item label={t('promotionOrderManage.colRefundOperator')}>
                   <Input
-                    placeholder="工號/門店ID/姓名"
+                    placeholder={t('promotionOrderManage.operatorIdNamePlaceholder')}
                     allowClear
                     value={filters.refundOperatorKeyword}
                     onChange={e => setFilters({ ...filters, refundOperatorKeyword: e.target.value })}
                   />
                 </Form.Item>
-                <Form.Item label="退款時間">
+                <Form.Item label={t('promotionOrderManage.colRefundTime')}>
                   <RangePicker style={{ width: '100%' }} />
                 </Form.Item>
               </>
             )}
             {orderType === '人氣商家' && (
               <>
-                <Form.Item label="退款人">
+                <Form.Item label={t('promotionOrderManage.colRefundOperator')}>
                   <Input
-                    placeholder="工號/姓名"
+                    placeholder={t('promotionOrderManage.operatorNamePlaceholder')}
                     allowClear
                     value={filters.refundOperatorKeyword}
                     onChange={e => setFilters({ ...filters, refundOperatorKeyword: e.target.value })}
                   />
                 </Form.Item>
-                <Form.Item label="退款時間">
+                <Form.Item label={t('promotionOrderManage.colRefundTime')}>
                   <RangePicker style={{ width: '100%' }} />
                 </Form.Item>
               </>
             )}
             {orderType === '新店廣告' && (
               <>
-                <Form.Item label="取消人">
+                <Form.Item label={t('promotionOrderManage.colCancelOperator')}>
                   <Input
-                    placeholder="工號/姓名"
+                    placeholder={t('promotionOrderManage.operatorNamePlaceholder')}
                     allowClear
                     value={filters.cancelOperatorKeyword}
                     onChange={e => setFilters({ ...filters, cancelOperatorKeyword: e.target.value })}
                   />
                 </Form.Item>
-                <Form.Item label="取消時間">
+                <Form.Item label={t('promotionOrderManage.colCancelTime')}>
                   <RangePicker style={{ width: '100%' }} />
                 </Form.Item>
               </>
             )}
-            <Form.Item label="下單人">
+            <Form.Item label={t('promotionOrderManage.colOperator')}>
               <Input
-                placeholder="工號/門店ID/姓名"
+                placeholder={t('promotionOrderManage.operatorIdNamePlaceholder')}
                 allowClear
                 value={filters.operatorKeyword}
                 onChange={e => setFilters({ ...filters, operatorKeyword: e.target.value })}
@@ -1001,9 +1018,9 @@ export default function PromotionOrderManage() {
             <Form.Item>
               <div className="search-actions">
                 <Button type="primary" icon={<SearchOutlined />}>
-                  查詢
+                  {t('common.search')}
                 </Button>
-                <Button onClick={handleReset}>重置</Button>
+                <Button onClick={handleReset}>{t('common.reset')}</Button>
               </div>
             </Form.Item>
           </Form>
@@ -1013,7 +1030,7 @@ export default function PromotionOrderManage() {
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            導出
+            {t('common.export')}
           </Button>
         </Space>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1035,12 +1052,12 @@ export default function PromotionOrderManage() {
           pagination={{
             total: filteredOrders.length,
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50'],
           }}
-          locale={{ emptyText: '暫無訂單數據' }}
+          locale={{ emptyText: t('promotionOrderManage.emptyText') }}
         />
     </div>
   )

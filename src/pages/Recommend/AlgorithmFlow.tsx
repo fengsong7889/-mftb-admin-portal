@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Space, Tag, Tooltip, message, Modal, Input, Popconfirm } from 'antd'
 import {
   ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, ExpandOutlined,
@@ -282,12 +283,54 @@ const _CUSTOM_EDGES_KEY = 'algorithm-flow-custom-edges'
 
 /* ===== 节点面板配置 ===== */
 const NODE_PALETTE = [
-  { type: 'terminal', label: '開始/結束', icon: '🟢', color: '#52C41A', desc: '流程起止點' },
-  { type: 'stage', label: '階段標題', icon: '📋', color: '#1890FF', desc: '階段分組標題' },
-  { type: 'process', label: '流程步驟', icon: '📝', color: '#1890FF', desc: '具體操作步驟' },
-  { type: 'decision', label: '決策/判斷', icon: '⚖️', color: '#FAAD14', desc: '判斷條件節點' },
-  { type: 'system', label: '系統處理', icon: '⚙️', color: '#722ED1', desc: '系統自動處理' },
+  { type: 'terminal', labelKey: 'recommend.flowPaletteStartEnd', icon: '🟢', color: '#52C41A', descKey: 'recommend.flowPaletteStartEndDesc' },
+  { type: 'stage', labelKey: 'recommend.flowPaletteStage', icon: '📋', color: '#1890FF', descKey: 'recommend.flowPaletteStageDesc' },
+  { type: 'process', labelKey: 'recommend.flowPaletteProcess', icon: '📝', color: '#1890FF', descKey: 'recommend.flowPaletteProcessDesc' },
+  { type: 'decision', labelKey: 'recommend.flowPaletteDecision', icon: '⚖️', color: '#FAAD14', descKey: 'recommend.flowPaletteDecisionDesc' },
+  { type: 'system', labelKey: 'recommend.flowPaletteSystem', icon: '⚙️', color: '#722ED1', descKey: 'recommend.flowPaletteSystemDesc' },
 ]
+
+/** 初始節點翻譯 key 映射 */
+const NODE_I18N: Record<string, { labelKey: string; descKey?: string }> = {
+  start: { labelKey: 'recommend.flowStart', descKey: 'recommend.flowStartDesc' },
+  stg1: { labelKey: 'recommend.flowStage1', descKey: 'recommend.flowStage1Desc' },
+  n1a: { labelKey: 'recommend.flowCreateAlgo', descKey: 'recommend.flowCreateAlgoDesc' },
+  n1b: { labelKey: 'recommend.flowConfigAlgoParams', descKey: 'recommend.flowConfigAlgoParamsDesc' },
+  n1c: { labelKey: 'recommend.flowEnableAlgo', descKey: 'recommend.flowEnableAlgoDesc' },
+  stg2: { labelKey: 'recommend.flowStage2', descKey: 'recommend.flowStage1Desc' },
+  n2a: { labelKey: 'recommend.flowRefAlgo', descKey: 'recommend.flowRefAlgoDesc' },
+  n2b: { labelKey: 'recommend.flowSelectWaterfall', descKey: 'recommend.flowSelectWaterfallDesc' },
+  n2c: { labelKey: 'recommend.flowAssignSlot', descKey: 'recommend.flowAssignSlotDesc' },
+  stg3: { labelKey: 'recommend.flowStage3', descKey: 'recommend.flowStage1Desc' },
+  n3a: { labelKey: 'recommend.flowAddAdSell', descKey: 'recommend.flowAddAdSellDesc' },
+  n3b: { labelKey: 'recommend.flowSelectSlot', descKey: 'recommend.flowSelectSlotDesc' },
+  n3c: { labelKey: 'recommend.flowSelectRegion', descKey: 'recommend.flowSelectRegionDesc' },
+  n3d: { labelKey: 'recommend.flowConfigRegionPrice', descKey: 'recommend.flowConfigRegionPriceDesc' },
+  stg4: { labelKey: 'recommend.flowStage4', descKey: 'recommend.flowMerchantOp' },
+  n4a: { labelKey: 'recommend.flowSelectAdType', descKey: 'recommend.flowSelectAdTypeDesc' },
+  n4b: { labelKey: 'recommend.flowSelectPurchasable', descKey: 'recommend.flowSelectPurchasableDesc' },
+  n4c: { labelKey: 'recommend.flowSelectPlacementRegion', descKey: 'recommend.flowSelectPlacementRegionDesc' },
+  n4d: { labelKey: 'recommend.flowSelectDateTime', descKey: 'recommend.flowSelectDateTimeDesc' },
+  n4e: { labelKey: 'recommend.flowSubmitAndPay', descKey: 'recommend.flowSubmitAndPayDesc' },
+  stg5: { labelKey: 'recommend.flowStage5', descKey: 'recommend.flowAutoAndMerchant' },
+  n5a: { labelKey: 'recommend.flowOrderSubmit', descKey: 'recommend.flowOrderSubmitDesc' },
+  n5b: { labelKey: 'recommend.flowSystemPush', descKey: 'recommend.flowSystemPushDesc' },
+  n5c: { labelKey: 'recommend.flowPushDone', descKey: 'recommend.flowPushDoneDesc' },
+  stg6: { labelKey: 'recommend.flowStage6', descKey: 'recommend.flowMerchantViewEffect' },
+  n6a: { labelKey: 'recommend.flowDataOverview', descKey: 'recommend.flowDataOverviewDesc' },
+  n6b: { labelKey: 'recommend.flowOrderReport', descKey: 'recommend.flowOrderReportDesc' },
+  n6c: { labelKey: 'recommend.flowTypeCompare', descKey: 'recommend.flowTypeCompareDesc' },
+  end: { labelKey: 'recommend.flowEnd', descKey: 'recommend.flowEndDesc' },
+}
+
+/** 初始邊翻譯 key 映射 */
+const EDGE_I18N: Record<string, string> = {
+  e12: 'recommend.flowEdgeAlgoEnabled',
+  e23: 'recommend.flowEdgeSlotAssigned',
+  e34: 'recommend.flowEdgeActivityListed',
+  e45: 'recommend.flowEdgePaid',
+  e56: 'recommend.flowEdgePushed',
+}
 
 /* ===== 生成新節點 ID ===== */
 let nodeIdCounter = 100
@@ -295,10 +338,25 @@ const genNodeId = () => `custom_${++nodeIdCounter}`
 
 /* ===== 内部组件（使用 useReactFlow） ===== */
 function FlowEditor() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const { screenToFlowPosition } = useReactFlow()
   const [messageApi, contextHolder] = message.useMessage()
+
+  /** 翻譯後的初始節點（使用 NODE_I18N 映射） */
+  const translatedInitialNodes = useMemo(() => initialNodes.map(node => {
+    const i18n = NODE_I18N[node.id]
+    if (!i18n) return node
+    return { ...node, data: { ...node.data, label: t(i18n.labelKey), desc: i18n.descKey ? t(i18n.descKey) : node.data.desc } }
+  }), [t])
+
+  /** 翻譯後的初始邊（使用 EDGE_I18N 映射） */
+  const translatedInitialEdges = useMemo(() => initialEdges.map(edge => {
+    const labelKey = EDGE_I18N[edge.id]
+    if (!labelKey) return edge
+    return { ...edge, label: t(labelKey) }
+  }), [t])
 
   // 从 localStorage 加载已保存的位置和节点数据
   const loadSavedData = useCallback(() => {
@@ -318,8 +376,8 @@ function FlowEditor() {
   // 初始化节点：合并已保存的位置和文字内容
   const getInitialNodes = useCallback(() => {
     const { positions, nodeDataMap } = loadSavedData()
-    if (!positions && !nodeDataMap) return initialNodes
-    return initialNodes.map(node => {
+    if (!positions && !nodeDataMap) return translatedInitialNodes
+    return translatedInitialNodes.map(node => {
       const savedPos = positions?.[node.id]
       const savedData = nodeDataMap?.[node.id]
       return {
@@ -328,10 +386,10 @@ function FlowEditor() {
         data: savedData ? { ...node.data, ...savedData } : node.data,
       }
     })
-  }, [loadSavedData])
+  }, [loadSavedData, translatedInitialNodes])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(getInitialNodes())
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(translatedInitialEdges)
   const [hasChanges, setHasChanges] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -358,8 +416,8 @@ function FlowEditor() {
     setEdges(eds => eds.filter(e => !selectedIds.includes(e.source) && !selectedIds.includes(e.target)))
     setSelectedIds([])
     setHasChanges(true)
-    messageApi.success(`已刪除 ${selectedIds.length} 個節點`)
-  }, [selectedIds, setNodes, setEdges, messageApi])
+    messageApi.success(t('recommend.flowNodeDeleted', { count: selectedIds.length }))
+  }, [selectedIds, setNodes, setEdges, messageApi, t])
 
   // 双击节点编辑
   const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -382,8 +440,8 @@ function FlowEditor() {
     setEditModalOpen(false)
     setEditingNode(null)
     setHasChanges(true)
-    messageApi.success('節點已更新')
-  }, [editingNode, setNodes, messageApi])
+    messageApi.success(t('recommend.flowNodeUpdated'))
+  }, [editingNode, setNodes, messageApi, t])
 
   // 拖拽添加节点
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -409,7 +467,7 @@ function FlowEditor() {
       position,
       data: {
         label,
-        desc: paletteItem?.desc || '',
+        desc: paletteItem?.descKey ? t(paletteItem.descKey) : '',
         color: paletteItem?.color || '#1890FF',
         icon: paletteItem?.icon || '',
       },
@@ -418,8 +476,8 @@ function FlowEditor() {
     }
     setNodes(nds => [...nds, newNode])
     setHasChanges(true)
-    messageApi.success(`已添加「${label}」節點`)
-  }, [screenToFlowPosition, setNodes, messageApi])
+    messageApi.success(t('recommend.flowNodeAdded', { label: t(paletteItem?.labelKey || '') || label }))
+  }, [screenToFlowPosition, setNodes, messageApi, t])
 
   // 键盘 Delete 删除
   useEffect(() => {
@@ -449,17 +507,18 @@ function FlowEditor() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
     localStorage.setItem(NODE_DATA_KEY, JSON.stringify(nodeDataMap))
     setHasChanges(false)
-    messageApi.success('已保存')
-  }, [nodes, messageApi])
+    messageApi.success(t('recommend.flowSaved'))
+  }, [nodes, messageApi, t])
 
   // 重置位置和数据
   const handleReset = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
     localStorage.removeItem(NODE_DATA_KEY)
-    setNodes(initialNodes)
+    setNodes(translatedInitialNodes)
+    setEdges(translatedInitialEdges)
     setHasChanges(false)
-    messageApi.info('已重置为默认位置')
-  }, [setNodes, messageApi])
+    messageApi.info(t('recommend.flowResetDone'))
+  }, [setNodes, setEdges, translatedInitialNodes, translatedInitialEdges, messageApi, t])
 
   // 页面卸载前自动保存未保存的更改
   useEffect(() => {
@@ -502,16 +561,16 @@ function FlowEditor() {
       }}>
         <Space size={16}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}>
-            返回算法庫
+            {t('recommend.flowBackToAlgo')}
           </Button>
           <h2 style={{ margin: 0, fontSize: 20 }}>
             <span style={{ marginRight: 8 }}>🔀</span>
-            算法推薦業務流程
+            {t('recommend.flowTitle')}
           </h2>
-          <Tag color={editMode ? 'warning' : 'processing'}>{editMode ? '編輯模式' : '交互式流程圖'}</Tag>
+          <Tag color={editMode ? 'warning' : 'processing'}>{editMode ? t('recommend.flowEditMode') : t('recommend.flowInteractive')}</Tag>
         </Space>
         <Space>
-          <Tooltip title={editMode ? '退出編輯' : '進入編輯'}>
+          <Tooltip title={editMode ? t('recommend.flowExitEdit') : t('recommend.flowEnterEdit')}>
             <Button
               type={editMode ? 'primary' : 'default'}
               icon={editMode ? <EyeOutlined /> : <EditOutlined />}
@@ -519,25 +578,25 @@ function FlowEditor() {
             />
           </Tooltip>
           {editMode && (
-            <Popconfirm title="確定刪除選中節點？" onConfirm={handleDeleteSelected} disabled={selectedIds.length === 0}>
-              <Tooltip title={`刪除選中 (${selectedIds.length})`}>
+            <Popconfirm title={t('recommend.flowConfirmDeleteNodes')} onConfirm={handleDeleteSelected} disabled={selectedIds.length === 0}>
+              <Tooltip title={`${t('recommend.flowDeleteSelected')} (${selectedIds.length})`}>
                 <Button icon={<DeleteOutlined />} danger disabled={selectedIds.length === 0} />
               </Tooltip>
             </Popconfirm>
           )}
-          <Tooltip title="縮小">
+          <Tooltip title={t('recommend.flowZoomOut')}>
             <Button icon={<ZoomOutOutlined />} onClick={() => {}} />
           </Tooltip>
-          <Tooltip title="放大">
+          <Tooltip title={t('recommend.flowZoomIn')}>
             <Button icon={<ZoomInOutlined />} onClick={() => {}} />
           </Tooltip>
-          <Tooltip title="適應屏幕">
+          <Tooltip title={t('recommend.flowFitScreen')}>
             <Button icon={<ExpandOutlined />} onClick={() => {}} />
           </Tooltip>
-          <Tooltip title="保存位置">
+          <Tooltip title={t('recommend.flowSavePosition')}>
             <Button icon={<SaveOutlined />} onClick={handleSave} />
           </Tooltip>
-          <Tooltip title="重置位置">
+          <Tooltip title={t('recommend.flowResetPosition')}>
             <Button icon={<UndoOutlined />} onClick={handleReset} />
           </Tooltip>
         </Space>
@@ -555,13 +614,13 @@ function FlowEditor() {
         alignItems: 'center',
       }}>
         {[
-          { label: '開始/結束', shape: 'ellipse', bg: '#F6FFED', border: '#52C41A' },
-          { label: '階段標題', shape: 'rect', bg: '#F0F5FF', border: '#1890FF' },
-          { label: '流程步驟', shape: 'rect', bg: '#FFFFFF', border: '#1890FF' },
-          { label: '決策/判斷', shape: 'rect', bg: '#FFFBE6', border: '#FAAD14' },
-          { label: '系統處理', shape: 'rect', bg: '#F9F0FF', border: '#722ED1', dashed: true },
+          { labelKey: 'recommend.flowLegendStartEnd', shape: 'ellipse', bg: '#F6FFED', border: '#52C41A' },
+          { labelKey: 'recommend.flowLegendStage', shape: 'rect', bg: '#F0F5FF', border: '#1890FF' },
+          { labelKey: 'recommend.flowLegendProcess', shape: 'rect', bg: '#FFFFFF', border: '#1890FF' },
+          { labelKey: 'recommend.flowLegendDecision', shape: 'rect', bg: '#FFFBE6', border: '#FAAD14' },
+          { labelKey: 'recommend.flowLegendSystem', shape: 'rect', bg: '#F9F0FF', border: '#722ED1', dashed: true },
         ].map(item => (
-          <Space key={item.label} size={4}>
+          <Space key={item.labelKey} size={4}>
             <div style={{
               width: 16,
               height: 16,
@@ -569,11 +628,11 @@ function FlowEditor() {
               background: item.bg,
               border: `2px ${item.dashed ? 'dashed' : 'solid'} ${item.border}`,
             }} />
-            <span style={{ fontSize: 12, color: '#595959' }}>{item.label}</span>
+            <span style={{ fontSize: 12, color: '#595959' }}>{t(item.labelKey)}</span>
           </Space>
         ))}
         <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
-          {editMode ? '編輯模式：從左側面板拖拽節點到畫布添加，雙擊節點編輯內容，選中後按 Delete 或點擊刪除按鈕移除' : '提示：可拖拽畫布、滾輪縮放、拖動節點調整位置'}
+          {editMode ? t('recommend.flowEditHint') : t('recommend.flowTipHint')}
         </span>
       </div>
 
@@ -590,10 +649,10 @@ function FlowEditor() {
             flexShrink: 0,
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <DragOutlined /> 節點面板
+              <DragOutlined /> {t('recommend.flowNodePanel')}
             </div>
             <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 10 }}>
-              拖拽到右側畫布添加節點
+              {t('recommend.flowDragToAdd')}
             </div>
             {NODE_PALETTE.map(item => (
               <div
@@ -601,7 +660,7 @@ function FlowEditor() {
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData('application/reactflow-type', item.type)
-                  e.dataTransfer.setData('application/reactflow-label', item.label)
+                  e.dataTransfer.setData('application/reactflow-label', t(item.labelKey))
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 style={{
@@ -622,8 +681,8 @@ function FlowEditor() {
               >
                 <span style={{ fontSize: 18 }}>{item.icon}</span>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{item.label}</div>
-                  <div style={{ fontSize: 10, color: '#8C8C8C' }}>{item.desc}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{t(item.labelKey)}</div>
+                  <div style={{ fontSize: 10, color: '#8C8C8C' }}>{t(item.descKey)}</div>
                 </div>
               </div>
             ))}
@@ -637,7 +696,7 @@ function FlowEditor() {
               color: '#D46B08',
               lineHeight: 1.6,
             }}>
-              💡 提示：雙擊已有節點可編輯標題和描述
+              💡 {t('recommend.flowEditNodeTip')}
             </div>
           </div>
         )}
@@ -678,32 +737,32 @@ function FlowEditor() {
 
       {/* 编辑节点弹窗 */}
       <Modal
-        title="編輯節點"
+        title={t('recommend.flowEditNode')}
         open={editModalOpen}
         onOk={handleEditSave}
         onCancel={() => { setEditModalOpen(false); setEditingNode(null) }}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={400}
       >
         {editingNode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>節點標題</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{t('recommend.flowNodeTitle')}</div>
               <Input
                 value={editingNode.label}
                 onChange={(e) => setEditingNode({ ...editingNode, label: e.target.value })}
-                placeholder="請輸入節點標題"
+                placeholder={t('recommend.flowNodeTitlePlaceholder')}
                 maxLength={30}
                 showCount
               />
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>描述信息</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{t('recommend.flowNodeDesc')}</div>
               <Input.TextArea
                 value={editingNode.desc}
                 onChange={(e) => setEditingNode({ ...editingNode, desc: e.target.value })}
-                placeholder="請輸入描述信息（可選）"
+                placeholder={t('recommend.flowNodeDescPlaceholder')}
                 rows={2}
                 maxLength={50}
                 showCount

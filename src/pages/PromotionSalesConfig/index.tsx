@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, Tag, Button, message, Tabs } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -62,6 +63,7 @@ const getInitialState = (searchParams: URLSearchParams) => {
 }
 
 export default function PromotionSalesConfig() {
+  const { t } = useTranslation('adSales')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initial = getInitialState(searchParams)
@@ -78,7 +80,7 @@ export default function PromotionSalesConfig() {
   // 購買廣告 - 直接进入日期时段选择界面
   const handleGoToPurchase = (config: RecommendTypeConfig) => {
     if (!config.enabled) {
-      message.info('該類型暫未開放，敬請期待')
+      message.info(t('notAvailable'))
       return
     }
     // 新店广告：进入赠送天数选购界面；人气商家：进入皮肤套件选购界面（均无需库存数据）
@@ -109,7 +111,7 @@ export default function PromotionSalesConfig() {
       setSelectedInventory(filtered[0])
       setCurrentStep(1)
     } else {
-      message.info('暫無可購買的廣告庫存')
+      message.info(t('noInventory'))
     }
   }
 
@@ -147,13 +149,13 @@ export default function PromotionSalesConfig() {
                     display: 'flex', alignItems: 'center', gap: 6,
                     boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}>返回</Button>
+                  }}>{t('common:back')}</Button>
                 <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
               </>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType ? '購買廣告' : '店鋪推廣'}
+                {currentStep >= 1 && selectedAlgorithmType ? t('buyAdTitle') : t('adSalesTitle')}
               </h2>
               {currentStep >= 1 && selectedAlgorithmType && (
                 <div style={{
@@ -178,21 +180,21 @@ export default function PromotionSalesConfig() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 18px',
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}>查看訂單</Button>
+              }}>{t('viewOrder')}</Button>
           )}
         </div>
       </div>
 
       {/* Step 1: 选择推荐类型 */}
       {currentStep === 0 && (
-        <Card title="選擇推薦類型" style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <Card title={t('selectRecommendType')} style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <Tabs
             defaultActiveKey="delivery"
             onChange={(key) => setSelectedTab(key as 'delivery' | 'groupBuy')}
             items={[
               {
                 key: 'delivery',
-                label: '外賣到家',
+                label: t('deliveryTab'),
                 children: (
                   <div style={{
                     display: 'grid',
@@ -216,7 +218,7 @@ export default function PromotionSalesConfig() {
                           <p className="algo-card-desc">{config.description}</p>
                           <div className="algo-card-tag">
                             {!config.enabled && (
-                              <Tag color="default">即將開放</Tag>
+                              <Tag color="default">{t('comingSoon')}</Tag>
                             )}
                             {config.enabled && (
                               <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
@@ -228,7 +230,7 @@ export default function PromotionSalesConfig() {
                                     navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
                                   }}
                                 >
-                                  查看訂單
+                                  {t('viewOrder')}
                                 </Button>
                                 {config.type !== AlgorithmType.NEW_STORE_AD && (
                                   <Button
@@ -240,7 +242,7 @@ export default function PromotionSalesConfig() {
                                       handleGoToPurchase(config)
                                     }}
                                   >
-                                    購買廣告
+                                    {t('buyAd')}
                                   </Button>
                                 )}
                               </div>
@@ -254,7 +256,7 @@ export default function PromotionSalesConfig() {
               },
               {
                 key: 'groupBuy',
-                label: '團購到店',
+                label: t('groupBuyTab'),
                 children: (
                   <div style={{
                     display: 'grid',
@@ -278,7 +280,7 @@ export default function PromotionSalesConfig() {
                           <p className="algo-card-desc">{config.description}</p>
                           <div className="algo-card-tag">
                             {!config.enabled && (
-                              <Tag color="default">即將開放</Tag>
+                              <Tag color="default">{t('comingSoon')}</Tag>
                             )}
                             {config.enabled && (
                               <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -290,7 +292,7 @@ export default function PromotionSalesConfig() {
                                     navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
                                   }}
                                 >
-                                  查看訂單
+                                  {t('viewOrder')}
                                 </Button>
                                 <Button
                                   type="primary"
@@ -301,7 +303,7 @@ export default function PromotionSalesConfig() {
                                     handleGoToPurchase(config)
                                   }}
                                 >
-                                  購買廣告
+                                  {t('buyAd')}
                                 </Button>
                               </div>
                             )}

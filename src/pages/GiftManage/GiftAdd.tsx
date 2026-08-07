@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button, Form, Input, Select, Tag, InputNumber, Upload, message } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
 import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import type { StoreItem } from '../../api/store'
@@ -11,24 +12,25 @@ import BrandTag from '../../components/BrandTag'
 
 const { TextArea } = Input
 
-/** 廣告類型（僅保留新店廣告與盤活復蘇） */
-const adTypeOptions = [
-  { label: '新店廣告', value: 'new_store' },
-  { label: '盤活復蘇', value: 'revival' },
-]
-
 /** 所屬品牌只讀展示（受 Form 控制）：選擇門店後直接展示品牌標籤，無需單選 */
-function BrandDisplay({ value }: { value?: string }) {
+function BrandDisplay({ value, placeholder }: { value?: string; placeholder?: string }) {
   if (!value) {
-    return <span style={{ color: '#8C8C8C', fontSize: 13 }}>請先選擇門店，品牌將自動帶出</span>
+    return <span style={{ color: '#8C8C8C', fontSize: 13 }}>{placeholder}</span>
   }
   return <BrandTag value={value} />
 }
 
 export default function GiftAdd() {
+  const { t } = useTranslation('giftAdd')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
+
+  /** 廣告類型（僅保留新店廣告與盤活復蘇） */
+  const adTypeOptions = [
+    { label: t('adTypeNewStore'), value: 'new_store' },
+    { label: t('adTypeRevival'), value: 'revival' },
+  ]
   const [successVisible, setSuccessVisible] = useState(false)
   const [countdown, setCountdown] = useState(5)
   const [submitting, setSubmitting] = useState(false)
@@ -48,7 +50,7 @@ export default function GiftAdd() {
   useEffect(() => {
     fetchAllMerchantGroups()
       .then(setGroups)
-      .catch(() => message.error('加載集團列表失敗'))
+      .catch(() => message.error(t('loadGroupFailed')))
   }, [])
 
   // 贈送模式：预选集团和门店
@@ -146,7 +148,7 @@ export default function GiftAdd() {
       setSuccessVisible(true)
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error('提交失敗，請重試')
+      message.error(t('submitFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -178,11 +180,11 @@ export default function GiftAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {isGiftMode ? '贈送廣告天數' : '新增推廣贈送'}
+                {isGiftMode ? t('giftAdDays') : t('addGift')}
               </h2>
               {isGiftMode && (
                 <div style={{
@@ -192,7 +194,7 @@ export default function GiftAdd() {
                   fontSize: 13, color: '#E8720C', fontWeight: 500,
                 }}>
                   <GiftOutlined />
-                  贈送模式
+                  {t('giftMode')}
                 </div>
               )}
             </div>
@@ -207,14 +209,14 @@ export default function GiftAdd() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>集團與門店選擇</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('groupStoreSelection')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
           <Form.Item
-            label="集團ID/名稱"
+            label={t('groupIdName')}
             name="groupId"
-            rules={[{ required: true, message: '請選擇集團' }]}
+            rules={[{ required: true, message: t('selectGroup') }]}
           >
             {isGiftMode ? (
               <Select
@@ -230,7 +232,7 @@ export default function GiftAdd() {
               <Select
                 showSearch
                 allowClear
-                placeholder="支持ID和名稱搜索查詢"
+                placeholder={t('searchGroupIdName')}
                 optionFilterProp="label"
                 onChange={(v) => setSelectedGroupId(v)}
                 options={groups.map(g => ({
@@ -242,9 +244,9 @@ export default function GiftAdd() {
           </Form.Item>
 
           <Form.Item
-            label="門店ID/名稱"
+            label={t('storeIdName')}
             name="storeId"
-            rules={[{ required: true, message: '請選擇門店' }]}
+            rules={[{ required: true, message: t('selectStore') }]}
           >
             {isGiftMode ? (
               <Select
@@ -260,7 +262,7 @@ export default function GiftAdd() {
               <Select
                 showSearch
                 allowClear
-                placeholder="請先選擇集團"
+                placeholder={t('selectGroupFirst')}
                 optionFilterProp="label"
                 disabled={!selectedGroupId}
                 onChange={handleStoreChange}
@@ -273,12 +275,12 @@ export default function GiftAdd() {
           </Form.Item>
 
           <Form.Item
-            label="所屬品牌"
+            label={t('common:brand')}
             name="brand"
-            tooltip="選擇門店後自動帶出，無需手動選擇"
-            rules={[{ required: true, message: '請先選擇門店，品牌將自動帶出' }]}
+            tooltip={t('brandAutoTip')}
+            rules={[{ required: true, message: t('selectStoreFirst') }]}
           >
-            <BrandDisplay />
+            <BrandDisplay placeholder={t('selectStoreFirst')} />
           </Form.Item>
         </div>
       </div>
@@ -289,62 +291,62 @@ export default function GiftAdd() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ClockCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>贈送配置</span>
-          <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>需審批</Tag>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('giftConfig')}</span>
+          <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('approvalRequired')}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <span style={{ fontSize: 12, color: '#8C6D1F' }}>
-            📋 提交後將進入審批中心，審核通過後系統自動為商戶增加對應廣告天數。
+            {t('approvalTip')}
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
           <Form.Item
-            label="廣告類型"
+            label={t('adType')}
             name="adType"
-            rules={[{ required: true, message: '請選擇廣告類型' }]}
+            rules={[{ required: true, message: t('selectAdType') }]}
           >
             <Select
-              placeholder="請選擇廣告類型"
+              placeholder={t('selectAdType')}
               options={adTypeOptions}
               disabled={isGiftMode}
             />
           </Form.Item>
 
           <Form.Item
-            label="贈送天數"
+            label={t('giftDays')}
             name="giftDays"
-            rules={[{ required: true, message: '請輸入贈送天數' }]}
+            rules={[{ required: true, message: t('inputGiftDays') }]}
           >
             <InputNumber
-              placeholder="請輸入贈送天數"
+              placeholder={t('inputGiftDays')}
               min={1}
               max={365}
               style={{ width: '100%' }}
-              addonAfter="天"
+              addonAfter={t('dayUnit')}
             />
           </Form.Item>
 
           <Form.Item
-            label="有效期"
+            label={t('validDays')}
             name="validDays"
-            rules={[{ required: true, message: '請輸入有效期天數' }]}
+            rules={[{ required: true, message: t('inputValidDays') }]}
           >
             <InputNumber
-              placeholder="請輸入有效期天數"
+              placeholder={t('inputValidDays')}
               min={1}
               max={730}
               style={{ width: '100%' }}
-              addonAfter="天"
+              addonAfter={t('dayUnit')}
             />
           </Form.Item>
         </div>
 
         <Form.Item
-          label="贈送原因"
+          label={t('giftReason')}
           name="reason"
-          rules={[{ required: true, message: '請輸入贈送原因' }]}
+          rules={[{ required: true, message: t('inputGiftReason') }]}
         >
           <TextArea
-            placeholder="請填寫贈送原因，便於相關審核人審閱，時限制500字"
+            placeholder={t('reasonPlaceholder')}
             rows={5}
             maxLength={500}
             showCount
@@ -352,14 +354,14 @@ export default function GiftAdd() {
         </Form.Item>
 
         <Form.Item
-          label="相關憑證"
+          label={t('certificate')}
           name="certificate"
           required
           rules={[{
             validator: (_, _value) => {
               const fileList = form.getFieldValue('certificate')
               if (!fileList || (Array.isArray(fileList) && fileList.length === 0)) {
-                return Promise.reject(new Error('請上傳相關憑證'))
+                return Promise.reject(new Error(t('uploadCert')))
               }
               return Promise.resolve()
             }
@@ -377,26 +379,26 @@ export default function GiftAdd() {
           >
             <div>
               <PlusOutlined style={{ fontSize: 20, color: '#8C8C8C' }} />
-              <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>上傳憑證</div>
+              <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>{t('uploadCertBtn')}</div>
             </div>
           </Upload>
         </Form.Item>
         <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: -16 }}>
-          支持 png、jpg、webp、jpeg、pdf；最大 10MB；最多上傳 5 張
+          {t('certFormatTip')}
         </div>
       </div>
       </Form>
 
       {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
-        <Button onClick={handleBack}>取消</Button>
+        <Button onClick={handleBack}>{t('common:cancel')}</Button>
         <Button
           type="primary"
           icon={<SendOutlined />}
           onClick={handleSubmit}
           loading={submitting}
         >
-          提交申請
+          {t('submitApply')}
         </Button>
       </div>
 
@@ -423,13 +425,13 @@ export default function GiftAdd() {
               <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-              提交成功
+              {t('submitSuccess')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
               {submittedFlowNo && (
-                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 600 }}>{submittedFlowNo}</span><br /></>
+                <>{t('flowNo')}：<span style={{ color: '#E8720C', fontWeight: 600 }}>{submittedFlowNo}</span><br /></>
               )}
-              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度，審批通過後剩餘天數自動生效
+              {t('approvalProgressTip')}
             </p>
             <Button
               type="primary"
@@ -437,7 +439,7 @@ export default function GiftAdd() {
               onClick={() => navigate('/gift-detail')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
-              返回列表{countdown > 0 && ` (${countdown}s)`}
+              {t('backToList')}{countdown > 0 && ` (${countdown}s)`}
             </Button>
           </div>
         </div>

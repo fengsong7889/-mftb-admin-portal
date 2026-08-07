@@ -1,5 +1,3 @@
-import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
-
 /** 所属APP */
 export enum AppType {
   SHANFENG = 1,
@@ -7,8 +5,8 @@ export enum AppType {
 }
 
 export const APP_OPTIONS = [
-  { label: BRAND_SHANFENG_LABEL, value: AppType.SHANFENG },
-  { label: 'mFood', value: AppType.MFOOD },
+  { labelKey: 'recommend.appShanfeng', value: AppType.SHANFENG },
+  { labelKey: 'recommend.appMfood', value: AppType.MFOOD },
 ]
 
 /** 业务频道（推荐瀑布流） */
@@ -20,10 +18,10 @@ export enum RecommendChannel {
 }
 
 export const RECOMMEND_CHANNEL_OPTIONS = [
-  { label: '大首頁', value: RecommendChannel.HOME },
-  { label: '外賣頻道', value: RecommendChannel.DELIVERY },
-  { label: '超市百貨', value: RecommendChannel.SUPERMARKET },
-  { label: '團購到店', value: RecommendChannel.GROUP_BUY },
+  { labelKey: 'recommend.channelHome', value: RecommendChannel.HOME },
+  { labelKey: 'recommend.channelDelivery', value: RecommendChannel.DELIVERY },
+  { labelKey: 'recommend.channelSupermarket', value: RecommendChannel.SUPERMARKET },
+  { labelKey: 'recommend.channelGroupBuy', value: RecommendChannel.GROUP_BUY },
 ]
 
 /** 投放界面 */
@@ -35,10 +33,10 @@ export enum PlacementInterface {
 }
 
 export const PLACEMENT_INTERFACE_OPTIONS = [
-  { label: '大首頁-Feed', value: PlacementInterface.HOME },
-  { label: '外賣頻道-Feed', value: PlacementInterface.DELIVERY },
-  { label: '超市頻道-Feed', value: PlacementInterface.SUPERMARKET },
-  { label: '團購頻道-Feed', value: PlacementInterface.GROUP_BUY },
+  { labelKey: 'recommend.placementHomeFeed', value: PlacementInterface.HOME },
+  { labelKey: 'recommend.placementDeliveryFeed', value: PlacementInterface.DELIVERY },
+  { labelKey: 'recommend.placementSupermarketFeed', value: PlacementInterface.SUPERMARKET },
+  { labelKey: 'recommend.placementGroupBuyFeed', value: PlacementInterface.GROUP_BUY },
 ]
 
 /** 算法类型 */
@@ -59,19 +57,19 @@ export enum AlgorithmType {
 }
 
 export const ALGORITHM_TYPE_OPTIONS = [
-  { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
-  { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-  { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
-  { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
-  { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
-  { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
-  { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
-  { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
-  { label: '人氣商家', value: AlgorithmType.POPULAR_MERCHANT_KA },
-  { label: '品牌商家(KA)', value: AlgorithmType.BRAND_MERCHANT },
-  { label: '點金廣告', value: AlgorithmType.GOLD_AD },
-  { label: '金字招牌', value: AlgorithmType.GOLDEN_SIGNBOARD },
-  { label: '商品促銷', value: AlgorithmType.PRODUCT_PROMO },
+  { labelKey: 'recommend.algoInvincibleStar', value: AlgorithmType.INVINCIBLE_STAR },
+  { labelKey: 'recommend.algoNewStoreAd', value: AlgorithmType.NEW_STORE_AD },
+  { labelKey: 'recommend.algoHotReviveAd', value: AlgorithmType.HOT_REVIVE_AD },
+  { labelKey: 'recommend.algoExclusiveMerchant', value: AlgorithmType.EXCLUSIVE_MERCHANT },
+  { labelKey: 'recommend.algoTrafficAd', value: AlgorithmType.TRAFFIC_AD },
+  { labelKey: 'recommend.algoGuessYouLike', value: AlgorithmType.GUESS_YOU_LIKE },
+  { labelKey: 'recommend.algoOrganicTraffic', value: AlgorithmType.ORGANIC_TRAFFIC },
+  { labelKey: 'recommend.algoSearchAlgorithm', value: AlgorithmType.SEARCH_ALGORITHM },
+  { labelKey: 'recommend.algoPopularMerchant', value: AlgorithmType.POPULAR_MERCHANT_KA },
+  { labelKey: 'recommend.algoBrandMerchant', value: AlgorithmType.BRAND_MERCHANT },
+  { labelKey: 'recommend.algoGoldAd', value: AlgorithmType.GOLD_AD },
+  { labelKey: 'recommend.algoGoldenSignboard', value: AlgorithmType.GOLDEN_SIGNBOARD },
+  { labelKey: 'recommend.algoProductPromo', value: AlgorithmType.PRODUCT_PROMO },
 ]
 
 /** 算法类型对应卡片顶部装饰线颜色（与 CSS .algo-card-wrapper--* 类名一致） */
@@ -112,24 +110,24 @@ export enum Region {
 }
 
 export const REGION_OPTIONS = [
-  { label: '黑沙環區', value: Region.KOKSAA },
-  { label: '高士德區', value: Region.COSTA },
-  { label: '新馬路區', value: Region.SANMA },
-  { label: '新皇朝區', value: Region.SANWONG },
-  { label: '港珠澳區', value: Region.HKM },
-  { label: '花城市區', value: Region.FAHUA },
-  { label: '北安機場', value: Region.AIRPORT },
-  { label: '左酒店區', value: Region.LHOTEL },
-  { label: '右酒店區', value: Region.RHOTEL },
-  { label: '澳大專區', value: Region.UM },
-  { label: '黑沙灘區', value: Region.HACS },
-  { label: '拱北區域', value: Region.GONGBEI },
-  { label: '横琴區域', value: Region.HENGQIN },
+  { labelKey: 'recommend.regionKoksaa', value: Region.KOKSAA },
+  { labelKey: 'recommend.regionCosta', value: Region.COSTA },
+  { labelKey: 'recommend.regionSanma', value: Region.SANMA },
+  { labelKey: 'recommend.regionSanwong', value: Region.SANWONG },
+  { labelKey: 'recommend.regionHkm', value: Region.HKM },
+  { labelKey: 'recommend.regionFahua', value: Region.FAHUA },
+  { labelKey: 'recommend.regionAirport', value: Region.AIRPORT },
+  { labelKey: 'recommend.regionLHotel', value: Region.LHOTEL },
+  { labelKey: 'recommend.regionRHotel', value: Region.RHOTEL },
+  { labelKey: 'recommend.regionUm', value: Region.UM },
+  { labelKey: 'recommend.regionHacs', value: Region.HACS },
+  { labelKey: 'recommend.regionGongbei', value: Region.GONGBEI },
+  { labelKey: 'recommend.regionHengqin', value: Region.HENGQIN },
 ]
 
-/** 商圈值 → 名称映射（由 REGION_OPTIONS 派生，唯一来源） */
-export const REGION_LABEL: Record<number, string> = Object.fromEntries(
-  REGION_OPTIONS.map(o => [o.value, o.label]),
+/** 商圈值 → i18n key 映射（由 REGION_OPTIONS 派生，唯一来源） */
+export const REGION_LABEL_KEY: Record<number, string> = Object.fromEntries(
+  REGION_OPTIONS.map(o => [o.value, o.labelKey]),
 )
 
 /** 区域父节点值（用于TreeSelect二级选择） */
@@ -150,36 +148,36 @@ export const AREA_TO_REGIONS: Record<string, Region[]> = {
 export const REGION_TREE_DATA = [
   {
     value: AREA_PARENT_VALUES.MACAU_AREA,
-    title: '澳門區域',
+    titleKey: 'recommend.areaMacau',
     selectable: true,
     children: [
-      { value: Region.KOKSAA, title: '黑沙環區' },
-      { value: Region.COSTA, title: '高士德區' },
-      { value: Region.SANMA, title: '新馬路區' },
-      { value: Region.SANWONG, title: '新皇朝區' },
-      { value: Region.HKM, title: '港珠澳區' },
+      { value: Region.KOKSAA, titleKey: 'recommend.regionKoksaa' },
+      { value: Region.COSTA, titleKey: 'recommend.regionCosta' },
+      { value: Region.SANMA, titleKey: 'recommend.regionSanma' },
+      { value: Region.SANWONG, titleKey: 'recommend.regionSanwong' },
+      { value: Region.HKM, titleKey: 'recommend.regionHkm' },
     ],
   },
   {
     value: AREA_PARENT_VALUES.TAIPA_AREA,
-    title: '氹仔區域',
+    titleKey: 'recommend.areaTaipa',
     selectable: true,
     children: [
-      { value: Region.FAHUA, title: '花城市區' },
-      { value: Region.AIRPORT, title: '北安機場' },
-      { value: Region.LHOTEL, title: '左酒店區' },
-      { value: Region.RHOTEL, title: '右酒店區' },
-      { value: Region.UM, title: '澳大專區' },
-      { value: Region.HACS, title: '黑沙灘區' },
+      { value: Region.FAHUA, titleKey: 'recommend.regionFahua' },
+      { value: Region.AIRPORT, titleKey: 'recommend.regionAirport' },
+      { value: Region.LHOTEL, titleKey: 'recommend.regionLHotel' },
+      { value: Region.RHOTEL, titleKey: 'recommend.regionRHotel' },
+      { value: Region.UM, titleKey: 'recommend.regionUm' },
+      { value: Region.HACS, titleKey: 'recommend.regionHacs' },
     ],
   },
   {
     value: AREA_PARENT_VALUES.ZH_AREA,
-    title: '珠海區域',
+    titleKey: 'recommend.areaZh',
     selectable: true,
     children: [
-      { value: Region.GONGBEI, title: '拱北區域' },
-      { value: Region.HENGQIN, title: '横琴區域' },
+      { value: Region.GONGBEI, titleKey: 'recommend.regionGongbei' },
+      { value: Region.HENGQIN, titleKey: 'recommend.regionHengqin' },
     ],
   },
 ]
@@ -194,11 +192,11 @@ export enum OrderStatus {
 }
 
 export const ORDER_STATUS_OPTIONS = [
-  { label: '待支付', value: OrderStatus.PENDING_PAYMENT },
-  { label: '已支付', value: OrderStatus.PAID },
-  { label: '投放中', value: OrderStatus.DELIVERING },
-  { label: '已完成', value: OrderStatus.COMPLETED },
-  { label: '已退款', value: OrderStatus.REFUNDED },
+  { labelKey: 'recommend.orderPendingPayment', value: OrderStatus.PENDING_PAYMENT },
+  { labelKey: 'recommend.orderPaid', value: OrderStatus.PAID },
+  { labelKey: 'recommend.orderDelivering', value: OrderStatus.DELIVERING },
+  { labelKey: 'recommend.orderCompleted', value: OrderStatus.COMPLETED },
+  { labelKey: 'recommend.orderRefunded', value: OrderStatus.REFUNDED },
 ]
 
 /** 服务状态 */
@@ -208,8 +206,8 @@ export enum ServiceStatus {
 }
 
 export const SERVICE_STATUS_OPTIONS = [
-  { label: '啟用', value: ServiceStatus.ENABLED },
-  { label: '停用', value: ServiceStatus.DISABLED },
+  { labelKey: 'recommend.statusEnabled', value: ServiceStatus.ENABLED },
+  { labelKey: 'recommend.statusDisabled', value: ServiceStatus.DISABLED },
 ]
 
 /** 召回维度 */
@@ -222,11 +220,11 @@ export enum RecallDimension {
 }
 
 export const RECALL_DIMENSION_OPTIONS = [
-  { label: '商家維度', value: RecallDimension.MERCHANT },
-  { label: '商品維度', value: RecallDimension.ITEM },
-  { label: '商業維度', value: RecallDimension.COMMERCIAL },
-  { label: '用戶維度', value: RecallDimension.USER },
-  { label: '平台維度', value: RecallDimension.PLATFORM },
+  { labelKey: 'recommend.recallMerchant', value: RecallDimension.MERCHANT },
+  { labelKey: 'recommend.recallItem', value: RecallDimension.ITEM },
+  { labelKey: 'recommend.recallCommercial', value: RecallDimension.COMMERCIAL },
+  { labelKey: 'recommend.recallUser', value: RecallDimension.USER },
+  { labelKey: 'recommend.recallPlatform', value: RecallDimension.PLATFORM },
 ]
 
 /** 召回维度颜色 */
@@ -246,9 +244,9 @@ export enum RankingStage {
 }
 
 export const RANKING_STAGE_OPTIONS = [
-  { label: '粗排', value: RankingStage.COARSE },
-  { label: '精排', value: RankingStage.FINE },
-  { label: '重排', value: RankingStage.RERANK },
+  { labelKey: 'recommend.stageCoarse', value: RankingStage.COARSE },
+  { labelKey: 'recommend.stageFine', value: RankingStage.FINE },
+  { labelKey: 'recommend.stageRerank', value: RankingStage.RERANK },
 ]
 
 /** 出价模式 */
@@ -259,9 +257,9 @@ export enum BidMode {
 }
 
 export const BID_MODE_OPTIONS = [
-  { label: 'CPC (按點擊付費)', value: BidMode.CPC },
-  { label: 'CPM (按展示付費)', value: BidMode.CPM },
-  { label: 'oCPC (優化點擊付費)', value: BidMode.OCPC },
+  { labelKey: 'recommend.bidCpc', value: BidMode.CPC },
+  { labelKey: 'recommend.bidCpm', value: BidMode.CPM },
+  { labelKey: 'recommend.bidOcpc', value: BidMode.OCPC },
 ]
 
 /** 时段类型 */
@@ -275,10 +273,10 @@ export enum TimeSlot {
 }
 
 export const TIME_SLOT_OPTIONS = [
-  { label: '全天', value: TimeSlot.ALL_DAY },
-  { label: '早餐 (06:00-09:00)', value: TimeSlot.BREAKFAST },
-  { label: '午餐 (11:00-14:00)', value: TimeSlot.LUNCH },
-  { label: '下午茶 (14:00-17:00)', value: TimeSlot.AFTERNOON },
-  { label: '晚餐 (17:00-20:00)', value: TimeSlot.DINNER },
-  { label: '夜宵 (20:00-02:00)', value: TimeSlot.NIGHT_SNACK },
+  { labelKey: 'recommend.slotAllDay', value: TimeSlot.ALL_DAY },
+  { labelKey: 'recommend.slotBreakfast', value: TimeSlot.BREAKFAST },
+  { labelKey: 'recommend.slotLunch', value: TimeSlot.LUNCH },
+  { labelKey: 'recommend.slotAfternoon', value: TimeSlot.AFTERNOON },
+  { labelKey: 'recommend.slotDinner', value: TimeSlot.DINNER },
+  { labelKey: 'recommend.slotNightSnack', value: TimeSlot.NIGHT_SNACK },
 ]

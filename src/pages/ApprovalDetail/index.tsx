@@ -23,6 +23,7 @@ import {
   cancelFinApproval,
 } from '../../api/finance'
 import type { FinApproval } from '../../api/finance'
+import { useTranslation } from 'react-i18next'
 
 /** 审批历史记录 */
 interface ApprovalTimelineItem {
@@ -114,7 +115,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棣(002)',
     applyDate: '2026-01-16 09:16:21',
     flowNo: 'CZ202601160000',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: '閃蜂',
     groupId: '20261298121911',
     groupName: '亞述集團',
@@ -136,10 +137,10 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '已通過銀行對公轉賬完成匯款，請審批。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'business', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'created', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
   // 充值 — 混合支付
@@ -148,7 +149,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棣(002)',
     applyDate: '2026-01-16 09:16:21',
     flowNo: 'CZ202601160001',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: '閃蜂',
     groupId: '20261298121911',
     groupName: '亞述集團',
@@ -175,10 +176,10 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '請領導迅速審批，老闆等著推廣金到賬，消費一波，謝謝！',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'business', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'created', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
   // 充值 — 營業額支付
@@ -187,7 +188,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棣(002)',
     applyDate: '2026-01-16 09:16:21',
     flowNo: 'CZ202601160002',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: 'mFood',
     groupId: '20261298121912',
     groupName: '漢堡王',
@@ -214,10 +215,10 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '商家委託進行營業額扣款充值，請審批。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'business', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'created', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
   deduct: {
@@ -225,13 +226,13 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棟(002)',
     applyDate: '2026-01-16 09:16:21',
     flowNo: 'KK202601160000',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: 'mFood',
     groupId: '20261298121911',
     groupName: '亞述集團',
     virtualBalance: 128560.50,
     deductMethodType: 'consume' as const,
-    deductMethod: '消費扣款',
+    deductMethod: 'consume',
     deductAmount: 30000,
     consumeChannel: '美食外賣',
     consumeStore: '廣州酒店天河廣場1號店(1234567890)',
@@ -243,10 +244,10 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '商家需要在巴士進行打廣告，委託我們進行操作，與商家達成協議，扣取推廣金30,000元。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'business', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'created', time: '2026-01-16 09:16:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
     ],
   },
   transfer: {
@@ -254,7 +255,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棟(002)',
     applyDate: '2026-01-16 09:16:21',
     flowNo: 'ZZ202601160000',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: 'mFood',
     fromGroupId: '20261298121911',
     fromGroupName: '亞述集團',
@@ -272,10 +273,10 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '商戶A和商戶B已完成合併協議簽訂，現在申請將商戶A賬戶推廣金餘額轉入商戶B。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'business', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'created', time: '2026-01-16 09:16:21', approver: '朱棟(002)', status: 'submitted', comment: '' },
     ],
   },
   merge: {
@@ -283,7 +284,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棣(002)',
     applyDate: '2026-01-16 09:16:21',
     flowNo: 'HB202601160000',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: 'mFood',
     sourceBrand: 'mFood',
     mergeGroupId: '20261298121911',
@@ -306,10 +307,10 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '亞述集團和廣州酒家已完成合併協議簽訂，現在申請將亞述集團賬戶推廣金餘額全部轉入廣州酒家。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '業務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '流程創建', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'business', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'created', time: '2026-01-16 09:16:21', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
   gift: {
@@ -317,14 +318,14 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     applicant: '朱棣(002)',
     applyDate: '2026-07-17 10:00:00',
     flowNo: 'TG202607170000',
-    flowStatus: '審核中',
+    flowStatus: 'pending',
     brand: '閃蜂',
     giftGroupId: 'G001',
     giftGroupName: '廣州酒家',
     giftStoreId: 'S1001',
     giftStoreName: '澳門總店',
     giftBrand: '閃蜂',
-    giftAdType: '新店廣告',
+    giftAdType: 'new_store',
     giftDays: 30,
     giftValidDays: 90,
     documents: [
@@ -333,38 +334,59 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     notes: '商家需要推廣支持，申請贈送推廣金。',
     hasRevoke: true,
     timeline: [
-      { node: '財務主管審批', time: '--', approver: '--', status: 'pending', comment: '' },
-      { node: '運營主管審批', time: '2026-07-17 14:30:00', approver: '劉邦(000)', status: 'approved', comment: '同意贈送，商家推廣需求屬實。' },
-      { node: '業務主管審批', time: '2026-07-17 11:20:00', approver: '朱元璋(001)', status: 'approved', comment: '已核實商家資質，同意贈送。' },
-      { node: '流程創建', time: '2026-07-17 10:00:00', approver: '朱棣(002)', status: 'submitted', comment: '' },
+      { node: 'finance', time: '--', approver: '--', status: 'pending', comment: '' },
+      { node: 'operation', time: '2026-07-17 14:30:00', approver: '劉邦(000)', status: 'approved', comment: '同意贈送，商家推廣需求屬實。' },
+      { node: 'business', time: '2026-07-17 11:20:00', approver: '朱元璋(001)', status: 'approved', comment: '已核實商家資質，同意贈送。' },
+      { node: 'created', time: '2026-07-17 10:00:00', approver: '朱棣(002)', status: 'submitted', comment: '' },
     ],
   },
 }
 
-const typeTitleMap: Record<string, string> = {
-  recharge: '充值審批',
-  deduct: '扣款審批',
-  transfer: '轉賬審批',
-  merge: '合併審批',
-  gift: '推廣贈送審批',
+/** 標題映射（i18n key，value 為英文枚舉碼） */
+const typeTitleMapKeys: Record<string, string> = {
+  recharge: 'approvalDetail.typeTitleRecharge',
+  deduct: 'approvalDetail.typeTitleDeduct',
+  transfer: 'approvalDetail.typeTitleTransfer',
+  merge: 'approvalDetail.typeTitleMerge',
+  gift: 'approvalDetail.typeTitleGift',
 }
 
 const brandLabelMap: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFood' }
-const flowStatusLabelMap: Record<string, string> = {
-  pending: '審核中', approved: '已通過', rejected: '已駁回', cancelled: '已撤銷',
+/** 流程狀態映射（i18n key，value 為英文枚舉碼） */
+const flowStatusLabelMapKeys: Record<string, string> = {
+  pending: 'approvalCenter.flowPending', approved: 'approvalCenter.flowApproved',
+  rejected: 'approvalCenter.flowRejected', cancelled: 'approvalCenter.flowCancelled',
 }
 /** 流程狀態標籤顏色（與審批中心列表保持一致：審核中藍/通過綠/駁回紅/撤銷灰） */
 const flowStatusColorMap: Record<string, string> = {
-  審核中: 'processing', 已通過: 'success', 已駁回: 'error', 已撤銷: 'default',
+  pending: 'processing', approved: 'success', rejected: 'error', cancelled: 'default',
 }
-const payMethodLabelMap: Record<string, string> = {
-  corporate: '對公轉賬', mixed: '混合支付', revenue: '營業額支付',
+/** 支付方式映射（i18n key，value 為英文枚舉碼） */
+const payMethodLabelMapKeys: Record<string, string> = {
+  corporate: 'approvalDetail.payMethodCorporate',
+  mixed: 'approvalDetail.payMethodMixed',
+  revenue: 'approvalDetail.payMethodRevenue',
 }
-const giftAdTypeLabelMap: Record<string, string> = {
-  new_store: '新店廣告', revival: '盤活復蘇', exclusive: '獨家商家', gold: '金牌商家', ka: '人氣商家',
+/** 廣告類型映射（i18n key，value 為英文枚舉碼） */
+const giftAdTypeLabelMapKeys: Record<string, string> = {
+  new_store: 'approvalDetail.giftAdTypeNewStore',
+  revival: 'approvalDetail.giftAdTypeRevival',
+  exclusive: 'approvalDetail.giftAdTypeExclusive',
+  gold: 'approvalDetail.giftAdTypeGold',
+  ka: 'approvalDetail.giftAdTypeKa',
 }
-const deductMethodLabelMap: Record<string, string> = {
-  account: '賬戶扣款', consume: '消費扣款', batch: '充值批次扣款',
+/** 扣款方式映射（i18n key，value 為英文枚舉碼） */
+const deductMethodLabelMapKeys: Record<string, string> = {
+  account: 'approvalDetail.deductMethodAccount',
+  consume: 'approvalDetail.deductMethodConsume',
+  batch: 'approvalDetail.deductMethodBatch',
+}
+/** 審批時間軸節點映射（i18n key，value 為英文枚舉碼） */
+const timelineNodeMapKeys: Record<string, string> = {
+  finance: 'approvalDetail.nodeFinance',
+  operation: 'approvalDetail.nodeOperation',
+  business: 'approvalDetail.nodeBusiness',
+  created: 'approvalDetail.nodeCreated',
 }
 
 function num(v: unknown): number {
@@ -416,17 +438,17 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
     applicant: record.applicant,
     applyDate: record.applyTime,
     flowNo: record.flowNo,
-    flowStatus: flowStatusLabelMap[record.flowStatus] || record.flowStatus,
+    flowStatus: record.flowStatus,
     brand,
     groupId: record.groupId,
     groupName: record.groupName,
     notes: str(extra.remark),
     hasRevoke: record.flowStatus === 'pending',
     timeline: [
-      nodeItem('財務主管審批', record.finApprover, record.finApproveTime, record.finApproveStatus, record.rejectReason),
-      nodeItem('運營主管審批', record.opsApprover, record.opsApproveTime, record.opsApproveStatus, record.rejectReason),
-      nodeItem('業務主管審批', record.bizApprover, record.bizApproveTime, record.bizApproveStatus, record.rejectReason),
-      { node: '流程創建', time: record.applyTime, approver: record.applicant, status: 'submitted', comment: '' },
+      nodeItem('finance', record.finApprover, record.finApproveTime, record.finApproveStatus, record.rejectReason),
+      nodeItem('operation', record.opsApprover, record.opsApproveTime, record.opsApproveStatus, record.rejectReason),
+      nodeItem('business', record.bizApprover, record.bizApproveTime, record.bizApproveStatus, record.rejectReason),
+      { node: 'created', time: record.applyTime, approver: record.applicant, status: 'submitted', comment: '' },
     ],
   }
 
@@ -439,7 +461,7 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
       bdPerson: str(extra.bd) || '--',
       isActual: extra.isActual === true,
       payMethod,
-      settlementMethod: payMethodLabelMap[str(extra.payMethod)] || '--',
+      settlementMethod: payMethod || '--',
       rechargeAmount: num(extra.virtualAmount),
       actualTotal: num(extra.actualTotal),
       discountAmount: num(extra.discountAmount),
@@ -454,7 +476,7 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
       ...base,
       virtualBalance: num(extra.virtualBalance),
       deductMethodType: method as ApprovalDetailData['deductMethodType'],
-      deductMethod: deductMethodLabelMap[method] || method,
+      deductMethod: method,
       deductAmount: num(extra.deductAmount),
       consumeChannel: str(extra.consumeChannel),
       consumeStore: str(extra.consumeStore),
@@ -502,7 +524,7 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
       giftStoreId: str(extra.storeCode) || str(extra.storeId),
       giftStoreName: str(extra.storeName),
       giftBrand: brand,
-      giftAdType: giftAdTypeLabelMap[adType] || adType,
+      giftAdType: adType,
       giftDays: num(extra.giftDays),
       giftValidDays: num(extra.validDays),
       notes: str(extra.reason) || str(extra.remark),
@@ -517,6 +539,7 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
 
 export default function ApprovalDetail() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const urlType = searchParams.get('type') || 'recharge'
   const flowNo = searchParams.get('flowNo') || ''
@@ -538,7 +561,7 @@ export default function ApprovalDetail() {
   /** 審批類型以記錄為準（未加載到時回退 URL 參數） */
   const type = data.approvalType || urlType
   /** 僅審批中的流程可通過/駁回 */
-  const isPending = data.flowStatus === '審核中'
+  const isPending = data.flowStatus === 'pending'
 
   /** 加載審批詳情 */
   useEffect(() => {
@@ -559,10 +582,10 @@ export default function ApprovalDetail() {
 
   const handleApprove = () => {
     Modal.confirm({
-      title: '審批確認',
-      content: '確定要通過此審批申請嗎？',
-      okText: '確定',
-      cancelText: '取消',
+      title: t('approvalDetail.approveConfirm'),
+      content: t('approvalDetail.approveContent'),
+      okText: t('approvalDetail.approveOk'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         setSubmitting(true)
         try {
@@ -572,15 +595,18 @@ export default function ApprovalDetail() {
             : await approveFinApproval(flowNo)
           if (result) {
             message.success(result.finished
-              ? `${result.nodeName}通過，流程全部節點審批完成，${type === 'gift' ? '贈送天數已寫入贈送明細' : '數據已寫入批次查詢'}`
-              : `${result.nodeName}通過，流程進入「${result.nextNode}」節點`)
+              ? t('approvalDetail.approveFinished', {
+                  nodeName: result.nodeName,
+                  writtenDesc: type === 'gift' ? t('approvalDetail.giftWritten') : t('approvalDetail.dataWritten'),
+                })
+              : t('approvalDetail.approveNext', { nodeName: result.nodeName, nextNode: result.nextNode }))
           } else {
-            message.success('審批通過成功')
+            message.success(t('approvalCenter.approveSuccess'))
           }
           navigate('/approval-center')
         } catch (err) {
           // 無審批權限（403）或餘額不足等業務校驗失敗，展示後端給出的具體原因
-          message.error((err as Error)?.message || '審批失敗')
+          message.error((err as Error)?.message || t('approvalDetail.approveFailed'))
         } finally {
           setSubmitting(false)
         }
@@ -603,12 +629,12 @@ export default function ApprovalDetail() {
         ? rejectCurrentNode(flowNo, rejectReason)
         : (await rejectFinApproval(flowNo, rejectReason), null)
       message.success(rejectedNode
-        ? `已在「${rejectedNode}」節點駁回，流程已結束`
-        : '審批駁回成功')
+        ? t('approvalDetail.rejectDone', { nodeName: rejectedNode })
+        : t('approvalCenter.rejectSuccess'))
       setShowRejectModal(false)
       navigate('/approval-center')
     } catch (err) {
-      message.error((err as Error)?.message || '駁回失敗')
+      message.error((err as Error)?.message || t('approvalDetail.rejectFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -627,25 +653,31 @@ export default function ApprovalDetail() {
       } else {
         await cancelFinApproval(flowNo)
       }
-      message.success('申請已撤銷')
+      message.success(t('approvalDetail.revokeSuccess'))
       setShowRevokeModal(false)
       navigate('/approval-center')
     } catch (err) {
-      message.error((err as Error)?.message || '撤銷失敗')
+      message.error((err as Error)?.message || t('approvalDetail.revokeFailed'))
     } finally {
       setSubmitting(false)
     }
   }
 
   const renderStatusTag = (status: string) => {
-    const map: Record<string, { color: string; text: string }> = {
-      approved: { color: 'success', text: '通過' },
-      rejected: { color: 'error', text: '駁回' },
-      submitted: { color: 'processing', text: '提交' },
-      pending: { color: 'default', text: '待審批' },
+    const colorMap: Record<string, string> = {
+      approved: 'success',
+      rejected: 'error',
+      submitted: 'processing',
+      pending: 'default',
     }
-    const info = map[status] || map.pending
-    return <Tag color={info.color}>{info.text}</Tag>
+    const statusKeyMap: Record<string, string> = {
+      approved: 'approvalCenter.statusApproved',
+      rejected: 'approvalCenter.statusRejected',
+      submitted: 'approvalDetail.statusSubmitted',
+      pending: 'approvalCenter.statusPending',
+    }
+    const labelKey = statusKeyMap[status] || statusKeyMap.pending
+    return <Tag color={colorMap[status] || 'default'}>{t(labelKey)}</Tag>
   }
 
   const renderDocument = (doc: { type: string; name?: string }, index: number) => {
@@ -667,7 +699,7 @@ export default function ApprovalDetail() {
     return (
       <div key={index} className="approval-doc-thumb approval-doc-thumb--view">
         <EyeOutlined className="approval-doc-icon" style={{ color: '#666' }} />
-        <span className="approval-doc-view-label">點擊查看</span>
+        <span className="approval-doc-view-label">{t('approvalDetail.viewDoc')}</span>
       </div>
     )
   }
@@ -698,11 +730,11 @@ export default function ApprovalDetail() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {typeTitleMap[type]}
+                {typeTitleMapKeys[type] ? t(typeTitleMapKeys[type]) : type}
               </h2>
               <Tag color="blue">{data.brand}</Tag>
               <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
@@ -710,14 +742,14 @@ export default function ApprovalDetail() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={() => navigate('/approval-center')}>返回</Button>
+            <Button onClick={() => navigate('/approval-center')}>{t('common.back')}</Button>
             {data.hasRevoke && (
-              <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
+              <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
             )}
             {isPending && (
               <>
-                <Button type="primary" loading={submitting} onClick={handleApprove}>通過</Button>
-                <Button danger loading={submitting} onClick={handleReject}>駁回</Button>
+                <Button type="primary" loading={submitting} onClick={handleApprove}>{t('approvalCenter.statusApproved')}</Button>
+                <Button danger loading={submitting} onClick={handleReject}>{t('approvalCenter.statusRejected')}</Button>
               </>
             )}
           </div>
@@ -730,24 +762,24 @@ export default function ApprovalDetail() {
         <div className="approval-detail-left">
           {/* 基本信息 */}
           <div className="approval-section">
-            <div className="approval-section-title approval-section-title--blue">基本資訊</div>
+            <div className="approval-section-title approval-section-title--blue">{t('approvalDetail.baseInfo')}</div>
             <div className="approval-info-grid">
               <div className="approval-info-item">
-                <span className="approval-info-label">申請人</span>
+                <span className="approval-info-label">{t('approvalCenter.colApplicant')}</span>
                 <span className="approval-info-value">{data.applicant}</span>
               </div>
               <div className="approval-info-item">
-                <span className="approval-info-label">申請日期</span>
+                <span className="approval-info-label">{t('approvalDetail.applyDate')}</span>
                 <span className="approval-info-value">{data.applyDate}</span>
               </div>
               <div className="approval-info-item">
-                <span className="approval-info-label">流程編號</span>
+                <span className="approval-info-label">{t('common.colFlowNo')}</span>
                 <span className="approval-info-value">{data.flowNo}</span>
               </div>
               <div className="approval-info-item">
-                <span className="approval-info-label">流程狀態</span>
+                <span className="approval-info-label">{t('approvalCenter.colFlowStatus')}</span>
                 <span className="approval-info-value">
-                  <Tag color={flowStatusColorMap[data.flowStatus] || 'default'} className="approval-status-tag">{data.flowStatus}</Tag>
+                  <Tag color={flowStatusColorMap[data.flowStatus] || 'default'} className="approval-status-tag">{flowStatusLabelMapKeys[data.flowStatus] ? t(flowStatusLabelMapKeys[data.flowStatus]) : data.flowStatus}</Tag>
                 </span>
               </div>
             </div>
@@ -758,30 +790,30 @@ export default function ApprovalDetail() {
             <>
               {/* 充值帳戶資訊 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--purple">充值帳戶資訊</div>
+                <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.rechargeAccountInfo')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-label">{t('common.colGroupId')}</span>
                     <span className="approval-info-value">{data.groupId}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-label">{t('common.colGroupName')}</span>
                     <span className="approval-info-value">{data.groupName}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-label">{t('common.colBrand')}</span>
                     <span className="approval-info-value">{data.brand}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">業務類型</span>
+                    <span className="approval-info-label">{t('approvalDetail.bizType')}</span>
                     <span className="approval-info-value">{data.businessType}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">業務頻道</span>
+                    <span className="approval-info-label">{t('approvalDetail.bizChannel')}</span>
                     <span className="approval-info-value">{data.businessChannel}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">歸屬BD</span>
+                    <span className="approval-info-label">{t('common.colBd')}</span>
                     <span className="approval-info-value">{data.bdPerson}</span>
                   </div>
                 </div>
@@ -789,27 +821,27 @@ export default function ApprovalDetail() {
 
               {/* 充值金額明細 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--orange">充值金額明細</div>
+                <div className="approval-section-title approval-section-title--orange">{t('approvalDetail.rechargeAmountDetail')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">是否實收</span>
-                    <span className="approval-info-value">{data.isActual ? '是' : '否'}</span>
+                    <span className="approval-info-label">{t('approvalDetail.isActual')}</span>
+                    <span className="approval-info-value">{t(data.isActual ? 'approvalDetail.yes' : 'approvalDetail.no')}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">虛擬賬戶充值</span>
+                    <span className="approval-info-label">{t('approvalDetail.virtualRecharge')}</span>
                     <span className="approval-info-value approval-amount--orange">MOP {data.rechargeAmount?.toLocaleString()}</span>
                   </div>
                   {/* 僅實收時展示結算方式及明細 */}
                   {data.isActual && (
                     <>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">結算方式</span>
-                        <span className="approval-info-value">{data.settlementMethod}</span>
+                        <span className="approval-info-label">{t('approvalDetail.settlementMethod')}</span>
+                        <span className="approval-info-value">{payMethodLabelMapKeys[data.settlementMethod ?? ''] ? t(payMethodLabelMapKeys[data.settlementMethod ?? '']) : data.settlementMethod}</span>
                       </div>
                       {/* 對公轉賬：僅銀行轉賬 */}
                       {data.payMethod === 'corporate' && (
                         <div className="approval-info-item">
-                          <span className="approval-info-label">銀行轉賬</span>
+                          <span className="approval-info-label">{t('approvalDetail.bankTransfer')}</span>
                           <span className="approval-info-value approval-amount--blue">MOP {data.bankTransfer?.toLocaleString()}</span>
                         </div>
                       )}
@@ -817,15 +849,15 @@ export default function ApprovalDetail() {
                       {data.payMethod === 'mixed' && (
                         <>
                           <div className="approval-info-item">
-                            <span className="approval-info-label">銀行轉賬</span>
+                            <span className="approval-info-label">{t('approvalDetail.bankTransfer')}</span>
                             <span className="approval-info-value approval-amount--blue">MOP {data.bankTransfer?.toLocaleString()}</span>
                           </div>
                           <div className="approval-info-item">
-                            <span className="approval-info-label">營業額扣款</span>
+                            <span className="approval-info-label">{t('approvalDetail.revenueDeduction')}</span>
                             <span className="approval-info-value approval-amount--purple">MOP {data.revenueDeduction?.toLocaleString()}</span>
                           </div>
                           <div className="approval-info-item">
-                            <span className="approval-info-label">實收賬戶充值合計</span>
+                            <span className="approval-info-label">{t('approvalDetail.actualRechargeTotal')}</span>
                             <span className="approval-info-value approval-amount--orange">MOP {data.actualTotal?.toLocaleString()}</span>
                           </div>
                         </>
@@ -834,17 +866,17 @@ export default function ApprovalDetail() {
                       {data.payMethod === 'revenue' && (
                         <>
                           <div className="approval-info-item">
-                            <span className="approval-info-label">營業額扣款</span>
+                            <span className="approval-info-label">{t('approvalDetail.revenueDeduction')}</span>
                             <span className="approval-info-value approval-amount--purple">MOP {data.revenueDeduction?.toLocaleString()}</span>
                           </div>
                           <div className="approval-info-item">
-                            <span className="approval-info-label">實收賬戶充值合計</span>
+                            <span className="approval-info-label">{t('approvalDetail.actualRechargeTotal')}</span>
                             <span className="approval-info-value approval-amount--orange">MOP {data.actualTotal?.toLocaleString()}</span>
                           </div>
                         </>
                       )}
                       <div className="approval-info-item">
-                        <span className="approval-info-label">優惠金額</span>
+                        <span className="approval-info-label">{t('approvalDetail.discountAmount')}</span>
                         <span className="approval-info-value approval-amount--green">MOP {(data.discountAmount ?? 0).toLocaleString()}</span>
                       </div>
                     </>
@@ -855,13 +887,13 @@ export default function ApprovalDetail() {
               {/* 扣款門店（僅實收 & 混合支付/營業額支付時展示） */}
               {data.isActual && (data.payMethod === 'mixed' || data.payMethod === 'revenue') && data.deductStores && data.deductStores.length > 0 && (
                 <div className="approval-section">
-                  <div className="approval-section-title">扣款門店</div>
+                  <div className="approval-section-title">{t('approvalDetail.deductStores')}</div>
                   <table className="approval-repayment-table">
                     <thead>
                       <tr>
-                        <th>門店ID</th>
-                        <th>門店名稱</th>
-                        <th>扣款金額</th>
+                        <th>{t('common.colStoreId')}</th>
+                        <th>{t('common.colStoreName')}</th>
+                        <th>{t('approvalDetail.deductAmount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -879,7 +911,7 @@ export default function ApprovalDetail() {
                         </tr>
                       ))}
                       <tr style={{ fontWeight: 600, background: '#fafafa' }}>
-                        <td colSpan={2} style={{ textAlign: 'right' }}>合計</td>
+                        <td colSpan={2} style={{ textAlign: 'right' }}>{t('approvalDetail.total')}</td>
                         <td>
                           <span style={{
                             display: 'inline-block', padding: '2px 10px', borderRadius: 4,
@@ -899,47 +931,47 @@ export default function ApprovalDetail() {
             <>
               {/* 基础信息 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--purple">基礎信息</div>
+                <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.baseInfo')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-label">{t('common.colGroupId')}</span>
                     <span className="approval-info-value">{data.groupId}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-label">{t('common.colGroupName')}</span>
                     <span className="approval-info-value">{data.groupName}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-label">{t('common.colBrand')}</span>
                     <span className="approval-info-value">{data.brand}</span>
                   </div>
                 </div>
               </div>
               {/* 扣款方式 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--orange">扣款方式</div>
+                <div className="approval-section-title approval-section-title--orange">{t('approvalDetail.deductMethodTitle')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">扣款方式</span>
-                    <span className="approval-info-value"><Tag color="orange">{data.deductMethod}</Tag></span>
+                    <span className="approval-info-label">{t('approvalDetail.deductMethodTitle')}</span>
+                    <span className="approval-info-value"><Tag color="orange">{deductMethodLabelMapKeys[data.deductMethod ?? ''] ? t(deductMethodLabelMapKeys[data.deductMethod ?? '']) : data.deductMethod}</Tag></span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">扣款金額</span>
+                    <span className="approval-info-label">{t('approvalDetail.deductAmount')}</span>
                     <span className="approval-info-value approval-amount--red">MOP {data.deductAmount?.toLocaleString()}</span>
                   </div>
                   {/* 消费扣款特有字段 */}
                   {data.deductMethodType === 'consume' && (
                     <>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">業務頻道</span>
+                        <span className="approval-info-label">{t('approvalDetail.bizChannel')}</span>
                         <span className="approval-info-value">{data.consumeChannel}</span>
                       </div>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">門店名稱</span>
+                        <span className="approval-info-label">{t('common.colStoreName')}</span>
                         <span className="approval-info-value">{data.consumeStore}</span>
                       </div>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">消費類型</span>
+                        <span className="approval-info-label">{t('approvalDetail.consumeType')}</span>
                         <span className="approval-info-value">{data.consumeType}</span>
                       </div>
                     </>
@@ -948,15 +980,15 @@ export default function ApprovalDetail() {
                   {data.deductMethodType === 'batch' && (
                     <>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">批次號</span>
+                        <span className="approval-info-label">{t('common.colBatchNo')}</span>
                         <span className="approval-info-value"><Tag color="blue">{data.batchNo}</Tag></span>
                       </div>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">可扣金額</span>
+                        <span className="approval-info-label">{t('approvalDetail.batchDeductible')}</span>
                         <span className="approval-info-value approval-amount--blue">MOP {data.batchDeductible?.toLocaleString()}</span>
                       </div>
                       <div className="approval-info-item">
-                        <span className="approval-info-label">結算方式</span>
+                        <span className="approval-info-label">{t('approvalDetail.settlementMethod')}</span>
                         <span className="approval-info-value">{data.batchSettlement}</span>
                       </div>
                     </>
@@ -971,54 +1003,54 @@ export default function ApprovalDetail() {
             <>
               {/* 转出集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--purple">轉出集團</div>
+                <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.fromGroup')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-label">{t('common.colGroupId')}</span>
                     <span className="approval-info-value">{data.fromGroupId}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-label">{t('common.colGroupName')}</span>
                     <span className="approval-info-value">{data.fromGroupName}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-label">{t('common.colBrand')}</span>
                     <span className="approval-info-value">{data.fromBrand}</span>
                   </div>
                 </div>
               </div>
               {/* 转入集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--green">轉入集團</div>
+                <div className="approval-section-title approval-section-title--green">{t('approvalDetail.toGroup')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-label">{t('common.colGroupId')}</span>
                     <span className="approval-info-value">{data.toGroupId}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-label">{t('common.colGroupName')}</span>
                     <span className="approval-info-value">{data.toGroupName}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-label">{t('common.colBrand')}</span>
                     <span className="approval-info-value">{data.toBrand}</span>
                   </div>
                 </div>
               </div>
               {/* 转账金额 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--orange">轉賬金額</div>
+                <div className="approval-section-title approval-section-title--orange">{t('approvalDetail.transferAmountTitle')}</div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">轉賬金額</span>
+                    <span className="approval-info-label">{t('approvalDetail.transferAmountTitle')}</span>
                     <span className="approval-info-value approval-amount--orange">MOP {data.transferAmount?.toLocaleString()}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">轉出集團扣除</span>
+                    <span className="approval-info-label">{t('approvalDetail.fromGroupDeduct')}</span>
                     <span className="approval-info-value approval-amount--red">-MOP {data.transferAmount?.toLocaleString()}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">轉入集團增加</span>
+                    <span className="approval-info-label">{t('approvalDetail.toGroupAdd')}</span>
                     <span className="approval-info-value approval-amount--green">+MOP {data.transferAmount?.toLocaleString()}</span>
                   </div>
                 </div>
@@ -1031,44 +1063,44 @@ export default function ApprovalDetail() {
             <>
               {/* 合并集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--purple">註銷集團 <Tag color="red" style={{ fontSize: 11, marginLeft: 4 }}>即將關閉</Tag></div>
+                <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.cancelledGroup')} <Tag color="red" style={{ fontSize: 11, marginLeft: 4 }}>{t('approvalDetail.closingSoon')}</Tag></div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-label">{t('common.colGroupId')}</span>
                     <span className="approval-info-value">{data.mergeGroupId}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-label">{t('common.colGroupName')}</span>
                     <span className="approval-info-value">{data.mergeGroupName}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-label">{t('common.colBrand')}</span>
                     <span className="approval-info-value">{data.mergeBrand}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">虛擬賬戶餘額</span>
+                    <span className="approval-info-label">{t('approvalDetail.virtualBalance')}</span>
                     <span className="approval-info-value approval-amount--blue">MOP {data.mergeVirtualBalance?.toLocaleString()}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">欠款金額</span>
+                    <span className="approval-info-label">{t('approvalDetail.debtAmount')}</span>
                     <span className="approval-info-value approval-amount--red">MOP {data.mergeDebtAmount?.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
               {/* 被合并集团资讯 */}
               <div className="approval-section">
-                <div className="approval-section-title approval-section-title--green">存續集團 <Tag color="green" style={{ fontSize: 11, marginLeft: 4 }}>接收資產</Tag></div>
+                <div className="approval-section-title approval-section-title--green">{t('approvalDetail.survivingGroup')} <Tag color="green" style={{ fontSize: 11, marginLeft: 4 }}>{t('approvalDetail.receivingAssets')}</Tag></div>
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團ID</span>
+                    <span className="approval-info-label">{t('common.colGroupId')}</span>
                     <span className="approval-info-value">{data.mergeToGroupId}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">集團名稱</span>
+                    <span className="approval-info-label">{t('common.colGroupName')}</span>
                     <span className="approval-info-value">{data.mergeToGroupName}</span>
                   </div>
                   <div className="approval-info-item">
-                    <span className="approval-info-label">所屬品牌</span>
+                    <span className="approval-info-label">{t('common.colBrand')}</span>
                     <span className="approval-info-value">{data.mergeToBrand}</span>
                   </div>
                 </div>
@@ -1076,9 +1108,9 @@ export default function ApprovalDetail() {
               {/* 欠款偿还 */}
               {data.repayStores && data.repayStores.length > 0 && (
                 <div className="approval-section">
-                  <div className="approval-section-title" style={{ borderLeftColor: '#ff4d4f', color: '#ff4d4f' }}>欠款償還</div>
+                  <div className="approval-section-title" style={{ borderLeftColor: '#ff4d4f', color: '#ff4d4f' }}>{t('approvalDetail.debtRepayment')}</div>
                   <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
-                    註銷集團存在欠款 MOP {data.mergeDebtAmount?.toLocaleString()}，分配至存續集團下門店進行償還
+                    {t('approvalDetail.debtRepaymentDesc', { amount: data.mergeDebtAmount?.toLocaleString() })}
                   </div>
                   <Table
                     size="small"
@@ -1088,15 +1120,15 @@ export default function ApprovalDetail() {
                     rowKey="storeId"
                     columns={[
                       {
-                        title: '門店ID/名稱', dataIndex: 'storeName', width: 280,
+                        title: t('approvalDetail.storeIdName'), dataIndex: 'storeName', width: 280,
                         render: (val: string) => <span>{val}</span>,
                       },
                       {
-                        title: '歸屬BD', dataIndex: 'bd', width: 120, align: 'center' as const,
+                        title: t('common.colBd'), dataIndex: 'bd', width: 120, align: 'center' as const,
                         render: (val: string) => <Tag color="blue">{val}</Tag>,
                       },
                       {
-                        title: '償還金額', dataIndex: 'amount', width: 160, align: 'center' as const,
+                        title: t('approvalDetail.repayAmount'), dataIndex: 'amount', width: 160, align: 'center' as const,
                         render: (val: number) => (
                           <span style={{
                             padding: '2px 10px', borderRadius: 4,
@@ -1114,7 +1146,7 @@ export default function ApprovalDetail() {
                         <Table.Summary fixed>
                           <Table.Summary.Row>
                             <Table.Summary.Cell index={0} colSpan={2} align="center">
-                              <strong>已分配合計</strong>
+                              <strong>{t('approvalDetail.allocatedTotal')}</strong>
                             </Table.Summary.Cell>
                             <Table.Summary.Cell index={1} align="center">
                               <span style={{
@@ -1133,7 +1165,7 @@ export default function ApprovalDetail() {
                     <div style={{ marginTop: 8, fontSize: 12, textAlign: 'right' }}>
                       {data.repayStores.reduce((sum, r) => sum + r.amount, 0) < (data.mergeDebtAmount || 0) && (
                         <span style={{ color: '#ff4d4f' }}>
-                          尚有 MOP {(data.mergeDebtAmount! - data.repayStores.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()} 未分配
+                          {t('approvalDetail.unallocated', { amount: (data.mergeDebtAmount! - data.repayStores.reduce((sum, r) => sum + r.amount, 0)).toLocaleString() })}
                         </span>
                       )}
                     </div>
@@ -1146,39 +1178,39 @@ export default function ApprovalDetail() {
           {/* 推广赠送类型 */}
           {type === 'gift' && (
             <div className="approval-section">
-              <div className="approval-section-title approval-section-title--purple">贈送配置資訊</div>
+              <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.giftConfig')}</div>
               <div className="approval-info-grid">
                 <div className="approval-info-item">
-                  <span className="approval-info-label">集團ID</span>
+                  <span className="approval-info-label">{t('common.colGroupId')}</span>
                   <span className="approval-info-value">{data.giftGroupId}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">集團名稱</span>
+                  <span className="approval-info-label">{t('common.colGroupName')}</span>
                   <span className="approval-info-value">{data.giftGroupName}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">門店ID</span>
+                  <span className="approval-info-label">{t('common.colStoreId')}</span>
                   <span className="approval-info-value">{data.giftStoreId}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">門店名稱</span>
+                  <span className="approval-info-label">{t('common.colStoreName')}</span>
                   <span className="approval-info-value">{data.giftStoreName}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">所屬品牌</span>
+                  <span className="approval-info-label">{t('common.colBrand')}</span>
                   <span className="approval-info-value">{data.giftBrand}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">廣告類型</span>
-                  <span className="approval-info-value approval-gift-highlight">{data.giftAdType}</span>
+                  <span className="approval-info-label">{t('approvalDetail.adType')}</span>
+                  <span className="approval-info-value approval-gift-highlight">{giftAdTypeLabelMapKeys[data.giftAdType ?? ''] ? t(giftAdTypeLabelMapKeys[data.giftAdType ?? '']) : data.giftAdType}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">贈送天數</span>
-                  <span className="approval-info-value approval-gift-highlight">{data.giftDays} 天</span>
+                  <span className="approval-info-label">{t('approvalDetail.giftDays')}</span>
+                  <span className="approval-info-value approval-gift-highlight">{data.giftDays} {t('approvalDetail.days')}</span>
                 </div>
                 <div className="approval-info-item">
-                  <span className="approval-info-label">有效期</span>
-                  <span className="approval-info-value approval-gift-highlight">{data.giftValidDays ?? '--'} 天</span>
+                  <span className="approval-info-label">{t('approvalDetail.validDays')}</span>
+                  <span className="approval-info-value approval-gift-highlight">{data.giftValidDays ?? '--'} {t('approvalDetail.days')}</span>
                 </div>
               </div>
             </div>
@@ -1186,7 +1218,7 @@ export default function ApprovalDetail() {
 
           {/* 相关凭证 */}
           <div className="approval-section">
-            <div className="approval-section-title">相關憑證</div>
+            <div className="approval-section-title">{t('approvalDetail.documents')}</div>
             <div className="approval-documents">
               {data.documents?.map((doc, i) => renderDocument(doc, i))}
             </div>
@@ -1194,16 +1226,16 @@ export default function ApprovalDetail() {
 
           {/* 备注信息 */}
           <div className="approval-section">
-            <div className="approval-section-title">備註信息</div>
+            <div className="approval-section-title">{t('approvalDetail.notesTitle')}</div>
             <div className="approval-notes">{data.notes}</div>
           </div>
 
           {/* 审批意见 */}
           <div className="approval-section">
-            <div className="approval-section-title">審批意見</div>
+            <div className="approval-section-title">{t('approvalDetail.commentTitle')}</div>
             <Input.TextArea
               rows={3}
-              placeholder="可備註審核意見，限制200字！"
+              placeholder={t('approvalDetail.commentPlaceholder')}
               maxLength={200}
               showCount
               value={approvalComment}
@@ -1214,31 +1246,31 @@ export default function ApprovalDetail() {
 
         {/* 右侧审批流 */}
         <div className="approval-detail-right">
-          <div className="approval-timeline-title">審批流程</div>
+          <div className="approval-timeline-title">{t('approvalCenter.flowSection')}</div>
           <div className="approval-timeline">
             {data.timeline.map((item, index) => (
               <div key={index} className={`approval-timeline-item approval-timeline-item--${item.status}`}>
                 <div className="approval-timeline-dot" />
                 <div className="approval-timeline-content">
                   <div className="approval-timeline-header">
-                    <span className="approval-timeline-node">{item.node}</span>
+                    <span className="approval-timeline-node">{timelineNodeMapKeys[item.node] ? t(timelineNodeMapKeys[item.node]) : item.node}</span>
                     <span className="approval-timeline-time">{item.time}</span>
                   </div>
                   <div className="approval-timeline-info">
-                    {item.status === 'submitted' ? '申請人' : '審批人'}：{item.approver}
+                    {item.status === 'submitted' ? t('approvalCenter.colApplicant') : t('approvalCenter.colApprover')}：{item.approver}
                   </div>
                   <div className="approval-timeline-status">
                     {renderStatusTag(item.status)}
                   </div>
                   {item.comment && (
                     <div className="approval-timeline-comment">
-                      <span className="approval-timeline-comment-label">審批意見：</span>
+                      <span className="approval-timeline-comment-label">{t('approvalDetail.commentTitle')}：</span>
                       {item.comment}
                     </div>
                   )}
                   {item.rejectReason && (
                     <div className="approval-timeline-reject">
-                      <span className="approval-timeline-reject-label">駁回理由：</span>
+                      <span className="approval-timeline-reject-label">{t('approvalCenter.rejectReasonTitle')}：</span>
                       {item.rejectReason}
                     </div>
                   )}
@@ -1251,14 +1283,14 @@ export default function ApprovalDetail() {
 
       {/* 底部操作栏 */}
       <div className="approval-detail-footer">
-        <Button onClick={() => navigate('/approval-center')}>返回</Button>
+        <Button onClick={() => navigate('/approval-center')}>{t('common.back')}</Button>
         {data.hasRevoke && (
-          <Button icon={<UndoOutlined />} onClick={handleRevoke}>撤銷</Button>
+          <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
         )}
         {isPending && (
           <>
-            <Button type="primary" loading={submitting} onClick={handleApprove}>通過</Button>
-            <Button danger loading={submitting} onClick={handleReject}>駁回</Button>
+            <Button type="primary" loading={submitting} onClick={handleApprove}>{t('approvalCenter.statusApproved')}</Button>
+            <Button danger loading={submitting} onClick={handleReject}>{t('approvalCenter.statusRejected')}</Button>
           </>
         )}
       </div>
@@ -1267,16 +1299,16 @@ export default function ApprovalDetail() {
       <Modal
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>撤銷確認</span>
-            <Button type="link" size="small" onClick={() => setShowRevokeModal(false)} style={{ padding: 0 }}>關閉</Button>
+            <span>{t('approvalCenter.cancelTitle')}</span>
+            <Button type="link" size="small" onClick={() => setShowRevokeModal(false)} style={{ padding: 0 }}>{t('approvalDetail.close')}</Button>
           </div>
         }
         open={showRevokeModal}
         onCancel={() => setShowRevokeModal(false)}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <Button onClick={() => setShowRevokeModal(false)}>取消</Button>
-            <Button type="primary" loading={submitting} onClick={handleRevokeConfirm}>確定撤銷</Button>
+            <Button onClick={() => setShowRevokeModal(false)}>{t('common.cancel')}</Button>
+            <Button type="primary" loading={submitting} onClick={handleRevokeConfirm}>{t('approvalDetail.confirmCancel')}</Button>
           </div>
         }
         width={440}
@@ -1286,29 +1318,29 @@ export default function ApprovalDetail() {
           <div className="revoke-modal-icon">
             <ExclamationCircleOutlined />
           </div>
-          <div className="revoke-modal-question">您確定要撤銷本次申請嗎？</div>
-          <div className="revoke-modal-warning">撤銷後，整個審批流程將立即終止，此操作不可恢復，請謹慎確認！</div>
+          <div className="revoke-modal-question">{t('approvalDetail.revokeQuestion')}</div>
+          <div className="revoke-modal-warning">{t('approvalDetail.revokeWarning')}</div>
         </div>
       </Modal>
 
       {/* 驳回弹窗 */}
       <Modal
-        title="駁回審批"
+        title={t('approvalDetail.rejectTitle')}
         open={showRejectModal}
         onCancel={() => setShowRejectModal(false)}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <Button onClick={() => setShowRejectModal(false)}>取消</Button>
-            <Button danger loading={submitting} onClick={handleRejectConfirm} disabled={!rejectReason.trim()}>確定駁回</Button>
+            <Button onClick={() => setShowRejectModal(false)}>{t('common.cancel')}</Button>
+            <Button danger loading={submitting} onClick={handleRejectConfirm} disabled={!rejectReason.trim()}>{t('approvalDetail.confirmReject')}</Button>
           </div>
         }
         width={480}
       >
         <div style={{ padding: '16px 0' }}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>駁回理由 <span style={{ color: '#E53935' }}>*</span></div>
+          <div style={{ marginBottom: 8, fontWeight: 500 }}>{t('approvalCenter.rejectReasonTitle')} <span style={{ color: '#E53935' }}>*</span></div>
           <Input.TextArea
             rows={4}
-            placeholder="請輸入駁回理由（必填）"
+            placeholder={t('approvalCenter.rejectPlaceholder')}
             maxLength={200}
             showCount
             value={rejectReason}

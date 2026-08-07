@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -20,37 +22,6 @@ const userPermissions = {
   canBoost: true,   // 是否有加分權限
   canDemote: true,  // 是否有減分權限
 }
-
-/** 搜索頻道 */
-const searchChannelOptions = [
-  { label: '全部', value: 'all' },
-  { label: '大首頁', value: 'home' },
-  { label: '外賣頻道', value: 'takeaway' },
-  { label: '團購頻道', value: 'groupBuy' },
-  { label: '超市頻道', value: 'supermarket' },
-]
-
-/** 干預方向 */
-const interventionDirectionOptions = [
-  { label: '全部', value: 'all' },
-  { label: '加分', value: 'boost' },
-  { label: '減分', value: 'demote' },
-]
-
-/** 調整方式（查詢用，含全部） */
-const adjustMethodQueryOptions = [
-  { label: '分數打折', value: 'discount' },
-  { label: '固定扣分', value: 'deduction' },
-  { label: '固定加分', value: 'fixedBoost' },
-  { label: '分數加成', value: 'percentBoost' },
-]
-
-/** 狀態 */
-const statusOptions = [
-  { label: '全部', value: 'all' },
-  { label: '生效', value: 'active' },
-  { label: '失效', value: 'inactive' },
-]
 
 /** 加分规则类型 */
 type BoostRuleType = 'amount_match' | 'fixed_boost'
@@ -95,19 +66,18 @@ interface InterventionRecord {
   operateTime: string
 }
 
-const channelMap: Record<string, string> = { home: '大首頁', takeaway: '外賣頻道', groupBuy: '團購頻道', supermarket: '超市頻道' }
 const _adjustMethodMap: Record<string, string> = { discount: '分數打折', deduction: '固定扣分', fixedBoost: '固定加分', percentBoost: '分數加成' }
 const _adjustMethodColorMap: Record<string, string> = { discount: 'orange', deduction: 'red', fixedBoost: 'green', percentBoost: 'blue' }
 
 /** 格式化調整數值顯示 */
-const formatAdjustValue = (method: string, value: number): string => {
+const formatAdjustValue = (method: string, value: number, t: TFunction): string => {
   switch (method) {
     case 'discount':
-      return `${value / 10}折`
+      return t('searchWeight.discountFold', { value: value / 10 })
     case 'deduction':
-      return `-${value}分`
+      return t('searchWeight.minusPoints', { value })
     case 'fixedBoost':
-      return `+${value}分`
+      return t('searchWeight.plusPoints', { value })
     case 'percentBoost':
       return `${value}%`
     default:
@@ -116,25 +86,25 @@ const formatAdjustValue = (method: string, value: number): string => {
 }
 
 /** 格式化加分梯队显示 */
-const formatBoostTiers = (tiers: BoostTier[]): string => {
+const formatBoostTiers = (tiers: BoostTier[], t: TFunction): string => {
   return tiers.map((tier, idx) => {
     const amountRange = tier.maxAmount
-      ? `消費${tier.minAmount}-${tier.maxAmount}元`
-      : `消費≥${tier.minAmount}元`
+      ? t('searchWeight.consumeRange', { min: tier.minAmount, max: tier.maxAmount })
+      : t('searchWeight.consumeMin', { min: tier.minAmount })
     const boostDesc = tier.boostType === 'amount_match'
-      ? '按消費金額加分'
-      : `+${tier.boostValue}分`
+      ? t('searchWeight.amountMatchDesc')
+      : t('searchWeight.plusPoints', { value: tier.boostValue })
     return `${idx + 1}. ${amountRange} → ${boostDesc}`
   }).join('\n')
 }
 
 /** 格式化减分梯队显示 */
-const formatDemoteTiers = (tiers: DemoteTier[]): string => {
+const formatDemoteTiers = (tiers: DemoteTier[], t: TFunction): string => {
   return tiers.map((tier, idx) => {
     const deductionDesc = tier.deductionType === 'fixed_deduction'
-      ? `扣${tier.deductionValue}分`
-      : `扣${tier.deductionValue}%`
-    return `${idx + 1}. ${tier.days}天未購買 → ${deductionDesc}`
+      ? t('searchWeight.deductPoints', { value: tier.deductionValue })
+      : t('searchWeight.deductPercent', { value: tier.deductionValue })
+    return `${idx + 1}. ${t('searchWeight.daysNoPurchase', { days: tier.days })} → ${deductionDesc}`
   }).join('\n')
 }
 
@@ -153,18 +123,18 @@ const _getMethodOptionsByDirection = (direction: 'boost' | 'demote') => {
 }
 
 /** 獲取調整數值輸入配置 */
-const getAdjustValueConfig = (method: string) => {
+const getAdjustValueConfig = (method: string, t: TFunction) => {
   switch (method) {
     case 'discount':
-      return { placeholder: '請輸入折扣，如80代表8折', addonAfter: '%' }
+      return { placeholder: t('searchWeight.discountPlaceholder'), addonAfter: '%' }
     case 'deduction':
-      return { placeholder: '請輸入扣減分數', addonAfter: '分' }
+      return { placeholder: t('searchWeight.deductionPlaceholder'), addonAfter: t('searchWeight.pointsUnit') }
     case 'fixedBoost':
-      return { placeholder: '請輸入加分分數', addonAfter: '分' }
+      return { placeholder: t('searchWeight.fixedBoostPlaceholder'), addonAfter: t('searchWeight.pointsUnit') }
     case 'percentBoost':
-      return { placeholder: '請輸入加成百分比，如120代表加20%', addonAfter: '%' }
+      return { placeholder: t('searchWeight.percentPlaceholder'), addonAfter: '%' }
     default:
-      return { placeholder: '請輸入數值', addonAfter: '' }
+      return { placeholder: t('searchWeight.valuePlaceholder'), addonAfter: '' }
   }
 }
 
@@ -422,6 +392,42 @@ const mockData: InterventionRecord[] = [
 ]
 
 export default function SearchWeightConfig() {
+  const { t } = useTranslation()
+
+  // 下拉選項依賴 t，需定義在組件內以便響應語言切換
+  const searchChannelOptions = [
+    { label: t('searchWeight.channelAll'), value: 'all' },
+    { label: t('searchWeight.channelHome'), value: 'home' },
+    { label: t('searchWeight.channelTakeaway'), value: 'takeaway' },
+    { label: t('searchWeight.channelGroupBuy'), value: 'groupBuy' },
+    { label: t('searchWeight.channelSupermarket'), value: 'supermarket' },
+  ]
+  const interventionDirectionOptions = [
+    { label: t('searchWeight.dirAll'), value: 'all' },
+    { label: t('searchWeight.dirBoost'), value: 'boost' },
+    { label: t('searchWeight.dirDemote'), value: 'demote' },
+  ]
+  const adjustMethodQueryOptions = [
+    { label: t('searchWeight.methodDiscount'), value: 'discount' },
+    { label: t('searchWeight.methodDeduction'), value: 'deduction' },
+    { label: t('searchWeight.methodFixedBoost'), value: 'fixedBoost' },
+    { label: t('searchWeight.methodPercentBoost'), value: 'percentBoost' },
+  ]
+  const statusOptions = [
+    { label: t('searchWeight.statusAll'), value: 'all' },
+    { label: t('searchWeight.statusActive'), value: 'active' },
+    { label: t('searchWeight.statusInactive'), value: 'inactive' },
+  ]
+  const channelLabel = (c: string) => {
+    const map: Record<string, string> = {
+      home: t('searchWeight.channelHome'),
+      takeaway: t('searchWeight.channelTakeaway'),
+      groupBuy: t('searchWeight.channelGroupBuy'),
+      supermarket: t('searchWeight.channelSupermarket'),
+    }
+    return map[c] || c
+  }
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<InterventionRecord | null>(null)
@@ -498,12 +504,12 @@ export default function SearchWeightConfig() {
   /** 切換狀態 */
   const handleToggleStatus = (record: InterventionRecord) => {
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
-    const statusText = newStatus === 'active' ? '生效' : '失效'
+    const statusText = newStatus === 'active' ? t('searchWeight.statusActive') : t('searchWeight.statusInactive')
     Modal.confirm({
-      title: '確認操作',
-      content: `確定要將集團「${record.groupName}」的干預配置設為「${statusText}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('searchWeight.toggleTitle'),
+      content: t('searchWeight.toggleContent', { name: record.groupName, status: statusText }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: () => {
         // 更新数据源中的状态
         setDataSource(prevData => 
@@ -511,7 +517,7 @@ export default function SearchWeightConfig() {
             item.key === record.key ? { ...item, status: newStatus } : item
           )
         )
-        message.success(`已${statusText}`)
+        message.success(t('searchWeight.toggleDone', { status: statusText }))
       },
     })
   }
@@ -539,10 +545,10 @@ export default function SearchWeightConfig() {
             return item
           })
         )
-        message.success('編輯成功')
+        message.success(t('common.updateSuccess'))
       } else {
         // 新增模式
-        message.success('新增成功')
+        message.success(t('common.addSuccess'))
       }
       setIsModalOpen(false)
     })
@@ -596,56 +602,56 @@ export default function SearchWeightConfig() {
 
   /** 彈窗標題 */
   const getModalTitle = () => {
-    if (editingRecord) return '編輯干預配置'
-    return '新增商戶配置'
+    if (editingRecord) return t('searchWeight.editTitle')
+    return t('searchWeight.addTitle')
   }
 
   /** 列配置元數據 */
   const columnMeta = useMemo(
     () => [
-      { key: 'interventionId', title: '配置ID' },
-      { key: 'groupId', title: '集團ID' },
-      { key: 'groupName', title: '集團名稱' },
-      { key: 'brand', title: '所屬品牌' },
-      { key: 'interventionDirection', title: '干預方向' },
-      { key: 'searchChannel', title: '搜索頻道' },
-      { key: 'effectDate', title: '生效時間' },
-      { key: 'status', title: '狀態' },
-      { key: 'operator', title: '操作人' },
-      { key: 'operateTime', title: '操作時間' },
-      { key: 'action', title: '操作' },
+      { key: 'interventionId', title: t('searchWeight.colConfigId') },
+      { key: 'groupId', title: t('searchWeight.colGroupId') },
+      { key: 'groupName', title: t('searchWeight.colGroupName') },
+      { key: 'brand', title: t('searchWeight.colBrand') },
+      { key: 'interventionDirection', title: t('searchWeight.colDirection') },
+      { key: 'searchChannel', title: t('searchWeight.colSearchChannel') },
+      { key: 'effectDate', title: t('searchWeight.colEffectDate') },
+      { key: 'status', title: t('searchWeight.colStatus') },
+      { key: 'operator', title: t('searchWeight.colOperator') },
+      { key: 'operateTime', title: t('common.colOperateTime') },
+      { key: 'action', title: t('searchWeight.colAction') },
     ],
-    [],
+    [t],
   )
 
   const { configComponent, applyConfig } = useColumnConfig('search-weight-config', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  const _adjustValueConfig = getAdjustValueConfig(currentAdjustMethod)
+  const _adjustValueConfig = getAdjustValueConfig(currentAdjustMethod, t)
 
   const columns: TableColumnsType<InterventionRecord> = [
     {
-      title: '配置ID',
+      title: t('searchWeight.colConfigId'),
       dataIndex: 'interventionId',
       key: 'interventionId',
       width: 120,
     },
     {
-      title: '集團ID',
+      title: t('searchWeight.colGroupId'),
       dataIndex: 'groupId',
       key: 'groupId',
       width: 100,
     },
     {
-      title: '集團名稱',
+      title: t('searchWeight.colGroupName'),
       dataIndex: 'groupName',
       key: 'groupName',
       width: 160,
       ellipsis: true,
     },
     {
-      title: '所屬品牌',
+      title: t('searchWeight.colBrand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
@@ -654,48 +660,48 @@ export default function SearchWeightConfig() {
       ),
     },
     {
-      title: '干預方向',
+      title: t('searchWeight.colDirection'),
       dataIndex: 'interventionDirection',
       key: 'interventionDirection',
       width: 90,
       render: (v: string) =>
-        v === 'boost' ? <Tag color="green">加分</Tag> : <Tag color="red">減分</Tag>,
+        v === 'boost' ? <Tag color="green">{t('searchWeight.dirBoost')}</Tag> : <Tag color="red">{t('searchWeight.dirDemote')}</Tag>,
     },
     {
-      title: '搜索頻道',
+      title: t('searchWeight.colSearchChannel'),
       dataIndex: 'searchChannel',
       key: 'searchChannel',
       width: 140,
-      render: (v: string[]) => v.map(c => channelMap[c] || c).join('、'),
+      render: (v: string[]) => v.map(c => channelLabel(c)).join('、'),
     },
     {
-      title: '生效時間',
+      title: t('searchWeight.colEffectDate'),
       key: 'effectDate',
       width: 200,
       render: (_, r) => `${r.effectStartDate} ~ ${r.effectEndDate}`,
     },
     {
-      title: '狀態',
+      title: t('searchWeight.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       render: (v: string) =>
-        v === 'active' ? <Tag color="success">生效</Tag> : <Tag color="default">失效</Tag>,
+        v === 'active' ? <Tag color="success">{t('searchWeight.statusActive')}</Tag> : <Tag color="default">{t('searchWeight.statusInactive')}</Tag>,
     },
     {
-      title: '操作人',
+      title: t('searchWeight.colOperator'),
       dataIndex: 'operator',
       key: 'operator',
       width: 110,
     },
     {
-      title: '操作時間',
+      title: t('common.colOperateTime'),
       dataIndex: 'operateTime',
       key: 'operateTime',
       width: 160,
     },
     {
-      title: '操作',
+      title: t('searchWeight.colAction'),
       key: 'action',
       width: 180,
       fixed: 'right',
@@ -710,7 +716,7 @@ export default function SearchWeightConfig() {
               e.preventDefault()
               handleDetail(record)
             }}>
-              詳情
+              {t('searchWeight.detail')}
             </Button>
             <Button
               type="link"
@@ -721,7 +727,7 @@ export default function SearchWeightConfig() {
                 handleEdit(record)
               }}
             >
-              編輯
+              {t('common.edit')}
             </Button>
             <Button
               type="link"
@@ -732,7 +738,7 @@ export default function SearchWeightConfig() {
                 handleToggleStatus(record)
               }}
             >
-              {record.status === 'active' ? '失效' : '生效'}
+              {record.status === 'active' ? t('searchWeight.statusInactive') : t('searchWeight.statusActive')}
             </Button>
           </Space>
         )
@@ -745,36 +751,36 @@ export default function SearchWeightConfig() {
       {/* 查詢區域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="集團名稱/ID">
-            <Input placeholder="請輸入集團名稱或ID" allowClear />
+          <Form.Item label={t('searchWeight.colGroupNameId')}>
+            <Input placeholder={t('searchWeight.groupPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="全部" allowClear options={brandOptions} />
+          <Form.Item label={t('searchWeight.colBrand')}>
+            <Select placeholder={t('searchWeight.channelAll')} allowClear options={brandOptions} />
           </Form.Item>
-          <Form.Item label="搜索頻道">
-            <Select placeholder="全部" allowClear options={searchChannelOptions} />
+          <Form.Item label={t('searchWeight.colSearchChannel')}>
+            <Select placeholder={t('searchWeight.channelAll')} allowClear options={searchChannelOptions} />
           </Form.Item>
-          <Form.Item label="干預方向">
-            <Select placeholder="全部" allowClear options={interventionDirectionOptions} />
+          <Form.Item label={t('searchWeight.colDirection')}>
+            <Select placeholder={t('searchWeight.channelAll')} allowClear options={interventionDirectionOptions} />
           </Form.Item>
-          <Form.Item label="調整方式">
-            <Select mode="multiple" placeholder="全部" allowClear options={adjustMethodQueryOptions} />
+          <Form.Item label={t('searchWeight.colAdjustMethod')}>
+            <Select mode="multiple" placeholder={t('searchWeight.channelAll')} allowClear options={adjustMethodQueryOptions} />
           </Form.Item>
-          <Form.Item label="狀態">
-            <Select placeholder="全部" allowClear options={statusOptions} />
+          <Form.Item label={t('searchWeight.colStatus')}>
+            <Select placeholder={t('searchWeight.channelAll')} allowClear options={statusOptions} />
           </Form.Item>
-          <Form.Item label="生效時間">
-            <RangePicker placeholder={['開始時間', '結束時間']} />
+          <Form.Item label={t('searchWeight.colEffectDate')}>
+            <RangePicker placeholder={[t('common.startTime'), t('common.endTime')]} />
           </Form.Item>
-          <Form.Item label="操作人">
-            <Input placeholder="請輸入操作人姓名/工號" allowClear />
+          <Form.Item label={t('searchWeight.colOperator')}>
+            <Input placeholder={t('searchWeight.operatorPlaceholder')} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />}>
-                搜尋
+                {t('searchWeight.search')}
               </Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -783,7 +789,7 @@ export default function SearchWeightConfig() {
       {/* 功能區域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           <Button
@@ -800,7 +806,7 @@ export default function SearchWeightConfig() {
               setIsModalOpen(true)
             }}
           >
-            新增商戶
+            {t('searchWeight.addMerchant')}
           </Button>
           {configComponent}
         </div>
@@ -815,7 +821,7 @@ export default function SearchWeightConfig() {
           pagination={{
             total: dataSource.length,
             pageSize: 10,
-            showTotal: total => `共 ${total} 條`,
+            showTotal: total => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 10,
@@ -833,49 +839,49 @@ export default function SearchWeightConfig() {
         open={isModalOpen}
         onOk={handleSave}
         onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={680}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
-            label="集團ID"
+            label={t('searchWeight.groupIdLabel')}
             name="groupId"
-            rules={[{ required: true, message: '請輸入集團ID' }]}
+            rules={[{ required: true, message: t('searchWeight.groupIdRequired') }]}
           >
-            <Input placeholder="請輸入集團ID" disabled={!!editingRecord} />
+            <Input placeholder={t('searchWeight.groupIdLabel')} disabled={!!editingRecord} />
           </Form.Item>
 
           <Form.Item
-            label="集團名稱"
+            label={t('searchWeight.groupNameLabel')}
             name="groupName"
-            rules={[{ required: true, message: '請輸入集團名稱' }]}
+            rules={[{ required: true, message: t('searchWeight.groupNameRequired') }]}
           >
-            <Input placeholder="請輸入集團名稱搜索" disabled={!!editingRecord} />
+            <Input placeholder={t('searchWeight.groupNamePlaceholder')} disabled={!!editingRecord} />
           </Form.Item>
 
           <Form.Item
-            label="所屬品牌"
+            label={t('searchWeight.colBrand')}
             name="brand"
-            rules={[{ required: true, message: '請選擇' }]}
+            rules={[{ required: true, message: t('searchWeight.brandRequired') }]}
           >
             <Select
               options={brandOptions.filter(o => o.value !== 'all')}
-              placeholder="請選擇品牌"
+              placeholder={t('searchWeight.brandPlaceholder')}
               disabled={!!editingRecord}
             />
           </Form.Item>
 
           <Form.Item
-            label="搜索頻道"
+            label={t('searchWeight.colSearchChannel')}
             name="searchChannel"
-            rules={[{ required: true, message: '請選擇搜索頻道' }]}
+            rules={[{ required: true, message: t('searchWeight.channelRequired') }]}
           >
             <Select
               mode="multiple"
               options={searchChannelOptions.filter(o => o.value !== 'all')}
-              placeholder="請選擇搜索頻道"
+              placeholder={t('searchWeight.channelPlaceholder')}
               disabled={!!editingRecord}
             />
           </Form.Item>
@@ -883,15 +889,15 @@ export default function SearchWeightConfig() {
           {/* 新增模式下显示干预类目选择 */}
           {!editingRecord && (
             <Form.Item
-              label="干預類目"
+              label={t('searchWeight.categoryLabel')}
               name="interventionCategory"
-              rules={[{ required: true, message: '請選擇干預類目' }]}
+              rules={[{ required: true, message: t('searchWeight.categoryRequired') }]}
             >
               <Select
-                placeholder="請選擇干預類目"
+                placeholder={t('searchWeight.categoryPlaceholder')}
                 options={[
-                  { label: '加分类目', value: 'boost' },
-                  { label: '减分类目', value: 'demote' },
+                  { label: t('searchWeight.catBoost'), value: 'boost' },
+                  { label: t('searchWeight.catDemote'), value: 'demote' },
                 ]}
                 onChange={(val: 'boost' | 'demote') => {
                   setModalDirection(val)
@@ -904,9 +910,9 @@ export default function SearchWeightConfig() {
           {/* 加分梯队配置 */}
           {modalDirection === 'boost' && (
             <>
-              <Form.Item label="加分規則配置">
+              <Form.Item label={t('searchWeight.boostRuleTitle')}>
                 <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
-                  配置階梯式加分規則，支持多個梯队
+                  {t('searchWeight.boostRuleDesc')}
                 </div>
                 {boostTiers.map((tier, index) => (
                   <div key={index} style={{ 
@@ -917,7 +923,7 @@ export default function SearchWeightConfig() {
                     background: '#fafafa'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 'bold' }}>梯队 {index + 1}</span>
+                      <span style={{ fontWeight: 'bold' }}>{t('searchWeight.tier', { index: index + 1 })}</span>
                       <Button 
                         type="link" 
                         danger 
@@ -925,49 +931,49 @@ export default function SearchWeightConfig() {
                         onClick={() => handleRemoveBoostTier(index)}
                         disabled={boostTiers.length <= 1}
                       >
-                        删除
+                        {t('searchWeight.delete')}
                       </Button>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <Form.Item label="消費金額下限" style={{ marginBottom: 0 }}>
+                      <Form.Item label={t('searchWeight.minAmount')} style={{ marginBottom: 0 }}>
                         <InputNumber
                           style={{ width: '100%' }}
                           value={tier.minAmount}
                           onChange={(val) => handleUpdateBoostTier(index, 'minAmount', val || 0)}
                           min={0}
-                          addonAfter="元"
+                          addonAfter={t('searchWeight.amountUnit')}
                         />
                       </Form.Item>
-                      <Form.Item label="消費金額上限" style={{ marginBottom: 0 }}>
+                      <Form.Item label={t('searchWeight.maxAmount')} style={{ marginBottom: 0 }}>
                         <InputNumber
                           style={{ width: '100%' }}
                           value={tier.maxAmount}
                           onChange={(val) => handleUpdateBoostTier(index, 'maxAmount', val)}
                           min={tier.minAmount}
-                          addonAfter="元"
-                          placeholder="留空表示無上限"
+                          addonAfter={t('searchWeight.amountUnit')}
+                          placeholder={t('searchWeight.maxAmountPlaceholder')}
                         />
                       </Form.Item>
-                      <Form.Item label="加分方式" style={{ marginBottom: 0 }}>
+                      <Form.Item label={t('searchWeight.boostTypeLabel')} style={{ marginBottom: 0 }}>
                         <Select
                           value={tier.boostType}
                           onChange={(val) => handleUpdateBoostTier(index, 'boostType', val)}
                           options={[
-                            { label: '消費金額', value: 'amount_match' },
-                            { label: '固定加分', value: 'fixed_boost' },
+                            { label: t('searchWeight.boostAmountMatch'), value: 'amount_match' },
+                            { label: t('searchWeight.boostFixed'), value: 'fixed_boost' },
                           ]}
                         />
                       </Form.Item>
                       {/* 只有固定加分时才显示加分数字段 */}
                       {tier.boostType === 'fixed_boost' && (
-                        <Form.Item label="加分數值" style={{ marginBottom: 0 }}>
+                        <Form.Item label={t('searchWeight.boostValueLabel')} style={{ marginBottom: 0 }}>
                           <InputNumber
                             style={{ width: '100%' }}
                             value={tier.boostValue}
                             onChange={(val) => handleUpdateBoostTier(index, 'boostValue', val || 0)}
                             min={0}
-                            addonAfter="分"
-                            placeholder="輸入固定分數"
+                            addonAfter={t('searchWeight.pointsUnit')}
+                            placeholder={t('searchWeight.boostValuePlaceholder')}
                           />
                         </Form.Item>
                       )}
@@ -980,18 +986,18 @@ export default function SearchWeightConfig() {
                   onClick={handleAddBoostTier}
                   style={{ width: '100%' }}
                 >
-                  新增梯队
+                  {t('searchWeight.addTier')}
                 </Button>
               </Form.Item>
             </>
           )}
-
+      
           {/* 減分梯队配置 */}
           {modalDirection === 'demote' && (
             <>
-              <Form.Item label="減分規則配置">
+              <Form.Item label={t('searchWeight.demoteRuleTitle')}>
                 <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
-                  配置階梯式減分規則，支持多個梯队
+                  {t('searchWeight.demoteRuleDesc')}
                 </div>
                 {demoteTiers.map((tier, index) => (
                   <div key={index} style={{ 
@@ -1002,7 +1008,7 @@ export default function SearchWeightConfig() {
                     background: '#fafafa'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 'bold' }}>梯队 {index + 1}</span>
+                      <span style={{ fontWeight: 'bold' }}>{t('searchWeight.tier', { index: index + 1 })}</span>
                       <Button 
                         type="link" 
                         danger 
@@ -1010,38 +1016,38 @@ export default function SearchWeightConfig() {
                         onClick={() => handleRemoveDemoteTier(index)}
                         disabled={demoteTiers.length <= 1}
                       >
-                        删除
+                        {t('searchWeight.delete')}
                       </Button>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <Form.Item label="未購買天數" style={{ marginBottom: 0 }}>
+                      <Form.Item label={t('searchWeight.daysLabel')} style={{ marginBottom: 0 }}>
                         <InputNumber
                           style={{ width: '100%' }}
                           value={tier.days}
                           onChange={(val) => handleUpdateDemoteTier(index, 'days', val || 30)}
                           min={1}
-                          addonAfter="天"
+                          addonAfter={t('searchWeight.daysUnit')}
                         />
                       </Form.Item>
-                      <Form.Item label="扣分方式" style={{ marginBottom: 0 }}>
+                      <Form.Item label={t('searchWeight.deductMethodLabel')} style={{ marginBottom: 0 }}>
                         <Select
                           value={tier.deductionType}
                           onChange={(val) => handleUpdateDemoteTier(index, 'deductionType', val)}
                           options={[
-                            { label: '固定分數扣', value: 'fixed_deduction' },
-                            { label: '按商戶總得分折扣', value: 'percent_deduction' },
+                            { label: t('searchWeight.deductFixed'), value: 'fixed_deduction' },
+                            { label: t('searchWeight.deductPercentMethod'), value: 'percent_deduction' },
                           ]}
                         />
                       </Form.Item>
-                      <Form.Item label="扣分數值" style={{ marginBottom: tier.deductionType === 'percent_deduction' ? 4 : 0, gridColumn: '1 / -1' }}>
+                      <Form.Item label={t('searchWeight.deductValueLabel')} style={{ marginBottom: tier.deductionType === 'percent_deduction' ? 4 : 0, gridColumn: '1 / -1' }}>
                         <InputNumber
                           style={{ width: '100%' }}
                           value={tier.deductionValue}
                           onChange={(val) => handleUpdateDemoteTier(index, 'deductionValue', val || 0)}
                           min={0}
                           max={tier.deductionType === 'percent_deduction' ? 100 : undefined}
-                          addonAfter={tier.deductionType === 'percent_deduction' ? '%' : '分'}
-                          placeholder={tier.deductionType === 'percent_deduction' ? '輸入折扣比例，如20表示8折' : '輸入固定扣分'}
+                          addonAfter={tier.deductionType === 'percent_deduction' ? '%' : t('searchWeight.pointsUnit')}
+                          placeholder={tier.deductionType === 'percent_deduction' ? t('searchWeight.pctPlaceholder') : t('searchWeight.fixedDeductPlaceholder')}
                         />
                       </Form.Item>
                       {/* 按比例扣时的提醒说明 */}
@@ -1056,10 +1062,9 @@ export default function SearchWeightConfig() {
                           color: '#d48806',
                           lineHeight: 1.6
                         }}>
-                          <strong>💡 計算說明：</strong>
-                          按商戶總得分折扣是根據商戶當前總分進行比例扣減。用戶搜索時，系統會執行：
+                          {t('searchWeight.pctTip')}
                           <code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>最終得分 = 商戶總分 × (1 - 折扣比例)</code>
-                          。例如：商戶總分100分，輸入20%則最終得分80分；輸入100%則全部扣除，最終得分0分。
+                          {t('searchWeight.pctExample')}
                         </div>
                       )}
                     </div>
@@ -1071,35 +1076,35 @@ export default function SearchWeightConfig() {
                   onClick={handleAddDemoteTier}
                   style={{ width: '100%' }}
                 >
-                  新增梯队
+                  {t('searchWeight.addTier')}
                 </Button>
               </Form.Item>
             </>
           )}
-
-
-
+      
+      
+      
           <Form.Item
-            label="原因說明"
+            label={t('searchWeight.reasonLabel')}
             name="reason"
-            rules={[{ required: true, message: '請填寫原因說明' }]}
+            rules={[{ required: true, message: t('searchWeight.reasonRequired') }]}
           >
-            <TextArea rows={3} placeholder="請填寫原因說明" maxLength={200} showCount />
+            <TextArea rows={3} placeholder={t('searchWeight.reasonPlaceholder')} maxLength={200} showCount />
           </Form.Item>
-
+      
           <Form.Item
-            label="生效日期"
+            label={t('searchWeight.effectDateLabel')}
             name="dateRange"
-            rules={[{ required: true, message: '請選擇生效日期' }]}
+            rules={[{ required: true, message: t('searchWeight.effectDateRequired') }]}
           >
             <RangePicker style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>
-
+      
       {/* 詳情彈窗 */}
       <Modal
-        title="干預配置詳情"
+        title={t('searchWeight.detailTitle')}
         open={isDetailModalOpen}
         onCancel={() => setIsDetailModalOpen(false)}
         footer={null}
@@ -1109,71 +1114,71 @@ export default function SearchWeightConfig() {
           <div style={{ padding: '8px 0' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
               <div>
-                <span style={{ color: '#999' }}>配置ID：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fConfigId')}</span>
                 {detailRecord.interventionId}
               </div>
               <div>
-                <span style={{ color: '#999' }}>集團ID：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fGroupId')}</span>
                 {detailRecord.groupId}
               </div>
               <div>
-                <span style={{ color: '#999' }}>集團名稱：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fGroupName')}</span>
                 {detailRecord.groupName}
               </div>
               <div>
-                <span style={{ color: '#999' }}>所屬品牌：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fBrand')}</span>
                 <BrandTag value={detailRecord.brand} />
               </div>
               <div>
-                <span style={{ color: '#999' }}>干預方向：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fDirection')}</span>
                 {detailRecord.interventionDirection === 'boost' ? (
-                  <Tag color="green">加分</Tag>
+                  <Tag color="green">{t('searchWeight.dirBoost')}</Tag>
                 ) : (
-                  <Tag color="red">減分</Tag>
+                  <Tag color="red">{t('searchWeight.dirDemote')}</Tag>
                 )}
               </div>
               <div>
-                <span style={{ color: '#999' }}>規則配置：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fRule')}</span>
                 {detailRecord.boostTiers ? (
                   <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', gridColumn: '1 / -1' }}>
-                    {formatBoostTiers(detailRecord.boostTiers)}
+                    {formatBoostTiers(detailRecord.boostTiers, t)}
                   </pre>
                 ) : detailRecord.demoteTiers ? (
                   <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', gridColumn: '1 / -1' }}>
-                    {formatDemoteTiers(detailRecord.demoteTiers)}
+                    {formatDemoteTiers(detailRecord.demoteTiers, t)}
                   </pre>
                 ) : detailRecord.adjustMethod && detailRecord.adjustValue !== undefined ? (
-                  formatAdjustValue(detailRecord.adjustMethod, detailRecord.adjustValue)
+                  formatAdjustValue(detailRecord.adjustMethod, detailRecord.adjustValue, t)
                 ) : (
                   '-'
                 )}
               </div>
               <div>
-                <span style={{ color: '#999' }}>搜索頻道：</span>
-                {detailRecord.searchChannel.map(c => channelMap[c]).join('、')}
+                <span style={{ color: '#999' }}>{t('searchWeight.fChannel')}</span>
+                {detailRecord.searchChannel.map(c => channelLabel(c)).join('、')}
               </div>
               <div>
-                <span style={{ color: '#999' }}>生效時間：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fEffect')}</span>
                 {detailRecord.effectStartDate} ~ {detailRecord.effectEndDate}
               </div>
               <div>
-                <span style={{ color: '#999' }}>狀態：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fStatus')}</span>
                 {detailRecord.status === 'active' ? (
-                  <Tag color="success">生效</Tag>
+                  <Tag color="success">{t('searchWeight.statusActive')}</Tag>
                 ) : (
-                  <Tag color="default">失效</Tag>
+                  <Tag color="default">{t('searchWeight.statusInactive')}</Tag>
                 )}
               </div>
               <div>
-                <span style={{ color: '#999' }}>操作人：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fOperator')}</span>
                 {detailRecord.operator}
               </div>
               <div>
-                <span style={{ color: '#999' }}>操作時間：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fOperateTime')}</span>
                 {detailRecord.operateTime}
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: '#999' }}>原因說明：</span>
+                <span style={{ color: '#999' }}>{t('searchWeight.fReason')}</span>
                 {detailRecord.reason}
               </div>
             </div>

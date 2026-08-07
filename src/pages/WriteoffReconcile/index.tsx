@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button, Input, Select, DatePicker, Table, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -262,6 +263,7 @@ function mockFetchReconcile(query: FinReconcileQuery): FinReconcileResult {
 
 export default function WriteoffReconcile() {
   // 菜单权限：writeoff-reconcile
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [searchForm] = Form.useForm<ReconcileFilters>()
@@ -319,99 +321,99 @@ export default function WriteoffReconcile() {
 
   /** 列配置元數據 */
   const columnMeta = useMemo(() => [
-    { key: 'date', title: '統計日期' },
-    { key: 'groupId', title: '集團ID' },
-    { key: 'groupName', title: '集團名稱' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'initVirtual', title: '期初虛擬賬戶餘額' },
-    { key: 'initActual', title: '期初實收賬戶餘額' },
-    { key: 'virtualRecharge', title: '虛擬賬戶充值總額' },
-    { key: 'actualRecharge', title: '實收賬戶充值總額' },
-    { key: 'bankReceipt', title: '銀行收款' },
-    { key: 'revenuePayment', title: '營業額支付' },
-    { key: 'consumeTotal', title: '消費總額' },
-    { key: 'deductVirtual', title: '扣款總額' },
-    { key: 'deductActual', title: '扣款實收變動' },
-    { key: 'virtualTransferIn', title: '虛擬賬戶轉入總額' },
-    { key: 'actualTransferIn', title: '實收賬戶轉入總額' },
-    { key: 'virtualTransferOut', title: '虛擬賬戶轉出總額' },
-    { key: 'actualTransferOut', title: '實收賬戶轉出總額' },
-    { key: 'virtualNet', title: '虛擬賬戶交易淨額' },
-    { key: 'actualNet', title: '實收賬戶交易淨額' },
-    { key: 'endVirtual', title: '期末虛擬賬戶餘額' },
-    { key: 'endActual', title: '期末實收賬戶餘額' },
-  ], [])
+    { key: 'date', title: t('writeoffReconcile.colStatDate') },
+    { key: 'groupId', title: t('common.colGroupId') },
+    { key: 'groupName', title: t('common.colGroupName') },
+    { key: 'brand', title: t('common.colBrand') },
+    { key: 'initVirtual', title: t('writeoffReconcile.colInitVirtual') },
+    { key: 'initActual', title: t('writeoffReconcile.colInitActual') },
+    { key: 'virtualRecharge', title: t('writeoffReconcile.colVirtualRecharge') },
+    { key: 'actualRecharge', title: t('writeoffReconcile.colActualRecharge') },
+    { key: 'bankReceipt', title: t('writeoffReconcile.colBankReceipt') },
+    { key: 'revenuePayment', title: t('writeoffReconcile.colRevenuePayment') },
+    { key: 'consumeTotal', title: t('writeoffReconcile.colConsumeTotal') },
+    { key: 'deductVirtual', title: t('writeoffReconcile.colDeductVirtual') },
+    { key: 'deductActual', title: t('writeoffReconcile.colDeductActual') },
+    { key: 'virtualTransferIn', title: t('writeoffReconcile.colVirtualTransferIn') },
+    { key: 'actualTransferIn', title: t('writeoffReconcile.colActualTransferIn') },
+    { key: 'virtualTransferOut', title: t('writeoffReconcile.colVirtualTransferOut') },
+    { key: 'actualTransferOut', title: t('writeoffReconcile.colActualTransferOut') },
+    { key: 'virtualNet', title: t('writeoffReconcile.colVirtualNet') },
+    { key: 'actualNet', title: t('writeoffReconcile.colActualNet') },
+    { key: 'endVirtual', title: t('writeoffReconcile.colEndVirtual') },
+    { key: 'endActual', title: t('writeoffReconcile.colEndActual') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('writeoff-reconcile', columnMeta)
 
   const columns: TableColumnsType<ReconcileRecord> = [
-    { title: '統計日期', dataIndex: 'date', key: 'date', width: 110, fixed: 'left' },
-    { title: '集團ID', dataIndex: 'groupId', key: 'groupId', width: 90, fixed: 'left' },
-    { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 110, fixed: 'left' },
+    { title: t('writeoffReconcile.colStatDate'), dataIndex: 'date', key: 'date', width: 110, fixed: 'left' },
+    { title: t('common.colGroupId'), dataIndex: 'groupId', key: 'groupId', width: 90, fixed: 'left' },
+    { title: t('common.colGroupName'), dataIndex: 'groupName', key: 'groupName', width: 110, fixed: 'left' },
     {
-      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      title: t('common.colBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: string) => <BrandTag value={v} />,
     },
     {
-      title: '期初虛擬賬戶餘額', dataIndex: 'initVirtual', key: 'initVirtual', width: 160, align: 'right',
+      title: t('writeoffReconcile.colInitVirtual'), dataIndex: 'initVirtual', key: 'initVirtual', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 500 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '期初實收賬戶餘額', dataIndex: 'initActual', key: 'initActual', width: 160, align: 'right',
+      title: t('writeoffReconcile.colInitActual'), dataIndex: 'initActual', key: 'initActual', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 500 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶充值總額', dataIndex: 'virtualRecharge', key: 'virtualRecharge', width: 160, align: 'right',
+      title: t('writeoffReconcile.colVirtualRecharge'), dataIndex: 'virtualRecharge', key: 'virtualRecharge', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '實收賬戶充值總額', dataIndex: 'actualRecharge', key: 'actualRecharge', width: 160, align: 'right',
+      title: t('writeoffReconcile.colActualRecharge'), dataIndex: 'actualRecharge', key: 'actualRecharge', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C' }}>{fmtAmt(v)}</span>,
     },
-    { title: '銀行收款', dataIndex: 'bankReceipt', key: 'bankReceipt', width: 110, align: 'right', render: (v: number) => fmtAmt(v) },
-    { title: '營業額支付', dataIndex: 'revenuePayment', key: 'revenuePayment', width: 110, align: 'right', render: (v: number) => fmtAmt(v) },
+    { title: t('writeoffReconcile.colBankReceipt'), dataIndex: 'bankReceipt', key: 'bankReceipt', width: 110, align: 'right', render: (v: number) => fmtAmt(v) },
+    { title: t('writeoffReconcile.colRevenuePayment'), dataIndex: 'revenuePayment', key: 'revenuePayment', width: 110, align: 'right', render: (v: number) => fmtAmt(v) },
     {
-      title: '消費總額', dataIndex: 'consumeTotal', key: 'consumeTotal', width: 120, align: 'right',
+      title: t('writeoffReconcile.colConsumeTotal'), dataIndex: 'consumeTotal', key: 'consumeTotal', width: 120, align: 'right',
       render: (v: number) => <span style={{ color: '#FF4D4F' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '扣款總額', dataIndex: 'deductVirtual', key: 'deductVirtual', width: 120, align: 'right',
+      title: t('writeoffReconcile.colDeductVirtual'), dataIndex: 'deductVirtual', key: 'deductVirtual', width: 120, align: 'right',
       render: (v: number) => <span style={{ color: '#FF4D4F' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '扣款實收變動', dataIndex: 'deductActual', key: 'deductActual', width: 130, align: 'right',
+      title: t('writeoffReconcile.colDeductActual'), dataIndex: 'deductActual', key: 'deductActual', width: 130, align: 'right',
       render: (v: number) => <span style={{ color: '#FF4D4F' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶轉入總額', dataIndex: 'virtualTransferIn', key: 'virtualTransferIn', width: 160, align: 'right',
+      title: t('writeoffReconcile.colVirtualTransferIn'), dataIndex: 'virtualTransferIn', key: 'virtualTransferIn', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '實收賬戶轉入總額', dataIndex: 'actualTransferIn', key: 'actualTransferIn', width: 160, align: 'right',
+      title: t('writeoffReconcile.colActualTransferIn'), dataIndex: 'actualTransferIn', key: 'actualTransferIn', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶轉出總額', dataIndex: 'virtualTransferOut', key: 'virtualTransferOut', width: 160, align: 'right',
+      title: t('writeoffReconcile.colVirtualTransferOut'), dataIndex: 'virtualTransferOut', key: 'virtualTransferOut', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '實收賬戶轉出總額', dataIndex: 'actualTransferOut', key: 'actualTransferOut', width: 160, align: 'right',
+      title: t('writeoffReconcile.colActualTransferOut'), dataIndex: 'actualTransferOut', key: 'actualTransferOut', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C' }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '虛擬賬戶交易淨額', dataIndex: 'virtualNet', key: 'virtualNet', width: 160, align: 'right',
+      title: t('writeoffReconcile.colVirtualNet'), dataIndex: 'virtualNet', key: 'virtualNet', width: 160, align: 'right',
       render: (v: number) => <NetAmountCell val={v} />,
     },
     {
-      title: '實收賬戶交易淨額', dataIndex: 'actualNet', key: 'actualNet', width: 160, align: 'right',
+      title: t('writeoffReconcile.colActualNet'), dataIndex: 'actualNet', key: 'actualNet', width: 160, align: 'right',
       render: (v: number) => <NetAmountCell val={v} />,
     },
     {
-      title: '期末虛擬賬戶餘額', dataIndex: 'endVirtual', key: 'endVirtual', width: 160, align: 'right',
+      title: t('writeoffReconcile.colEndVirtual'), dataIndex: 'endVirtual', key: 'endVirtual', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 600 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '期末實收賬戶餘額', dataIndex: 'endActual', key: 'endActual', width: 160, align: 'right',
+      title: t('writeoffReconcile.colEndActual'), dataIndex: 'endActual', key: 'endActual', width: 160, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{fmtAmt(v)}</span>,
     },
   ]
@@ -421,25 +423,25 @@ export default function WriteoffReconcile() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="集團ID" name="groupId">
-            <Input placeholder="請輸入集團ID" allowClear />
+          <Form.Item label={t('common.colGroupId')} name="groupId">
+            <Input placeholder={t('common.groupIdPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱" name="groupName">
-            <Input placeholder="請輸入集團名稱" allowClear />
+          <Form.Item label={t('common.colGroupName')} name="groupName">
+            <Input placeholder={t('common.groupNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="全部" options={brandOptions} allowClear />
+          <Form.Item label={t('common.colBrand')} name="brand">
+            <Select placeholder={t('common.all')} options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="統計週期" name="period">
+          <Form.Item label={t('writeoffReconcile.period')} name="period">
             <RangePicker
               format="YYYY-MM-DD"
-              placeholder={['開始日期', '結束日期']}
+              placeholder={[t('writeoffReconcile.startDate'), t('writeoffReconcile.endDate')]}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -449,27 +451,27 @@ export default function WriteoffReconcile() {
       <div className="reconcile-overview">
         {/* 期初 / 期末 结余 */}
         <div className="reconcile-balance-row">
-          <SummaryCard title="期初結餘統計" icon="📄" bgColor="linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)">
+          <SummaryCard title={t('writeoffReconcile.cardInitTitle')} icon="📄" bgColor="linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)">
             <div className="reconcile-balance-grid">
               <div className="reconcile-balance-item">
-                <div className="reconcile-balance-label">期初虛擬賬戶餘額</div>
+                <div className="reconcile-balance-label">{t('writeoffReconcile.colInitVirtual')}</div>
                 <div className="reconcile-balance-value" style={{ color: '#1565C0' }}><AnimatedAmount value={summary.initVirtual} /></div>
               </div>
               <div className="reconcile-balance-item">
-                <div className="reconcile-balance-label">期初實收賬戶餘額</div>
+                <div className="reconcile-balance-label">{t('writeoffReconcile.colInitActual')}</div>
                 <div className="reconcile-balance-value" style={{ color: '#E8720C' }}><AnimatedAmount value={summary.initActual} /></div>
               </div>
             </div>
           </SummaryCard>
 
-          <SummaryCard title="期末結餘統計" icon="📄" bgColor="linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)">
+          <SummaryCard title={t('writeoffReconcile.cardEndTitle')} icon="📄" bgColor="linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)">
             <div className="reconcile-balance-grid">
               <div className="reconcile-balance-item">
-                <div className="reconcile-balance-label">期末虛擬賬戶餘額</div>
+                <div className="reconcile-balance-label">{t('writeoffReconcile.colEndVirtual')}</div>
                 <div className="reconcile-balance-value" style={{ color: '#1565C0' }}><AnimatedAmount value={summary.endVirtual} /></div>
               </div>
               <div className="reconcile-balance-item">
-                <div className="reconcile-balance-label">期末實收賬戶餘額</div>
+                <div className="reconcile-balance-label">{t('writeoffReconcile.colEndActual')}</div>
                 <div className="reconcile-balance-value" style={{ color: '#E8720C' }}><AnimatedAmount value={summary.endActual} /></div>
               </div>
             </div>
@@ -478,29 +480,29 @@ export default function WriteoffReconcile() {
 
         {/* 统计明细卡片 */}
         <div className="reconcile-stats-row">
-          <SummaryCard title="充值統計" icon="💰" bgColor="#F8FAFF">
-            <MetricItem label="虛擬賬戶充值總額" value={summary.virtualRecharge} color="#1565C0"
-              subLabel="實收賬戶充值總額" subValue={summary.actualRecharge} subColor="#E8720C" />
-            <MetricItem label="銀行收款" value={summary.bankReceipt} color="#1565C0"
-              subLabel="營業額支付" subValue={summary.revenuePayment} subColor="#E8720C" />
+          <SummaryCard title={t('writeoffReconcile.cardRechargeTitle')} icon="💰" bgColor="#F8FAFF">
+            <MetricItem label={t('writeoffReconcile.colVirtualRecharge')} value={summary.virtualRecharge} color="#1565C0"
+              subLabel={t('writeoffReconcile.colActualRecharge')} subValue={summary.actualRecharge} subColor="#E8720C" />
+            <MetricItem label={t('writeoffReconcile.colBankReceipt')} value={summary.bankReceipt} color="#1565C0"
+              subLabel={t('writeoffReconcile.colRevenuePayment')} subValue={summary.revenuePayment} subColor="#E8720C" />
           </SummaryCard>
 
-          <SummaryCard title="消費扣款統計" icon="📉" bgColor="#FFF8F0">
-            <MetricItem label="消費總額" value={summary.consumeTotal} color="#E53935"
-              subLabel="扣款總額" subValue={summary.deductVirtual} subColor="#E53935" />
-            <MetricItem label="扣款實收變動" value={summary.deductActual} color="#E8720C" />
+          <SummaryCard title={t('writeoffReconcile.cardConsumeTitle')} icon="📉" bgColor="#FFF8F0">
+            <MetricItem label={t('writeoffReconcile.colConsumeTotal')} value={summary.consumeTotal} color="#E53935"
+              subLabel={t('writeoffReconcile.colDeductVirtual')} subValue={summary.deductVirtual} subColor="#E53935" />
+            <MetricItem label={t('writeoffReconcile.colDeductActual')} value={summary.deductActual} color="#E8720C" />
           </SummaryCard>
 
-          <SummaryCard title="轉入轉出" icon="🔁" bgColor="#F3F0FF">
-            <MetricItem label="虛擬賬戶轉入總額" value={summary.virtualTransferIn} color="#7B1FA2"
-              subLabel="虛擬賬戶轉出總額" subValue={summary.virtualTransferOut} subColor="#7B1FA2" />
-            <MetricItem label="實收賬戶轉入總額" value={summary.actualTransferIn} color="#7B1FA2"
-              subLabel="實收賬戶轉出總額" subValue={summary.actualTransferOut} subColor="#7B1FA2" />
+          <SummaryCard title={t('writeoffReconcile.cardTransferTitle')} icon="🔁" bgColor="#F3F0FF">
+            <MetricItem label={t('writeoffReconcile.colVirtualTransferIn')} value={summary.virtualTransferIn} color="#7B1FA2"
+              subLabel={t('writeoffReconcile.colVirtualTransferOut')} subValue={summary.virtualTransferOut} subColor="#7B1FA2" />
+            <MetricItem label={t('writeoffReconcile.colActualTransferIn')} value={summary.actualTransferIn} color="#7B1FA2"
+              subLabel={t('writeoffReconcile.colActualTransferOut')} subValue={summary.actualTransferOut} subColor="#7B1FA2" />
           </SummaryCard>
 
-          <SummaryCard title="交易淨額" icon="🧮" bgColor="#F0FFF4">
-            <MetricItem label="虛擬賬戶交易淨額" value={summary.virtualNet} color="#2E7D32" />
-            <MetricItem label="實收賬戶交易淨額" value={summary.actualNet} color="#2E7D32" />
+          <SummaryCard title={t('writeoffReconcile.cardNetTitle')} icon="🧮" bgColor="#F0FFF4">
+            <MetricItem label={t('writeoffReconcile.colVirtualNet')} value={summary.virtualNet} color="#2E7D32" />
+            <MetricItem label={t('writeoffReconcile.colActualNet')} value={summary.actualNet} color="#2E7D32" />
           </SummaryCard>
         </div>
       </div>
@@ -510,7 +512,7 @@ export default function WriteoffReconcile() {
         <div className="action-section-left">
           {hasPermission('writeoff-reconcile:export') && (
             <Button className="btn-export" icon={<ExportOutlined />}>
-              導出
+              {t('common.export')}
             </Button>
           )}
         </div>
@@ -534,7 +536,7 @@ export default function WriteoffReconcile() {
             current: pagination.page,
             pageSize: pagination.size,
             total,
-            showTotal: (t) => `共 ${t} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showQuickJumper: true,

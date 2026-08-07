@@ -3,6 +3,7 @@ import { Button, DatePicker, Form, Input, Modal, Select, Table, Tag, TreeSelect,
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import { ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchDepartments } from '../../api/department'
 import type { DepartmentItem } from '../../api/department'
@@ -21,13 +22,6 @@ const LOGIN_STATUS = {
   OFFLINE_FORCED: 'forced',
 } as const
 
-const LOGIN_STATUS_LABEL: Record<string, string> = {
-  [LOGIN_STATUS.ONLINE]: '在線',
-  [LOGIN_STATUS.OFFLINE_MANUAL]: '離線-主動退出',
-  [LOGIN_STATUS.OFFLINE_TIMEOUT]: '離線-超時退出',
-  [LOGIN_STATUS.OFFLINE_FORCED]: '離線-強制下線',
-}
-
 const LOGIN_STATUS_TAG: Record<string, { color: string }> = {
   [LOGIN_STATUS.ONLINE]: { color: 'success' },
   [LOGIN_STATUS.OFFLINE_MANUAL]: { color: 'default' },
@@ -35,31 +29,39 @@ const LOGIN_STATUS_TAG: Record<string, { color: string }> = {
   [LOGIN_STATUS.OFFLINE_FORCED]: { color: 'error' },
 }
 
-const STATUS_OPTIONS = [
-  { value: LOGIN_STATUS.ONLINE, label: '在線' },
-  { value: LOGIN_STATUS.OFFLINE_MANUAL, label: '離線-主動退出' },
-  { value: LOGIN_STATUS.OFFLINE_TIMEOUT, label: '離線-超時退出' },
-  { value: LOGIN_STATUS.OFFLINE_FORCED, label: '離線-強制下線' },
-]
-
 /** 計算在線時長展示文本 */
-function formatDuration(seconds: number | null): string {
+function formatDuration(seconds: number | null, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (seconds == null) return '-'
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = seconds % 60
   if (hours > 0) {
-    return `${hours}小時${minutes}分鐘`
+    return t('loginLog.durationHour', { h: hours, m: minutes })
   }
   if (minutes > 0) {
-    return `${minutes}分鐘${secs}秒`
+    return t('loginLog.durationMinute', { m: minutes, s: secs })
   }
-  return `${secs}秒`
+  return t('loginLog.durationSecond', { s: secs })
 }
 
 /** 員工動態頁面 */
 export default function LoginLog() {
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
+
+  /** 狀態標籤（依賴 t，定義在組件內以便響應語言切換） */
+  const STATUS_LABEL: Record<string, string> = {
+    [LOGIN_STATUS.ONLINE]: t('loginLog.statusOnline'),
+    [LOGIN_STATUS.OFFLINE_MANUAL]: t('loginLog.statusManual'),
+    [LOGIN_STATUS.OFFLINE_TIMEOUT]: t('loginLog.statusTimeout'),
+    [LOGIN_STATUS.OFFLINE_FORCED]: t('loginLog.statusForced'),
+  }
+  const STATUS_OPTIONS = [
+    { value: LOGIN_STATUS.ONLINE, label: t('loginLog.statusOnline') },
+    { value: LOGIN_STATUS.OFFLINE_MANUAL, label: t('loginLog.statusManual') },
+    { value: LOGIN_STATUS.OFFLINE_TIMEOUT, label: t('loginLog.statusTimeout') },
+    { value: LOGIN_STATUS.OFFLINE_FORCED, label: t('loginLog.statusForced') },
+  ]
   const [searchForm] = Form.useForm()
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,7 +106,7 @@ export default function LoginLog() {
       setDataSource(res.records)
       setTotal(res.total)
     } catch {
-      message.error('加載登錄日志失敗')
+      message.error(t('loginLog.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -203,41 +205,40 @@ export default function LoginLog() {
   /** 導出當前搜索結果 */
   const handleExport = () => {
     if (dataSource.length === 0) {
-      message.warning('當前無數據可導出')
+      message.warning(t('loginLog.noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '員工工號', dataIndex: 'empId' },
-      { title: '員工姓名', dataIndex: 'employeeName' },
-      { title: '所屬部門', dataIndex: 'departmentName' },
-      { title: '登錄時間', dataIndex: 'loginTime', render: (v: number | string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '' },
-      { title: '退出時間', dataIndex: 'logoutTime', render: (v: number | string | null) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '' },
-      { title: '在線時長', dataIndex: 'duration', render: (v: number | null) => {
-        // 統一使用後端計算的 duration（避免前端解析 loginTime 的時區歧義）
-        return v != null ? formatDuration(v) : ''
+      { title: t('loginLog.colEmpId'), dataIndex: 'empId' },
+      { title: t('loginLog.colEmpName'), dataIndex: 'employeeName' },
+      { title: t('loginLog.colDept'), dataIndex: 'departmentName' },
+      { title: t('loginLog.colLoginTime'), dataIndex: 'loginTime', render: (v: number | string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '' },
+      { title: t('loginLog.colLogoutTime'), dataIndex: 'logoutTime', render: (v: number | string | null) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '' },
+      { title: t('loginLog.colDuration'), dataIndex: 'duration', render: (v: number | null) => {
+        return v != null ? formatDuration(v, t) : ''
       }},
-      { title: '狀態', dataIndex: 'logoutReason', render: (_: unknown, record: LoginLogRecord) => {
-        if (record.logoutTime == null) return '在線'
-        return record.logoutReason === 'timeout' ? '離線-超時退出' : record.logoutReason === 'forced' ? '離線-強制下線' : '離線-主動退出'
+      { title: t('loginLog.colStatus'), dataIndex: 'logoutReason', render: (_: unknown, record: LoginLogRecord) => {
+        if (record.logoutTime == null) return STATUS_LABEL[LOGIN_STATUS.ONLINE]
+        return record.logoutReason === 'timeout' ? STATUS_LABEL[LOGIN_STATUS.OFFLINE_TIMEOUT] : record.logoutReason === 'forced' ? STATUS_LABEL[LOGIN_STATUS.OFFLINE_FORCED] : STATUS_LABEL[LOGIN_STATUS.OFFLINE_MANUAL]
       }},
     ]
-    exportToCSV('員工動態', exportColumns, dataSource)
+    exportToCSV(t('loginLog.pageTitle'), exportColumns, dataSource)
   }
 
   /** 強制下線 */
   const handleForceLogout = (record: LoginLogRecord) => {
     Modal.confirm({
-      title: '確認下線',
-      content: `確定要將「${record.employeeName}」強制下線嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('loginLog.confirmLogout'),
+      content: t('loginLog.confirmLogoutContent', { name: record.employeeName }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await forceLogout(record.id)
-          message.success(`已將「${record.employeeName}」強制下線`)
+          message.success(t('loginLog.logoutSuccess', { name: record.employeeName }))
           fetchList()
         } catch {
-          message.error('操作失敗，請重試')
+          message.error(t('loginLog.logoutFailed'))
         }
       },
     })
@@ -246,18 +247,18 @@ export default function LoginLog() {
   /** 刪除日志 */
   const handleDelete = (record: LoginLogRecord) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除「${record.employeeName}」的登錄日志嗎？刪除後不可恢復。`,
-      okText: '確定',
+      title: t('common.confirmDelete'),
+      content: t('loginLog.confirmDeleteContent', { name: record.employeeName }),
+      okText: t('common.confirm'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await deleteLoginLog(record.id)
-          message.success('刪除成功')
+          message.success(t('common.deleteSuccess'))
           fetchList()
         } catch {
-          message.error('刪除失敗，請重試')
+          message.error(t('loginLog.deleteFailed'))
         }
       },
     })
@@ -266,25 +267,25 @@ export default function LoginLog() {
   /** 表格列定義 */
   const columns: TableColumnsType<LoginLogRecord> = [
     {
-      title: '員工工號',
+      title: t('loginLog.colEmpId'),
       dataIndex: 'empId',
       key: 'empId',
       width: 110,
     },
     {
-      title: '員工姓名',
+      title: t('loginLog.colEmpName'),
       dataIndex: 'employeeName',
       key: 'employeeName',
       width: 100,
     },
     {
-      title: '所屬部門',
+      title: t('loginLog.colDept'),
       dataIndex: 'departmentName',
       key: 'departmentName',
       width: 220,
     },
     {
-      title: '登錄時間',
+      title: t('loginLog.colLoginTime'),
       dataIndex: 'loginTime',
       key: 'loginTime',
       width: 180,
@@ -293,31 +294,30 @@ export default function LoginLog() {
       defaultSortOrder: 'descend',
     },
     {
-      title: '退出時間',
+      title: t('loginLog.colLogoutTime'),
       dataIndex: 'logoutTime',
       key: 'logoutTime',
       width: 180,
       render: (val: number | string | null) => val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '在線時長',
+      title: t('loginLog.colDuration'),
       dataIndex: 'duration',
       key: 'duration',
       width: 130,
       render: (val: number | null) => {
-        // 統一使用後端計算的 duration（避免前端解析 loginTime 的時區歧義）
-        return val != null ? formatDuration(val) : '-'
+        return val != null ? formatDuration(val, t) : '-'
       },
       sorter: (a, b) => (a.duration ?? 0) - (b.duration ?? 0),
     },
     {
-      title: '狀態',
+      title: t('loginLog.colStatus'),
       dataIndex: 'logoutReason',
       key: 'status',
       width: 140,
       render: (_: unknown, record: LoginLogRecord) => {
         if (record.logoutTime == null) {
-          return <Tag color={LOGIN_STATUS_TAG[LOGIN_STATUS.ONLINE].color}>{LOGIN_STATUS_LABEL[LOGIN_STATUS.ONLINE]}</Tag>
+          return <Tag color={LOGIN_STATUS_TAG[LOGIN_STATUS.ONLINE].color}>{STATUS_LABEL[LOGIN_STATUS.ONLINE]}</Tag>
         }
         const statusKey = record.logoutReason === 'timeout'
           ? LOGIN_STATUS.OFFLINE_TIMEOUT
@@ -325,11 +325,11 @@ export default function LoginLog() {
             ? LOGIN_STATUS.OFFLINE_FORCED
             : LOGIN_STATUS.OFFLINE_MANUAL
         const config = LOGIN_STATUS_TAG[statusKey]
-        return <Tag color={config?.color}>{LOGIN_STATUS_LABEL[statusKey]}</Tag>
+        return <Tag color={config?.color}>{STATUS_LABEL[statusKey]}</Tag>
       },
     },
     {
-      title: '操作',
+      title: t('loginLog.colAction'),
       key: 'action',
       width: 120,
       fixed: 'right',
@@ -337,11 +337,11 @@ export default function LoginLog() {
         <>
           {record.logoutTime == null && hasPermission('login-log:forceLogout') && (
             <Button type="link" danger size="small" onClick={() => handleForceLogout(record)}>
-              下線
+              {t('loginLog.btnForceLogout')}
             </Button>
           )}
           <Button type="link" danger size="small" onClick={() => handleDelete(record)}>
-            刪除
+            {t('common.delete')}
           </Button>
         </>
       ),
@@ -357,12 +357,12 @@ export default function LoginLog() {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="員工" name="keyword">
-            <Input placeholder="請輸入工號/姓名" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('loginLog.searchEmployee')} name="keyword">
+            <Input placeholder={t('loginLog.empPlaceholder')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="所屬部門" name="department">
+          <Form.Item label={t('loginLog.searchDept')} name="department">
             <TreeSelect
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               treeData={deptTreeData}
               treeDefaultExpandAll
@@ -371,19 +371,19 @@ export default function LoginLog() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" allowClear options={STATUS_OPTIONS} />
+          <Form.Item label={t('loginLog.searchStatus')} name="status">
+            <Select placeholder={t('common.all')} allowClear options={STATUS_OPTIONS} />
           </Form.Item>
-          <Form.Item label="登錄日期" name="dateRange">
+          <Form.Item label={t('loginLog.searchDate')} name="dateRange">
             <RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common.search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common.reset')}
               </Button>
             </div>
           </Form.Item>
@@ -394,7 +394,7 @@ export default function LoginLog() {
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            導出
+            {t('common.export')}
           </Button>
         </div>
         <div className="action-section-right">
@@ -418,7 +418,7 @@ export default function LoginLog() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條數據`,
+          showTotal: (total) => t('common.total', { count: total }),
           onChange: (p, s) => {
             setPage(s !== pageSize ? 1 : p)
             setPageSize(s)

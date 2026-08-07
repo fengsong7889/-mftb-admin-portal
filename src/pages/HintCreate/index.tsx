@@ -1,66 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Select, Radio, Checkbox, DatePicker, Table, message, Divider } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { BRAND_SHANFENG_LABEL, BRAND_MFOOD_LABEL } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-/** 搜索频道 */
-const searchChannelOptions = [
-  { label: '大首頁', value: 'home' },
-  { label: '外賣頻道', value: 'takeaway' },
-  { label: '團購頻道', value: 'groupBuy' },
-  { label: '超市頻道', value: 'supermarket' },
-]
-
-/** 所属品牌 */
-const brandOptions = [
-  { label: BRAND_MFOOD_LABEL, value: 'mFood' },
-  { label: BRAND_SHANFENG_LABEL, value: 'flashBee' },
-  { label: '其它', value: 'other' },
-]
-
-/** 展示终端 */
-const terminalOptions = [
-  { label: 'APP', value: 'app' },
-  { label: '微信小程序', value: 'wechatMini' },
-  { label: '微信H5', value: 'wechatH5' },
-  { label: '支付寶H5', value: 'alipayH5' },
-  { label: 'mPay小應用', value: 'mpayMini' },
-]
-
-/** 底纹词源 */
-const hintSourceOptions = [
-  { label: '運營推廣', value: 'operation' },
-  { label: '熱搜推廣', value: 'hotSearch' },
-]
-
-/** 跳转类型 */
-const jumpTypeOptions = [
-  { label: '無跳轉', value: 'none' },
-  { label: 'H5鏈接', value: 'h5' },
-  { label: '簽到中心', value: 'checkInCenter' },
-  { label: '個人中心', value: 'personalCenter' },
-  { label: '領券中心', value: 'couponCenter' },
-  { label: '外賣頻道', value: 'takeawayChannel' },
-]
-
-/** 生效时段 */
-const timeSlotOptions = [
-  { label: '早餐', value: 'breakfast' },
-  { label: '午餐', value: 'lunch' },
-  { label: '下午茶', value: 'afternoonTea' },
-  { label: '晚餐', value: 'dinner' },
-  { label: '宵夜', value: 'midnightSnack' },
-]
-
-/** 展示区域 */
-const regionOptions = [
-  { label: '澳門半島', value: 'macau' },
-  { label: '氹仔路半島', value: 'taipa' },
-  { label: '珠海市', value: 'zhuhai' },
-  { label: '橫琴粵深度合作區', value: 'hengqin' },
-]
 
 /** 人群数据 */
 interface CrowdRecord {
@@ -81,6 +25,7 @@ interface HintCreateModalProps {
 }
 
 export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreateModalProps) {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [terminalType, setTerminalType] = useState<string>('specified')
   const [jumpType, setJumpType] = useState<string>('none')
@@ -90,6 +35,63 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([])
   const [allRegionSelected, setAllRegionSelected] = useState(false)
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
+
+  /** 搜索频道 */
+  const searchChannelOptions = [
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawayChannel'), value: 'takeaway' },
+    { label: t('dict.channel.groupBuyChannel'), value: 'groupBuy' },
+    { label: t('dict.channel.supermarketChannel'), value: 'supermarket' },
+  ]
+
+  /** 所属品牌 */
+  const brandOptions = [
+    { label: BRAND_MFOOD_LABEL, value: 'mFood' },
+    { label: BRAND_SHANFENG_LABEL, value: 'flashBee' },
+    { label: t('hintCreate.brandOther'), value: 'other' },
+  ]
+
+  /** 展示终端 */
+  const terminalOptions = [
+    { label: t('dict.terminal.app'), value: 'app' },
+    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
+    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
+    { label: t('dict.terminal.alipayH5'), value: 'alipayH5' },
+    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
+  ]
+
+  /** 底纹词源 */
+  const hintSourceOptions = [
+    { label: t('dict.hintSource.operation'), value: 'operation' },
+    { label: t('dict.hintSource.hotSearch'), value: 'hotSearch' },
+  ]
+
+  /** 跳转类型 */
+  const jumpTypeOptions = [
+    { label: t('dict.jumpType.none'), value: 'none' },
+    { label: t('dict.jumpType.h5'), value: 'h5' },
+    { label: t('dict.jumpType.checkInCenter'), value: 'checkInCenter' },
+    { label: t('dict.jumpType.personalCenter'), value: 'personalCenter' },
+    { label: t('dict.jumpType.couponCenter'), value: 'couponCenter' },
+    { label: t('dict.channel.takeawayChannel'), value: 'takeawayChannel' },
+  ]
+
+  /** 生效时段 */
+  const timeSlotOptions = [
+    { label: t('dict.timeSlot.breakfast'), value: 'breakfast' },
+    { label: t('dict.timeSlot.lunch'), value: 'lunch' },
+    { label: t('dict.timeSlot.afternoonTea'), value: 'afternoonTea' },
+    { label: t('dict.timeSlot.dinner'), value: 'dinner' },
+    { label: t('dict.timeSlot.midnightSnack'), value: 'midnightSnack' },
+  ]
+
+  /** 展示区域 */
+  const regionOptions = [
+    { label: t('dict.region.macauPeninsula'), value: 'macau' },
+    { label: t('dict.region.taipaPeninsula'), value: 'taipa' },
+    { label: t('dict.region.zhuhai'), value: 'zhuhai' },
+    { label: t('dict.region.hengqin'), value: 'hengqin' },
+  ]
 
   // 重置表单
   useEffect(() => {
@@ -108,7 +110,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
 
   const handleSubmit = () => {
     form.validateFields().then((values) => {
-      message.success('新增底紋詞成功')
+      message.success(t('hintCreate.submitSuccess'))
       onSuccess?.()
       onCancel()
     })
@@ -158,25 +160,25 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
 
   const crowdColumns = [
     {
-      title: '群名稱',
+      title: t('hintCreate.crowdColName'),
       dataIndex: 'crowdName',
       key: 'crowdName',
     },
     {
-      title: '群人數',
+      title: t('hintCreate.crowdColCount'),
       dataIndex: 'crowdCount',
       key: 'crowdCount',
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       render: () => (
         <div>
           <button type="button" style={{ color: '#1890ff', background: 'none', border: 'none', cursor: 'pointer', padding: '0 8px' }}>
-            修改
+            {t('hintCreate.crowdEdit')}
           </button>
           <button type="button" style={{ color: '#ff4d4f', background: 'none', border: 'none', cursor: 'pointer', padding: '0 8px' }}>
-            刪除
+            {t('common.delete')}
           </button>
         </div>
       ),
@@ -187,7 +189,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
     <Modal
       title={
         <div style={{ fontSize: 18, fontWeight: 600, color: '#1890ff' }}>
-          新增底紋詞
+          {t('hintCreate.title')}
         </div>
       }
       open={open}
@@ -206,7 +208,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
               fontSize: 14,
             }}
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -221,7 +223,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
               fontWeight: 500,
             }}
           >
-            確認
+            {t('common.confirm')}
           </button>
         </div>
       }
@@ -250,23 +252,23 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
             borderBottom: '2px solid #1890ff',
             paddingBottom: 8,
           }}>
-            基础配置
+            {t('hintCreate.sectionBase')}
           </h3>
 
           {/* 搜索频道 */}
           <Form.Item
-            label="搜索頻道"
+            label={t('hintCreate.searchChannelLabel')}
             name="searchChannel"
-            rules={[{ required: true, message: '請選擇搜索頻道' }]}
+            rules={[{ required: true, message: t('hintCreate.searchChannelRequired') }]}
           >
-            <Select options={searchChannelOptions} placeholder="請選擇" />
+            <Select options={searchChannelOptions} placeholder={t('common.placeholderSelect')} />
           </Form.Item>
 
           {/* 所属品牌 */}
           <Form.Item
-            label="所屬品牌"
+            label={t('hintCreate.brandLabel')}
             name="brand"
-            rules={[{ required: true, message: '請選擇所屬品牌' }]}
+            rules={[{ required: true, message: t('hintCreate.brandRequired') }]}
           >
             <Radio.Group>
               {brandOptions.map((option) => (
@@ -279,9 +281,9 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
 
           {/* 展示终端 */}
           <Form.Item
-            label="展示終端"
+            label={t('hintCreate.terminalLabel')}
             name="terminalType"
-            rules={[{ required: true, message: '請選擇展示終端' }]}
+            rules={[{ required: true, message: t('hintCreate.terminalRequired') }]}
           >
             <div>
               <Radio.Group
@@ -289,8 +291,8 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
                 onChange={(e) => setTerminalType(e.target.value)}
                 style={{ marginBottom: 12 }}
               >
-                <Radio value="all">全部</Radio>
-                <Radio value="specified">指定</Radio>
+                <Radio value="all">{t('common.all')}</Radio>
+                <Radio value="specified">{t('hintCreate.specified')}</Radio>
               </Radio.Group>
               {terminalType === 'specified' && (
                 <Form.Item name="terminals" noStyle>
@@ -323,18 +325,18 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
             borderBottom: '2px solid #1890ff',
             paddingBottom: 8,
           }}>
-            底纹内容
+            {t('hintCreate.sectionContent')}
           </h3>
 
           {/* 底纹词源 */}
           <Form.Item
-            label="底紋詞源"
+            label={t('hintCreate.hintSourceLabel')}
             name="hintSource"
-            rules={[{ required: true, message: '請選擇底紋詞源' }]}
+            rules={[{ required: true, message: t('hintCreate.hintSourceRequired') }]}
           >
             <Select
               options={hintSourceOptions}
-              placeholder="請選擇"
+              placeholder={t('common.placeholderSelect')}
               onChange={(v) => setHintSource(v)}
             />
           </Form.Item>
@@ -342,12 +344,12 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
           {/* 底纹内容 */}
           {hintSource === 'operation' && (
             <Form.Item
-              label="底紋內容"
+              label={t('hintCreate.hintWordLabel')}
               name="hintWord"
-              rules={[{ required: true, message: '請輸入底紋詞，限制10個字！' }]}
+              rules={[{ required: true, message: t('hintCreate.hintWordRequired') }]}
             >
               <Input
-                placeholder="請輸入底紋詞，限制10個字！"
+                placeholder={t('hintCreate.hintWordRequired')}
                 maxLength={10}
                 showCount
                 style={{ borderRadius: 6 }}
@@ -357,16 +359,16 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
 
           {/* 指定搜索 */}
           {hintSource === 'operation' && (
-            <Form.Item label="指定搜索" required>
+            <Form.Item label={t('hintCreate.specifiedSearchLabel')} required>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <Form.Item
                   name="jumpType"
                   noStyle
-                  rules={[{ required: true, message: '請選擇' }]}
+                  rules={[{ required: true, message: t('common.placeholderSelect') }]}
                 >
                   <Select
                     options={jumpTypeOptions}
-                    placeholder="請選擇"
+                    placeholder={t('common.placeholderSelect')}
                     style={{ width: 180 }}
                     onChange={(v) => setJumpType(v)}
                   />
@@ -375,10 +377,10 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
                   <Form.Item
                     name="jumpTarget"
                     noStyle
-                    rules={[{ required: jumpType === 'h5', message: '請輸入H5鏈接地址' }]}
+                    rules={[{ required: jumpType === 'h5', message: t('hintCreate.h5LinkRequired') }]}
                   >
                     <Input
-                      placeholder="請輸入H5鏈接地址"
+                      placeholder={t('hintCreate.h5LinkRequired')}
                       style={{ flex: 1, borderRadius: 6 }}
                     />
                   </Form.Item>
@@ -400,26 +402,26 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
             borderBottom: '2px solid #1890ff',
             paddingBottom: 8,
           }}>
-            生效配置
+            {t('hintCreate.sectionEffect')}
           </h3>
 
           {/* 生效时间 */}
           <Form.Item
-            label="生效時間"
+            label={t('hintCreate.effectTimeLabel')}
             name="dateRange"
-            rules={[{ required: true, message: '請選擇生效時間' }]}
+            rules={[{ required: true, message: t('hintCreate.effectTimeRequired') }]}
           >
             <RangePicker
               style={{ width: '100%' }}
-              placeholder={['開始日期', '結束日期']}
+              placeholder={[t('common.startTime'), t('common.endTime')]}
             />
           </Form.Item>
 
           {/* 生效时段 */}
           <Form.Item
-            label="生效時段"
+            label={t('hintCreate.effectTimeSlotLabel')}
             name="timeSlots"
-            rules={[{ required: !allTimeSelected && selectedTimeSlots.length === 0, message: '請選擇生效時段' }]}
+            rules={[{ required: !allTimeSelected && selectedTimeSlots.length === 0, message: t('hintCreate.effectTimeSlotRequired') }]}
           >
             <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: 6 }}>
               <div style={{ marginBottom: 12 }}>
@@ -428,7 +430,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
                   onChange={handleAllTimeChange}
                   style={{ fontWeight: 600, fontSize: 14 }}
                 >
-                  全時段
+                  {t('dict.timeSlot.allDay')}
                 </Checkbox>
               </div>
               <Checkbox.Group
@@ -450,20 +452,20 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
           </Form.Item>
 
           {/* 指定人群 */}
-          <Form.Item label="指定人群" required>
+          <Form.Item label={t('hintCreate.crowdLabel')} required>
             <div>
               <Radio.Group
                 value={crowdType}
                 onChange={(e) => setCrowdType(e.target.value)}
                 style={{ marginBottom: 12 }}
               >
-                <Radio value="all">全部</Radio>
-                <Radio value="specified">指定</Radio>
+                <Radio value="all">{t('common.all')}</Radio>
+                <Radio value="specified">{t('hintCreate.specified')}</Radio>
               </Radio.Group>
               {crowdType === 'specified' && (
                 <div style={{ marginTop: 12, padding: '16px', background: '#f5f5f5', borderRadius: 6 }}>
                   <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#1890ff' }}>人群選擇</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: '#1890ff' }}>{t('hintCreate.crowdSelectTitle')}</span>
                     <button
                       type="button"
                       style={{
@@ -480,7 +482,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
                       }}
                     >
                       <PlusOutlined />
-                      新增人群
+                      {t('hintCreate.addCrowd')}
                     </button>
                   </div>
                   <Table
@@ -509,14 +511,14 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
             borderBottom: '2px solid #1890ff',
             paddingBottom: 8,
           }}>
-            展示配置
+            {t('hintCreate.sectionDisplay')}
           </h3>
 
           {/* 展示区域 */}
           <Form.Item
-            label="展示區域"
+            label={t('hintCreate.regionLabel')}
             name="regions"
-            rules={[{ required: !allRegionSelected && selectedRegions.length === 0, message: '請選擇展示區域' }]}
+            rules={[{ required: !allRegionSelected && selectedRegions.length === 0, message: t('hintCreate.regionRequired') }]}
           >
             <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: 6 }}>
               <div style={{ marginBottom: 12 }}>
@@ -525,7 +527,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
                   onChange={handleAllRegionChange}
                   style={{ fontWeight: 600, fontSize: 14 }}
                 >
-                  全部
+                  {t('common.all')}
                 </Checkbox>
               </div>
               <Checkbox.Group

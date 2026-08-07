@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload } from 'antd'
 import type { TableColumnsType } from 'antd'
 import BrandTag from '../../components/BrandTag'
@@ -13,58 +14,6 @@ import {
 } from '@ant-design/icons'
 
 const { TextArea } = Input
-
-/* ===== 常量配置 ===== */
-
-/** 搜索入口下拉选项 */
-const entryOptions = [
-  { label: '全部入口', value: 'all' },
-  { label: '大首頁', value: 'home' },
-  { label: '外賣搜索', value: 'takeaway' },
-  { label: '超市搜索', value: 'supermarket' },
-  { label: '團購搜索', value: 'groupBuy' },
-]
-
-const entryMap: Record<string, string> = {
-  home: '大首頁', takeaway: '外賣搜索', supermarket: '超市搜索', groupBuy: '團購搜索',
-}
-
-const categoryOptions = [
-  { label: '全部', value: 'all' },
-  { label: '美食餐飲', value: 'food' },
-  { label: '生鮮超市', value: 'supermarket' },
-  { label: '甜點飲品', value: 'dessert' },
-  { label: '品牌商家', value: 'brand' },
-  { label: '節日活動', value: 'festival' },
-  { label: '熱門話題', value: 'trending' },
-]
-
-const sourceOptions = [
-  { label: '全部', value: 'all' },
-  { label: '系統抓取', value: 'system' },
-  { label: '運營添加', value: 'operation' },
-  { label: '商戶提交', value: 'merchant' },
-]
-
-const statusOptions = [
-  { label: '全部', value: 'all' },
-  { label: '生效', value: 'active' },
-  { label: '停用', value: 'inactive' },
-]
-
-const categoryMap: Record<string, string> = {
-  food: '美食餐飲', supermarket: '生鮮超市', dessert: '甜點飲品',
-  brand: '品牌商家', festival: '節日活動', trending: '熱門話題',
-}
-const _sourceMap: Record<string, string> = { system: '系統抓取', operation: '運營添加', merchant: '商戶提交' }
-
-/** 展示位置 */
-const displayPositionOptions = [
-  { label: '全部', value: 'all' },
-  { label: '頂部', value: 'top' },
-  { label: '底部', value: 'bottom' },
-]
-const displayPositionMap: Record<string, string> = { top: '頂部', bottom: '底部' }
 
 /* ===== 数据模型 ===== */
 
@@ -132,6 +81,7 @@ const allData = makeMockData()
 /* ===== 组件 ===== */
 
 export default function HotSearchLibrary() {
+  const { t } = useTranslation()
   const [filterBrand, setFilterBrand] = useState('all')
   const [activeEntry, setActiveEntry] = useState('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -168,6 +118,54 @@ export default function HotSearchLibrary() {
     return data
   }, [filterBrand, activeEntry, filterWord, filterCategory, filterSource, filterStatus])
 
+  const entryOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawaySearch'), value: 'takeaway' },
+    { label: t('dict.channel.supermarketSearch'), value: 'supermarket' },
+    { label: t('dict.channel.groupBuySearch'), value: 'groupBuy' },
+  ]
+
+  const entryMap: Record<string, string> = {
+    home: t('dict.channel.home'), takeaway: t('dict.channel.takeawaySearch'), supermarket: t('dict.channel.supermarketSearch'), groupBuy: t('dict.channel.groupBuySearch'),
+  }
+
+  const categoryOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.category.food'), value: 'food' },
+    { label: t('dict.category.supermarket'), value: 'supermarket' },
+    { label: t('dict.category.dessert'), value: 'dessert' },
+    { label: t('dict.category.brand'), value: 'brand' },
+    { label: t('dict.category.festival'), value: 'festival' },
+    { label: t('dict.category.trending'), value: 'trending' },
+  ]
+
+  const sourceOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.wordSourceLib.system'), value: 'system' },
+    { label: t('dict.wordSourceLib.operation'), value: 'operation' },
+    { label: t('dict.wordSourceLib.merchant'), value: 'merchant' },
+  ]
+
+  const statusOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.status.active'), value: 'active' },
+    { label: t('dict.status.inactive'), value: 'inactive' },
+  ]
+
+  const categoryMap: Record<string, string> = {
+    food: t('dict.category.food'), supermarket: t('dict.category.supermarket'), dessert: t('dict.category.dessert'),
+    brand: t('dict.category.brand'), festival: t('dict.category.festival'), trending: t('dict.category.trending'),
+  }
+
+  const displayPositionOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.displayPosition.top'), value: 'top' },
+    { label: t('dict.displayPosition.bottom'), value: 'bottom' },
+  ]
+
+  const displayPositionMap: Record<string, string> = { top: t('dict.displayPosition.top'), bottom: t('dict.displayPosition.bottom') }
+
   const handleReset = () => {
     setFilterWord('')
     setFilterCategory(undefined)
@@ -199,26 +197,26 @@ export default function HotSearchLibrary() {
 
   const handleDelete = (record: HotSearchWord) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除熱搜詞「${record.word}」嗎？此操作不可恢復。`,
-      okText: '確定', okType: 'danger', cancelText: '取消',
-      onOk: () => message.success('刪除成功'),
+      title: t('hotSearchLibrary.deleteTitle'),
+      content: t('hotSearchLibrary.deleteContent', { word: record.word }),
+      okText: t('common.confirm'), okType: 'danger', cancelText: t('common.cancel'),
+      onOk: () => message.success(t('common.deleteSuccess')),
     })
   }
 
   const handleToggleStatus = (record: HotSearchWord) => {
-    const action = record.status === 'active' ? '停用' : '啟用'
+    const action = record.status === 'active' ? t('common.disable') : t('common.enable')
     Modal.confirm({
-      title: '確認操作',
-      content: `確定要將「${record.word}」設為「${action}」嗎？`,
-      okText: '確定', cancelText: '取消',
-      onOk: () => message.success(`已${action}`),
+      title: t('common.confirmOperation'),
+      content: t('hotSearchLibrary.toggleContent', { word: record.word, action }),
+      okText: t('common.confirm'), cancelText: t('common.cancel'),
+      onOk: () => message.success(t('hotSearchLibrary.toggled', { action })),
     })
   }
 
   const handleSave = () => {
     form.validateFields().then(() => {
-      message.success(editingRecord ? '編輯成功' : '新增成功')
+      message.success(editingRecord ? t('common.updateSuccess') : t('common.addSuccess'))
       setIsModalOpen(false)
     })
   }
@@ -226,7 +224,7 @@ export default function HotSearchLibrary() {
   /* 表格列 */
   const columns: TableColumnsType<HotSearchWord> = [
     {
-      title: '排名', dataIndex: 'rank', key: 'rank', width: 70, align: 'center',
+      title: t('hotSearchLibrary.colRank'), dataIndex: 'rank', key: 'rank', width: 70, align: 'center',
       render: (v: number) => {
         const colors = ['#ff4d4f', '#fa8c16', '#fadb14']
         if (v <= 3) return <Tag color={colors[v - 1]} style={{ fontWeight: 'bold', minWidth: 32, textAlign: 'center' }}>{v}</Tag>
@@ -234,63 +232,63 @@ export default function HotSearchLibrary() {
       },
     },
     {
-      title: '熱搜詞', dataIndex: 'word', key: 'word', width: 180,
+      title: t('hotSearchLibrary.colWord'), dataIndex: 'word', key: 'word', width: 180,
       render: (text: string) => <span style={{ fontWeight: 600 }}>{text}</span>,
     },
     {
-      title: '詞庫分類', dataIndex: 'category', key: 'category', width: 110,
+      title: t('hotSearchLibrary.colCategory'), dataIndex: 'category', key: 'category', width: 110,
       render: (v: string) => <Tag color="blue">{categoryMap[v]}</Tag>,
     },
     {
-      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 90,
+      title: t('hotSearchLibrary.colBrand'), dataIndex: 'brand', key: 'brand', width: 90,
       render: (v: string) => (
         <BrandTag value={v} />
       ),
     },
     {
-      title: '搜索入口', dataIndex: 'searchEntry', key: 'searchEntry', width: 110,
+      title: t('hotSearchLibrary.colEntry'), dataIndex: 'searchEntry', key: 'searchEntry', width: 110,
       render: (v: string) => <Tag color="geekblue">{entryMap[v]}</Tag>,
     },
     {
-      title: '詞來源', dataIndex: 'source', key: 'source', width: 100,
+      title: t('hotSearchLibrary.colSource'), dataIndex: 'source', key: 'source', width: 100,
       render: (v: string) => {
         const map: Record<string, { color: string; text: string }> = {
-          system: { color: 'cyan', text: '系統抓取' },
-          operation: { color: 'purple', text: '運營添加' },
-          merchant: { color: 'orange', text: '商戶提交' },
+          system: { color: 'cyan', text: t('dict.wordSourceLib.system') },
+          operation: { color: 'purple', text: t('dict.wordSourceLib.operation') },
+          merchant: { color: 'orange', text: t('dict.wordSourceLib.merchant') },
         }
         const c = map[v] || { color: 'default', text: v }
         return <Tag color={c.color}>{c.text}</Tag>
       },
     },
     {
-      title: '搜索次數', dataIndex: 'searchCount', key: 'searchCount', width: 110,
+      title: t('hotSearchLibrary.colSearchCount'), dataIndex: 'searchCount', key: 'searchCount', width: 110,
       sorter: (a, b) => a.searchCount - b.searchCount,
       render: (v: number) => v.toLocaleString(),
     },
     {
-      title: '展示位置', dataIndex: 'displayPosition', key: 'displayPosition', width: 80,
+      title: t('hotSearchLibrary.colPosition'), dataIndex: 'displayPosition', key: 'displayPosition', width: 80,
       render: (v: string) => <Tag color={v === 'top' ? 'orange' : 'default'}>{displayPositionMap[v] || v}</Tag>,
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 70,
-      render: (v: string) => v === 'active' ? <Tag color="success">生效</Tag> : <Tag color="default">停用</Tag>,
+      title: t('hotSearchLibrary.colStatus'), dataIndex: 'status', key: 'status', width: 70,
+      render: (v: string) => v === 'active' ? <Tag color="success">{t('dict.status.active')}</Tag> : <Tag color="default">{t('dict.status.inactive')}</Tag>,
     },
     {
-      title: '添加人', dataIndex: 'addedBy', key: 'addedBy', width: 140, ellipsis: true,
+      title: t('hotSearchLibrary.colAddedBy'), dataIndex: 'addedBy', key: 'addedBy', width: 140, ellipsis: true,
     },
     {
-      title: '添加時間', dataIndex: 'addedTime', key: 'addedTime', width: 150,
+      title: t('hotSearchLibrary.colAddedTime'), dataIndex: 'addedTime', key: 'addedTime', width: 150,
     },
     {
-      title: '操作', key: 'action', width: 140, fixed: 'right',
+      title: t('common.colAction'), key: 'action', width: 140, fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger={record.status === 'active'} style={record.status !== 'active' ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
-            {record.status === 'active' ? '停用' : '啟用'}
+            {record.status === 'active' ? t('common.disable') : t('common.enable')}
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -301,53 +299,53 @@ export default function HotSearchLibrary() {
       {/* 查询区域 */}
       <div className="search-section">
           <Form layout="inline">
-          <Form.Item label="熱搜詞">
+          <Form.Item label={t('hotSearchLibrary.searchWord')}>
             <Input
-              placeholder="輸入關鍵詞"
+              placeholder={t('hotSearchLibrary.searchWordPlaceholder')}
               allowClear
               value={filterWord}
               onChange={e => setFilterWord(e.target.value)}
             />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label={t('hotSearchLibrary.searchBrand')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={filterBrand}
               onChange={v => { setFilterBrand(v); setActiveEntry('all') }}
               options={brandOptions}
             />
           </Form.Item>
-          <Form.Item label="搜索入口">
+          <Form.Item label={t('hotSearchLibrary.searchEntry')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={activeEntry}
               onChange={v => setActiveEntry(v || 'all')}
               options={entryOptions}
             />
           </Form.Item>
-          <Form.Item label="分類">
+          <Form.Item label={t('hotSearchLibrary.searchCategory')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={filterCategory}
               onChange={setFilterCategory}
               options={categoryOptions}
             />
           </Form.Item>
-          <Form.Item label="詞來源">
+          <Form.Item label={t('hotSearchLibrary.searchSource')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={filterSource}
               onChange={setFilterSource}
               options={sourceOptions}
             />
           </Form.Item>
-          <Form.Item label="狀態">
+          <Form.Item label={t('hotSearchLibrary.searchStatus')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={filterStatus}
               onChange={setFilterStatus}
@@ -356,8 +354,8 @@ export default function HotSearchLibrary() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
           </Form>
@@ -366,11 +364,11 @@ export default function HotSearchLibrary() {
       {/* 操作区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-import" icon={<ImportOutlined />} onClick={() => message.info('批量導入功能開發中')}>批量導入</Button>
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={() => message.success('導出成功')}>導出</Button>
+          <Button className="btn-import" icon={<ImportOutlined />} onClick={() => message.info(t('hotSearchLibrary.importDev'))}>{t('common.batchImport')}</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={() => message.success(t('common.exportSuccess'))}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增熱搜詞</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>{t('hotSearchLibrary.addWord')}</Button>
         </div>
       </div>
 
@@ -383,66 +381,66 @@ export default function HotSearchLibrary() {
           pagination={{
             total: filteredData.length,
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
           }}
           size="middle"
           bordered={false}
           scroll={{ x: 1600 }}
-          locale={{ emptyText: '暫無熱搜詞數據' }}
+          locale={{ emptyText: t('hotSearchLibrary.emptyText') }}
         />
       </div>
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingRecord ? '編輯熱搜詞' : '新增熱搜詞'}
+        title={editingRecord ? t('hotSearchLibrary.editTitle') : t('hotSearchLibrary.addTitle')}
         open={isModalOpen}
         onOk={handleSave}
         onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={640}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="熱搜詞" name="word" rules={[{ required: true, message: '請輸入熱搜詞' }]}>
-            <Input placeholder="請輸入熱搜詞，如：火鍋、奶茶" maxLength={50} showCount />
+          <Form.Item label={t('hotSearchLibrary.colWord')} name="word" rules={[{ required: true, message: t('hotSearchLibrary.wordRequired') }]}>
+            <Input placeholder={t('hotSearchLibrary.wordPlaceholder')} maxLength={50} showCount />
           </Form.Item>
 
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item label="所屬品牌" name="brand" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <Form.Item label={t('hotSearchLibrary.brandLabel')} name="brand" rules={[{ required: true }]} style={{ flex: 1 }}>
               <Select options={brandOptions.filter(o => o.value !== 'all')} />
             </Form.Item>
-            <Form.Item label="搜索入口" name="searchEntry" rules={[{ required: true, message: '請選擇搜索入口' }]} style={{ flex: 1 }}>
+            <Form.Item label={t('hotSearchLibrary.entryLabel')} name="searchEntry" rules={[{ required: true, message: t('hotSearchLibrary.entryRequired') }]} style={{ flex: 1 }}>
               <Select options={entryOptions.filter(e => e.value !== 'all')} />
             </Form.Item>
           </div>
 
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item label="詞庫分類" name="category" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <Form.Item label={t('hotSearchLibrary.categoryLabel')} name="category" rules={[{ required: true }]} style={{ flex: 1 }}>
               <Select options={categoryOptions.filter(o => o.value !== 'all')} />
             </Form.Item>
-            <Form.Item label="詞來源" name="source" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <Form.Item label={t('hotSearchLibrary.sourceLabel')} name="source" rules={[{ required: true }]} style={{ flex: 1 }}>
               <Select options={sourceOptions.filter(o => o.value !== 'all')} />
             </Form.Item>
           </div>
 
-          <Form.Item label="展示位置" name="displayPosition" rules={[{ required: true, message: '請選擇展示位置' }]}>
+          <Form.Item label={t('hotSearchLibrary.positionLabel')} name="displayPosition" rules={[{ required: true, message: t('hotSearchLibrary.positionRequired') }]}>
             <Select options={displayPositionOptions.filter(o => o.value !== 'all')} />
           </Form.Item>
 
-          <Form.Item label="配圖" name="imageUrl" extra="建議尺寸：200×200px，支持 JPG/PNG，不超過 2MB">
+          <Form.Item label={t('hotSearchLibrary.imageLabel')} name="imageUrl" extra={t('hotSearchLibrary.imageExtra')}>
             <Upload listType="picture-card" maxCount={1} accept=".jpg,.jpeg,.png" beforeUpload={() => false}>
-              <div><PlusCircleOutlined /><div style={{ marginTop: 6, fontSize: 12 }}>上傳圖片</div></div>
+              <div><PlusCircleOutlined /><div style={{ marginTop: 6, fontSize: 12 }}>{t('hotSearchLibrary.uploadImage')}</div></div>
             </Upload>
           </Form.Item>
 
-          <Form.Item label="備註" name="remark">
-            <TextArea rows={3} placeholder="請填寫備註說明" maxLength={200} showCount />
+          <Form.Item label={t('hotSearchLibrary.remarkLabel')} name="remark">
+            <TextArea rows={3} placeholder={t('hotSearchLibrary.remarkPlaceholder')} maxLength={200} showCount />
           </Form.Item>
 
-          <Form.Item label="狀態" name="status">
+          <Form.Item label={t('hotSearchLibrary.statusLabel')} name="status">
             <Select options={statusOptions.filter(o => o.value !== 'all')} />
           </Form.Item>
         </Form>

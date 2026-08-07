@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -17,7 +18,7 @@ import { fetchRoles } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
-import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE, POSITION_SEQUENCE_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
+import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
 import type { PositionItem } from '../../../api/position'
 import { exportToCSV } from '../../../utils/exportCSV'
 
@@ -30,11 +31,6 @@ const EMPLOYEE_STATUS = {
 
 /** 内置管理员登录账号（工号，禁止停用/删除） */
 const BUILTIN_ADMIN = 'MF00001'
-
-const statusOptions = [
-  { value: EMPLOYEE_STATUS.ENABLED, label: '啟用' },
-  { value: EMPLOYEE_STATUS.DISABLED, label: '停用' },
-]
 
 /** 新增/编辑表单值（工号由后端自动生成，仅编辑时回显） */
 interface EmployeeFormValues {
@@ -82,6 +78,20 @@ function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
 }
 
 export default function EmployeeManagement() {
+  const { t } = useTranslation()
+
+  /** 狀態/序列選項（依賴 t，定義在組件內以便響應語言切換） */
+  const STATUS_OPTIONS = [
+    { value: EMPLOYEE_STATUS.ENABLED, label: t('employee.statusEnabled') },
+    { value: EMPLOYEE_STATUS.DISABLED, label: t('employee.statusDisabled') },
+  ]
+  const SEQ_LABEL: Record<string, string> = {
+    M: 'M(\u7BA1\u7406)',
+    T: 'T(\u6280\u8853)',
+    P: 'P(\u5C08\u696D)',
+  }
+  const SEQ_OPTIONS = Object.entries(SEQ_LABEL).map(([value, label]) => ({ value, label }))
+
   const [dataSource, setDataSource] = useState<EmployeeItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -269,14 +279,14 @@ export default function EmployeeManagement() {
     try {
       if (editing) {
         await updateEmployee(editing.id, payload)
-        message.success('員工信息已更新')
+        message.success(t('employee.updateSuccess'))
       } else {
         // 工号即登录账号，由后端按 MF 前缀自增生成
         const created = await createEmployee({
           ...payload,
           password: values.password,
         })
-        message.success(`員工創建成功，工號/登錄賬號：${created.empId}`)
+        message.success(t('employee.createSuccess', { empId: created.empId }))
       }
       setEditModalVisible(false)
       fetchList()
@@ -300,7 +310,7 @@ export default function EmployeeManagement() {
     setSubmitting(true)
     try {
       await resetEmployeePassword(pwdTarget.id, values.password)
-      message.success('密碼已重置')
+      message.success(t('employee.resetPwdSuccess'))
       setPwdModalVisible(false)
     } finally {
       setSubmitting(false)
@@ -310,19 +320,19 @@ export default function EmployeeManagement() {
   /** 启用/停用（带确认弹窗） */
   const handleToggleStatus = (record: EmployeeItem) => {
     const isDisabling = record.status === EMPLOYEE_STATUS.ENABLED
-    const action = isDisabling ? '停用' : '啟用'
+    const action = isDisabling ? t('common.disable') : t('common.enable')
     Modal.confirm({
-      title: `確認${action}`,
+      title: t('employee.confirmToggle', { action }),
       content: isDisabling
-        ? `確定要停用員工「${record.name}」嗎？停用後該帳號將被強制下線且無法登錄。`
-        : `確定要啟用員工「${record.name}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+        ? t('employee.disableContent', { name: record.name })
+        : t('employee.enableContent', { name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: isDisabling },
       onOk: async () => {
         const next = isDisabling ? EMPLOYEE_STATUS.DISABLED : EMPLOYEE_STATUS.ENABLED
         await updateEmployeeStatus(record.id, next)
-        message.success(isDisabling ? '已停用' : '已啟用')
+        message.success(isDisabling ? t('employee.disabled') : t('employee.enabled'))
         fetchList()
       },
     })
@@ -331,7 +341,7 @@ export default function EmployeeManagement() {
   /** 删除 */
   const handleDelete = async (record: EmployeeItem) => {
     await deleteEmployee(record.id)
-    message.success('員工已刪除')
+    message.success(t('employee.deleteSuccess'))
     fetchList()
     fetchRoleList()
   }
@@ -339,29 +349,29 @@ export default function EmployeeManagement() {
   /** 导出当前搜索结果 */
   const handleExport = () => {
     if (dataSource.length === 0) {
-      message.warning('當前無數據可導出')
+      message.warning(t('employee.noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '工號', dataIndex: 'empId' },
-      { title: '姓名', dataIndex: 'name' },
-      { title: '部門', dataIndex: 'department' },
-      { title: '職位名稱(中文)', dataIndex: 'position' },
-      { title: '職位名稱(英文)', dataIndex: 'positionEn' },
-      { title: '職級序列', dataIndex: 'sequence' },
-      { title: '職級', dataIndex: 'jobLevel' },
-      { title: '職等', dataIndex: 'rank' },
-      { title: '狀態', dataIndex: 'status', render: (v: number) => v === EMPLOYEE_STATUS.ENABLED ? '啟用' : '停用' },
-      { title: '最後更新人', dataIndex: 'updatedBy' },
-      { title: '最後更新時間', dataIndex: 'updatedAt' },
+      { title: t('employee.colEmpId'), dataIndex: 'empId' },
+      { title: t('employee.colName'), dataIndex: 'name' },
+      { title: t('employee.colDepartment'), dataIndex: 'department' },
+      { title: t('employee.colPositionZh'), dataIndex: 'position' },
+      { title: t('employee.colPositionEn'), dataIndex: 'positionEn' },
+      { title: t('employee.colSequence'), dataIndex: 'sequence' },
+      { title: t('employee.colJobLevel'), dataIndex: 'jobLevel' },
+      { title: t('employee.colRank'), dataIndex: 'rank' },
+      { title: t('common.colStatus'), dataIndex: 'status', render: (v: number) => v === EMPLOYEE_STATUS.ENABLED ? t('employee.statusEnabled') : t('employee.statusDisabled') },
+      { title: t('employee.colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
-    exportToCSV('員工管理', exportColumns, dataSource)
+    exportToCSV(t('employee.pageTitle'), exportColumns, dataSource)
   }
 
   /** 根据角色ID渲染角色名称标签 */
   const renderRoleTags = (roleIds: number[]) => {
     if (!roleIds || roleIds.length === 0) {
-      return <span style={{ color: '#8C8C8C' }}>未綁定</span>
+      return <span style={{ color: '#8C8C8C' }}>{t('employee.notBound')}</span>
     }
     return (
       <Space size={4} wrap>
@@ -374,69 +384,69 @@ export default function EmployeeManagement() {
   }
 
   const columns: TableColumnsType<EmployeeItem> = [
-    { title: '工號', dataIndex: 'empId', key: 'empId', width: 110 },
-    { title: '姓名', dataIndex: 'name', key: 'name', width: 120 },
-    { title: '部門', dataIndex: 'department', key: 'department', width: 120, render: (v: string) => v || '-' },
-    { title: '職位名稱(中文)', dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
-    { title: '職位名稱(英文)', dataIndex: 'positionEn', key: 'positionEn', width: 150, render: (v: string) => v || '-' },
+    { title: t('employee.colEmpId'), dataIndex: 'empId', key: 'empId', width: 110 },
+    { title: t('employee.colName'), dataIndex: 'name', key: 'name', width: 120 },
+    { title: t('employee.colDepartment'), dataIndex: 'department', key: 'department', width: 120, render: (v: string) => v || '-' },
+    { title: t('employee.colPositionZh'), dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
+    { title: t('employee.colPositionEn'), dataIndex: 'positionEn', key: 'positionEn', width: 150, render: (v: string) => v || '-' },
     {
-      title: '職級序列',
+      title: t('employee.colSequence'),
       dataIndex: 'sequence',
       key: 'sequence',
       width: 110,
       render: (v: string) => (
-        v ? <Tag color={POSITION_SEQUENCE_TAG_COLOR[v] || 'default'}>{POSITION_SEQUENCE[v] || v}</Tag> : '-'
+        v ? <Tag color={POSITION_SEQUENCE_TAG_COLOR[v] || 'default'}>{SEQ_LABEL[v] || v}</Tag> : '-'
       ),
     },
-    { title: '職級', dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
-    { title: '職等', dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
+    { title: t('employee.colJobLevel'), dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
+    { title: t('employee.colRank'), dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
     {
-      title: '角色授權',
+      title: t('employee.colRoleAuth'),
       dataIndex: 'functionRoleIds',
       key: 'functionRoleIds',
       render: (roleIds: number[]) => renderRoleTags(roleIds),
     },
     {
-      title: '部門授權',
+      title: t('employee.colDeptAuth'),
       dataIndex: 'departmentId',
       key: 'deptPermission',
       width: 110,
       render: (_: unknown, record: EmployeeItem) => {
-        if (!record.departmentId) return <span style={{ color: '#8C8C8C' }}>未加入部門</span>
+        if (!record.departmentId) return <span style={{ color: '#8C8C8C' }}>{t('employee.noDept')}</span>
         const dept = departments.find(d => d.id === record.departmentId)
         const hasDeptPerm = dept?.permissions && dept.permissions.length > 0
         return hasDeptPerm
-          ? <Tag color="success">已授權</Tag>
-          : <Tag color="default">未授權</Tag>
+          ? <Tag color="success">{t('employee.authorized')}</Tag>
+          : <Tag color="default">{t('employee.unauthorized')}</Tag>
       },
     },
     {
-      title: '狀態',
+      title: t('common.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 90,
       render: (value: number) => (
         value === EMPLOYEE_STATUS.ENABLED
-          ? <Tag color="success">啟用</Tag>
-          : <Tag color="default">停用</Tag>
+          ? <Tag color="success">{t('employee.statusEnabled')}</Tag>
+          : <Tag color="default">{t('employee.statusDisabled')}</Tag>
       ),
     },
     {
-      title: '最後更新人',
+      title: t('employee.colUpdatedBy'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
       width: 110,
       render: (v: string) => v || '-',
     },
     {
-      title: '最後更新時間',
+      title: t('employee.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 240,
       render: (_, record) => {
@@ -445,29 +455,29 @@ export default function EmployeeManagement() {
           <Space size={4}>
             {hasPermission('employee-management:edit') && (
               <Button type="link" size="small" onClick={() => handleEdit(record)}>
-                編輯
+                {t('common.edit')}
               </Button>
             )}
             {hasPermission('employee-management:edit') && (
               <Button type="link" size="small" onClick={() => handleOpenResetPwd(record)}>
-                重置密碼
+                {t('employee.resetPassword')}
               </Button>
             )}
             {!isBuiltinAdmin && hasPermission('employee-management:edit') && (
               <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-                {record.status === EMPLOYEE_STATUS.ENABLED ? '停用' : '啟用'}
+                {record.status === EMPLOYEE_STATUS.ENABLED ? t('common.disable') : t('common.enable')}
               </Button>
             )}
             {!isBuiltinAdmin && hasPermission('employee-management:delete') && (
               <Popconfirm
-                title="確認刪除"
-                description={`確定要刪除員工「${record.name}」嗎？`}
+                title={t('common.confirmDelete')}
+                description={t('employee.confirmDeleteContent', { name: record.name })}
                 onConfirm={() => handleDelete(record)}
-                okText="確認"
-                cancelText="取消"
+                okText={t('common.confirm')}
+                cancelText={t('common.cancel')}
               >
                 <Button type="link" size="small" danger>
-                  刪除
+                  {t('common.delete')}
                 </Button>
               </Popconfirm>
             )}
@@ -488,19 +498,19 @@ export default function EmployeeManagement() {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="關鍵詞" name="keyword">
-            <Input placeholder="請輸入賬號/姓名/工號" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('employee.searchKeyword')} name="keyword">
+            <Input placeholder={t('employee.keywordPlaceholder')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" allowClear options={statusOptions} />
+          <Form.Item label={t('common.colStatus')} name="status">
+            <Select placeholder={t('common.all')} allowClear options={STATUS_OPTIONS} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common.search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common.reset')}
               </Button>
             </div>
           </Form.Item>
@@ -510,12 +520,12 @@ export default function EmployeeManagement() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {hasPermission('employee-management:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增
+              {t('common.add')}
             </Button>
           )}
           {configComponent}
@@ -537,7 +547,7 @@ export default function EmployeeManagement() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條數據`,
+          showTotal: (total) => t('common.total', { count: total }),
           onChange: (p, s) => {
             setPage(s !== pageSize ? 1 : p)
             setPageSize(s)
@@ -548,42 +558,42 @@ export default function EmployeeManagement() {
       {/* 新增/编辑员工弹窗：createFormKey 变化时强制重建，确保新增时表单无残留数据 */}
       <Modal
         key={editing ? 'edit' : `create-${createFormKey}`}
-        title={editing ? '編輯員工' : '新增員工'}
+        title={editing ? t('employee.editTitle') : t('employee.addTitle')}
         open={editModalVisible}
         onOk={handleSubmit}
         onCancel={() => setEditModalVisible(false)}
         confirmLoading={submitting}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={560}
       >
         <Form form={form} layout="vertical" autoComplete="off">
-          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
-            <Input placeholder="請輸入員工姓名" allowClear autoComplete="off" />
+          <Form.Item name="name" label={t('employee.nameLabel')} rules={[{ required: true, message: t('employee.nameRequired') }]}>
+            <Input placeholder={t('employee.namePlaceholder')} allowClear autoComplete="off" />
           </Form.Item>
           <Form.Item
             name="empId"
-            label="工號"
-            extra={editing ? '工號同時作為登錄賬號，不可修改' : '工號由系統自動生成（MF 開頭自增），同時作為登錄賬號'}
+            label={t('employee.empIdLabel')}
+            extra={editing ? t('employee.empIdExtraEdit') : t('employee.empIdExtraCreate')}
           >
-            <Input placeholder="保存後由系統自動生成" disabled />
+            <Input placeholder={t('employee.empIdPlaceholder')} disabled />
           </Form.Item>
           {!editing && (
             <Form.Item
               name="password"
-              label="登錄密碼"
+              label={t('employee.passwordLabel')}
               rules={[
-                { required: true, message: '請輸入登錄密碼' },
-                { min: 6, max: 32, message: '密碼長度為6-32位' },
+                { required: true, message: t('employee.passwordRequired') },
+                { min: 6, max: 32, message: t('employee.passwordLength') },
               ]}
             >
-              <Input.Password placeholder="請輸入初始登錄密碼" autoComplete="new-password" />
+              <Input.Password placeholder={t('employee.passwordPlaceholder')} autoComplete="new-password" />
             </Form.Item>
           )}
-          <Form.Item name="departmentId" label="所屬部門" extra="部門在「組織管理」中維護，加入部門後自動獲得部門授權的菜單權限">
+          <Form.Item name="departmentId" label={t('employee.deptLabel')} extra={t('employee.deptExtra')}>
             <TreeSelect
               treeData={deptTreeData}
-              placeholder="請選擇所屬部門"
+              placeholder={t('employee.deptPlaceholder')}
               allowClear
               treeDefaultExpandAll
               showSearch
@@ -592,25 +602,27 @@ export default function EmployeeManagement() {
           </Form.Item>
           <Form.Item
             name="sequence"
-            label="職級序列"
-            extra="選擇序列後自動過濾對應職級的職位"
+            label={t('employee.sequenceLabel')}
+            extra={t('employee.sequenceExtra')}
           >
             <Select
-              placeholder="請選擇職級序列"
+              placeholder={t('employee.sequencePlaceholder')}
               allowClear
-              options={POSITION_SEQUENCE_OPTIONS}
+              options={SEQ_OPTIONS}
               onChange={handleSequenceChange}
             />
           </Form.Item>
           <Form.Item
             name="positionId"
-            label="職位"
+            label={t('employee.positionLabel')}
             extra={selectedPosition
-              ? `對應職級：${selectedPosition.jobLevel}${selectedPosition.rank ? `，職等：${selectedPosition.rank}` : ''}${selectedPosition.nameEn ? `，英文名稱：${selectedPosition.nameEn}` : ''}`
-              : '職位在「職位管理」中維護，選擇後自動帶出對應職級、職等與英文名稱'}
+              ? t('employee.positionLevelExtra', { level: selectedPosition.jobLevel })
+                + (selectedPosition.rank ? t('employee.positionRankExtra', { rank: selectedPosition.rank }) : '')
+                + (selectedPosition.nameEn ? t('employee.positionNameEnExtra', { nameEn: selectedPosition.nameEn }) : '')
+              : t('employee.positionExtra')}
           >
             <Select
-              placeholder={watchSequence ? '請選擇職位' : '請先選擇職級序列，或直接選擇職位'}
+              placeholder={watchSequence ? t('employee.positionPlaceholder') : t('employee.positionPlaceholderSeq')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -618,17 +630,17 @@ export default function EmployeeManagement() {
               onChange={handlePositionChange}
             />
           </Form.Item>
-          <Form.Item name="rank" label="職等" extra={watchPositionId ? '職等由所選職位自動帶出，不可手動修改' : '僅展示職位管理中已配置的職等'}>
-            <Select placeholder={watchPositionId ? '由職位自動帶出' : '請先選擇職位'} disabled={!watchPositionId} allowClear={!watchPositionId} options={availableRankOptions} />
+          <Form.Item name="rank" label={t('employee.rankLabel')} extra={watchPositionId ? t('employee.rankAutoExtra') : t('employee.rankConfigExtra')}>
+            <Select placeholder={watchPositionId ? t('employee.rankAutoPlaceholder') : t('employee.rankSelectPlaceholder')} disabled={!watchPositionId} allowClear={!watchPositionId} options={availableRankOptions} />
           </Form.Item>
           <Form.Item
             name="functionRoleIds"
-            label="角色授權"
-            extra="綁定後員工按角色的菜單權限訪問系統，可稍後在「功能授權」中配置"
+            label={t('employee.roleAuthLabel')}
+            extra={t('employee.roleAuthExtra')}
           >
             <Select
               mode="multiple"
-              placeholder="請選擇功能角色（可多選）"
+              placeholder={t('employee.roleAuthPlaceholder')}
               allowClear
               optionFilterProp="label"
               options={roles.map(r => ({ value: r.id, label: r.name, disabled: r.status !== 1 }))}
@@ -639,26 +651,26 @@ export default function EmployeeManagement() {
 
       {/* 重置密码弹窗 */}
       <Modal
-        title={`重置密碼 - ${pwdTarget?.name ?? ''}`}
+        title={t('employee.resetPwdTitle', { name: pwdTarget?.name ?? '' })}
         open={pwdModalVisible}
         onOk={handleResetPwd}
         onCancel={() => setPwdModalVisible(false)}
         confirmLoading={submitting}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={420}
         destroyOnClose
       >
         <Form form={pwdForm} layout="vertical">
           <Form.Item
             name="password"
-            label="新密碼"
+            label={t('employee.newPasswordLabel')}
             rules={[
-              { required: true, message: '請輸入新密碼' },
-              { min: 6, max: 32, message: '密碼長度為6-32位' },
+              { required: true, message: t('employee.newPasswordRequired') },
+              { min: 6, max: 32, message: t('employee.passwordLength') },
             ]}
           >
-            <Input.Password placeholder="請輸入新密碼" />
+            <Input.Password placeholder={t('employee.newPasswordPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Alert, message, Select, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
@@ -16,19 +17,7 @@ interface DimensionWeight {
   other: number
 }
 
-const DIMENSION_CHANNELS: { key: DimensionChannelType; label: string }[] = [
-  { key: 'takeaway', label: '外賣頻道搜索' },
-  { key: 'groupBuy', label: '團購頻道搜索' },
-  { key: 'supermarket', label: '超市頻道搜索' },
-]
-
-const DIMENSION_LABELS: { key: keyof DimensionWeight; label: string }[] = [
-  { key: 'relevance', label: '搜索詞匹配得分佔比' },
-  { key: 'commercial', label: '商業得分佔比' },
-  { key: 'store', label: '店鋪得分佔比' },
-  { key: 'user', label: '用戶得分佔比' },
-  { key: 'other', label: '平台得分佔比' },
-]
+/** 頻道標籤 / 維度標籤依賴 t，移入組件內定義 */
 
 function createDefaultDimensionWeight(): DimensionWeight {
   return { relevance: 20, commercial: 30, store: 25, user: 15, other: 10 }
@@ -42,31 +31,19 @@ interface RelevanceWeightRow {
   description: string
 }
 
-const defaultStoreRelevanceWeights: RelevanceWeightRow[] = [
-  { key: 's1', method: '分詞命中', weight: 100, description: '分詞後，分詞命中店鋪名稱加分' },
-  { key: 's2', method: '用戶輸入內容（模糊匹配）', weight: 60, description: '用戶輸入的內容，模糊匹配店鋪名稱加分' },
-  { key: 's3', method: '用戶輸入內容（精準匹配）', weight: 200, description: '用戶輸入的內容，精準匹配店鋪名稱加分' },
-]
-
-const defaultProductRelevanceWeights: RelevanceWeightRow[] = [
-  { key: 'p1', method: '分詞命中', weight: 100, description: '分詞後，分詞命中商品名稱加分' },
-  { key: 'p2', method: '用戶輸入內容（模糊匹配）', weight: 60, description: '用戶輸入的內容，模糊匹配商品名稱加分' },
-  { key: 'p3', method: '用戶輸入內容（精準匹配）', weight: 200, description: '用戶輸入的內容，精準匹配商品名稱加分' },
-]
+/** 粗排默認權重（依賴 t，移入組件內初始化） */
 
 /** 時段類型枚舉（固定5個，不可重複配置） */
 type TimePeriodKey = 'breakfast' | 'lunch' | 'afternoonTea' | 'dinner' | 'supper'
 
-/** 時段枚舉配置 */
-const TIME_PERIOD_ENUM: Record<TimePeriodKey, { label: string; timeRange: string }> = {
-  breakfast: { label: '早餐時段', timeRange: '07:00-09:00' },
-  lunch: { label: '午餐時段', timeRange: '11:00-13:00' },
-  afternoonTea: { label: '下午茶時段', timeRange: '14:00-17:00' },
-  dinner: { label: '晚餐時段', timeRange: '17:00-19:00' },
-  supper: { label: '宵夜時段', timeRange: '22:00-01:00' },
+/** 時段時間範圍（數據，不隨語言切換） */
+const TIME_PERIOD_RANGES: Record<TimePeriodKey, string> = {
+  breakfast: '07:00-09:00',
+  lunch: '11:00-13:00',
+  afternoonTea: '14:00-17:00',
+  dinner: '17:00-19:00',
+  supper: '22:00-01:00',
 }
-
-const TIME_PERIOD_KEYS = Object.keys(TIME_PERIOD_ENUM) as TimePeriodKey[]
 
 /** 時段優先配置行 */
 interface TimePeriodItem {
@@ -105,6 +82,29 @@ const defaultChannelMixingPriority: ChannelMixingPriorityConfig = {
 
 export default function GlobalConfig() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+
+  // 標籤/枚舉依賴 t，需定義在組件內以便響應語言切換
+  const DIMENSION_CHANNELS: { key: DimensionChannelType; label: string }[] = [
+    { key: 'takeaway', label: t('globalConfig.channelTakeaway') },
+    { key: 'groupBuy', label: t('globalConfig.channelGroupBuy') },
+    { key: 'supermarket', label: t('globalConfig.channelSupermarket') },
+  ]
+  const DIMENSION_LABELS: { key: keyof DimensionWeight; label: string }[] = [
+    { key: 'relevance', label: t('globalConfig.dimRelevance') },
+    { key: 'commercial', label: t('globalConfig.dimCommercial') },
+    { key: 'store', label: t('globalConfig.dimStore') },
+    { key: 'user', label: t('globalConfig.dimUser') },
+    { key: 'other', label: t('globalConfig.dimOther') },
+  ]
+  const TIME_PERIOD_ENUM: Record<TimePeriodKey, { label: string; timeRange: string }> = {
+    breakfast: { label: t('globalConfig.periodBreakfast'), timeRange: TIME_PERIOD_RANGES.breakfast },
+    lunch: { label: t('globalConfig.periodLunch'), timeRange: TIME_PERIOD_RANGES.lunch },
+    afternoonTea: { label: t('globalConfig.periodTea'), timeRange: TIME_PERIOD_RANGES.afternoonTea },
+    dinner: { label: t('globalConfig.periodDinner'), timeRange: TIME_PERIOD_RANGES.dinner },
+    supper: { label: t('globalConfig.periodSupper'), timeRange: TIME_PERIOD_RANGES.supper },
+  }
+  const TIME_PERIOD_KEYS = Object.keys(TIME_PERIOD_ENUM) as TimePeriodKey[]
 
   // 詞庫管理狀態
   const [synonymEnabled, setSynonymEnabled] = useState(true)
@@ -132,8 +132,16 @@ export default function GlobalConfig() {
   }
 
   // 粗排配置狀態
-  const [storeRelevanceWeights, setStoreRelevanceWeights] = useState<RelevanceWeightRow[]>(defaultStoreRelevanceWeights)
-  const [productRelevanceWeights, setProductRelevanceWeights] = useState<RelevanceWeightRow[]>(defaultProductRelevanceWeights)
+  const [storeRelevanceWeights, setStoreRelevanceWeights] = useState<RelevanceWeightRow[]>([
+    { key: 's1', method: t('globalConfig.storeSegHit'), weight: 100, description: t('globalConfig.storeSegDesc') },
+    { key: 's2', method: t('globalConfig.storeFuzzy'), weight: 60, description: t('globalConfig.storeFuzzyDesc') },
+    { key: 's3', method: t('globalConfig.storeExact'), weight: 200, description: t('globalConfig.storeExactDesc') },
+  ])
+  const [productRelevanceWeights, setProductRelevanceWeights] = useState<RelevanceWeightRow[]>([
+    { key: 'p1', method: t('globalConfig.productSegHit'), weight: 100, description: t('globalConfig.productSegDesc') },
+    { key: 'p2', method: t('globalConfig.productFuzzy'), weight: 60, description: t('globalConfig.productFuzzyDesc') },
+    { key: 'p3', method: t('globalConfig.productExact'), weight: 200, description: t('globalConfig.productExactDesc') },
+  ])
   const [isBonusEditing, setIsBonusEditing] = useState(false)
   const [bonusSnapshot, setBonusSnapshot] = useState<{
     store: RelevanceWeightRow[]; product: RelevanceWeightRow[];
@@ -181,7 +189,7 @@ export default function GlobalConfig() {
   const handleDimSave = () => {
     setDimSnapshot(null)
     setIsDimEditing(false)
-    message.success('維度權重佔比已保存')
+    message.success(t('globalConfig.dimSaved'))
   }
 
   // 頻道混排優先級編輯態（快照回滾）
@@ -205,7 +213,7 @@ export default function GlobalConfig() {
   const handleMixingSave = () => {
     setMixingSnapshot(null)
     setIsMixingEditing(false)
-    message.success('頻道混排優先級已保存')
+    message.success(t('globalConfig.mixingSaved'))
   }
 
   const updateStoreRelevance = (rowKey: string, value: number | null) => {
@@ -249,7 +257,7 @@ export default function GlobalConfig() {
 
   const addTimePeriod = () => {
     if (mixingPriority.timePeriodList.length >= MAX_TIME_PERIODS) {
-      message.warning(`最多只能新增 ${MAX_TIME_PERIODS} 個時段`)
+      message.warning(t('globalConfig.maxPeriodWarning', { count: MAX_TIME_PERIODS }))
       return
     }
     const newPeriod: TimePeriodItem = {
@@ -269,7 +277,7 @@ export default function GlobalConfig() {
       const newList = [...prev.timePeriodList]
       // 檢查是否重複（排除當前編輯的行）
       if (newKey !== null && newList.some((p, i) => i !== index && p.key === newKey)) {
-        message.warning(`${TIME_PERIOD_ENUM[newKey].label} 已存在，請選擇其他時段`)
+        message.warning(t('globalConfig.periodExists', { label: TIME_PERIOD_ENUM[newKey].label }))
         return prev
       }
       newList[index] = { ...newList[index], key: newKey }
@@ -326,12 +334,12 @@ export default function GlobalConfig() {
   const tabItems = [
     {
       key: 'library',
-      label: '詞庫與搜索',
+      label: t('globalConfig.tabLibrary'),
       children: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* 詞庫配置區域 */}
           <Card
-            title={<span style={{ color: '#1d39c4', fontWeight: 600 }}>詞庫配置</span>}
+            title={<span style={{ color: '#1d39c4', fontWeight: 600 }}>{t('globalConfig.libTitle')}</span>}
             size="small"
             style={{ borderColor: '#d6e4ff' }}
             styles={{ header: { background: '#f0f5ff', borderBottom: '1px solid #d6e4ff' } }}
@@ -342,19 +350,19 @@ export default function GlobalConfig() {
               <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Space>
-                    <span style={{ fontWeight: 600 }}>同義詞庫</span>
+                    <span style={{ fontWeight: 600 }}>{t('globalConfig.libSynonym')}</span>
                     <Switch
                       checked={synonymEnabled}
                       onChange={setSynonymEnabled}
-                      checkedChildren="開"
-                      unCheckedChildren="關"
+                      checkedChildren={t('globalConfig.on')}
+                      unCheckedChildren={t('globalConfig.off')}
                       size="small"
                     />
                   </Space>
-                  <Button type="link" size="small" onClick={() => navigate('/synonym-config')}>管理詞庫</Button>
+                  <Button type="link" size="small" onClick={() => navigate('/synonym-config')}>{t('globalConfig.manage')}</Button>
                 </div>
                 <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
-                  搜「漢堡」可召回「burger」等同義詞
+                  {t('globalConfig.libSynonymDesc')}
                 </div>
               </Card>
 
@@ -362,19 +370,19 @@ export default function GlobalConfig() {
               <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Space>
-                    <span style={{ fontWeight: 600 }}>停用詞庫</span>
+                    <span style={{ fontWeight: 600 }}>{t('globalConfig.libStopWord')}</span>
                     <Switch
                       checked={stopWordEnabled}
                       onChange={setStopWordEnabled}
-                      checkedChildren="開"
-                      unCheckedChildren="關"
+                      checkedChildren={t('globalConfig.on')}
+                      unCheckedChildren={t('globalConfig.off')}
                       size="small"
                     />
                   </Space>
-                  <Button type="link" size="small" onClick={() => navigate('/stop-words')}>管理詞庫</Button>
+                  <Button type="link" size="small" onClick={() => navigate('/stop-words')}>{t('globalConfig.manage')}</Button>
                 </div>
                 <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
-                  過濾無意義詞，避免干擾搜索結果
+                  {t('globalConfig.libStopWordDesc')}
                 </div>
               </Card>
 
@@ -382,18 +390,18 @@ export default function GlobalConfig() {
               <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Space>
-                    <span style={{ fontWeight: 600 }}>商家關鍵詞匹配</span>
+                    <span style={{ fontWeight: 600 }}>{t('globalConfig.libMerchantKw')}</span>
                     <Switch
                       checked={merchantKeywordEnabled}
                       onChange={setMerchantKeywordEnabled}
-                      checkedChildren="開"
-                      unCheckedChildren="關"
+                      checkedChildren={t('globalConfig.on')}
+                      unCheckedChildren={t('globalConfig.off')}
                       size="small"
                     />
                   </Space>
                 </div>
                 <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
-                  搜「快餐」可召回漢堡店、肯德基等商家
+                  {t('globalConfig.libMerchantKwDesc')}
                 </div>
               </Card>
 
@@ -401,18 +409,18 @@ export default function GlobalConfig() {
               <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Space>
-                    <span style={{ fontWeight: 600 }}>商品關鍵詞匹配</span>
+                    <span style={{ fontWeight: 600 }}>{t('globalConfig.libProductKw')}</span>
                     <Switch
                       checked={productKeywordEnabled}
                       onChange={setProductKeywordEnabled}
-                      checkedChildren="開"
-                      unCheckedChildren="關"
+                      checkedChildren={t('globalConfig.on')}
+                      unCheckedChildren={t('globalConfig.off')}
                       size="small"
                     />
                   </Space>
                 </div>
                 <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
-                  搜「飲品」可召回奶茶、可樂等商品
+                  {t('globalConfig.libProductKwDesc')}
                 </div>
               </Card>
             </div>
@@ -420,52 +428,52 @@ export default function GlobalConfig() {
 
           {/* 用戶輸入模糊糾錯 */}
           <Card
-            title={<span style={{ color: '#389e0d', fontWeight: 600 }}>用戶輸入模糊糾錯</span>}
+            title={<span style={{ color: '#389e0d', fontWeight: 600 }}>{t('globalConfig.fuzzyTitle')}</span>}
             size="small"
             style={{ borderColor: '#d9f7be' }}
             styles={{ header: { background: '#f6ffed', borderBottom: '1px solid #d9f7be' } }}
           >
             <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 10 }}>
-              用戶輸入搜索詞時的自動糾錯與模糊匹配能力，提升召回率
+              {t('globalConfig.fuzzyDesc')}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
               <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>拼音匹配</div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzyPinyin')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
                     checked={fuzzyPinyin}
                     onChange={setFuzzyPinyin}
-                    checkedChildren="開"
-                    unCheckedChildren="關"
+                    checkedChildren={t('globalConfig.on')}
+                    unCheckedChildren={t('globalConfig.off')}
                     size="small"
                   />
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>如搜「汉bao」召回「漢堡」</span>
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.fuzzyPinyinTip')}</span>
                 </div>
               </div>
               <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>簡繁體匹配</div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzySimp')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
                     checked={fuzzySimplifiedTraditional}
                     onChange={setFuzzySimplifiedTraditional}
-                    checkedChildren="開"
-                    unCheckedChildren="關"
+                    checkedChildren={t('globalConfig.on')}
+                    unCheckedChildren={t('globalConfig.off')}
                     size="small"
                   />
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>如搜「汉堡」召回「漢堡」</span>
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.fuzzySimpTip')}</span>
                 </div>
               </div>
               <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>容錯匹配</div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzyTolerance')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
                     checked={fuzzyTolerance}
                     onChange={setFuzzyTolerance}
-                    checkedChildren="開"
-                    unCheckedChildren="關"
+                    checkedChildren={t('globalConfig.on')}
+                    unCheckedChildren={t('globalConfig.off')}
                     size="small"
                   />
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>如搜「肯德鷄」召回「肯德基」</span>
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.fuzzyToleranceTip')}</span>
                 </div>
               </div>
             </div>
@@ -474,9 +482,9 @@ export default function GlobalConfig() {
           {/* 用戶輸入搜索詞匹配加分：門店與商品左右並排 */}
           {(() => {
             const bonusCols: TableColumnsType<RelevanceWeightRow> = [
-              { title: '匹配方式', dataIndex: 'method', width: 200 },
+              { title: t('globalConfig.colMethod'), dataIndex: 'method', width: 200 },
               {
-                title: '加分值', dataIndex: 'weight', width: 130,
+                title: t('globalConfig.colWeight'), dataIndex: 'weight', width: 130,
                 render: (v: number, r) => (
                   <InputNumber
                     min={0} max={9999} value={v} size="small" style={{ width: '100%' }}
@@ -485,13 +493,13 @@ export default function GlobalConfig() {
                   />
                 ),
               },
-              { title: '說明', dataIndex: 'description' },
+              { title: t('globalConfig.colDesc'), dataIndex: 'description' },
             ]
 
             const productBonusCols: TableColumnsType<RelevanceWeightRow> = [
-              { title: '匹配方式', dataIndex: 'method', width: 200 },
+              { title: t('globalConfig.colMethod'), dataIndex: 'method', width: 200 },
               {
-                title: '加分值', dataIndex: 'weight', width: 130,
+                title: t('globalConfig.colWeight'), dataIndex: 'weight', width: 130,
                 render: (v: number, r) => (
                   <InputNumber
                     min={0} max={9999} value={v} size="small" style={{ width: '100%' }}
@@ -500,55 +508,55 @@ export default function GlobalConfig() {
                   />
                 ),
               },
-              { title: '說明', dataIndex: 'description' },
+              { title: t('globalConfig.colDesc'), dataIndex: 'description' },
             ]
 
             const bonusExtra = isBonusEditing
               ? (
                 <Space>
-                  <Button size="small" onClick={handleBonusCancel}>取消</Button>
+                  <Button size="small" onClick={handleBonusCancel}>{t('common.cancel')}</Button>
                   <Button type="primary" size="small" icon={<SaveOutlined />} onClick={() => {
-                    message.success('搜索詞匹配加分已保存')
+                    message.success(t('globalConfig.bonusSaved'))
                     setBonusSnapshot(null)
                     setIsBonusEditing(false)
-                  }}>保存</Button>
+                  }}>{t('common.save')}</Button>
                 </Space>
               )
               : (
-                <Button type="primary" size="small" icon={<EditOutlined />} onClick={handleBonusEdit}>編輯加分</Button>
+                <Button type="primary" size="small" icon={<EditOutlined />} onClick={handleBonusEdit}>{t('globalConfig.editBonus')}</Button>
               )
 
             return (
               <Card
-                title={<span style={{ color: '#d46b08', fontWeight: 600 }}>用戶輸入搜索詞匹配加分</span>}
+                title={<span style={{ color: '#d46b08', fontWeight: 600 }}>{t('globalConfig.bonusTitle')}</span>}
                 size="small"
                 extra={bonusExtra}
                 style={{ borderColor: '#ffe7ba' }}
                 styles={{ header: { background: '#fff7e6', borderBottom: '1px solid #ffe7ba' } }}
               >
                 <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 10 }}>
-                  基於<span style={{ fontWeight: 600 }}>用戶實際輸入內容</span>命中商家名稱或商品名稱時的加分值（與上方詞庫配置無關）
-                  {isBonusEditing && <span style={{ color: '#1677ff', marginLeft: 8 }}>（編輯中）</span>}
+                  {t('globalConfig.bonusDesc', { strong: <span style={{ fontWeight: 600 }}>{t('globalConfig.bonusDescStrong')}</span> })}
+                  {isBonusEditing && <span style={{ color: '#1677ff', marginLeft: 8 }}>{t('globalConfig.editing')}</span>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商家相關信息加分</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>{t('globalConfig.bonusStore')}</div>
                     <Table<RelevanceWeightRow>
                       columns={bonusCols}
                       dataSource={[
                         ...storeRelevanceWeights,
-                        ...(merchantKeywordEnabled ? [{ key: 'merchant_kw', method: '商家關鍵詞命中', weight: merchantKeywordBonus, description: '用戶輸入內容，匹配商家關鍵詞加分' }] : []),
+                        ...(merchantKeywordEnabled ? [{ key: 'merchant_kw', method: t('globalConfig.storeKwMethod'), weight: merchantKeywordBonus, description: t('globalConfig.storeKwDesc') }] : []),
                       ]}
                       pagination={false} size="small" bordered
                     />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>命中商品相關信息加分</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>{t('globalConfig.bonusProduct')}</div>
                     <Table<RelevanceWeightRow>
                       columns={productBonusCols}
                       dataSource={[
                         ...productRelevanceWeights,
-                        ...(productKeywordEnabled ? [{ key: 'product_kw', method: '商品關鍵詞命中', weight: productKeywordBonus, description: '用戶輸入內容，匹配商品關鍵詞加分' }] : []),
+                        ...(productKeywordEnabled ? [{ key: 'product_kw', method: t('globalConfig.productKwMethod'), weight: productKeywordBonus, description: t('globalConfig.productKwDesc') }] : []),
                       ]}
                       pagination={false} size="small" bordered
                     />
@@ -562,7 +570,7 @@ export default function GlobalConfig() {
     },
     {
       key: 'strategy',
-      label: '策略權重',
+      label: t('globalConfig.tabStrategy'),
       children: (() => {
         // 計算每個業務頻道的維度權重總和
         const channelTotals: Record<DimensionChannelType, number> = {
@@ -576,14 +584,14 @@ export default function GlobalConfig() {
             {/* 維度權重佔比：3 個業務頻道並排 */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ color: '#722ed1', fontWeight: 600, fontSize: 15 }}>維度權重佔比（按業務頻道獨立配置）</div>
+                <div style={{ color: '#722ed1', fontWeight: 600, fontSize: 15 }}>{t('globalConfig.dimTitle')}</div>
                 {isDimEditing ? (
                   <Space>
-                    <Button onClick={handleDimCancel}>取消</Button>
-                    <Button type="primary" icon={<SaveOutlined />} onClick={handleDimSave}>保存</Button>
+                    <Button onClick={handleDimCancel}>{t('common.cancel')}</Button>
+                    <Button type="primary" icon={<SaveOutlined />} onClick={handleDimSave}>{t('common.save')}</Button>
                   </Space>
                 ) : (
-                  <Button type="primary" icon={<EditOutlined />} onClick={handleDimEdit}>編輯權重</Button>
+                  <Button type="primary" icon={<EditOutlined />} onClick={handleDimEdit}>{t('globalConfig.editWeight')}</Button>
                 )}
               </div>
               <Alert
@@ -592,7 +600,7 @@ export default function GlobalConfig() {
                 style={{ marginBottom: 12 }}
                 message={
                   <span style={{ fontSize: 13 }}>
-                    各業務頻道獨立配置權重：<strong>最終得分 = 相關性×% + 商業×% + 店鋪×% + 用戶×% + 平台×%</strong>；大首頁無獨立權重，透過下方「頻道混排優先級」聚合三個頻道的搜索結果
+                    {t('globalConfig.dimAlert', { formula: <strong>{t('globalConfig.dimFormula')}</strong> })}
                   </span>
                 }
               />
@@ -648,7 +656,7 @@ export default function GlobalConfig() {
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         fontSize: 12,
                       }}>
-                        <span style={{ color: '#595959' }}>佔比總和</span>
+                        <span style={{ color: '#595959' }}>{t('globalConfig.dimTotal')}</span>
                         <span style={{ fontWeight: 600, color: ok ? '#52c41a' : '#ff4d4f' }}>
                           {total}%{ok ? ' ✓' : ' ✗'}
                         </span>
@@ -661,23 +669,23 @@ export default function GlobalConfig() {
 
             {/* 頻道混排優先級（僅大首頁生效） */}
             <Card
-              title={<span style={{ color: '#08979c', fontWeight: 600 }}>頻道混排優先級（僅大首頁生效）</span>}
+              title={<span style={{ color: '#08979c', fontWeight: 600 }}>{t('globalConfig.mixingTitle')}</span>}
               size="small"
               style={{ borderColor: '#b5f5ec' }}
               styles={{ header: { background: '#e6fffb', borderBottom: '1px solid #b5f5ec' } }}
               extra={
                 isMixingEditing ? (
                   <Space>
-                    <Button onClick={handleMixingCancel}>取消</Button>
-                    <Button type="primary" icon={<SaveOutlined />} onClick={handleMixingSave}>保存</Button>
+                    <Button onClick={handleMixingCancel}>{t('common.cancel')}</Button>
+                    <Button type="primary" icon={<SaveOutlined />} onClick={handleMixingSave}>{t('common.save')}</Button>
                   </Space>
                 ) : (
-                  <Button type="primary" icon={<EditOutlined />} onClick={handleMixingEdit}>編輯配置</Button>
+                  <Button type="primary" icon={<EditOutlined />} onClick={handleMixingEdit}>{t('globalConfig.editConfig')}</Button>
                 )
               }
             >
               <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 12 }}>
-                大首頁聚合多個頻道內容時的排序與展示比例策略
+                {t('globalConfig.mixingDesc')}
               </div>
 
               {/* 當前生效時段提示 */}
@@ -688,11 +696,13 @@ export default function GlobalConfig() {
                   style={{ marginBottom: 12 }}
                   message={
                     <span style={{ fontSize: 13 }}>
-                      🕐 當前時段：<strong>{currentActivePeriod.label}</strong>（{currentActivePeriod.timeRange}）
+                      {t('globalConfig.currentPeriod', { label: <strong>{currentActivePeriod.label}</strong>, range: currentActivePeriod.timeRange })}
                       <span style={{ marginLeft: 16 }}>
-                        生效配置：外賣 {currentActivePeriod.takeawayRatio}%
-                        {' '}超市 {currentActivePeriod.supermarketRatio}%
-                        {' '}團購 {currentActivePeriod.groupBuyRatio}%
+                        {t('globalConfig.activeConfig', {
+                          takeaway: currentActivePeriod.takeawayRatio,
+                          supermarket: currentActivePeriod.supermarketRatio,
+                          groupBuy: currentActivePeriod.groupBuyRatio,
+                        })}
                       </span>
                     </span>
                   }
@@ -703,7 +713,7 @@ export default function GlobalConfig() {
               <Card 
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>📋 展示比例規則</span>
+                    <span>{t('globalConfig.ratioTitle')}</span>
                     <QuestionCircleOutlined 
                       style={{ color: '#1677ff', cursor: 'pointer', fontSize: 14 }} 
                       onClick={() => setShowRatioHelp(true)}
@@ -725,14 +735,14 @@ export default function GlobalConfig() {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                     <Tag color="blue" style={{ margin: 0 }}>
-                      全時段展示比例
-                      {!currentActivePeriod && <span style={{ marginLeft: 6, color: '#52c41a' }}>（當前生效）</span>}
+                      {t('globalConfig.allDayRatio')}
+                      {!currentActivePeriod && <span style={{ marginLeft: 6, color: '#52c41a' }}>{t('globalConfig.activeNow')}</span>}
                     </Tag>
-                    <span style={{ color: '#8c8c8c', fontSize: 12 }}>默認配置，無時段規則時生效</span>
+                    <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.allDayDefault')}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <span>
-                      外賣：
+                      {t('globalConfig.takeaway')}：
                       <InputNumber
                         min={0} max={100} size="small"
                         disabled={!isMixingEditing}
@@ -743,7 +753,7 @@ export default function GlobalConfig() {
                       />
                     </span>
                     <span>
-                      超市：
+                      {t('globalConfig.supermarket')}：
                       <InputNumber
                         min={0} max={100} size="small"
                         disabled={!isMixingEditing}
@@ -754,7 +764,7 @@ export default function GlobalConfig() {
                       />
                     </span>
                     <span>
-                      團購：
+                      {t('globalConfig.groupBuy')}：
                       <InputNumber
                         min={0} max={100} size="small"
                         disabled={!isMixingEditing}
@@ -774,7 +784,7 @@ export default function GlobalConfig() {
                 <div style={{ marginTop: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 600, color: '#595959' }}>時段優先規則</span>
+                      <span style={{ fontWeight: 600, color: '#595959' }}>{t('globalConfig.periodRules')}</span>
                       <QuestionCircleOutlined 
                         style={{ color: '#1677ff', cursor: 'pointer', fontSize: 14 }} 
                         onClick={() => setShowTimePeriodHelp(true)}
@@ -788,7 +798,7 @@ export default function GlobalConfig() {
                         onClick={addTimePeriod}
                         disabled={mixingPriority.timePeriodList.length >= MAX_TIME_PERIODS}
                       >
-                        新增時段
+                        {t('globalConfig.addPeriod')}
                       </Button>
                     )}
                   </div>
@@ -821,7 +831,7 @@ export default function GlobalConfig() {
                             {isMixingEditing ? (
                               <Select
                                 size="small"
-                                placeholder="請選擇時段"
+                                placeholder={t('globalConfig.selectPeriod')}
                                 value={period.key}
                                 style={{ width: 140 }}
                                 onChange={value => updateTimePeriodKey(index, value)}
@@ -839,8 +849,8 @@ export default function GlobalConfig() {
                               />
                             ) : (
                               <Tag color="cyan" style={{ margin: 0 }}>
-                                {enumConfig?.label || '待選擇'}
-                                {isActive && <span style={{ marginLeft: 6, color: '#52c41a' }}>（當前生效）</span>}
+                                {enumConfig?.label || t('globalConfig.pending')}
+                                {isActive && <span style={{ marginLeft: 6, color: '#52c41a' }}>{t('globalConfig.activeNow')}</span>}
                               </Tag>
                             )}
                             {/* 時間範圍 */}
@@ -849,7 +859,7 @@ export default function GlobalConfig() {
                             )}
                             {/* 當前生效標籤（查看模式） */}
                             {!isMixingEditing && isActive && (
-                              <Tag color="success" style={{ margin: 0 }}>當前生效</Tag>
+                              <Tag color="success" style={{ margin: 0 }}>{t('globalConfig.currentActive')}</Tag>
                             )}
                             {/* 刪除按鈕 */}
                             {isMixingEditing && (
@@ -861,14 +871,14 @@ export default function GlobalConfig() {
                                 style={{ marginLeft: 'auto' }}
                                 onClick={() => removeTimePeriod(index)}
                               >
-                                刪除
+                                {t('common.delete')}
                               </Button>
                             )}
                           </div>
                           
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             <span>
-                              外賣：
+                              {t('globalConfig.takeaway')}：
                               <InputNumber
                                 min={0} max={100} size="small"
                                 disabled={!isMixingEditing}
@@ -879,7 +889,7 @@ export default function GlobalConfig() {
                               />
                             </span>
                             <span>
-                              超市：
+                              {t('globalConfig.supermarket')}：
                               <InputNumber
                                 min={0} max={100} size="small"
                                 disabled={!isMixingEditing}
@@ -890,7 +900,7 @@ export default function GlobalConfig() {
                               />
                             </span>
                             <span>
-                              團購：
+                              {t('globalConfig.groupBuy')}：
                               <InputNumber
                                 min={0} max={100} size="small"
                                 disabled={!isMixingEditing}
@@ -909,7 +919,7 @@ export default function GlobalConfig() {
                     })}
                     {mixingPriority.timePeriodList.length === 0 && (
                       <div style={{ textAlign: 'center', padding: '16px', color: '#8c8c8c', border: '1px dashed #d9d9d9', borderRadius: 6 }}>
-                        暫無時段規則，使用「全時段展示比例」作為默認配置
+                        {t('globalConfig.noPeriodRule')}
                       </div>
                     )}
                   </div>
@@ -920,7 +930,7 @@ export default function GlobalConfig() {
               <Card 
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>輪插策略</span>
+                    <span>{t('globalConfig.interleaveTitle')}</span>
                     <QuestionCircleOutlined 
                       style={{ 
                         color: '#1677ff', 
@@ -935,131 +945,131 @@ export default function GlobalConfig() {
                 style={{ marginBottom: 12 }}
               >
                 <Space wrap>
-                  <span>每</span>
+                  <span>{t('globalConfig.interleaveA')}</span>
                   <InputNumber min={1} max={99} disabled={!isMixingEditing} value={mixingPriority.interleaveX} onChange={v => updateMixingPriority('interleaveX', v ?? 1)} />
-                  <span>條外賣，插入</span>
+                  <span>{t('globalConfig.interleaveB')}</span>
                   <InputNumber min={0} max={99} disabled={!isMixingEditing} value={mixingPriority.interleaveZ} onChange={v => updateMixingPriority('interleaveZ', v ?? 0)} />
-                  <span>條團購 /</span>
+                  <span>{t('globalConfig.interleaveC')}</span>
                   <InputNumber min={0} max={99} disabled={!isMixingEditing} value={mixingPriority.interleaveY} onChange={v => updateMixingPriority('interleaveY', v ?? 0)} />
-                  <span>條超市</span>
+                  <span>{t('globalConfig.interleaveD')}</span>
                 </Space>
               </Card>
 
               {/* 輪插策略說明彈窗 */}
               <Modal
-                title="輪插策略說明"
+                title={t('globalConfig.helpTitle1')}
                 open={showInterleaveHelp}
                 onCancel={() => setShowInterleaveHelp(false)}
                 footer={[
                   <Button key="close" type="primary" onClick={() => setShowInterleaveHelp(false)}>
-                    知道了
+                    {t('globalConfig.gotIt')}
                   </Button>
                 ]}
                 width={480}
               >
                 <div style={{ lineHeight: 1.8, fontSize: 14 }}>
                   <div style={{ marginBottom: 16, color: '#595959' }}>
-                    控制各頻道內容的穿插順序，避免單一頻道壟斷前排位置
+                    {t('globalConfig.help1Desc')}
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>🔄 運作方式</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help1How')}</div>
                   <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
-                    <div>• 按照配置的比例循環插入各頻道結果</div>
-                    <div>• 例如「3條外賣 + 1條團購 + 2條超市」循環展示</div>
+                    <div>{t('globalConfig.help1How1')}</div>
+                    <div>{t('globalConfig.help1How2')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>⚠️ 特殊場景處理</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help1Special')}</div>
                   <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
-                    <div>• 若某頻道無結果 → 自動跳過該頻道</div>
-                    <div>• 若某頻道結果不足 → 展示該頻道全部結果後繼續</div>
-                    <div>• 若僅有一個頻道有結果 → 直接展示該頻道全部結果</div>
+                    <div>{t('globalConfig.help1Special1')}</div>
+                    <div>{t('globalConfig.help1Special2')}</div>
+                    <div>{t('globalConfig.help1Special3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>📊 順序說明</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help1Order')}</div>
                   <div style={{ paddingLeft: 12, color: '#595959' }}>
-                    按照「外賣 → 團購 → 超市」順序循環插入
+                    {t('globalConfig.help1Order1')}
                   </div>
                 </div>
               </Modal>
 
               {/* 展示比例規則說明彈窗 */}
               <Modal
-                title="展示比例規則說明"
+                title={t('globalConfig.helpTitle2')}
                 open={showRatioHelp}
                 onCancel={() => setShowRatioHelp(false)}
                 footer={[
                   <Button key="close" type="primary" onClick={() => setShowRatioHelp(false)}>
-                    知道了
+                    {t('globalConfig.gotIt')}
                   </Button>
                 ]}
                 width={480}
               >
                 <div style={{ lineHeight: 1.8, fontSize: 14 }}>
                   <div style={{ marginBottom: 16, color: '#595959' }}>
-                    配置大首頁搜索結果中各頻道的展示比例，包括默認比例和時段優先比例
+                    {t('globalConfig.help2Desc')}
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>📋 全時段展示比例</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help2AllDay')}</div>
                   <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
-                    <div>• 默認配置，無時段規則時生效</div>
-                    <div>• 配置外賣、超市、團購三個頻道的展示比例</div>
-                    <div>• 比例總和必須等於 100%</div>
+                    <div>{t('globalConfig.help2AllDay1')}</div>
+                    <div>{t('globalConfig.help2AllDay2')}</div>
+                    <div>{t('globalConfig.help2AllDay3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>⏰ 時段優先規則</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help2Period')}</div>
                   <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
-                    <div>• 可配置不同時段的專屬展示比例</div>
-                    <div>• 系統會根據當前時間自動匹配對應時段</div>
-                    <div>• 命中時段時使用該時段配置，否則使用全時段比例</div>
+                    <div>{t('globalConfig.help2Period1')}</div>
+                    <div>{t('globalConfig.help2Period2')}</div>
+                    <div>{t('globalConfig.help2Period3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>💡 使用建議</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help2Tip')}</div>
                   <div style={{ paddingLeft: 12, color: '#595959' }}>
-                    <div>• 午晚餐時間可提高外賣比例</div>
-                    <div>• 下午茶時間可提高超市比例</div>
-                    <div>• 宵夜時間可提高團購比例</div>
+                    <div>{t('globalConfig.help2Tip1')}</div>
+                    <div>{t('globalConfig.help2Tip2')}</div>
+                    <div>{t('globalConfig.help2Tip3')}</div>
                   </div>
                 </div>
               </Modal>
 
               {/* 時段優先規則說明彈窗 */}
               <Modal
-                title="時段優先規則說明"
+                title={t('globalConfig.helpTitle3')}
                 open={showTimePeriodHelp}
                 onCancel={() => setShowTimePeriodHelp(false)}
                 footer={[
                   <Button key="close" type="primary" onClick={() => setShowTimePeriodHelp(false)}>
-                    知道了
+                    {t('globalConfig.gotIt')}
                   </Button>
                 ]}
                 width={480}
               >
                 <div style={{ lineHeight: 1.8, fontSize: 14 }}>
                   <div style={{ marginBottom: 16, color: '#595959' }}>
-                    配置不同時段的專屬展示比例，系統會根據當前時間自動匹配
+                    {t('globalConfig.help3Desc')}
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>📅 可用時段</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help3Avail')}</div>
                   <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
-                    <div>• 早餐時段（07:00-09:00）</div>
-                    <div>• 午餐時段（11:00-13:00）</div>
-                    <div>• 下午茶時段（14:00-17:00）</div>
-                    <div>• 晚餐時段（17:00-19:00）</div>
-                    <div>• 宵夜時段（22:00-01:00）</div>
+                    <div>• {t('globalConfig.periodBreakfast')}（07:00-09:00）</div>
+                    <div>• {t('globalConfig.periodLunch')}（11:00-13:00）</div>
+                    <div>• {t('globalConfig.periodTea')}（14:00-17:00）</div>
+                    <div>• {t('globalConfig.periodDinner')}（17:00-19:00）</div>
+                    <div>• {t('globalConfig.periodSupper')}（22:00-01:00）</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>⚙️ 配置規則</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help3Rule')}</div>
                   <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
-                    <div>• 每個時段最多配置一次，不可重複</div>
-                    <div>• 每個時段的展示比例總和必須等於 100%</div>
-                    <div>• 最多可配置 5 個時段</div>
+                    <div>{t('globalConfig.help3Rule1')}</div>
+                    <div>{t('globalConfig.help3Rule2')}</div>
+                    <div>{t('globalConfig.help3Rule3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>🔄 匹配邏輯</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help3Match')}</div>
                   <div style={{ paddingLeft: 12, color: '#595959' }}>
-                    <div>• 系統根據當前時間匹配對應時段</div>
-                    <div>• 命中時段 → 使用該時段配置</div>
-                    <div>• 未命中 → 使用「全時段展示比例」</div>
+                    <div>{t('globalConfig.help3Match1')}</div>
+                    <div>{t('globalConfig.help3Match2')}</div>
+                    <div>{t('globalConfig.help3Match3')}</div>
                   </div>
                 </div>
               </Modal>
@@ -1078,7 +1088,7 @@ export default function GlobalConfig() {
         style={{ marginBottom: 16, background: '#f6f8fa', border: '1px solid #e8e8e8' }}
       >
         <span style={{ color: '#595959', fontSize: 13 }}>
-          全局通用配置對閃蜂和mFood兩個APP共同生效，所有頻道共享此配置
+          {t('globalConfig.pageDesc')}
         </span>
       </Card>
 

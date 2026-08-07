@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Card, Form, Input, InputNumber, Table, Switch, Button, Space, Tag,
   Modal, Select, Radio, message, Row, Col, Typography, Tooltip,
@@ -71,32 +72,7 @@ interface BizConfig {
 }
 type ChannelConfig = Record<Biz, BizConfig>
 
-/* ============================ 常量 ============================ */
-
-const bizOptions: { label: string; value: Biz }[] = [
-  { label: '外賣', value: 'takeaway' }, { label: '團購', value: 'groupBuy' }, { label: '超市', value: 'supermarket' },
-]
-const _bizMap: Record<Biz, string> = { takeaway: '外賣', supermarket: '超市', groupBuy: '團購' }
-const appChannelMap: Record<AppChannelType, string> = { all: '全部', flashBee: '閃蜂', mFood: 'mFood' }
-const appChannelColorMap: Record<AppChannelType, string> = { all: 'blue', flashBee: 'orange', mFood: 'green' }
-const boostMethodMap: Record<BoostMethod, string> = { fixed: '固定加分', weight_multiply: '權重×倍數' }
-const appChannelOptions = [{ label: '全部', value: 'all' }, { label: '閃蜂', value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]
-
-const activityTypeOptions = [
-  { label: '滿額立減', value: 'full_reduce' }, { label: '減免運費', value: 'free_delivery' },
-  { label: '進店領券', value: 'store_coupon' }, { label: '新客立減', value: 'new_user_reduce' },
-  { label: '收藏送券', value: 'fav_coupon' }, { label: '官方勝券', value: 'official_coupon' },
-  { label: '會員紅包', value: 'member_bonus' }, { label: '人氣搜索', value: 'popular_search' },
-  { label: '限時折扣', value: 'flash_sale' }, { label: '買一送一', value: 'buy_one_get_one' },
-]
-const adTypeOptions = [
-  { label: '關鍵詞廣告', value: 'keyword_ad' }, { label: '熱搜詞廣告', value: 'hotsearch_ad' },
-  { label: '曝光廣告', value: 'exposure_ad' }, { label: '品牌廣告', value: 'brand_ad' },
-]
-const activityTypeMap: Record<string, string> = Object.fromEntries(activityTypeOptions.map(o => [o.value, o.label]))
-const adTypeMap: Record<string, string> = Object.fromEntries(adTypeOptions.map(o => [o.value, o.label]))
-
-/* ============================ 默認數據 ============================ */
+/* ============================ 主組件 ============================ */
 
 function createDefaultBizConfig(): BizConfig {
   return {
@@ -184,7 +160,14 @@ const bizIcons: Record<Biz, React.ReactNode> = {
   supermarket: <ShoppingOutlined />,
 }
 
-const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz) => void }) => (
+const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz) => void }) => {
+  const { t } = useTranslation()
+  const bizOptions: { label: string; value: Biz }[] = [
+    { label: t('channelStrategy.bizTakeaway'), value: 'takeaway' },
+    { label: t('channelStrategy.bizGroupBuy'), value: 'groupBuy' },
+    { label: t('channelStrategy.bizSupermarket'), value: 'supermarket' },
+  ]
+  return (
   <div style={{ width: 160, flexShrink: 0, marginRight: 16 }}>
     <div style={{ background: '#fafafa', borderRadius: 8, padding: 12 }}>
       <div style={{
@@ -200,7 +183,7 @@ const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz
         gap: 8,
       }}>
         <AppstoreOutlined />
-        <span>業務頻道</span>
+        <span>{t('channelStrategy.bizChannel')}</span>
       </div>
       {bizOptions.map(opt => (
         <div
@@ -235,16 +218,38 @@ const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz
           }}
         >
           <span style={{ fontSize: 16 }}>{bizIcons[opt.value]}</span>
-          <span>{opt.label}業務</span>
+          <span>{opt.label}{t('channelStrategy.bizSuffix')}</span>
         </div>
       ))}
     </div>
   </div>
-)
+  )
+}
 
 /* ============================ 主組件 ============================ */
 
 export default function DimensionStrategy() {
+  const { t } = useTranslation()
+
+  // 選項依賴 t，需定義在組件內以便響應語言切換
+  const activityTypeOptions = [
+    { label: t('channelStrategy.actFullReduce'), value: 'full_reduce' }, { label: t('channelStrategy.actFreeDelivery'), value: 'free_delivery' },
+    { label: t('channelStrategy.actStoreCoupon'), value: 'store_coupon' }, { label: t('channelStrategy.actNewUserReduce'), value: 'new_user_reduce' },
+    { label: t('channelStrategy.actFavCoupon'), value: 'fav_coupon' }, { label: t('channelStrategy.actOfficialCoupon'), value: 'official_coupon' },
+    { label: t('channelStrategy.actMemberBonus'), value: 'member_bonus' }, { label: t('channelStrategy.actPopularSearch'), value: 'popular_search' },
+    { label: t('channelStrategy.actFlashSale'), value: 'flash_sale' }, { label: t('channelStrategy.actBuyOneGetOne'), value: 'buy_one_get_one' },
+  ]
+  const adTypeOptions = [
+    { label: t('channelStrategy.adKeyword'), value: 'keyword_ad' }, { label: t('channelStrategy.adHotsearch'), value: 'hotsearch_ad' },
+    { label: t('channelStrategy.adExposure'), value: 'exposure_ad' }, { label: t('channelStrategy.adBrand'), value: 'brand_ad' },
+  ]
+  const activityTypeMap: Record<string, string> = Object.fromEntries(activityTypeOptions.map(o => [o.value, o.label]))
+  const adTypeMap: Record<string, string> = Object.fromEntries(adTypeOptions.map(o => [o.value, o.label]))
+  const appChannelMap: Record<AppChannelType, string> = { all: t('common.all'), flashBee: t('common.flashBee'), mFood: 'mFood' }
+  const appChannelColorMap: Record<AppChannelType, string> = { all: 'blue', flashBee: 'orange', mFood: 'green' }
+  const boostMethodMap: Record<BoostMethod, string> = { fixed: t('channelStrategy.boostFixed'), weight_multiply: t('channelStrategy.boostMultiply') }
+  const appChannelOptions = [{ label: t('common.all'), value: 'all' }, { label: t('common.flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]
+
   const [activeDimension, setActiveDimension] = useState<string>('commercial')
   const [activeBiz, setActiveBiz] = useState<Biz>('takeaway')
   const [commercialSubTab, setCommercialSubTab] = useState<'activity' | 'ad'>('activity')
@@ -261,16 +266,16 @@ export default function DimensionStrategy() {
 
   // 活動類目列配置
   const actColumnMeta = useMemo(() => [
-    { key: 'activityType', title: '活動類型' },
-    { key: 'appChannel', title: '適用頻道' },
-    { key: 'boostValue', title: '加分值' },
-    { key: 'boostMethod', title: '加分方式' },
-    { key: 'status', title: '狀態' },
-    { key: 'description', title: '說明' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'activityType', title: t('channelStrategy.colActivityType') },
+    { key: 'appChannel', title: t('channelStrategy.colAppChannel') },
+    { key: 'boostValue', title: t('channelStrategy.colBoostValue') },
+    { key: 'boostMethod', title: t('channelStrategy.colBoostMethod') },
+    { key: 'status', title: t('common.colStatus') },
+    { key: 'description', title: t('channelStrategy.colDesc') },
+    { key: 'updatedBy', title: t('channelStrategy.colUpdatedBy') },
+    { key: 'updatedAt', title: t('channelStrategy.colUpdatedAt') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent: actConfigComponent, applyConfig: actApplyConfig } = useColumnConfig(
     'dimension-strategy-activity',
@@ -280,15 +285,15 @@ export default function DimensionStrategy() {
 
   // 廣告類目列配置
   const adColumnMeta = useMemo(() => [
-    { key: 'adType', title: '廣告類型' },
-    { key: 'appChannel', title: '適用頻道' },
-    { key: 'boostValue', title: '加分值' },
-    { key: 'status', title: '狀態' },
-    { key: 'description', title: '說明' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'adType', title: t('channelStrategy.colAdType') },
+    { key: 'appChannel', title: t('channelStrategy.colAppChannel') },
+    { key: 'boostValue', title: t('channelStrategy.colBoostValue') },
+    { key: 'status', title: t('common.colStatus') },
+    { key: 'description', title: t('channelStrategy.colDesc') },
+    { key: 'updatedBy', title: t('channelStrategy.colUpdatedBy') },
+    { key: 'updatedAt', title: t('channelStrategy.colUpdatedAt') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent: adConfigComponent, applyConfig: adApplyConfig } = useColumnConfig(
     'dimension-strategy-ad',
@@ -312,8 +317,8 @@ export default function DimensionStrategy() {
     setTimeout(() => actForm.setFieldsValue({ ...r, appChannel: r.appChannel || 'all' }), 0)
   }
   const handleActDelete = (r: ActivityRecord) => {
-    Modal.confirm({ title: '確認刪除', content: `確定刪除「${r.activityName}」？`, okText: '確定', cancelText: '取消',
-      onOk: () => { updateBiz(p => ({ ...p, activities: p.activities.filter(a => a.key !== r.key) })); message.success('刪除成功') } })
+    Modal.confirm({ title: t('common.confirmDelete'), content: t('channelStrategy.deleteContent', { name: r.activityName }), okText: t('common.confirm'), cancelText: t('common.cancel'),
+      onOk: () => { updateBiz(p => ({ ...p, activities: p.activities.filter(a => a.key !== r.key) })); message.success(t('common.deleteSuccess')) } })
   }
   const handleActSave = () => {
     actForm.validateFields().then(values => {
@@ -322,10 +327,10 @@ export default function DimensionStrategy() {
       const base = { ...values, activityName, updatedBy: '當前用戶', updatedAt: now }
       if (editingAct) {
         updateBiz(p => ({ ...p, activities: p.activities.map(a => a.key === editingAct.key ? { ...a, ...base } : a) }))
-        message.success('編輯成功')
+        message.success(t('common.updateSuccess'))
       } else {
         updateBiz(p => ({ ...p, activities: [...p.activities, { key: String(Date.now()), ...base }] }))
-        message.success('新增成功')
+        message.success(t('common.addSuccess'))
       }
       setActModalOpen(false)
     })
@@ -367,11 +372,11 @@ export default function DimensionStrategy() {
   }
   const handleAdDelete = (r: AdRecord) => {
     if (r.deletable === false) {
-      message.warning('此數據不可删除')
+      message.warning(t('channelStrategy.notDeletable'))
       return
     }
-    Modal.confirm({ title: '確認刪除', content: `確定刪除「${r.adName}」？`, okText: '確定', cancelText: '取消',
-      onOk: () => { updateBiz(p => ({ ...p, ads: p.ads.filter(a => a.key !== r.key) })); message.success('刪除成功') } })
+    Modal.confirm({ title: t('common.confirmDelete'), content: t('channelStrategy.deleteContent', { name: r.adName }), okText: t('common.confirm'), cancelText: t('common.cancel'),
+      onOk: () => { updateBiz(p => ({ ...p, ads: p.ads.filter(a => a.key !== r.key) })); message.success(t('common.deleteSuccess')) } })
   }
   const handleAdSave = () => {
     adForm.validateFields().then(values => {
@@ -387,10 +392,10 @@ export default function DimensionStrategy() {
       }
       if (editingAd) {
         updateBiz(p => ({ ...p, ads: p.ads.map(a => a.key === editingAd.key ? { ...a, ...base } : a) }))
-        message.success('編輯成功')
+        message.success(t('common.updateSuccess'))
       } else {
         updateBiz(p => ({ ...p, ads: [...p.ads, { key: String(Date.now()), ...base }] }))
-        message.success('新增成功')
+        message.success(t('common.addSuccess'))
       }
       setAdModalOpen(false)
     })
@@ -435,13 +440,13 @@ export default function DimensionStrategy() {
   }
   const handleStoreToggle = (r: StoreFactor) => {
     updateBiz(p => ({ ...p, storeFactors: p.storeFactors.map(f => f.key === r.key ? { ...f, enabled: !f.enabled } : f) }))
-    message.success(r.enabled ? '已停用' : '已啟用')
+    message.success(r.enabled ? t('channelStrategy.storeToggleOff') : t('channelStrategy.storeToggleOn'))
   }
   const handleStoreSave = () => {
     storeEditForm.validateFields().then(values => {
       if (editingStoreFactor) {
         updateBiz(p => ({ ...p, storeFactors: p.storeFactors.map(f => f.key === editingStoreFactor.key ? { ...f, ...values } : f) }))
-        message.success('編輯成功')
+        message.success(t('common.updateSuccess'))
       }
       setStoreEditModalOpen(false)
     })
@@ -469,40 +474,40 @@ export default function DimensionStrategy() {
     })
 
     const actCols: TableColumnsType<ActivityRecord> = [
-      { title: '活動類型', dataIndex: 'activityType', key: 'activityType', width: 120, render: (v: string) => <Tag color="blue">{activityTypeMap[v] || v}</Tag> },
-      { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
-      { title: '加分值', dataIndex: 'boostValue', key: 'boostValue', width: 80, render: (v: number, r: ActivityRecord) => r.boostMethod === 'weight_multiply' ? `${r.weightValue}×${r.multiplyValue}` : v },
-      { title: '加分方式', dataIndex: 'boostMethod', key: 'boostMethod', width: 100, render: (v: BoostMethod) => <Tag color={v === 'fixed' ? 'blue' : 'purple'}>{boostMethodMap[v]}</Tag> },
-      { title: '狀態', dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? '啟用' : '停用'}</Tag> },
-      { title: '說明', dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
-      { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
-      { title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 150, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
-      { title: '操作', key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: ActivityRecord) => (
+      { title: t('channelStrategy.colActivityType'), dataIndex: 'activityType', key: 'activityType', width: 120, render: (v: string) => <Tag color="blue">{activityTypeMap[v] || v}</Tag> },
+      { title: t('channelStrategy.colAppChannel'), dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
+      { title: t('channelStrategy.colBoostValue'), dataIndex: 'boostValue', key: 'boostValue', width: 80, render: (v: number, r: ActivityRecord) => r.boostMethod === 'weight_multiply' ? `${r.weightValue}×${r.multiplyValue}` : v },
+      { title: t('channelStrategy.colBoostMethod'), dataIndex: 'boostMethod', key: 'boostMethod', width: 100, render: (v: BoostMethod) => <Tag color={v === 'fixed' ? 'blue' : 'purple'}>{boostMethodMap[v]}</Tag> },
+      { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
+      { title: t('channelStrategy.colDesc'), dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
+      { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+      { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 150, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+      { title: t('common.colAction'), key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: ActivityRecord) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" onClick={e => { e.preventDefault(); handleActEdit(r) }}>編輯</Button>
+          <Button type="link" size="small" onClick={e => { e.preventDefault(); handleActEdit(r) }}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger={r.status} onClick={e => { e.preventDefault(); updateBiz(p => ({ ...p, activities: p.activities.map(a => a.key === r.key ? { ...a, status: !a.status } : a) })) }}>
-            {r.status ? '停用' : '啟用'}
+            {r.status ? t('common.disable') : t('common.enable')}
           </Button>
-          <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleActDelete(r) }}>刪除</Button>
+          <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleActDelete(r) }}>{t('common.delete')}</Button>
         </Space>
       )},
     ]
 
     const adCols: TableColumnsType<AdRecord> = [
-      { title: '廣告類型', dataIndex: 'adType', key: 'adType', width: 120, render: (v: string) => <Tag color="orange">{adTypeMap[v] || v}</Tag> },
-      { title: '適用頻道', dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
-      { title: '狀態', dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? '啟用' : '停用'}</Tag> },
-      { title: '說明', dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
-      { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
-      { title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 150, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
-      { title: '操作', key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: AdRecord) => (
+      { title: t('channelStrategy.colAdType'), dataIndex: 'adType', key: 'adType', width: 120, render: (v: string) => <Tag color="orange">{adTypeMap[v] || v}</Tag> },
+      { title: t('channelStrategy.colAppChannel'), dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
+      { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
+      { title: t('channelStrategy.colDesc'), dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
+      { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+      { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 150, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+      { title: t('common.colAction'), key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: AdRecord) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" onClick={e => { e.preventDefault(); handleAdEdit(r) }}>編輯</Button>
+          <Button type="link" size="small" onClick={e => { e.preventDefault(); handleAdEdit(r) }}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger={r.status} onClick={e => { e.preventDefault(); updateBiz(p => ({ ...p, ads: p.ads.map(a => a.key === r.key ? { ...a, status: !a.status } : a) })) }}>
-            {r.status ? '停用' : '啟用'}
+            {r.status ? t('common.disable') : t('common.enable')}
           </Button>
           {r.deletable !== false && (
-            <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleAdDelete(r) }}>刪除</Button>
+            <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleAdDelete(r) }}>{t('common.delete')}</Button>
           )}
         </Space>
       )},
@@ -513,18 +518,18 @@ export default function DimensionStrategy() {
         <BizSidebar activeBiz={activeBiz} onChange={setActiveBiz} />
         <div style={{ flex: 1 }}>
           <Tabs activeKey={commercialSubTab} onChange={val => setCommercialSubTab(val as 'activity' | 'ad')}
-            items={[{ key: 'activity', label: '📋 活動類目' }, { key: 'ad', label: '📢 廣告類目' }]}
+            items={[{ key: 'activity', label: t('channelStrategy.tabActivity') }, { key: 'ad', label: t('channelStrategy.tabAd') }]}
             style={{ marginBottom: 16 }}
           />
           <div style={{ marginBottom: 16 }}>
             <Space>
-              <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder="搜索名稱" allowClear
+              <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder={t('channelStrategy.searchName')} allowClear
                 value={commercialSearchText} onChange={e => setCommercialSearchText(e.target.value)} style={{ width: 200 }} />
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => setCommercialSearchText('')}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => setCommercialSearchText('')}>{t('common.reset')}</Button>
               <Button type="primary" icon={<PlusOutlined />}
                 onClick={isActivity ? handleActAdd : handleAdAdd}>
-                {isActivity ? '新增活動' : '新增廣告'}
+                {isActivity ? t('channelStrategy.addActivity') : t('channelStrategy.addAd')}
               </Button>
             </Space>
             <div style={{ float: 'right' }}>
@@ -533,10 +538,10 @@ export default function DimensionStrategy() {
           </div>
           {isActivity ? (
             <Table<ActivityRecord> columns={actApplyConfig(actCols)} dataSource={filteredActivities} rowKey="key"
-              pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條`, size: 'small', showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true }} size="small" scroll={{ x: 1100 }} />
+              pagination={{ pageSize: 10, showTotal: t2 => t('common.total', { count: t2 }), size: 'small', showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true }} size="small" scroll={{ x: 1100 }} />
           ) : (
             <Table<AdRecord> columns={adApplyConfig(adCols)} dataSource={filteredAds} rowKey="key"
-              pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條`, size: 'small', showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true }} size="small" scroll={{ x: 950 }} />
+              pagination={{ pageSize: 10, showTotal: t2 => t('common.total', { count: t2 }), size: 'small', showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true }} size="small" scroll={{ x: 950 }} />
           )}
         </div>
       </div>
@@ -551,15 +556,15 @@ export default function DimensionStrategy() {
       return true
     })
     const cols: TableColumnsType<StoreFactor> = [
-      { title: '因子名稱', dataIndex: 'factorName', width: 140 },
-      { title: '加分值', dataIndex: 'bonusValue', width: 100, render: (v: number) => v },
-      { title: '說明', dataIndex: 'description', render: (v: string) => <Text type="secondary">{v}</Text> },
-      { title: '狀態', dataIndex: 'enabled', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? '啟用' : '停用'}</Tag> },
-      { title: '操作', key: 'action', width: 140, fixed: 'right', render: (_: unknown, r: StoreFactor) => (
+      { title: t('channelStrategy.colFactorName'), dataIndex: 'factorName', width: 140 },
+      { title: t('channelStrategy.colBoostValue'), dataIndex: 'bonusValue', width: 100, render: (v: number) => v },
+      { title: t('channelStrategy.colDesc'), dataIndex: 'description', render: (v: string) => <Text type="secondary">{v}</Text> },
+      { title: t('common.colStatus'), dataIndex: 'enabled', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
+      { title: t('common.colAction'), key: 'action', width: 140, fixed: 'right', render: (_: unknown, r: StoreFactor) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" onClick={e => { e.preventDefault(); handleStoreEdit(r) }}>編輯</Button>
+          <Button type="link" size="small" onClick={e => { e.preventDefault(); handleStoreEdit(r) }}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger={r.enabled} onClick={e => { e.preventDefault(); handleStoreToggle(r) }}>
-            {r.enabled ? '停用' : '啟用'}
+            {r.enabled ? t('common.disable') : t('common.enable')}
           </Button>
         </Space>
       )},
@@ -570,14 +575,14 @@ export default function DimensionStrategy() {
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: 16 }}>
             <Space>
-              <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder="搜索因子名稱" allowClear
+              <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder={t('channelStrategy.searchFactor')} allowClear
                 value={storeNameFilter} onChange={e => setStoreNameFilter(e.target.value)} style={{ width: 180 }} />
-              <Button type="primary" icon={<SearchOutlined />} onClick={() => {}}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => setStoreNameFilter('')}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={() => {}}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => setStoreNameFilter('')}>{t('common.reset')}</Button>
             </Space>
           </div>
           <Table<StoreFactor> columns={cols} dataSource={filtered} rowKey="key"
-            pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條`, size: 'small' }} size="small" bordered />
+            pagination={{ pageSize: 10, showTotal: t2 => t('common.total', { count: t2 }), size: 'small' }} size="small" bordered />
         </div>
       </div>
     )
@@ -652,10 +657,10 @@ export default function DimensionStrategy() {
   /* ============================ 頁面渲染 ============================ */
 
   const dimensionPanels: Record<string, { icon: React.ReactNode; label: string; render: () => JSX.Element }> = {
-    commercial: { icon: <DollarOutlined />, label: '商業維度', render: renderCommercial },
-    store: { icon: <ShopOutlined />, label: '店鋪維度', render: renderStore },
-    user: { icon: <UserOutlined />, label: '用戶維度', render: renderUser },
-    platform: { icon: <GlobalOutlined />, label: '平台維度', render: renderPlatform },
+    commercial: { icon: <DollarOutlined />, label: t('channelStrategy.dimCommercial'), render: renderCommercial },
+    store: { icon: <ShopOutlined />, label: t('channelStrategy.dimStore'), render: renderStore },
+    user: { icon: <UserOutlined />, label: t('channelStrategy.dimUser'), render: renderUser },
+    platform: { icon: <GlobalOutlined />, label: t('channelStrategy.dimPlatform'), render: renderPlatform },
   }
 
   return (
@@ -667,7 +672,7 @@ export default function DimensionStrategy() {
           style={{ marginBottom: 16, background: '#f6f8fa', border: '1px solid #e8e8e8' }}
         >
           <span style={{ color: '#595959', fontSize: 13 }}>
-            維度策略配置對閃蜂和mFood兩個APP共同生效，每個業務頻道的配置參數獨立維護
+            {t('channelStrategy.pageDesc')}
           </span>
         </Card>
         <Tabs
@@ -686,41 +691,41 @@ export default function DimensionStrategy() {
       </div>
 
       {/* ---- 活動 Modal ---- */}
-      <Modal title={editingAct ? '編輯活動' : '新增活動'} open={actModalOpen} onOk={handleActSave}
+      <Modal title={editingAct ? t('channelStrategy.editActivity') : t('channelStrategy.addActivity')} open={actModalOpen} onOk={handleActSave}
         onCancel={() => setActModalOpen(false)} width={600} destroyOnClose>
         <Form form={actForm} layout="vertical" style={{ marginTop: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item label="活動類型" name="activityType" rules={[{ required: true, message: '請選擇活動類型' }]}>
-              <Select options={activityTypeOptions} placeholder="選擇活動類型" />
+            <Form.Item label={t('channelStrategy.colActivityType')} name="activityType" rules={[{ required: true, message: t('channelStrategy.actTypeRequired') }]}>
+              <Select options={activityTypeOptions} placeholder={t('channelStrategy.selectActivityType')} />
             </Form.Item>
-            <Form.Item label="適用頻道" name="appChannel" rules={[{ required: true }]}>
+            <Form.Item label={t('channelStrategy.colAppChannel')} name="appChannel" rules={[{ required: true }]}>
               <Select options={appChannelOptions} />
             </Form.Item>
           </div>
-          <Form.Item label="加分方式" name="boostMethod" rules={[{ required: true }]}>
+          <Form.Item label={t('channelStrategy.boostMethod')} name="boostMethod" rules={[{ required: true }]}>
             <Radio.Group onChange={e => setActBoostMethod(e.target.value)}>
-              <Radio value="fixed">固定加分</Radio><Radio value="weight_multiply">權重×倍數</Radio>
+              <Radio value="fixed">{t('channelStrategy.boostFixed')}</Radio><Radio value="weight_multiply">{t('channelStrategy.boostMultiply')}</Radio>
             </Radio.Group>
           </Form.Item>
           {actBoostMethod === 'fixed'
-            ? <Form.Item label="加分值" name="boostValue" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={9999} /></Form.Item>
+            ? <Form.Item label={t('channelStrategy.colBoostValue')} name="boostValue" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={9999} /></Form.Item>
             : <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                <Form.Item label="權重值" name="weightValue" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={9999} /></Form.Item>
-                <Form.Item label="倍數" name="multiplyValue" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={99} /></Form.Item>
+                <Form.Item label={t('channelStrategy.weightValue')} name="weightValue" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={9999} /></Form.Item>
+                <Form.Item label={t('channelStrategy.multiplier')} name="multiplyValue" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={99} /></Form.Item>
               </div>
           } 
-          <Form.Item label="狀態" name="status" valuePropName="checked">
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+          <Form.Item label={t('common.colStatus')} name="status" valuePropName="checked">
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} />
           </Form.Item>
-          <Form.Item label="說明" name="description">
-            <Input.TextArea rows={2} placeholder="請輸入活動說明（選填）" maxLength={200} showCount />
+          <Form.Item label={t('channelStrategy.colDesc')} name="description">
+            <Input.TextArea rows={2} placeholder={t('channelStrategy.actDescPlaceholder')} maxLength={200} showCount />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* ---- 廣告 Modal ---- */}
       <Modal 
-        title={editingAd ? '編輯廣告' : '新增廣告'} 
+        title={editingAd ? t('channelStrategy.editAd') : t('channelStrategy.addAd')} 
         open={adModalOpen} 
         onOk={handleAdSave}
         onCancel={() => setAdModalOpen(false)} 
@@ -730,21 +735,21 @@ export default function DimensionStrategy() {
         <Form form={adForm} layout="vertical" style={{ marginTop: 16 }}>
           {/* 新增模式下显示广告类型选择 */}
           {!editingAd && (
-            <Form.Item label="廣告類型" name="adType" rules={[{ required: true, message: '請選擇廣告類型' }]}>
-              <Select options={adTypeOptions} placeholder="選擇廣告類型" />
+            <Form.Item label={t('channelStrategy.colAdType')} name="adType" rules={[{ required: true, message: t('channelStrategy.adTypeRequired') }]}>
+              <Select options={adTypeOptions} placeholder={t('channelStrategy.selectAdType')} />
             </Form.Item>
           )}
 
           {/* 所有广告都显示加分/扣分Tab切换 */}
           {editingAd && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>配置類型</div>
+              <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>{t('channelStrategy.configType')}</div>
               <Tabs
                 activeKey={adCategory}
                 onChange={(key) => setAdCategory(key as 'boost' | 'demote')}
                 items={[
-                  { key: 'boost', label: '➕ 加分' },
-                  { key: 'demote', label: '➖ 扣分' },
+                  { key: 'boost', label: t('channelStrategy.tabBoost') },
+                  { key: 'demote', label: t('channelStrategy.tabDemote') },
                 ]}
                 size="small"
               />
@@ -753,9 +758,9 @@ export default function DimensionStrategy() {
 
           {/* 加分规则配置 - 根据Tab显示 */}
           {adCategory === 'boost' && (
-            <Form.Item label="加分規則配置">
+            <Form.Item label={t('channelStrategy.boostRuleTitle')}>
               <div style={{ marginBottom: 12, color: '#666', fontSize: 12 }}>
-                配置廣告加分規則
+                {t('channelStrategy.boostRuleDesc')}
               </div>
               {adBoostTiers.map((tier, index) => (
                 <div key={index} style={{ 
@@ -765,18 +770,18 @@ export default function DimensionStrategy() {
                   background: '#fafafa'
                 }}>
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ marginBottom: 8, fontSize: 13, color: '#333', fontWeight: 500 }}>加分方式</div>
+                    <div style={{ marginBottom: 8, fontSize: 13, color: '#333', fontWeight: 500 }}>{t('channelStrategy.boostMethod')}</div>
                     <Radio.Group 
                       value={tier.boostType}
                       onChange={(e) => handleUpdateAdBoostTier(index, 'boostType', e.target.value)}
                     >
-                      <Radio value="amount_match">按消費金額×倍數加分</Radio>
-                      <Radio value="fixed_boost">固定加分</Radio>
+                      <Radio value="amount_match">{t('channelStrategy.amountMultiply')}</Radio>
+                      <Radio value="fixed_boost">{t('channelStrategy.boostFixed')}</Radio>
                     </Radio.Group>
                   </div>
                   <div>
                     <div style={{ marginBottom: 8, fontSize: 13, color: '#333', fontWeight: 500 }}>
-                      {tier.boostType === 'amount_match' ? '消費金額倍數' : '固定加分值'}
+                      {tier.boostType === 'amount_match' ? t('channelStrategy.amountMultiplier') : t('channelStrategy.fixedBoostValue')}
                     </div>
                     <InputNumber
                       style={{ width: '100%' }}
@@ -785,13 +790,13 @@ export default function DimensionStrategy() {
                       min={0}
                       max={9999}
                       step={tier.boostType === 'amount_match' ? 0.1 : 1}
-                      addonAfter={tier.boostType === 'amount_match' ? '倍' : '分'}
-                      placeholder={tier.boostType === 'amount_match' ? '請輸入倍數，如1.5' : '請輸入固定加分值'}
+                      addonAfter={tier.boostType === 'amount_match' ? t('channelStrategy.unitTimes') : t('channelStrategy.unitPoints')}
+                      placeholder={tier.boostType === 'amount_match' ? t('channelStrategy.amountPlaceholder') : t('channelStrategy.fixedPlaceholder')}
                     />
                     <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
                       {tier.boostType === 'amount_match' 
-                        ? '說明：按廣告消費金額 × 倍數計算加分，如消費100元×1.5倍=150分' 
-                        : '說明：無論消費多少，固定增加指定分數'}
+                        ? t('channelStrategy.amountTip') 
+                        : t('channelStrategy.fixedTip')}
                     </div>
                   </div>
                 </div>
@@ -801,9 +806,9 @@ export default function DimensionStrategy() {
 
           {/* 减分规则配置 - 根据Tab显示 */}
           {adCategory === 'demote' && (
-            <Form.Item label="減分規則配置">
+            <Form.Item label={t('channelStrategy.demoteRuleTitle')}>
               <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
-                配置階梯式減分規則，支持多個梯队
+                {t('channelStrategy.demoteRuleDesc')}
               </div>
               {adDemoteTiers.map((tier, index) => (
                 <div key={index} style={{ 
@@ -814,7 +819,7 @@ export default function DimensionStrategy() {
                   background: '#fff2f0'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 'bold' }}>梯队 {index + 1}</span>
+                    <span style={{ fontWeight: 'bold' }}>{t('channelStrategy.tier', { index: index + 1 })}</span>
                     <Button 
                       type="link" 
                       danger 
@@ -822,33 +827,33 @@ export default function DimensionStrategy() {
                       onClick={() => handleRemoveAdDemoteTier(index)}
                       disabled={adDemoteTiers.length <= 1}
                     >
-                      删除
+                      {t('common.delete')}
                     </Button>
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>x天未消費</div>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>{t('channelStrategy.daysLabel')}</div>
                     <InputNumber
                       style={{ width: '100%' }}
                       value={tier.days}
                       onChange={(val) => handleUpdateAdDemoteTier(index, 'days', val || 0)}
                       min={0}
                       max={365}
-                      addonAfter="天"
+                      addonAfter={t('channelStrategy.unitDays')}
                     />
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>扣分方式</div>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>{t('channelStrategy.deductionMethod')}</div>
                     <Radio.Group 
                       value={tier.deductionType}
                       onChange={(e) => handleUpdateAdDemoteTier(index, 'deductionType', e.target.value)}
                     >
-                      <Radio value="fixed_deduction">固定扣分</Radio>
-                      <Radio value="percent_deduction">按商戶總得分折扣</Radio>
+                      <Radio value="fixed_deduction">{t('channelStrategy.fixedDeduction')}</Radio>
+                      <Radio value="percent_deduction">{t('channelStrategy.percentDeduction')}</Radio>
                     </Radio.Group>
                   </div>
                   <div>
                     <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>
-                      {tier.deductionType === 'fixed_deduction' ? '扣分值' : '折扣比例'}
+                      {tier.deductionType === 'fixed_deduction' ? t('channelStrategy.deductionValue') : t('channelStrategy.discountRatio')}
                     </div>
                     <InputNumber
                       style={{ width: '100%' }}
@@ -856,8 +861,8 @@ export default function DimensionStrategy() {
                       onChange={(val) => handleUpdateAdDemoteTier(index, 'deductionValue', val || 0)}
                       min={0}
                       max={tier.deductionType === 'percent_deduction' ? 100 : 9999}
-                      addonAfter={tier.deductionType === 'percent_deduction' ? '%' : '分'}
-                      placeholder={tier.deductionType === 'percent_deduction' ? '請輸入折扣比例，如20' : '請輸入扣分值'}
+                      addonAfter={tier.deductionType === 'percent_deduction' ? '%' : t('channelStrategy.unitPoints')}
+                      placeholder={tier.deductionType === 'percent_deduction' ? t('channelStrategy.pctPlaceholder') : t('channelStrategy.fixedDeductPlaceholder')}
                     />
                     {tier.deductionType === 'percent_deduction' && (
                       <div style={{ 
@@ -869,7 +874,10 @@ export default function DimensionStrategy() {
                         color: '#0050b3',
                         lineHeight: 1.6
                       }}>
-                        <strong>按商戶總得分折扣說明：</strong>按商戶總得分折扣是根據商戶當前總分進行比例扣減。用戶搜索時，系統會執行：<code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>最終得分 = 商戶總分 × (1 - 折扣比例)</code>。例如：商戶總分100分，輸入20%則最終得分80分；輸入100%則全部扣除，最終得分0分。
+                        <strong>{t('channelStrategy.percentTipTitle')}</strong>
+                        {t('channelStrategy.percentTipBody')}
+                        <code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>{t('channelStrategy.percentTipCode')}</code>
+                        {t('channelStrategy.percentTipExample')}
                       </div>
                     )}
                   </div>
@@ -881,35 +889,35 @@ export default function DimensionStrategy() {
                 onClick={handleAddAdDemoteTier}
                 style={{ width: '100%' }}
               >
-                新增梯队
+                {t('channelStrategy.addTier')}
               </Button>
             </Form.Item>
           )}
 
-          <Form.Item label="狀態" name="status" valuePropName="checked">
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+          <Form.Item label={t('common.colStatus')} name="status" valuePropName="checked">
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} />
           </Form.Item>
-          <Form.Item label="說明" name="description">
-            <Input.TextArea rows={2} placeholder="請輸入廣告說明（選填）" maxLength={200} showCount />
+          <Form.Item label={t('channelStrategy.colDesc')} name="description">
+            <Input.TextArea rows={2} placeholder={t('channelStrategy.adDescPlaceholder')} maxLength={200} showCount />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* ---- 店鋪因子編輯 Modal ---- */}
-      <Modal title="編輯店鋪因子" open={storeEditModalOpen} onOk={handleStoreSave}
+      <Modal title={t('channelStrategy.storeEditTitle')} open={storeEditModalOpen} onOk={handleStoreSave}
         onCancel={() => setStoreEditModalOpen(false)} width={500} destroyOnClose>
         <Form form={storeEditForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="因子名稱" name="factorName">
+          <Form.Item label={t('channelStrategy.factorNameLabel')} name="factorName">
             <Input disabled />
           </Form.Item>
-          <Form.Item label="加分值" name="bonusValue" rules={[{ required: true }]}>
+          <Form.Item label={t('channelStrategy.colBoostValue')} name="bonusValue" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={-9999} max={9999} />
           </Form.Item>
-          <Form.Item label="說明" name="description">
+          <Form.Item label={t('channelStrategy.colDesc')} name="description">
             <Input />
           </Form.Item>
-          <Form.Item label="狀態" name="enabled" valuePropName="checked">
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+          <Form.Item label={t('common.colStatus')} name="enabled" valuePropName="checked">
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} />
           </Form.Item>
         </Form>
       </Modal>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import type { DataNode } from 'antd/es/tree'
 import type { MenuPermission } from '../types'
 import { menuPermissionTree, getMenuActions } from '../types'
@@ -118,6 +119,7 @@ function buildDeptTreeData(list: DepartmentItem[], disabledIds?: Set<number>): D
 }
 
 export default function FunctionPermission() {
+  const { t } = useTranslation()
   const [roles, setRoles] = useState<RoleItem[]>([])
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -217,7 +219,7 @@ export default function FunctionPermission() {
   /** 保存授权（形成/更新一条授权数据） */
   const handleSave = async () => {
     if (targetId == null) {
-      message.warning(activeTab === TARGET_TYPE.ROLE ? '請選擇要授權的角色' : '請選擇要授權的部門')
+      message.warning(activeTab === TARGET_TYPE.ROLE ? t('functionPermission.selectRole') : t('functionPermission.selectDept'))
       return
     }
     const permissions: MenuPermission[] = []
@@ -229,7 +231,7 @@ export default function FunctionPermission() {
       }
     })
     if (permissions.length === 0) {
-      message.warning('請至少勾選一個授權功能')
+      message.warning(t('functionPermission.selectFunction'))
       return
     }
     setSubmitting(true)
@@ -239,7 +241,7 @@ export default function FunctionPermission() {
       } else {
         await updateDepartmentPermissions(targetId, permissions)
       }
-      message.success(editingId ? '授權已更新' : '授權已創建')
+      message.success(editingId ? t('functionPermission.authUpdated') : t('functionPermission.authCreated'))
       setModalVisible(false)
       fetchList()
     } catch {
@@ -257,7 +259,7 @@ export default function FunctionPermission() {
       } else {
         await updateDepartmentPermissions(record.id, [])
       }
-      message.success('授權已刪除')
+      message.success(t('common.deleteSuccess'))
       fetchList()
     } catch {
       // 错误提示由请求层统一处理
@@ -267,14 +269,14 @@ export default function FunctionPermission() {
   /** 详情弹窗：授权菜单与对应功能操作 */
   const detailColumns: TableColumnsType<MenuPermission> = [
     {
-      title: '授權菜單',
+      title: t('functionPermission.colAuthMenu'),
       dataIndex: 'menuKey',
       key: 'menuKey',
       width: 200,
       render: (menuKey: string) => MENU_NAME_MAP[menuKey] ?? menuKey,
     },
     {
-      title: '對應功能',
+      title: t('functionPermission.colActions'),
       dataIndex: 'actions',
       key: 'actions',
       render: (actions: string[], record) => (
@@ -292,23 +294,23 @@ export default function FunctionPermission() {
   const renderActions = (record: RoleItem | DepartmentItem) => (
     <Space size={4}>
       <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
-        詳情
+        {t('common.detail')}
       </Button>
       {hasPermission('function-permission:edit') && (
         <Button type="link" size="small" onClick={() => handleEdit(record)}>
-          編輯
+          {t('common.edit')}
         </Button>
       )}
       {hasPermission('function-permission:delete') && (
         <Popconfirm
-          title="確認刪除"
-          description={`確定要刪除「${record.name}」的授權嗎？刪除後其成員將失去對應菜單權限。`}
+          title={t('common.confirmDelete')}
+          description={t('functionPermission.confirmDeleteContent', { name: record.name })}
           onConfirm={() => handleDelete(record)}
-          okText="確認"
-          cancelText="取消"
+          okText={t('common.confirm')}
+          cancelText={t('common.cancel')}
         >
           <Button type="link" size="small" danger>
-            刪除
+            {t('common.delete')}
           </Button>
         </Popconfirm>
       )}
@@ -316,32 +318,32 @@ export default function FunctionPermission() {
   )
 
   const roleColumns: TableColumnsType<RoleItem> = [
-    { title: '角色名稱', dataIndex: 'name', key: 'name', width: 200 },
-    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 120, render: (v: number) => `${v} 人` },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('functionPermission.colRoleName'), dataIndex: 'name', key: 'name', width: 200 },
+    { title: t('functionPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 120, render: (v: number) => t('functionPermission.personCount', { count: v }) },
+    { title: t('functionPermission.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '最後更新時間',
+      title: t('functionPermission.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
-    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
+    { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
   const deptColumns: TableColumnsType<DepartmentItem> = [
-    { title: '部門名稱', dataIndex: 'name', key: 'name', width: 200 },
-    { title: '上級部門', dataIndex: 'parentName', key: 'parentName', width: 180, render: (v: string) => v || '-' },
-    { title: '員工人數', dataIndex: 'userCount', key: 'userCount', width: 120, render: (v: number) => `${v} 人` },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('functionPermission.colDeptName'), dataIndex: 'name', key: 'name', width: 200 },
+    { title: t('functionPermission.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 180, render: (v: string) => v || '-' },
+    { title: t('functionPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 120, render: (v: number) => t('functionPermission.personCount', { count: v }) },
+    { title: t('functionPermission.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
     {
-      title: '最後更新時間',
+      title: t('functionPermission.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
-    { title: '操作', key: 'action', width: 180, render: (_, record) => renderActions(record) },
+    { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
   /** 列字段配置 */
@@ -361,7 +363,7 @@ export default function FunctionPermission() {
         <div className="action-section-right">
           {hasPermission('function-permission:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增
+              {t('common.add')}
             </Button>
           )}
           {type === TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
@@ -376,9 +378,9 @@ export default function FunctionPermission() {
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (t) => `共 ${t} 條數據`,
+            showTotal: (total) => t('common.total', { count: total }),
           }}
-          locale={{ emptyText: '暫無授權數據，點擊「新增」為角色配置功能授權' }}
+          locale={{ emptyText: t('functionPermission.emptyRole') }}
         />
       ) : (
         <Table
@@ -389,9 +391,9 @@ export default function FunctionPermission() {
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (t) => `共 ${t} 條數據`,
+            showTotal: (total) => t('common.total', { count: total }),
           }}
-          locale={{ emptyText: '暫無授權數據，點擊「新增」為部門配置功能授權' }}
+          locale={{ emptyText: t('functionPermission.emptyDept') }}
         />
       )}
     </div>
@@ -410,8 +412,8 @@ export default function FunctionPermission() {
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as TargetType)}
         items={[
-          { key: TARGET_TYPE.ROLE, label: '角色授權', children: renderTabContent(TARGET_TYPE.ROLE) },
-          { key: TARGET_TYPE.DEPARTMENT, label: '部門授權', children: renderTabContent(TARGET_TYPE.DEPARTMENT) },
+          { key: TARGET_TYPE.ROLE, label: t('functionPermission.tabRoleAuth'), children: renderTabContent(TARGET_TYPE.ROLE) },
+          { key: TARGET_TYPE.DEPARTMENT, label: t('functionPermission.tabDeptAuth'), children: renderTabContent(TARGET_TYPE.DEPARTMENT) },
         ]}
       />
 
@@ -419,27 +421,27 @@ export default function FunctionPermission() {
       <Modal
         title={
           editingId
-            ? `編輯授權 - ${editingName ?? ''}`
-            : (activeTab === TARGET_TYPE.ROLE ? '新增角色授權' : '新增部門授權')
+            ? t('functionPermission.editTitle', { name: editingName ?? '' })
+            : (activeTab === TARGET_TYPE.ROLE ? t('functionPermission.addRoleTitle') : t('functionPermission.addDeptTitle'))
         }
         open={modalVisible}
         onOk={handleSave}
         onCancel={() => setModalVisible(false)}
         confirmLoading={submitting}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={920}
         destroyOnClose
       >
         {/* 授权对象选择（编辑模式锁定） */}
         <div className="permission-target-bar">
           <span className="permission-target-label">
-            {activeTab === TARGET_TYPE.ROLE ? '授權角色：' : '授權部門：'}
+            {activeTab === TARGET_TYPE.ROLE ? t('functionPermission.targetRole') : t('functionPermission.targetDept')}
           </span>
           {activeTab === TARGET_TYPE.ROLE ? (
             <Select
               className="permission-target-select"
-              placeholder="請選擇角色"
+              placeholder={t('functionPermission.selectRolePlaceholder')}
               showSearch
               optionFilterProp="label"
               disabled={editingId != null}
@@ -453,7 +455,7 @@ export default function FunctionPermission() {
           ) : (
             <TreeSelect
               className="permission-target-select"
-              placeholder="請選擇部門"
+              placeholder={t('functionPermission.selectDeptPlaceholder')}
               showSearch
               treeDefaultExpandAll
               treeNodeFilterProp="title"
@@ -465,8 +467,8 @@ export default function FunctionPermission() {
           )}
           <Tag color={activeTab === TARGET_TYPE.ROLE ? 'blue' : 'purple'}>
             {activeTab === TARGET_TYPE.ROLE
-              ? '加入該角色的員工將獲得所配置的權限'
-              : '進入該部門的人員將自動獲得所配置的權限'}
+              ? t('functionPermission.roleTip')
+              : t('functionPermission.deptTip')}
           </Tag>
         </div>
 
@@ -475,8 +477,8 @@ export default function FunctionPermission() {
           {/* 左侧：菜单树 */}
           <div className="permission-menu-tree">
             <div className="permission-tree-actions">
-              <Button size="small" onClick={() => handleCheckAll(true)}>全選</Button>
-              <Button size="small" onClick={() => handleCheckAll(false)}>取消全選</Button>
+              <Button size="small" onClick={() => handleCheckAll(true)}>{t('functionPermission.selectAll')}</Button>
+              <Button size="small" onClick={() => handleCheckAll(false)}>{t('functionPermission.deselectAll')}</Button>
             </div>
             <Tree
               checkable
@@ -494,7 +496,7 @@ export default function FunctionPermission() {
 
           {/* 右侧：功能操作勾选 */}
           <div className="permission-actions-panel">
-            <h4 className="permission-actions-title">請選擇功能</h4>
+            <h4 className="permission-actions-title">{t('functionPermission.selectFunctionTitle')}</h4>
             {selectedMenuKey && (
               <div className="permission-actions-list">
                 {getMenuActions(selectedMenuKey).map(action => (
@@ -511,7 +513,7 @@ export default function FunctionPermission() {
               </div>
             )}
             <div className="permission-actions-tip">
-              提示：勾選左側菜單後，點擊菜單名稱可在右側細化功能操作權限；登錄時系統會合併「角色權限 + 部門權限」生效
+              {t('functionPermission.tipContent')}
             </div>
           </div>
         </div>
@@ -519,7 +521,7 @@ export default function FunctionPermission() {
 
       {/* 授权详情弹窗 */}
       <Modal
-        title={`授權詳情 - ${detailRecord?.name ?? ''}`}
+        title={t('functionPermission.detailTitle', { name: detailRecord?.name ?? '' })}
         open={detailRecord != null}
         onCancel={() => setDetailRecord(null)}
         footer={null}
@@ -532,7 +534,7 @@ export default function FunctionPermission() {
           size="small"
           pagination={false}
           scroll={{ y: 420 }}
-          locale={{ emptyText: '暫無授權功能' }}
+          locale={{ emptyText: t('functionPermission.emptyPermissions') }}
         />
       </Modal>
     </div>

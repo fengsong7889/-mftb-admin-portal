@@ -14,6 +14,7 @@ import {
   WalletOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
 import type { GiftRecordItem } from '../../api/gift'
@@ -45,14 +46,6 @@ function useCountUp(target: number, duration = 1200) {
 function AnimatedNumber({ value }: { value: number }) {
   const animated = useCountUp(value)
   return <>{animated.toLocaleString()}</>
-}
-
-const adTypeMap: Record<string, string> = {
-  new_store: '新店廣告',
-  revival: '盤活復蘇',
-  exclusive: '獨家商家',
-  gold: '金牌商家',
-  ka: '人氣商家',
 }
 
 const adTypeColorMap: Record<string, string> = {
@@ -101,9 +94,18 @@ type GiftStatus = 'valid' | 'exhausted'
 const getStatus = (r: GiftRecord): GiftStatus => (r.remainingDays > 0 ? 'valid' : 'exhausted')
 
 export default function GiftDetailView() {
+  const { t } = useTranslation('giftDetailView')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const recordId = searchParams.get('id')
+
+  const adTypeMap: Record<string, string> = {
+    new_store: t('adTypeNewStore'),
+    revival: t('adTypeRevival'),
+    exclusive: t('adTypeExclusive'),
+    gold: t('adTypeGold'),
+    ka: t('adTypeKa'),
+  }
 
   const [loading, setLoading] = useState(true)
   const [merchantInfo, setMerchantInfo] = useState<{
@@ -154,7 +156,7 @@ export default function GiftDetailView() {
       })
       setRecords((listRes.records || []).map(mapToRecord))
     } catch {
-      message.error('加載詳情失敗')
+      message.error(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -226,7 +228,7 @@ export default function GiftDetailView() {
   const handleDeductConfirm = async () => {
     if (!deductTarget) return
     if (deductDays < 1 || deductDays > deductTarget.remainingDays) {
-      message.error('扣除天數需在 1 ~ 剩餘天數之間')
+      message.error(t('deductRangeError'))
       return
     }
     try {
@@ -238,25 +240,25 @@ export default function GiftDetailView() {
         deductDays,
         reason: deductReason,
       })
-      message.success(`已扣除 ${deductDays} 天（贈送ID：${deductTarget.giftId}）`)
+      message.success(t('deductSuccess', { days: deductDays, giftId: deductTarget.giftId }))
       setDeductTarget(null)
       loadData() // 重新加载数据
     } catch {
-      message.error('扣除失敗，請重試')
+      message.error(t('deductFailed'))
     }
   }
 
   const statCards = [
-    { label: '累計贈送', value: stats.totalGift, unit: '天', color: '#1890FF', bg: '#E6F4FF' },
-    { label: '已消耗', value: stats.consumed, unit: '天', color: '#FF7A45', bg: '#FFF2E8' },
-    { label: '剩餘可用', value: stats.remaining, unit: '天', color: '#52C41A', bg: '#F6FFED' },
-    { label: '贈送筆數', value: stats.count, unit: `筆 · 有效 ${stats.validCount} / 用完 ${stats.exhaustedCount}`, color: '#722ED1', bg: '#F9F0FF' },
+    { label: t('statTotalGift'), value: stats.totalGift, unit: t('statUnitDay'), color: '#1890FF', bg: '#E6F4FF' },
+    { label: t('statConsumed'), value: stats.consumed, unit: t('statUnitDay'), color: '#FF7A45', bg: '#FFF2E8' },
+    { label: t('statRemaining'), value: stats.remaining, unit: t('statUnitDay'), color: '#52C41A', bg: '#F6FFED' },
+    { label: t('statCount'), value: stats.count, unit: t('statUnitValid', { valid: stats.validCount, exhausted: stats.exhaustedCount }), color: '#722ED1', bg: '#F9F0FF' },
   ]
 
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="加載中..." />
+        <Spin size="large" tip={t('loading')} />
       </div>
     )
   }
@@ -264,7 +266,7 @@ export default function GiftDetailView() {
   if (!merchantInfo) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Empty description="未找到贈送記錄" />
+        <Empty description={t('notFound')} />
       </div>
     )
   }
@@ -294,10 +296,10 @@ export default function GiftDetailView() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}
             >
-              返回
+              {t('common:back')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>贈送明細</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('pageTitle')}</h2>
           </div>
         </div>
       </div>
@@ -313,26 +315,26 @@ export default function GiftDetailView() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <ShopOutlined style={{ color: '#E8720C' }} />
-          商家基本信息
+          {t('merchantInfo')}
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
           <div>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>集團ID</div>
+            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>{t('groupId')}</div>
             <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchantInfo.groupCode || merchantInfo.groupId}</div>
           </div>
           <div>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>集團名稱</div>
+            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>{t('groupName')}</div>
             <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{merchantInfo.groupName}</div>
           </div>
           <div>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>門店ID/名稱</div>
+            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>{t('storeIdName')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>
               <span style={{ color: '#8C8C8C', fontSize: 12 }}>{merchantInfo.storeCode || merchantInfo.storeId}</span>
               <span style={{ marginLeft: 8 }}>{merchantInfo.storeName}</span>
             </div>
           </div>
           <div>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>所屬品牌</div>
+            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>{t('common:brand')}</div>
             <div><BrandTag value={merchantInfo.brand} /></div>
           </div>
         </div>
@@ -350,7 +352,7 @@ export default function GiftDetailView() {
           <div style={{ width: 6, height: 20, borderRadius: 3, background: adColor }} />
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
             <WalletOutlined style={{ color: adColor }} />
-            贈送概覽
+            {t('giftOverview')}
           </h3>
           <Tag style={{
             background: `${adColor}15`, color: adColor,
@@ -402,7 +404,7 @@ export default function GiftDetailView() {
         }}>
           <Input
             allowClear
-            placeholder="贈送ID / 審批編號"
+            placeholder={t('filterPlaceholder')}
             prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
@@ -414,9 +416,9 @@ export default function GiftDetailView() {
             onChange={setStatusFilter}
             style={{ width: 140 }}
             options={[
-              { label: '全部狀態', value: 'all' },
-              { label: '可用', value: 'valid' },
-              { label: '已用完', value: 'exhausted' },
+              { label: t('statusAll'), value: 'all' },
+              { label: t('statusValid'), value: 'valid' },
+              { label: t('statusExhausted'), value: 'exhausted' },
             ]}
           />
           <RangePicker
@@ -425,19 +427,19 @@ export default function GiftDetailView() {
               if (strings && strings[0] && strings[1]) setDateRange([strings[0], strings[1]])
               else setDateRange(null)
             }}
-            placeholder={['贈送開始', '贈送結束']}
+            placeholder={[t('dateStart'), t('dateEnd')]}
             style={{ width: 260 }}
           />
-          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common:search')}</Button>
+          <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common:reset')}</Button>
           <span style={{ marginLeft: 'auto', fontSize: 13, color: '#595959' }}>
-            共 <span style={{ fontWeight: 600, color: adColor }}>{filteredRecords.length}</span> 筆記錄
+            {t('totalRecords', { count: filteredRecords.length })}
           </span>
         </div>
 
         {/* 記錄卡片列表 */}
         {filteredRecords.length === 0 ? (
-          <Empty description="暫無符合條件的贈送記錄" />
+          <Empty description={t('noMatch')} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {pagedRecords.map(record => {
@@ -460,33 +462,33 @@ export default function GiftDetailView() {
                       padding: '4px 12px', borderRadius: 6,
                       background: '#FAFAFA', border: '1px solid #E8E8E8', flexShrink: 0,
                     }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>贈送ID</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('giftIdLabel')}</span>
                       <span style={{ fontSize: 14, color: '#262626', fontWeight: 700, fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{record.giftId}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>贈送日期</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('giftDateLabel')}</span>
                       <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{record.giftDate}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>贈送天數</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('giftDaysLabel')}</span>
                       <span style={{ fontSize: 15, color: '#262626', fontWeight: 600 }}>{record.giftDays}</span>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>天</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('dayUnit')}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>剩餘天數</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('remainingDaysLabel')}</span>
                       <span style={{ fontSize: 16, color: noRemaining ? '#8C8C8C' : '#52C41A', fontWeight: 700 }}>{record.remainingDays}</span>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>天</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('dayUnit')}</span>
                       <Tag color={status === 'valid' ? 'success' : 'default'} style={{ margin: 0 }}>
-                        {status === 'valid' ? '可用' : '已用完'}
+                        {status === 'valid' ? t('statusValid') : t('statusExhausted')}
                       </Tag>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>有效期</span>
-                      <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{record.validDays} 天</span>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>（至 {record.expireDate}）</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('validDaysLabel')}</span>
+                      <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{record.validDays} {t('validDaysUnit')}</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('expireDatePrefix', { date: record.expireDate })}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>審批編號</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('approvalNoLabel')}</span>
                       <span style={{ fontSize: 13, color: '#595959', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{record.approvalNo}</span>
                     </div>
 
@@ -496,21 +498,21 @@ export default function GiftDetailView() {
                         disabled={noRemaining} onClick={() => openDeduct(record)}
                         style={{ padding: '4px 8px', borderRadius: 4, fontSize: 13, fontWeight: 500 }}
                       >
-                        扣除天數
+                        {t('deductDays')}
                       </Button>
                       <Button
                         type="link" icon={<EyeOutlined />}
                         onClick={() => navigate(`/gift-consume-detail?giftId=${record.giftId}`)}
                         style={{ color: '#E8720C', padding: '4px 8px', borderRadius: 4, fontSize: 13, fontWeight: 500 }}
                       >
-                        查看明細
+                        {t('viewDetail')}
                       </Button>
                       <Button
                         type="text" icon={expanded ? <UpOutlined /> : <DownOutlined />}
                         onClick={() => toggleExpand(record.key)}
                         style={{ color: '#8C8C8C', padding: '4px 8px', borderRadius: 4, fontSize: 13 }}
                       >
-                        {expanded ? '收起' : '詳情'}
+                        {expanded ? t('collapse') : t('detail')}
                       </Button>
                     </div>
                   </div>
@@ -524,7 +526,7 @@ export default function GiftDetailView() {
                           fontSize: 12, color: '#8C8C8C', marginBottom: 8,
                         }}>
                           <FileTextOutlined />
-                          贈送原因
+                          {t('giftReasonLabel')}
                         </div>
                         <div style={{
                           fontSize: 13, color: '#262626', lineHeight: 1.8,
@@ -542,7 +544,7 @@ export default function GiftDetailView() {
                             fontSize: 12, color: '#8C8C8C', marginBottom: 8,
                           }}>
                             <PaperClipOutlined />
-                            相關憑證（{record.credentials.length}）
+                            {t('certificateLabel', { count: record.credentials.length })}
                           </div>
                           <Image.PreviewGroup>
                             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -575,7 +577,7 @@ export default function GiftDetailView() {
               pageSize={PAGE_SIZE}
               total={filteredRecords.length}
               onChange={setPage}
-              showTotal={(total) => `共 ${total} 筆`}
+              showTotal={(total) => t('common:totalRecords', { count: total })}
             />
           </div>
         )}
@@ -592,18 +594,18 @@ export default function GiftDetailView() {
           onClick={() => navigate('/gift-detail')}
           style={{ height: 38, minWidth: 96, borderRadius: 8 }}
         >
-          返回列表
+          {t('backToList')}
         </Button>
       </div>
 
       {/* 扣除天數彈窗 */}
       <Modal
-        title="扣除天數"
+        title={t('deductModalTitle')}
         open={!!deductTarget}
         onCancel={() => setDeductTarget(null)}
         onOk={handleDeductConfirm}
-        okText="確認扣除"
-        cancelText="取消"
+        okText={t('confirmDeduct')}
+        cancelText={t('common:cancel')}
         okButtonProps={{ danger: true }}
         destroyOnClose
       >
@@ -611,17 +613,17 @@ export default function GiftDetailView() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8, paddingBottom: 24 }}>
             <div style={{ display: 'flex', gap: 24 }}>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>贈送ID</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>{t('giftIdLabel')}</div>
                 <div style={{ fontSize: 14, color: '#262626', fontWeight: 700, fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{deductTarget.giftId}</div>
               </div>
               <div>
-                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>當前剩餘</div>
-                <div style={{ fontSize: 14, color: '#52C41A', fontWeight: 700 }}>{deductTarget.remainingDays} 天</div>
+                <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>{t('currentRemaining')}</div>
+                <div style={{ fontSize: 14, color: '#52C41A', fontWeight: 700 }}>{deductTarget.remainingDays} {t('dayUnit')}</div>
               </div>
             </div>
             <div>
               <div style={{ color: '#262626', fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>扣除天數
+                <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>{t('deductDaysField')}
               </div>
               <InputNumber
                 min={1}
@@ -629,14 +631,14 @@ export default function GiftDetailView() {
                 value={deductDays}
                 onChange={v => setDeductDays(v || 1)}
                 style={{ width: '100%' }}
-                addonAfter="天"
+                addonAfter={t('dayUnit')}
               />
             </div>
             <div>
-              <div style={{ color: '#262626', fontSize: 13, marginBottom: 4 }}>扣除原因</div>
+              <div style={{ color: '#262626', fontSize: 13, marginBottom: 4 }}>{t('deductReasonField')}</div>
               <Input.TextArea
                 rows={3}
-                placeholder="請輸入扣除原因（選填）"
+                placeholder={t('deductReasonPlaceholder')}
                 value={deductReason}
                 onChange={e => setDeductReason(e.target.value)}
                 maxLength={200}

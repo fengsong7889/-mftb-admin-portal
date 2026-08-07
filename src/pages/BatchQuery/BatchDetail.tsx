@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeftOutlined, FileTextOutlined, ProfileOutlined,
 } from '@ant-design/icons'
@@ -12,25 +13,25 @@ import type { BatchStoreRecord } from '../../utils/approvalStore'
 import { fetchFinBatchDetail, fetchFinDetails } from '../../api/finance'
 import type { FinBatch, FinDetail } from '../../api/finance'
 
-/** 批次類型標題映射（僅充值/轉賬/合併生成批次，扣款不生成批次） */
-const typeTitleMap: Record<string, string> = {
-  recharge: '充值信息',
-  transfer: '轉賬信息',
-  merge: '合併信息',
+/** 批次類型標題映射（i18n key，僅充值/轉賬/合併生成批次，扣款不生成批次） */
+const TYPE_TITLE_MAP_KEYS: Record<string, string> = {
+  recharge: 'batchDetail.titleRecharge',
+  transfer: 'batchDetail.titleTransfer',
+  merge: 'batchDetail.titleMerge',
 }
 
-/** 批次類型 Tag（與批次查詢列表配色一致） */
-const typeTagMap: Record<string, { label: string; color: string }> = {
-  recharge: { label: '充值', color: 'blue' },
-  transfer: { label: '轉賬', color: 'green' },
-  merge: { label: '合併', color: 'orange' },
+/** 批次類型 Tag（與批次查詢列表配色一致，label 為 i18n key） */
+const TYPE_TAG_MAP_KEYS: Record<string, { labelKey: string; color: string }> = {
+  recharge: { labelKey: 'batchQuery.typeRecharge', color: 'blue' },
+  transfer: { labelKey: 'batchQuery.typeTransfer', color: 'green' },
+  merge: { labelKey: 'batchQuery.typeMerge', color: 'orange' },
 }
 
-/** 結算方式映射 */
-const payMethodMap: Record<string, string> = {
-  corporate: '對公轉賬',
-  mixed: '混合支付',
-  revenue: '營業額支付',
+/** 結算方式映射（i18n key，value 為英文枚舉碼） */
+const PAY_METHOD_MAP_KEYS: Record<string, string> = {
+  corporate: 'batchDetail.payCorporate',
+  mixed: 'batchDetail.payMixed',
+  revenue: 'batchDetail.payRevenue',
 }
 
 /** 交易明細行 */
@@ -158,6 +159,7 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 
 export default function BatchDetail() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const recordKey = searchParams.get('key') || ''
   const typeParam = searchParams.get('type') || 'recharge'
@@ -203,7 +205,7 @@ export default function BatchDetail() {
   const extra = useMemo(() => (record.extra || {}) as Record<string, any>, [record.extra])
   const batchType = record.batchType
   const remark = extra.remark || (record.remark !== '--' ? record.remark : '')
-  const typeTag = typeTagMap[batchType] || typeTagMap.recharge
+  const typeTag = TYPE_TAG_MAP_KEYS[batchType] || TYPE_TAG_MAP_KEYS.recharge
 
   /** 營業額扣款門店（充值）：已扣金額取本批次該門店的扣款明細合計 */
   const deductStores: DeductStoreRow[] = useMemo(() =>
@@ -245,14 +247,14 @@ export default function BatchDetail() {
         tradeTime: d.tradeTime,
         virtualChange: Number(d.virtualChange) || 0,
         actualChange: d.actualChange === null || d.actualChange === undefined ? null : Number(d.actualChange),
-        relatedId: `明細ID：${d.detailId}`,
+        relatedId: t('batchDetail.relatedId', { id: d.detailId }),
       }))
     }
-    const t = record.tradeTime
+    const tradeTime = record.tradeTime
     const rows: FlowRow[] = []
     let i = 1
     const push = (row: Omit<FlowRow, 'key' | 'tradeTime' | 'relatedId'>) => {
-      rows.push({ ...row, key: String(i), tradeTime: t, relatedId: `明細ID：${genDetailId(i)}` })
+      rows.push({ ...row, key: String(i), tradeTime, relatedId: t('batchDetail.relatedId', { id: genDetailId(i) }) })
       i += 1
     }
     if (batchType === 'recharge') {
@@ -281,7 +283,7 @@ export default function BatchDetail() {
       }
     }
     return rows
-  }, [batchType, record, extra, deductStores, repayStores, details])
+  }, [batchType, record, extra, deductStores, repayStores, details, t])
 
   /** 金額渲染（+藍 / -紅） */
   const renderChange = (val: number | null) => {
@@ -296,32 +298,32 @@ export default function BatchDetail() {
 
   /** 交易明細列 */
   const flowColumns: TableColumnsType<FlowRow> = [
-    { title: '序號', dataIndex: 'key', key: 'key', width: 60, align: 'center' },
-    { title: '交易類型', dataIndex: 'tradeType', key: 'tradeType', width: 90, align: 'center' },
-    { title: '門店ID', dataIndex: 'storeId', key: 'storeId', width: 110, align: 'center', render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
-    { title: '門店名稱', dataIndex: 'storeName', key: 'storeName', width: 140, align: 'center', render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
-    { title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 90, align: 'center' },
-    { title: '變動類別', dataIndex: 'changeType', key: 'changeType', width: 150, align: 'center' },
-    { title: '交易時間', dataIndex: 'tradeTime', key: 'tradeTime', width: 170, align: 'center' },
-    { title: '虛擬賬戶變動金額', dataIndex: 'virtualChange', key: 'virtualChange', width: 140, align: 'center', render: renderChange },
-    { title: '實收賬戶變動金額', dataIndex: 'actualChange', key: 'actualChange', width: 140, align: 'center', render: renderChange },
-    { title: '關聯信息', dataIndex: 'relatedId', key: 'relatedId', width: 190, align: 'center', render: (v: string) => <span style={{ color: '#8C8C8C' }}>{v}</span> },
+    { title: t('common.colIndex'), dataIndex: 'key', key: 'key', width: 60, align: 'center' },
+    { title: t('common.colTradeType'), dataIndex: 'tradeType', key: 'tradeType', width: 90, align: 'center' },
+    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId', width: 110, align: 'center', render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
+    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', width: 140, align: 'center', render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
+    { title: t('common.colChannel'), dataIndex: 'channel', key: 'channel', width: 90, align: 'center' },
+    { title: t('common.colChangeType'), dataIndex: 'changeType', key: 'changeType', width: 150, align: 'center' },
+    { title: t('common.colTradeTime'), dataIndex: 'tradeTime', key: 'tradeTime', width: 170, align: 'center' },
+    { title: t('common.colVirtualChange'), dataIndex: 'virtualChange', key: 'virtualChange', width: 140, align: 'center', render: renderChange },
+    { title: t('common.colActualChange'), dataIndex: 'actualChange', key: 'actualChange', width: 140, align: 'center', render: renderChange },
+    { title: t('batchDetail.colRelated'), dataIndex: 'relatedId', key: 'relatedId', width: 190, align: 'center', render: (v: string) => <span style={{ color: '#8C8C8C' }}>{v}</span> },
   ]
 
   /** 營業額扣款門店列（充值） */
   const deductStoreColumns: TableColumnsType<DeductStoreRow> = [
-    { title: '扣款門店ID', dataIndex: 'storeId', key: 'storeId', align: 'center' },
-    { title: '扣款門店名稱', dataIndex: 'storeName', key: 'storeName', align: 'center' },
-    { title: '扣款金額', dataIndex: 'amount', key: 'amount', align: 'center', render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
-    { title: '已扣金額', dataIndex: 'deducted', key: 'deducted', align: 'center', render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 600 }}>{v.toLocaleString()}</span> },
+    { title: t('batchDetail.colDeductStoreId'), dataIndex: 'storeId', key: 'storeId', align: 'center' },
+    { title: t('batchDetail.colDeductStoreName'), dataIndex: 'storeName', key: 'storeName', align: 'center' },
+    { title: t('batchDetail.colDeductAmount'), dataIndex: 'amount', key: 'amount', align: 'center', render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
+    { title: t('batchDetail.colDeductedAmount'), dataIndex: 'deducted', key: 'deducted', align: 'center', render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 600 }}>{v.toLocaleString()}</span> },
   ]
 
   /** 欠款償還門店列（合併） */
   const repayStoreColumns: TableColumnsType<RepayStoreRow> = [
-    { title: '門店ID', dataIndex: 'storeId', key: 'storeId', align: 'center' },
-    { title: '門店名稱', dataIndex: 'storeName', key: 'storeName', align: 'center' },
-    { title: '歸屬BD', dataIndex: 'bd', key: 'bd', align: 'center' },
-    { title: '償還金額', dataIndex: 'amount', key: 'amount', align: 'center', render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
+    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId', align: 'center' },
+    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', align: 'center' },
+    { title: t('common.colBd'), dataIndex: 'bd', key: 'bd', align: 'center' },
+    { title: t('batchDetail.colRepayAmount'), dataIndex: 'amount', key: 'amount', align: 'center', render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
   ]
 
   /** 四列信息網格（全局統一：標籤在上、值在下） */
@@ -331,7 +333,9 @@ export default function BatchDetail() {
 
   /** 充值信息版塊 */
   const renderRechargeInfo = () => {
-    const payMethod = payMethodMap[extra.payMethod as string] || '--'
+    const payMethod = PAY_METHOD_MAP_KEYS[extra.payMethod as string]
+      ? t(PAY_METHOD_MAP_KEYS[extra.payMethod as string])
+      : '--'
     /** 虛擬賬戶充值金額（到賬總額） */
     const virtualAmount = Number(record.virtualAmount) || 0
     /** 實收賬戶充值金額（非實收批次為 null，展示 --） */
@@ -344,30 +348,30 @@ export default function BatchDetail() {
     return (
       <>
         <div style={gridStyle}>
-          <InfoItem label="充值批次號" value={record.batchNo} />
-          <InfoItem label="流程編號" value={record.flowNo} />
-          <InfoItem label="集團ID" value={record.groupId} />
-          <InfoItem label="集團名稱" value={record.groupName} />
-          <InfoItem label="所屬品牌" value={<BrandTag value={record.brand} />} />
-          <InfoItem label="是否實收" value={record.isActual} />
-          <InfoItem label="申請人" value={record.applicant || '--'} />
-          <InfoItem label="歸屬BD" value={record.bd || '--'} />
+          <InfoItem label={t('batchDetail.rechargeBatchNo')} value={record.batchNo} />
+          <InfoItem label={t('common.colFlowNo')} value={record.flowNo} />
+          <InfoItem label={t('common.colGroupId')} value={record.groupId} />
+          <InfoItem label={t('common.colGroupName')} value={record.groupName} />
+          <InfoItem label={t('common.colBrand')} value={<BrandTag value={record.brand} />} />
+          <InfoItem label={t('batchQuery.colIsActual')} value={record.isActual} />
+          <InfoItem label={t('batchQuery.colApplicant')} value={record.applicant || '--'} />
+          <InfoItem label={t('common.colBd')} value={record.bd || '--'} />
         </div>
         {/* 充值金額信息：虛擬到賬 / 實收 / 優惠 */}
         <div style={{ borderTop: '1px dashed rgba(0,0,0,0.08)', margin: '20px 0' }} />
         <div style={gridStyle}>
           <InfoItem
-            label="虛擬賬戶充值金額"
+            label={t('batchDetail.virtualRechargeAmount')}
             value={virtualAmount.toLocaleString()}
             valueStyle={{ color: '#1890FF', fontWeight: 600 }}
           />
           <InfoItem
-            label="實收賬戶充值金額"
+            label={t('batchDetail.actualRechargeAmount')}
             value={actualAmount === null ? <span style={{ color: '#999' }}>--</span> : actualAmount.toLocaleString()}
             valueStyle={{ color: '#52C41A', fontWeight: 600 }}
           />
           <InfoItem
-            label="優惠金額"
+            label={t('batchDetail.discountAmount')}
             value={discountAmount.toLocaleString()}
             valueStyle={{ color: '#FF4D4F', fontWeight: 600 }}
           />
@@ -375,22 +379,22 @@ export default function BatchDetail() {
         {record.isActual === '是' && (
           <>
             <div style={{ ...gridStyle, marginTop: 20 }}>
-              <InfoItem label="結算方式" value={payMethod} />
-              <InfoItem label="銀行轉賬金額" value={(Number(extra.bankAmount) || 0).toLocaleString()} valueStyle={{ color: '#E8720C', fontWeight: 600 }} />
-              <InfoItem label="營業額支付金額" value={(Number(extra.revenueAmount) || 0).toLocaleString()} valueStyle={{ color: '#E8720C', fontWeight: 600 }} />
+              <InfoItem label={t('batchDetail.payMethod')} value={payMethod} />
+              <InfoItem label={t('batchDetail.bankAmount')} value={(Number(extra.bankAmount) || 0).toLocaleString()} valueStyle={{ color: '#E8720C', fontWeight: 600 }} />
+              <InfoItem label={t('batchDetail.revenueAmount')} value={(Number(extra.revenueAmount) || 0).toLocaleString()} valueStyle={{ color: '#E8720C', fontWeight: 600 }} />
             </div>
             {deductStores.length > 0 && (
               <div style={{ marginTop: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
-                  營業額扣款門店
+                  {t('batchDetail.deductStoresTitle')}
                 </div>
                 <Table<DeductStoreRow>
                   columns={deductStoreColumns}
                   dataSource={deductStores}
                   pagination={deductStores.length > SUB_TABLE_PAGE_SIZE ? {
                     pageSize: SUB_TABLE_PAGE_SIZE,
-                    showTotal: (total) => `共 ${total} 條`,
+                    showTotal: (total) => t('common.total', { count: total }),
                     size: 'small',
                   } : false}
                   size="small"
@@ -410,20 +414,20 @@ export default function BatchDetail() {
     const amount = Math.abs(Number(extra.transferAmount) || record.virtualAmount || 0)
     return (
       <div style={gridStyle}>
-        <InfoItem label="轉賬批次號" value={record.batchNo} />
-        <InfoItem label="流程編號" value={record.flowNo} />
-        <InfoItem label="集團ID" value={record.groupId} />
-        <InfoItem label="集團名稱" value={record.groupName} />
-        <InfoItem label="所屬品牌" value={<BrandTag value={record.brand} />} />
-        <InfoItem label="轉賬方向" value={isIn ? <Tag color="green">轉入</Tag> : <Tag color="red">轉出</Tag>} />
-        <InfoItem label={isIn ? '轉出集團ID' : '轉入集團ID'} value={isIn ? (extra.fromGroupId || '--') : (extra.toGroupId || '--')} />
-        <InfoItem label={isIn ? '轉出集團名稱' : '轉入集團名稱'} value={isIn ? (extra.fromGroupName || '--') : (extra.toGroupName || '--')} />
+        <InfoItem label={t('batchDetail.transferBatchNo')} value={record.batchNo} />
+        <InfoItem label={t('common.colFlowNo')} value={record.flowNo} />
+        <InfoItem label={t('common.colGroupId')} value={record.groupId} />
+        <InfoItem label={t('common.colGroupName')} value={record.groupName} />
+        <InfoItem label={t('common.colBrand')} value={<BrandTag value={record.brand} />} />
+        <InfoItem label={t('batchDetail.transferDirection')} value={isIn ? <Tag color="green">{t('batchDetail.transferIn')}</Tag> : <Tag color="red">{t('batchDetail.transferOut')}</Tag>} />
+        <InfoItem label={isIn ? t('batchDetail.fromGroupId') : t('batchDetail.toGroupId')} value={isIn ? (extra.fromGroupId || '--') : (extra.toGroupId || '--')} />
+        <InfoItem label={isIn ? t('batchDetail.fromGroupName') : t('batchDetail.toGroupName')} value={isIn ? (extra.fromGroupName || '--') : (extra.toGroupName || '--')} />
         <InfoItem
-          label="轉賬金額"
+          label={t('batchDetail.transferAmount')}
           value={`${isIn ? '+' : '-'}${amount.toLocaleString()}`}
           valueStyle={{ color: isIn ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}
         />
-        <InfoItem label="申請人" value={record.applicant || '--'} />
+        <InfoItem label={t('batchQuery.colApplicant')} value={record.applicant || '--'} />
       </div>
     )
   }
@@ -436,55 +440,55 @@ export default function BatchDetail() {
     return (
       <>
         <div style={gridStyle}>
-          <InfoItem label="合併批次號" value={record.batchNo} />
-          <InfoItem label="流程編號" value={record.flowNo} />
-          <InfoItem label="集團ID" value={record.groupId} />
+          <InfoItem label={t('batchDetail.mergeBatchNo')} value={record.batchNo} />
+          <InfoItem label={t('common.colFlowNo')} value={record.flowNo} />
+          <InfoItem label={t('common.colGroupId')} value={record.groupId} />
           <InfoItem
-            label="集團名稱"
+            label={t('common.colGroupName')}
             value={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 {record.groupName}
                 {isIn
-                  ? <Tag color="green" style={{ margin: 0 }}>存續集團</Tag>
-                  : <Tag color="red" style={{ margin: 0 }}>註銷集團</Tag>}
+                  ? <Tag color="green" style={{ margin: 0 }}>{t('batchDetail.survivingGroup')}</Tag>
+                  : <Tag color="red" style={{ margin: 0 }}>{t('batchDetail.cancelledGroup')}</Tag>}
               </span>
             }
           />
-          <InfoItem label="所屬品牌" value={<BrandTag value={record.brand} />} />
-          <InfoItem label={isIn ? '註銷集團ID' : '存續集團ID'} value={isIn ? (extra.sourceGroupId || '--') : (extra.targetGroupId || '--')} />
+          <InfoItem label={t('common.colBrand')} value={<BrandTag value={record.brand} />} />
+          <InfoItem label={isIn ? t('batchDetail.cancelledGroupId') : t('batchDetail.survivingGroupId')} value={isIn ? (extra.sourceGroupId || '--') : (extra.targetGroupId || '--')} />
           <InfoItem
-            label={isIn ? '註銷集團名稱' : '存續集團名稱'}
+            label={isIn ? t('batchDetail.cancelledGroupName') : t('batchDetail.survivingGroupName')}
             value={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 {isIn ? (extra.sourceGroupName || '--') : (extra.targetGroupName || '--')}
                 {isIn
-                  ? <Tag color="red" style={{ margin: 0 }}>註銷集團</Tag>
-                  : <Tag color="green" style={{ margin: 0 }}>存續集團</Tag>}
+                  ? <Tag color="red" style={{ margin: 0 }}>{t('batchDetail.cancelledGroup')}</Tag>
+                  : <Tag color="green" style={{ margin: 0 }}>{t('batchDetail.survivingGroup')}</Tag>}
               </span>
             }
           />
           <InfoItem
-            label="轉移餘額"
+            label={t('batchDetail.transferBalance')}
             value={`${isIn ? '+' : '-'}${balance.toLocaleString()}`}
             valueStyle={{ color: isIn ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}
           />
           {!isIn && debtAmount > 0 && (
-            <InfoItem label="欠款總額" value={debtAmount.toLocaleString()} valueStyle={{ color: '#FF4D4F', fontWeight: 600 }} />
+            <InfoItem label={t('batchDetail.debtAmount')} value={debtAmount.toLocaleString()} valueStyle={{ color: '#FF4D4F', fontWeight: 600 }} />
           )}
-          <InfoItem label="申請人" value={record.applicant || '--'} />
+          <InfoItem label={t('batchQuery.colApplicant')} value={record.applicant || '--'} />
         </div>
         {!isIn && debtAmount > 0 && repayStores.length > 0 && (
           <div style={{ marginTop: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
-              欠款償還門店
+              {t('batchDetail.repayStoresTitle')}
             </div>
             <Table<RepayStoreRow>
               columns={repayStoreColumns}
               dataSource={repayStores}
               pagination={repayStores.length > SUB_TABLE_PAGE_SIZE ? {
                 pageSize: SUB_TABLE_PAGE_SIZE,
-                showTotal: (total) => `共 ${total} 條`,
+                showTotal: (total) => t('common.total', { count: total }),
                 size: 'small',
               } : false}
               size="small"
@@ -522,13 +526,13 @@ export default function BatchDetail() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}
             >
-              返回
+              {t('common.back')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>批次明細</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('batchDetail.pageTitle')}</h2>
               <Tag color={typeTag.color} style={{ margin: 0, fontSize: 12, padding: '2px 10px', borderRadius: 4, fontWeight: 500 }}>
-                {typeTag.label}
+                {t(typeTag.labelKey)}
               </Tag>
             </div>
           </div>
@@ -537,27 +541,27 @@ export default function BatchDetail() {
 
       {/* 批次基本信息 */}
       <div style={sectionStyle}>
-        <SectionTitle icon={<FileTextOutlined />} title={typeTitleMap[batchType] || '批次信息'} />
+        <SectionTitle icon={<FileTextOutlined />} title={TYPE_TITLE_MAP_KEYS[batchType] ? t(TYPE_TITLE_MAP_KEYS[batchType]) : t('batchDetail.titleBatch')} />
         {batchType === 'recharge' && renderRechargeInfo()}
         {batchType === 'transfer' && renderTransferInfo()}
         {batchType === 'merge' && renderMergeInfo()}
 
         {/* 備註信息 */}
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
-          <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>備註信息</div>
+          <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 6 }}>{t('common.colRemark')}</div>
           <div style={{ fontSize: 14, color: '#595959', lineHeight: 1.6 }}>{remark || '--'}</div>
         </div>
       </div>
 
       {/* 交易明細（流水數據） */}
       <div style={{ ...sectionStyle, marginBottom: 0 }}>
-        <SectionTitle icon={<ProfileOutlined />} title="交易明細" />
+        <SectionTitle icon={<ProfileOutlined />} title={t('batchDetail.flowTitle')} />
         <Table<FlowRow>
           columns={flowColumns}
           dataSource={flowRows}
           pagination={{
             total: flowRows.length,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 10,

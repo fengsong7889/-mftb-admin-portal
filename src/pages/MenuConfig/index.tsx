@@ -17,6 +17,7 @@ import {
   EyeOutlined,
   EyeInvisibleOutlined,
 } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchMenuTree, createMenu, updateMenu, updateMenuStatus, deleteMenu } from '../../api/menu'
 import type { MenuVO, MenuPayload } from '../../api/menu'
@@ -43,17 +44,11 @@ const STATUS_TO_NUM: Record<string, number> = { enabled: 1, disabled: 0 }
 const NUM_TO_STATUS: Record<number, string> = { 1: 'enabled', 0: 'disabled' }
 
 /** ────── 类型常量 ────── */
-const MENU_TYPE_MAP = {
-  directory: { label: '目錄', color: 'blue' },
-  menu: { label: '菜單', color: 'green' },
-  button: { label: '按鈕', color: 'orange' },
-} as const
-
-const MENU_TYPE_OPTIONS = [
-  { label: '目錄', value: 'directory' },
-  { label: '菜單', value: 'menu' },
-  { label: '按鈕', value: 'button' },
-]
+const MENU_TYPE_COLOR: Record<string, string> = {
+  directory: 'blue',
+  menu: 'green',
+  button: 'orange',
+}
 
 /** ────── 后端 VO → 前端 MenuItem 转换 ────── */
 const voToItem = (vo: MenuVO): MenuItem => ({
@@ -95,7 +90,20 @@ const flattenTree = (data: MenuItem[]): MenuItem[] => {
 
 /** ────── 主组件 ────── */
 export default function MenuConfig() {
+  const { t } = useTranslation()
   const [data, setData] = useState<MenuItem[]>([])
+
+  /** 菜單類型標籤（依賴 t，定義在組件內以便響應語言切換） */
+  const TYPE_LABEL: Record<string, string> = {
+    directory: t('menuConfig.typeDirectory'),
+    menu: t('menuConfig.typeMenu'),
+    button: t('menuConfig.typeButton'),
+  }
+  const TYPE_OPTIONS = [
+    { label: t('menuConfig.typeDirectory'), value: 'directory' },
+    { label: t('menuConfig.typeMenu'), value: 'menu' },
+    { label: t('menuConfig.typeButton'), value: 'button' },
+  ]
   const [loading, setLoading] = useState(false)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editForm] = Form.useForm()
@@ -227,7 +235,7 @@ export default function MenuConfig() {
       if (!record) return
       const updated = { ...record, ...values }
       await updateMenu(Number(id), itemToPayload(updated))
-      message.success('保存成功')
+      message.success(t('menuConfig.saveSuccess'))
       setEditingKey(null)
       loadData()
     } catch {
@@ -263,7 +271,7 @@ export default function MenuConfig() {
     const idx = siblings.findIndex((i) => i.id === id)
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1
     if (targetIdx < 0 || targetIdx >= siblings.length) {
-      message.warning(direction === 'up' ? '已經是最前面' : '已經是最後面')
+      message.warning(direction === 'up' ? t('menuConfig.moveFirst') : t('menuConfig.moveLast'))
       return
     }
     // 交换排序
@@ -272,7 +280,7 @@ export default function MenuConfig() {
     try {
       await updateMenu(Number(current.id), { ...itemToPayload(current), sort: target.sortOrder })
       await updateMenu(Number(target.id), { ...itemToPayload(target), sort: current.sortOrder })
-      message.success(direction === 'up' ? '已上移' : '已下移')
+      message.success(direction === 'up' ? t('menuConfig.movedUp') : t('menuConfig.movedDown'))
       loadData()
     } catch {
       // API error
@@ -282,15 +290,15 @@ export default function MenuConfig() {
   /** 切换状态（带确认弹窗） */
   const handleToggleStatus = (record: MenuItem) => {
     const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
-    const actionText = newStatus === 'enabled' ? '啟用' : '停用'
+    const actionText = newStatus === 'enabled' ? t('common.enable') : t('common.disable')
     Modal.confirm({
-      title: `確認${actionText}`,
-      content: `確定要${actionText}菜單「${record.name}」嗎？`,
-      okText: '確認',
-      cancelText: '取消',
+      title: t('menuConfig.confirmToggle', { action: actionText }),
+      content: t('menuConfig.confirmToggleContent', { action: actionText, name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         await updateMenuStatus(Number(record.id), STATUS_TO_NUM[newStatus])
-        message.success(`已${actionText}菜單「${record.name}」`)
+        message.success(t('menuConfig.toggleSuccess', { action: actionText, name: record.name }))
         loadData()
       },
     })
@@ -337,10 +345,10 @@ export default function MenuConfig() {
       }
       if (editing) {
         await updateMenu(Number(editing.id), payload)
-        message.success('菜單信息已更新')
+        message.success(t('menuConfig.updateSuccess'))
       } else {
         await createMenu(payload)
-        message.success('菜單創建成功')
+        message.success(t('menuConfig.createSuccess'))
       }
       setModalVisible(false)
       loadData()
@@ -356,29 +364,28 @@ export default function MenuConfig() {
     const source = selectedRows.length > 0 ? selectedRows : filteredData
     const allItems = flattenTree(source)
     if (allItems.length === 0) {
-      message.warning('當前無數據可導出')
+      message.warning(t('menuConfig.noDataToExport'))
       return
     }
-    // 简单 CSV 导出
-    const headers = ['排序', '菜單名稱', '菜單Key', '路由路徑', '圖標', '類型', '狀態']
+    const headers = [t('menuConfig.colSort'), t('menuConfig.colNameZh'), t('menuConfig.colMenuKey'), t('menuConfig.colPath'), t('menuConfig.colIcon'), t('menuConfig.colType'), t('menuConfig.colStatus')]
     const rows = allItems.map((item) => [
       item.sortOrder,
       item.name,
       item.menuKey,
       item.path || '-',
       item.icon,
-      MENU_TYPE_MAP[item.type].label,
-      item.status === 'enabled' ? '啟用' : '停用',
+      TYPE_LABEL[item.type],
+      item.status === 'enabled' ? t('common.enable') : t('common.disable'),
     ])
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = '菜單配置.csv'
+    a.download = `${t('menuConfig.pageTitle')}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    message.success(`已導出 ${allItems.length} 條數據${selectedRows.length > 0 ? '（勾選數據）' : ''}`)
+    message.success(`${t('menuConfig.exportSuccess', { count: allItems.length })}${selectedRows.length > 0 ? t('menuConfig.exportSelected') : ''}`)
   }
 
   /** 行勾选变化 */
@@ -393,8 +400,7 @@ export default function MenuConfig() {
   /** 表格列定义 */
   const columns: ColumnsType<MenuItem> = [
     {
-      title: '排序',
-      dataIndex: 'sortOrder',
+      title: t('menuConfig.colSort'),
       key: 'sortOrder',
       width: 70,
       align: 'center',
@@ -403,15 +409,15 @@ export default function MenuConfig() {
       ),
     },
     {
-      title: '菜單名稱（中文）',
+      title: t('menuConfig.colNameZh'),
       dataIndex: 'name',
       key: 'name',
       width: 200,
       render: (name: string, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="name" style={{ margin: 0 }} rules={[{ required: true, message: '請輸入菜單名稱' }]}>
-              <Input size="small" placeholder="菜單名稱" style={{ width: 160 }} />
+            <Form.Item name="name" style={{ margin: 0 }} rules={[{ required: true, message: t('menuConfig.menuNameRequired') }]}>
+              <Input size="small" placeholder={t('menuConfig.namePlaceholder')} style={{ width: 160 }} />
             </Form.Item>
           )
         }
@@ -423,7 +429,7 @@ export default function MenuConfig() {
       },
     },
     {
-      title: '路由路徑',
+      title: t('menuConfig.colPath'),
       dataIndex: 'path',
       key: 'path',
       width: 200,
@@ -443,7 +449,7 @@ export default function MenuConfig() {
       },
     },
     {
-      title: '菜單 Key（英文）',
+      title: t('menuConfig.colMenuKey'),
       dataIndex: 'menuKey',
       key: 'menuKey',
       width: 180,
@@ -452,7 +458,7 @@ export default function MenuConfig() {
       ),
     },
     {
-      title: '圖標',
+      title: t('menuConfig.colIcon'),
       dataIndex: 'icon',
       key: 'icon',
       width: 200,
@@ -469,30 +475,29 @@ export default function MenuConfig() {
       },
     },
     {
-      title: '類型',
+      title: t('menuConfig.colType'),
       dataIndex: 'type',
       key: 'type',
       width: 80,
       align: 'center',
-      render: (type: keyof typeof MENU_TYPE_MAP) => {
-        const cfg = MENU_TYPE_MAP[type]
-        return <Tag color={cfg.color} style={{ borderRadius: 4, fontSize: 12 }}>{cfg.label}</Tag>
+      render: (type: string) => {
+        return <Tag color={MENU_TYPE_COLOR[type] || 'default'} style={{ borderRadius: 4, fontSize: 12 }}>{TYPE_LABEL[type]}</Tag>
       },
     },
     {
-      title: '狀態',
+      title: t('menuConfig.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       align: 'center',
       render: (status: string) => (
         status === 'enabled'
-          ? <Tag color="success" style={{ borderRadius: 4 }}>啟用</Tag>
-          : <Tag color="default" style={{ borderRadius: 4 }}>停用</Tag>
+          ? <Tag color="success" style={{ borderRadius: 4 }}>{t('common.enable')}</Tag>
+          : <Tag color="default" style={{ borderRadius: 4 }}>{t('common.disable')}</Tag>
       ),
     },
     {
-      title: '操作',
+      title: t('menuConfig.colAction'),
       key: 'action',
       width: 260,
       align: 'center',
@@ -501,19 +506,19 @@ export default function MenuConfig() {
         if (isEditing(record)) {
           return (
             <Space size={4}>
-              <Button type="link" size="small" onClick={() => handleSave(record.id)}>保存</Button>
-              <Button type="link" size="small" onClick={handleCancel}>取消</Button>
+              <Button type="link" size="small" onClick={() => handleSave(record.id)}>{t('menuConfig.btnSave')}</Button>
+              <Button type="link" size="small" onClick={handleCancel}>{t('menuConfig.btnCancel')}</Button>
             </Space>
           )
         }
         return (
           <Space size={4}>
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
-            <Button type="link" size="small" onClick={() => handleOpenModalEdit(record)}>設置</Button>
-            <Tooltip title="上移">
+            <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('menuConfig.btnEdit')}</Button>
+            <Button type="link" size="small" onClick={() => handleOpenModalEdit(record)}>{t('menuConfig.btnSettings')}</Button>
+            <Tooltip title={t('menuConfig.tooltipMoveUp')}>
               <Button type="link" size="small" icon={<ArrowUpOutlined />} onClick={() => handleMove(record.id, 'up')} />
             </Tooltip>
-            <Tooltip title="下移">
+            <Tooltip title={t('menuConfig.tooltipMoveDown')}>
               <Button type="link" size="small" icon={<ArrowDownOutlined />} onClick={() => handleMove(record.id, 'down')} />
             </Tooltip>
             <Button
@@ -522,7 +527,7 @@ export default function MenuConfig() {
               danger={record.status === 'enabled'}
               onClick={() => handleToggleStatus(record)}
             >
-              {record.status === 'enabled' ? '停用' : '啟用'}
+              {record.status === 'enabled' ? t('common.disable') : t('common.enable')}
             </Button>
           </Space>
         )
@@ -551,37 +556,37 @@ export default function MenuConfig() {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="搜索">
+          <Form.Item label={t('menuConfig.searchLabel')}>
             <Input
-              placeholder="菜單名稱 / Key / 路徑"
+              placeholder={t('menuConfig.searchPlaceholder')}
               allowClear
               onPressEnter={handleSearch}
             />
           </Form.Item>
-          <Form.Item label="類型">
+          <Form.Item label={t('menuConfig.searchType')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
-              options={MENU_TYPE_OPTIONS}
+              options={TYPE_OPTIONS}
             />
           </Form.Item>
-          <Form.Item label="狀態">
+          <Form.Item label={t('menuConfig.searchStatus')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               options={[
-                { label: '啟用', value: 'enabled' },
-                { label: '停用', value: 'disabled' },
+                { label: t('common.enable'), value: 'enabled' },
+                { label: t('common.disable'), value: 'disabled' },
               ]}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common.search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common.reset')}
               </Button>
             </div>
           </Form.Item>
@@ -591,22 +596,22 @@ export default function MenuConfig() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
           {selectedRowKeys.length > 0 && (
             <span style={{ fontSize: 12, color: '#8C8C8C', alignSelf: 'center' }}>
-              已選 {selectedRowKeys.length} 項
+              {t('menuConfig.selectedCount', { count: selectedRowKeys.length })}
             </span>
           )}
           <Button
             icon={allExpanded ? <ShrinkOutlined /> : <ExpandAltOutlined />}
             onClick={handleToggleExpandAll}
           >
-            {allExpanded ? '收起全部' : '展開全部'}
+            {allExpanded ? t('menuConfig.collapseAll') : t('menuConfig.expandAll')}
           </Button>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新增
+            {t('common.add')}
           </Button>
           {configComponent}
         </div>
@@ -632,29 +637,29 @@ export default function MenuConfig() {
 
       {/* 新增菜单弹窗 */}
       <Modal
-        title={editing ? '編輯菜單' : '新增菜單'}
+        title={editing ? t('menuConfig.editTitle') : t('menuConfig.addTitle')}
         open={modalVisible}
         onOk={handleModalSubmit}
         onCancel={() => setModalVisible(false)}
         confirmLoading={submitting}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={520}
         destroyOnClose
       >
         <Form form={modalForm} layout="vertical">
-          <Form.Item name="name" label="菜單名稱（中文）" rules={[{ required: true, message: '請輸入菜單名稱' }]}>
-            <Input placeholder="例如：菜單配置" allowClear maxLength={50} />
+          <Form.Item name="name" label={t('menuConfig.menuName')} rules={[{ required: true, message: t('menuConfig.menuNameRequired') }]}>
+            <Input placeholder={t('menuConfig.menuNamePlaceholder')} allowClear maxLength={50} />
           </Form.Item>
-          <Form.Item name="menuKey" label="菜單 Key（英文）" rules={[{ required: true, message: '請輸入菜單Key' }]}>
-            <Input placeholder="例如：menu-config" allowClear maxLength={100} disabled={!!editing} />
+          <Form.Item name="menuKey" label={t('menuConfig.menuKey')} rules={[{ required: true, message: t('menuConfig.menuKeyRequired') }]}>
+            <Input placeholder={t('menuConfig.menuKeyPlaceholder')} allowClear maxLength={100} disabled={!!editing} />
           </Form.Item>
-          <Form.Item name="path" label="路由路徑">
-            <Input placeholder="例如：/menu-config" allowClear maxLength={200} />
+          <Form.Item name="path" label={t('menuConfig.routePath')}>
+            <Input placeholder={t('menuConfig.routePathPlaceholder')} allowClear maxLength={200} />
           </Form.Item>
-          <Form.Item name="parentId" label="上級菜單" rules={[{ required: true, message: '請選擇上級菜單' }]}>
-            <Select placeholder="請選擇上級菜單" allowClear>
-              <Select.Option value="0">頂級菜單</Select.Option>
+          <Form.Item name="parentId" label={t('menuConfig.parentMenu')} rules={[{ required: true, message: t('menuConfig.parentMenuRequired') }]}>
+            <Select placeholder={t('menuConfig.parentMenuPlaceholder')} allowClear>
+              <Select.Option value="0">{t('menuConfig.topLevelMenu')}</Select.Option>
               {flattenTree(data)
                 .filter((item) => item.type !== 'button')
                 .map((item) => (
@@ -664,35 +669,35 @@ export default function MenuConfig() {
                 ))}
             </Select>
           </Form.Item>
-          <Form.Item name="type" label="菜單類型" rules={[{ required: true, message: '請選擇菜單類型' }]}>
-            <Select placeholder="請選擇菜單類型" options={MENU_TYPE_OPTIONS} />
+          <Form.Item name="type" label={t('menuConfig.menuType')} rules={[{ required: true, message: t('menuConfig.menuTypeRequired') }]}>
+            <Select placeholder={t('menuConfig.menuTypePlaceholder')} options={TYPE_OPTIONS} />
           </Form.Item>
           <Form.Item
             name="icon"
-            label="圖標"
+            label={t('menuConfig.iconLabel')}
             extra={currentIcon ? (
               <Space size={6} style={{ marginTop: 4 }}>
-                <span style={{ fontSize: 15, color: '#595959' }}>{renderMenuIcon(currentIcon) ?? <span style={{ fontSize: 12, color: '#FF4D4F' }}>未識別圖標</span>}</span>
+                <span style={{ fontSize: 15, color: '#595959' }}>{renderMenuIcon(currentIcon) ?? <span style={{ fontSize: 12, color: '#FF4D4F' }}>{t('menuConfig.iconUnknown')}</span>}</span>
                 <span style={{ fontSize: 12, color: '#8C8C8C' }}>{currentIcon}</span>
               </Space>
             ) : null}
           >
             <AutoComplete
-              placeholder="選擇或輸入圖標名稱，如 SettingOutlined"
+              placeholder={t('menuConfig.iconExtra')}
               allowClear
               showSearch
               filterOption={(input, option) => String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
               options={getMenuIconOptions()}
             />
           </Form.Item>
-          <Form.Item name="sortOrder" label="排序">
-            <Input placeholder="數字越小越靠前" allowClear />
+          <Form.Item name="sortOrder" label={t('menuConfig.sortLabel')}>
+            <Input placeholder={t('menuConfig.sortPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item name="status" label="狀態" valuePropName="checked"
+          <Form.Item name="status" label={t('menuConfig.statusLabel')} valuePropName="checked"
             getValueFromEvent={(checked: boolean) => checked ? 'enabled' : 'disabled'}
             getValueProps={(value: string) => ({ checked: value === 'enabled' })}
           >
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} />
           </Form.Item>
         </Form>
       </Modal>

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { Button, Space, Input, Select, Table, Modal, Form, InputNumber, message } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import {
@@ -21,28 +22,29 @@ import type { StoreItem } from '../../api/store'
 import { fetchStoresByGroup } from '../../api/store'
 import { getApprovalRecords } from '../../utils/approvalStore'
 
-/** 廣告類型 */
-const adTypeOptions = [
-  { label: '全部', value: '' },
-  { label: '新店廣告', value: 'new_store' },
-  { label: '盤活復蘇', value: 'revival' },
-  { label: '獨家商家', value: 'exclusive' },
-  { label: '金牌商家', value: 'gold' },
-  { label: '人氣商家', value: 'ka' },
-]
-
-const adTypeMap: Record<string, string> = {
-  new_store: '新店廣告',
-  revival: '盤活復蘇',
-  exclusive: '獨家商家',
-  gold: '金牌商家',
-  ka: '人氣商家',
-}
-
 export default function GiftDetail() {
+  const { t } = useTranslation('giftDetail')
   const navigate = useNavigate()
   // 菜单权限：gift-detail
   const { hasPermission } = useAuth()
+
+  /** 廣告類型 */
+  const adTypeOptions = [
+    { label: t('common:all'), value: '' },
+    { label: t('adTypeNewStore'), value: 'new_store' },
+    { label: t('adTypeRevival'), value: 'revival' },
+    { label: t('adTypeExclusive'), value: 'exclusive' },
+    { label: t('adTypeGold'), value: 'gold' },
+    { label: t('adTypeKa'), value: 'ka' },
+  ]
+
+  const adTypeMap: Record<string, string> = {
+    new_store: t('adTypeNewStore'),
+    revival: t('adTypeRevival'),
+    exclusive: t('adTypeExclusive'),
+    gold: t('adTypeGold'),
+    ka: t('adTypeKa'),
+  }
   const [form] = Form.useForm()
   const [deductModalVisible, setDeductModalVisible] = useState(false)
   const [currentRecord, setCurrentRecord] = useState<GiftRecordItem | null>(null)
@@ -118,7 +120,7 @@ export default function GiftDetail() {
       setDataSource(res.records || [])
       setTotal(res.total || 0)
     } catch {
-      message.error('查詢失敗')
+      message.error(t('common:queryFailed'))
     } finally {
       setLoading(false)
     }
@@ -150,7 +152,7 @@ export default function GiftDetail() {
   }
 
   const handleExport = () => {
-    message.success('導出功能開發中...')
+    message.success(t('common:exportDev'))
   }
 
   const handleViewDetail = (record: GiftRecordItem) => {
@@ -186,12 +188,12 @@ export default function GiftDetail() {
         deductDays: values.deductDays,
         reason: values.reason,
       })
-      message.success('扣除成功')
+      message.success(t('deductSuccess'))
       setDeductModalVisible(false)
       loadData()
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error('扣除失敗，請重試')
+      message.error(t('deductFailed'))
     }
   }
 
@@ -207,7 +209,7 @@ export default function GiftDetail() {
 
   const columns: TableColumnsType<GiftRecordItem> = [
     {
-      title: '集團ID/集團名稱',
+      title: t('colGroupInfo'),
       key: 'groupInfo',
       width: 160,
       render: (_, record) => (
@@ -218,7 +220,7 @@ export default function GiftDetail() {
       ),
     },
     {
-      title: '門店ID/門店名稱',
+      title: t('colStoreInfo'),
       key: 'storeInfo',
       width: 160,
       render: (_, record) => (
@@ -229,32 +231,32 @@ export default function GiftDetail() {
       ),
     },
     {
-      title: '所屬品牌',
+      title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
       render: (brand: string) => <BrandTag value={brand} />,
     },
     {
-      title: '廣告類型',
+      title: t('colAdType'),
       dataIndex: 'adType',
       key: 'adType',
       width: 110,
       render: (adType: string) => adTypeMap[adType] || adType,
     },
     {
-      title: '剩餘天數',
+      title: t('colRemainingDays'),
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
       render: (days: number) => (
         <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-          {days} 天
+          {days} {t('dayUnit')}
         </span>
       ),
     },
     {
-      title: '操作',
+      title: t('common:action'),
       key: 'action',
       width: 120,
       fixed: 'right',
@@ -265,7 +267,7 @@ export default function GiftDetail() {
             size="small"
             onClick={() => handleViewDetail(record)}
           >
-            贈送明細
+            {t('giftConsumeDetail')}
           </Button>
           {hasPermission('gift-detail:create') && (
             <Button
@@ -273,7 +275,7 @@ export default function GiftDetail() {
               size="small"
               onClick={() => handleGift(record)}
             >
-              贈送
+              {t('gift')}
             </Button>
           )}
         </Space>
@@ -293,9 +295,9 @@ export default function GiftDetail() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
-          <Form.Item name="groupInfo" label="集團ID/名稱">
+          <Form.Item name="groupInfo" label={t('searchGroupIdName')}>
             <Select
-              placeholder="支持ID和名稱搜索查詢"
+              placeholder={t('searchGroupIdPlaceholder')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -308,9 +310,9 @@ export default function GiftDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="storeInfo" label="門店ID/名稱">
+          <Form.Item name="storeInfo" label={t('searchStoreIdName')}>
             <Select
-              placeholder="支持ID和名稱搜索查詢"
+              placeholder={t('searchStoreIdPlaceholder')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -324,9 +326,9 @@ export default function GiftDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="brand" label="所屬品牌">
+          <Form.Item name="brand" label={t('common:brand')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common:all')}
               allowClear
               options={brandOptions}
               value={searchBrand || undefined}
@@ -334,9 +336,9 @@ export default function GiftDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="adType" label="廣告類型">
+          <Form.Item name="adType" label={t('colAdType')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common:all')}
               allowClear
               options={adTypeOptions}
               value={searchAdType || undefined}
@@ -348,10 +350,10 @@ export default function GiftDetail() {
           <Form.Item className="search-actions">
             <Space>
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common:search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common:reset')}
               </Button>
             </Space>
           </Form.Item>
@@ -363,23 +365,23 @@ export default function GiftDetail() {
         <div className="action-section-left">
           {hasPermission('gift-detail:export') && (
             <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-              導出
+              {t('common:export')}
             </Button>
           )}
-          <Button icon={<AuditOutlined />} onClick={handleGoApproval}>查看審批進度</Button>
+          <Button icon={<AuditOutlined />} onClick={handleGoApproval}>{t('viewApprovalProgress')}</Button>
           {pendingGiftCount > 0 && (
             <span
               onClick={handleGoApproval}
               style={{ color: '#E8720C', fontSize: 13, cursor: 'pointer', alignSelf: 'center' }}
             >
-              {pendingGiftCount} 筆申請審批中，通過後剩餘天數自動生效
+              {t('pendingApprovalTip', { count: pendingGiftCount })}
             </span>
           )}
         </div>
         <div className="action-section-right">
           {hasPermission('gift-detail:create') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增贈送
+              {t('addGift')}
             </Button>
           )}
           {configComponent}
@@ -405,19 +407,19 @@ export default function GiftDetail() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條`,
+          showTotal: (total) => t('common:total', { count: total }),
         }}
         scroll={{ x: 1500 }}
       />
 
       {/* 扣除彈窗 */}
       <Modal
-        title="扣除贈送天數"
+        title={t('deductTitle')}
         open={deductModalVisible}
         onOk={handleDeductOk}
         onCancel={() => setDeductModalVisible(false)}
-        okText="確認扣除"
-        cancelText="取消"
+        okText={t('confirmDeduct')}
+        cancelText={t('common:cancel')}
         okButtonProps={{ danger: true }}
         width={500}
       >
@@ -425,46 +427,46 @@ export default function GiftDetail() {
           <div style={{ marginTop: 16 }}>
             <div style={{ padding: '12px 16px', background: '#FFF7E6', borderRadius: 8, marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: '#595959' }}>
-                <span>集團：</span>
+                <span>{t('groupLabel')}：</span>
                 <span style={{ color: '#262626', fontWeight: 600 }}>{currentRecord.groupName}</span>
                 <span style={{ margin: '0 12px' }}>|</span>
-                <span>廣告類型：</span>
+                <span>{t('adTypeLabel')}：</span>
                 <span style={{ color: '#262626', fontWeight: 600 }}>{adTypeMap[currentRecord.adType]}</span>
               </div>
               <div style={{ fontSize: 13, color: '#595959', marginTop: 8 }}>
-                <span>剩餘天數：</span>
-                <span style={{ color: '#52C41A', fontWeight: 700, fontSize: 16 }}>{currentRecord.remainingDays} 天</span>
+                <span>{t('remainingDaysLabel')}：</span>
+                <span style={{ color: '#52C41A', fontWeight: 700, fontSize: 16 }}>{currentRecord.remainingDays} {t('dayUnit')}</span>
               </div>
             </div>
             <Form form={deductForm} layout="vertical">
               <Form.Item
                 name="deductDays"
-                label="扣除天數"
+                label={t('deductDaysLabel')}
                 rules={[
-                  { required: true, message: '請輸入扣除天數' },
+                  { required: true, message: t('inputDeductDays') },
                   {
                     type: 'number',
                     min: 1,
                     max: currentRecord.remainingDays,
-                    message: `扣除天數不能超過 ${currentRecord.remainingDays} 天`,
+                    message: t('deductDaysMax', { max: currentRecord.remainingDays }),
                   },
                 ]}
               >
                 <InputNumber
-                  placeholder="請輸入扣除天數"
+                  placeholder={t('deductDaysPlaceholder')}
                   min={1}
                   max={currentRecord.remainingDays}
                   style={{ width: '100%' }}
-                  addonAfter="天"
+                  addonAfter={t('dayUnit')}
                 />
               </Form.Item>
               <Form.Item
                 name="reason"
-                label="扣除原因"
-                rules={[{ required: true, message: '請輸入扣除原因' }]}
+                label={t('deductReasonLabel')}
+                rules={[{ required: true, message: t('deductReasonPlaceholder') }]}
               >
                 <Input.TextArea
-                  placeholder="請輸入扣除原因"
+                  placeholder={t('deductReasonPlaceholder')}
                   rows={3}
                   maxLength={200}
                   showCount

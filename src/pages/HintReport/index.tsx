@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Input, Select, DatePicker, Table, Form, Card, Row, Col, Statistic } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -12,26 +13,6 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-const terminalOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'APP', value: 'app' },
-  { label: '微信小程序', value: 'wechatMini' },
-  { label: 'Mpay小應用', value: 'mpayMini' },
-  { label: '微信H5', value: 'wechatH5' },
-]
-
-const regionOptions = [
-  { label: '全部', value: 'all' },
-  { label: '澳門', value: 'macau' },
-  { label: '氹仔', value: 'taipa' },
-]
-
-const hintTypeOptions = [
-  { label: '全部', value: 'all' },
-  { label: '運營推廣', value: 'operation' },
-  { label: '熱搜推廣', value: 'hotSearch' },
-]
 
 interface ReportData {
   key: string
@@ -98,19 +79,6 @@ const brandCompareData = [
   { brand: 'mFood', type: '點擊次數', value: 1342 },
   { brand: '閃蜂', type: '展示次數', value: 6520 },
   { brand: '閃蜂', type: '點擊次數', value: 898 },
-]
-const columns: TableColumnsType<ReportData> = [
-  { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-  { title: '底紋詞', dataIndex: 'hintWord', key: 'hintWord', width: 140 },
-  { title: '詞源類型', dataIndex: 'hintType', key: 'hintType', width: 100 },
-  { title: '搜索界面', dataIndex: 'searchPage', key: 'searchPage', width: 100 },
-  { title: '品牌', dataIndex: 'brand', key: 'brand', width: 80 },
-  { title: '展示終端', dataIndex: 'terminal', key: 'terminal', width: 120 },
-  { title: '區域', dataIndex: 'region', key: 'region', width: 80 },
-  { title: '展示次數', dataIndex: 'showCount', key: 'showCount', width: 100, sorter: true },
-  { title: '點擊次數', dataIndex: 'clickCount', key: 'clickCount', width: 100, sorter: true },
-  { title: '點擊率', dataIndex: 'clickRate', key: 'clickRate', width: 100, sorter: true },
-  { title: '跳轉次數', dataIndex: 'jumpCount', key: 'jumpCount', width: 100, sorter: true },
 ]
 
 const trendConfig = {
@@ -179,20 +147,56 @@ const brandColumnConfig = {
 }
 
 export default function HintReport() {
+  const { t } = useTranslation()
+
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'date', title: '日期' },
-    { key: 'hintWord', title: '底紋詞' },
-    { key: 'hintType', title: '詞源類型' },
-    { key: 'searchPage', title: '搜索界面' },
-    { key: 'brand', title: '品牌' },
-    { key: 'terminal', title: '展示終端' },
-    { key: 'region', title: '區域' },
-    { key: 'showCount', title: '展示次數' },
-    { key: 'clickCount', title: '點擊次數' },
-    { key: 'clickRate', title: '點擊率' },
+    { key: 'date', title: t('hintReport.colDate') },
+    { key: 'hintWord', title: t('hintReport.colHintWord') },
+    { key: 'hintType', title: t('hintReport.colHintType') },
+    { key: 'searchPage', title: t('hintReport.colSearchPage') },
+    { key: 'brand', title: t('hintReport.colBrand') },
+    { key: 'terminal', title: t('hintReport.colTerminal') },
+    { key: 'region', title: t('hintReport.colRegion') },
+    { key: 'showCount', title: t('hintReport.colShowCount') },
+    { key: 'clickCount', title: t('hintReport.colClickCount') },
+    { key: 'clickRate', title: t('hintReport.colClickRate') },
     { key: 'ctr', title: 'CTR' },
-  ], [])
+  ], [t])
+
+  const columns: TableColumnsType<ReportData> = [
+    { title: t('hintReport.colDate'), dataIndex: 'date', key: 'date', width: 120 },
+    { title: t('hintReport.colHintWord'), dataIndex: 'hintWord', key: 'hintWord', width: 140 },
+    { title: t('hintReport.colHintType'), dataIndex: 'hintType', key: 'hintType', width: 100 },
+    { title: t('hintReport.colSearchPage'), dataIndex: 'searchPage', key: 'searchPage', width: 100 },
+    { title: t('hintReport.colBrand'), dataIndex: 'brand', key: 'brand', width: 80 },
+    { title: t('hintReport.colTerminal'), dataIndex: 'terminal', key: 'terminal', width: 120 },
+    { title: t('hintReport.colRegion'), dataIndex: 'region', key: 'region', width: 80 },
+    { title: t('hintReport.colShowCount'), dataIndex: 'showCount', key: 'showCount', width: 100, sorter: true },
+    { title: t('hintReport.colClickCount'), dataIndex: 'clickCount', key: 'clickCount', width: 100, sorter: true },
+    { title: t('hintReport.colClickRate'), dataIndex: 'clickRate', key: 'clickRate', width: 100, sorter: true },
+    { title: t('hintReport.colJumpCount'), dataIndex: 'jumpCount', key: 'jumpCount', width: 100, sorter: true },
+  ]
+
+  const terminalOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.terminal.app'), value: 'app' },
+    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
+    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
+    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
+  ]
+
+  const regionOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.region.macau'), value: 'macau' },
+    { label: t('dict.region.taipa'), value: 'taipa' },
+  ]
+
+  const hintTypeOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.hintSource.operation'), value: 'operation' },
+    { label: t('dict.promotionType.hotSearch'), value: 'hotSearch' },
+  ]
 
   const { configComponent, applyConfig } = useColumnConfig('hint-report', columnMeta)
 
@@ -201,28 +205,28 @@ export default function HintReport() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="底紋詞">
-            <Input placeholder="請輸入底紋詞" allowClear />
+          <Form.Item label={t('hintReport.searchHintWord')}>
+            <Input placeholder={t('hintReport.searchHintWordPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="詞源類型">
-            <Select placeholder="全部" allowClear options={hintTypeOptions} />
+          <Form.Item label={t('hintReport.searchHintType')}>
+            <Select placeholder={t('common.all')} allowClear options={hintTypeOptions} />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="全部" allowClear options={brandOptions} />
+          <Form.Item label={t('hintReport.searchBrand')}>
+            <Select placeholder={t('common.all')} allowClear options={brandOptions} />
           </Form.Item>
-          <Form.Item label="展示終端">
-            <Select placeholder="全部" allowClear options={terminalOptions} />
+          <Form.Item label={t('hintReport.searchTerminal')}>
+            <Select placeholder={t('common.all')} allowClear options={terminalOptions} />
           </Form.Item>
-          <Form.Item label="區域">
-            <Select placeholder="全部" allowClear options={regionOptions} />
+          <Form.Item label={t('hintReport.searchRegion')}>
+            <Select placeholder={t('common.all')} allowClear options={regionOptions} />
           </Form.Item>
-          <Form.Item label="統計日期">
+          <Form.Item label={t('hintReport.searchDate')}>
             <RangePicker />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -231,7 +235,7 @@ export default function HintReport() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}> 導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {configComponent}
@@ -243,31 +247,31 @@ export default function HintReport() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="總展示次數"
+              title={t('hintReport.totalShow')}
               value={16370}
               precision={0}
               valueStyle={{ color: '#1890ff' }}
               prefix={<ArrowUpOutlined />}
-              suffix="次"
+              suffix={t('common.times')}
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
-              title="總點擊次數"
+              title={t('hintReport.totalClick')}
               value={2240}
               precision={0}
               valueStyle={{ color: '#52c41a' }}
               prefix={<ArrowUpOutlined />}
-              suffix="次"
+              suffix={t('common.times')}
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
-              title="平均點擊率"
+              title={t('hintReport.avgClickRate')}
               value={13.68}
               precision={2}
               valueStyle={{ color: '#fa8c16' }}
@@ -278,12 +282,12 @@ export default function HintReport() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="總跳轉次數"
+              title={t('hintReport.totalJump')}
               value={1098}
               precision={0}
               valueStyle={{ color: '#722ed1' }}
               prefix={<ArrowUpOutlined />}
-              suffix="次"
+              suffix={t('common.times')}
             />
           </Card>
         </Col>
@@ -292,12 +296,12 @@ export default function HintReport() {
       {/* 图表区域 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col span={16}>
-          <Card title="📈 展示與點擊趨勢" bordered={false}>
+          <Card title={`📈 ${t('hintReport.trendTitle')}`} bordered={false}>
             <Line {...trendConfig} height={300} />
           </Card>
         </Col>
         <Col span={8}>
-          <Card title="🥧 詞源分布" bordered={false}>
+          <Card title={`🥧 ${t('hintReport.sourceTitle')}`} bordered={false}>
             <Pie {...sourcePieConfig} height={300} />
           </Card>
         </Col>
@@ -305,7 +309,7 @@ export default function HintReport() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col span={24}>
-          <Card title="📊 品牌對比分析" bordered={false}>
+          <Card title={`📊 ${t('hintReport.brandTitle')}`} bordered={false}>
             <Column {...brandColumnConfig} height={280} />
           </Card>
         </Col>
@@ -313,14 +317,14 @@ export default function HintReport() {
 
       {/* 列表区域 */}
       <div className="table-section">
-        <Card title="📋 明細數據" bordered={false}>
+        <Card title={`📋 ${t('hintReport.detailTitle')}`} bordered={false}>
           <Table<ReportData>
             columns={applyConfig(columns)}
             dataSource={mockData}
             pagination={{
               total: mockData.length,
               pageSize: 10,
-              showTotal: (total) => `共 ${total} 條`,
+              showTotal: (total) => t('common.total', { count: total }),
               showSizeChanger: true,
               pageSizeOptions: ['10', '20', '50', '100'],
               defaultPageSize: 10,

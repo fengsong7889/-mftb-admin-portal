@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { Button, Result } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
+import i18n from '../i18n'
 
 interface RouteErrorBoundaryProps {
   children: ReactNode
@@ -66,15 +67,15 @@ export default class RouteErrorBoundary extends Component<
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
         <Result
           status={chunkError ? 'warning' : 'error'}
-          title={chunkError ? '頁面資源加載失敗' : '頁面出現異常'}
+          title={chunkError ? i18n.t('errorBoundary.chunkFailed') : i18n.t('errorBoundary.pageError')}
           subTitle={
             chunkError
-              ? '可能是版本已更新，請重新加載頁面獲取最新資源。'
-              : error?.message || '頁面渲染時發生錯誤，請重新加載或聯繫技術支持。'
+              ? i18n.t('errorBoundary.chunkSub')
+              : error?.message || i18n.t('errorBoundary.errorSub')
           }
           extra={
             <Button type="primary" icon={<ReloadOutlined />} onClick={this.handleReload}>
-              重新加載
+              {i18n.t('errorBoundary.reload')}
             </Button>
           }
         />

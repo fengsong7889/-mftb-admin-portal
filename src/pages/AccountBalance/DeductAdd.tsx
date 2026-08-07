@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Popover, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -47,37 +48,37 @@ function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; su
   return <>{prefix}{animated.toLocaleString()}{suffix}</>
 }
 
-/** 扣款方式選項 */
-const _deductMethodOptions = [
-  { label: '消費扣款', value: 'consume' },
-  { label: '充值批次扣款', value: 'batch' },
-  { label: '賬戶扣款', value: 'account' },
+/** 扣款方式選項（labelKey 為 i18n key） */
+const deductMethodOptions = [
+  { labelKey: 'accountBalance.deductMethodConsume', value: 'consume' },
+  { labelKey: 'accountBalance.deductMethodBatch', value: 'batch' },
+  { labelKey: 'accountBalance.deductMethodAccount', value: 'account' },
 ]
 
-/** 業務頻道選項 */
+/** 業務頻道選項（labelKey 為 i18n key） */
 const businessChannelOptions = [
-  { label: '美食外賣', value: 'foodTakeout' },
-  { label: '超市百貨', value: 'supermarket' },
-  { label: '團購到店', value: 'groupBuyStore' },
+  { labelKey: 'accountBalance.channelFoodTakeout', value: 'foodTakeout' },
+  { labelKey: 'accountBalance.channelSupermarket', value: 'supermarket' },
+  { labelKey: 'accountBalance.channelGroupBuyStore', value: 'groupBuyStore' },
 ]
 
-/** 消費類型選項 */
+/** 消費類型選項（labelKey 為 i18n key） */
 const consumeTypeOptions = [
-  { label: 'POS機維修', value: 'posRepair' },
-  { label: '巴士廣告', value: 'busAd' },
-  { label: '百貨精選', value: 'deptStore' },
-  { label: '復蘇盤活', value: 'revitalize' },
-  { label: '基礎套餐', value: 'basicPlan' },
-  { label: '機器檢測', value: 'machineInspect' },
-  { label: '機器維修', value: 'machineRepair' },
-  { label: '金牌套餐', value: 'goldPlan' },
-  { label: '精選套餐', value: 'selectPlan' },
-  { label: '免費入駐', value: 'freeEntry' },
-  { label: '企業套餐', value: 'enterprisePlan' },
-  { label: '升級套餐', value: 'upgradePlan' },
-  { label: '團購套餐', value: 'groupPlan' },
-  { label: '小紅書廣告', value: 'xiaohongshuAd' },
-  { label: '專業套餐', value: 'proPlan' },
+  { labelKey: 'accountBalance.consumePosRepair', value: 'posRepair' },
+  { labelKey: 'accountBalance.consumeBusAd', value: 'busAd' },
+  { labelKey: 'accountBalance.consumeDeptStore', value: 'deptStore' },
+  { labelKey: 'accountBalance.consumeRevitalize', value: 'revitalize' },
+  { labelKey: 'accountBalance.consumeBasicPlan', value: 'basicPlan' },
+  { labelKey: 'accountBalance.consumeMachineInspect', value: 'machineInspect' },
+  { labelKey: 'accountBalance.consumeMachineRepair', value: 'machineRepair' },
+  { labelKey: 'accountBalance.consumeGoldPlan', value: 'goldPlan' },
+  { labelKey: 'accountBalance.consumeSelectPlan', value: 'selectPlan' },
+  { labelKey: 'accountBalance.consumeFreeEntry', value: 'freeEntry' },
+  { labelKey: 'accountBalance.consumeEnterprisePlan', value: 'enterprisePlan' },
+  { labelKey: 'accountBalance.consumeUpgradePlan', value: 'upgradePlan' },
+  { labelKey: 'accountBalance.consumeGroupPlan', value: 'groupPlan' },
+  { labelKey: 'accountBalance.consumeXiaohongshuAd', value: 'xiaohongshuAd' },
+  { labelKey: 'accountBalance.consumeProPlan', value: 'proPlan' },
 ]
 
 /** 充值批次選項（批次號 + 可扣金額 + 結算方式） */
@@ -88,11 +89,11 @@ interface BatchOption {
   settlement: string
 }
 
-/** 結算方式映射 */
-const settlementMap: Record<string, string> = {
-  corporate: '對公轉賬',
-  mixed: '混合支付',
-  revenue: '營業額支付',
+/** 結算方式映射（值為 i18n key） */
+const settlementKeyMap: Record<string, string> = {
+  corporate: 'accountBalance.settlementCorporate',
+  mixed: 'accountBalance.settlementMixed',
+  revenue: 'accountBalance.settlementRevenue',
 }
 
 /** 数字金额转中文大写 */
@@ -129,6 +130,7 @@ function amountToChinese(num: number): string {
 }
 
 export default function DeductAdd() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const groupIdParam = searchParams.get('groupId') || ''
@@ -152,6 +154,10 @@ export default function DeductAdd() {
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
+
+  /** 翻譯後的選項陣列（供 Select 使用） */
+  const tBusinessChannelOptions = businessChannelOptions.map(o => ({ label: t(o.labelKey), value: o.value }))
+  const tConsumeTypeOptions = consumeTypeOptions.map(o => ({ label: t(o.labelKey), value: o.value }))
 
   /** 當前批次的可扣金額 */
   const currentBatch = batchOptions.find(b => b.value === selectedBatch)
@@ -218,15 +224,15 @@ export default function DeductAdd() {
     try {
       await form.validateFields()
       if (!deductAmount || deductAmount <= 0) {
-        message.warning('請填寫扣款金額')
+        message.warning(t('accountBalance.fillDeductAmount'))
         return
       }
       if (deductMethod === 'batch' && currentBatch && deductAmount > currentBatch.deductible) {
-        message.warning('扣款金額不能超過可扣金額')
+        message.warning(t('accountBalance.amountExceedDeductible'))
         return
       }
       if (certificateFiles.length === 0) {
-        message.warning('請上傳相關憑證')
+        message.warning(t('accountBalance.uploadCertificate'))
         return
       }
       // 提交審批記錄
@@ -242,13 +248,13 @@ export default function DeductAdd() {
         deductMethod,
         deductAmount,
         virtualBalance: sourceVirtualBalance,
-        consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.label || '',
+        consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.labelKey ? t(businessChannelOptions.find(c => c.value === consumeChannelVal)!.labelKey) : '',
         consumeStore: consumeStoreOpt?.label || '',
-        consumeType: consumeTypeOptions.find(t => t.value === consumeTypeVal)?.label || '',
+        consumeType: consumeTypeOptions.find(o => o.value === consumeTypeVal)?.labelKey ? t(consumeTypeOptions.find(o => o.value === consumeTypeVal)!.labelKey) : '',
         consumeBd: bdOptions.find(o => o.value === consumeBdVal)?.label || consumeBdVal || '--',
         batchNo: deductMethod === 'batch' ? (selectedBatch || '') : '',
         batchDeductible: deductMethod === 'batch' ? (currentBatch?.deductible || 0) : 0,
-        batchSettlement: deductMethod === 'batch' ? (settlementMap[currentBatch?.settlement || ''] || '') : '',
+        batchSettlement: deductMethod === 'batch' ? (settlementKeyMap[currentBatch?.settlement || ''] ? t(settlementKeyMap[currentBatch?.settlement || '']) : '') : '',
         remark: form.getFieldValue('remark') || '',
       }
       setSubmitting(true)
@@ -259,7 +265,7 @@ export default function DeductAdd() {
     } catch (err) {
       // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {
-        message.error(err instanceof Error && err.message ? err.message : '提交失败，请稍后重试')
+        message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
       }
     } finally {
       setSubmitting(false)
@@ -270,11 +276,11 @@ export default function DeductAdd() {
   const beforeUpload = (file: File) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
     if (!validTypes.includes(file.type)) {
-      message.error('僅支持 jpeg/jpg/png/PDF 格式')
+      message.error(t('accountBalance.onlyFormatError'))
       return Upload.LIST_IGNORE
     }
     if (file.size > 5 * 1024 * 1024) {
-      message.error('文件大小不能超過 5MB')
+      message.error(t('accountBalance.fileSizeExceed'))
       return Upload.LIST_IGNORE
     }
     return false
@@ -323,7 +329,7 @@ export default function DeductAdd() {
             onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
           >
             <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-            <span>上傳</span>
+            <span>{t('accountBalance.upload')}</span>
           </div>
         </Upload>
       )}
@@ -355,11 +361,11 @@ export default function DeductAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>賬戶扣款</h2>
-              <Tag color="blue" style={{ fontSize: 11 }}>扣款申請</Tag>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('accountBalance.deductPageTitle')}</h2>
+              <Tag color="blue" style={{ fontSize: 11 }}>{t('accountBalance.deductApplyTag')}</Tag>
             </div>
           </div>
         </div>
@@ -378,19 +384,19 @@ export default function DeductAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AccountBookOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基礎信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.basicInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="集團" name="groupId" rules={[{ required: true, message: '請選擇集團' }]}>
+            <Form.Item label={t('common:colGroupId')} name="groupId" rules={[{ required: true, message: t('accountBalance.selectGroup') }]}>
               <Input disabled addonAfter={groupNameParam} />
             </Form.Item>
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('common:colBrand')}>
               <BrandTag value={brandParam} />
             </Form.Item>
-            <Form.Item label="賬戶狀態">
-              <Tag color="green">正常</Tag>
+            <Form.Item label={t('accountBalance.accountStatusLabel')}>
+              <Tag color="green">{t('accountBalance.statusNormal')}</Tag>
             </Form.Item>
           </div>
         </div>
@@ -401,8 +407,8 @@ export default function DeductAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DollarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>扣款方式</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>扣款配置</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.deductMethodLabel')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.deductConfigTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -428,22 +434,22 @@ export default function DeductAdd() {
               <div style={{ fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
                 <AnimatedNumber value={sourceVirtualBalance} prefix="MOP " />
               </div>
-              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>虛擬賬戶餘額</div>
+              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{t('accountBalance.virtualBalance')}</div>
             </div>
           </div>
 
-          <Form.Item label="扣款方式" name="deductMethod" rules={[{ required: true }]}>
+          <Form.Item label={t('accountBalance.deductMethodLabel')} name="deductMethod" rules={[{ required: true }]}>
             <Radio.Group onChange={(e) => { setDeductMethod(e.target.value); setDeductAmount(0); setSelectedBatch(undefined) }}>
-              <Radio value="consume">消費扣款</Radio>
+              <Radio value="consume">{t('accountBalance.deductMethodConsume')}</Radio>
               <Radio value="batch">
-                充值批次扣款
+                {t('accountBalance.deductMethodBatch')}
                 <Popover
                   content={
                     <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>
-                      <div>1. 此扣款只會扣除該筆充值批次的金額。</div>
-                      <div>2. 當該筆充值使用的結算方式是「混合支付」「營業額支付」並且商家還尚未結清欠款：</div>
-                      <div style={{ paddingLeft: 12 }}>• 本次扣款不會自動核銷商家側對應的欠款單，商家所欠金額將繼續按期履約還款；</div>
-                      <div style={{ paddingLeft: 12 }}>• 如您扣款後需要進行商家欠款平賬，請協商財務根據本次扣除金額，按比例計算出可用於抵扣欠款的金額，並在商家欠款賬單核銷。</div>
+                      <div>1. {t('accountBalance.batchPopoverB1')}</div>
+                      <div>2. {t('accountBalance.batchPopoverB2')}</div>
+                      <div style={{ paddingLeft: 12 }}>• {t('accountBalance.batchPopoverB2a')}</div>
+                      <div style={{ paddingLeft: 12 }}>• {t('accountBalance.batchPopoverB2b')}</div>
                     </div>
                   }
                   trigger="hover"
@@ -453,15 +459,15 @@ export default function DeductAdd() {
                 </Popover>
               </Radio>
               <Radio value="account">
-                賬戶扣款
+                {t('accountBalance.deductMethodAccount')}
                 <Popover
                   content={
                     <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>
-                      <div>1. 此扣款將直接扣除該集團賬戶的推廣金，當扣款金額過大，會扣除多筆充值批次的金額。</div>
-                      <div>2. 當部分充值批次的結算方式是「混合支付」「營業額支付」並且商家還尚未完成還款：</div>
-                      <div style={{ paddingLeft: 12 }}>• 本次扣款不會自動核銷商家側對應的欠款單，商家所欠金額將繼續按期履約還款；</div>
-                      <div style={{ paddingLeft: 12 }}>• 如您扣款後需要進行商家欠款平賬，請協商財務根據本次扣除金額，按比例計算出可用於抵扣欠款的金額，並在商家欠款賬單核銷。</div>
-                      <div>3. 如您的目標是對某一筆充值進行扣款，請選擇「充值批次扣款」功能。</div>
+                      <div>1. {t('accountBalance.acctPopoverB1')}</div>
+                      <div>2. {t('accountBalance.acctPopoverB2')}</div>
+                      <div style={{ paddingLeft: 12 }}>• {t('accountBalance.deductPopoverB2a')}</div>
+                      <div style={{ paddingLeft: 12 }}>• {t('accountBalance.deductPopoverB2b')}</div>
+                      <div>3. {t('accountBalance.acctPopoverB3')}</div>
                     </div>
                   }
                   trigger="hover"
@@ -476,12 +482,12 @@ export default function DeductAdd() {
           {/* ====== 消費扣款 ====== */}
           {deductMethod === 'consume' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px 24px' }}>
-              <Form.Item label="業務頻道" name="consumeChannel" rules={[{ required: true, message: '請選擇業務頻道' }]}>
-                <Select placeholder="請選擇業務頻道" options={businessChannelOptions} allowClear />
+              <Form.Item label={t('common:colChannel')} name="consumeChannel" rules={[{ required: true, message: t('accountBalance.selectBusinessChannel') }]}>
+                <Select placeholder={t('accountBalance.selectBusinessChannel')} options={tBusinessChannelOptions} allowClear />
               </Form.Item>
-              <Form.Item label="門店名稱" name="consumeStore" rules={[{ required: true, message: '請選擇門店' }]}>
+              <Form.Item label={t('common:colStoreName')} name="consumeStore" rules={[{ required: true, message: t('accountBalance.selectStore') }]}>
                 <Select
-                  placeholder={storeOptions.length ? '請選擇門店' : '該集團下暫無同品牌門店'}
+                  placeholder={storeOptions.length ? t('accountBalance.selectStore') : t('accountBalance.noSameBrandStore')}
                   options={storeOptions}
                   showSearch
                   allowClear
@@ -489,22 +495,22 @@ export default function DeductAdd() {
                   filterOption={(input, option) => (option?.label ?? '').includes(input)}
                 />
               </Form.Item>
-              <Form.Item label="消費類型" name="consumeType" rules={[{ required: true, message: '請選擇消費類型' }]}>
-                <Select placeholder="請選擇消費類型" options={consumeTypeOptions} allowClear />
+              <Form.Item label={t('accountBalance.consumeTypeLabel')} name="consumeType" rules={[{ required: true, message: t('accountBalance.selectConsumeType') }]}>
+                <Select placeholder={t('accountBalance.selectConsumeType')} options={tConsumeTypeOptions} allowClear />
               </Form.Item>
-              <Form.Item label="歸屬BD" name="consumeBd">
+              <Form.Item label={t('accountBalance.belongBdLabel')} name="consumeBd">
                 <Select
                   placeholder={
-                    !form.getFieldValue('consumeStore') ? '請先選擇門店'
-                      : bdOptions.length ? '請選擇BD' : '該門店暫未綁定BD'
+                    !form.getFieldValue('consumeStore') ? t('accountBalance.selectStoreFirst')
+                      : bdOptions.length ? t('accountBalance.selectBd') : t('accountBalance.noBdBound')
                   }
                   options={bdOptions}
                   allowClear
                 />
               </Form.Item>
-              <Form.Item label="扣款金額" required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
+              <Form.Item label={t('accountBalance.deductAmountLabel')} required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
                 <InputNumber
-                  placeholder="請輸入扣款金額"
+                  placeholder={t('accountBalance.enterDeductAmount')}
                   min={0}
                   precision={2}
                   value={deductAmount || undefined}
@@ -527,9 +533,9 @@ export default function DeductAdd() {
           {deductMethod === 'batch' && (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px 24px' }}>
-                <Form.Item label="批次號" name="batchNo" rules={[{ required: true, message: '請選擇批次號' }]}>
+                <Form.Item label={t('accountBalance.batchNoLabel')} name="batchNo" rules={[{ required: true, message: t('accountBalance.selectBatchNo') }]}>
                   <Select
-                    placeholder={batchOptions.length ? '請選擇充值批次' : '該集團暫無充值批次'}
+                    placeholder={batchOptions.length ? t('accountBalance.selectRechargeBatch') : t('accountBalance.noRechargeBatch')}
                     options={batchOptions.map(b => ({ label: b.label, value: b.value }))}
                     showSearch
                     allowClear
@@ -537,7 +543,7 @@ export default function DeductAdd() {
                     filterOption={(input, option) => (option?.label ?? '').includes(input)}
                   />
                 </Form.Item>
-                <Form.Item label="可扣金額">
+                <Form.Item label={t('accountBalance.deductibleAmountLabel')}>
                   <InputNumber
                     disabled
                     value={currentBatch ? currentBatch.deductible : undefined}
@@ -546,16 +552,16 @@ export default function DeductAdd() {
                     formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                   />
                 </Form.Item>
-                <Form.Item label="結算方式">
+                <Form.Item label={t('accountBalance.settlementMethodLabel')}>
                   <Input
                     disabled
-                    value={currentBatch ? (settlementMap[currentBatch.settlement] || '--') : undefined}
-                    placeholder="選擇批次後展示"
+                    value={currentBatch ? (settlementKeyMap[currentBatch.settlement] ? t(settlementKeyMap[currentBatch.settlement]) : '--') : undefined}
+                    placeholder={t('accountBalance.showAfterSelectBatch')}
                   />
                 </Form.Item>
-                <Form.Item label="扣款金額" required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
+                <Form.Item label={t('accountBalance.deductAmountLabel')} required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
                   <InputNumber
-                    placeholder="請輸入扣款金額"
+                    placeholder={t('accountBalance.enterDeductAmount')}
                     min={0}
                     max={currentBatch ? currentBatch.deductible : undefined}
                     precision={2}
@@ -580,9 +586,9 @@ export default function DeductAdd() {
           {deductMethod === 'account' && (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px 24px' }}>
-                <Form.Item label="扣款金額" required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
+                <Form.Item label={t('accountBalance.deductAmountLabel')} required style={{ marginBottom: deductAmount > 0 ? 4 : undefined }}>
                   <InputNumber
-                    placeholder="請輸入扣款金額"
+                    placeholder={t('accountBalance.enterDeductAmount')}
                     min={0}
                     precision={2}
                     value={deductAmount || undefined}
@@ -609,15 +615,15 @@ export default function DeductAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileProtectOutlined style={{ fontSize: 14, color: '#722ed1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>相關憑證</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>憑證上傳</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.relatedVoucher')}</span>
+            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.voucherUploadTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>支持 jpeg/jpg/png/PDF</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportFormat')}</span>
           </div>
-          <Form.Item label="相關憑證" required style={{ marginBottom: 0 }}>
+          <Form.Item label={t('accountBalance.relatedVoucher')} required style={{ marginBottom: 0 }}>
             {renderFileList()}
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
-              限 jpeg/jpg/png/PDF 格式，5MB 內，最多可上傳 5 份
+              {t('accountBalance.voucherLimitHint')}
             </div>
           </Form.Item>
         </div>
@@ -628,7 +634,7 @@ export default function DeductAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>備註信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.remarkInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Form.Item name="remark" style={{ marginBottom: 0 }}>
@@ -636,7 +642,7 @@ export default function DeductAdd() {
               rows={4}
               maxLength={200}
               showCount
-              placeholder="本次扣款相關說明，限制200字！"
+              placeholder={t('accountBalance.deductRemarkPlaceholder')}
               style={{ borderRadius: 8 }}
             />
           </Form.Item>
@@ -645,9 +651,9 @@ export default function DeductAdd() {
 
       {/* 底部操作按鈕 */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>取消</Button>
+        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
-          提交申請
+          {t('accountBalance.submitApply')}
         </Button>
       </div>
 
@@ -674,13 +680,13 @@ export default function DeductAdd() {
               <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-              提交成功
+              {t('accountBalance.submitSuccessTitle')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
               {submittedFlowNo && (
-                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+                <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+              {t('accountBalance.submitSuccessDesc')}
             </p>
             <Button
               type="primary"
@@ -688,7 +694,7 @@ export default function DeductAdd() {
               onClick={() => navigate('/account-balance')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
-              返回列表{countdown > 0 && ` (${countdown}s)`}
+              {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}
             </Button>
           </div>
         </div>

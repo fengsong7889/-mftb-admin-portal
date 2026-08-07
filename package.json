@@ -27,9 +27,11 @@
     "antd": "^5.22.0",
     "axios": "^1.18.1",
     "dayjs": "^1.11.21",
+    "i18next": "^26.3.6",
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.11",
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.28.0"
   },

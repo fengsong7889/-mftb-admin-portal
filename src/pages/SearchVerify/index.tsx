@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   Card, Input, Button, Select, Space, Tag, Table, Collapse,
   Row, Col, Badge, Modal,
@@ -14,15 +16,8 @@ import {
 import { BRAND_OPTIONS } from '../../constants/brand'
 
 // ============================
-// 常量定义
+// 類型定義
 // ============================
-
-const CHANNELS = [
-  { key: 'home', label: '大首頁', icon: '🏠' },
-  { key: 'takeaway', label: '外賣', icon: '🛵' },
-  { key: 'supermarket', label: '超市', icon: '🛒' },
-  { key: 'groupBuy', label: '團購', icon: '👥' },
-]
 
 // ============================
 // 類型定義
@@ -65,63 +60,63 @@ interface MerchantResult {
 // Mock 數據工廠
 // ============================
 
-function generateRuleAnalysis(keyword: string): RuleMatchResult[] {
+function generateRuleAnalysis(keyword: string, t: TFunction): RuleMatchResult[] {
   if (!keyword) return []
   const segs = keyword.length > 2 ? [keyword.slice(0, 2), keyword.slice(2)] : [keyword]
   return [
     {
       type: 'segmentation',
-      label: '分詞效果',
+      label: t('searchVerify.ruleSeg'),
       matched: true,
-      details: `輸入「${keyword}」經分詞處理後拆分為以下詞組：`,
+      details: t('searchVerify.ruleSegDetail', { kw: keyword }),
       tags: segs,
     },
     {
       type: 'stopWord',
-      label: '停用詞匹配',
+      label: t('searchVerify.ruleStop'),
       matched: ['的', '了', '是', '在'].some(w => keyword.includes(w)),
       details: ['的', '了', '是', '在'].some(w => keyword.includes(w))
-        ? `命中停用詞，已自動過濾`
-        : `未命中任何停用詞`,
+        ? t('searchVerify.ruleStopHit')
+        : t('searchVerify.ruleStopMiss'),
       tags: ['的', '了', '是', '在'].filter(w => keyword.includes(w)),
     },
     {
       type: 'synonym',
-      label: '同義詞匹配',
+      label: t('searchVerify.ruleSyn'),
       matched: ['漢堡', '奶茶', '火鍋'].some(w => keyword.includes(w)),
       details: ['漢堡', '奶茶', '火鍋'].some(w => keyword.includes(w))
-        ? `命中同義詞規則，擴展搜索範圍`
-        : `未命中同義詞規則`,
+        ? t('searchVerify.ruleSynHit')
+        : t('searchVerify.ruleSynMiss'),
       tags: keyword.includes('漢堡') ? ['汉堡', '堡包', '漢堡包'] : keyword.includes('奶茶') ? ['奶綠', '珍珠奶茶'] : [],
     },
     {
       type: 'merchantKeyword',
-      label: '商家關鍵詞命中',
+      label: t('searchVerify.ruleMkw'),
       matched: keyword.length >= 2,
-      details: keyword.length >= 2 ? `命中商家關鍵詞規則，匹配商家名稱及標籤` : `輸入過短，未命中商家關鍵詞`,
+      details: keyword.length >= 2 ? t('searchVerify.ruleMkwHit') : t('searchVerify.ruleMkwMiss'),
       tags: keyword.length >= 2 ? ['漢堡王', '必勝客'] : [],
     },
     {
       type: 'productKeyword',
-      label: '商品關鍵詞命中',
+      label: t('searchVerify.rulePkw'),
       matched: ['漢堡', '奶茶', '披薩'].some(w => keyword.includes(w)),
       details: ['漢堡', '奶茶', '披薩'].some(w => keyword.includes(w))
-        ? `命中商品關鍵詞規則，匹配商品名稱`
-        : `未命中商品關鍵詞規則`,
+        ? t('searchVerify.rulePkwHit')
+        : t('searchVerify.rulePkwMiss'),
       tags: keyword.includes('漢堡') ? ['芝士漢堡', '雙層漢堡'] : keyword.includes('奶茶') ? ['珍珠奶茶', '芒果奶茶'] : [],
     },
     {
       type: 'exact',
-      label: '精準匹配',
+      label: t('searchVerify.ruleExact'),
       matched: keyword.length >= 2,
-      details: keyword.length >= 2 ? `嘗試精準匹配商家名稱及標籤` : `輸入過短，未觸發精準匹配`,
+      details: keyword.length >= 2 ? t('searchVerify.ruleExactHit') : t('searchVerify.ruleExactMiss'),
       tags: [],
     },
     {
       type: 'fuzzy',
-      label: '模糊匹配',
+      label: t('searchVerify.ruleFuzzy'),
       matched: true,
-      details: `對原始輸入進行模糊匹配，召回更多結果`,
+      details: t('searchVerify.ruleFuzzyDetail'),
       tags: [],
     },
   ]
@@ -303,6 +298,7 @@ function generateMerchantResults(keyword: string, channel: string): MerchantResu
 // ============================
 
 function RuleAnalysisPanel({ rules }: { rules: RuleMatchResult[] }) {
+  const { t } = useTranslation()
   if (!rules.length) return null
   const iconMap: Record<string, React.ReactNode> = {
     segmentation: <ScissorOutlined />,
@@ -323,8 +319,8 @@ function RuleAnalysisPanel({ rules }: { rules: RuleMatchResult[] }) {
         label: (
           <Space>
             <InfoCircleOutlined style={{ color: '#1890ff' }} />
-            <span style={{ fontWeight: 600 }}>規則維度分析</span>
-            <Tag color="blue">{matchedCount}/{rules.length} 項命中</Tag>
+            <span style={{ fontWeight: 600 }}>{t('searchVerify.ruleTitle')}</span>
+            <Tag color="blue">{t('searchVerify.ruleHit', { matched: matchedCount, total: rules.length })}</Tag>
           </Space>
         ),
         children: (
@@ -346,7 +342,7 @@ function RuleAnalysisPanel({ rules }: { rules: RuleMatchResult[] }) {
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{rule.label}</span>
                   <Badge
                     status={rule.matched ? 'success' : 'error'}
-                    text={rule.matched ? '命中' : '未命中'}
+                    text={rule.matched ? t('searchVerify.hit') : t('searchVerify.miss')}
                   />
                 </div>
                 <div style={{ fontSize: 12, color: '#666', marginBottom: rule.tags.length ? 6 : 0 }}>
@@ -376,6 +372,26 @@ function RuleAnalysisPanel({ rules }: { rules: RuleMatchResult[] }) {
 
 function SearchVerifyPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+
+  // 搜索頻道（依賴 t，需定義在組件內以便響應語言切換）
+  const CHANNELS = [
+    { key: 'home', label: t('searchVerify.chHome'), icon: '🏠' },
+    { key: 'takeaway', label: t('searchVerify.chTakeaway'), icon: '🛵' },
+    { key: 'supermarket', label: t('searchVerify.chSupermarket'), icon: '🛒' },
+    { key: 'groupBuy', label: t('searchVerify.chGroupBuy'), icon: '👥' },
+  ]
+
+  // 維度名轉換：mock 數據中文 key → i18n key
+  const DIM_KEY_MAP: Record<string, string> = {
+    '搜索詞匹配得分': 'searchVerify.dimRel',
+    '商業得分': 'searchVerify.dimCom',
+    '店鋪得分': 'searchVerify.dimStore',
+    '用戶得分': 'searchVerify.dimUser',
+    '平台得分': 'searchVerify.dimPlt',
+  }
+  const dimLabel = (dim: string) => t(DIM_KEY_MAP[dim] || 'searchVerify.dimRel')
+
   const [channel, setChannel] = useState('home')
   const [keyword, setKeyword] = useState('')
   const [brand, setBrand] = useState('mFood')
@@ -408,7 +424,7 @@ function SearchVerifyPage() {
 
   const handleSearch = () => {
     if (!keyword.trim()) return
-    setRuleResults(generateRuleAnalysis(keyword))
+    setRuleResults(generateRuleAnalysis(keyword, t))
     setMerchantResults(generateMerchantResults(keyword, channel))
     setSearched(true)
   }
@@ -425,7 +441,7 @@ function SearchVerifyPage() {
 
   const merchantColumns: TableColumnsType<MerchantResult> = [
     {
-      title: '排名', dataIndex: 'rank', width: 60, align: 'center',
+      title: t('searchVerify.colRank'), dataIndex: 'rank', width: 60, align: 'center',
       render: (v: number) => {
         const colorMap: Record<number, string> = {
           1: '#ff4d4f',
@@ -440,15 +456,15 @@ function SearchVerifyPage() {
       },
     },
     {
-      title: '門店ID', dataIndex: 'merchantId', width: 100,
+      title: t('searchVerify.colMerchantId'), dataIndex: 'merchantId', width: 100,
       render: (v: string) => <span style={{ color: '#666', fontSize: 12 }}>{v}</span>,
     },
     {
-      title: '門店名稱', dataIndex: 'merchantName', width: 160,
+      title: t('searchVerify.colMerchantName'), dataIndex: 'merchantName', width: 160,
       render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '業務頻道', dataIndex: 'businessChannel', width: 100,
+      title: t('searchVerify.colChannel'), dataIndex: 'businessChannel', width: 100,
       render: (v: string) => {
         const colorMap: Record<string, string> = {
           '外賣': 'orange',
@@ -459,30 +475,30 @@ function SearchVerifyPage() {
       },
     },
     {
-      title: '加權總分', dataIndex: 'totalScore', width: 90, align: 'center',
+      title: t('searchVerify.colTotal'), dataIndex: 'totalScore', width: 90, align: 'center',
       render: (_: number, r: MerchantResult) => {
         const weightedTotal = r.dimensionScores.reduce((sum, ds) => sum + Math.round(ds.score * ds.weight / 100), 0)
         return <span style={{ fontWeight: 700, fontSize: 16, color: '#1890ff' }}>{weightedTotal}</span>
       },
     },
     {
-      title: '維度得分', width: 400,
+      title: t('searchVerify.colDim'), width: 400,
       render: (_: unknown, r: MerchantResult) => (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {r.dimensionScores
             .map(ds => (
               <Tag key={ds.dimension} color="blue" style={{ fontSize: 11 }}>
-                {ds.dimension}: {Math.round(ds.score * ds.weight / 100)}
+                {dimLabel(ds.dimension)}: {Math.round(ds.score * ds.weight / 100)}
               </Tag>
             ))}
         </div>
       ),
     },
     {
-      title: '操作', width: 100, align: 'center',
+      title: t('searchVerify.colAction'), width: 100, align: 'center',
       render: (_: unknown, r: MerchantResult) => (
         <Button type="link" size="small" onClick={() => navigate(`/search-verify-detail/${r.merchantId}`)}>
-          查看明細
+          {t('searchVerify.viewDetail')}
         </Button>
       ),
     },
@@ -492,13 +508,13 @@ function SearchVerifyPage() {
     <div>
       {/* 查詢區域 */}
       <Card
-        title={<Space><SearchOutlined style={{ color: '#1890ff' }} /><span>搜索校驗條件</span></Space>}
+        title={<Space><SearchOutlined style={{ color: '#1890ff' }} /><span>{t('searchVerify.conditionTitle')}</span></Space>}
         size="small"
         style={{ marginBottom: 16, borderRadius: 8 }}
       >
         <Row gutter={16} style={{ marginBottom: 12 }}>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>搜索頻道</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('searchVerify.channelLabel')}</div>
             <Select
               value={channel}
               onChange={setChannel}
@@ -507,26 +523,26 @@ function SearchVerifyPage() {
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>所屬品牌</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('searchVerify.brandLabel')}</div>
             <Select value={brand} onChange={setBrand} options={BRAND_OPTIONS} style={{ width: '100%' }} />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>用戶（可選）</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('searchVerify.userLabel')}</div>
             <Input
               value={userId}
               onChange={e => setUserId(e.target.value)}
-              placeholder="輸入用戶ID或手機號"
+              placeholder={t('searchVerify.userPlaceholder')}
               allowClear
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>地圖位置</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('searchVerify.mapLabel')}</div>
             <Input
               value={`${location.name}（${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}）`}
               readOnly
               prefix={<EnvironmentOutlined style={{ color: '#1890ff' }} />}
               style={{ cursor: 'pointer' }}
-              placeholder="點擊選擇位置"
+              placeholder={t('searchVerify.mapPlaceholder')}
               onClick={() => setIsMapModalOpen(true)}
             />
           </Col>
@@ -537,7 +553,7 @@ function SearchVerifyPage() {
           <Col span={18}>
             <Input
               size="large"
-              placeholder={`輸入${CHANNELS.find(c => c.key === channel)?.label || ''}搜索內容進行校驗`}
+              placeholder={t('searchVerify.searchPlaceholder', { channel: CHANNELS.find(c => c.key === channel)?.label || '' })}
               value={keyword}
               onChange={e => setKeyword(e.target.value)}
               onPressEnter={handleSearch}
@@ -548,9 +564,9 @@ function SearchVerifyPage() {
           <Col span={6} style={{ display: 'flex', gap: 8 }}>
             <Button type="primary" size="large" icon={<SearchOutlined />} onClick={handleSearch}
               disabled={!keyword.trim()} style={{ flex: 1 }}>
-              校驗搜索
+              {t('searchVerify.verifySearch')}
             </Button>
-            <Button size="large" icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+            <Button size="large" icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
           </Col>
         </Row>
       </Card>
@@ -559,7 +575,7 @@ function SearchVerifyPage() {
       <Modal
         title={
           <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>
-            🗺️ 地圖選點
+            {t('searchVerify.mapTitle')}
           </div>
         }
         open={isMapModalOpen}
@@ -567,14 +583,14 @@ function SearchVerifyPage() {
         width={700}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '12px 0' }}>
-            <Button onClick={() => setIsMapModalOpen(false)}>取消</Button>
-            <Button type="primary" onClick={handleMapConfirm} disabled={!selectedLocation}>確認選擇</Button>
+            <Button onClick={() => setIsMapModalOpen(false)}>{t('common.cancel')}</Button>
+            <Button type="primary" onClick={handleMapConfirm} disabled={!selectedLocation}>{t('searchVerify.confirmSelect')}</Button>
           </div>
         }
       >
         <div style={{ padding: '12px 0' }}>
           <Input
-            placeholder="搜索位置名稱"
+            placeholder={t('searchVerify.mapSearchPlaceholder')}
             value={mapSearchText}
             onChange={e => setMapSearchText(e.target.value)}
             prefix={<SearchOutlined />}
@@ -591,19 +607,19 @@ function SearchVerifyPage() {
           }}>
             <div style={{ textAlign: 'center' }}>
               <EnvironmentOutlined style={{ fontSize: 48, marginBottom: 12 }} />
-              <div style={{ fontSize: 14, opacity: 0.9 }}>地圖區域（模擬）</div>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>{t('searchVerify.mapArea')}</div>
               {selectedLocation && (
                 <div style={{ marginTop: 12, padding: '10px', background: 'rgba(255,255,255,0.2)', borderRadius: 8 }}>
                   <div style={{ fontWeight: 600 }}>📍 {selectedLocation.name}</div>
                   <div style={{ fontSize: 13 }}>
-                    緯度: {selectedLocation.lat.toFixed(4)} | 經度: {selectedLocation.lng.toFixed(4)}
+                    {t('searchVerify.latLabel', { lat: selectedLocation.lat.toFixed(4) })} | {t('searchVerify.lngLabel', { lng: selectedLocation.lng.toFixed(4) })}
                   </div>
                 </div>
               )}
             </div>
           </div>
           {/* 熱門位置列表 */}
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: '#666' }}>熱門位置（點擊選擇）</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: '#666' }}>{t('searchVerify.hotTitle')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
             {mapLocations
               .filter(loc => !mapSearchText || loc.name.includes(mapSearchText))
@@ -626,7 +642,7 @@ function SearchVerifyPage() {
                         {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
                       </span>
                     </div>
-                    {selectedLocation?.name === loc.name && <Tag color="blue">已選擇</Tag>}
+                    {selectedLocation?.name === loc.name && <Tag color="blue">{t('common.selected')}</Tag>}
                   </div>
                 </div>
               ))
@@ -643,9 +659,9 @@ function SearchVerifyPage() {
 
           {/* 商家結果 */}
           <Card
-            title={<Space><ShopOutlined style={{ color: '#1890ff' }} /><span>搜索結果 — 門店得分排名</span></Space>}
+            title={<Space><ShopOutlined style={{ color: '#1890ff' }} /><span>{t('searchVerify.resultTitle')}</span></Space>}
             size="small"
-            extra={<Tag color="blue">共 {merchantResults.length} 個門店</Tag>}
+            extra={<Tag color="blue">{t('searchVerify.resultCount', { count: merchantResults.length })}</Tag>}
             style={{ borderRadius: 8 }}
           >
             <Table<MerchantResult>
@@ -656,7 +672,7 @@ function SearchVerifyPage() {
                 showSizeChanger: true,
                 pageSizeOptions: ['10', '20', '50'],
                 showQuickJumper: true,
-                showTotal: (total) => `共 ${total} 個門店`,
+                showTotal: (total) => t('searchVerify.resultCount', { count: total }),
               }}
               size="small"
             />
@@ -667,7 +683,7 @@ function SearchVerifyPage() {
       {!searched && (
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#bbb' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-          <div style={{ fontSize: 15 }}>請在上方輸入搜索內容，點擊「校驗搜索」查看結果</div>
+          <div style={{ fontSize: 15 }}>{t('searchVerify.emptyTip')}</div>
         </div>
       )}
     </div>
@@ -679,6 +695,7 @@ function SearchVerifyPage() {
 // ============================
 
 export default function SearchVerify() {
+  const { t } = useTranslation()
   return (
     <div className="content-area">
       {/* 頁面標題 */}
@@ -690,10 +707,10 @@ export default function SearchVerify() {
           <CheckCircleOutlined style={{ fontSize: 20, color: '#1890ff' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-              搜索校驗
+              {t('searchVerify.title')}
             </h2>
             <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-              校驗搜索管理配置的實際效果，包括分詞、停用詞、同義詞、商家關鍵詞、商品關鍵詞規則分析，以及門店得分明細
+              {t('searchVerify.desc')}
             </div>
           </div>
         </div>

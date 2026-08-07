@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -29,21 +30,21 @@ const groupOptions = [
   { label: '20261298121913 - 海底撈', value: '20261298121913', name: '海底撈' },
 ]
 
-/** 實收賬戶充值方式 */
+/** 實收賬戶充值方式（labelKey 為 i18n key） */
 const actualPayOptions = [
-  { label: '對公轉賬', value: 'corporate' },
-  { label: '混合支付', value: 'mixed' },
-  { label: '營業額支付', value: 'revenue' },
+  { labelKey: 'accountBalance.settlementCorporate', value: 'corporate' },
+  { labelKey: 'accountBalance.settlementMixed', value: 'mixed' },
+  { labelKey: 'accountBalance.settlementRevenue', value: 'revenue' },
 ]
 
-/** 業務類型 → 可選業務頻道 */
-const businessChannelMap: Record<string, { label: string; value: string }[]> = {
+/** 業務類型 → 可選業務頻道（labelKey 為 i18n key） */
+const businessChannelMap: Record<string, { labelKey: string; value: string }[]> = {
   delivery: [
-    { label: '美食外賣', value: 'foodTakeout' },
-    { label: '超市百貨', value: 'supermarket' },
+    { labelKey: 'accountBalance.channelFoodTakeout', value: 'foodTakeout' },
+    { labelKey: 'accountBalance.channelSupermarket', value: 'supermarket' },
   ],
   store: [
-    { label: '團購到店', value: 'groupBuyStore' },
+    { labelKey: 'accountBalance.channelGroupBuyStore', value: 'groupBuyStore' },
   ],
 }
 
@@ -89,6 +90,7 @@ function amountToChinese(num: number): string {
 }
 
 export default function RechargeAdd() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const groupIdParam = searchParams.get('groupId') || ''
@@ -109,6 +111,16 @@ export default function RechargeAdd() {
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
+  /** 翻譯後的選項 */
+  const tActualPayOptions = actualPayOptions.map(o => ({ label: t(o.labelKey), value: o.value }))
+  const tBusinessChannelMap = useMemo(() => {
+    const result: Record<string, { label: string; value: string }[]> = {}
+    Object.entries(businessChannelMap).forEach(([key, channels]) => {
+      result[key] = channels.map(c => ({ label: t(c.labelKey), value: c.value }))
+    })
+    return result
+  }, [t])
+
   // 歸屬BD選項：集團下門店已綁定的BD（門店管理菜單綁定）
   const [bdOptions, setBdOptions] = useState<OptionItem[]>([])
   // 扣款門店選項：當前集團下的門店列表
@@ -178,41 +190,41 @@ export default function RechargeAdd() {
     try {
       await form.validateFields()
       if (!virtualAmount || virtualAmount <= 0) {
-        message.warning('請填寫虛擬賬戶充值金額')
+        message.warning(t('accountBalance.fillVirtualAmount'))
         return
       }
       if (isActual) {
         if ((payMethod === 'corporate' || payMethod === 'mixed') && (!bankAmount || bankAmount <= 0)) {
-          message.warning('請填寫銀行轉賬金額')
+          message.warning(t('accountBalance.fillBankAmount'))
           return
         }
         if (payMethod === 'mixed' || payMethod === 'revenue') {
           if (!revenueAmount || revenueAmount <= 0) {
-            message.warning('請填寫營業額扣款金額')
+            message.warning(t('accountBalance.fillRevenueAmount'))
             return
           }
           if (deductRows.length === 0) {
-            message.warning('請添加扣款門店')
+            message.warning(t('accountBalance.addDeductStore'))
             return
           }
           const emptyStore = deductRows.find(r => !r.storeId)
           if (emptyStore) {
-            message.warning('請為所有扣款門店選擇門店')
+            message.warning(t('accountBalance.selectAllDeductStores'))
             return
           }
           const emptyAmount = deductRows.find(r => !r.amount || r.amount <= 0)
           if (emptyAmount) {
-            message.warning('請為所有扣款門店填寫金額')
+            message.warning(t('accountBalance.fillAllDeductAmounts'))
             return
           }
         }
       }
       if (contractFiles.length === 0) {
-        message.warning('請上傳合同憑證')
+        message.warning(t('accountBalance.uploadContractVoucher'))
         return
       }
       if (paymentFiles.length === 0) {
-        message.warning('請上傳付款憑證')
+        message.warning(t('accountBalance.uploadPaymentVoucher'))
         return
       }
       // 提交審批記錄
@@ -222,7 +234,7 @@ export default function RechargeAdd() {
         groupName: group?.name || groupNameParam || '',
         brand: brandParam || 'flashBee',
         businessType,
-        businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.label || '--',
+        businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.labelKey ? t((businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))!.labelKey) : '--',
         isActual,
         payMethod,
         virtualAmount,
@@ -245,7 +257,7 @@ export default function RechargeAdd() {
     } catch (err) {
       // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {
-        message.error(err instanceof Error && err.message ? err.message : '提交失败，请稍后重试')
+        message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
       }
     } finally {
       setSubmitting(false)
@@ -256,11 +268,11 @@ export default function RechargeAdd() {
   const beforeUpload = (file: File) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
     if (!validTypes.includes(file.type)) {
-      message.error('僅支持 jpeg/jpg/png/PDF 格式')
+      message.error(t('accountBalance.onlyFormatError'))
       return Upload.LIST_IGNORE
     }
     if (file.size > 5 * 1024 * 1024) {
-      message.error('文件大小不能超過 5MB')
+      message.error(t('accountBalance.fileSizeExceed'))
       return Upload.LIST_IGNORE
     }
     return false
@@ -309,7 +321,7 @@ export default function RechargeAdd() {
             onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
           >
             <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-            <span>上傳</span>
+            <span>{t('accountBalance.upload')}</span>
           </div>
         </Upload>
       )}
@@ -341,11 +353,11 @@ export default function RechargeAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>推廣金充值</h2>
-              <Tag color="blue" style={{ fontSize: 11 }}>充值申請</Tag>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('accountBalance.rechargePageTitle')}</h2>
+              <Tag color="blue" style={{ fontSize: 11 }}>{t('accountBalance.rechargeApplyTag')}</Tag>
             </div>
           </div>
         </div>
@@ -367,23 +379,23 @@ export default function RechargeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AccountBookOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基礎信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.basicInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="集團" name="groupId" rules={[{ required: true, message: '請選擇集團' }]}>
-              <Input disabled addonAfter={groupNameParam || '選擇集團後展示'} />
+            <Form.Item label={t('common:colGroupId')} name="groupId" rules={[{ required: true, message: t('accountBalance.selectGroup') }]}>
+              <Input disabled addonAfter={groupNameParam || t('accountBalance.showAfterSelectGroup')} />
             </Form.Item>
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('common:colBrand')}>
               <BrandTag value={brandParam || 'mFood'} />
             </Form.Item>
-            <Form.Item label="賬戶狀態">
-              <Tag color="green">正常</Tag>
+            <Form.Item label={t('accountBalance.accountStatusLabel')}>
+              <Tag color="green">{t('accountBalance.statusNormal')}</Tag>
             </Form.Item>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="業務類型" name="businessType" rules={[{ required: true, message: '請選擇業務類型' }]}>
+            <Form.Item label={t('accountBalance.bizTypeLabel')} name="businessType" rules={[{ required: true, message: t('accountBalance.selectBizType') }]}>
               <Radio.Group
                 onChange={(e) => {
                   const type = e.target.value
@@ -391,13 +403,13 @@ export default function RechargeAdd() {
                   form.setFieldsValue({ businessChannel: businessChannelMap[type][0].value })
                 }}
               >
-                <Radio value="delivery">到家</Radio>
-                <Radio value="store">到店</Radio>
+                <Radio value="delivery">{t('accountBalance.bizDelivery')}</Radio>
+                <Radio value="store">{t('accountBalance.bizStore')}</Radio>
               </Radio.Group>
             </Form.Item>
-            <Form.Item label="業務頻道" name="businessChannel" rules={[{ required: true, message: '請選擇業務頻道' }]}>
+            <Form.Item label={t('common:colChannel')} name="businessChannel" rules={[{ required: true, message: t('accountBalance.selectBusinessChannel') }]}>
               <Radio.Group>
-                {businessChannelMap[businessType].map(opt => (
+                {tBusinessChannelMap[businessType].map(opt => (
                   <Radio key={opt.value} value={opt.value}>{opt.label}</Radio>
                 ))}
               </Radio.Group>
@@ -411,8 +423,8 @@ export default function RechargeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DollarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>充值金額</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>金額配置</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.rechargeAmountSection')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.amountConfigTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -421,16 +433,16 @@ export default function RechargeAdd() {
             <Form.Item
               label={
                 <span>
-                  虛擬賬戶充值
+                  {t('accountBalance.virtualRechargeLabel')}
                   <span style={{ fontSize: 12, color: '#E53935', marginLeft: 4 }}>*</span>
-                  <span style={{ fontSize: 11, color: '#E53935', fontWeight: 400, marginLeft: 8 }}>記錄該筆充值業績歸屬BD，沒有實收，則不會計算績效！</span>
+                  <span style={{ fontSize: 11, color: '#E53935', fontWeight: 400, marginLeft: 8 }}>{t('accountBalance.bdPerformanceWarn')}</span>
                 </span>
               }
               required
               style={{ marginBottom: 0 }}
             >
               <InputNumber
-                placeholder="請輸入充值金額"
+                placeholder={t('accountBalance.enterRechargeAmount')}
                 min={0}
                 precision={2}
                 value={virtualAmount || undefined}
@@ -444,9 +456,9 @@ export default function RechargeAdd() {
                 <span style={{ color: '#E8720C', fontSize: 12, fontWeight: 500, marginTop: 4, display: 'block' }}>{amountToChinese(virtualAmount)}</span>
               )}
             </Form.Item>
-            <Form.Item label="歸屬BD" name="bd" style={{ marginBottom: 0 }}>
+            <Form.Item label={t('accountBalance.belongBdLabel')} name="bd" style={{ marginBottom: 0 }}>
               <Select
-                placeholder={bdOptions.length ? '請選擇BD' : '該集團門店暫未綁定BD'}
+                placeholder={bdOptions.length ? t('accountBalance.selectBdOrNone') : t('accountBalance.noBdBoundGroup')}
                 options={bdOptions}
                 allowClear
                 showSearch
@@ -457,11 +469,11 @@ export default function RechargeAdd() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
             <span style={{ fontSize: 14, color: '#262626' }}>
-              是否實收
+              {t('accountBalance.isActualLabel')}
               <Tooltip title={
                 <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-                  <div>開啟：將根據「實收賬戶充值」所填寫的金額向商家收取對應金額。</div>
-                  <div>關閉：無需向商家收費，該筆金額直接充值到商家虛擬賬戶。</div>
+                  <div>{t('accountBalance.isActualOnDesc')}</div>
+                  <div>{t('accountBalance.isActualOffDesc')}</div>
                 </div>
               }>
                 <QuestionCircleOutlined style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 6, cursor: 'help' }} />
@@ -469,8 +481,8 @@ export default function RechargeAdd() {
             </span>
             <Switch
               checked={isActual}
-              checkedChildren="是"
-              unCheckedChildren="否"
+              checkedChildren={t('accountBalance.switchYes')}
+              unCheckedChildren={t('accountBalance.switchNo')}
               onChange={(checked) => setIsActual(checked)}
             />
           </div>
@@ -483,16 +495,16 @@ export default function RechargeAdd() {
                 background: '#FAFAFA', border: '1px solid #f0f0f0',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>實收賬戶充值</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('accountBalance.actualAccountRecharge')}</span>
                   <Select
-                    options={actualPayOptions}
+                    options={tActualPayOptions}
                     value={payMethod}
                     onChange={setPayMethod}
                     style={{ width: 180 }}
                   />
                   {(payMethod === 'mixed' || payMethod === 'revenue') && (
                     <span style={{ fontSize: 12, color: '#E53935' }}>
-                      審批通過，系統會自動充值該筆金額，但不會自動扣款商家營業額，會生成欠款單，後續由人工操作扣款
+                      {t('accountBalance.autoRechargeWarn')}
                     </span>
                   )}
                 </div>
@@ -502,10 +514,10 @@ export default function RechargeAdd() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px', marginBottom: 12 }}>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
-                        銀行轉賬 <span style={{ color: '#E53935' }}>*</span>
+                        {t('accountBalance.bankTransfer')} <span style={{ color: '#E53935' }}>*</span>
                       </div>
                       <InputNumber
-                        placeholder="請輸入銀行轉賬金額"
+                        placeholder={t('accountBalance.enterBankAmount')}
                         min={0}
                         precision={2}
                         value={bankAmount || undefined}
@@ -521,10 +533,10 @@ export default function RechargeAdd() {
                     </div>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
-                        營業額扣款 <span style={{ color: '#E53935' }}>*</span>
+                        {t('accountBalance.revenueDeduction')} <span style={{ color: '#E53935' }}>*</span>
                       </div>
                       <InputNumber
-                        placeholder="請輸入營業額扣款金額"
+                        placeholder={t('accountBalance.enterRevenueAmount')}
                         min={0}
                         precision={2}
                         value={revenueAmount || undefined}
@@ -545,10 +557,10 @@ export default function RechargeAdd() {
                 {payMethod === 'corporate' && (
                   <div style={{ marginBottom: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
-                      銀行轉賬 <span style={{ color: '#E53935' }}>*</span>
+                      {t('accountBalance.bankTransfer')} <span style={{ color: '#E53935' }}>*</span>
                     </div>
                     <InputNumber
-                      placeholder="請輸入銀行轉賬金額"
+                      placeholder={t('accountBalance.enterBankAmount')}
                       min={0}
                       precision={2}
                       value={bankAmount || undefined}
@@ -568,10 +580,10 @@ export default function RechargeAdd() {
                 {payMethod === 'revenue' && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: '#595959', marginBottom: 8 }}>
-                      營業額扣款 <span style={{ color: '#E53935' }}>*</span>
+                      {t('accountBalance.revenueDeduction')} <span style={{ color: '#E53935' }}>*</span>
                     </div>
                     <InputNumber
-                      placeholder="請輸入營業額扣款金額"
+                      placeholder={t('accountBalance.enterRevenueAmount')}
                       min={0}
                       precision={2}
                       value={revenueAmount || undefined}
@@ -595,9 +607,9 @@ export default function RechargeAdd() {
                     background: 'linear-gradient(135deg, #f6ffed, #e8f5e9)',
                     border: '1px solid #52c41a22',
                   }}>
-                    <span style={{ fontSize: 13, color: '#595959' }}>優惠金額</span>
+                    <span style={{ fontSize: 13, color: '#595959' }}>{t('accountBalance.discountAmountLabel')}</span>
                     <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-                      虛擬賬戶充值 MOP {virtualAmount.toLocaleString()} - 實收賬戶充值 MOP {actualTotal.toLocaleString()} =
+                      {t('accountBalance.virtualMinusActual', { virtual: virtualAmount.toLocaleString(), actual: actualTotal.toLocaleString() })}
                     </span>
                     <span style={{ fontSize: 18, fontWeight: 700, color: '#52C41A' }}>MOP {discountAmount.toLocaleString()}</span>
                   </div>
@@ -612,12 +624,12 @@ export default function RechargeAdd() {
                       <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
                       </div>
-                      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>扣款門店</span>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.deductStoreSection')}</span>
                       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                       <Button type="primary" size="small" icon={<PlusOutlined />}
                         style={{ borderRadius: 6 }}
                         onClick={() => handleAddDeductRow()}
-                      >添加門店</Button>
+                      >{t('accountBalance.addStore')}</Button>
                     </div>
                     <ConfigProvider componentSize="middle">
                     <Table
@@ -627,12 +639,12 @@ export default function RechargeAdd() {
                       bordered
                       columns={[
                         {
-                          title: '門店ID/名稱',
+                          title: t('common:colStoreId') + '/' + t('common:colStoreName'),
                           dataIndex: 'storeLabel',
                           width: 240,
                           render: (_: string, record: DeductStoreRow) => (
                             <Select
-                              placeholder="輸入門店名稱或ID查詢"
+                              placeholder={t('accountBalance.searchStoreByIdOrName')}
                               options={deductStoreOptions}
                               value={record.storeId || undefined}
                               onChange={(v) => handleUpdateDeductRow(record.key, 'storeId', v || '')}
@@ -644,13 +656,13 @@ export default function RechargeAdd() {
                           ),
                         },
                         {
-                          title: '扣款金額',
+                          title: t('accountBalance.deductAmountLabel'),
                           dataIndex: 'amount',
                           width: 180,
                           align: 'center',
                           render: (val: number, record: DeductStoreRow) => (
                             <InputNumber
-                              placeholder="請輸入扣款金額"
+                              placeholder={t('accountBalance.enterDeductAmount')}
                               value={val || undefined}
                               min={0}
                               precision={2}
@@ -661,11 +673,11 @@ export default function RechargeAdd() {
                           ),
                         },
                         {
-                          title: '操作',
+                          title: t('common:colAction'),
                           width: 80,
                           align: 'center',
                           render: (_: unknown, record: DeductStoreRow) => (
-                            <Button type="link" danger size="small" onClick={() => handleRemoveDeductRow(record.key)}>刪除</Button>
+                            <Button type="link" danger size="small" onClick={() => handleRemoveDeductRow(record.key)}>{t('accountBalance.deleteAction')}</Button>
                           ),
                         },
                       ]}
@@ -684,22 +696,22 @@ export default function RechargeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileProtectOutlined style={{ fontSize: 14, color: '#722ed1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>相關憑證</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>憑證上傳</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.relatedVoucher')}</span>
+            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.voucherUploadTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>支持 jpeg/jpg/png/PDF</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportFormat')}</span>
           </div>
-          <Form.Item label="合同憑證" required>
+          <Form.Item label={t('accountBalance.contractVoucher')} required>
             {renderFileList(contractFiles, setContractFiles)}
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
-              限 jpeg/jpg/png/PDF 格式，5MB 內，最多可上傳 5 份
+              {t('accountBalance.voucherLimitHint')}
             </div>
           </Form.Item>
 
-          <Form.Item label="付款憑證" required style={{ marginBottom: 0 }}>
+          <Form.Item label={t('accountBalance.paymentVoucher')} required style={{ marginBottom: 0 }}>
             {renderFileList(paymentFiles, setPaymentFiles)}
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
-              限 jpeg/jpg/png/PDF 格式，5MB 內，最多可上傳 5 份
+              {t('accountBalance.voucherLimitHint')}
             </div>
           </Form.Item>
         </div>
@@ -710,7 +722,7 @@ export default function RechargeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>備註信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.remarkInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Form.Item name="remark" style={{ marginBottom: 0 }}>
@@ -718,7 +730,7 @@ export default function RechargeAdd() {
               rows={4}
               maxLength={200}
               showCount
-              placeholder="本次充值需要注意的事項可在此進行描述，限制200字！"
+              placeholder={t('accountBalance.rechargeRemarkPlaceholder')}
               style={{ borderRadius: 8 }}
             />
           </Form.Item>
@@ -727,9 +739,9 @@ export default function RechargeAdd() {
 
       {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>取消</Button>
+        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
-          提交申請
+          {t('accountBalance.submitApply')}
         </Button>
       </div>
 
@@ -756,13 +768,13 @@ export default function RechargeAdd() {
               <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-              提交成功
+              {t('accountBalance.submitSuccessTitle')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
               {submittedFlowNo && (
-                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+                <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+              {t('accountBalance.submitSuccessDesc')}
             </p>
             <Button
               type="primary"
@@ -770,7 +782,7 @@ export default function RechargeAdd() {
               onClick={() => navigate('/account-balance')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
-              返回列表{countdown > 0 && ` (${countdown}s)`}
+              {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}
             </Button>
           </div>
         </div>

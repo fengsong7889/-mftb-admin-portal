@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Card, DatePicker, Empty, Form, InputNumber, Modal, Select, Space, Tag, message } from 'antd'
 import {
   SearchOutlined,
@@ -22,7 +23,7 @@ import type { Dayjs } from 'dayjs'
 
 /** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 */
 type DishLayout = 'grid' | 'carousel'
-const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: '大圖拼列（1大2小）', carousel: '階梯輪播' }
+// DISH_LAYOUT_LABEL moved inside component for t() access
 
 /** 預覽用 Mock 餐品（與銷售定價預覽一致，bg 為餐品底圖漸變） */
 const PREVIEW_DISHES = [
@@ -185,7 +186,9 @@ const ALGORITHM_OPTIONS = [
 ]
 
 export default function PopularSkinPicker() {
+  const { t } = useTranslation('adSales')
   const navigate = useNavigate()
+  const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: t('layoutGrid'), carousel: t('layoutCarousel') }
 
   // 查詢條件（算法名稱 / 所屬品牌；店鋪推廣入口無需選擇門店）
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
@@ -239,8 +242,8 @@ export default function PopularSkinPicker() {
   }
 
   const handleSearch = () => {
-    if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
-    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
+    if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
+    if (!searchBrand) { message.warning(t('selectBrand')); return }
     setHasSearched(true)
   }
   const handleReset = () => {
@@ -250,8 +253,8 @@ export default function PopularSkinPicker() {
 
   // 訂單支付
   const handlePayment = () => {
-    if (!selectedSkin) { message.warning('請先選擇皮膚套件'); return }
-    if (priceSummary.sale > merchantBalance) { message.error('推廣金餘額不足，請先充值'); return }
+    if (!selectedSkin) { message.warning(t('selectSkinFirst')); return }
+    if (priceSummary.sale > merchantBalance) { message.error(t('balanceInsufficient')); return }
     setIsPaymentModalVisible(true)
   }
   const handleConfirmPayment = () => {
@@ -266,7 +269,7 @@ export default function PopularSkinPicker() {
   const handleContinuePurchase = () => {
     setIsSuccessModalVisible(false)
     setSelectedSkinId(null)
-    message.success('可繼續為門店選購其它皮膚')
+    message.success(t('continuePurchaseHint'))
   }
 
   /** 店鋪信息行（與銷售定價預覽字段保持一致：店名 + 評分/月售/起送信息） */
@@ -482,7 +485,7 @@ export default function PopularSkinPicker() {
           background: 'linear-gradient(135deg, #E8720C, #F59432)',
           borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
           boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-        }}>您的門店</span>
+        }}>{t('adSales.yourStore')}</span>
         {skinCard}
       </div>
       <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
@@ -496,18 +499,18 @@ export default function PopularSkinPicker() {
       {/* 查詢區域 - 店鋪推廣入口無需選擇門店 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
-          <Form.Item label="算法名稱">
-            <Select placeholder="請輸入搜索" value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+          <Form.Item label={t('algoNameLabel')}>
+            <Select placeholder={t('algoSearchPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
               options={ALGORITHM_OPTIONS.map(o => ({ label: o.label, value: o.value }))} />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
-              options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
+          <Form.Item label={t('brandLabel')}>
+            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
+              options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -515,7 +518,7 @@ export default function PopularSkinPicker() {
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
-          <Empty description="請先選擇算法名稱、所屬品牌，點擊查詢後展示可購買的皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description={t('pspEmptyHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -525,18 +528,18 @@ export default function PopularSkinPicker() {
             <Card
               title={
                 <div>
-                  <Space><SkinOutlined style={{ color: '#E8720C' }} /><span>選擇皮膚套件</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>點擊選中，右側可預覽實際展示效果</span></Space>
+                  <Space><SkinOutlined style={{ color: '#E8720C' }} /><span>{t('selectSkinKit')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('skinSelectHint')}</span></Space>
                   {/* 購買規則說明：生效時間 / 唯一生效 / 到期恢復 */}
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     marginTop: 8, padding: '6px 12px', borderRadius: 6,
                     background: '#FFF9F0', border: '1px solid #FFE0B2',
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>⏰ 購買後於開始日期 00:00 自動生效</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoEffective')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>☁️ 同一門店同一時段僅可生效一套皮膚</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleUniqueSkin')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>🔄 到期後自動恢復默認樣式，可隨時續購</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoRevert')}</span>
                   </div>
                 </div>
               }
@@ -580,10 +583,10 @@ export default function PopularSkinPicker() {
                           fontSize: 9, color: '#595959', background: '#F0F0F0', borderRadius: 3,
                           padding: '1px 5px', flexShrink: 0,
                         }}>{DISH_LAYOUT_LABEL[skin.dishLayout]}</span>
-                        <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>🔥已售{skin.sold}套</span>
+                        <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>{t('soldCount', { count: skin.sold })}</span>
                         <div style={{ flex: 1 }} />
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#FF4D4F' }}>${skin.pricePerDay}</span>
-                        <span style={{ fontSize: 10, color: '#8C8C8C', marginLeft: 1 }}>/天</span>
+                        <span style={{ fontSize: 10, color: '#8C8C8C', marginLeft: 1 }}>{t('perDay')}</span>
                       </div>
                     </div>
                   )
@@ -593,31 +596,31 @@ export default function PopularSkinPicker() {
 
             {/* ② 選擇購買時長 */}
             <Card
-              title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>選擇購買時長</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>按天計價，購買越多折扣越大</span></Space>}
+              title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>{t('selectDurationTitle')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('durationPricingHint')}</span></Space>}
               bodyStyle={{ padding: '16px 20px' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959' }}>開始日期：</span>
+                  <span style={{ fontSize: 13, color: '#595959' }}>{t('startDateLabel')}</span>
                   <DatePicker
                     value={startDate}
                     allowClear={false}
                     disabledDate={d => d.isBefore(dayjs().add(1, 'day'), 'day')}
                     onChange={d => { if (d) setStartDate(d) }}
                   />
-                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（最早次日生效）</span>
+                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('earliestNextDay')}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959' }}>結束日期：</span>
+                  <span style={{ fontSize: 13, color: '#595959' }}>{t('endDateLabel')}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{endDate.format('YYYY-MM-DD')}</span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959' }}>購買天數：</span>
+                <span style={{ fontSize: 13, color: '#595959' }}>{t('buyDaysLabel')}</span>
                 {QUICK_DAY_OPTIONS.map(d => {
                   const isActive = buyDays === d
-                  const tier = [...DISCOUNT_TIERS].reverse().find(t => d >= t.minDays)
+                  const tier = [...DISCOUNT_TIERS].reverse().find(tier => d >= tier.minDays)
                   return (
                     <div
                       key={d}
@@ -631,25 +634,25 @@ export default function PopularSkinPicker() {
                         transition: 'all 0.2s',
                       }}
                     >
-                      {d}天
+                      {d}{t('unitDay')}
                       {tier && (
                         <span style={{
                           position: 'absolute', top: -9, right: -8, fontSize: 10, color: '#fff',
                           background: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', borderRadius: 8,
                           padding: '0 6px', lineHeight: '16px', fontWeight: 600,
-                        }}>{tier.discount / 10}折</span>
+                        }}>{tier.discount / 10}{t('discountSuffix')}</span>
                       )}
                     </div>
                   )
                 })}
-                <span style={{ fontSize: 13, color: '#595959', marginLeft: 8 }}>自定義：</span>
+                <span style={{ fontSize: 13, color: '#595959', marginLeft: 8 }}>{t('customLabel')}</span>
                 <InputNumber
                   min={MIN_BUY_DAYS}
                   max={MAX_BUY_DAYS}
                   precision={0}
                   value={buyDays}
                   onChange={v => { if (v) setBuyDays(v) }}
-                  addonAfter="天"
+                  addonAfter={t('unitDay')}
                   style={{ width: 120 }}
                 />
               </div>
@@ -659,54 +662,54 @@ export default function PopularSkinPicker() {
           {/* 右側：效果預覽 + 訂單結算 */}
           <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* 效果預覽：瀑布流對比視角，上下模糊普通店鋪卡，突出當前所選皮膚 */}
-            <Card size="small" title={<Space><span>📱</span><span>購買後效果預覽</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
+            <Card size="small" title={<Space><span>📱</span><span>{t('previewTitle')}</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
               {selectedSkin ? (
                 <div>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>小圖模式</div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('smallMode')}</div>
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
-                  <div style={{ fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px' }}>大圖模式</div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px' }}>{t('bigMode')}</div>
                   {renderWaterfallCompare(renderSkinBigPreview(selectedSkin))}
                 </div>
               ) : (
-                <Empty description="請先選擇皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('skinEmptyHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
             </Card>
 
             {/* 訂單結算 */}
-            <Card size="small" title="費用結算">
+            <Card size="small" title={t('settlementTitle')}>
               <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>推廣金餘額</span>
+                <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
                 <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
               </div>
               <div style={{ fontSize: 13, color: '#595959', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>購買算法</span>
+                  <span>{t('buyAlgo')}</span>
                   <span style={{ color: '#262626', fontWeight: 500 }}>{selectedAlgorithm?.label || '-'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>皮膚套件</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedSkin ? `${selectedSkin.name}（$${selectedSkin.pricePerDay}/天）` : '未選擇'}</span>
+                  <span>{t('skinKit')}</span>
+                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedSkin ? `${selectedSkin.name}（$${selectedSkin.pricePerDay}/${t('unitDay')}）` : t('notSelected')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>投放時段</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{startDate.format('MM-DD')} ~ {endDate.format('MM-DD')}（{buyDays}天）</span>
+                  <span>{t('deliveryPeriod')}</span>
+                  <span style={{ color: '#262626', fontWeight: 500 }}>{startDate.format('MM-DD')} ~ {endDate.format('MM-DD')}（{buyDays}{t('unitDay')}）</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>梯度折扣</span>
-                  {currentTier ? <Tag color="green" style={{ marginRight: 0 }}>{currentTier.discount / 10}折</Tag> : <Tag style={{ marginRight: 0 }}>無折扣</Tag>}
+                  <span>{t('tierDiscountRate')}</span>
+                  {currentTier ? <Tag color="green" style={{ marginRight: 0 }}>{currentTier.discount / 10}{t('discountSuffix')}</Tag> : <Tag style={{ marginRight: 0 }}>{t('noDiscount')}</Tag>}
                 </div>
               </div>
               <div style={{ background: '#FAFAFA', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>訂單金額（原價）</span>
+                  <span style={{ color: '#8C8C8C' }}>{t('orderOriginalPrice')}</span>
                   <span style={{ fontWeight: 600, color: '#595959' }}>${priceSummary.original}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>訂單優惠</span>
+                  <span style={{ color: '#8C8C8C' }}>{t('orderDiscount')}</span>
                   <span style={{ fontWeight: 600, color: '#FA8C16' }}>-${priceSummary.saved}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #E8E8E8', paddingTop: 8, marginTop: 8 }}>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>實付總額</span>
+                  <span style={{ color: '#262626', fontWeight: 600 }}>{t('totalPayable')}</span>
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#FF4D4F' }}>${priceSummary.sale}</span>
                 </div>
               </div>
@@ -719,7 +722,7 @@ export default function PopularSkinPicker() {
                   height: 44, fontSize: 16, fontWeight: 600,
                 }}
               >
-                訂單支付
+                {t('payButton')}
               </Button>
             </Card>
           </div>
@@ -728,9 +731,9 @@ export default function PopularSkinPicker() {
 
       {/* 支付確認彈窗 */}
       <Modal
-        title="確認訂單" open={isPaymentModalVisible}
+        title={t('confirmOrder')} open={isPaymentModalVisible}
         onOk={handleConfirmPayment} onCancel={() => setIsPaymentModalVisible(false)}
-        okText="確定支付" cancelText="取消"
+        okText={t('confirmPay')} cancelText={t('cancel')}
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
         width={480}
       >
@@ -741,19 +744,19 @@ export default function PopularSkinPicker() {
             </div>
             <div style={{ background: '#fafafa', padding: 16, borderRadius: 6, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#595959' }}>皮膚套件：</span>
-                <span style={{ fontWeight: 600 }}>{selectedSkin.name}（${selectedSkin.pricePerDay}/天）</span>
+                <span style={{ color: '#595959' }}>{t('skinKitColon')}</span>
+                <span style={{ fontWeight: 600 }}>{selectedSkin.name}（$${selectedSkin.pricePerDay}/{t('unitDay')}）</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#595959' }}>投放時段：</span>
-                <span style={{ fontWeight: 600 }}>{startDate.format('YYYY-MM-DD')} ~ {endDate.format('YYYY-MM-DD')}（{buyDays}天）</span>
+                <span style={{ color: '#595959' }}>{t('deliveryPeriodColon')}</span>
+                <span style={{ fontWeight: 600 }}>{startDate.format('YYYY-MM-DD')} ~ {endDate.format('YYYY-MM-DD')}（{buyDays}{t('unitDay')}）</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-                <span>訂單優惠：</span>
-                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}{currentTier ? `（${currentTier.discount / 10}折）` : ''}</span>
+                <span>{t('orderDiscountColon')}</span>
+                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}{currentTier ? `（${currentTier.discount / 10}${t('discountSuffix')}）` : ''}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                <span style={{ fontWeight: 600 }}>實付金額：</span>
+                <span style={{ fontWeight: 600 }}>{t('actualAmountColon')}</span>
                 <span style={{ fontWeight: 700 }}>${priceSummary.sale}</span>
               </div>
             </div>
@@ -763,18 +766,18 @@ export default function PopularSkinPicker() {
 
       {/* 支付成功彈窗 */}
       <Modal
-        title="購買成功" open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
+        title={t('purchaseSuccess')} open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
         footer={[
-          <Button key="view" type="primary" onClick={handleViewOrder}>查看訂單</Button>,
-          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>繼續購買</Button>,
+          <Button key="view" type="primary" onClick={handleViewOrder}>{t('viewOrder')}</Button>,
+          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>{t('continueBuy')}</Button>,
         ]}
         width={400}
       >
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>恭喜！皮膚購買成功</p>
+          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('skinPurchaseSuccess')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8 }}>
-            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已扣除推廣金</p>
+            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
             <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${priceSummary.sale}</p>
           </div>
         </div>

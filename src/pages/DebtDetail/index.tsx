@@ -13,6 +13,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { useAuth } from '../../contexts/AuthContext'
@@ -86,17 +87,17 @@ function useAnimatedProgress(target: number, duration = 1400) {
   return percent
 }
 
-/** 賬單狀態展示映射 */
-const statusMeta: Record<string, { label: string; color: string }> = {
-  unsettled: { label: '未結清', color: 'error' },
-  settled: { label: '已結清', color: 'success' },
-  transferred: { label: '已轉結', color: 'processing' },
+/** 賬單狀態展示映射（label 為 i18n key） */
+const statusMeta: Record<string, { labelKey: string; color: string }> = {
+  unsettled: { labelKey: 'debtReconcile.statusUnsettled', color: 'error' },
+  settled: { labelKey: 'debtReconcile.statusSettled', color: 'success' },
+  transferred: { labelKey: 'debtReconcile.statusTransferred', color: 'processing' },
 }
 
-/** 賬單來源展示映射（與欠款對賬列表配色一致） */
-const sourceTagMap: Record<string, { label: string; color: string }> = {
-  recharge: { label: '充值營業額扣款', color: 'blue' },
-  merge: { label: '合併欠款轉入', color: 'purple' },
+/** 賬單來源展示映射（label 為 i18n key，與欠款對賬列表配色一致） */
+const sourceTagMap: Record<string, { labelKey: string; color: string }> = {
+  recharge: { labelKey: 'debtReconcile.sourceRecharge', color: 'blue' },
+  merge: { labelKey: 'debtReconcile.sourceMerge', color: 'purple' },
 }
 
 /** 還款渠道 Tag 配色 */
@@ -173,6 +174,7 @@ interface RepayFormValues {
 
 export default function DebtDetail() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const billNoParam = searchParams.get('billNo') || ''
@@ -234,14 +236,14 @@ export default function DebtDetail() {
       } else {
         removeLocal()
       }
-      message.success('删除成功')
+      message.success(t('debtDetail.deleteSuccess'))
     } catch (err) {
       if (!isBackendUnavailable(err)) {
-        message.error(err instanceof Error ? err.message : '删除失敗')
+        message.error(err instanceof Error ? err.message : t('debtDetail.deleteFailed'))
         return
       }
       removeLocal()
-      message.success('删除成功')
+      message.success(t('debtDetail.deleteSuccess'))
     }
   }
 
@@ -256,7 +258,7 @@ export default function DebtDetail() {
     }
     const amount = r2(Number(values.amount))
     if (amount > bill.remainAmount) {
-      message.error(`還款金額不能超過剩餘待還 ${fmtAmt(bill.remainAmount)}`)
+      message.error(t('debtDetail.amountExceedRemain', { amount: fmtAmt(bill.remainAmount) }))
       return
     }
     const date = (values.date || dayjs()).format('YYYY-MM-DD')
@@ -303,11 +305,11 @@ export default function DebtDetail() {
         if (!isBackendUnavailable(err)) throw err
         addLocal()
       }
-      message.success('新增還款成功')
+      message.success(t('debtDetail.addSuccess'))
       setAddOpen(false)
       addForm.resetFields()
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '新增還款失敗')
+      message.error(err instanceof Error ? err.message : t('debtDetail.addFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -315,38 +317,38 @@ export default function DebtDetail() {
 
   /** 列配置元數據 */
   const columnMeta = useMemo(() => [
-    { key: 'date', title: '還款日期' },
-    { key: 'channel', title: '還款渠道' },
-    { key: 'amount', title: '還款金額' },
-    { key: 'remark', title: '備註' },
-    { key: 'operator', title: '操作人' },
-    { key: 'operateTime', title: '操作時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'date', title: t('debtDetail.colRepayDate') },
+    { key: 'channel', title: t('debtDetail.colRepayChannel') },
+    { key: 'amount', title: t('debtDetail.colRepayAmount') },
+    { key: 'remark', title: t('debtDetail.colRemarkShort') },
+    { key: 'operator', title: t('debtDetail.colOperator') },
+    { key: 'operateTime', title: t('debtDetail.colOperateTime') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('debt-detail', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
   const columns: TableColumnsType<RepaymentRow> = [
-    { title: '還款日期', dataIndex: 'date', key: 'date', width: 120 },
+    { title: t('debtDetail.colRepayDate'), dataIndex: 'date', key: 'date', width: 120 },
     {
-      title: '還款渠道', dataIndex: 'channel', key: 'channel', width: 130,
+      title: t('debtDetail.colRepayChannel'), dataIndex: 'channel', key: 'channel', width: 130,
       render: (v: string) => <Tag color={channelColorMap[v] || 'default'}>{v}</Tag>,
     },
     {
-      title: '還款金額', dataIndex: 'amount', key: 'amount', width: 130, align: 'right',
+      title: t('debtDetail.colRepayAmount'), dataIndex: 'amount', key: 'amount', width: 130, align: 'right',
       render: (v: number) => <span style={{ color: '#52C41A', fontWeight: 600 }}>{fmtAmt(v)}</span>,
     },
-    { title: '備註', dataIndex: 'remark', key: 'remark', width: 380 },
-    { title: '操作人', dataIndex: 'operator', key: 'operator', width: 110 },
-    { title: '操作時間', dataIndex: 'operateTime', key: 'operateTime', width: 170 },
+    { title: t('debtDetail.colRemarkShort'), dataIndex: 'remark', key: 'remark', width: 380 },
+    { title: t('debtDetail.colOperator'), dataIndex: 'operator', key: 'operator', width: 110 },
+    { title: t('debtDetail.colOperateTime'), dataIndex: 'operateTime', key: 'operateTime', width: 170 },
     {
-      title: '操作', key: 'action', width: 80, align: 'center',
+      title: t('common.colAction'), key: 'action', width: 80, align: 'center',
       render: (_, record) => (
         record.canDelete ? (
-          <Popconfirm title="確認刪除該還款記錄？" onConfirm={() => handleDelete(record)} okText="確認" cancelText="取消">
-            <Button type="link" size="small" danger>刪除</Button>
+          <Popconfirm title={t('debtDetail.deleteConfirm')} onConfirm={() => handleDelete(record)} okText={t('debtDetail.confirm')} cancelText={t('common.cancel')}>
+            <Button type="link" size="small" danger>{t('debtDetail.delete')}</Button>
           </Popconfirm>
         ) : (
           <span style={{ color: '#999' }}>--</span>
@@ -359,15 +361,15 @@ export default function DebtDetail() {
     return (
       <div>
         <div style={sectionStyle}>
-          <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/debt-reconcile')}>返回</Button>
-          <span style={{ marginLeft: 16, color: '#8C8C8C' }}>{loading ? '加載中...' : '未找到對應欠款單'}</span>
+          <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/debt-reconcile')}>{t('common.back')}</Button>
+          <span style={{ marginLeft: 16, color: '#8C8C8C' }}>{loading ? t('common.loading') : t('debtDetail.notFound')}</span>
         </div>
       </div>
     )
   }
 
-  const status = statusMeta[bill.status] || { label: bill.status, color: 'default' }
-  const sourceTag = sourceTagMap[bill.source] || { label: bill.source, color: 'default' }
+  const status = statusMeta[bill.status] || { labelKey: '', color: 'default' }
+  const sourceTag = sourceTagMap[bill.source] || { labelKey: '', color: 'default' }
 
   return (
     <div>
@@ -395,13 +397,13 @@ export default function DebtDetail() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}
             >
-              返回
+              {t('common.back')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#262626' }}>還款信息</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#262626' }}>{t('debtDetail.pageTitle')}</h2>
               <Tag color={status.color} style={{ margin: 0, fontSize: 12, padding: '2px 10px', borderRadius: 4, fontWeight: 500 }}>
-                {status.label}
+                {t(status.labelKey)}
               </Tag>
             </div>
           </div>
@@ -410,27 +412,27 @@ export default function DebtDetail() {
 
       {/* 欠款單信息 */}
       <div style={sectionStyle}>
-        <SectionTitle icon={<FileTextOutlined />} title="欠款單信息" />
+        <SectionTitle icon={<FileTextOutlined />} title={t('debtDetail.billInfoTitle')} />
         <div style={gridStyle}>
-          <InfoItem label="賬單編號" value={bill.billNo} valueStyle={{ fontWeight: 600 }} />
-          <InfoItem label="關聯批次號" value={bill.batchNo} />
-          <InfoItem label="流程編號" value={bill.flowNo} />
-          <InfoItem label="賬單來源" value={<Tag color={sourceTag.color} style={{ margin: 0 }}>{sourceTag.label}</Tag>} />
-          <InfoItem label="集團ID" value={bill.groupId} />
-          <InfoItem label="集團名稱" value={bill.groupName} />
-          <InfoItem label="所屬品牌" value={<BrandTag value={bill.brand} />} />
-          <InfoItem label="門店ID" value={bill.storeId} />
-          <InfoItem label="門店名稱" value={bill.storeName} />
-          <InfoItem label="業務頻道" value={bill.channel} />
-          <InfoItem label="歸屬BD" value={bill.bd || '--'} />
-          <InfoItem label="借款日期" value={bill.loanDate} />
+          <InfoItem label={t('debtReconcile.colBillNo')} value={bill.billNo} valueStyle={{ fontWeight: 600 }} />
+          <InfoItem label={t('common.colBatchNo')} value={bill.batchNo} />
+          <InfoItem label={t('common.colFlowNo')} value={bill.flowNo} />
+          <InfoItem label={t('debtReconcile.colSource')} value={<Tag color={sourceTag.color} style={{ margin: 0 }}>{t(sourceTag.labelKey)}</Tag>} />
+          <InfoItem label={t('common.colGroupId')} value={bill.groupId} />
+          <InfoItem label={t('common.colGroupName')} value={bill.groupName} />
+          <InfoItem label={t('common.colBrand')} value={<BrandTag value={bill.brand} />} />
+          <InfoItem label={t('common.colStoreId')} value={bill.storeId} />
+          <InfoItem label={t('common.colStoreName')} value={bill.storeName} />
+          <InfoItem label={t('common.colChannel')} value={bill.channel} />
+          <InfoItem label={t('common.colBd')} value={bill.bd || '--'} />
+          <InfoItem label={t('debtReconcile.colLoanDate')} value={bill.loanDate} />
         </div>
 
         {/* 還款進度（帶動畫） */}
         <div style={{ borderTop: '1px dashed rgba(0,0,0,0.08)', margin: '20px 0' }} />
         <div className="debt-detail-progress-card" style={{ marginBottom: 16 }}>
           <div className="debt-detail-progress-bar">
-            <span className="debt-detail-progress-label">還款進度</span>
+            <span className="debt-detail-progress-label">{t('debtDetail.progressLabel')}</span>
             <Progress
               percent={animatedPercent}
               strokeColor={{ from: '#52C41A', to: '#73D13D' }}
@@ -453,7 +455,7 @@ export default function DebtDetail() {
             <span className="debt-detail-stat-value" style={{ color: '#E8720C' }}>
               <AnimatedAmount value={bill.debtTotal} />
             </span>
-            <span className="debt-detail-stat-label">欠款總額</span>
+            <span className="debt-detail-stat-label">{t('debtDetail.statDebtTotal')}</span>
           </div>
           <div
             className="debt-detail-stat-card"
@@ -463,7 +465,7 @@ export default function DebtDetail() {
             <span className="debt-detail-stat-value" style={{ color: '#52C41A' }}>
               <AnimatedAmount value={bill.paidAmount} />
             </span>
-            <span className="debt-detail-stat-label">已還金額</span>
+            <span className="debt-detail-stat-label">{t('debtDetail.statPaidAmount')}</span>
           </div>
           <div
             className="debt-detail-stat-card"
@@ -476,7 +478,7 @@ export default function DebtDetail() {
             <span className="debt-detail-stat-value" style={{ color: bill.remainAmount > 0 ? '#FF4D4F' : '#52C41A' }}>
               <AnimatedAmount value={bill.remainAmount} />
             </span>
-            <span className="debt-detail-stat-label">剩餘待還</span>
+            <span className="debt-detail-stat-label">{t('debtDetail.statRemainAmount')}</span>
           </div>
         </div>
       </div>
@@ -485,7 +487,7 @@ export default function DebtDetail() {
       <div style={{ ...sectionStyle, marginBottom: 0 }}>
         <SectionTitle
           icon={<ProfileOutlined />}
-          title="還款明細"
+          title={t('debtDetail.repayListTitle')}
           extra={
             <>
               <Button
@@ -498,7 +500,7 @@ export default function DebtDetail() {
                   setAddOpen(true)
                 }}
               >
-                新增還款
+                {t('debtDetail.addRepay')}
               </Button>
               {configComponent}
             </>
@@ -517,56 +519,57 @@ export default function DebtDetail() {
 
       {/* 新增還款彈窗 */}
       <Modal
-        title="新增還款"
+        title={t('debtDetail.addRepay')}
         open={addOpen}
         onCancel={() => setAddOpen(false)}
         onOk={handleAddSubmit}
         confirmLoading={submitting}
-        okText="提交"
-        cancelText="取消"
+        okText={t('debtDetail.submit')}
+        cancelText={t('common.cancel')}
         destroyOnClose
         width={520}
       >
         <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 16 }}>
-          剩餘待還：
+          {t('debtDetail.remainAmountPrefix')}
           <span style={{ color: '#FF4D4F', fontWeight: 600 }}>{fmtAmt(bill.remainAmount)}</span>
         </div>
         <Form form={addForm} layout="vertical" requiredMark={false}>
-          <Form.Item label="還款日期" name="date" rules={[{ required: true, message: '請選擇還款日期' }]}>
-            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} placeholder="請選擇還款日期" />
+          <Form.Item label={t('debtDetail.repayDateLabel')} name="date" rules={[{ required: true, message: t('debtDetail.selectRepayDate') }]}>
+            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} placeholder={t('debtDetail.selectRepayDate')} />
           </Form.Item>
-          <Form.Item label="還款渠道" name="channel" rules={[{ required: true, message: '請選擇還款渠道' }]}>
-            <Select placeholder="請選擇還款渠道" options={repayChannelOptions} />
+          <Form.Item label={t('debtDetail.repayChannelLabel')} name="channel" rules={[{ required: true, message: t('debtDetail.selectRepayChannel') }]}>
+            <Select placeholder={t('debtDetail.selectRepayChannel')} options={repayChannelOptions} />
           </Form.Item>
           <Form.Item
-            label="還款金額"
+            label={t('debtDetail.repayAmountLabel')}
             name="amount"
             rules={[
-              { required: true, message: '請輸入還款金額' },
+              { required: true, message: t('debtDetail.inputRepayAmount') },
               {
                 validator: (_, value) =>
                   value === undefined || value === null || Number(value) <= 0
-                    ? Promise.reject(new Error('還款金額必須大於 0'))
+                    ? Promise.reject(new Error(t('debtDetail.amountGreaterZero')))
                     : Number(value) > bill.remainAmount
-                      ? Promise.reject(new Error(`還款金額不能超過剩餘待還 ${fmtAmt(bill.remainAmount)}`))
+                      ? Promise.reject(new Error(t('debtDetail.amountExceedRemain', { amount: fmtAmt(bill.remainAmount) })))
                       : Promise.resolve(),
               },
             ]}
           >
             <InputNumber
               style={{ width: '100%' }}
-              placeholder="請輸入還款金額"
+              placeholder={t('debtDetail.inputRepayAmount')}
               min={0.01}
               max={bill.remainAmount}
               precision={2}
               step={100}
             />
           </Form.Item>
-          <Form.Item label="備註" name="remark">
-            <Input.TextArea rows={3} maxLength={200} showCount placeholder="請輸入備註（選填）" />
+          <Form.Item label={t('debtDetail.remarkLabel')} name="remark">
+            <Input.TextArea rows={3} maxLength={200} showCount placeholder={t('debtDetail.remarkPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>
     </div>
   )
+
 }

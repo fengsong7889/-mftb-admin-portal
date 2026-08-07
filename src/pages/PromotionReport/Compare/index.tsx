@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, Row, Col, Select, DatePicker, Table, Tag, Statistic } from 'antd'
 import {
   Line,
@@ -11,6 +12,7 @@ import {
   ReportApp,
   ReportChannel,
   ReportRegion,
+  ReportRecommendType,
   REPORT_APP_LABEL,
   REPORT_CHANNEL_LABEL,
   REPORT_REGION_LABEL,
@@ -23,6 +25,7 @@ const { RangePicker } = DatePicker
 
 export default function PromotionReportCompare() {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs().subtract(29, 'day'),
     dayjs(),
@@ -34,29 +37,51 @@ export default function PromotionReportCompare() {
   // 权限控制
   const canViewAllBrands = user?.role === 'admin'
 
+  // 枚舉標籤（依賴 t，定義在組件內以便響應語言切換）
+  const recommendTypeLabel = (v: ReportRecommendType) => {
+    const map: Partial<Record<ReportRecommendType, string>> = {
+      [ReportRecommendType.INVINCIBLE_STAR]: t('promotionReport.recTypeInvincibleStar'),
+      [ReportRecommendType.HOT_REVIVE_AD]: t('promotionReport.recTypeHotRevive'),
+      [ReportRecommendType.NEW_STORE_AD]: t('promotionReport.recTypeNewStore'),
+      [ReportRecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
+    }
+    return map[v] || String(v)
+  }
+  const appLabel = (v: ReportApp) => (v === ReportApp.SHANFENG ? t('common.flashBee') : 'mFood')
+  const channelLabel = (v: ReportChannel) => ({
+    [ReportChannel.FOOD_DELIVERY]: t('promotionReport.chFood'),
+    [ReportChannel.RETAIL]: t('promotionReport.chRetail'),
+    [ReportChannel.GROUP_BUY]: t('promotionReport.chGroupBuy'),
+  }[v])
+  const regionLabel = (v: ReportRegion) => ({
+    [ReportRegion.MACAU]: t('promotionReport.regionMacau'),
+    [ReportRegion.TAIPA]: t('promotionReport.regionTaipa'),
+    [ReportRegion.ZHUHAI]: t('promotionReport.regionZhuhai'),
+  }[v])
+
   // 对比表格列定义
   const columns: ColumnsType<typeof mockRecommendTypeCompare[0]> = [
     {
-      title: '推薦類型',
+      title: t('promotionReport.recommendType'),
       dataIndex: 'recommendTypeLabel',
       key: 'recommendTypeLabel',
       width: 120,
       fixed: 'left' as const,
-      render: (text: string, record: typeof mockRecommendTypeCompare[0]) => (
+      render: (_text: string, record: typeof mockRecommendTypeCompare[0]) => (
         <Tag color={REPORT_RECOMMEND_TYPE_COLOR[record.recommendType]} style={{ fontSize: 14 }}>
-          {text}
+          {recommendTypeLabel(record.recommendType)}
         </Tag>
       ),
     },
     {
-      title: '訂單數量',
+      title: t('promotionReport.orderCountTitle'),
       dataIndex: 'orderCount',
       key: 'orderCount',
       width: 100,
-      render: (val: number) => `${val} 個`,
+      render: (val: number) => t('promotionReport.orderCountUnit', { count: val }),
     },
     {
-      title: '總曝光量',
+      title: t('promotionReport.totalImpressions'),
       dataIndex: 'totalImpressions',
       key: 'totalImpressions',
       width: 120,
@@ -64,7 +89,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.totalImpressions - b.totalImpressions,
     },
     {
-      title: '總點擊量',
+      title: t('promotionReport.totalClicks'),
       dataIndex: 'totalClicks',
       key: 'totalClicks',
       width: 120,
@@ -72,7 +97,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.totalClicks - b.totalClicks,
     },
     {
-      title: '平均CTR',
+      title: t('promotionReport.avgCtr'),
       dataIndex: 'avgCtr',
       key: 'avgCtr',
       width: 100,
@@ -80,7 +105,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.avgCtr - b.avgCtr,
     },
     {
-      title: '平均CPC',
+      title: t('promotionReport.avgCpc'),
       dataIndex: 'avgCpc',
       key: 'avgCpc',
       width: 110,
@@ -88,7 +113,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.avgCpc - b.avgCpc,
     },
     {
-      title: '平均CVR',
+      title: t('promotionReport.avgCvr'),
       dataIndex: 'avgCvr',
       key: 'avgCvr',
       width: 100,
@@ -96,7 +121,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.avgCvr - b.avgCvr,
     },
     {
-      title: '總消耗',
+      title: t('promotionReport.totalCost'),
       dataIndex: 'totalCost',
       key: 'totalCost',
       width: 120,
@@ -104,7 +129,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.totalCost - b.totalCost,
     },
     {
-      title: '總產出',
+      title: t('promotionReport.totalRevenue'),
       dataIndex: 'totalRevenue',
       key: 'totalRevenue',
       width: 120,
@@ -112,7 +137,7 @@ export default function PromotionReportCompare() {
       sorter: (a, b) => a.totalRevenue - b.totalRevenue,
     },
     {
-      title: '平均ROI',
+      title: t('promotionReport.avgRoi'),
       dataIndex: 'avgRoi',
       key: 'avgRoi',
       width: 100,
@@ -163,7 +188,7 @@ export default function PromotionReportCompare() {
     ...ctrTrendConfig,
     data: mockDailyTrends.map(d => ({
       date: d.date,
-      type: '消耗',
+      type: t('promotionReport.costTrendType'),
       value: d.cost,
     })),
     color: ['#faad14'],
@@ -177,7 +202,7 @@ export default function PromotionReportCompare() {
   // 散点图配置 (效益矩阵)
   const scatterConfig = {
     data: mockRecommendTypeCompare.map(item => ({
-      type: item.recommendTypeLabel,
+      type: recommendTypeLabel(item.recommendType),
       cpc: item.avgCpc,
       cvr: item.avgCvr,
       cost: item.totalCost,
@@ -190,7 +215,7 @@ export default function PromotionReportCompare() {
     shape: 'circle',
     xAxis: {
       title: {
-        text: '點擊成本 (CPC)',
+        text: t('promotionReport.scatterXTitle'),
       },
       label: {
         formatter: (v: string) => `MOP ${v}`,
@@ -198,7 +223,7 @@ export default function PromotionReportCompare() {
     },
     yAxis: {
       title: {
-        text: '轉化率 (CVR)',
+        text: t('promotionReport.scatterYTitle'),
       },
       label: {
         formatter: (v: string) => `${v}%`,
@@ -211,7 +236,11 @@ export default function PromotionReportCompare() {
     tooltip: {
       formatter: (data: Record<string, string>) => ({
         name: data.type,
-        value: `CPC: MOP ${data.cpc}<br/>CVR: ${data.cvr}%<br/>消耗: MOP ${data.cost.toLocaleString()}`,
+        value: t('promotionReport.scatterTooltip', {
+          cpc: data.cpc,
+          cvr: data.cvr,
+          cost: data.cost.toLocaleString(),
+        }),
       }),
     },
   }
@@ -222,7 +251,7 @@ export default function PromotionReportCompare() {
       <div className="search-section">
         <form className="search-form" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px 12px', alignItems: 'flex-end' }}>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>時間範圍</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.timeRange')}</label>
             <RangePicker
               value={dateRange}
               onChange={(dates) => {
@@ -235,42 +264,42 @@ export default function PromotionReportCompare() {
           </div>
           {canViewAllBrands && (
             <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>所屬品牌</label>
+              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.brand')}</label>
               <Select
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 value={app}
                 onChange={setApp}
-                options={Object.entries(REPORT_APP_LABEL).map(([value, label]) => ({
+                options={Object.entries(REPORT_APP_LABEL).map(([value]) => ({
                   value: Number(value),
-                  label,
+                  label: appLabel(Number(value) as ReportApp),
                 }))}
               />
             </div>
           )}
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>業務頻道</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.channel')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={channel}
               onChange={setChannel}
-              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: channelLabel(Number(value) as ReportChannel),
               }))}
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>商圈</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.region')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={region}
               onChange={setRegion}
-              options={Object.entries(REPORT_REGION_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_REGION_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: regionLabel(Number(value) as ReportRegion),
               }))}
             />
           </div>
@@ -278,7 +307,7 @@ export default function PromotionReportCompare() {
       </div>
 
       {/* 数据卡片对比 */}
-      <Card title="推薦類型核心指標對比" style={{ marginTop: 16, marginBottom: 16 }}>
+      <Card title={t('promotionReport.recCoreCompareTitle')} style={{ marginTop: 16, marginBottom: 16 }}>
         <Row gutter={[16, 16]}>
           {mockRecommendTypeCompare.map(item => (
             <Col xs={24} sm={12} lg={6} key={item.recommendType}>
@@ -291,30 +320,30 @@ export default function PromotionReportCompare() {
               >
                 <div style={{ textAlign: 'center', marginBottom: 16 }}>
                   <Tag color={REPORT_RECOMMEND_TYPE_COLOR[item.recommendType]} style={{ fontSize: 16, padding: '4px 12px' }}>
-                    {item.recommendTypeLabel}
+                    {recommendTypeLabel(item.recommendType)}
                   </Tag>
                 </div>
                 <Row gutter={[8, 12]}>
                   <Col span={12}>
-                    <Statistic title="總曝光" value={item.totalImpressions} suffix="" precision={0} valueStyle={{ fontSize: 16 }} />
+                    <Statistic title={t('promotionReport.totalImpressions')} value={item.totalImpressions} suffix="" precision={0} valueStyle={{ fontSize: 16 }} />
                   </Col>
                   <Col span={12}>
-                    <Statistic title="總點擊" value={item.totalClicks} suffix="" precision={0} valueStyle={{ fontSize: 16 }} />
+                    <Statistic title={t('promotionReport.totalClicks')} value={item.totalClicks} suffix="" precision={0} valueStyle={{ fontSize: 16 }} />
                   </Col>
                   <Col span={12}>
-                    <Statistic title="平均CTR" value={item.avgCtr} suffix="%" precision={1} valueStyle={{ fontSize: 16 }} />
+                    <Statistic title={t('promotionReport.avgCtr')} value={item.avgCtr} suffix="%" precision={1} valueStyle={{ fontSize: 16 }} />
                   </Col>
                   <Col span={12}>
-                    <Statistic title="平均CVR" value={item.avgCvr} suffix="%" precision={1} valueStyle={{ fontSize: 16 }} />
+                    <Statistic title={t('promotionReport.avgCvr')} value={item.avgCvr} suffix="%" precision={1} valueStyle={{ fontSize: 16 }} />
                   </Col>
                   <Col span={12}>
-                    <Statistic title="平均CPC" value={item.avgCpc} prefix="MOP" precision={2} valueStyle={{ fontSize: 16 }} />
+                    <Statistic title={t('promotionReport.avgCpc')} value={item.avgCpc} prefix="MOP" precision={2} valueStyle={{ fontSize: 16 }} />
                   </Col>
                   <Col span={12}>
-                    <Statistic title="平均ROI" value={item.avgRoi} precision={2} valueStyle={{ fontSize: 16, color: item.avgRoi >= 3 ? '#52c41a' : '#faad14' }} />
+                    <Statistic title={t('promotionReport.avgRoi')} value={item.avgRoi} precision={2} valueStyle={{ fontSize: 16, color: item.avgRoi >= 3 ? '#52c41a' : '#faad14' }} />
                   </Col>
                   <Col span={24}>
-                    <Statistic title="總消耗" value={item.totalCost} prefix="MOP" precision={0} valueStyle={{ fontSize: 18, fontWeight: 500 }} />
+                    <Statistic title={t('promotionReport.totalCost')} value={item.totalCost} prefix="MOP" precision={0} valueStyle={{ fontSize: 18, fontWeight: 500 }} />
                   </Col>
                 </Row>
               </Card>
@@ -324,7 +353,7 @@ export default function PromotionReportCompare() {
       </Card>
 
       {/* 对比表格 */}
-      <Card title="詳細數據對比" style={{ marginBottom: 16 }}>
+      <Card title={t('promotionReport.detailCompareTitle')} style={{ marginBottom: 16 }}>
         <Table
           columns={columns}
           dataSource={mockRecommendTypeCompare}
@@ -337,30 +366,30 @@ export default function PromotionReportCompare() {
       {/* 趋势图 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={8}>
-          <Card title="CTR趨勢對比">
+          <Card title={t('promotionReport.ctrTrendTitle')}>
             <Line {...ctrTrendConfig} style={{ height: 280 }} />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title="CPC趨勢對比">
+          <Card title={t('promotionReport.cpcTrendTitle')}>
             <Line {...cpcTrendConfig} style={{ height: 280 }} />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title="消耗趨勢對比">
+          <Card title={t('promotionReport.costTrendTitle')}>
             <Line {...costTrendConfig} style={{ height: 280 }} />
           </Card>
         </Col>
       </Row>
 
       {/* 效益矩阵图 */}
-      <Card title="效益矩陣 (低成本高轉化)">
+      <Card title={t('promotionReport.matrixTitle')}>
         <div style={{ marginBottom: 12, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-          <strong>💡 解讀指南:</strong> 
+          <strong>{t('promotionReport.matrixGuideTitle')}</strong>
           <span style={{ marginLeft: 8 }}>
-            散點圖展示各推薦類型的成本效益關係。
-            <strong style={{ color: '#52c41a' }}> 左上角</strong> = 低成本高轉化(最優)，
-            <strong style={{ color: '#ff4d4f' }}> 右下角</strong> = 高成本低轉化(需優化)
+            {t('promotionReport.matrixGuideDesc')}
+            <strong style={{ color: '#52c41a' }}> {t('promotionReport.matrixGuideOptimal')}</strong> = {t('promotionReport.matrixGuideOptimalDesc')}，
+            <strong style={{ color: '#ff4d4f' }}> {t('promotionReport.matrixGuideNeedOpt')}</strong> = {t('promotionReport.matrixGuideNeedOptDesc')}
           </span>
         </div>
         <Scatter {...scatterConfig} style={{ height: 400 }} />

@@ -8,6 +8,7 @@ import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
+@Order(5)
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
@@ -128,6 +130,8 @@ public class DataInitializer implements CommandLineRunner {
         migrateRoleMenuTable();
         migrateDepartmentMenuTable();
         seedSystemMenus();
+        // 再回填一次英文名: 确保本次新种子化的菜单也能拿到 name_en
+        seedMenuEnglishNames();
     }
 
     /** 回填存量员工的职级序列快照 (仅处理空值, 可重复执行) */
@@ -228,6 +232,7 @@ public class DataInitializer implements CommandLineRunner {
                             + "parent_id BIGINT NULL COMMENT '父菜单ID, 顶级为 NULL', "
                             + "menu_key VARCHAR(64) NOT NULL COMMENT '菜单标识, 用于权限判断与前端路由key', "
                             + "name VARCHAR(50) NOT NULL COMMENT '菜单名称', "
+                            + "name_en VARCHAR(100) NULL COMMENT '菜单英文名称', "
                             + "path VARCHAR(200) NULL COMMENT '路由路径', "
                             + "component VARCHAR(200) NULL COMMENT '前端组件路径', "
                             + "icon VARCHAR(100) NULL COMMENT '图标', "
@@ -254,6 +259,8 @@ public class DataInitializer implements CommandLineRunner {
                 "ALTER TABLE sys_menu ADD COLUMN actions TEXT NULL COMMENT '可用操作 JSON数组' AFTER sort_order");
         addColumnIfAbsent("sys_menu", "updated_by",
                 "ALTER TABLE sys_menu ADD COLUMN updated_by VARCHAR(64) NULL COMMENT '最后更新人' AFTER status");
+        addColumnIfAbsent("sys_menu", "name_en",
+                "ALTER TABLE sys_menu ADD COLUMN name_en VARCHAR(100) NULL COMMENT '菜单英文名称' AFTER name");
 
         // 为存量数据生成 menu_key, 避免后续非空约束与唯一索引失败
         jdbcTemplate.update(
@@ -274,6 +281,81 @@ public class DataInitializer implements CommandLineRunner {
                 Integer.class);
         if (indexCount == null || indexCount == 0) {
             jdbcTemplate.execute("ALTER TABLE sys_menu ADD UNIQUE INDEX uk_menu_key (menu_key)");
+        }
+        seedMenuEnglishNames();
+    }
+
+    /** 菜单多语言: 按 menu_key 回填英文名称 (仅填充未配置的, 不覆盖人工修改), 与 sql/18_menu_i18n.sql 保持一致 */
+    private void seedMenuEnglishNames() {
+        Map<String, String> enNames = Map.ofEntries(
+                Map.entry("home", "Home"),
+                Map.entry("merchant_group", "Merchant Group"),
+                Map.entry("merchant-group-list", "Group Management"),
+                Map.entry("store-list", "Store Management"),
+                Map.entry("merchant_promotion", "Merchant Promotion Tools"),
+                Map.entry("promotion-dashboard", "Dashboard"),
+                Map.entry("promotion-algorithm", "Algorithm Library"),
+                Map.entry("promotion-slot-config", "Feed Strategy"),
+                Map.entry("promotion-waterfall", "Sales Pricing"),
+                Map.entry("gift-manage", "Gift Management"),
+                Map.entry("gift-detail", "Promotion Gifts"),
+                Map.entry("gift-consume-detail", "Consumption Details"),
+                Map.entry("ad-sales", "Ad Sales"),
+                Map.entry("promotion-word-library", "Word Library"),
+                Map.entry("promotion-tool", "Promotion Pass"),
+                Map.entry("promotion_tool", "Promotion Pass"),
+                Map.entry("promotion-sales-config", "Store Promotion"),
+                Map.entry("promotion-report-group", "Report Analysis"),
+                Map.entry("promotion-report-overview", "Overview"),
+                Map.entry("promotion-report-order", "Order Report"),
+                Map.entry("promotion-report-compare", "Type Comparison"),
+                Map.entry("search", "Search Management"),
+                Map.entry("search-config-new", "Search Config"),
+                Map.entry("global-config", "Global Config"),
+                Map.entry("channel-strategy", "Dimension Strategy"),
+                Map.entry("search-guide", "Search Guide"),
+                Map.entry("hint-config", "Hint Config"),
+                Map.entry("hot-search-config", "Hot Search Config"),
+                Map.entry("search-weight-config", "Weight Control"),
+                Map.entry("search-library", "Search Library"),
+                Map.entry("word-segmentation", "Word Segmentation"),
+                Map.entry("synonym-config", "Synonym Library"),
+                Map.entry("hot-search-library", "Hot Search Library"),
+                Map.entry("stop-words", "Stop Words"),
+                Map.entry("search-verify-group", "Verification"),
+                Map.entry("search-verify", "Search Verify"),
+                Map.entry("hint-verify", "Hint Verify"),
+                Map.entry("hot-search-verify", "Hot Search Verify"),
+                Map.entry("report", "Reports"),
+                Map.entry("hint-report", "Hint Report"),
+                Map.entry("hot-search-report", "Hot Search Report"),
+                Map.entry("finance", "Finance"),
+                Map.entry("promotion", "Promotion Funds"),
+                Map.entry("account-balance", "Account Balance"),
+                Map.entry("batch-query", "Batch Query"),
+                Map.entry("detail-query", "Detail Query"),
+                Map.entry("merchant-reconcile", "Merchant Reconciliation"),
+                Map.entry("writeoff-reconcile", "Write-off Reconciliation"),
+                Map.entry("debt-reconcile", "Debt Reconciliation"),
+                Map.entry("approval", "Approval Management"),
+                Map.entry("approval-center", "Approval Center"),
+                Map.entry("hr", "Group HR"),
+                Map.entry("employee-management", "Employee Management"),
+                Map.entry("organization-management", "Organization"),
+                Map.entry("position-management", "Position"),
+                Map.entry("login-log", "Employee Activity"),
+                Map.entry("permission", "Permission Management"),
+                Map.entry("role-management", "Role Management"),
+                Map.entry("function-permission", "Function Authorization"),
+                Map.entry("data-permission", "Data Authorization"),
+                Map.entry("system-config", "System Config"),
+                Map.entry("menu-config", "Menu Config"),
+                Map.entry("merchant-order-manage", "Order Management"),
+                Map.entry("promotion-order-manage", "Order Management"));
+        for (Map.Entry<String, String> entry : enNames.entrySet()) {
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
+                    entry.getValue(), entry.getKey());
         }
     }
 
@@ -414,6 +496,8 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-manage",         new String[]{"贈送管理",         "merchant_promotion", "5"});
         menus.put("ad-sales",            new String[]{"廣告銷售",         "merchant_promotion", "6"});
         menus.put("promotion-word-library", new String[]{"詞庫管理",     "merchant_promotion", "7"});
+        // ── 商家推廣工具 > 廣告銷售 ──
+        menus.put("promotion-order-manage", new String[]{"訂單管理",    "ad-sales",           "1"});
         // ── 商家推廣工具 > 贈送管理 ──
         menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
@@ -464,6 +548,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("data-permission",     new String[]{"數據授權",         "permission",         "3"});
         // ── 系統配置 ──
         menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
+        menus.put("translation-manage",  new String[]{"多語言配置",         "system-config",      "2"});
 
         int created = 0;
         int updated = 0;

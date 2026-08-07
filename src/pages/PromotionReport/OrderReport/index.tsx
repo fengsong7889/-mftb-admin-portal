@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Table, Tag, Space, Select, Input, Button, DatePicker, message, Modal, Card, Row, Col, Statistic } from 'antd'
 import {
   SearchOutlined,
@@ -16,6 +17,7 @@ import {
   ReportRegion,
   ReportRecommendType,
   ReportAdStatus,
+  ReportTimeSlot,
   REPORT_APP_LABEL,
   REPORT_CHANNEL_LABEL,
   REPORT_REGION_LABEL,
@@ -30,6 +32,7 @@ const { RangePicker } = DatePicker
 
 export default function PromotionReportOrder() {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [loading, _setLoading] = useState(false)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | undefined>(undefined)
   const [orderNo, setOrderNo] = useState<string | undefined>(undefined)
@@ -90,18 +93,18 @@ export default function PromotionReportOrder() {
   // 导出Excel
   const handleExport = () => {
     const headers = [
-      '訂單編號', '推廣活動名稱', '推薦類型', '所屬品牌', '業務頻道', '商圈',
-      '推廣期間', '曝光量', '點擊量', '點擊率(%)', '點擊成本', '轉化訂單數',
-      '轉化率(%)', '消耗金額', '產出金額', 'ROI', '廣告狀態'
+      t('promotionReport.colOrderNo'), t('promotionReport.colPromotionName'), t('promotionReport.recommendType'), t('promotionReport.brand'), t('promotionReport.channel'), t('promotionReport.region'),
+      t('promotionReport.colPromotionPeriod'), t('promotionReport.colImpressions'), t('promotionReport.colClicks'), t('promotionReport.ctrPct'), t('promotionReport.colCpc'), t('promotionReport.conversionsCount'),
+      t('promotionReport.cvrPct'), t('promotionReport.colCost'), t('promotionReport.colRevenue'), t('promotionReport.colRoi'), t('promotionReport.adStatus')
     ]
     
     const rows = filteredReports.map(item => [
       item.orderNo,
       item.promotionName,
-      REPORT_RECOMMEND_TYPE_LABEL[item.recommendType],
-      REPORT_APP_LABEL[item.app],
-      REPORT_CHANNEL_LABEL[item.channel],
-      REPORT_REGION_LABEL[item.region],
+      recommendTypeLabel(item.recommendType),
+      appLabel(item.app),
+      channelLabel(item.channel),
+      regionLabel(item.region),
       item.promotionPeriod,
       item.impressions,
       item.clicks,
@@ -112,7 +115,7 @@ export default function PromotionReportOrder() {
       item.cost,
       item.revenue,
       item.roi,
-      REPORT_AD_STATUS_LABEL[item.adStatus].label,
+      adStatusLabel(item.adStatus).label,
     ])
     
     const csvContent = [
@@ -123,11 +126,47 @@ export default function PromotionReportOrder() {
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `訂單效果報表_${dayjs().format('YYYY-MM-DD')}.csv`
+    link.download = `${t('promotionReport.orderReportExportFile')}_${dayjs().format('YYYY-MM-DD')}.csv`
     link.click()
     
-    message.success('導出成功')
+    message.success(t('common.exportSuccess'))
   }
+
+  // 枚舉標籤（依賴 t，定義在組件內以便響應語言切換）
+  const recommendTypeLabel = (v: ReportRecommendType) => {
+    const map: Partial<Record<ReportRecommendType, string>> = {
+      [ReportRecommendType.INVINCIBLE_STAR]: t('promotionReport.recTypeInvincibleStar'),
+      [ReportRecommendType.HOT_REVIVE_AD]: t('promotionReport.recTypeHotRevive'),
+      [ReportRecommendType.NEW_STORE_AD]: t('promotionReport.recTypeNewStore'),
+      [ReportRecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
+    }
+    return map[v] || String(v)
+  }
+  const appLabel = (v: ReportApp) => (v === ReportApp.SHANFENG ? t('common.flashBee') : 'mFood')
+  const channelLabel = (v: ReportChannel) => ({
+    [ReportChannel.FOOD_DELIVERY]: t('promotionReport.chFood'),
+    [ReportChannel.RETAIL]: t('promotionReport.chRetail'),
+    [ReportChannel.GROUP_BUY]: t('promotionReport.chGroupBuy'),
+  }[v])
+  const regionLabel = (v: ReportRegion) => ({
+    [ReportRegion.MACAU]: t('promotionReport.regionMacau'),
+    [ReportRegion.TAIPA]: t('promotionReport.regionTaipa'),
+    [ReportRegion.ZHUHAI]: t('promotionReport.regionZhuhai'),
+  }[v])
+  const adStatusLabel = (v: ReportAdStatus) => {
+    const map: Partial<Record<ReportAdStatus, { label: string; color: string }>> = {
+      [ReportAdStatus.ONLINE]: { label: t('promotionReport.adStatusOnline'), color: 'green' },
+      [ReportAdStatus.PAUSED]: { label: t('promotionReport.adStatusPaused'), color: 'orange' },
+      [ReportAdStatus.OFFLINE]: { label: t('promotionReport.adStatusOffline'), color: 'red' },
+    }
+    return map[v] || { label: String(v), color: 'default' }
+  }
+  const timeSlotLabel = (v: ReportTimeSlot) => ({
+    [ReportTimeSlot.BREAKFAST]: t('promotionReport.timeSlotBreakfast'),
+    [ReportTimeSlot.LUNCH]: t('promotionReport.timeSlotLunch'),
+    [ReportTimeSlot.DINNER]: t('promotionReport.timeSlotDinner'),
+    [ReportTimeSlot.NIGHT_SNACK]: t('promotionReport.timeSlotNightSnack'),
+  }[v])
 
   // 查看详情
   const handleViewDetail = (record: OrderReportItem) => {
@@ -138,7 +177,7 @@ export default function PromotionReportOrder() {
   // 表格列定义
   const columns: ColumnsType<OrderReportItem> = [
     {
-      title: '訂單編號',
+      title: t('promotionReport.colOrderNo'),
       dataIndex: 'orderNo',
       key: 'orderNo',
       width: 150,
@@ -147,52 +186,52 @@ export default function PromotionReportOrder() {
       ),
     },
     {
-      title: '推廣活動名稱',
+      title: t('promotionReport.colPromotionName'),
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 180,
       ellipsis: true,
     },
     {
-      title: '推薦類型',
+      title: t('promotionReport.recommendType'),
       dataIndex: 'recommendType',
       key: 'recommendType',
       width: 120,
       render: (type: ReportRecommendType) => (
         <Tag color={REPORT_RECOMMEND_TYPE_COLOR[type]}>
-          {REPORT_RECOMMEND_TYPE_LABEL[type]}
+          {recommendTypeLabel(type)}
         </Tag>
       ),
     },
     {
-      title: '所屬品牌',
+      title: t('promotionReport.brand'),
       dataIndex: 'app',
       key: 'app',
       width: 90,
-      render: (app: ReportApp) => REPORT_APP_LABEL[app],
+      render: (app: ReportApp) => appLabel(app),
     },
     {
-      title: '業務頻道',
+      title: t('promotionReport.channel'),
       dataIndex: 'channel',
       key: 'channel',
       width: 110,
-      render: (channel: ReportChannel) => REPORT_CHANNEL_LABEL[channel],
+      render: (channel: ReportChannel) => channelLabel(channel),
     },
     {
-      title: '商圈',
+      title: t('promotionReport.region'),
       dataIndex: 'region',
       key: 'region',
       width: 80,
-      render: (region: ReportRegion) => REPORT_REGION_LABEL[region],
+      render: (region: ReportRegion) => regionLabel(region),
     },
     {
-      title: '推廣期間',
+      title: t('promotionReport.colPromotionPeriod'),
       dataIndex: 'promotionPeriod',
       key: 'promotionPeriod',
       width: 160,
     },
     {
-      title: '曝光量',
+      title: t('promotionReport.colImpressions'),
       dataIndex: 'impressions',
       key: 'impressions',
       width: 100,
@@ -200,7 +239,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.impressions - b.impressions,
     },
     {
-      title: '點擊量',
+      title: t('promotionReport.colClicks'),
       dataIndex: 'clicks',
       key: 'clicks',
       width: 100,
@@ -208,7 +247,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.clicks - b.clicks,
     },
     {
-      title: '點擊率',
+      title: t('promotionReport.colCtr'),
       dataIndex: 'ctr',
       key: 'ctr',
       width: 90,
@@ -216,7 +255,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.ctr - b.ctr,
     },
     {
-      title: '點擊成本',
+      title: t('promotionReport.colCpc'),
       dataIndex: 'cpc',
       key: 'cpc',
       width: 100,
@@ -224,7 +263,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.cpc - b.cpc,
     },
     {
-      title: '轉化訂單',
+      title: t('promotionReport.colConversions'),
       dataIndex: 'conversions',
       key: 'conversions',
       width: 100,
@@ -232,7 +271,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.conversions - b.conversions,
     },
     {
-      title: '轉化率',
+      title: t('promotionReport.colCvr'),
       dataIndex: 'cvr',
       key: 'cvr',
       width: 90,
@@ -240,7 +279,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.cvr - b.cvr,
     },
     {
-      title: '消耗金額',
+      title: t('promotionReport.colCost'),
       dataIndex: 'cost',
       key: 'cost',
       width: 110,
@@ -248,7 +287,7 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.cost - b.cost,
     },
     {
-      title: 'ROI',
+      title: t('promotionReport.colRoi'),
       dataIndex: 'roi',
       key: 'roi',
       width: 80,
@@ -256,12 +295,12 @@ export default function PromotionReportOrder() {
       sorter: (a, b) => a.roi - b.roi,
     },
     {
-      title: '廣告狀態',
+      title: t('promotionReport.adStatus'),
       dataIndex: 'adStatus',
       key: 'adStatus',
       width: 90,
       render: (status: ReportAdStatus) => {
-        const { label, color } = REPORT_AD_STATUS_LABEL[status]
+        const { label, color } = adStatusLabel(status)
         return <Tag color={color}>{label}</Tag>
       },
     },
@@ -278,7 +317,7 @@ export default function PromotionReportOrder() {
 
   const timeSlotConfig = {
     data: mockTimeSlotReports.map(item => ({
-      timeSlot: item.timeSlotLabel,
+      timeSlot: timeSlotLabel(item.timeSlot),
       impressions: item.impressions,
       clicks: item.clicks,
     })),
@@ -295,7 +334,7 @@ export default function PromotionReportOrder() {
       <div className="search-section">
         <form className="search-form" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px 12px', alignItems: 'flex-end' }}>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>時間範圍</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.timeRange')}</label>
             <RangePicker
               value={dateRange}
               onChange={(dates) => {
@@ -309,96 +348,96 @@ export default function PromotionReportOrder() {
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>訂單編號</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.colOrderNo')}</label>
             <Input
-              placeholder="請輸入訂單編號"
+              placeholder={t('promotionReport.orderNoPlaceholder')}
               allowClear
               value={orderNo}
               onChange={(e) => setOrderNo(e.target.value)}
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>推廣活動名稱</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.colPromotionName')}</label>
             <Input
-              placeholder="請輸入活動名稱"
+              placeholder={t('promotionReport.promoNamePlaceholder')}
               allowClear
               value={promotionName}
               onChange={(e) => setPromotionName(e.target.value)}
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>推薦類型</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.recommendType')}</label>
             <Select
               mode="multiple"
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={recommendType}
               onChange={setRecommendType}
-              options={Object.entries(REPORT_RECOMMEND_TYPE_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_RECOMMEND_TYPE_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: recommendTypeLabel(Number(value) as ReportRecommendType),
               }))}
             />
           </div>
           {canViewAllBrands && (
             <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>所屬品牌</label>
+              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.brand')}</label>
               <Select
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 value={app}
                 onChange={setApp}
-                options={Object.entries(REPORT_APP_LABEL).map(([value, label]) => ({
+                options={Object.entries(REPORT_APP_LABEL).map(([value]) => ({
                   value: Number(value),
-                  label,
+                  label: appLabel(Number(value) as ReportApp),
                 }))}
               />
             </div>
           )}
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>業務頻道</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.channel')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={channel}
               onChange={setChannel}
-              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: channelLabel(Number(value) as ReportChannel),
               }))}
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>商圈</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.region')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={region}
               onChange={setRegion}
-              options={Object.entries(REPORT_REGION_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_REGION_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: regionLabel(Number(value) as ReportRegion),
               }))}
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>廣告狀態</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.adStatus')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={adStatus}
               onChange={setAdStatus}
-              options={Object.entries(REPORT_AD_STATUS_LABEL).map(([value, { label }]) => ({
+              options={Object.entries(REPORT_AD_STATUS_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: adStatusLabel(Number(value) as ReportAdStatus).label,
               }))}
             />
           </div>
           <div style={{ flex: '0 0 auto', paddingTop: 26 }}>
             <Space>
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
-              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+              <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
+              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
             </Space>
           </div>
         </form>
@@ -414,7 +453,7 @@ export default function PromotionReportOrder() {
           pageSize: 10,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 條`,
+          showTotal: (total) => t('promotionReport.totalCount', { total }),
         }}
         scroll={{ x: 1600 }}
         style={{ marginTop: 16 }}
@@ -422,7 +461,7 @@ export default function PromotionReportOrder() {
 
       {/* 详情弹窗 */}
       <Modal
-        title="訂單效果詳情"
+        title={t('promotionReport.orderDetailTitle')}
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={null}
@@ -431,66 +470,66 @@ export default function PromotionReportOrder() {
         {selectedOrder && (
           <div>
             {/* 基本信息 */}
-            <Card title="基本信息" style={{ marginBottom: 16 }}>
+            <Card title={t('promotionReport.baseInfo')} style={{ marginBottom: 16 }}>
               <Row gutter={[16, 16]}>
                 <Col span={6}>
-                  <div style={{ fontSize: 12, color: '#999' }}>訂單編號</div>
+                  <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.colOrderNo')}</div>
                   <div style={{ fontSize: 16, fontWeight: 500 }}>{selectedOrder.orderNo}</div>
                 </Col>
                 <Col span={6}>
-                  <div style={{ fontSize: 12, color: '#999' }}>推廣活動</div>
+                  <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.colPromotionName')}</div>
                   <div style={{ fontSize: 16, fontWeight: 500 }}>{selectedOrder.promotionName}</div>
                 </Col>
                 <Col span={6}>
-                  <div style={{ fontSize: 12, color: '#999' }}>推薦類型</div>
+                  <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.recommendType')}</div>
                   <Tag color={REPORT_RECOMMEND_TYPE_COLOR[selectedOrder.recommendType]}>
-                    {REPORT_RECOMMEND_TYPE_LABEL[selectedOrder.recommendType]}
+                    {recommendTypeLabel(selectedOrder.recommendType)}
                   </Tag>
                 </Col>
                 <Col span={6}>
-                  <div style={{ fontSize: 12, color: '#999' }}>推廣期間</div>
+                  <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.colPromotionPeriod')}</div>
                   <div style={{ fontSize: 16 }}>{selectedOrder.promotionPeriod}</div>
                 </Col>
               </Row>
             </Card>
 
             {/* 核心指标 */}
-            <Card title="核心指標" style={{ marginBottom: 16 }}>
+            <Card title={t('promotionReport.coreMetrics')} style={{ marginBottom: 16 }}>
               <Row gutter={[16, 16]}>
                 <Col span={6}>
-                  <Statistic title="曝光量" value={selectedOrder.impressions} suffix="次" />
+                  <Statistic title={t('promotionReport.colImpressions')} value={selectedOrder.impressions} suffix={t('promotionReport.unitTimes')} />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="點擊量" value={selectedOrder.clicks} suffix="次" />
+                  <Statistic title={t('promotionReport.colClicks')} value={selectedOrder.clicks} suffix={t('promotionReport.unitTimes')} />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="點擊率" value={selectedOrder.ctr} suffix="%" precision={1} />
+                  <Statistic title={t('promotionReport.colCtr')} value={selectedOrder.ctr} suffix="%" precision={1} />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="點擊成本" value={selectedOrder.cpc} prefix="MOP" precision={2} />
+                  <Statistic title={t('promotionReport.colCpc')} value={selectedOrder.cpc} prefix="MOP" precision={2} />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="轉化訂單" value={selectedOrder.conversions} suffix="單" />
+                  <Statistic title={t('promotionReport.colConversions')} value={selectedOrder.conversions} suffix={t('promotionReport.unitOrders')} />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="轉化率" value={selectedOrder.cvr} suffix="%" precision={1} />
+                  <Statistic title={t('promotionReport.colCvr')} value={selectedOrder.cvr} suffix="%" precision={1} />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="消耗金額" value={selectedOrder.cost} prefix="MOP" />
+                  <Statistic title={t('promotionReport.colCost')} value={selectedOrder.cost} prefix="MOP" />
                 </Col>
                 <Col span={6}>
-                  <Statistic title="ROI" value={selectedOrder.roi} precision={2} />
+                  <Statistic title={t('promotionReport.colRoi')} value={selectedOrder.roi} precision={2} />
                 </Col>
               </Row>
             </Card>
 
             {/* 日趋势图 */}
-            <Card title="近7天曝光趨勢" style={{ marginBottom: 16 }}>
+            <Card title={t('promotionReport.trend7d')} style={{ marginBottom: 16 }}>
               <Line {...detailTrendConfig} style={{ height: 250 }} />
             </Card>
 
             {/* 时段分析 */}
-            <Card title="時段效果分析">
+            <Card title={t('promotionReport.timeSlotAnalysis')}>
               <Row gutter={[16, 16]}>
                 <Col span={24}>
                   <Column {...timeSlotConfig} style={{ height: 250 }} />
@@ -500,9 +539,9 @@ export default function PromotionReportOrder() {
                 {mockTimeSlotReports.map(item => (
                   <Col span={6} key={item.timeSlot}>
                     <Card size="small">
-                      <div style={{ fontWeight: 500, marginBottom: 8 }}>{item.timeSlotLabel}</div>
-                      <div style={{ fontSize: 12, color: '#999' }}>曝光: {item.impressions.toLocaleString()}</div>
-                      <div style={{ fontSize: 12, color: '#999' }}>點擊: {item.clicks.toLocaleString()}</div>
+                      <div style={{ fontWeight: 500, marginBottom: 8 }}>{timeSlotLabel(item.timeSlot)}</div>
+                      <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.colImpressions')}: {item.impressions.toLocaleString()}</div>
+                      <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.colClicks')}: {item.clicks.toLocaleString()}</div>
                       <div style={{ fontSize: 12, color: '#999' }}>CTR: {item.ctr}%</div>
                       <div style={{ fontSize: 12, color: '#999' }}>CPC: MOP {item.cpc}</div>
                     </Card>

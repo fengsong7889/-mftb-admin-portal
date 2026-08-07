@@ -1,36 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Card, Select, Tag, Empty, Form } from 'antd'
 import { SearchOutlined, ReloadOutlined, FireOutlined, WifiOutlined } from '@ant-design/icons'
 import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
-
-/** 搜索界面 */
-const searchPageOptions = [
-  { label: '大首頁', value: 'home' },
-  { label: '外賣頁', value: 'takeaway' },
-  { label: '團購頁', value: 'groupBuy' },
-  { label: '超市頁', value: 'supermarket' },
-]
-
-const terminalOptions = [
-  { label: 'APP', value: 'app' },
-  { label: '微信小程序', value: 'wechatMini' },
-  { label: 'Mpay小應用', value: 'mpayMini' },
-  { label: '微信H5', value: 'wechatH5' },
-]
-
-const regionOptions = [
-  { label: '澳門', value: 'macau' },
-  { label: '氹仔', value: 'taipa' },
-]
-
-const timeSlotOptions = [
-  { label: '全天', value: 'allDay' },
-  { label: '早餐', value: 'breakfast' },
-  { label: '午餐', value: 'lunch' },
-  { label: '下午茶', value: 'afternoonTea' },
-  { label: '晚餐', value: 'dinner' },
-  { label: '宵夜', value: 'midnightSnack' },
-]
 
 /** 模擬預覽數據 */
 interface HotSearchItem {
@@ -62,15 +34,49 @@ const previewData: Record<string, HotSearchItem[]> = {
   ],
 }
 
-const promotionTypeMap: Record<string, string> = { activity: '活動推廣', merchant: '商家推廣', operation: '運營推廣', hotSearchLib: '熱搜詞庫' }
-
 export default function HotSearchPreview() {
+  const { t } = useTranslation()
   const [searchPage, setSearchPage] = useState('home')
   const [brand, setBrand] = useState('mFood')
   const [terminal, setTerminal] = useState('app')
   const [region, setRegion] = useState('macau')
   const [timeSlot, setTimeSlot] = useState('lunch')
   const [previewItems, setPreviewItems] = useState<HotSearchItem[]>(previewData['home-mFood-app-macau-lunch'] || [])
+
+  const searchPageOptions = [
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawayPage'), value: 'takeaway' },
+    { label: t('dict.channel.groupBuyPage'), value: 'groupBuy' },
+    { label: t('dict.channel.supermarketPage'), value: 'supermarket' },
+  ]
+
+  const terminalOptions = [
+    { label: t('dict.terminal.app'), value: 'app' },
+    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
+    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
+    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
+  ]
+
+  const regionOptions = [
+    { label: t('dict.region.macau'), value: 'macau' },
+    { label: t('dict.region.taipa'), value: 'taipa' },
+  ]
+
+  const timeSlotOptions = [
+    { label: t('dict.timeSlot.allDay'), value: 'allDay' },
+    { label: t('dict.timeSlot.breakfast'), value: 'breakfast' },
+    { label: t('dict.timeSlot.lunch'), value: 'lunch' },
+    { label: t('dict.timeSlot.afternoonTea'), value: 'afternoonTea' },
+    { label: t('dict.timeSlot.dinner'), value: 'dinner' },
+    { label: t('dict.timeSlot.midnightSnack'), value: 'midnightSnack' },
+  ]
+
+  const promotionTypeMap: Record<string, string> = {
+    activity: t('dict.promotionType.activity'),
+    merchant: t('dict.promotionType.merchant'),
+    operation: t('dict.promotionType.operation'),
+    hotSearchLib: t('dict.promotionType.hotSearchLib'),
+  }
 
   const handlePreview = () => {
     const key = `${searchPage}-${brand}-${terminal}-${region}-${timeSlot}`
@@ -82,25 +88,25 @@ export default function HotSearchPreview() {
       {/* 筛选区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="搜索界面">
+          <Form.Item label={t('hotSearchPreview.searchPageLabel')}>
             <Select value={searchPage} onChange={setSearchPage} options={searchPageOptions} />
           </Form.Item>
-          <Form.Item label="所屬品牌">
+          <Form.Item label={t('hotSearchPreview.brandLabel')}>
             <Select value={brand} onChange={setBrand} options={brandOptions} />
           </Form.Item>
-          <Form.Item label="展示終端">
+          <Form.Item label={t('hotSearchPreview.terminalLabel')}>
             <Select value={terminal} onChange={setTerminal} options={terminalOptions} />
           </Form.Item>
-          <Form.Item label="區域">
+          <Form.Item label={t('hotSearchPreview.regionLabel')}>
             <Select value={region} onChange={setRegion} options={regionOptions} />
           </Form.Item>
-          <Form.Item label="時段">
+          <Form.Item label={t('hotSearchPreview.timeSlotLabel')}>
             <Select value={timeSlot} onChange={setTimeSlot} options={timeSlotOptions} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handlePreview}>預覽</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handlePreview}>{t('hotSearchPreview.previewBtn')}</Button>
+              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -108,7 +114,7 @@ export default function HotSearchPreview() {
 
       {/* 预览区域 */}
       <div style={{ background: '#fff', borderRadius: 8, padding: 24 }}>
-        <h3 style={{ marginBottom: 16, fontSize: 15, color: '#333' }}>熱搜詞預覽效果</h3>
+        <h3 style={{ marginBottom: 16, fontSize: 15, color: '#333' }}>{t('hotSearchPreview.previewTitle')}</h3>
 
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           {/* 手机模型 - 统一样式 */}
@@ -168,14 +174,14 @@ export default function HotSearchPreview() {
                 border: '1px solid #EEEEEE',
               }}>
                 <SearchOutlined style={{ color: '#BFBFBF', fontSize: 16 }} />
-                <span style={{ color: '#BFBFBF' }}>搜索你想要的...</span>
+                <span style={{ color: '#BFBFBF' }}>{t('hotSearchPreview.searchPlaceholder')}</span>
               </div>
 
               {/* 热搜词列表 */}
               <div style={{ padding: '0 4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
                   <FireOutlined style={{ color: '#E8720C', fontSize: 15 }} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>熱搜</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>{t('hotSearchPreview.hotTitle')}</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                   {previewItems.length > 0 ? previewItems.map((item) => (
@@ -193,7 +199,7 @@ export default function HotSearchPreview() {
                       {item.word}
                     </span>
                   )) : (
-                    <span style={{ color: '#999', fontSize: 13 }}>暫無熱搜詞</span>
+                    <span style={{ color: '#999', fontSize: 13 }}>{t('hotSearchPreview.emptyWord')}</span>
                   )}
                 </div>
               </div>
@@ -202,7 +208,7 @@ export default function HotSearchPreview() {
 
           {/* 列表视图 */}
           <div style={{ flex: 1, minWidth: 360 }}>
-            <h4 style={{ marginBottom: 12, color: '#666' }}>當前生效熱搜詞列表</h4>
+            <h4 style={{ marginBottom: 12, color: '#666' }}>{t('hotSearchPreview.listTitle')}</h4>
             {previewItems.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {previewItems.map((item) => (
@@ -227,7 +233,7 @@ export default function HotSearchPreview() {
                 ))}
               </div>
             ) : (
-              <Empty description="暫無生效的熱搜詞配置" />
+              <Empty description={t('hotSearchPreview.emptyConfig')} />
             )}
           </div>
         </div>

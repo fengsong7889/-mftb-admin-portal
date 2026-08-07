@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Card, Button, Select, Space, Tag, Table, Row, Col, Form, Empty,
 } from 'antd'
@@ -8,32 +9,6 @@ import {
   FireOutlined, WifiOutlined,
 } from '@ant-design/icons'
 import { BRAND_OPTIONS as BRAND_OPTIONS_IMPORT } from '../../constants/brand'
-
-// ============================
-// 常量定义
-// ============================
-
-const CHANNELS = [
-  { key: 'home', label: '大首頁' },
-  { key: 'takeaway', label: '外賣頻道' },
-  { key: 'groupBuy', label: '團購頻道' },
-  { key: 'supermarket', label: '超市頻道' },
-]
-
-const REGION_OPTIONS = [
-  { label: '澳門半島', value: 'macau' },
-  { label: '氹仔路半島', value: 'taipa' },
-  { label: '珠海市', value: 'zhuhai' },
-]
-
-const TIME_SLOT_OPTIONS = [
-  { label: '全時段', value: 'allDay' },
-  { label: '早餐', value: 'breakfast' },
-  { label: '午餐', value: 'lunch' },
-  { label: '下午茶', value: 'afternoonTea' },
-  { label: '晚餐', value: 'dinner' },
-  { label: '宵夜', value: 'midnightSnack' },
-]
 
 // ============================
 // 類型定義
@@ -77,12 +52,35 @@ const typeColorMap: Record<string, string> = {
 // ============================
 
 export default function HotSearchVerify() {
+  const { t } = useTranslation()
   const [channel, setChannel] = useState('home')
   const [brand, setBrand] = useState('mFood')
   const [region, setRegion] = useState('macau')
   const [timeSlot, setTimeSlot] = useState('lunch')
   const [results, setResults] = useState<HotSearchItem[]>([])
   const [searched, setSearched] = useState(false)
+
+  const channelOptions = [
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawayChannel'), value: 'takeaway' },
+    { label: t('dict.channel.groupBuyChannel'), value: 'groupBuy' },
+    { label: t('dict.channel.supermarketChannel'), value: 'supermarket' },
+  ]
+
+  const regionOptions = [
+    { label: t('dict.region.macauPeninsula'), value: 'macau' },
+    { label: t('dict.region.taipaPeninsula'), value: 'taipa' },
+    { label: t('dict.region.zhuhai'), value: 'zhuhai' },
+  ]
+
+  const timeSlotOptions = [
+    { label: t('dict.timeSlot.allDay'), value: 'allDay' },
+    { label: t('dict.timeSlot.breakfast'), value: 'breakfast' },
+    { label: t('dict.timeSlot.lunch'), value: 'lunch' },
+    { label: t('dict.timeSlot.afternoonTea'), value: 'afternoonTea' },
+    { label: t('dict.timeSlot.dinner'), value: 'dinner' },
+    { label: t('dict.timeSlot.midnightSnack'), value: 'midnightSnack' },
+  ]
 
   const handleSearch = () => {
     setResults(MOCK_DATA)
@@ -100,7 +98,7 @@ export default function HotSearchVerify() {
 
   const columns: TableColumnsType<HotSearchItem> = [
     {
-      title: '排名', dataIndex: 'rank', width: 70, align: 'center',
+      title: t('hotSearchVerify.colRank'), dataIndex: 'rank', width: 70, align: 'center',
       render: (v: number) => (
         <Tag color={v <= 3 ? 'orange' : 'default'} style={{ fontWeight: 700, minWidth: 28, textAlign: 'center' }}>
           {v}
@@ -110,17 +108,17 @@ export default function HotSearchVerify() {
       defaultSortOrder: 'ascend',
     },
     {
-      title: '熱搜詞', dataIndex: 'word', width: 180,
+      title: t('hotSearchVerify.colWord'), dataIndex: 'word', width: 180,
       render: (v: string) => <span style={{ fontWeight: 600, fontSize: 14 }}>{v}</span>,
     },
     {
-      title: '類型', dataIndex: 'type', width: 100,
+      title: t('hotSearchVerify.colType'), dataIndex: 'type', width: 100,
       render: (v: string) => <Tag color={typeColorMap[v] || 'default'}>{v}</Tag>,
     },
-    { title: '來源', dataIndex: 'source', width: 100 },
+    { title: t('hotSearchVerify.colSource'), dataIndex: 'source', width: 100 },
     {
-      title: '狀態', dataIndex: 'status', width: 80,
-      render: (v: string) => <Tag color={v === 'active' ? 'success' : 'default'}>{v === 'active' ? '生效中' : '已停用'}</Tag>,
+      title: t('hotSearchVerify.colStatus'), dataIndex: 'status', width: 80,
+      render: (v: string) => <Tag color={v === 'active' ? 'success' : 'default'}>{v === 'active' ? t('dict.status.activeLong') : t('dict.status.inactive')}</Tag>,
     },
   ]
 
@@ -135,10 +133,10 @@ export default function HotSearchVerify() {
           <FireOutlined style={{ fontSize: 20, color: '#E8720C' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#E8720C' }}>
-              熱搜校驗
+              {t('hotSearchVerify.title')}
             </h2>
             <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-              校驗熱搜詞在不同頻道、區域、時段下的展示效果
+              {t('hotSearchVerify.desc')}
             </div>
           </div>
         </div>
@@ -146,31 +144,31 @@ export default function HotSearchVerify() {
 
       {/* 篩選條件 */}
       <Card
-        title={<Space><FireOutlined style={{ color: '#E8720C' }} /><span>熱搜校驗條件</span></Space>}
+        title={<Space><FireOutlined style={{ color: '#E8720C' }} /><span>{t('hotSearchVerify.condTitle')}</span></Space>}
         style={{ marginBottom: 12, borderRadius: 8 }}
         bodyStyle={{ padding: '16px 24px' }}
       >
         <Form layout="vertical">
           <Row gutter={16}>
             <Col span={6}>
-              <Form.Item label="搜索頻道" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hotSearchVerify.channelLabel')} style={{ marginBottom: 12 }}>
                 <Select value={channel} onChange={setChannel}
-                  options={CHANNELS.map(c => ({ label: c.label, value: c.key }))} />
+                  options={channelOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="所屬品牌" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hotSearchVerify.brandLabel')} style={{ marginBottom: 12 }}>
                 <Select value={brand} onChange={setBrand} options={BRAND_OPTIONS_IMPORT} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="展示區域" style={{ marginBottom: 12 }}>
-                <Select value={region} onChange={setRegion} options={REGION_OPTIONS} />
+              <Form.Item label={t('hotSearchVerify.regionLabel')} style={{ marginBottom: 12 }}>
+                <Select value={region} onChange={setRegion} options={regionOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="展示時段" style={{ marginBottom: 12 }}>
-                <Select value={timeSlot} onChange={setTimeSlot} options={TIME_SLOT_OPTIONS} />
+              <Form.Item label={t('hotSearchVerify.timeSlotLabel')} style={{ marginBottom: 12 }}>
+                <Select value={timeSlot} onChange={setTimeSlot} options={timeSlotOptions} />
               </Form.Item>
             </Col>
           </Row>
@@ -180,9 +178,9 @@ export default function HotSearchVerify() {
                 <Space>
                   <Button type="primary" icon={<EyeOutlined />} onClick={handleSearch}
                     style={{ background: '#E8720C', borderColor: '#E8720C' }}>
-                    校驗熱搜
+                    {t('hotSearchVerify.verifyBtn')}
                   </Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                  <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
                 </Space>
               </Form.Item>
             </Col>
@@ -227,13 +225,13 @@ export default function HotSearchVerify() {
                 fontSize: 14, marginBottom: 20, border: '1px solid #EEEEEE',
               }}>
                 <SearchOutlined style={{ color: '#BFBFBF', fontSize: 16 }} />
-                <span style={{ color: '#BFBFBF' }}>搜索你想要的...</span>
+                <span style={{ color: '#BFBFBF' }}>{t('hotSearchVerify.searchPlaceholder')}</span>
               </div>
               {/* 熱搜詞列表 */}
               <div style={{ padding: '0 4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
                   <FireOutlined style={{ color: '#E8720C', fontSize: 15 }} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>熱搜</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>{t('hotSearchVerify.hotTitle')}</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                   {results.map((item) => (
@@ -262,8 +260,8 @@ export default function HotSearchVerify() {
             <Card
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>📋 當前生效熱搜詞列表</span>
-                  <Tag color="orange">共 {results.length} 個熱搜詞</Tag>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>📋 {t('hotSearchPreview.listTitle')}</span>
+                  <Tag color="orange">{t('hotSearchVerify.countTag', { count: results.length })}</Tag>
                 </div>
               }
               style={{ borderRadius: 8 }}
@@ -273,7 +271,7 @@ export default function HotSearchVerify() {
                 dataSource={results}
                 pagination={{
                   pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'],
-                  showQuickJumper: true, showTotal: (total) => `共 ${total} 條`,
+                  showQuickJumper: true, showTotal: (total) => t('common.total', { count: total }),
                 }}
                 size="small"
                 rowKey={(r) => `${r.rank}-${r.word}`}
@@ -285,14 +283,14 @@ export default function HotSearchVerify() {
 
       {searched && results.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <Empty description="暫無生效的熱搜詞配置" />
+          <Empty description={t('hotSearchPreview.emptyConfig')} />
         </div>
       )}
 
       {!searched && (
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#bbb' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔥</div>
-          <div style={{ fontSize: 15 }}>請設置篩選條件後，點擊「校驗熱搜」查看熱搜詞配置</div>
+          <div style={{ fontSize: 15 }}>{t('hotSearchVerify.emptyTip')}</div>
         </div>
       )}
     </div>

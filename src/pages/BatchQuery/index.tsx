@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Input, Select, Table, Tag, Form, DatePicker } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -18,20 +19,12 @@ import type { FinBatch, FinBatchQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
-/** 批次类型选项（僅充值/轉賬/合併生成批次，扣款不生成批次） */
-const batchTypeOptions = [
-  { label: '全部', value: 'all' },
-  { label: '充值', value: 'recharge' },
-  { label: '轉賬', value: 'transfer' },
-  { label: '合併', value: 'merge' },
-]
-
-/** 是否实收选项（值與後端存儲一致） */
-const actualOptions = [
-  { label: '全部', value: 'all' },
-  { label: '是', value: '是' },
-  { label: '否', value: '否' },
-]
+/** 批次类型显示映射（text 为 i18n key，value 為英文枚舉碼） */
+const BATCH_TYPE_MAP_KEYS: Record<string, string> = {
+  recharge: 'batchQuery.typeRecharge',
+  transfer: 'batchQuery.typeTransfer',
+  merge: 'batchQuery.typeMerge',
+}
 
 /** 批次记录类型 */
 interface BatchRecord {
@@ -53,14 +46,7 @@ interface BatchRecord {
   remark: string
 }
 
-/** 品牌显示映射 */
-
-/** 批次类型显示映射 */
-const batchTypeMap: Record<string, string> = {
-  recharge: '充值',
-  transfer: '轉賬',
-  merge: '合併',
-}
+/** 批次类型显示映射（text 为 i18n key） */
 
 /** 模拟数据（覆蓋充值/轉賬/合併三類，非充值類型實收與優惠為空） */
 const flowPrefixMap: Record<string, string> = { recharge: 'CZ', transfer: 'ZZ', merge: 'HB' }
@@ -176,7 +162,23 @@ function mockFetchBatches(query: FinBatchQuery) {
 export default function BatchQuery() {
   const navigate = useNavigate()
   // 菜单权限：batch-query
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
+
+  /** 批次類型選項（僅充值/轉賬/合併生成批次，扣款不生成批次） */
+  const batchTypeOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('batchQuery.typeRecharge'), value: 'recharge' },
+    { label: t('batchQuery.typeTransfer'), value: 'transfer' },
+    { label: t('batchQuery.typeMerge'), value: 'merge' },
+  ]
+
+  /** 是否實收選項（值與後端存儲一致，是/否為數據值） */
+  const actualOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: '是', value: '是' },
+    { label: '否', value: '否' },
+  ]
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [searchForm] = Form.useForm<BatchFilters>()
   const [data, setData] = useState<BatchRecord[]>([])
@@ -249,23 +251,23 @@ export default function BatchQuery() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'index', title: '序號' },
-    { key: 'groupId', title: '集團ID' },
-    { key: 'groupName', title: '集團名稱' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'batchType', title: '批次類型' },
-    { key: 'batchNo', title: '批次號' },
-    { key: 'flowNo', title: '流程編號' },
-    { key: 'tradeTime', title: '交易時間' },
-    { key: 'isActual', title: '實收標記' },
-    { key: 'virtualAmount', title: '虛擬金額' },
-    { key: 'actualAmount', title: '實收金額' },
-    { key: 'discountAmount', title: '優惠金額' },
-    { key: 'applicant', title: '申請人' },
-    { key: 'bd', title: '歸屬BD' },
-    { key: 'remark', title: '備註' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'index', title: t('common.colIndex') },
+    { key: 'groupId', title: t('common.colGroupId') },
+    { key: 'groupName', title: t('common.colGroupName') },
+    { key: 'brand', title: t('common.colBrand') },
+    { key: 'batchType', title: t('batchQuery.colBatchType') },
+    { key: 'batchNo', title: t('batchQuery.colBatchNoShort') },
+    { key: 'flowNo', title: t('common.colFlowNo') },
+    { key: 'tradeTime', title: t('common.colTradeTime') },
+    { key: 'isActual', title: t('batchQuery.colIsActualShort') },
+    { key: 'virtualAmount', title: t('batchQuery.colVirtualAmountShort') },
+    { key: 'actualAmount', title: t('batchQuery.colActualAmountShort') },
+    { key: 'discountAmount', title: t('batchQuery.colDiscountAmount') },
+    { key: 'applicant', title: t('batchQuery.colApplicant') },
+    { key: 'bd', title: t('common.colBd') },
+    { key: 'remark', title: t('batchQuery.colRemarkShort') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('batch-query', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const }
@@ -275,26 +277,26 @@ export default function BatchQuery() {
 
   const columns: TableColumnsType<BatchRecord> = [
     {
-      title: '序號',
+      title: t('common.colIndex'),
       dataIndex: 'index',
       key: 'index',
       width: 60,
       align: 'center',
     },
     {
-      title: '集團ID',
+      title: t('common.colGroupId'),
       dataIndex: 'groupId',
       key: 'groupId',
       width: 100,
     },
     {
-      title: '集團名稱',
+      title: t('common.colGroupName'),
       dataIndex: 'groupName',
       key: 'groupName',
       width: 120,
     },
     {
-      title: '所屬品牌',
+      title: t('common.colBrand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
@@ -303,36 +305,36 @@ export default function BatchQuery() {
       ),
     },
     {
-      title: '批次類型',
+      title: t('batchQuery.colBatchType'),
       dataIndex: 'batchType',
       key: 'batchType',
       width: 90,
       render: (val: string) => {
-        const text = batchTypeMap[val] || val
+        const text = BATCH_TYPE_MAP_KEYS[val] ? t(BATCH_TYPE_MAP_KEYS[val]) : val
         const colorMap: Record<string, string> = { recharge: 'blue', transfer: 'green', merge: 'orange' }
         return <Tag color={colorMap[val] || 'default'}>{text}</Tag>
       },
     },
     {
-      title: '批次編號',
+      title: t('batchQuery.colBatchNo'),
       dataIndex: 'batchNo',
       key: 'batchNo',
       width: 140,
     },
     {
-      title: '流程編號',
+      title: t('common.colFlowNo'),
       dataIndex: 'flowNo',
       key: 'flowNo',
       width: 100,
     },
     {
-      title: '交易時間',
+      title: t('common.colTradeTime'),
       dataIndex: 'tradeTime',
       key: 'tradeTime',
       width: 180,
     },
     {
-      title: '是否實收',
+      title: t('batchQuery.colIsActual'),
       dataIndex: 'isActual',
       key: 'isActual',
       width: 90,
@@ -344,7 +346,7 @@ export default function BatchQuery() {
       },
     },
     {
-      title: '虛擬賬戶變動金額',
+      title: t('common.colVirtualChange'),
       dataIndex: 'virtualAmount',
       key: 'virtualAmount',
       width: 160,
@@ -358,7 +360,7 @@ export default function BatchQuery() {
       },
     },
     {
-      title: '實收賬戶變動金額',
+      title: t('common.colActualChange'),
       dataIndex: 'actualAmount',
       key: 'actualAmount',
       width: 160,
@@ -372,7 +374,7 @@ export default function BatchQuery() {
       },
     },
     {
-      title: '優惠金額',
+      title: t('batchQuery.colDiscountAmount'),
       dataIndex: 'discountAmount',
       key: 'discountAmount',
       width: 100,
@@ -383,13 +385,13 @@ export default function BatchQuery() {
           : <span style={{ fontWeight: 500 }}>{val.toLocaleString()}</span>,
     },
     {
-      title: '申請人',
+      title: t('batchQuery.colApplicant'),
       dataIndex: 'applicant',
       key: 'applicant',
       width: 120,
     },
     {
-      title: '歸屬BD',
+      title: t('common.colBd'),
       dataIndex: 'bd',
       key: 'bd',
       width: 120,
@@ -397,7 +399,7 @@ export default function BatchQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '備註信息',
+      title: t('common.colRemark'),
       dataIndex: 'remark',
       key: 'remark',
       width: 180,
@@ -405,12 +407,12 @@ export default function BatchQuery() {
         val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 80,
       fixed: 'right',
       render: (_, record) => (
-        <a onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}&groupId=${record.groupId}`)}>明細</a>
+        <a onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}&groupId=${record.groupId}`)}>{t('common.detail')}</a>
       ),
     },
   ]
@@ -420,41 +422,41 @@ export default function BatchQuery() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="集團ID" name="groupId">
-            <Input placeholder="請輸入集團ID" allowClear />
+          <Form.Item label={t('common.colGroupId')} name="groupId">
+            <Input placeholder={t('common.groupIdPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱" name="groupName">
-            <Input placeholder="請輸入集團名稱" allowClear />
+          <Form.Item label={t('common.colGroupName')} name="groupName">
+            <Input placeholder={t('common.groupNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="請選擇" options={brandOptions} style={{ width: 140 }} />
+          <Form.Item label={t('common.colBrand')} name="brand">
+            <Select placeholder={t('common.placeholderSelect')} options={brandOptions} style={{ width: 140 }} />
           </Form.Item>
-          <Form.Item label="批次編號" name="batchNo">
-            <Input placeholder="請輸入批次編號" allowClear />
+          <Form.Item label={t('batchQuery.colBatchNo')} name="batchNo">
+            <Input placeholder={t('common.batchNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="流程編號" name="flowNo">
-            <Input placeholder="請輸入流程編號" allowClear />
+          <Form.Item label={t('common.colFlowNo')} name="flowNo">
+            <Input placeholder={t('common.flowNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="交易時間" name="tradeTime">
+          <Form.Item label={t('common.colTradeTime')} name="tradeTime">
             <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm:ss"
-              placeholder={['開始時間', '結束時間']}
+              placeholder={[t('common.startTime'), t('common.endTime')]}
             />
           </Form.Item>
-          <Form.Item label="是否實收" name="isActual">
-            <Select placeholder="請選擇" options={actualOptions} style={{ width: 120 }} />
+          <Form.Item label={t('batchQuery.colIsActual')} name="isActual">
+            <Select placeholder={t('common.placeholderSelect')} options={actualOptions} style={{ width: 120 }} />
           </Form.Item>
-          <Form.Item label="批次類型" name="batchType">
-            <Select placeholder="請選擇" options={batchTypeOptions} style={{ width: 120 }} />
+          <Form.Item label={t('batchQuery.colBatchType')} name="batchType">
+            <Select placeholder={t('common.placeholderSelect')} options={batchTypeOptions} style={{ width: 120 }} />
           </Form.Item>
-          <Form.Item label="申請人" name="applicant">
-            <Input placeholder="請輸入申請人姓名/工號" allowClear />
+          <Form.Item label={t('batchQuery.colApplicant')} name="applicant">
+            <Input placeholder={t('batchQuery.applicantPlaceholder')} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -465,7 +467,7 @@ export default function BatchQuery() {
         <div className="action-section-left">
           {hasPermission('batch-query:export') && (
             <Button className="btn-export" icon={<ExportOutlined />}>
-              導出
+              {t('common.export')}
             </Button>
           )}
         </div>
@@ -489,7 +491,7 @@ export default function BatchQuery() {
             current: pagination.page,
             pageSize: pagination.size,
             total,
-            showTotal: (t) => `共 ${t} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showQuickJumper: true,

@@ -1,31 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Card, Select, Space, Tag, Form, Input, Row, Col, Divider, Modal } from 'antd'
 import { SearchOutlined, ReloadOutlined, EyeOutlined, EnvironmentOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
-
-/** 搜索频道 */
-const searchChannelOptions = [
-  { label: '大首頁', value: 'home' },
-  { label: '外賣頻道', value: 'takeaway' },
-  { label: '團購頻道', value: 'groupBuy' },
-  { label: '超市頻道', value: 'supermarket' },
-]
-
-const regionOptions = [
-  { label: '澳門半島', value: 'macau' },
-  { label: '氹仔路半島', value: 'taipa' },
-  { label: '珠海市', value: 'zhuhai' },
-  { label: '橫琴粵深度合作區', value: 'hengqin' },
-]
-
-const timeSlotOptions = [
-  { label: '全時段', value: 'allDay' },
-  { label: '早餐', value: 'breakfast' },
-  { label: '午餐', value: 'lunch' },
-  { label: '下午茶', value: 'afternoonTea' },
-  { label: '晚餐', value: 'dinner' },
-  { label: '宵夜', value: 'midnightSnack' },
-]
 
 /** 模擬底紋預覽數據 */
 interface HintPreviewItem {
@@ -85,6 +62,7 @@ const previewData: HintPreviewItem[] = [
 ]
 
 export default function HintPreview() {
+  const { t } = useTranslation()
   const [searchChannel, setSearchChannel] = useState('home')
   const [brand, setBrand] = useState('mFood')
   const [region, setRegion] = useState('macau')
@@ -98,6 +76,30 @@ export default function HintPreview() {
   const [mapSearchText, setMapSearchText] = useState('')
   const [selectedLocation, setSelectedLocation] = useState<{name: string, lat: number, lng: number} | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  /** 搜索频道 */
+  const searchChannelOptions = [
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawayChannel'), value: 'takeaway' },
+    { label: t('dict.channel.groupBuyChannel'), value: 'groupBuy' },
+    { label: t('dict.channel.supermarketChannel'), value: 'supermarket' },
+  ]
+
+  const regionOptions = [
+    { label: t('dict.region.macauPeninsula'), value: 'macau' },
+    { label: t('dict.region.taipaPeninsula'), value: 'taipa' },
+    { label: t('dict.region.zhuhai'), value: 'zhuhai' },
+    { label: t('dict.region.hengqin'), value: 'hengqin' },
+  ]
+
+  const timeSlotOptions = [
+    { label: t('dict.timeSlot.allDay'), value: 'allDay' },
+    { label: t('dict.timeSlot.breakfast'), value: 'breakfast' },
+    { label: t('dict.timeSlot.lunch'), value: 'lunch' },
+    { label: t('dict.timeSlot.afternoonTea'), value: 'afternoonTea' },
+    { label: t('dict.timeSlot.dinner'), value: 'dinner' },
+    { label: t('dict.timeSlot.midnightSnack'), value: 'midnightSnack' },
+  ]
 
   const handlePreview = () => {
     setPreviewItems(previewData)
@@ -155,19 +157,19 @@ export default function HintPreview() {
   }, [previewItems.length])
 
   const _channelMap: Record<string, string> = {
-    home: '大首頁',
-    takeaway: '外賣頻道',
-    groupBuy: '團購頻道',
-    supermarket: '超市頻道',
+    home: t('dict.channel.home'),
+    takeaway: t('dict.channel.takeawayChannel'),
+    groupBuy: t('dict.channel.groupBuyChannel'),
+    supermarket: t('dict.channel.supermarketChannel'),
   }
 
   const jumpTypeMap: Record<string, string> = {
-    none: '無跳轉',
-    h5: 'H5鏈接',
-    checkInCenter: '簽到中心',
-    personalCenter: '個人中心',
-    couponCenter: '領券中心',
-    takeawayChannel: '外賣頻道',
+    none: t('dict.jumpType.none'),
+    h5: t('dict.jumpType.h5'),
+    checkInCenter: t('dict.jumpType.checkInCenter'),
+    personalCenter: t('dict.jumpType.personalCenter'),
+    couponCenter: t('dict.jumpType.couponCenter'),
+    takeawayChannel: t('dict.channel.takeawayChannel'),
   }
 
   const currentHint = previewItems[currentHintIndex]
@@ -186,10 +188,10 @@ export default function HintPreview() {
           <EyeOutlined style={{ fontSize: 20, color: '#1890ff' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#1890ff' }}>
-              底紋效果預覽
+              {t('hintPreview.title')}
             </h2>
             <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-              預覽不同場景下搜索框展示的底紋詞效果
+              {t('hintPreview.desc')}
             </div>
           </div>
         </div>
@@ -199,7 +201,7 @@ export default function HintPreview() {
       <Card
         title={
           <div style={{ fontSize: 14, fontWeight: 600 }}>
-            🎯 篩選條件
+            🎯 {t('hintPreview.filterTitle')}
           </div>
         }
         style={{ marginBottom: 12, borderRadius: 8 }}
@@ -208,45 +210,45 @@ export default function HintPreview() {
         <Form layout="vertical">
           <Row gutter={16}>
             <Col span={6}>
-              <Form.Item label="搜索頻道" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintPreview.searchChannelLabel')} style={{ marginBottom: 12 }}>
                 <Select value={searchChannel} onChange={setSearchChannel} options={searchChannelOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="所屬品牌" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintPreview.brandLabel')} style={{ marginBottom: 12 }}>
                 <Select value={brand} onChange={setBrand} options={brandOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="展示區域" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintPreview.regionLabel')} style={{ marginBottom: 12 }}>
                 <Select value={region} onChange={setRegion} options={regionOptions} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="展示時段" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintPreview.timeSlotLabel')} style={{ marginBottom: 12 }}>
                 <Select value={timeSlot} onChange={setTimeSlot} options={timeSlotOptions} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item label="用戶" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintPreview.userLabel')} style={{ marginBottom: 12 }}>
                 <Input
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
-                  placeholder="請輸入用戶ID或手機號"
+                  placeholder={t('hintPreview.userPlaceholder')}
                   allowClear
                 />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item label="地圖踩點" style={{ marginBottom: 12 }}>
+              <Form.Item label={t('hintPreview.mapLabel')} style={{ marginBottom: 12 }}>
                 <Input
                   value={`${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}
                   readOnly
                   prefix={<EnvironmentOutlined style={{ color: '#1890ff' }} />}
                   style={{ cursor: 'pointer' }}
-                  placeholder="點擊選擇位置"
+                  placeholder={t('hintPreview.mapPlaceholder')}
                   onClick={() => setIsMapModalOpen(true)}
                 />
               </Form.Item>
@@ -255,10 +257,10 @@ export default function HintPreview() {
               <Form.Item label="&nbsp;" style={{ marginBottom: 12 }}>
                 <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Button type="primary" icon={<EyeOutlined />} onClick={handlePreview}>
-                    查詢預覽
+                    {t('hintPreview.previewBtn')}
                   </Button>
                   <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                    重置
+                    {t('common.reset')}
                   </Button>
                 </Space>
               </Form.Item>
@@ -275,7 +277,7 @@ export default function HintPreview() {
             <Card
               title={
                 <div style={{ fontSize: 15, fontWeight: 600 }}>
-                  📱 手機端預覽
+                  📱 {t('hintPreview.mobileTitle')}
                 </div>
               }
               style={{ borderRadius: 8, position: 'sticky', top: 20 }}
@@ -361,7 +363,7 @@ export default function HintPreview() {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}>
-                            {currentHint?.hintWord || '請輸入搜索關鍵詞'}
+                            {currentHint?.hintWord || t('hintPreview.searchPlaceholder')}
                           </span>
                         </div>
                         {/* 下一个词 - 从下方往上滑入 */}
@@ -426,14 +428,14 @@ export default function HintPreview() {
                         border: '1px solid #F0F0F0',
                       }}>
                         <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>
-                          當前底紋配置
+                          {t('hintPreview.currentHintConfig')}
                         </div>
                         <div style={{ fontSize: 16, fontWeight: 600, color: '#1890ff', marginBottom: 8 }}>
                           {currentHint.hintWord}
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           <Tag color="blue">ID: {currentHint.hintId}</Tag>
-                          <Tag color="gold">優先級 {currentHint.priority}</Tag>
+                          <Tag color="gold">{t('hintPreview.priorityTag', { priority: currentHint.priority })}</Tag>
                         </div>
                       </div>
                     )}
@@ -445,7 +447,7 @@ export default function HintPreview() {
                         color: '#999',
                       }}>
                         <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
-                        <div style={{ fontSize: 15 }}>暫無底紋詞展示</div>
+                        <div style={{ fontSize: 15 }}>{t('hintPreview.emptyHint')}</div>
                       </div>
                     )}
                   </div>
@@ -460,10 +462,10 @@ export default function HintPreview() {
               title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 15, fontWeight: 600 }}>
-                    📋 底紋配置詳情
+                    📋 {t('hintPreview.detailTitle')}
                   </span>
                   <Tag color="blue" style={{ fontSize: 13 }}>
-                    共 {previewItems.length} 個配置
+                    {t('hintPreview.totalConfig', { count: previewItems.length })}
                   </Tag>
                 </div>
               }
@@ -494,11 +496,11 @@ export default function HintPreview() {
                             {item.hintWord}
                           </div>
                           <Tag color="gold" style={{ fontSize: 12 }}>
-                            排序 {item.priority}
+                            {t('hintPreview.sortTag', { priority: item.priority })}
                           </Tag>
                         </div>
                         <div style={{ fontSize: 13, color: '#666' }}>
-                          底紋ID：<span style={{ color: '#1890ff', fontWeight: 600 }}>{item.hintId}</span>
+                          {t('hintPreview.hintIdLabel')}<span style={{ color: '#1890ff', fontWeight: 600 }}>{item.hintId}</span>
                         </div>
                       </div>
                       {index === currentHintIndex && (
@@ -510,7 +512,7 @@ export default function HintPreview() {
                           fontSize: 13,
                           fontWeight: 600,
                         }}>
-                          ✨ 當前展示
+                          ✨ {t('hintPreview.currentShowing')}
                         </div>
                       )}
                     </div>
@@ -525,19 +527,19 @@ export default function HintPreview() {
                       fontSize: 13,
                     }}>
                       <div>
-                        <span style={{ color: '#999' }}>所屬品牌：</span>
+                        <span style={{ color: '#999' }}>{t('hintPreview.brandField')}</span>
                         <span style={{ marginLeft: 4, fontWeight: 500 }}>{item.brand}</span>
                       </div>
                       <div>
-                        <span style={{ color: '#999' }}>展示區域：</span>
+                        <span style={{ color: '#999' }}>{t('hintPreview.regionField')}</span>
                         <span style={{ marginLeft: 4 }}>{item.region}</span>
                       </div>
                       <div>
-                        <span style={{ color: '#999' }}>指定人群：</span>
+                        <span style={{ color: '#999' }}>{t('hintPreview.crowdField')}</span>
                         <Tag color="cyan" style={{ marginLeft: 4 }}>{item.crowd}</Tag>
                       </div>
                       <div>
-                        <span style={{ color: '#999' }}>指定搜索：</span>
+                        <span style={{ color: '#999' }}>{t('hintPreview.jumpField')}</span>
                         <Tag color={item.jumpType === 'h5' ? 'blue' : item.jumpType === 'none' ? 'default' : 'green'} style={{ marginLeft: 4 }}>
                           {jumpTypeMap[item.jumpType || 'none']}
                         </Tag>
@@ -548,7 +550,7 @@ export default function HintPreview() {
                         )}
                       </div>
                       <div style={{ gridColumn: '1 / -1' }}>
-                        <span style={{ color: '#999' }}>生效時間：</span>
+                        <span style={{ color: '#999' }}>{t('hintPreview.effectField')}</span>
                         <span style={{ marginLeft: 4, color: '#666' }}>{item.effectDate}</span>
                       </div>
                     </div>
@@ -563,8 +565,8 @@ export default function HintPreview() {
                   color: '#999',
                 }}>
                   <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
-                  <div style={{ fontSize: 15, marginBottom: 8 }}>暫無符合條件的底紋配置</div>
-                  <div style={{ fontSize: 13, color: '#bbb' }}>請調整篩選條件後重試</div>
+                  <div style={{ fontSize: 15, marginBottom: 8 }}>{t('hintPreview.emptyFilter')}</div>
+                  <div style={{ fontSize: 13, color: '#bbb' }}>{t('hintPreview.emptyFilterTip')}</div>
                 </div>
               )}
             </Card>
@@ -576,7 +578,7 @@ export default function HintPreview() {
       <Modal
         title={
           <div style={{ fontSize: 18, fontWeight: 600, color: '#1890ff' }}>
-            🗺️ 地圖踩點
+            🗺️ {t('hintPreview.mapTitle')}
           </div>
         }
         open={isMapModalOpen}
@@ -585,10 +587,10 @@ export default function HintPreview() {
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '12px 0' }}>
             <Button onClick={() => setIsMapModalOpen(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button type="primary" onClick={handleMapConfirm} disabled={!selectedLocation}>
-              確認選擇
+              {t('hintPreview.confirmSelect')}
             </Button>
           </div>
         }
@@ -597,7 +599,7 @@ export default function HintPreview() {
           {/* 搜索框 */}
           <div style={{ marginBottom: 16 }}>
             <Input
-              placeholder="搜索位置名稱"
+              placeholder={t('hintPreview.mapSearchPlaceholder')}
               value={mapSearchText}
               onChange={(e) => setMapSearchText(e.target.value)}
               prefix={<SearchOutlined />}
@@ -623,7 +625,7 @@ export default function HintPreview() {
             <div style={{ textAlign: 'center' }}>
               <EnvironmentOutlined style={{ fontSize: 48, marginBottom: 12 }} />
               <div style={{ fontSize: 14, opacity: 0.9 }}>
-                地圖區域（模擬）
+                {t('hintPreview.mapArea')}
               </div>
               {selectedLocation && (
                 <div style={{ marginTop: 16, padding: '12px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: 8 }}>
@@ -631,7 +633,7 @@ export default function HintPreview() {
                     📍 {selectedLocation.name}
                   </div>
                   <div style={{ fontSize: 13 }}>
-                    緯度: {selectedLocation.lat.toFixed(4)} | 經度: {selectedLocation.lng.toFixed(4)}
+                    {t('hintPreview.mapLat', { lat: selectedLocation.lat.toFixed(4), lng: selectedLocation.lng.toFixed(4) })}
                   </div>
                 </div>
               )}
@@ -641,7 +643,7 @@ export default function HintPreview() {
           {/* 搜索结果列表 */}
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#666' }}>
-              熱門位置（點擊選擇）
+              {t('hintPreview.mapHotTitle')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {mapLocations
@@ -665,11 +667,11 @@ export default function HintPreview() {
                           📍 {loc.name}
                         </div>
                         <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                          緯度: {loc.lat.toFixed(4)} | 經度: {loc.lng.toFixed(4)}
+                          {t('hintPreview.mapLat', { lat: loc.lat.toFixed(4), lng: loc.lng.toFixed(4) })}
                         </div>
                       </div>
                       {selectedLocation?.name === loc.name && (
-                        <Tag color="blue">已選擇</Tag>
+                        <Tag color="blue">{t('hintPreview.mapSelected')}</Tag>
                       )}
                     </div>
                   </div>

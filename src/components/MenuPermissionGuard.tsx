@@ -1,5 +1,6 @@
 import { Button, Result } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { ROUTE_MENU_KEY_MAP, resolveFirstAccessiblePath } from '../pages/Permission/types'
 
@@ -9,6 +10,7 @@ import { ROUTE_MENU_KEY_MAP, resolveFirstAccessiblePath } from '../pages/Permiss
  * 無權限時展示 403 提示頁；非受控路由直接放行。
  */
 export default function MenuPermissionGuard({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const { hasMenuPermission, user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -23,10 +25,10 @@ export default function MenuPermissionGuard({ children }: { children: React.Reac
       <Result
         status="403"
         title="403"
-        subTitle="抱歉，您沒有訪問該菜單的權限，請聯繫管理員到「功能授權」為您的角色或部門授權"
+        subTitle={t('guard.403Sub')}
         extra={
           <Button type="primary" onClick={() => navigate(fallbackPath)}>
-            {fallbackPath === '/' ? '返回首頁' : '前往可用菜單'}
+            {fallbackPath === '/' ? t('guard.backHome') : t('guard.goMenu')}
           </Button>
         }
       />

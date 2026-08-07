@@ -4,18 +4,13 @@ import type { ColumnsType } from 'antd/es/table'
 import BrandTag from '../../components/BrandTag'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
   fetchWaterfallList, updateWaterfallStatus, deleteWaterfall,
   fetchAdAlgorithms, withAdFallback,
 } from '../../api/adPromotion'
 import type { WaterfallStrategy } from '../../api/adPromotion'
-
-/** 状态标签: 1=启用 2=停用 */
-const STATUS_LABEL: Record<number, string> = {
-  1: '啟用',
-  2: '停用',
-}
 
 /** 伪随机数生成器（本地演示数据用） */
 const pseudoRandom = (seed: number) => {
@@ -60,6 +55,9 @@ const MOCK_ALGO_OPTIONS = [
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  /** 状态标签: 1=启用 2=停用（依赖 t，定义在组件内以便响应语言切换） */
+  const statusLabel = (v: number) => (v === 1 ? t('common.enable') : t('common.disable'))
   const [searchForm] = Form.useForm()
   const [data, setData] = useState<WaterfallStrategy[]>([])
   const [total, setTotal] = useState(0)
@@ -137,22 +135,22 @@ export default function PromotionSlotConfig() {
   // 启用/停用
   const handleToggleStatus = (record: WaterfallStrategy) => {
     const newStatus = record.status === 1 ? 2 : 1
-    const actionText = newStatus === 1 ? '啟用' : '停用'
+    const actionText = newStatus === 1 ? t('common.enable') : t('common.disable')
     Modal.confirm({
-      title: `確認${actionText}`,
-      content: `確定要${actionText}「${record.strategyName}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('promotionSlotConfig.confirmToggleTitle', { action: actionText }),
+      content: t('promotionSlotConfig.confirmToggleContent', { action: actionText, name: record.strategyName }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         if (mockMode) {
           setData(prev => prev.map(item =>
             item.id === record.id ? { ...item, status: newStatus } : item
           ))
-          message.success(`已${actionText}「${record.strategyName}」`)
+          message.success(t('promotionSlotConfig.toggleSuccess', { action: actionText, name: record.strategyName }))
           return
         }
         await updateWaterfallStatus(record.id as number, newStatus)
-        message.success(`已${actionText}「${record.strategyName}」`)
+        message.success(t('promotionSlotConfig.toggleSuccess', { action: actionText, name: record.strategyName }))
         load(page, pageSize)
       },
     })
@@ -161,19 +159,19 @@ export default function PromotionSlotConfig() {
   // 删除
   const handleDelete = (record: WaterfallStrategy) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除瀑布流「${record.strategyName}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common.confirmDelete'),
+      content: t('promotionSlotConfig.confirmDeleteContent', { name: record.strategyName }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         if (mockMode) {
           setData(prev => prev.filter(item => item.id !== record.id))
-          message.success('刪除成功')
+          message.success(t('common.deleteSuccess'))
           return
         }
         await deleteWaterfall(record.id as number)
-        message.success('刪除成功')
+        message.success(t('common.deleteSuccess'))
         load(page, pageSize)
       },
     })
@@ -194,12 +192,12 @@ export default function PromotionSlotConfig() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'id', title: '配置ID' },
-    { key: 'strategyName', title: '瀑布流名稱' },
-    { key: 'app', title: '所屬品牌' },
-    { key: 'status', title: '狀態' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'id', title: t('promotionSlotConfig.colConfigId') },
+    { key: 'strategyName', title: t('promotionSlotConfig.colWaterfallName') },
+    { key: 'app', title: t('common.colBrand') },
+    { key: 'status', title: t('common.colStatus') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('promotionSlotConfig', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -208,7 +206,7 @@ export default function PromotionSlotConfig() {
   // 列定义
   const columns: ColumnsType<WaterfallStrategy> = [
     {
-      title: '配置ID',
+      title: t('promotionSlotConfig.colConfigId'),
       dataIndex: 'id',
       key: 'id',
       width: 100,
@@ -218,14 +216,14 @@ export default function PromotionSlotConfig() {
       ),
     },
     {
-      title: '瀑布流名稱',
+      title: t('promotionSlotConfig.colWaterfallName'),
       dataIndex: 'strategyName',
       key: 'strategyName',
       width: 200,
       render: (text: string) => <strong>{text}</strong>,
     },
     {
-      title: '所屬品牌',
+      title: t('common.colBrand'),
       dataIndex: 'brand',
       key: 'app',
       width: 100,
@@ -234,19 +232,19 @@ export default function PromotionSlotConfig() {
       ),
     },
     {
-      title: '狀態',
+      title: t('common.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       align: 'center',
       render: (v: number) => (
         <Tag color={v === 1 ? 'success' : 'default'}>
-          {STATUS_LABEL[v]}
+          {statusLabel(v)}
         </Tag>
       ),
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 240,
       fixed: 'right' as const,
@@ -257,7 +255,7 @@ export default function PromotionSlotConfig() {
             size="small"
             onClick={() => handleViewDetail(record)}
           >
-            詳情
+            {t('promotionSlotConfig.detail')}
           </Button>
           <Button 
             type="link" 
@@ -266,14 +264,14 @@ export default function PromotionSlotConfig() {
             style={record.status !== 1 ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
-            {record.status === 1 ? '停用' : '啟用'}
+            {record.status === 1 ? t('common.disable') : t('common.enable')}
           </Button>
           <Button 
             type="link" 
             size="small"
             onClick={() => handleEdit(record)}
           >
-            編輯
+            {t('common.edit')}
           </Button>
           <Button 
             type="link" 
@@ -281,7 +279,7 @@ export default function PromotionSlotConfig() {
             danger
             onClick={() => handleDelete(record)}
           >
-            刪除
+            {t('common.delete')}
           </Button>
         </Space>
       ),
@@ -293,26 +291,26 @@ export default function PromotionSlotConfig() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="配置ID" name="id">
-            <Input placeholder="請輸入配置ID" allowClear />
+          <Form.Item label={t('promotionSlotConfig.colConfigId')} name="id">
+            <Input placeholder={t('promotionSlotConfig.placeholderConfigId')} allowClear />
           </Form.Item>
-          <Form.Item label="瀑布流名稱" name="strategyName">
-            <Input placeholder="請輸入瀑布流名稱" allowClear />
+          <Form.Item label={t('promotionSlotConfig.colWaterfallName')} name="strategyName">
+            <Input placeholder={t('promotionSlotConfig.placeholderWaterfallName')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
+          <Form.Item label={t('common.colBrand')} name="brand">
             <Select 
-              placeholder="全部" 
+              placeholder={t('common.all')} 
               allowClear
               style={{ width: 120 }}
               options={[
-                { label: '閃蜂', value: 'flashBee' },
+                { label: t('common.flashBee'), value: 'flashBee' },
                 { label: 'mFood', value: 'mFood' },
               ]}
             />
           </Form.Item>
-          <Form.Item label="算法名稱" name="algoId">
+          <Form.Item label={t('promotionSlotConfig.colAlgorithmName')} name="algoId">
             <Select 
-              placeholder="請選擇算法" 
+              placeholder={t('promotionSlotConfig.placeholderSelectAlgorithm')} 
               allowClear
               showSearch
               style={{ width: 220 }}
@@ -320,21 +318,21 @@ export default function PromotionSlotConfig() {
               options={algoOptions}
             />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
+          <Form.Item label={t('common.colStatus')} name="status">
             <Select 
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               style={{ width: 100 }}
               options={[
-                { label: '啟用', value: 1 },
-                { label: '停用', value: 2 },
+                { label: t('common.enable'), value: 1 },
+                { label: t('common.disable'), value: 2 },
               ]}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>查詢</Button>
-              <Button onClick={handleReset} icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button onClick={handleReset} icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -348,7 +346,7 @@ export default function PromotionSlotConfig() {
             icon={<PlusOutlined />}
             onClick={() => navigate('/promotion-slot-config-add')}
           >
-            新增策略
+            {t('promotionSlotConfig.addStrategy')}
           </Button>
           {configComponent}
         </div>
@@ -367,7 +365,7 @@ export default function PromotionSlotConfig() {
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
             showQuickJumper: true,
-            showTotal: (t) => `共 ${t} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             onChange: (p, s) => {
               setPage(p)
               setPageSize(s)

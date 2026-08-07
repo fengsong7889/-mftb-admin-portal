@@ -344,6 +344,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    // 退出前：将首页当前的国家/语言同步到登录页独立键，确保登录页记住首页的语言
+    const currentCountry = localStorage.getItem('selected_country') || 'usa'
+    const currentLang = localStorage.getItem('app_language') || 'en'
+    localStorage.setItem('login_country', currentCountry)
+    localStorage.setItem('login_language', currentLang)
+
     // 通知后端登出，等待完成後再清理本地狀態，確保 logoutTime 被記錄
     try {
       await logoutApi()

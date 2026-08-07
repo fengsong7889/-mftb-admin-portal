@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, Tree, Button, Space, Modal, Form, Input, Select, message, Switch, Popconfirm, Tag } from 'antd'
 import { PlusOutlined, DeleteOutlined, DownOutlined, EditOutlined } from '@ant-design/icons'
 import { MapContainer, TileLayer, Polygon } from 'react-leaflet'
@@ -144,6 +145,7 @@ const mockTreeData: RegionNode[] = [
 ]
 
 const MapPlanning: React.FC = () => {
+  const { t } = useTranslation('common')
   const [treeData, setTreeData] = useState<RegionNode[]>(mockTreeData)
   const [selectedNode, setSelectedNode] = useState<RegionNode | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
@@ -161,12 +163,12 @@ const MapPlanning: React.FC = () => {
           <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {node.level === 1 ? (
               <>
-                <span style={{ color: '#1890ff', fontWeight: 600 }}>【區域】</span>
+                <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('regionTag')}</span>
                 <span>{node.title}</span>
               </>
             ) : (
               <>
-                <span style={{ color: '#52c41a', fontWeight: 500 }}>【商圈】</span>
+                <span style={{ color: '#52c41a', fontWeight: 500 }}>{t('bizTag')}</span>
                 <span>{node.title}</span>
               </>
             )}
@@ -200,15 +202,15 @@ const MapPlanning: React.FC = () => {
                 style={{ padding: '0 4px', minWidth: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               />
               <Popconfirm
-                title="確認刪除"
-                description={`確定要刪除區域"${node.title}"嗎？這將同時刪除所有子區域。`}
+                title={t('confirmDelete')}
+                description={t('deleteRegionWithChildren', { name: node.title })}
                 onConfirm={(e) => {
                   e?.stopPropagation()
                   handleDelete(node)
                 }}
                 onCancel={(e) => e?.stopPropagation()}
-                okText="確定"
-                cancelText="取消"
+                okText={t('confirm')}
+                cancelText={t('cancel')}
               >
                 <Button
                   type="link"
@@ -239,15 +241,15 @@ const MapPlanning: React.FC = () => {
                 style={{ padding: '0 4px', minWidth: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               />
               <Popconfirm
-                title="確認刪除"
-                description={`確定要刪除區域"${node.title}"嗎？`}
+                title={t('confirmDelete')}
+                description={t('deleteRegionConfirm', { name: node.title })}
                 onConfirm={(e) => {
                   e?.stopPropagation()
                   handleDelete(node)
                 }}
                 onCancel={(e) => e?.stopPropagation()}
-                okText="確定"
-                cancelText="取消"
+                okText={t('confirm')}
+                cancelText={t('cancel')}
               >
                 <Button
                   type="link"
@@ -340,7 +342,7 @@ const MapPlanning: React.FC = () => {
     }
     
     setTreeData(updateNodeStatus(treeData))
-    message.success(`區域"${node.title}"已${checked ? '啟用' : '停用'}`)
+    message.success(t(checked ? 'regionEnabled' : 'regionDisabled', { name: node.title }))
   }
 
   /** 删除区域 */
@@ -359,7 +361,7 @@ const MapPlanning: React.FC = () => {
       setSelectedNode(null)
       setPolygonCoords([])
     }
-    message.success(`刪除區域"${node.title}"成功`)
+    message.success(t('deleteRegionSuccess', { name: node.title }))
   }
 
   /** 提交表单 */
@@ -389,7 +391,7 @@ const MapPlanning: React.FC = () => {
         if (selectedNode) {
           setSelectedNode({ ...selectedNode, title: values.title, status: values.status })
         }
-        message.success('更新區域成功')
+        message.success(t('updateRegionSuccess'))
         setModalVisible(false)
         form.resetFields()
         return
@@ -422,7 +424,7 @@ const MapPlanning: React.FC = () => {
         setTreeData(addChild(treeData))
       }
 
-      message.success('新增區域成功')
+      message.success(t('addRegionSuccess'))
       setModalVisible(false)
       form.resetFields()
     } catch (error) {
@@ -434,13 +436,13 @@ const MapPlanning: React.FC = () => {
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 180px)' }}>
       {/* 左侧树形结构 */}
       <Card
-        title="區域管理"
+        title={t('regionMgmt')}
         style={{ width: 350, flexShrink: 0 }}
       >
         <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-          <Input.Search placeholder="搜索區域" allowClear style={{ flex: 1 }} />
+          <Input.Search placeholder={t('searchRegion')} allowClear style={{ flex: 1 }} />
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAddLevel1}>
-            新增
+            {t('add')}
           </Button>
         </div>
         
@@ -453,14 +455,14 @@ const MapPlanning: React.FC = () => {
         />
 
         {selectedNode && (
-          <Card size="small" style={{ marginTop: 16 }} title="區域信息">
+          <Card size="small" style={{ marginTop: 16 }} title={t('regionInfo')}>
             <div style={{ fontSize: 13, lineHeight: 2 }}>
-              <div><strong>區域名稱:</strong> {selectedNode.title}</div>
-              <div><strong>區域級別:</strong> {selectedNode.level === 1 ? '一級區域' : '二級區域'}</div>
+              <div><strong>{t('regionNameLabel')}</strong> {selectedNode.title}</div>
+              <div><strong>{t('regionLevel')}</strong> {selectedNode.level === 1 ? t('level1Region') : t('level2Region')}</div>
               {selectedNode.parentId && (
-                <div><strong>上級區域:</strong> {findNode(treeData, selectedNode.parentId)?.title}</div>
+                <div><strong>{t('parentRegion')}</strong> {findNode(treeData, selectedNode.parentId)?.title}</div>
               )}
-              <div><strong>狀態:</strong> {selectedNode.status === 'active' ? '啟用' : '停用'}</div>
+              <div><strong>{t('statusLabel')}</strong> {selectedNode.status === 'active' ? t('active') : t('inactive')}</div>
             </div>
           </Card>
         )}
@@ -470,7 +472,7 @@ const MapPlanning: React.FC = () => {
       <Card
         title={
           <Space>
-            <span>地圖圍欄</span>
+            <span>{t('mapFence')}</span>
             {selectedNode && (
               <Tag color="blue">{selectedNode.title}</Tag>
             )}
@@ -479,7 +481,7 @@ const MapPlanning: React.FC = () => {
         extra={
           <Space>
             <span style={{ fontSize: 12, color: '#999' }}>
-              {polygonCoords.length > 0 ? `已繪製 ${polygonCoords.length} 個點` : '未繪製'}
+              {polygonCoords.length > 0 ? t('drawnPoints', { count: polygonCoords.length }) : t('notDrawn')}
             </span>
           </Space>
         }
@@ -506,30 +508,30 @@ const MapPlanning: React.FC = () => {
       <Modal
         title={
           modalMode === 'add-level1'
-            ? '新增一級區域'
+            ? t('addLevel1Region')
             : modalMode === 'add-level2'
-            ? '新增二級區域'
-            : '編輯區域'
+            ? t('addLevel2Region')
+            : t('editRegion')
         }
         open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => setModalVisible(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('confirm')}
+        cancelText={t('cancel')}
         width={600}
       >
         <Form form={form} layout="vertical">
           <Form.Item
-            label="區域名稱"
+            label={t('regionNameField')}
             name="title"
-            rules={[{ required: true, message: '請輸入區域名稱' }]}
+            rules={[{ required: true, message: t('inputRegionName') }]}
           >
-            <Input placeholder="請輸入區域名稱" />
+            <Input placeholder={t('inputRegionName')} />
           </Form.Item>
 
           {modalMode === 'add-level2' && (
             <Form.Item
-              label="上級區域"
+              label={t('parentRegionField')}
               name="parentId"
             >
               <Input disabled value={currentParent?.title} />
@@ -537,15 +539,15 @@ const MapPlanning: React.FC = () => {
           )}
 
           <Form.Item
-            label="狀態"
+            label={t('statusField')}
             name="status"
-            rules={[{ required: true, message: '請選擇狀態' }]}
+            rules={[{ required: true, message: t('selectStatus') }]}
           >
             <Select
-              placeholder="請選擇狀態"
+              placeholder={t('selectStatus')}
               options={[
-                { label: '啟用', value: 'active' },
-                { label: '停用', value: 'inactive' },
+                { label: t('active'), value: 'active' },
+                { label: t('inactive'), value: 'inactive' },
               ]}
             />
           </Form.Item>

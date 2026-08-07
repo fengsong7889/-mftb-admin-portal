@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, DatePicker, Button, Tag, Space, message } from 'antd'
 import { ShoppingCartOutlined, CalendarOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -20,6 +21,7 @@ interface TimeSlotPickerProps {
 }
 
 export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotPickerProps) {
+  const { t } = useTranslation('adSales')
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null)
   const [selectedSlots, setSelectedSlots] = useState<number[]>([])
 
@@ -74,13 +76,13 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
   // 加购
   const handleAddToCart = () => {
     if (selectedSlots.length === 0) {
-      message.warning('請先選擇時段')
+      message.warning(t('selectTimeSlotFirst'))
       return
     }
     const dateStr = selectedDate!.format('YYYY-MM-DD')
     onAddToCart(dateStr, selectedSlots, totalPrice)
     setSelectedSlots([])
-    message.success(`已加購 ${selectedSlots.length} 個時段`)
+    message.success(t('addedToCartMsg', { count: selectedSlots.length }))
   }
 
   // 获取时段最终状态（覆盖 selected 状态）
@@ -96,7 +98,7 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
       title={
         <Space>
           <CalendarOutlined />
-          <span>選擇日期和時段</span>
+          <span>{t('selectDateAndSlot')}</span>
         </Space>
       }
       style={{ marginTop: 16 }}
@@ -105,29 +107,29 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
       <div style={{ marginBottom: 16, padding: '12px 16px', background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f' }}>
         <Space size={24}>
           <span>
-            單日單價：<strong style={{ color: '#fa8c16', fontSize: 16 }}>MOP {inventoryItem.dailyPrice.toLocaleString()}</strong>
+            {t('dailyUnitPrice')}<strong style={{ color: '#fa8c16', fontSize: 16 }}>MOP {inventoryItem.dailyPrice.toLocaleString()}</strong>
           </span>
           <span>
-            可選時段：<strong style={{ color: '#52c41a' }}>{availableCount}</strong> 個
+            {t('availableSlotsCount')}<strong style={{ color: '#52c41a' }}>{availableCount}</strong> {t('slotsUnit')}
           </span>
           <span>
-            單時段價格：<strong style={{ color: '#1890ff' }}>MOP {slotPrice}</strong>
+            {t('slotUnitPrice')}<strong style={{ color: '#1890ff' }}>MOP {slotPrice}</strong>
           </span>
         </Space>
       </div>
 
       {/* 日期选择 */}
       <div style={{ marginBottom: 20 }}>
-        <span style={{ marginRight: 12, fontWeight: 500 }}>選擇日期：</span>
+        <span style={{ marginRight: 12, fontWeight: 500 }}>{t('selectDateLabel')}</span>
         <DatePicker
           value={selectedDate}
           onChange={handleDateChange}
           disabledDate={disabledDate}
-          placeholder="請選擇購買日期"
+          placeholder={t('selectPurchaseDate')}
           style={{ width: 200 }}
         />
         <span style={{ marginLeft: 12, color: '#8c8c8c', fontSize: 13 }}>
-          可購買範圍：{inventoryItem.availableStartDate} ~ {inventoryItem.availableEndDate}
+          {t('purchaseDateRange')}{inventoryItem.availableStartDate} ~ {inventoryItem.availableEndDate}
         </span>
       </div>
 
@@ -135,7 +137,7 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
       {selectedDate && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ marginBottom: 12, fontWeight: 500 }}>
-            選擇時段（{selectedDate.format('YYYY-MM-DD')}）：
+            {t('selectTimeSlotForDate', { date: selectedDate.format('YYYY-MM-DD') })}
           </div>
 
           {/* 图例 */}
@@ -253,7 +255,7 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
             <div style={{ marginTop: 16, padding: '12px 16px', background: '#e6f7ff', borderRadius: 8, border: '1px solid #91d5ff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <strong>已選 {selectedSlots.length} 個時段：</strong>
+                  <strong>{t('selectedSlotsCountTsp', { count: selectedSlots.length })}</strong>
                   <span style={{ color: '#595959', marginLeft: 8 }}>
                     {selectedSlots.map(i => {
                       const def = timeSlotDefs[i]
@@ -263,7 +265,7 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
                 </div>
                 <div>
                   <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
-                    小計：MOP {totalPrice.toLocaleString()}
+                    {t('subtotalColon')}MOP {totalPrice.toLocaleString()}
                   </Tag>
                 </div>
               </div>
@@ -281,7 +283,7 @@ export default function TimeSlotPicker({ inventoryItem, onAddToCart }: TimeSlotP
           disabled={selectedSlots.length === 0}
           onClick={handleAddToCart}
         >
-          加入購物車{selectedSlots.length > 0 ? ` (${selectedSlots.length}個時段)` : ''}
+          {t('addToCart')}{selectedSlots.length > 0 ? ` (${selectedSlots.length}${t('addToCartSuffix')})` : ''}
         </Button>
       </div>
     </Card>

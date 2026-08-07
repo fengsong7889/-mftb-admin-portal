@@ -1,42 +1,44 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Button, Tooltip, message, Modal } from 'antd'
+import { Input, Button, Tooltip, message, Modal, Select } from 'antd'
 import {
   UserOutlined,
   LockOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
-  FormOutlined,
   SafetyOutlined,
+  GlobalOutlined,
+  WechatOutlined,
+  AlipayCircleOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import BrandLogo from '../../components/BrandLogo'
+import { useTranslation } from 'react-i18next'
+import { changeAppLanguage, getCountryLanguage, SUPPORTED_LANGUAGES } from '../../i18n'
+import type { AppLanguage } from '../../i18n'
 import '../../styles/components.css'
 
-/* ---- 动物验证码题库 ---- */
-const animalQuestions = [
-  { name: '貓', emoji: '🐱', options: ['貓', '狗', '兔子'], answer: '貓' },
-  { name: '狗', emoji: '🐶', options: ['貓', '狗', '魚'], answer: '狗' },
-  { name: '熊貓', emoji: '🐼', options: ['熊貓', '北極熊', '企鵝'], answer: '熊貓' },
-  { name: '兔子', emoji: '🐰', options: ['倉鼠', '兔子', '貓'], answer: '兔子' },
-  { name: '狐狸', emoji: '🦊', options: ['狗', '狐狸', '狼'], answer: '狐狸' },
-  { name: '猴子', emoji: '🐵', options: ['猩猩', '猴子', '熊'], answer: '猴子' },
-  { name: '企鵝', emoji: '🐧', options: ['企鵝', '鴿子', '鴨子'], answer: '企鵝' },
-  { name: '獅子', emoji: '🦁', options: ['老虎', '獅子', '熊'], answer: '獅子' },
+/* ---- 动物验证码题库（key 化，渲染时按当前语言翻译） ---- */
+interface AnimalQuestion {
+  key: string
+  emoji: string
+  options: string[]
+  answer: string
+}
+
+const animalQuestions: AnimalQuestion[] = [
+  { key: 'cat', emoji: '🐱', options: ['cat', 'dog', 'rabbit'], answer: 'cat' },
+  { key: 'dog', emoji: '🐶', options: ['cat', 'dog', 'fish'], answer: 'dog' },
+  { key: 'panda', emoji: '🐼', options: ['panda', 'polarBear', 'penguin'], answer: 'panda' },
+  { key: 'rabbit', emoji: '🐰', options: ['hamster', 'rabbit', 'cat'], answer: 'rabbit' },
+  { key: 'fox', emoji: '🦊', options: ['dog', 'fox', 'wolf'], answer: 'fox' },
+  { key: 'monkey', emoji: '🐵', options: ['gorilla', 'monkey', 'bear'], answer: 'monkey' },
+  { key: 'penguin', emoji: '🐧', options: ['penguin', 'pigeon', 'duck'], answer: 'penguin' },
+  { key: 'lion', emoji: '🦁', options: ['tiger', 'lion', 'bear'], answer: 'lion' },
 ]
 
-const teasingMessages = [
-  '你的眼睛是裝飾用的嗎？👀',
-  '我家貓都比你認得準 🐈',
-  '認錯動物這件事，你是認真的嗎？',
-  '建議先從認識自己的寵物開始 🐶',
-  '這個難度...是小學等級的吧？',
-  '我懷疑你在閉著眼睛點 🙈',
-  '再錯一次我就懷疑你是機器人了 🤖',
-  '動物們都表示很失望 🥲',
-  '你的辨識系統需要重新校準一下',
-  '這題答對的話可以獲得空氣一份 🌬️',
-]
+/** 调侃语条数（与语言包 login.teasing 保持一致） */
+const TEASING_COUNT = 10
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -55,6 +57,7 @@ const REMOTE_VIDEO = 'https://mftb-video-song.oss-cn-shenzhen.aliyuncs.com/%E9%8
 
 /* ---- 左侧视频背景组件 ---- */
 function VideoBackground() {
+  const { t } = useTranslation()
   // 统一使用本地视频(本地开发走 Vite dev server, 部署走 GitHub Pages)
   const [videoSrc, setVideoSrc] = useState(LOCAL_VIDEO)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -108,60 +111,43 @@ function VideoBackground() {
 
       <div className="video-brand">
         <BrandLogo size={36} style={{ margin: '0 auto 8px' }} />
-        <span className="video-brand-text">MFTB // 搜廣推系統</span>
+        <span className="video-brand-text">{t('login.videoBrand')}</span>
       </div>
     </div>
   )
 }
 
-/* ---- 二维码组件 ---- */
-function QRCodeView({ type, label }: { type: 'wechat' | 'alipay'; label: string }) {
-  const isWechat = type === 'wechat'
-  const cells = useMemo(() => {
-    const arr: boolean[] = []
-    for (let i = 0; i < 121; i++) {
-      const row = Math.floor(i / 11)
-      const col = i % 11
-      const isCorner = (row < 3 && col < 3) || (row < 3 && col > 7) || (row > 7 && col < 3)
-      arr.push(isCorner || Math.random() > 0.48)
-    }
-    return arr
-  }, [])
 
-  return (
-    <div className="qr-view">
-      <div className={`qr-view-icon ${isWechat ? 'qr-icon-wechat' : 'qr-icon-alipay'}`}>
-        {isWechat ? (
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-            <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348z" />
-          </svg>
-        ) : (
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-            <path d="M21.422 15.358c-1.152-.378-4.32-1.578-6.024-2.196a14.2 14.2 0 0 0 1.776-4.362h-3.84v-1.44h4.8V6.24h-4.8V3.6h-2.16c-.24 0-.24.24-.24.24v2.4h-4.8v1.12h4.8v1.44h-3.84v1.12h7.056a11.27 11.27 0 0 1-1.344 3.162c-1.824-.6-3.456-.9-4.896-.672-3.312.528-4.752 3.12-3.888 5.472.768 2.112 3.648 3.12 6.048 1.392z" />
-          </svg>
-        )}
-      </div>
-      <h3 className="qr-view-title">{label}掃碼登錄</h3>
-      <div className={`qr-code-box ${isWechat ? 'qr-border-wechat' : 'qr-border-alipay'}`}>
-        <div className="qr-code-grid">
-          {cells.map((dark, i) => (
-            <div key={i} className={`qr-cell ${dark ? 'qr-cell-dark' : ''}`} />
-          ))}
-        </div>
-      </div>
-      <p className="qr-view-hint">請使用{label}掃描上方二維碼</p>
-      <p className="qr-view-sub">掃碼後請在手機端確認登錄</p>
-    </div>
-  )
-}
+/* ---- 国家选项（带国旗图标） ---- */
+const COUNTRY_OPTIONS = [
+  { value: 'china', label: '中国', flag: '🇨🇳' },
+  { value: 'hongkong', label: '香港', flag: '🇭🇰' },
+  { value: 'macau', label: '澳门', flag: '🇲🇴' },
+  { value: 'taiwan', label: '台湾', flag: '🇹🇼' },
+  { value: 'japan', label: '日本', flag: '🇯🇵' },
+  { value: 'south_korea', label: '韩国', flag: '🇰🇷' },
+  { value: 'singapore', label: '新加坡', flag: '🇸🇬' },
+  { value: 'malaysia', label: '马来西亚', flag: '🇲🇾' },
+  { value: 'thailand', label: '泰国', flag: '🇹🇭' },
+  { value: 'vietnam', label: '越南', flag: '🇻🇳' },
+  { value: 'philippines', label: '菲律宾', flag: '🇵🇭' },
+  { value: 'indonesia', label: '印度尼西亚', flag: '🇮🇩' },
+  { value: 'usa', label: '美国', flag: '🇺🇸' },
+  { value: 'uk', label: '英国', flag: '🇬🇧' },
+  { value: 'australia', label: '澳大利亚', flag: '🇦🇺' },
+]
 
 /* ========= 主登录组件 ========= */
 export default function Login() {
+  const { t, i18n: i18nInstance } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [loginMode, setLoginMode] = useState<'password' | 'wechat' | 'alipay'>('password')
+
+  // 登录页独立的国家/语言选择（与首页互不干扰）
+  const [loginCountry, setLoginCountry] = useState('usa')
+  const [loginLanguage, setLoginLanguage] = useState<AppLanguage>('en')
 
   // 验证码状态
   const [captchaStage, setCaptchaStage] = useState<'checkbox' | 'quiz' | 'success'>('checkbox')
@@ -182,11 +168,38 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
+  /** 初始化：从登录页独立存储读取国家/语言 */
+  useEffect(() => {
+    const savedCountry = localStorage.getItem('login_country') || 'usa'
+    const savedLang = localStorage.getItem('login_language') as AppLanguage | null
+    const lang = savedLang || getCountryLanguage(savedCountry)
+    setLoginCountry(savedCountry)
+    setLoginLanguage(lang)
+    changeAppLanguage(lang)
+  }, [])
+
+  /** 登录页国家切换 → 联动默认语言 */
+  const handleLoginCountryChange = (country: string) => {
+    setLoginCountry(country)
+    localStorage.setItem('login_country', country)
+    const lang = getCountryLanguage(country)
+    setLoginLanguage(lang)
+    localStorage.setItem('login_language', lang)
+    changeAppLanguage(lang)
+  }
+
+  /** 登录页语言手动切换 */
+  const handleLoginLanguageChange = (lang: AppLanguage) => {
+    setLoginLanguage(lang)
+    localStorage.setItem('login_language', lang)
+    changeAppLanguage(lang)
+  }
+
   /** 点击验证码复选框 → 展示动物识别题目 */
   const handleCaptchaClick = useCallback(() => {
     if (captchaStage !== 'checkbox') return
     if (!username.trim()) {
-      setUsernameError('請先輸入工號')
+      setUsernameError(t('login.empIdRequired'))
       return
     }
     setUsernameError('')
@@ -194,7 +207,7 @@ export default function Login() {
     setSelectedAnimal(null)
     setCaptchaResult(null)
     setOptionStates({})
-  }, [captchaStage, username])
+  }, [captchaStage, username, t])
 
   /** 选择动物选项 → 立即判断 */
   const handleSelectAnimal = (option: string) => {
@@ -213,8 +226,8 @@ export default function Login() {
         [currentQuestion.answer]: 'correct',
       })
       setCaptchaResult('error')
-      // 随机调侃提示语
-      const randomMsg = teasingMessages[Math.floor(Math.random() * teasingMessages.length)]
+      // 随机调侃提示语（按语言包翻译）
+      const randomMsg = t(`login.teasing.${Math.floor(Math.random() * TEASING_COUNT)}`)
       setErrorMsg(randomMsg)
       // 2秒后重置题目
       setTimeout(() => {
@@ -232,27 +245,31 @@ export default function Login() {
   /** 登录 */
   const handleLogin = () => {
     let hasError = false
-    if (!username.trim()) { setUsernameError('請輸入工號'); hasError = true }
+    if (!username.trim()) { setUsernameError(t('login.empIdRequired')); hasError = true }
     else { setUsernameError('') }
 
     if (captchaStage !== 'success') return
-    if (!password.trim()) { setPasswordError('請輸入密碼'); hasError = true }
+    if (!password.trim()) { setPasswordError(t('login.pwdRequired')); hasError = true }
     else { setPasswordError('') }
 
     if (hasError) return
+
+    // 将登录页选择的国家/语言同步到首页键，进入系统后直接使用
+    localStorage.setItem('selected_country', loginCountry)
+    localStorage.setItem('app_language', loginLanguage)
 
     setLoading(true)
     setTimeout(async () => {
       const result = await login(username, password)
       setLoading(false)
       if (result.success) {
-        message.success('登錄成功')
+        message.success(t('login.success'))
         navigate(result.redirectPath || '/', { replace: true })
       } else if (result.accountDisabled) {
         // 账号被停用: 弹窗提醒（不显示 toast）
         setAccountDisabledVisible(true)
       } else {
-        message.error(result.message || '登錄失敗')
+        message.error(result.message || t('login.failed'))
       }
     }, 600)
   }
@@ -261,17 +278,14 @@ export default function Login() {
     if (e.key === 'Enter') handleLogin()
   }
 
-  const isQrMode = loginMode === 'wechat' || loginMode === 'alipay'
-
-  // 按钮是否禁用
   const canLogin = username.trim() && captchaStage === 'success' && password.trim()
 
   // 按钮 tooltip 提示
   const getBtnTooltip = () => {
     if (canLogin) return ''
-    if (!username.trim()) return '請輸入工號'
-    if (captchaStage !== 'success') return '請先完成驗證'
-    if (!password.trim()) return '請輸入密碼'
+    if (!username.trim()) return t('login.empIdRequired')
+    if (captchaStage !== 'success') return t('login.todoVerify')
+    if (!password.trim()) return t('login.pwdRequired')
     return ''
   }
 
@@ -283,33 +297,33 @@ export default function Login() {
       {/* 登录框 - 居中浮动 */}
       <div className="login-right">
         <div className="login-card-v2">
-          {/* 右上角三角形角标 */}
-          <div
-            className={`login-corner-triangle ${isQrMode ? 'is-qr-mode' : ''}`}
-            onClick={() => setLoginMode(isQrMode ? 'password' : 'wechat')}
-            title={isQrMode ? '切換賬號密碼登錄' : '切換掃碼登錄'}
-          >
-            <div className="corner-triangle-bg" />
-            <div className="corner-triangle-icon">
-              {isQrMode ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                  <rect x="14" y="14" width="3" height="3" />
-                  <line x1="21" y1="14" x2="21" y2="14.01" />
-                  <line x1="21" y1="21" x2="21" y2="21.01" />
-                  <line x1="17" y1="17" x2="17" y2="17.01" />
-                  <line x1="21" y1="17" x2="21" y2="17.01" />
-                </svg>
-              )}
-            </div>
+          {/* 右上角国家 & 语言选择器 */}
+          <div className="login-locale-corner">
+            <Select
+              value={loginCountry}
+              onChange={handleLoginCountryChange}
+              size="small"
+              variant="borderless"
+              className="login-locale-select"
+              popupMatchSelectWidth={false}
+              options={COUNTRY_OPTIONS.map(opt => ({
+                value: opt.value,
+                label: `${opt.flag} ${t(`country.${opt.value}`)}`,
+              }))}
+              suffixIcon={<GlobalOutlined style={{ color: 'rgba(255,255,255,0.6)' }} />}
+            />
+            <Select
+              value={loginLanguage}
+              onChange={handleLoginLanguageChange}
+              size="small"
+              variant="borderless"
+              className="login-locale-select"
+              popupMatchSelectWidth={false}
+              options={SUPPORTED_LANGUAGES.map(lang => ({
+                value: lang,
+                label: t(`language.${lang}`),
+              }))}
+            />
           </div>
 
           <div className="login-title-v2">
@@ -317,156 +331,138 @@ export default function Login() {
             <div className="login-brand-badge">
               <BrandLogo size={44} />
             </div>
-            <h2>您好！歡迎登錄MFTB搜廣推系統</h2>
+            <h2>{t('login.welcomeTitle')}</h2>
           </div>
 
-          {/* 账号密码登录面板 */}
-          {!isQrMode && (
-            <>
-              <div className="login-form-v2">
-                {/* 账号输入 */}
-                <div className="login-field-v2">
-                  <label>登錄工號</label>
-                  <Input
-                    size="large"
-                    placeholder="請輸入工號"
-                    prefix={<UserOutlined style={{ color: '#5a5080' }} />}
-                    value={username}
-                    onChange={e => { setUsername(e.target.value); setUsernameError('') }}
-                    onKeyDown={handleKeyDown}
-                    status={usernameError ? 'error' : undefined}
-                  />
-                  {usernameError && <div className="field-error-tip">{usernameError}</div>}
+          {/* 账号密码登录表单 */}
+          <div className="login-form-v2">
+            {/* 账号输入 */}
+            <div className="login-field-v2">
+              <label>{t('login.empIdLabel')}</label>
+              <Input
+                size="large"
+                placeholder={t('login.empIdPlaceholder')}
+                prefix={<UserOutlined style={{ color: '#5a5080' }} />}
+                value={username}
+                onChange={e => { setUsername(e.target.value); setUsernameError('') }}
+                onKeyDown={handleKeyDown}
+                status={usernameError ? 'error' : undefined}
+              />
+              {usernameError && <div className="field-error-tip">{usernameError}</div>}
+            </div>
+
+            {/* 验证码区域 */}
+            <div className="login-field-v2">
+              <label>{t('login.captchaLabel')}</label>
+              {/* 验证复选框 */}
+              <div
+                className={`captcha-checkbox ${captchaStage === 'success' ? 'verified' : ''}`}
+                onClick={handleCaptchaClick}
+              >
+                <div className="check-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                 </div>
-
-                {/* 验证码区域 */}
-                <div className="login-field-v2">
-                  <label>安全驗證</label>
-                  {/* 验证复选框 */}
-                  <div
-                    className={`captcha-checkbox ${captchaStage === 'success' ? 'verified' : ''}`}
-                    onClick={handleCaptchaClick}
-                  >
-                    <div className="check-box">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </div>
-                    <span className="captcha-label">
-                      {captchaStage === 'success' ? '很好，你不是機器人 ✓' : '點擊驗證，確認你不是機器人'}
-                    </span>
-                    <div className="captcha-brand">
-                      <div className="captcha-brand-icon">
-                        <SafetyOutlined />
-                      </div>
-                      <span>MFTB</span>
-                    </div>
+                <span className="captcha-label">
+                  {captchaStage === 'success' ? t('login.captchaVerified') : t('login.captchaClick')}
+                </span>
+                <div className="captcha-brand">
+                  <div className="captcha-brand-icon">
+                    <SafetyOutlined />
                   </div>
+                  <span>MFTB</span>
+                </div>
+              </div>
 
-                  {/* 动物识别验证码面板 */}
-                  {captchaStage === 'quiz' && (
-                    <div className="captcha-animal-panel">
-                      <div className="captcha-animal-title">請識別下方的動物</div>
-                      <div className="captcha-animal-display">
-                        <div className="captcha-animal-emoji">{currentQuestion.emoji}</div>
+              {/* 动物识别验证码面板 */}
+              {captchaStage === 'quiz' && (
+                <div className="captcha-animal-panel">
+                  <div className="captcha-animal-title">{t('login.animalTitle')}</div>
+                  <div className="captcha-animal-display">
+                    <div className="captcha-animal-emoji">{currentQuestion.emoji}</div>
+                  </div>
+                  <div className="captcha-animal-options">
+                    {shuffledOptions.map(option => (
+                      <div
+                        key={option}
+                        className={`captcha-animal-option ${
+                          selectedAnimal === option ? 'selected' : ''
+                        } ${optionStates[option] || ''}`}
+                        onClick={() => handleSelectAnimal(option)}
+                      >
+                        {t(`login.animals.${option}`)}
                       </div>
-                      <div className="captcha-animal-options">
-                        {shuffledOptions.map(option => (
-                          <div
-                            key={option}
-                            className={`captcha-animal-option ${
-                              selectedAnimal === option ? 'selected' : ''
-                            } ${optionStates[option] || ''}`}
-                            onClick={() => handleSelectAnimal(option)}
-                          >
-                            {option}
-                          </div>
-                        ))}
-                      </div>
-                      {captchaResult === 'error' && (
-                        <div className="captcha-message error">
-                          {errorMsg || '請你稍微認真點，好嗎？'}
-                        </div>
-                      )}
-                      {captchaResult === 'success' && (
-                        <div className="captcha-message success">
-                          很好，你不是機器人 🎉
-                        </div>
-                      )}
+                    ))}
+                  </div>
+                  {captchaResult === 'error' && (
+                    <div className="captcha-message error">
+                      {errorMsg || t('login.captchaFallbackError')}
+                    </div>
+                  )}
+                  {captchaResult === 'success' && (
+                    <div className="captcha-message success">
+                      {t('login.captchaSuccessMsg')}
                     </div>
                   )}
                 </div>
+              )}
+            </div>
 
-                {/* 密码输入 - 仅在验证通过后显示 */}
-                {captchaStage === 'success' && (
-                  <div className="login-field-v2" style={{ animation: 'captchaSlideIn 0.3s ease' }}>
-                    <label>登錄密碼</label>
-                    <Input
-                      size="large"
-                      placeholder="請輸入密碼"
-                      prefix={<LockOutlined style={{ color: '#5a5080' }} />}
-                      type={showPwd ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => { setPassword(e.target.value); setPasswordError('') }}
-                      onKeyDown={handleKeyDown}
-                      status={passwordError ? 'error' : undefined}
-                      suffix={
-                        <span className="pwd-toggle" onClick={() => setShowPwd(!showPwd)}>
-                          {showPwd ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-                        </span>
-                      }
-                    />
-                    {passwordError && <div className="field-error-tip">{passwordError}</div>}
-                  </div>
-                )}
-
-                {/* 登录按钮 */}
-                <Tooltip title={getBtnTooltip() || undefined} placement="top">
-                  <Button
-                    type="primary"
-                    size="large"
-                    block
-                    loading={loading}
-                    disabled={!canLogin}
-                    onClick={handleLogin}
-                    className="login-btn-v2"
-                  >
-                    登 錄
-                  </Button>
-                </Tooltip>
+            {/* 密码输入 - 仅在验证通过后显示 */}
+            {captchaStage === 'success' && (
+              <div className="login-field-v2" style={{ animation: 'captchaSlideIn 0.3s ease' }}>
+                <label>{t('login.pwdLabel')}</label>
+                <Input
+                  size="large"
+                  placeholder={t('login.pwdPlaceholder')}
+                  prefix={<LockOutlined style={{ color: '#5a5080' }} />}
+                  type={showPwd ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setPasswordError('') }}
+                  onKeyDown={handleKeyDown}
+                  status={passwordError ? 'error' : undefined}
+                  suffix={
+                    <span className="pwd-toggle" onClick={() => setShowPwd(!showPwd)}>
+                      {showPwd ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                    </span>
+                  }
+                />
+                {passwordError && <div className="field-error-tip">{passwordError}</div>}
               </div>
+            )}
 
-              {/* 快捷登录 */}
-              <div className="quick-login">
-                <div className="quick-login-btns">
-                  <button className="social-login-btn social-login-btn--wechat" onClick={() => setLoginMode('wechat')}>
-                    <div className="social-login-btn__icon social-login-btn__icon--wechat">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                        <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-7.062-6.122z" />
-                      </svg>
-                    </div>
-                  </button>
-                  <button className="social-login-btn social-login-btn--alipay" onClick={() => setLoginMode('alipay')}>
-                    <div className="social-login-btn__icon social-login-btn__icon--alipay">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                        <path d="M21.422 15.358c-1.152-.378-4.32-1.578-6.024-2.196a14.2 14.2 0 0 0 1.776-4.362h-3.84v-1.44h4.8V6.24h-4.8V3.6h-2.16c-.24 0-.24.24-.24.24v2.4h-4.8v1.12h4.8v1.44h-3.84v1.12h7.056a11.27 11.27 0 0 1-1.344 3.162c-1.824-.6-3.456-.9-4.896-.672-3.312.528-4.752 3.12-3.888 5.472.768 2.112 3.648 3.12 6.048 1.392 1.488-1.08 2.64-2.88 3.456-4.896 2.064.864 5.928 2.544 5.928 2.544l1.968-3.564zM8.694 18.678c-1.944.9-3.864.36-4.272-.72-.528-1.392.528-2.88 2.448-3.168 1.224-.192 2.592.096 4.08.672a8.62 8.62 0 0 1-2.256 3.216z" />
-                      </svg>
-                    </div>
-                  </button>
+            {/* 登录按钮 */}
+            <Tooltip title={getBtnTooltip() || undefined} placement="top">
+              <Button
+                type="primary"
+                size="large"
+                block
+                loading={loading}
+                disabled={!canLogin}
+                onClick={handleLogin}
+                className="login-btn-v2"
+              >
+                {t('login.submit')}
+              </Button>
+            </Tooltip>
+          </div>
+
+          {/* 快捷登录 */}
+          <div className="quick-login">
+            <div className="quick-login-btns">
+              <button className="social-login-btn social-login-btn--wechat" title={t('login.wechat')}>
+                <div className="social-login-btn__icon social-login-btn__icon--wechat">
+                  <WechatOutlined style={{ fontSize: 28, color: '#fff' }} />
                 </div>
-              </div>
-            </>
-          )}
-
-          {/* 二维码登录面板 */}
-          {isQrMode && (
-            <div className="login-qr-panel">
-              <QRCodeView type={loginMode} label={loginMode === 'wechat' ? '微信' : '支付宝'} />
-              <button className="back-to-pwd" onClick={() => setLoginMode('password')}>
-                <FormOutlined /> 返回賬號密碼登錄
+              </button>
+              <button className="social-login-btn social-login-btn--alipay" title={t('login.alipay')}>
+                <div className="social-login-btn__icon social-login-btn__icon--alipay">
+                  <AlipayCircleOutlined style={{ fontSize: 28, color: '#fff' }} />
+                </div>
               </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
       {/* 账号被停用提醒弹窗 */}
@@ -477,7 +473,7 @@ export default function Login() {
         closable={false}
         maskClosable={false}
         cancelButtonProps={{ style: { display: 'none' } }}
-        okText="我知道了"
+        okText={t('login.accountDisabledOk')}
         onOk={() => setAccountDisabledVisible(false)}
         styles={{
           header: { display: 'none' },
@@ -487,10 +483,10 @@ export default function Login() {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
           <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-            账号已被停用
+            {t('login.accountDisabledTitle')}
           </h3>
           <p style={{ fontSize: 14, color: '#595959', marginBottom: 0 }}>
-            您的账号已被管理员停用，如需恢复请联系管理员。
+            {t('login.accountDisabledDesc')}
           </p>
         </div>
       </Modal>

@@ -7,6 +7,7 @@ import {
   PlusOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { exportToCSV } from '../../utils/exportCSV'
 import { useNavigate } from 'react-router-dom'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
@@ -36,6 +37,7 @@ interface GroupSearchValues {
 type GroupFilters = Omit<MerchantGroupQueryParams, 'page' | 'size'>
 
 export default function GroupList() {
+  const { t } = useTranslation('merchantGroup')
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<MerchantGroupItem[]>([])
@@ -61,7 +63,7 @@ export default function GroupList() {
       setDataSource(res.records || [])
       setTotal(res.total || 0)
     } catch {
-      message.error('查詢失敗')
+      message.error(t('common:queryFailed'))
     } finally {
       setLoading(false)
     }
@@ -113,22 +115,22 @@ export default function GroupList() {
 
   const handleDelete = (record: MerchantGroupItem) => {
     if (record.storeCount > 0) {
-      message.warning(`該集團下還有 ${record.storeCount} 家門店，請先刪除門店後再刪除集團`)
+      message.warning(t('deleteStoreWarning', { count: record.storeCount }))
       return
     }
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除集團「${record.groupName}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common:confirmDelete'),
+      content: t('confirmDeleteGroup', { name: record.groupName }),
+      okText: t('common:confirm'),
+      cancelText: t('common:cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await deleteMerchantGroup(record.id)
-          message.success('集團已刪除')
+          message.success(t('groupDeleted'))
           loadData()
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : '刪除失敗'
+          const msg = err instanceof Error ? err.message : t('common:deleteFailed')
           message.error(msg)
         }
       },
@@ -143,20 +145,20 @@ export default function GroupList() {
 
   const handleExport = () => {
     if (!dataSource.length) {
-      message.warning('暫無數據可導出')
+      message.warning(t('common:noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '集團ID', dataIndex: 'groupCode' },
-      { title: '集團名稱', dataIndex: 'groupName' },
-      { title: '門店數量', dataIndex: 'storeCount', render: (v: number) => `${v} 家` },
-      { title: '登錄主賬號', dataIndex: 'loginAccount' },
-      { title: '最後更新人', dataIndex: 'updatedBy' },
-      { title: '最後更新時間', dataIndex: 'updatedAt' },
-      { title: '創建時間', dataIndex: 'createdAt' },
+      { title: t('colGroupId'), dataIndex: 'groupCode' },
+      { title: t('colGroupName'), dataIndex: 'groupName' },
+      { title: t('colStoreCount'), dataIndex: 'storeCount', render: (v: number) => `${v} ${t('storeUnit')}` },
+      { title: t('colLoginAccount'), dataIndex: 'loginAccount' },
+      { title: t('colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('colUpdatedAt'), dataIndex: 'updatedAt' },
+      { title: t('colCreatedAt'), dataIndex: 'createdAt' },
     ]
-    exportToCSV(`集團管理_${new Date().toISOString().slice(0, 10)}`, exportColumns, dataSource)
-    message.success('導出成功')
+    exportToCSV(`${t('exportFileName')}_${new Date().toISOString().slice(0, 10)}`, exportColumns, dataSource)
+    message.success(t('common:exportSuccess'))
   }
 
   const handleTableChange = (pagination: TablePaginationConfig) => {
@@ -171,71 +173,71 @@ export default function GroupList() {
 
   const columns: TableColumnsType<MerchantGroupItem> = [
     {
-      title: '集團ID',
+      title: t('colGroupId'),
       dataIndex: 'groupCode',
       key: 'groupCode',
       width: 120,
     },
     {
-      title: '集團名稱',
+      title: t('colGroupName'),
       dataIndex: 'groupName',
       key: 'groupName',
       width: 180,
     },
     {
-      title: '門店數量',
+      title: t('colStoreCount'),
       dataIndex: 'storeCount',
       key: 'storeCount',
       width: 100,
       render: (count: number) => (
         <span style={{ color: count > 0 ? '#1890ff' : '#8c8c8c' }}>
-          {count} 家
+          {count} {t('storeUnit')}
         </span>
       ),
     },
     {
-      title: '登錄主賬號',
+      title: t('colLoginAccount'),
       dataIndex: 'loginAccount',
       key: 'loginAccount',
       width: 150,
       render: (val: string) => val || '-',
     },
     {
-      title: '最後更新人',
+      title: t('colUpdatedBy'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
       width: 120,
       render: (val: string) => val || '-',
     },
     {
-      title: '最後更新時間',
+      title: t('colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
       render: (val: string) => val || '-',
     },
     {
-      title: '創建時間',
+      title: t('colCreatedAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
       render: (val: string) => val || '-',
     },
     {
-      title: '操作',
+      title: t('common:action'),
       key: 'action',
       width: 200,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => handleViewStores(record)}>
-            查看門店
+            {t('viewStores')}
           </Button>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>
-            編輯
+            {t('common:edit')}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
-            刪除
+            {t('common:delete')}
           </Button>
         </Space>
       ),
@@ -253,31 +255,31 @@ export default function GroupList() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="集團ID/名稱" name="keyword">
+          <Form.Item label={t('searchGroupIdName')} name="keyword">
             <RemoteSearchSelect
-              placeholder="搜索集團ID/名稱"
+              placeholder={t('searchGroupPlaceholder')}
               fetchOptions={fetchMerchantGroupOptions}
             />
           </Form.Item>
-          <Form.Item label="最後更新人" name="updatedBy">
+          <Form.Item label={t('searchUpdatedBy')} name="updatedBy">
             <RemoteSearchSelect
-              placeholder="搜索最後更新人"
+              placeholder={t('searchUpdatedByPlaceholder')}
               fetchOptions={fetchMerchantGroupUpdatedByOptions}
             />
           </Form.Item>
-          <Form.Item label="最後更新時間" name="updatedRange">
-            <RangePicker format="YYYY-MM-DD" placeholder={['開始日期', '結束日期']} allowClear />
+          <Form.Item label={t('searchUpdatedTime')} name="updatedRange">
+            <RangePicker format="YYYY-MM-DD" placeholder={[t('common:startDate'), t('common:endDate')]} allowClear />
           </Form.Item>
-          <Form.Item label="創建時間" name="createdRange">
-            <RangePicker format="YYYY-MM-DD" placeholder={['開始日期', '結束日期']} allowClear />
+          <Form.Item label={t('searchCreatedTime')} name="createdRange">
+            <RangePicker format="YYYY-MM-DD" placeholder={[t('common:startDate'), t('common:endDate')]} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common:search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common:reset')}
               </Button>
             </div>
           </Form.Item>
@@ -288,12 +290,12 @@ export default function GroupList() {
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            導出
+            {t('common:export')}
           </Button>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增
+            {t('common:add')}
           </Button>
           {configComponent}
         </div>
@@ -318,7 +320,7 @@ export default function GroupList() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條`,
+          showTotal: (total) => t('common:total', { count: total }),
         }}
         scroll={{ x: 1200 }}
       />

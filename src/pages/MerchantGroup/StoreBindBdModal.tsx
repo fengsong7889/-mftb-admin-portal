@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Modal, Popconfirm, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { fetchEmployeeOptions } from '../../api/employee'
 import { fetchStoreBds, addStoreBd, removeStoreBd } from '../../api/store'
@@ -20,6 +21,7 @@ interface StoreBindBdModalProps {
  * 门店绑定BD弹窗：展示当前已绑定的BD列表（含部门/职位/职级），支持新增绑定与删除解绑
  */
 export default function StoreBindBdModal({ open, record, onClose, onSuccess }: StoreBindBdModalProps) {
+  const { t } = useTranslation('store')
   const [bdList, setBdList] = useState<StoreBdItem[]>([])
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -33,7 +35,7 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
       const list = await fetchStoreBds(storeId)
       setBdList(list || [])
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '加載BD列表失敗'
+      const msg = err instanceof Error ? err.message : t('loadBdFailed')
       message.error(msg)
     } finally {
       setLoading(false)
@@ -55,12 +57,12 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
     setAdding(true)
     try {
       await addStoreBd(record.id, selectedEmpId)
-      message.success('BD綁定成功')
+      message.success(t('bdBindSuccess'))
       setSelectedEmpId(undefined)
       setChanged(true)
       loadBds(record.id)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '綁定失敗'
+      const msg = err instanceof Error ? err.message : t('bindFailed')
       message.error(msg)
     } finally {
       setAdding(false)
@@ -71,11 +73,11 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
     if (!record) return
     try {
       await removeStoreBd(record.id, bind.id)
-      message.success('BD已解綁')
+      message.success(t('bdUnbound'))
       setChanged(true)
       loadBds(record.id)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '解綁失敗'
+      const msg = err instanceof Error ? err.message : t('unbindFailed')
       message.error(msg)
     }
   }
@@ -91,37 +93,37 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
 
   const columns: ColumnsType<StoreBdItem> = [
     {
-      title: 'BD員工',
+      title: t('bdEmployee'),
       dataIndex: 'bdName',
       key: 'bdName',
       render: (val: string, row) => `${val || row.bdEmpId}(${row.bdEmpId})`,
     },
     {
-      title: '部門',
+      title: t('bdDepartment'),
       dataIndex: 'department',
       key: 'department',
       render: (val: string) => val || '-',
     },
     {
-      title: '職位',
+      title: t('bdPosition'),
       dataIndex: 'position',
       key: 'position',
       render: (val: string) => val || '-',
     },
     {
-      title: '職級',
+      title: t('bdJobLevel'),
       dataIndex: 'jobLevel',
       key: 'jobLevel',
       width: 70,
       render: (val: string) => val || '-',
     },
     {
-      title: '操作',
+      title: t('common:action'),
       key: 'action',
       width: 70,
       render: (_, row) => (
-        <Popconfirm title="確認解除該BD綁定？" onConfirm={() => handleRemove(row)}>
-          <Button type="link" size="small" danger>刪除</Button>
+        <Popconfirm title={t('confirmUnbindBd')} onConfirm={() => handleRemove(row)}>
+          <Button type="link" size="small" danger>{t('common:delete')}</Button>
         </Popconfirm>
       ),
     },
@@ -129,11 +131,11 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
 
   return (
     <Modal
-      title={`綁定BD${record ? ` - ${record.storeName}` : ''}`}
+      title={`${t('bindBdTitle')}${record ? ` - ${record.storeName}` : ''}`}
       open={open}
       onCancel={handleClose}
       footer={[
-        <Button key="close" onClick={handleClose}>關閉</Button>,
+        <Button key="close" onClick={handleClose}>{t('close')}</Button>,
       ]}
       destroyOnClose
       width={640}
@@ -142,7 +144,7 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
       <Space.Compact block style={{ margin: '16px 0' }}>
         <RemoteSearchSelect
           key={record?.id}
-          placeholder="搜索員工姓名/工號"
+          placeholder={t('searchEmployee')}
           fetchOptions={fetchEmployeeOptions}
           value={selectedEmpId}
           onChange={setSelectedEmpId}
@@ -155,7 +157,7 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
           disabled={!selectedEmpId}
           onClick={handleAdd}
         >
-          新增
+          {t('common:add')}
         </Button>
       </Space.Compact>
 
@@ -167,7 +169,7 @@ export default function StoreBindBdModal({ open, record, onClose, onSuccess }: S
         dataSource={bdList}
         loading={loading}
         pagination={false}
-        locale={{ emptyText: '暫未綁定BD' }}
+        locale={{ emptyText: t('noBdBound') }}
       />
     </Modal>
   )

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ReactNode, CSSProperties } from 'react'
 import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, Tag, message } from 'antd'
 import {
@@ -26,9 +27,8 @@ const { RangePicker } = DatePicker
  * 由系統配置瀑布流策略時決定，商家不可選擇。
  */
 
-/** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 */
+/** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 — 移入組件內使用 t() */
 type DishLayout = 'grid' | 'carousel'
-const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: '大圖拼列（1大2小）', carousel: '階梯輪播' }
 
 /** 預覽用 Mock 餐品（與銷售定價預覽一致，bg 為餐品底圖漸變） */
 const PREVIEW_DISHES = [
@@ -187,9 +187,6 @@ function getPresaleOpenTime(date: Dayjs): Dayjs {
   return date.startOf('day').subtract(MAX_BUY_DAYS, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
 }
 
-/** 中文星期映射（週日開頭，與日曆列對齊） */
-const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
-
 /** 月份選擇器每頁展示數（超出用上下頁按鈕切換） */
 const MONTHS_PER_PAGE = 6
 
@@ -222,6 +219,9 @@ const ALGORITHM_REFUND_CONFIG: Record<string, boolean> = {
 }
 
 export default function PopularSkinPicker() {
+  const { t } = useTranslation('adSales')
+  const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+  const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: t('layoutGrid'), carousel: t('layoutCarousel') }
   const navigate = useNavigate()
 
   // 查詢條件（算法名稱 / 所屬品牌 / 門店名稱 / 歸屬BD，與其它購買界面保持一致）
@@ -267,11 +267,11 @@ export default function PopularSkinPicker() {
   const effectiveDays = customDates.length
   // 投放時段文案（結算欄 / 支付彈窗）：首末日期區間
   const periodText = customDates.length > 0
-    ? `${dayjs(customDates[0]).format('MM-DD')} ~ ${dayjs(customDates[customDates.length - 1]).format('MM-DD')}（自選${customDates.length}天）`
-    : '未選擇'
+    ? `${dayjs(customDates[0]).format('MM-DD')} ~ ${dayjs(customDates[customDates.length - 1]).format('MM-DD')}（${t('selfSelectDays', { count: customDates.length })}）`
+    : t('notSelected')
   const periodTextFull = customDates.length > 0
-    ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（自選${customDates.length}天）`
-    : '未選擇'
+    ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（${t('selfSelectDays', { count: customDates.length })}）`
+    : t('notSelected')
 
   // 階梯輪播預覽：所選皮膚支持階梯輪播佈局時逐張輪播，切換皮膚時重置
   useEffect(() => {
@@ -347,9 +347,9 @@ export default function PopularSkinPicker() {
   }
 
   const handleSearch = () => {
-    if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
-    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
-    if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
+    if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
+    if (!searchBrand) { message.warning(t('selectBrand')); return }
+    if (!searchStoreName) { message.warning(t('selectStore')); return }
     setHasSearched(true)
   }
   const handleReset = () => {
@@ -361,13 +361,13 @@ export default function PopularSkinPicker() {
   // 自選日期：點擊日曆單日選中/取消
   const handleCustomDateClick = (date: Dayjs | null) => {
     if (!date) return
-    if (date.isBefore(customMinDate, 'day')) { message.warning('最早可選次日（購買後於開始日期 00:00 生效）'); return }
+    if (date.isBefore(customMinDate, 'day')) { message.warning(t('earliestDateWarning')); return }
     if (date.isAfter(customMaxDate, 'day')) {
       // 待開售日期：彈窗提示開售時間（同盤活復蘇規範）
       setPresaleInfo({
         date: date.format('YYYY-MM-DD'),
         weekday: WEEKDAY_LABELS[date.day()],
-        openTime: getPresaleOpenTime(date).format('M月D日 HH:mm'),
+        openTime: getPresaleOpenTime(date).format(t('presaleDateFormat')),
       })
       return
     }
@@ -380,7 +380,7 @@ export default function PopularSkinPicker() {
   }
   // 自選日期：按範圍批量添加（自動跳過休息日與不可選日期）
   const handleBatchAdd = () => {
-    if (!batchRange || !batchRange[0] || !batchRange[1]) { message.warning('請先選擇日期範圍'); return }
+    if (!batchRange || !batchRange[0] || !batchRange[1]) { message.warning(t('selectDateRangeFirst')); return }
     const merged = new Set(customDates)
     let added = 0
     for (let d = batchRange[0].startOf('day'); !d.isAfter(batchRange[1], 'day'); d = d.add(1, 'day')) {
@@ -389,17 +389,17 @@ export default function PopularSkinPicker() {
       const key = d.format('YYYY-MM-DD')
       if (!merged.has(key)) { merged.add(key); added++ }
     }
-    if (added === 0) { message.info('該範圍內沒有可添加的日期'); return }
+    if (added === 0) { message.info(t('noDatesInRange')); return }
     setCustomDates([...merged].sort())
-    message.success(`已添加 ${added} 天${excludedWeekdays.length > 0 ? '（已自動跳過休息日）' : ''}`)
+    message.success(excludedWeekdays.length > 0 ? t('batchAddSkipRest', { count: added }) : t('batchAddSuccess', { count: added }))
   }
   const handleClearCustomDates = () => setCustomDates([])
 
   // 訂單支付
   const handlePayment = () => {
-    if (!selectedSkin) { message.warning('請先選擇皮膚套件'); return }
-    if (customDates.length === 0) { message.warning('請先在日曆中選擇投放日期'); return }
-    if (priceSummary.sale > merchantBalance) { message.error('推廣金餘額不足，請先充值'); return }
+    if (!selectedSkin) { message.warning(t('selectSkinFirst')); return }
+    if (customDates.length === 0) { message.warning(t('selectDatesInCalendar')); return }
+    if (priceSummary.sale > merchantBalance) { message.error(t('balanceInsufficient')); return }
     setIsPaymentModalVisible(true)
   }
   const handleConfirmPayment = () => {
@@ -414,7 +414,7 @@ export default function PopularSkinPicker() {
   const handleContinuePurchase = () => {
     setIsSuccessModalVisible(false)
     setSelectedSkinId(null)
-    message.success('可繼續為門店選購其它皮膚')
+    message.success(t('continuePurchaseHint'))
   }
 
   /** 店鋪信息行（與銷售定價預覽字段保持一致：店名 + 評分/月售/起送信息） */
@@ -634,7 +634,7 @@ export default function PopularSkinPicker() {
           background: 'linear-gradient(135deg, #E8720C, #F59432)',
           borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
           boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-        }}>您的門店</span>
+        }}>{t('adSales.yourStore')}</span>
         {skinCard}
       </div>
       <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
@@ -648,24 +648,24 @@ export default function PopularSkinPicker() {
       {/* 查詢區域 - 與其它購買界面保持一致 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-          <Form.Item label="算法名稱">
-            <Select placeholder="請輸入搜索" value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+          <Form.Item label={t('algoNameLabel')}>
+            <Select placeholder={t('algoSearchPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
               options={ALGORITHM_OPTIONS.map(o => ({ label: o.label, value: o.value }))} />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
+          <Form.Item label={t('brandLabel')}>
+            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
           </Form.Item>
-          <Form.Item label="門店名稱">
-            <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
+          <Form.Item label={t('storeNameLabel')}>
+            <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
           </Form.Item>
-          <Form.Item label="歸屬BD">
-            <Select placeholder="選擇門店後自動帶出" value={searchBD} onChange={v => setSearchBD(v)} allowClear showSearch optionFilterProp="label" options={BD_OPTIONS} />
+          <Form.Item label={t('bdLabel')}>
+            <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={v => setSearchBD(v)} allowClear showSearch optionFilterProp="label" options={BD_OPTIONS} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -673,7 +673,7 @@ export default function PopularSkinPicker() {
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
-          <Empty description="請先選擇算法名稱、所屬品牌、門店名稱，點擊查詢後展示可購買的皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description={t('pspEmptyHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -683,20 +683,20 @@ export default function PopularSkinPicker() {
             <Card
               title={
                 <div>
-                  <Space><SkinOutlined style={{ color: '#E8720C' }} /><span>選擇皮膚套件</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>點擊選中，右側可預覽實際展示效果</span></Space>
+                  <Space><SkinOutlined style={{ color: '#E8720C' }} /><span>{t('selectSkinKit')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('skinSelectHint')}</span></Space>
                   {/* 購買規則說明：生效時間 / 唯一生效 / 到期恢復 */}
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     marginTop: 8, padding: '6px 12px', borderRadius: 6,
                     background: '#FFF9F0', border: '1px solid #FFE0B2',
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>⏰ 購買後於開始日期 00:00 自動生效</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoEffective')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>☁️ 同一門店同一時段僅可生效一套皮膚</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleUniqueSkin')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>🔄 到期後自動恢復默認樣式，可隨時續購</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoRevert')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>🧩 大圖模式菜品佈局由系統按瀑布流策略自動分配，無需選擇</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoLayout')}</span>
                   </div>
                 </div>
               }
@@ -742,10 +742,10 @@ export default function PopularSkinPicker() {
                             padding: '1px 5px', flexShrink: 0,
                           }}>{DISH_LAYOUT_LABEL[l]}</span>
                         ))}
-                        <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>🔥已售{skin.sold}套</span>
+                        <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>{t('soldCount', { count: skin.sold })}</span>
                         <div style={{ flex: 1 }} />
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#FF4D4F' }}>${skin.pricePerDay}</span>
-                        <span style={{ fontSize: 10, color: '#8C8C8C', marginLeft: 1 }}>/天</span>
+                        <span style={{ fontSize: 10, color: '#8C8C8C', marginLeft: 1 }}>{t('perDay')}</span>
                       </div>
                     </div>
                   )
@@ -755,13 +755,13 @@ export default function PopularSkinPicker() {
 
             {/* ② 選擇購買時長：自選日期（日曆跳選），滿足打烊、休息日等靈活投放需求 */}
             <Card
-              title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>選擇購買時長</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>按天計價，購買越多折扣越大</span></Space>}
+              title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>{t('selectDurationTitle')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('durationPricingHint')}</span></Space>}
               bodyStyle={{ padding: '16px 20px' }}
             >
               {/* 梯度折扣橫幅：常駐展示折扣規則與不可退款標識（同盤活復蘇） */}
               <GradientDiscountBanner
-                tiers={DISCOUNT_TIERS.map(t => ({ threshold: t.minDays, discount: t.discount }))}
-                unitLabel="天"
+                tiers={DISCOUNT_TIERS.map(tier => ({ threshold: tier.minDays, discount: tier.discount }))}
+                unitLabel={t('unitDay')}
                 currentCount={customDates.length}
                 refundDisabled={!!searchAlgorithm && ALGORITHM_REFUND_CONFIG[searchAlgorithm] === false}
               />
@@ -794,7 +794,7 @@ export default function PopularSkinPicker() {
                               setPresaleInfo({
                                 date: firstDay.format('YYYY-MM-DD'),
                                 weekday: WEEKDAY_LABELS[firstDay.day()],
-                                openTime: getPresaleOpenTime(firstDay).format('M月D日 HH:mm'),
+                                openTime: getPresaleOpenTime(firstDay).format(t('presaleDateFormat')),
                               })
                               return
                             }
@@ -814,10 +814,10 @@ export default function PopularSkinPicker() {
                           }}
                         >
                           <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                            {m.year() === dayjs().year() ? m.format('M月') : m.format('YY年M月')}
+                            {m.year() === dayjs().year() ? m.format(t('monthFormat')) : m.format(t('yearMonthFormat'))}
                           </span>
                           {monthPresale && (
-                            <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                            <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
                           )}
                           {hasSelectedDates && (
                             <div style={{
@@ -843,17 +843,17 @@ export default function PopularSkinPicker() {
                   {/* 批量添加工具欄：日期範圍 + 每週休息日排除 */}
                   <div style={{ background: '#FAFAFA', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: '#595959' }}>批量添加：</span>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('batchAddLabel')}</span>
                       <RangePicker
                         size="small"
                         value={batchRange}
                         onChange={v => setBatchRange(v)}
                         disabledDate={d => d.isBefore(customMinDate, 'day') || d.isAfter(customMaxDate, 'day')}
                       />
-                      <Button size="small" type="primary" onClick={handleBatchAdd}>添加至日曆</Button>
+                      <Button size="small" type="primary" onClick={handleBatchAdd}>{t('addToCalendar')}</Button>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>每週休息日（批量添加時自動跳過）：</span>
+                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('weeklyRestDays')}</span>
                       {WEEKDAY_LABELS.map((label, i) => {
                         const isExcluded = excludedWeekdays.includes(i)
                         return (
@@ -868,7 +868,7 @@ export default function PopularSkinPicker() {
                               textDecoration: isExcluded ? 'line-through' : 'none',
                               transition: 'all 0.2s',
                             }}
-                          >週{label}</div>
+                          >{t('weekdayPrefix')}{label}</div>
                         )
                       })}
                     </div>
@@ -878,7 +878,7 @@ export default function PopularSkinPicker() {
                   <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAFAFA', borderBottom: '1px solid #f0f0f0' }}>
                       {WEEKDAY_LABELS.map((w, i) => (
-                        <div key={w} style={{ padding: '8px 0', textAlign: 'center', fontSize: 12, fontWeight: 600, color: i === 0 || i === 6 ? '#FA8C16' : '#595959' }}>週{w}</div>
+                        <div key={w} style={{ padding: '8px 0', textAlign: 'center', fontSize: 12, fontWeight: 600, color: i === 0 || i === 6 ? '#FA8C16' : '#595959' }}>{t('weekdayPrefix')}{w}</div>
                       ))}
                     </div>
                     {customCalendarGrid.map((week, wi) => (
@@ -906,9 +906,9 @@ export default function PopularSkinPicker() {
                               }}
                             >
                               <span>{date.date()}</span>
-                              {isSelected && <span style={{ fontSize: 9, lineHeight: 1, color: '#52C41A' }}>已選</span>}
+                              {isSelected && <span style={{ fontSize: 9, lineHeight: 1, color: '#52C41A' }}>{t('selectedTag')}</span>}
                               {isPresale && (
-                                <span style={{ fontSize: 9, lineHeight: '12px', color: '#8c8c8c', border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                                <span style={{ fontSize: 9, lineHeight: '12px', color: '#8c8c8c', border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
                               )}
                             </div>
                           )
@@ -922,16 +922,16 @@ export default function PopularSkinPicker() {
                     <div style={{ marginTop: 12, background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 8, padding: '10px 12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: '#389E0D' }}>
-                          已選 {customDates.length} 天{currentTier ? `，享 ${currentTier.discount / 10} 折` : ''}
+                          已選 {customDates.length} 天{currentTier ? t('enjoyingDiscount', { discount: currentTier.discount / 10 }) : ''}
                         </span>
                         {(() => {
-                          const nextTier = DISCOUNT_TIERS.find(t => effectiveDays < t.minDays)
+                          const nextTier = DISCOUNT_TIERS.find(tier => effectiveDays < tier.minDays)
                           return nextTier ? (
-                            <span style={{ fontSize: 12, color: '#FA8C16' }}>再選 {nextTier.minDays - effectiveDays} 天可享 {nextTier.discount / 10} 折</span>
+                            <span style={{ fontSize: 12, color: '#FA8C16' }}>{t('moreForNextTier', { days: nextTier.minDays - effectiveDays, discount: nextTier.discount / 10 })}</span>
                           ) : null
                         })()}
                         <div style={{ flex: 1 }} />
-                        <Button size="small" type="link" danger onClick={handleClearCustomDates} style={{ padding: 0 }}>清空</Button>
+                        <Button size="small" type="link" danger onClick={handleClearCustomDates} style={{ padding: 0 }}>{t('clearAction')}</Button>
                       </div>
                       {customDatesByMonth.map(g => (
                         <div key={g.month} style={{ fontSize: 12, color: '#595959', lineHeight: '20px' }}>
@@ -940,7 +940,7 @@ export default function PopularSkinPicker() {
                       ))}
                     </div>
                   ) : (
-                    <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>尚未選擇日期，點擊日曆中的日期即可選中/取消，也可使用上方批量添加</div>
+                    <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>{t('noDatesSelectedHint')}</div>
                   )}
                 </div>
             </Card>
@@ -949,13 +949,13 @@ export default function PopularSkinPicker() {
           {/* 右側：效果預覽 + 訂單結算 */}
           <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* 效果預覽：瀑布流對比視角，上下模糊普通店鋪卡，突出當前所選皮膚 */}
-            <Card size="small" title={<Space><span>📱</span><span>購買後效果預覽</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
+            <Card size="small" title={<Space><span>📱</span><span>{t('previewTitle')}</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
               {selectedSkin ? (
                 <div>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>小圖模式</div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('smallMode')}</div>
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '12px 0 6px' }}>
-                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>大圖模式</span>
+                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('bigMode')}</span>
                     {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
                     {selectedSkin.dishLayouts.length > 1 && selectedSkin.dishLayouts.map((l, idx) => {
                       const isActive = idx === Math.min(previewLayoutIndex, selectedSkin.dishLayouts.length - 1)
@@ -977,49 +977,49 @@ export default function PopularSkinPicker() {
                   {renderWaterfallCompare(renderSkinBigPreview(selectedSkin))}
                   {/* 風格分配說明：消除商家對固定展示風格的誤解 */}
                   <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
-                    💡 大圖模式風格由系統隨機分配，在皮膚支持的風格間自動切換展示，商家無需選擇；在瀑布流第幾個位置以大圖模式展示，同樣由系統策略決定
+                    💡 {t('styleAutoHint')}
                   </div>
                 </div>
               ) : (
-                <Empty description="請先選擇皮膚套件" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('skinEmptyHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
             </Card>
 
             {/* 訂單結算 */}
-            <Card size="small" title="費用結算">
+            <Card size="small" title={t('settlementTitle')}>
               <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>推廣金餘額</span>
+                <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
                 <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
               </div>
               <div style={{ fontSize: 13, color: '#595959', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>購買門店</span>
+                  <span>{t('purchaseStore')}</span>
                   <span style={{ color: '#262626', fontWeight: 500 }}>{selectedStore?.name || '-'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>皮膚套件</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedSkin ? `${selectedSkin.name}（$${selectedSkin.pricePerDay}/天）` : '未選擇'}</span>
+                  <span>{t('skinKit')}</span>
+                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedSkin ? `${selectedSkin.name}（$${selectedSkin.pricePerDay}${t('perDay')}）` : t('notSelected')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>投放時段</span>
+                  <span>{t('deliveryPeriod')}</span>
                   <span style={{ color: '#262626', fontWeight: 500 }}>{periodText}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>梯度折扣</span>
-                  {currentTier ? <Tag color="green" style={{ marginRight: 0 }}>{currentTier.discount / 10}折</Tag> : <Tag style={{ marginRight: 0 }}>無折扣</Tag>}
+                  <span>{t('tierDiscountRate')}</span>
+                  {currentTier ? <Tag color="green" style={{ marginRight: 0 }}>{currentTier.discount / 10}{t('discount')}</Tag> : <Tag style={{ marginRight: 0 }}>{t('noDiscount')}</Tag>}
                 </div>
               </div>
               <div style={{ background: '#FAFAFA', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>訂單金額（原價）</span>
+                  <span style={{ color: '#8C8C8C' }}>{t('orderOriginal')}</span>
                   <span style={{ fontWeight: 600, color: '#595959' }}>${priceSummary.original}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>訂單優惠</span>
+                  <span style={{ color: '#8C8C8C' }}>{t('orderDiscount')}</span>
                   <span style={{ fontWeight: 600, color: '#FA8C16' }}>-${priceSummary.saved}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #E8E8E8', paddingTop: 8, marginTop: 8 }}>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>實付總額</span>
+                  <span style={{ color: '#262626', fontWeight: 600 }}>{t('totalPayable')}</span>
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#FF4D4F' }}>${priceSummary.sale}</span>
                 </div>
               </div>
@@ -1032,7 +1032,7 @@ export default function PopularSkinPicker() {
                   height: 44, fontSize: 16, fontWeight: 600,
                 }}
               >
-                訂單支付
+                {t('payButton')}
               </Button>
             </Card>
           </div>
@@ -1041,9 +1041,9 @@ export default function PopularSkinPicker() {
 
       {/* 支付確認彈窗 */}
       <Modal
-        title="確認訂單" open={isPaymentModalVisible}
+        title={t('confirmOrder')} open={isPaymentModalVisible}
         onOk={handleConfirmPayment} onCancel={() => setIsPaymentModalVisible(false)}
-        okText="確定支付" cancelText="取消"
+        okText={t('confirmPay')} cancelText={t('cancel')}
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
         width={480}
       >
@@ -1054,19 +1054,19 @@ export default function PopularSkinPicker() {
             </div>
             <div style={{ background: '#fafafa', padding: 16, borderRadius: 6, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#595959' }}>皮膚套件：</span>
-                <span style={{ fontWeight: 600 }}>{selectedSkin.name}（${selectedSkin.pricePerDay}/天）</span>
+                <span style={{ color: '#595959' }}>{t('skinKitColon')}</span>
+                <span style={{ fontWeight: 600 }}>{selectedSkin.name}（${selectedSkin.pricePerDay}{t('perDay')}）</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#595959' }}>投放時段：</span>
+                <span style={{ color: '#595959' }}>{t('deliveryPeriodColon')}</span>
                 <span style={{ fontWeight: 600 }}>{periodTextFull}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-                <span>訂單優惠：</span>
-                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}{currentTier ? `（${currentTier.discount / 10}折）` : ''}</span>
+                <span>{t('orderDiscountColon')}</span>
+                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}{currentTier ? `（${currentTier.discount / 10}${t('discount')}）` : ''}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                <span style={{ fontWeight: 600 }}>實付金額：</span>
+                <span style={{ fontWeight: 600 }}>{t('actualAmountColon')}</span>
                 <span style={{ fontWeight: 700 }}>${priceSummary.sale}</span>
               </div>
             </div>
@@ -1076,18 +1076,18 @@ export default function PopularSkinPicker() {
 
       {/* 支付成功彈窗 */}
       <Modal
-        title="購買成功" open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
+        title={t('purchaseSuccess')} open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
         footer={[
-          <Button key="view" type="primary" onClick={handleViewOrder}>查看訂單</Button>,
-          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>繼續購買</Button>,
+          <Button key="view" type="primary" onClick={handleViewOrder}>{t('viewOrder')}</Button>,
+          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>{t('continueBuy')}</Button>,
         ]}
         width={400}
       >
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>恭喜！皮膚購買成功</p>
+          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('skinPurchaseSuccess')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8 }}>
-            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已扣除推廣金</p>
+            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
             <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${priceSummary.sale}</p>
           </div>
         </div>
@@ -1098,14 +1098,14 @@ export default function PopularSkinPicker() {
         title={
           <Space>
             <span style={{ fontSize: 18 }}>⏳</span>
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>該日期尚未開售</span>
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('notYetOnSale')}</span>
           </Space>
         }
         open={!!presaleInfo}
         onCancel={() => setPresaleInfo(null)}
         footer={[
           <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
-            我知道了
+            {t('gotIt')}
           </Button>
         ]}
         width={420}
@@ -1116,11 +1116,11 @@ export default function PopularSkinPicker() {
               background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
               padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
             }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>⏰ 開售時間：</span>
+              <span style={{ fontSize: 13, color: '#595959' }}>{t('saleTimeLabel')}</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
             </div>
             <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
-              每日 {PRESALE_OPEN_HOUR}:00 會放出新一天的可購買日期，請屆時再來搶購。
+              {t('dailyReleaseHint', { hour: PRESALE_OPEN_HOUR })}
             </p>
           </div>
         )}

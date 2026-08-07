@@ -3,6 +3,7 @@ import { Button, Input, Select, DatePicker, Table, Tag, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -20,37 +21,24 @@ import { getAllDebtBills } from './mockBills'
 
 const { RangePicker } = DatePicker
 
-/** 賬單狀態選項 */
-const statusOptions = [
-  { label: '未結清', value: 'unsettled' },
-  { label: '已結清', value: 'settled' },
-  { label: '已轉結', value: 'transferred' },
-]
-
-/** 賬單來源選項 */
-const sourceOptions = [
-  { label: '充值營業額扣款', value: 'recharge' },
-  { label: '合併欠款轉入', value: 'merge' },
-]
-
-/** 業務頻道選項（全局統一枚舉） */
+/** 業務頻道選項（全局統一枚舉，值與數據庫存儲一致，保持中文） */
 const channelOptions = [
   { label: '美食外賣', value: '美食外賣' },
   { label: '超市百貨', value: '超市百貨' },
   { label: '團購到店', value: '團購到店' },
 ]
 
-/** 賬單狀態展示映射 */
-const statusMeta: Record<string, { label: string; color: string }> = {
-  unsettled: { label: '未結清', color: 'error' },
-  settled: { label: '已結清', color: 'success' },
-  transferred: { label: '已轉結', color: 'processing' },
+/** 賬單狀態展示映射（label 為 i18n key，value 為英文枚舉碼） */
+const statusMeta: Record<string, { labelKey: string; color: string }> = {
+  unsettled: { labelKey: 'debtReconcile.statusUnsettled', color: 'error' },
+  settled: { labelKey: 'debtReconcile.statusSettled', color: 'success' },
+  transferred: { labelKey: 'debtReconcile.statusTransferred', color: 'processing' },
 }
 
-/** 賬單來源展示映射 */
-const sourceLabelMap: Record<string, string> = {
-  recharge: '充值營業額扣款',
-  merge: '合併欠款轉入',
+/** 賬單來源展示映射（i18n key，value 為英文枚舉碼） */
+const sourceLabelMapKeys: Record<string, string> = {
+  recharge: 'debtReconcile.sourceRecharge',
+  merge: 'debtReconcile.sourceMerge',
 }
 
 /** 保留兩位小數 */
@@ -89,6 +77,7 @@ function AnimatedAmount({ value }: { value: number }) {
 function BrandDebtCard({ icon, label, value, count, color, bgColor }: {
   icon: string; label: string; value: number; count: number; color: string; bgColor: string
 }) {
+  const { t } = useTranslation()
   return (
     <div
       className="debt-brand-card"
@@ -105,7 +94,7 @@ function BrandDebtCard({ icon, label, value, count, color, bgColor }: {
       <span className="debt-brand-card-icon">{icon}</span>
       <div className="debt-brand-card-info">
         <span className="debt-brand-card-label">{label}</span>
-        <span className="debt-brand-card-sub">未結清 {count} 筆</span>
+        <span className="debt-brand-card-sub">{t('debtReconcile.unsettledCount', { count })}</span>
       </div>
       <span className="debt-brand-card-value" style={{ color }}><AnimatedAmount value={value} /></span>
     </div>
@@ -176,7 +165,21 @@ function mockFetchDebts(query: FinDebtQuery): FinDebtPageResult {
 export default function DebtReconcile() {
   const navigate = useNavigate()
   // 菜单权限：debt-reconcile
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
+
+  /** 賬單狀態選項（label 為 i18n key） */
+  const statusOptions = [
+    { label: t('debtReconcile.statusUnsettled'), value: 'unsettled' },
+    { label: t('debtReconcile.statusSettled'), value: 'settled' },
+    { label: t('debtReconcile.statusTransferred'), value: 'transferred' },
+  ]
+
+  /** 賬單來源選項 */
+  const sourceOptions = [
+    { label: t('debtReconcile.sourceRecharge'), value: 'recharge' },
+    { label: t('debtReconcile.sourceMerge'), value: 'merge' },
+  ]
   const [form] = Form.useForm<DebtFilters>()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [filters, setFilters] = useState<DebtFilters>({})
@@ -241,25 +244,25 @@ export default function DebtReconcile() {
 
   /** 列配置元數據 */
   const columnMeta = useMemo(() => [
-    { key: 'index', title: '序號' },
-    { key: 'groupId', title: '集團ID' },
-    { key: 'groupName', title: '集團名稱' },
-    { key: 'storeId', title: '門店ID' },
-    { key: 'storeName', title: '門店名稱' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'channel', title: '業務頻道' },
-    { key: 'bd', title: '歸屬BD' },
-    { key: 'source', title: '賬單來源' },
-    { key: 'loanDate', title: '借款日期' },
-    { key: 'billNo', title: '賬單編號' },
-    { key: 'batchNo', title: '關聯批次號' },
-    { key: 'flowNo', title: '流程編號' },
-    { key: 'debtTotal', title: '欠款總額' },
-    { key: 'paidAmount', title: '已還金額' },
-    { key: 'remainAmount', title: '剩餘待還' },
-    { key: 'status', title: '賬單狀態' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'index', title: t('common.colIndex') },
+    { key: 'groupId', title: t('common.colGroupId') },
+    { key: 'groupName', title: t('common.colGroupName') },
+    { key: 'storeId', title: t('common.colStoreId') },
+    { key: 'storeName', title: t('common.colStoreName') },
+    { key: 'brand', title: t('common.colBrand') },
+    { key: 'channel', title: t('common.colChannel') },
+    { key: 'bd', title: t('common.colBd') },
+    { key: 'source', title: t('debtReconcile.colSource') },
+    { key: 'loanDate', title: t('debtReconcile.colLoanDate') },
+    { key: 'billNo', title: t('debtReconcile.colBillNo') },
+    { key: 'batchNo', title: t('common.colBatchNo') },
+    { key: 'flowNo', title: t('common.colFlowNo') },
+    { key: 'debtTotal', title: t('debtReconcile.colDebtTotal') },
+    { key: 'paidAmount', title: t('debtReconcile.colPaidAmount') },
+    { key: 'remainAmount', title: t('debtReconcile.colRemainAmount') },
+    { key: 'status', title: t('debtReconcile.colStatus') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('debt-reconcile', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -267,57 +270,57 @@ export default function DebtReconcile() {
 
   const columns: TableColumnsType<DebtStoreRecord> = [
     {
-      title: '序號', key: 'index', width: 60, align: 'center', fixed: 'left',
+      title: t('common.colIndex'), key: 'index', width: 60, align: 'center', fixed: 'left',
       render: (_, __, i) => (pagination.page - 1) * pagination.size + i + 1,
     },
-    { title: '集團ID', dataIndex: 'groupId', key: 'groupId', width: 100, fixed: 'left' },
-    { title: '集團名稱', dataIndex: 'groupName', key: 'groupName', width: 120, fixed: 'left' },
-    { title: '門店ID', dataIndex: 'storeId', key: 'storeId', width: 110 },
-    { title: '門店名稱', dataIndex: 'storeName', key: 'storeName', width: 150 },
+    { title: t('common.colGroupId'), dataIndex: 'groupId', key: 'groupId', width: 100, fixed: 'left' },
+    { title: t('common.colGroupName'), dataIndex: 'groupName', key: 'groupName', width: 120, fixed: 'left' },
+    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId', width: 110 },
+    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', width: 150 },
     {
-      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      title: t('common.colBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: string) => <BrandTag value={v} />,
     },
     {
-      title: '業務頻道', dataIndex: 'channel', key: 'channel', width: 100,
+      title: t('common.colChannel'), dataIndex: 'channel', key: 'channel', width: 100,
       render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v,
     },
-    { title: '歸屬BD', dataIndex: 'bd', key: 'bd', width: 110 },
+    { title: t('common.colBd'), dataIndex: 'bd', key: 'bd', width: 110 },
     {
-      title: '賬單來源', dataIndex: 'source', key: 'source', width: 130,
+      title: t('debtReconcile.colSource'), dataIndex: 'source', key: 'source', width: 130,
       render: (v: string) => (
-        <Tag color={v === 'merge' ? 'purple' : 'blue'}>{sourceLabelMap[v] || v}</Tag>
+        <Tag color={v === 'merge' ? 'purple' : 'blue'}>{sourceLabelMapKeys[v] ? t(sourceLabelMapKeys[v]) : v}</Tag>
       ),
     },
-    { title: '借款日期', dataIndex: 'loanDate', key: 'loanDate', width: 110 },
-    { title: '賬單編號', dataIndex: 'billNo', key: 'billNo', width: 160 },
-    { title: '關聯批次號', dataIndex: 'batchNo', key: 'batchNo', width: 160 },
-    { title: '流程編號', dataIndex: 'flowNo', key: 'flowNo', width: 160 },
+    { title: t('debtReconcile.colLoanDate'), dataIndex: 'loanDate', key: 'loanDate', width: 110 },
+    { title: t('debtReconcile.colBillNo'), dataIndex: 'billNo', key: 'billNo', width: 160 },
+    { title: t('common.colBatchNo'), dataIndex: 'batchNo', key: 'batchNo', width: 160 },
+    { title: t('common.colFlowNo'), dataIndex: 'flowNo', key: 'flowNo', width: 160 },
     {
-      title: '欠款總額', dataIndex: 'debtTotal', key: 'debtTotal', width: 120, align: 'right',
+      title: t('debtReconcile.colDebtTotal'), dataIndex: 'debtTotal', key: 'debtTotal', width: 120, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '已還金額', dataIndex: 'paidAmount', key: 'paidAmount', width: 120, align: 'right',
+      title: t('debtReconcile.colPaidAmount'), dataIndex: 'paidAmount', key: 'paidAmount', width: 120, align: 'right',
       render: (v: number) => <span style={{ color: '#52C41A', fontWeight: 500 }}>{fmtAmt(v)}</span>,
     },
     {
-      title: '剩餘待還', dataIndex: 'remainAmount', key: 'remainAmount', width: 120, align: 'right',
+      title: t('debtReconcile.colRemainAmount'), dataIndex: 'remainAmount', key: 'remainAmount', width: 120, align: 'right',
       render: (v: number) => (
         <span style={{ color: v > 0 ? '#FF4D4F' : '#52C41A', fontWeight: 600 }}>{fmtAmt(v)}</span>
       ),
     },
     {
-      title: '賬單狀態', dataIndex: 'status', key: 'status', width: 100,
+      title: t('debtReconcile.colStatus'), dataIndex: 'status', key: 'status', width: 100,
       render: (v: string) => {
-        const meta = statusMeta[v] || { label: v, color: 'default' }
-        return <Tag color={meta.color}>{meta.label}</Tag>
+        const meta = statusMeta[v] || { labelKey: '', color: 'default' }
+        return <Tag color={meta.color}>{meta.labelKey ? t(meta.labelKey) : v}</Tag>
       },
     },
     {
-      title: '操作', key: 'action', width: 80, fixed: 'right',
+      title: t('common.colAction'), key: 'action', width: 80, fixed: 'right',
       render: (_, record) => (
-        <Button type="link" size="small" onClick={() => navigate(`/debt-detail?billNo=${record.billNo}`)}>詳情</Button>
+        <Button type="link" size="small" onClick={() => navigate(`/debt-detail?billNo=${record.billNo}`)}>{t('common.detail')}</Button>
       ),
     },
   ]
@@ -327,43 +330,43 @@ export default function DebtReconcile() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={form}>
-          <Form.Item label="集團ID" name="groupId">
-            <Input placeholder="請輸入集團ID" allowClear />
+          <Form.Item label={t('common.colGroupId')} name="groupId">
+            <Input placeholder={t('common.groupIdPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="集團名稱" name="groupName">
-            <Input placeholder="請輸入集團名稱" allowClear />
+          <Form.Item label={t('common.colGroupName')} name="groupName">
+            <Input placeholder={t('common.groupNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="門店名稱" name="storeName">
-            <Input placeholder="請輸入門店名稱" allowClear />
+          <Form.Item label={t('common.colStoreName')} name="storeName">
+            <Input placeholder={t('debtReconcile.storeNamePlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="全部" options={brandOptions} allowClear />
+          <Form.Item label={t('common.colBrand')} name="brand">
+            <Select placeholder={t('common.all')} options={brandOptions} allowClear />
           </Form.Item>
-          <Form.Item label="賬單編號" name="billNo">
-            <Input placeholder="請輸入賬單編號" allowClear />
+          <Form.Item label={t('debtReconcile.colBillNo')} name="billNo">
+            <Input placeholder={t('debtReconcile.billNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="關聯批次號" name="batchNo">
-            <Input placeholder="請輸入批次號" allowClear />
+          <Form.Item label={t('common.colBatchNo')} name="batchNo">
+            <Input placeholder={t('common.batchNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="流程編號" name="flowNo">
-            <Input placeholder="請輸入流程編號" allowClear />
+          <Form.Item label={t('common.colFlowNo')} name="flowNo">
+            <Input placeholder={t('common.flowNoPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="賬單狀態" name="status">
-            <Select placeholder="全部" options={statusOptions} allowClear />
+          <Form.Item label={t('debtReconcile.colStatus')} name="status">
+            <Select placeholder={t('common.all')} options={statusOptions} allowClear />
           </Form.Item>
-          <Form.Item label="賬單來源" name="source">
-            <Select placeholder="全部" options={sourceOptions} allowClear />
+          <Form.Item label={t('debtReconcile.colSource')} name="source">
+            <Select placeholder={t('common.all')} options={sourceOptions} allowClear />
           </Form.Item>
-          <Form.Item label="業務頻道" name="channel">
-            <Select placeholder="全部" options={channelOptions} allowClear />
+          <Form.Item label={t('common.colChannel')} name="channel">
+            <Select placeholder={t('common.all')} options={channelOptions} allowClear />
           </Form.Item>
-          <Form.Item label="借款日期" name="loanDateRange">
-            <RangePicker format="YYYY-MM-DD" placeholder={['開始日期', '結束日期']} />
+          <Form.Item label={t('debtReconcile.colLoanDate')} name="loanDateRange">
+            <RangePicker format="YYYY-MM-DD" placeholder={[t('writeoffReconcile.startDate'), t('writeoffReconcile.endDate')]} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -373,7 +376,7 @@ export default function DebtReconcile() {
       <div className="debt-brand-cards">
         <BrandDebtCard
           icon="🐝"
-          label="閃蜂總待還金額"
+          label={t('debtReconcile.cardShanfeng')}
           value={brandStats.shanfeng.amount}
           count={brandStats.shanfeng.count}
           color="#FB8C00"
@@ -381,7 +384,7 @@ export default function DebtReconcile() {
         />
         <BrandDebtCard
           icon="🍔"
-          label="mFood總待還金額"
+          label={t('debtReconcile.cardMfood')}
           value={brandStats.mfood.amount}
           count={brandStats.mfood.count}
           color="#F5680C"
@@ -393,10 +396,10 @@ export default function DebtReconcile() {
       <div className="action-section">
         <div className="action-section-left">
           {hasPermission('debt-reconcile:export') && (
-            <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+            <Button className="btn-export" icon={<ExportOutlined />}>{t('common.export')}</Button>
           )}
           {hasPermission('debt-reconcile:import') && (
-            <Button className="btn-import" icon={<ImportOutlined />}>還款導入</Button>
+            <Button className="btn-import" icon={<ImportOutlined />}>{t('debtReconcile.repayImport')}</Button>
           )}
         </div>
         <div className="action-section-right">
@@ -419,7 +422,7 @@ export default function DebtReconcile() {
             current: pagination.page,
             pageSize: pagination.size,
             total,
-            showTotal: (t) => `共 ${t} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showQuickJumper: true,

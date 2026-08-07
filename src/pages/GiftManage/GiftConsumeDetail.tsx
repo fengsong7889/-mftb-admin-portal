@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { Button, Space, Input, Select, Table, Form, message, Tag, DatePicker, Tooltip } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import {
@@ -21,46 +22,12 @@ import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
 
-/** 廣告類型 */
-const adTypeOptions = [
-  { label: '全部', value: '' },
-  { label: '新店廣告', value: 'new_store' },
-  { label: '盤活復蘇', value: 'revival' },
-  { label: '獨家商家', value: 'exclusive' },
-  { label: '金牌商家', value: 'gold' },
-  { label: '人氣商家', value: 'ka' },
-]
-
-const adTypeMap: Record<string, string> = {
-  new_store: '新店廣告',
-  revival: '盤活復蘇',
-  exclusive: '獨家商家',
-  gold: '金牌商家',
-  ka: '人氣商家',
-}
-
 const adTypeColorMap: Record<string, string> = {
   new_store: '#52C41A',
   revival: '#E8720C',
   exclusive: '#722ED1',
   gold: '#FAAD14',
   ka: '#1890FF',
-}
-
-/** 交易類型 */
-const tradeTypeOptions = [
-  { label: '全部', value: '' },
-  { label: '購買廣告', value: 'ad_purchase' },
-  { label: '廣告退款', value: 'ad_refund' },
-  { label: '手動扣除', value: 'manual_deduct' },
-  { label: '自動過期', value: 'auto_expire' },
-]
-
-const tradeTypeMap: Record<string, string> = {
-  ad_purchase: '購買廣告',
-  ad_refund: '廣告退款',
-  manual_deduct: '手動扣除',
-  auto_expire: '自動過期',
 }
 
 const tradeTypeColorMap: Record<string, string> = {
@@ -73,7 +40,42 @@ const tradeTypeColorMap: Record<string, string> = {
 export default function GiftConsumeDetail() {
   // 菜单权限：gift-consume-detail
   const { hasPermission } = useAuth()
+  const { t } = useTranslation('giftConsumeDetail')
   const [form] = Form.useForm()
+
+  /** 廣告類型 */
+  const adTypeOptions = [
+    { label: t('common:all'), value: '' },
+    { label: t('adTypeNewStore'), value: 'new_store' },
+    { label: t('adTypeRevival'), value: 'revival' },
+    { label: t('adTypeExclusive'), value: 'exclusive' },
+    { label: t('adTypeGold'), value: 'gold' },
+    { label: t('adTypeKa'), value: 'ka' },
+  ]
+
+  const adTypeMap: Record<string, string> = {
+    new_store: t('adTypeNewStore'),
+    revival: t('adTypeRevival'),
+    exclusive: t('adTypeExclusive'),
+    gold: t('adTypeGold'),
+    ka: t('adTypeKa'),
+  }
+
+  /** 交易類型 */
+  const tradeTypeOptions = [
+    { label: t('common:all'), value: '' },
+    { label: t('tradeTypePurchase'), value: 'ad_purchase' },
+    { label: t('tradeTypeRefund'), value: 'ad_refund' },
+    { label: t('tradeTypeDeduct'), value: 'manual_deduct' },
+    { label: t('tradeTypeExpire'), value: 'auto_expire' },
+  ]
+
+  const tradeTypeMap: Record<string, string> = {
+    ad_purchase: t('tradeTypePurchase'),
+    ad_refund: t('tradeTypeRefund'),
+    manual_deduct: t('tradeTypeDeduct'),
+    auto_expire: t('tradeTypeExpire'),
+  }
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<GiftConsumeItem[]>([])
@@ -145,7 +147,7 @@ export default function GiftConsumeDetail() {
       setDataSource(res.records || [])
       setTotal(res.total || 0)
     } catch {
-      message.error('查詢失敗')
+      message.error(t('common:queryFailed'))
     } finally {
       setLoading(false)
     }
@@ -187,7 +189,7 @@ export default function GiftConsumeDetail() {
   }
 
   const handleExport = () => {
-    message.success('導出功能開發中...')
+    message.success(t('common:exportDev'))
   }
 
   const handleTableChange = (pagination: TablePaginationConfig) => {
@@ -202,7 +204,7 @@ export default function GiftConsumeDetail() {
 
   const columns: TableColumnsType<GiftConsumeItem> = [
     {
-      title: '集團ID/集團名稱',
+      title: t('colGroupInfo'),
       key: 'groupInfo',
       width: 160,
       render: (_, record) => (
@@ -213,7 +215,7 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '門店ID/門店名稱',
+      title: t('colStoreInfo'),
       key: 'storeInfo',
       width: 160,
       render: (_, record) => (
@@ -224,14 +226,14 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '所屬品牌',
+      title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
       render: (brand: string) => <BrandTag value={brand} />,
     },
     {
-      title: '廣告類型',
+      title: t('colAdType'),
       dataIndex: 'adType',
       key: 'adType',
       width: 110,
@@ -249,7 +251,7 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '交易類型',
+      title: t('colTradeType'),
       dataIndex: 'tradeType',
       key: 'tradeType',
       width: 120,
@@ -260,7 +262,7 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '余額變動',
+      title: t('colBalanceChange'),
       dataIndex: 'balanceChange',
       key: 'balanceChange',
       width: 110,
@@ -270,18 +272,18 @@ export default function GiftConsumeDetail() {
           fontWeight: 600,
           fontSize: 14,
         }}>
-          {val > 0 ? '+' : ''}{val} 天
+          {val > 0 ? '+' : ''}{val} {t('dayUnit')}
         </span>
       ),
     },
     {
-      title: '變動日期',
+      title: t('colChangeDate'),
       dataIndex: 'changeDate',
       key: 'changeDate',
       width: 120,
     },
     {
-      title: '廣告算法ID/算法名稱',
+      title: t('colAlgorithmInfo'),
       key: 'algorithmInfo',
       width: 200,
       render: (_, record) => (
@@ -292,7 +294,7 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '關聯贈送ID',
+      title: t('colGiftId'),
       dataIndex: 'giftId',
       key: 'giftId',
       width: 160,
@@ -303,7 +305,7 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '關聯訂單號',
+      title: t('colOrderNo'),
       dataIndex: 'orderNo',
       key: 'orderNo',
       width: 150,
@@ -314,18 +316,18 @@ export default function GiftConsumeDetail() {
       ),
     },
     {
-      title: '剩餘天數',
+      title: t('colRemainingDays'),
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
       render: (days: number) => (
         <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-          {days} 天
+          {days} {t('dayUnit')}
         </span>
       ),
     },
     {
-      title: '備註',
+      title: t('colRemark'),
       dataIndex: 'remark',
       key: 'remark',
       width: 220,
@@ -363,9 +365,9 @@ export default function GiftConsumeDetail() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
-          <Form.Item name="groupInfo" label="集團ID/名稱">
+          <Form.Item name="groupInfo" label={t('searchGroupIdName')}>
             <Select
-              placeholder="支持ID和名稱搜索查詢"
+              placeholder={t('searchGroupIdPlaceholder')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -378,9 +380,9 @@ export default function GiftConsumeDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="storeInfo" label="門店ID/名稱">
+          <Form.Item name="storeInfo" label={t('searchStoreIdName')}>
             <Select
-              placeholder="支持ID和名稱搜索查詢"
+              placeholder={t('searchStoreIdPlaceholder')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -394,9 +396,9 @@ export default function GiftConsumeDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="brand" label="所屬品牌">
+          <Form.Item name="brand" label={t('common:brand')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common:all')}
               allowClear
               options={brandOptions}
               value={searchBrand || undefined}
@@ -404,9 +406,9 @@ export default function GiftConsumeDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="adType" label="廣告類型">
+          <Form.Item name="adType" label={t('colAdType')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common:all')}
               allowClear
               options={adTypeOptions}
               value={searchAdType || undefined}
@@ -414,9 +416,9 @@ export default function GiftConsumeDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="tradeType" label="交易類型">
+          <Form.Item name="tradeType" label={t('colTradeType')}>
             <Select
-              placeholder="全部"
+              placeholder={t('common:all')}
               allowClear
               options={tradeTypeOptions}
               value={searchTradeType || undefined}
@@ -424,34 +426,34 @@ export default function GiftConsumeDetail() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="algorithmInfo" label="廣告算法ID/名稱">
+          <Form.Item name="algorithmInfo" label={t('searchAlgorithmInfo')}>
             <Input
-              placeholder="輸入算法ID或名稱搜索"
+              placeholder={t('searchAlgorithmPlaceholder')}
               allowClear
               value={searchAlgorithmId}
               onChange={(e) => setSearchAlgorithmId(e.target.value)}
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="giftId" label="贈送ID">
+          <Form.Item name="giftId" label={t('searchGiftId')}>
             <Input
-              placeholder="請輸入贈送ID"
+              placeholder={t('searchGiftIdPlaceholder')}
               allowClear
               value={searchGiftId}
               onChange={(e) => setSearchGiftId(e.target.value)}
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="orderNo" label="關聯訂單號">
+          <Form.Item name="orderNo" label={t('colOrderNo')}>
             <Input
-              placeholder="請輸入訂單號"
+              placeholder={t('searchOrderNoPlaceholder')}
               allowClear
               value={searchOrderNo}
               onChange={(e) => setSearchOrderNo(e.target.value)}
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item name="changeDate" label="變動日期">
+          <Form.Item name="changeDate" label={t('searchChangeDate')}>
             <RangePicker
               style={{ width: '100%' }}
               value={searchDateRange ? [dayjs(searchDateRange[0]), dayjs(searchDateRange[1])] : null}
@@ -468,10 +470,10 @@ export default function GiftConsumeDetail() {
           <Form.Item className="search-actions">
             <Space>
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common:search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common:reset')}
               </Button>
             </Space>
           </Form.Item>
@@ -483,7 +485,7 @@ export default function GiftConsumeDetail() {
         <div className="action-section-left">
           {hasPermission('gift-consume-detail:export') && (
             <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-              導出
+              {t('common:export')}
             </Button>
           )}
         </div>
@@ -511,7 +513,7 @@ export default function GiftConsumeDetail() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條`,
+          showTotal: (total) => t('common:total', { count: total }),
         }}
         scroll={{ x: 1500 }}
       />

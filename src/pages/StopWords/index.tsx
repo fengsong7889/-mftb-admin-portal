@@ -3,6 +3,7 @@ import { Card, Table, Button, Modal, Input, message, Popconfirm, Tag, Space } fr
 import {
   PlusOutlined,
 } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 
 interface StopWord {
   id: string
@@ -12,6 +13,7 @@ interface StopWord {
 }
 
 export default function StopWords() {
+  const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingWord, setEditingWord] = useState<StopWord | null>(null)
   const [searchText, setSearchText] = useState('')
@@ -34,23 +36,23 @@ export default function StopWords() {
 
   const columns = [
     {
-      title: '停用詞',
+      title: t('stopWords.colStopWord'),
       dataIndex: 'word',
       key: 'word',
       render: (text: string) => <Tag color="red">{text}</Tag>,
     },
     {
-      title: '創建時間',
+      title: t('common.colCreateTime'),
       dataIndex: 'createTime',
       key: 'createTime',
     },
     {
-      title: '創建人',
+      title: t('common.colCreator'),
       dataIndex: 'creator',
       key: 'creator',
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       render: (_: unknown, record: StopWord) => (
         <Space size="small">
@@ -60,17 +62,17 @@ export default function StopWords() {
             
             onClick={() => handleEdit(record)}
           >
-            編輯
+            {t('common.edit')}
           </Button>
           <Popconfirm
-            title="確認刪除"
-            description="刪除後將無法恢復,確認刪除該停用詞?"
+            title={t('common.confirmDelete')}
+            description={t('stopWords.deleteDesc')}
             onConfirm={() => handleDelete(record.id)}
-            okText="確認"
-            cancelText="取消"
+            okText={t('common.confirm')}
+            cancelText={t('common.cancel')}
           >
             <Button type="link" size="small" danger >
-              刪除
+              {t('common.delete')}
             </Button>
           </Popconfirm>
         </Space>
@@ -86,7 +88,7 @@ export default function StopWords() {
 
   const handleDelete = (id: string) => {
     setDataSource(dataSource.filter(item => item.id !== id))
-    message.success('刪除成功')
+    message.success(t('common.deleteSuccess'))
   }
 
   const handleAdd = () => {
@@ -97,7 +99,7 @@ export default function StopWords() {
 
   const handleSubmit = () => {
     if (!formWord.trim()) {
-      message.warning('請輸入停用詞')
+      message.warning(t('stopWords.wordRequired'))
       return
     }
 
@@ -108,7 +110,7 @@ export default function StopWords() {
           ? { ...item, word: formWord.trim() }
           : item
       ))
-      message.success('更新成功')
+      message.success(t('common.updateSuccess'))
     } else {
       // 新增模式
       const newWord: StopWord = {
@@ -125,7 +127,7 @@ export default function StopWords() {
         creator: '当前用户',
       }
       setDataSource([newWord, ...dataSource])
-      message.success('添加成功')
+      message.success(t('common.addSuccess'))
     }
 
     setIsModalOpen(false)
@@ -141,21 +143,21 @@ export default function StopWords() {
     <div className="content-area">
       <Card>
         <div style={{ marginBottom: 20 }}>
-          <h2 style={{ marginBottom: 8 }}>停用詞庫管理</h2>
+          <h2 style={{ marginBottom: 8 }}>{t('stopWords.title')}</h2>
           <p style={{ color: '#666', marginBottom: 16 }}>
-            管理搜索時需要過濾的停用詞,不分品牌,2個APP同時使用
+            {t('stopWords.desc')}
           </p>
 
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             <Input.Search
-              placeholder="搜索停用詞"
+              placeholder={t('stopWords.searchPlaceholder')}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               style={{ width: 300 }}
               allowClear
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增停用詞
+              {t('stopWords.addStopWord')}
             </Button>
           </div>
         </div>
@@ -169,7 +171,7 @@ export default function StopWords() {
       </Card>
 
       <Modal
-        title={editingWord ? '編輯停用詞' : '新增停用詞'}
+        title={editingWord ? `${t('common.edit')} ${t('stopWords.colStopWord')}` : t('stopWords.addStopWord')}
         open={isModalOpen}
         onOk={handleSubmit}
         onCancel={() => {
@@ -177,15 +179,15 @@ export default function StopWords() {
           setFormWord('')
           setEditingWord(null)
         }}
-        okText="確認"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
       >
         <div style={{ padding: '16px 0' }}>
-          <div style={{ marginBottom: 8 }}>停用詞:</div>
+          <div style={{ marginBottom: 8 }}>{t('stopWords.wordLabel')}</div>
           <Input
             value={formWord}
             onChange={(e) => setFormWord(e.target.value)}
-            placeholder="請輸入停用詞"
+            placeholder={t('stopWords.wordPlaceholder')}
             onPressEnter={handleSubmit}
           />
         </div>

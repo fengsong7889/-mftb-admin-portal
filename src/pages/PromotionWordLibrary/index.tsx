@@ -8,6 +8,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useTranslation } from 'react-i18next'
 import {
   fetchWordLibraryList,
   createWordLibraryItem,
@@ -22,37 +23,32 @@ const { TextArea } = Input
 
 /* ──────────── 常量定义 ──────────── */
 
-/** 业务频道 */
-const CHANNEL_OPTIONS = [
-  { label: '美食外賣', value: 'takeaway' },
-  { label: '超市百貨', value: 'supermarket' },
-  { label: '團購到店', value: 'groupBuy' },
-]
-
-const CHANNEL_LABEL: Record<string, string> = {
-  takeaway: '美食外賣',
-  supermarket: '超市百貨',
-  groupBuy: '團購到店',
-}
-
-/** 状态选项 — 值对应后端 1=啟用 2=停用 */
-const statusOptions = [
-  { label: '全部', value: 'all' },
-  { label: '啟用', value: 1 },
-  { label: '停用', value: 2 },
-]
-
-/** 频道选项 */
-const channelFilterOptions = [
-  { label: '全部', value: 'all' },
-  { label: '美食外賣', value: 'takeaway' },
-  { label: '超市百貨', value: 'supermarket' },
-  { label: '團購到店', value: 'groupBuy' },
-]
-
 /* ──────────── 组件 ──────────── */
 
 export default function PromotionWordLibrary() {
+  const { t } = useTranslation()
+  /** 业务频道选项（依赖 t，定义在组件内以便响应语言切换） */
+  const CHANNEL_OPTIONS = [
+    { label: t('promotionWordLibrary.chTakeaway'), value: 'takeaway' },
+    { label: t('promotionWordLibrary.chSupermarket'), value: 'supermarket' },
+    { label: t('promotionWordLibrary.chGroupBuy'), value: 'groupBuy' },
+  ]
+  const CHANNEL_LABEL: Record<string, string> = {
+    takeaway: t('promotionWordLibrary.chTakeaway'),
+    supermarket: t('promotionWordLibrary.chSupermarket'),
+    groupBuy: t('promotionWordLibrary.chGroupBuy'),
+  }
+  /** 状态选项 — 值对应后端 1=啟用 2=停用 */
+  const statusOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('common.enable'), value: 1 },
+    { label: t('common.disable'), value: 2 },
+  ]
+  /** 频道选项 */
+  const channelFilterOptions = [
+    { label: t('common.all'), value: 'all' },
+    ...CHANNEL_OPTIONS,
+  ]
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<WordLibraryItem | null>(null)
   const [form] = Form.useForm()
@@ -92,15 +88,15 @@ export default function PromotionWordLibrary() {
 
   /* ---- 列配置 ---- */
   const columnMeta = useMemo(() => [
-    { key: 'word', title: '詞條' },
-    { key: 'channel', title: '所屬頻道' },
-    { key: 'matchCount', title: '匹配次數' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updateTime', title: '最後更新時間' },
-    { key: 'status', title: '狀態' },
-    { key: 'remark', title: '備註' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'word', title: t('promotionWordLibrary.colWord') },
+    { key: 'channel', title: t('promotionWordLibrary.colChannel') },
+    { key: 'matchCount', title: t('promotionWordLibrary.colMatchCount') },
+    { key: 'updatedBy', title: t('promotionWordLibrary.colUpdatedBy') },
+    { key: 'updateTime', title: t('promotionWordLibrary.colUpdateTime') },
+    { key: 'status', title: t('common.colStatus') },
+    { key: 'remark', title: t('promotionWordLibrary.colRemark') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('promotion-word-library', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -138,31 +134,31 @@ export default function PromotionWordLibrary() {
 
   const handleDelete = (record: WordLibraryItem) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除詞條「${record.word}」嗎？刪除後將不再參與推薦匹配。`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common.confirmDelete'),
+      content: t('promotionWordLibrary.deleteWordContent', { word: record.word }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         await deleteWordLibraryItem(record.id)
-        message.success('刪除成功')
+        message.success(t('common.deleteSuccess'))
         loadData()
       },
     })
   }
 
   const handleToggleStatus = (record: WordLibraryItem) => {
-    const actionText = record.status === 1 ? '停用' : '啟用'
+    const actionText = record.status === 1 ? t('common.disable') : t('common.enable')
     const confirmTitle = record.status === 1
-      ? `確定要停用詞條「${record.word}」嗎？停用後將不再參與推薦匹配。`
-      : `確定要啟用詞條「${record.word}」嗎？`
+      ? t('promotionWordLibrary.disableWordContent', { word: record.word })
+      : t('promotionWordLibrary.enableWordContent', { word: record.word })
     Modal.confirm({
       title: confirmTitle,
-      okText: '確定',
-      cancelText: '取消',
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         await toggleWordLibraryStatus(record.id)
-        message.success(`已${actionText}詞條「${record.word}」`)
+        message.success(t('promotionWordLibrary.toggleWordSuccess', { action: actionText, word: record.word }))
         loadData()
       },
     })
@@ -181,54 +177,54 @@ export default function PromotionWordLibrary() {
     } else {
       await createWordLibraryItem(payload)
     }
-    message.success(editingRecord ? '編輯成功' : '新增成功')
+    message.success(editingRecord ? t('promotionWordLibrary.editSuccess') : t('promotionWordLibrary.addSuccess'))
     setIsModalOpen(false)
     loadData()
   }
 
   const handleExport = () => {
-    message.success('導出成功')
+    message.success(t('common.exportSuccess'))
   }
 
   /* ---- 表格列定义 ---- */
   const columns: TableColumnsType<WordLibraryItem> = [
     {
-      title: '詞條',
+      title: t('promotionWordLibrary.colWord'),
       dataIndex: 'word',
       key: 'word',
       width: 100,
       render: (val: string) => <span style={{ fontWeight: 600, color: '#2D3436' }}>{val}</span>,
     },
     {
-      title: '所屬頻道',
+      title: t('promotionWordLibrary.colChannel'),
       dataIndex: 'channel',
       key: 'channel',
       width: 120,
       render: (ch: string) => <Tag>{CHANNEL_LABEL[ch] || ch}</Tag>,
     },
     {
-      title: '匹配次數',
+      title: t('promotionWordLibrary.colMatchCount'),
       dataIndex: 'matchCount',
       key: 'matchCount',
       width: 100,
       sorter: (a, b) => a.matchCount - b.matchCount,
       render: (val: number) => <span>{val.toLocaleString()}</span>,
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
-    { title: '最後更新時間', dataIndex: 'updateTime', key: 'updateTime', width: 150 },
+    { title: t('promotionWordLibrary.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
+    { title: t('promotionWordLibrary.colUpdateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 150 },
     {
-      title: '狀態',
+      title: t('common.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       render: (status: number) => (
         <Tag color={status === 1 ? 'success' : 'default'}>
-          {status === 1 ? '啟用' : '停用'}
+          {status === 1 ? t('common.enable') : t('common.disable')}
         </Tag>
       ),
     },
     {
-      title: '備註',
+      title: t('promotionWordLibrary.colRemark'),
       dataIndex: 'remark',
       key: 'remark',
       width: 200,
@@ -237,17 +233,17 @@ export default function PromotionWordLibrary() {
         val ? <span title={val}>{val}</span> : <span style={{ color: '#BFBFBF' }}>—</span>,
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 100,
       fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
           <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === 1 ? '停用' : '啟用'}
+            {record.status === 1 ? t('common.disable') : t('common.enable')}
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -258,28 +254,28 @@ export default function PromotionWordLibrary() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="詞條關鍵詞" name="keyword">
-            <Input placeholder="請輸入關鍵詞" allowClear />
+          <Form.Item label={t('promotionWordLibrary.keywordLabel')} name="keyword">
+            <Input placeholder={t('promotionWordLibrary.placeholderKeyword')} allowClear />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select options={statusOptions} defaultValue="all" placeholder="全部" allowClear />
+          <Form.Item label={t('common.colStatus')} name="status">
+            <Select options={statusOptions} defaultValue="all" placeholder={t('common.all')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬頻道" name="channel">
-            <Select options={channelFilterOptions} defaultValue="all" placeholder="全部" allowClear />
+          <Form.Item label={t('promotionWordLibrary.colChannel')} name="channel">
+            <Select options={channelFilterOptions} defaultValue="all" placeholder={t('common.all')} allowClear />
           </Form.Item>
-          <Form.Item label="更新時間" name="dateRange">
+          <Form.Item label={t('promotionWordLibrary.dateRangeLabel')} name="dateRange">
             <RangePicker />
           </Form.Item>
-          <Form.Item label="最後更新人" name="updatedBy">
-            <Input placeholder="請輸入更新人" allowClear />
+          <Form.Item label={t('promotionWordLibrary.updatedByLabel')} name="updatedBy">
+            <Input placeholder={t('promotionWordLibrary.placeholderUpdater')} allowClear />
           </Form.Item>
-          <Form.Item label="備註" name="remark">
-            <Input placeholder="請輸入備註關鍵詞" allowClear />
+          <Form.Item label={t('promotionWordLibrary.remarkLabel')} name="remark">
+            <Input placeholder={t('promotionWordLibrary.placeholderRemarkKeyword')} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -288,10 +284,10 @@ export default function PromotionWordLibrary() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增詞條</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>{t('promotionWordLibrary.addWord')}</Button>
           {configComponent}
         </div>
       </div>
@@ -311,7 +307,7 @@ export default function PromotionWordLibrary() {
             current: page,
             pageSize,
             total,
-            showTotal: (t) => `共 ${t} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showQuickJumper: true,
@@ -329,27 +325,27 @@ export default function PromotionWordLibrary() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingRecord ? '編輯詞條' : '新增詞條'}
+        title={editingRecord ? t('promotionWordLibrary.editWord') : t('promotionWordLibrary.addWord')}
         open={isModalOpen}
         onOk={handleSave}
         onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={600}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
-            label="詞條"
+            label={t('promotionWordLibrary.colWord')}
             name="word"
-            rules={[{ required: true, message: '請輸入詞條' }]}
+            rules={[{ required: true, message: t('promotionWordLibrary.placeholderWord') }]}
           >
-            <Input placeholder="請輸入詞條（如：牛肉面）" />
+            <Input placeholder={t('promotionWordLibrary.placeholderWordExample')} />
           </Form.Item>
           <Form.Item
-            label="所屬頻道"
+            label={t('promotionWordLibrary.colChannel')}
             name="channel"
-            rules={[{ required: true, message: '請選擇所屬頻道' }]}
+            rules={[{ required: true, message: t('promotionWordLibrary.placeholderSelectChannel') }]}
           >
             <Radio.Group optionType="button" buttonStyle="solid">
               {CHANNEL_OPTIONS.map(opt => (
@@ -357,11 +353,11 @@ export default function PromotionWordLibrary() {
               ))}
             </Radio.Group>
           </Form.Item>
-          <Form.Item label="狀態" name="status" valuePropName="checked">
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />
+          <Form.Item label={t('common.colStatus')} name="status" valuePropName="checked">
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} defaultChecked />
           </Form.Item>
-          <Form.Item label="備註" name="remark">
-            <TextArea placeholder="請輸入備註說明（選填）" rows={2} maxLength={200} />
+          <Form.Item label={t('promotionWordLibrary.remarkLabel')} name="remark">
+            <TextArea placeholder={t('promotionWordLibrary.placeholderRemark')} rows={2} maxLength={200} />
           </Form.Item>
         </Form>
       </Modal>

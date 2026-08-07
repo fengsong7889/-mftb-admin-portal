@@ -10,6 +10,7 @@ import {
   ImportOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useTranslation } from 'react-i18next'
 
 const { RangePicker } = DatePicker
 
@@ -39,6 +40,7 @@ const mockData: WordRecord[] = [
 ]
 
 export default function WordSegmentation() {
+  const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<WordRecord | null>(null)
   const [form] = Form.useForm()
@@ -57,50 +59,50 @@ export default function WordSegmentation() {
 
   const handleDelete = (record: WordRecord) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除分詞「${record.word}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
-      onOk: () => message.success('刪除成功'),
+      title: t('common.confirmDelete'),
+      content: t('wordSegmentation.deleteContent', { word: record.word }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: () => message.success(t('common.deleteSuccess')),
     })
   }
 
   const handleBatchDelete = () => {
     Modal.confirm({
-      title: '批量刪除',
-      content: '確定要刪除選中的分詞記錄嗎？此操作不可恢復。',
-      okText: '確定',
+      title: t('common.batchDelete'),
+      content: t('wordSegmentation.batchDeleteContent'),
+      okText: t('common.confirm'),
       okType: 'danger',
-      cancelText: '取消',
-      onOk: () => message.success('批量刪除成功'),
+      cancelText: t('common.cancel'),
+      onOk: () => message.success(t('common.batchDeleteSuccess')),
     })
   }
 
   const handleSave = () => {
     form.validateFields().then(() => {
-      message.success(editingRecord ? '編輯成功' : '新增成功')
+      message.success(editingRecord ? t('common.updateSuccess') : t('common.addSuccess'))
       setIsModalOpen(false)
     })
   }
 
   const handleBatchImport = () => {
-    message.info('批量導入功能開發中')
+    message.info(t('common.underDev'))
   }
 
   const handleBatchExport = () => {
-    message.success('導出成功')
+    message.success(t('common.exportSuccess'))
   }
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'index', title: '序號' },
-    { key: 'word', title: '搜索詞' },
-    { key: 'segmented', title: 'ES分詞結果' },
-    { key: 'corrected', title: '新增分詞' },
-    { key: 'lastUpdater', title: '最後更新人' },
-    { key: 'lastUpdateTime', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'index', title: t('common.colIndex') },
+    { key: 'word', title: t('common.colWord') },
+    { key: 'segmented', title: t('wordSegmentation.colSegmented') },
+    { key: 'corrected', title: t('wordSegmentation.colCorrected') },
+    { key: 'lastUpdater', title: t('wordSegmentation.colLastUpdater') },
+    { key: 'lastUpdateTime', title: t('wordSegmentation.colLastUpdateTime') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('word-segmentation', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const }
@@ -108,46 +110,46 @@ export default function WordSegmentation() {
 
   const columns: TableColumnsType<WordRecord> = [
     {
-      title: '搜索詞',
+      title: t('common.colWord'),
       dataIndex: 'word',
       key: 'word',
       width: 150,
       render: (text: string) => <strong>{text}</strong>,
     },
     {
-      title: 'ES分詞結果',
+      title: t('wordSegmentation.colSegmented'),
       dataIndex: 'segmented',
       key: 'segmented',
       width: 180,
       render: (text: string) => <span style={{ color: '#999' }}>{text}</span>,
     },
     {
-      title: '新增分詞',
+      title: t('wordSegmentation.colCorrected'),
       dataIndex: 'corrected',
       key: 'corrected',
       width: 160,
       render: (val: string) => <span style={{ color: '#E8720C', fontWeight: 500 }}>{val}</span>,
     },
     {
-      title: '最後更新人',
+      title: t('wordSegmentation.colLastUpdater'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
       width: 160,
     },
     {
-      title: '最後更新時間',
+      title: t('wordSegmentation.colLastUpdateTime'),
       dataIndex: 'updateTime',
       key: 'updateTime',
       width: 170,
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 120,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -158,19 +160,19 @@ export default function WordSegmentation() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="搜索詞">
-            <Input placeholder="請輸入搜索詞" allowClear style={{ height: 30 }} />
+          <Form.Item label={t('common.colWord')}>
+            <Input placeholder={t('wordSegmentation.wordSearchPlaceholder')} allowClear style={{ height: 30 }} />
           </Form.Item>
-          <Form.Item label="更新人">
-            <Input placeholder="請輸入更新人姓名/工號" allowClear style={{ height: 30 }} />
+          <Form.Item label={t('common.colUpdater')}>
+            <Input placeholder={t('wordSegmentation.updaterSearchPlaceholder')} allowClear style={{ height: 30 }} />
           </Form.Item>
-          <Form.Item label="更新時間">
+          <Form.Item label={t('wordSegmentation.updateTime')}>
             <RangePicker style={{ height: 30 }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} style={{ height: 30 }}>查詢</Button>
-              <Button icon={<ReloadOutlined />} style={{ height: 30 }}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} style={{ height: 30 }}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} style={{ height: 30 }}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -179,12 +181,12 @@ export default function WordSegmentation() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-import" icon={<ImportOutlined />} onClick={handleBatchImport}>批量導入</Button>
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleBatchExport}>導出</Button>
-          <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>批量刪除</Button>
+          <Button className="btn-import" icon={<ImportOutlined />} onClick={handleBatchImport}>{t('common.batchImport')}</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleBatchExport}>{t('common.export')}</Button>
+          <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>{t('common.batchDelete')}</Button>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增分詞</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>{t('wordSegmentation.addWord')}</Button>
           {configComponent}
         </div>
       </div>
@@ -198,7 +200,7 @@ export default function WordSegmentation() {
           pagination={{
             total: mockData.length,
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 10,
@@ -212,24 +214,24 @@ export default function WordSegmentation() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingRecord ? '編輯分詞' : '新增分詞'}
+        title={editingRecord ? t('wordSegmentation.editWord') : t('wordSegmentation.addWord')}
         open={isModalOpen}
         onOk={handleSave}
         onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={520}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="搜索詞" name="word" rules={[{ required: true, message: '請輸入搜索詞' }]}>
-            <Input placeholder="請輸入需要糾正分詞的搜索詞" />
+          <Form.Item label={t('common.colWord')} name="word" rules={[{ required: true, message: t('wordSegmentation.wordRequired') }]}>
+            <Input placeholder={t('wordSegmentation.wordPlaceholder')} />
           </Form.Item>
-          <Form.Item label="ES分詞結果" name="segmented">
-            <Input placeholder="ES自動分詞結果（僅展示）" disabled />
+          <Form.Item label={t('wordSegmentation.colSegmented')} name="segmented">
+            <Input placeholder={t('wordSegmentation.segmentedPlaceholder')} disabled />
           </Form.Item>
-          <Form.Item label="新增分詞" name="corrected" rules={[{ required: true, message: '請輸入新增的分詞結果' }]}>
-            <Input placeholder="請輸入新增分詞，用/分隔" />
+          <Form.Item label={t('wordSegmentation.colCorrected')} name="corrected" rules={[{ required: true, message: t('wordSegmentation.correctedRequired') }]}>
+            <Input placeholder={t('wordSegmentation.correctedPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>

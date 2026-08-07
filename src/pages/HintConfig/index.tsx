@@ -1,4 +1,5 @@
 import { useState , useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message } from 'antd'
 import type { TableColumnsType } from 'antd'
@@ -15,86 +16,6 @@ import HintCreateModal from '../HintCreate'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-/** 展示區域 */
-const regionOptions = [
-  { label: '全部', value: 'all' },
-  { label: '澳門', value: 'macau' },
-  { label: '氹仔', value: 'taipa' },
-  { label: '高仕德', value: 'costa' },
-  { label: '威尼斯', value: 'venetian' },
-  { label: '澳門大學', value: 'macauUni' },
-]
-
-/** 業務終端 */
-const terminalOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'APP', value: 'app' },
-  { label: '微信小程序', value: 'wechatMini' },
-  { label: 'Mpay小應用', value: 'mpayMini' },
-  { label: '微信H5', value: 'wechatH5' },
-]
-
-/** 狀態 */
-const statusOptions = [
-  { label: '全部', value: 'all' },
-  { label: '生效', value: 'active' },
-  { label: '失效', value: 'inactive' },
-]
-
-/** 底紋詞源 */
-const hintSourceOptions = [
-  { label: '運營推廣', value: 'operation' },
-  { label: '熱搜推廣', value: 'hotSearch' },
-]
-
-/** 搜索頻道 */
-const searchChannelOptions = [
-  { label: '大首頁', value: 'home' },
-  { label: '外賣頻道', value: 'takeaway' },
-  { label: '團購頻道', value: 'groupBuy' },
-  { label: '超市頻道', value: 'supermarket' },
-]
-
-/** 跳轉類型 */
-const jumpTypeOptions = [
-  { label: '無跳轉', value: 'none' },
-  { label: 'H5鏈接', value: 'h5' },
-  { label: 'APP內頁面', value: 'appPage' },
-]
-
-/** APP頁面 */
-const appPageOptions = [
-  { label: '個人中心', value: 'personalCenter' },
-  { label: '簽到中心', value: 'checkInCenter' },
-  { label: '領取中心', value: 'claimCenter' },
-  { label: '優惠券頁', value: 'couponPage' },
-  { label: '商家詳情', value: 'shopDetail' },
-]
-
-/** 熱搜推廣排名 */
-const hotSearchRankOptions = [
-  { label: '前5', value: 5 },
-  { label: '前10', value: 10 },
-]
-
-/** 時段 */
-const timeSlotOptions = [
-  { label: '全天', value: 'allDay' },
-  { label: '早餐', value: 'breakfast' },
-  { label: '午餐', value: 'lunch' },
-  { label: '下午茶', value: 'afternoonTea' },
-  { label: '晚餐', value: 'dinner' },
-  { label: '宵夜', value: 'midnightSnack' },
-]
-
-/** 人群 */
-const crowdOptions = [
-  { label: '全部', value: 'all' },
-  { label: '新用戶', value: 'newUser' },
-  { label: '老用戶', value: 'oldUser' },
-  { label: 'VIP用戶', value: 'vip' },
-]
 
 interface HintRecord {
   key: string
@@ -141,6 +62,7 @@ const mockData: HintRecord[] = [
 ]
 
 export default function HintConfig() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -174,37 +96,114 @@ export default function HintConfig() {
   }
 
   const handleToggleStatus = (record: HintRecord) => {
-    const newStatus = record.status === 'active' ? '失效' : '生效'
+    const newStatus = record.status === 'active' ? t('common.disable') : t('common.enable')
     Modal.confirm({
-      title: '確認操作',
-      content: `確定要將該底紋配置設為「${newStatus}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
-      onOk: () => message.success(`已${newStatus}`),
+      title: t('common.confirmOperation'),
+      content: t('hintConfig.toggleContent', { status: newStatus }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: () => message.success(t('hintConfig.toggled', { status: newStatus })),
     })
   }
 
   const handleSave = () => {
     form.validateFields().then(() => {
-      message.success(editingRecord ? '編輯成功' : '新增成功')
+      message.success(editingRecord ? t('common.updateSuccess') : t('common.addSuccess'))
       setIsModalOpen(false)
     })
   }
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'hintId', title: '底紋ID' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'hintSource', title: '底紋來源' },
-    { key: 'searchChannel', title: '搜索頻道' },
-    { key: 'region', title: '地區' },
-    { key: 'terminal', title: '終端' },
-    { key: 'effectStartDate', title: '生效開始日' },
-    { key: 'effectEndDate', title: '生效結束日' },
-    { key: 'lastUpdater', title: '最後更新人' },
-    { key: 'lastUpdateTime', title: '最後更新時間' },
-    { key: 'status', title: '狀態' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'hintId', title: t('hintConfig.colHintId') },
+    { key: 'brand', title: t('hintConfig.colBrand') },
+    { key: 'hintSource', title: t('hintConfig.colHintSource') },
+    { key: 'searchChannel', title: t('hintConfig.colSearchChannel') },
+    { key: 'region', title: t('hintConfig.colRegion') },
+    { key: 'terminal', title: t('hintConfig.colTerminal') },
+    { key: 'effectStartDate', title: t('hintConfig.colEffectDate') },
+    { key: 'effectEndDate', title: t('hintConfig.colEffectDate') },
+    { key: 'lastUpdater', title: t('hintConfig.colLastUpdater') },
+    { key: 'lastUpdateTime', title: t('hintConfig.colLastUpdateTime') },
+    { key: 'status', title: t('hintConfig.colStatus') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const regionOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.region.macau'), value: 'macau' },
+    { label: t('dict.region.taipa'), value: 'taipa' },
+    { label: t('dict.region.costa'), value: 'costa' },
+    { label: t('dict.region.venetian'), value: 'venetian' },
+    { label: t('dict.region.macauUni'), value: 'macauUni' },
+  ]
+
+  const terminalOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.terminal.app'), value: 'app' },
+    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
+    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
+    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
+  ]
+
+  const statusOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.status.active'), value: 'active' },
+    { label: t('dict.status.inactive'), value: 'inactive' },
+  ]
+
+  const hintSourceOptions = [
+    { label: t('dict.hintSource.operation'), value: 'operation' },
+    { label: t('dict.hintSource.hotSearch'), value: 'hotSearch' },
+  ]
+
+  const searchChannelOptions = [
+    { label: t('dict.channel.home'), value: 'home' },
+    { label: t('dict.channel.takeawayChannel'), value: 'takeaway' },
+    { label: t('dict.channel.groupBuyChannel'), value: 'groupBuy' },
+    { label: t('dict.channel.supermarketChannel'), value: 'supermarket' },
+  ]
+
+  const jumpTypeOptions = [
+    { label: t('dict.jumpType.none'), value: 'none' },
+    { label: t('dict.jumpType.h5'), value: 'h5' },
+    { label: t('dict.jumpType.appPage'), value: 'appPage' },
+  ]
+
+  const appPageOptions = [
+    { label: t('dict.jumpType.personalCenter'), value: 'personalCenter' },
+    { label: t('dict.jumpType.checkInCenter'), value: 'checkInCenter' },
+    { label: t('dict.jumpType.claimCenter'), value: 'claimCenter' },
+    { label: t('dict.jumpType.couponPage'), value: 'couponPage' },
+    { label: t('dict.jumpType.shopDetail'), value: 'shopDetail' },
+  ]
+
+  const hotSearchRankOptions = [
+    { label: t('hintConfig.rankTop5'), value: 5 },
+    { label: t('hintConfig.rankTop10'), value: 10 },
+  ]
+
+  const timeSlotOptions = [
+    { label: t('dict.timeSlot.allDay'), value: 'allDay' },
+    { label: t('dict.timeSlot.breakfast'), value: 'breakfast' },
+    { label: t('dict.timeSlot.lunch'), value: 'lunch' },
+    { label: t('dict.timeSlot.afternoonTea'), value: 'afternoonTea' },
+    { label: t('dict.timeSlot.dinner'), value: 'dinner' },
+    { label: t('dict.timeSlot.midnightSnack'), value: 'midnightSnack' },
+  ]
+
+  const crowdOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.crowd.newUser'), value: 'newUser' },
+    { label: t('dict.crowd.oldUser'), value: 'oldUser' },
+    { label: t('dict.crowd.vip'), value: 'vip' },
+  ]
+
+  const channelMap: Record<string, string> = { home: t('dict.channel.home'), takeaway: t('dict.channel.takeawayChannel'), groupBuy: t('dict.channel.groupBuyChannel'), supermarket: t('dict.channel.supermarketChannel') }
+  const terminalMap: Record<string, string> = { app: t('dict.terminal.app'), wechatMini: t('dict.terminal.wechatMini'), mpayMini: t('dict.terminal.mpayMini'), wechatH5: t('dict.terminal.wechatH5') }
+  const regionMap: Record<string, string> = { macau: t('dict.region.macau'), taipa: t('dict.region.taipa'), costa: t('dict.region.costa'), venetian: t('dict.region.venetian'), macauUni: t('dict.region.macauUni') }
+  const hintSourceMap: Record<string, string> = { operation: t('dict.hintSource.operation'), hotSearch: t('dict.hintSource.hotSearch') }
+  const timeSlotMap: Record<string, string> = { allDay: t('dict.timeSlot.allDay'), breakfast: t('dict.timeSlot.breakfast'), lunch: t('dict.timeSlot.lunch'), afternoonTea: t('dict.timeSlot.afternoonTea'), dinner: t('dict.timeSlot.dinner'), midnightSnack: t('dict.timeSlot.midnightSnack') }
+  const crowdMap: Record<string, string> = { all: t('common.all'), newUser: t('dict.crowd.newUser'), oldUser: t('dict.crowd.oldUser'), vip: t('dict.crowd.vip') }
 
   const { configComponent, applyConfig } = useColumnConfig('hint-config', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const }
@@ -214,13 +213,13 @@ export default function HintConfig() {
 
   const columns: TableColumnsType<HintRecord> = [
     {
-      title: '底紋ID',
+      title: t('hintConfig.colHintId'),
       dataIndex: 'hintId',
       key: 'hintId',
       width: 130,
     },
     {
-      title: '所屬品牌',
+      title: t('hintConfig.colBrand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 90,
@@ -229,76 +228,76 @@ export default function HintConfig() {
       ),
     },
     {
-      title: '底紋詞源',
+      title: t('hintConfig.colHintSource'),
       dataIndex: 'hintSource',
       key: 'hintSource',
       width: 100,
       render: (v: string) => <Tag color={v === 'operation' ? 'blue' : 'orange'}>{hintSourceMap[v]}</Tag>,
     },
     {
-      title: '搜索頻道',
+      title: t('hintConfig.colSearchChannel'),
       dataIndex: 'searchChannel',
       key: 'searchChannel',
       width: 100,
       render: (v: string) => channelMap[v] || v,
     },
     {
-      title: '展示區域',
+      title: t('hintConfig.colRegion'),
       dataIndex: 'region',
       key: 'region',
       width: 130,
       render: (v: string[]) => v.map(r => regionMap[r] || r).join('、'),
     },
     {
-      title: '展示終端',
+      title: t('hintConfig.colTerminal'),
       dataIndex: 'terminal',
       key: 'terminal',
       width: 170,
       render: (v: string[]) => v.map(t => terminalMap[t] || t).join('、'),
     },
     {
-      title: '展示時段',
+      title: t('hintConfig.colTimeSlot'),
       dataIndex: 'timeSlot',
       key: 'timeSlot',
       width: 100,
       render: (v: string) => timeSlotMap[v] || v,
     },
     {
-      title: '生效時間',
+      title: t('hintConfig.colEffectDate'),
       key: 'effectDate',
       width: 200,
       render: (_, r) => `${r.effectStartDate} - ${r.effectEndDate}`,
     },
     {
-      title: '最後更新人',
+      title: t('hintConfig.colLastUpdater'),
       dataIndex: 'lastUpdater',
       key: 'lastUpdater',
       width: 120,
     },
     {
-      title: '最後更新時間',
+      title: t('hintConfig.colLastUpdateTime'),
       dataIndex: 'lastUpdateTime',
       key: 'lastUpdateTime',
       width: 170,
     },
     {
-      title: '狀態',
+      title: t('hintConfig.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       render: (v: string) => v === 'active'
-        ? <Tag color="success">生效</Tag>
-        : <Tag color="default">失效</Tag>,
+        ? <Tag color="success">{t('dict.status.active')}</Tag>
+        : <Tag color="default">{t('dict.status.inactive')}</Tag>,
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 180,
       fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleDetail(record)}>詳情</Button>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => handleDetail(record)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
           <Button
             type="link"
             size="small"
@@ -306,7 +305,7 @@ export default function HintConfig() {
             style={record.status !== 'active' ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
-            {record.status === 'active' ? '失效' : '生效'}
+            {record.status === 'active' ? t('common.disable') : t('common.enable')}
           </Button>
         </Space>
       ),
@@ -318,40 +317,40 @@ export default function HintConfig() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="底紋ID">
-            <Input placeholder="請輸入底紋ID搜索" allowClear />
+          <Form.Item label={t('hintConfig.searchHintId')}>
+            <Input placeholder={t('hintConfig.searchHintIdPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="全部" allowClear options={brandOptions} />
+          <Form.Item label={t('hintConfig.searchBrand')}>
+            <Select placeholder={t('common.all')} allowClear options={brandOptions} />
           </Form.Item>
-          <Form.Item label="搜索頻道">
-            <Select placeholder="全部" allowClear options={searchChannelOptions} />
+          <Form.Item label={t('hintConfig.searchChannel')}>
+            <Select placeholder={t('common.all')} allowClear options={searchChannelOptions} />
           </Form.Item>
-          <Form.Item label="展示時段">
-            <Select placeholder="全部" allowClear options={timeSlotOptions} />
+          <Form.Item label={t('hintConfig.searchTimeSlot')}>
+            <Select placeholder={t('common.all')} allowClear options={timeSlotOptions} />
           </Form.Item>
-          <Form.Item label="展示區域">
-            <Select placeholder="全部" allowClear options={regionOptions} />
+          <Form.Item label={t('hintConfig.searchRegion')}>
+            <Select placeholder={t('common.all')} allowClear options={regionOptions} />
           </Form.Item>
-          <Form.Item label="狀態">
-            <Select placeholder="全部" allowClear options={statusOptions} />
+          <Form.Item label={t('hintConfig.searchStatus')}>
+            <Select placeholder={t('common.all')} allowClear options={statusOptions} />
           </Form.Item>
-          <Form.Item label="生效時間">
-            <RangePicker placeholder={['開始時間', '結束時間']} />
+          <Form.Item label={t('hintConfig.searchEffectTime')}>
+            <RangePicker placeholder={[t('common.startTime'), t('common.endTime')]} />
           </Form.Item>
-          <Form.Item label="業務終端">
-            <Select placeholder="全部" allowClear options={terminalOptions} />
+          <Form.Item label={t('hintConfig.searchTerminal')}>
+            <Select placeholder={t('common.all')} allowClear options={terminalOptions} />
           </Form.Item>
-          <Form.Item label="最後更新人">
-            <Input placeholder="請輸入申請人姓名/工號" allowClear />
+          <Form.Item label={t('hintConfig.searchUpdater')}>
+            <Input placeholder={t('hintConfig.searchUpdaterPlaceholder')} allowClear />
           </Form.Item>
-          <Form.Item label="最後更新時間">
-            <RangePicker placeholder={['開始時間', '結束時間']} />
+          <Form.Item label={t('hintConfig.searchUpdateTime')}>
+            <RangePicker placeholder={[t('common.startTime'), t('common.endTime')]} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-              <Button icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -360,11 +359,11 @@ export default function HintConfig() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}> 導出</Button>
-          <Button icon={<EyeOutlined />} onClick={() => navigate('/hint-verify')}>效果預覽</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>{t('common.export')}</Button>
+          <Button icon={<EyeOutlined />} onClick={() => navigate('/hint-verify')}>{t('common.preview')}</Button>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>新增</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>{t('common.add')}</Button>
           {configComponent}
         </div>
       </div>
@@ -378,7 +377,7 @@ export default function HintConfig() {
           pagination={{
             total: mockData.length,
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             defaultPageSize: 10,
@@ -392,42 +391,42 @@ export default function HintConfig() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingRecord ? '編輯底紋' : '新增底紋'}
+        title={editingRecord ? t('hintConfig.editTitle') : t('hintConfig.addTitle')}
         open={isModalOpen}
         onOk={handleSave}
         onCancel={() => setIsModalOpen(false)}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={680}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="詞源類型" name="hintSource" rules={[{ required: true, message: '請選擇' }]}>
+          <Form.Item label={t('hintConfig.hintSourceLabel')} name="hintSource" rules={[{ required: true, message: t('hintConfig.selectRequired') }]}>
             <Select options={hintSourceOptions} onChange={(v) => setHintType(v)} />
           </Form.Item>
 
           {hintType === 'operation' && (
             <>
-              <Form.Item label="底紋詞" name="hintWord" rules={[{ required: true, message: '請輸入底紋詞' }]}>
-                <Input placeholder="請輸入底紋詞內容" maxLength={20} showCount />
+              <Form.Item label={t('hintConfig.hintWordLabel')} name="hintWord" rules={[{ required: true, message: t('hintConfig.hintWordRequired') }]}>
+                <Input placeholder={t('hintConfig.hintWordPlaceholder')} maxLength={20} showCount />
               </Form.Item>
-              <Form.Item label="跳轉類型" name="jumpType">
-                <Select options={jumpTypeOptions} placeholder="請選擇跳轉類型" />
+              <Form.Item label={t('hintConfig.jumpTypeLabel')} name="jumpType">
+                <Select options={jumpTypeOptions} placeholder={t('hintConfig.jumpTypePlaceholder')} />
               </Form.Item>
               <Form.Item noStyle shouldUpdate={(prev, cur) => prev.jumpType !== cur.jumpType}>
                 {({ getFieldValue }) => {
                   const jumpType = getFieldValue('jumpType')
                   if (jumpType === 'h5') {
                     return (
-                      <Form.Item label="H5鏈接" name="jumpTarget" rules={[{ required: true, message: '請輸入H5鏈接' }]}>
-                        <Input placeholder="請輸入H5鏈接地址" />
+                      <Form.Item label={t('hintConfig.h5LinkLabel')} name="jumpTarget" rules={[{ required: true, message: t('hintConfig.h5LinkRequired') }]}>
+                        <Input placeholder={t('hintConfig.h5LinkPlaceholder')} />
                       </Form.Item>
                     )
                   }
                   if (jumpType === 'appPage') {
                     return (
-                      <Form.Item label="APP頁面" name="jumpTarget" rules={[{ required: true, message: '請選擇APP頁面' }]}>
-                        <Select options={appPageOptions} placeholder="請選擇跳轉頁面" />
+                      <Form.Item label={t('hintConfig.appPageLabel')} name="jumpTarget" rules={[{ required: true, message: t('hintConfig.appPageRequired') }]}>
+                        <Select options={appPageOptions} placeholder={t('hintConfig.appPagePlaceholder')} />
                       </Form.Item>
                     )
                   }
@@ -438,33 +437,33 @@ export default function HintConfig() {
           )}
 
           {hintType === 'hotSearch' && (
-            <Form.Item label="熱搜詞排名" name="hotSearchRank" rules={[{ required: true, message: '請選擇' }]}>
-              <Select options={hotSearchRankOptions} placeholder="獲取近30天熱搜詞排名" />
+            <Form.Item label={t('hintConfig.hotSearchRankLabel')} name="hotSearchRank" rules={[{ required: true, message: t('hintConfig.selectRequired') }]}>
+              <Select options={hotSearchRankOptions} placeholder={t('hintConfig.hotSearchRankPlaceholder')} />
             </Form.Item>
           )}
 
-          <Form.Item label="所屬品牌" name="brand" rules={[{ required: true, message: '請選擇' }]}>
-            <Select options={brandOptions.filter(o => o.value !== 'all')} placeholder="請選擇" />
+          <Form.Item label={t('hintConfig.colBrand')} name="brand" rules={[{ required: true, message: t('hintConfig.selectRequired') }]}>
+            <Select options={brandOptions.filter(o => o.value !== 'all')} placeholder={t('hintConfig.selectRequired')} />
           </Form.Item>
 
-          <Form.Item label="展示終端" name="terminal" rules={[{ required: true, message: '請選擇' }]}>
-            <Select mode="multiple" options={terminalOptions.filter(o => o.value !== 'all')} placeholder="請選擇展示終端" />
+          <Form.Item label={t('hintConfig.colTerminal')} name="terminal" rules={[{ required: true, message: t('hintConfig.selectRequired') }]}>
+            <Select mode="multiple" options={terminalOptions.filter(o => o.value !== 'all')} placeholder={t('hintConfig.terminalPlaceholder')} />
           </Form.Item>
 
-          <Form.Item label="展示區域" name="region" rules={[{ required: true, message: '請選擇' }]}>
-            <Select mode="multiple" options={regionOptions.filter(o => o.value !== 'all')} placeholder="請選擇區域" />
+          <Form.Item label={t('hintConfig.colRegion')} name="region" rules={[{ required: true, message: t('hintConfig.selectRequired') }]}>
+            <Select mode="multiple" options={regionOptions.filter(o => o.value !== 'all')} placeholder={t('hintConfig.regionPlaceholder')} />
           </Form.Item>
 
           <Space size={24}>
-            <Form.Item label="展示時段" name="timeSlot" rules={[{ required: true, message: '請選擇' }]}>
-              <Select options={timeSlotOptions} placeholder="請選擇" />
+            <Form.Item label={t('hintConfig.colTimeSlot')} name="timeSlot" rules={[{ required: true, message: t('hintConfig.selectRequired') }]}>
+              <Select options={timeSlotOptions} placeholder={t('hintConfig.selectRequired')} />
             </Form.Item>
-            <Form.Item label="配置人群" name="crowd">
-              <Select options={crowdOptions} placeholder="請選擇" />
+            <Form.Item label={t('hintConfig.crowdLabel')} name="crowd">
+              <Select options={crowdOptions} placeholder={t('hintConfig.selectRequired')} />
             </Form.Item>
           </Space>
 
-          <Form.Item label="生效日期" name="dateRange" rules={[{ required: true, message: '請選擇生效日期' }]}>
+          <Form.Item label={t('hintConfig.effectDateLabel')} name="dateRange" rules={[{ required: true, message: t('hintConfig.effectDateRequired') }]}>
             <RangePicker style={{ width: '100%' }} />
           </Form.Item>
         </Form>
@@ -472,7 +471,7 @@ export default function HintConfig() {
 
       {/* 详情弹窗 */}
       <Modal
-        title="底紋詳情"
+        title={t('hintConfig.detailTitle')}
         open={isDetailModalOpen}
         onCancel={() => setIsDetailModalOpen(false)}
         footer={null}
@@ -481,24 +480,24 @@ export default function HintConfig() {
         {detailRecord && (
           <div style={{ padding: '8px 0' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
-              <div><span style={{ color: '#999' }}>底紋ID：</span>{detailRecord.hintId}</div>
-              <div><span style={{ color: '#999' }}>所屬品牌：</span><BrandTag value={detailRecord.brand} /></div>
-              <div><span style={{ color: '#999' }}>底紋詞源：</span>{hintSourceMap[detailRecord.hintSource]}</div>
-              <div><span style={{ color: '#999' }}>底紋詞：</span>{detailRecord.hintWord || (detailRecord.hotSearchRank ? `熱搜排名前${detailRecord.hotSearchRank}` : '-')}</div>
-              <div><span style={{ color: '#999' }}>展示區域：</span>{detailRecord.region.map(r => regionMap[r]).join('、')}</div>
-              <div><span style={{ color: '#999' }}>展示終端：</span>{detailRecord.terminal.map(t => terminalMap[t]).join('、')}</div>
-              <div><span style={{ color: '#999' }}>生效時間：</span>{detailRecord.effectStartDate} - {detailRecord.effectEndDate}</div>
-              <div><span style={{ color: '#999' }}>狀態：</span>{detailRecord.status === 'active' ? <Tag color="success">生效</Tag> : <Tag color="default">失效</Tag>}</div>
-              <div><span style={{ color: '#999' }}>最後更新人：</span>{detailRecord.lastUpdater}</div>
-              <div><span style={{ color: '#999' }}>最後更新時間：</span>{detailRecord.lastUpdateTime}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlHintId')}</span>{detailRecord.hintId}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlBrand')}</span><BrandTag value={detailRecord.brand} /></div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlHintSource')}</span>{hintSourceMap[detailRecord.hintSource]}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlHintWord')}</span>{detailRecord.hintWord || (detailRecord.hotSearchRank ? t('hintConfig.dlRank', { rank: detailRecord.hotSearchRank }) : '-')}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlRegion')}</span>{detailRecord.region.map(r => regionMap[r]).join('、')}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlTerminal')}</span>{detailRecord.terminal.map(t => terminalMap[t]).join('、')}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlEffectDate')}</span>{detailRecord.effectStartDate} - {detailRecord.effectEndDate}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlStatus')}</span>{detailRecord.status === 'active' ? <Tag color="success">{t('dict.status.active')}</Tag> : <Tag color="default">{t('dict.status.inactive')}</Tag>}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlUpdater')}</span>{detailRecord.lastUpdater}</div>
+              <div><span style={{ color: '#999' }}>{t('hintConfig.dlUpdateTime')}</span>{detailRecord.lastUpdateTime}</div>
               {detailRecord.jumpType && detailRecord.jumpType !== 'none' && (
                 <>
-                  <div><span style={{ color: '#999' }}>跳轉類型：</span>{jumpTypeOptions.find(o => o.value === detailRecord.jumpType)?.label}</div>
-                  <div><span style={{ color: '#999' }}>跳轉目標：</span>{detailRecord.jumpTarget}</div>
+                  <div><span style={{ color: '#999' }}>{t('hintConfig.dlJumpType')}</span>{jumpTypeOptions.find(o => o.value === detailRecord.jumpType)?.label}</div>
+                  <div><span style={{ color: '#999' }}>{t('hintConfig.dlJumpTarget')}</span>{detailRecord.jumpTarget}</div>
                 </>
               )}
-              {detailRecord.timeSlot && <div><span style={{ color: '#999' }}>展示時段：</span>{timeSlotMap[detailRecord.timeSlot]}</div>}
-              {detailRecord.crowd && <div><span style={{ color: '#999' }}>配置人群：</span>{crowdMap[detailRecord.crowd]}</div>}
+              {detailRecord.timeSlot && <div><span style={{ color: '#999' }}>{t('hintConfig.dlTimeSlot')}</span>{timeSlotMap[detailRecord.timeSlot]}</div>}
+              {detailRecord.crowd && <div><span style={{ color: '#999' }}>{t('hintConfig.dlCrowd')}</span>{crowdMap[detailRecord.crowd]}</div>}
             </div>
           </div>
         )}
@@ -509,7 +508,7 @@ export default function HintConfig() {
         open={isCreateModalOpen}
         onCancel={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
-          message.success('新增成功')
+          message.success(t('common.addSuccess'))
           // 这里可以添加刷新列表的逻辑
         }}
       />

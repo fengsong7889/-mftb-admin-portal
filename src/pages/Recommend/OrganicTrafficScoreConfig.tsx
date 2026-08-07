@@ -2,14 +2,15 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Popover } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
 import {
   ScoreDimension, ScoreMode,
-  SCORE_DIMENSION_LABEL, SCORE_DIMENSION_DESC, SCORE_DIMENSION_ICON, SCORE_DIMENSION_COLOR,
-  SCORE_MODE_LABEL, SCORE_MODE_COLOR, SCORE_MODE_OPTIONS,
+  SCORE_DIMENSION_ICON, SCORE_DIMENSION_COLOR,
+  SCORE_MODE_COLOR,
   DEFAULT_DIMENSION_WEIGHT, DIMENSION_WEIGHT_TOTAL,
   DEFAULT_SCORE_TIMER_MINUTES, DEFAULT_ORGANIC_SCORE_RULES,
-  RANGE_SCORE_KEYS, RANGE_SCORE_LABELS, DEFAULT_RANGE_SCORES,
+  RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
   type OrganicScoreRule, type RangeScores,
 } from './organicTrafficConfig'
 
@@ -81,7 +82,42 @@ interface Props {
  * 自然流量不售賣坑位，商家靠綜合得分高低較量排名。
  */
 export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
+  const { t } = useTranslation()
   const [rules, setRules] = useState<OrganicScoreRule[]>(DEFAULT_ORGANIC_SCORE_RULES)
+
+  /** 維度標籤（依賴 t，定義在組件內以便響應語言切換） */
+  const DIM_LABEL: Record<ScoreDimension, string> = {
+    [ScoreDimension.COMMERCIAL]: t('organicTrafficScore.dimCommercial'),
+    [ScoreDimension.STORE]: t('organicTrafficScore.dimStore'),
+    [ScoreDimension.PLATFORM]: t('organicTrafficScore.dimPlatform'),
+  }
+  /** 維度說明（依賴 t） */
+  const DIM_DESC: Record<ScoreDimension, string> = {
+    [ScoreDimension.COMMERCIAL]: t('organicTrafficScore.descCommercial'),
+    [ScoreDimension.STORE]: t('organicTrafficScore.descStore'),
+    [ScoreDimension.PLATFORM]: t('organicTrafficScore.descPlatform'),
+  }
+  /** 計分方式標籤（依賴 t） */
+  const MODE_LABEL: Record<ScoreMode, string> = {
+    [ScoreMode.RULE_BONUS]: t('organicTrafficScore.modeRuleBonus'),
+    [ScoreMode.DECAY]: t('organicTrafficScore.modeDecay'),
+    [ScoreMode.RULE_DEDUCTION]: t('organicTrafficScore.modeRuleDeduction'),
+    [ScoreMode.AMOUNT_MULTIPLIER]: t('organicTrafficScore.modeAmountMultiplier'),
+  }
+  /** 配送範圍分層標籤（依賴 t） */
+  const RANGE_LABEL: Record<keyof RangeScores, string> = {
+    short: t('organicTrafficScore.rangeShort'),
+    medium: t('organicTrafficScore.rangeMedium'),
+    long: t('organicTrafficScore.rangeLong'),
+    crossBridge: t('organicTrafficScore.rangeCrossBridge'),
+  }
+  /** 計分方式選項（依賴 t） */
+  const MODE_OPTIONS = [
+    { label: MODE_LABEL[ScoreMode.RULE_BONUS], value: ScoreMode.RULE_BONUS },
+    { label: MODE_LABEL[ScoreMode.DECAY], value: ScoreMode.DECAY },
+    { label: MODE_LABEL[ScoreMode.RULE_DEDUCTION], value: ScoreMode.RULE_DEDUCTION },
+    { label: MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
+  ]
   const [dimensionWeight, setDimensionWeight] = useState<Record<ScoreDimension, number>>(DEFAULT_DIMENSION_WEIGHT)
   const [timerMinutes, setTimerMinutes] = useState<number>(DEFAULT_SCORE_TIMER_MINUTES)
 
@@ -177,7 +213,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     const values = await ruleForm.validateFields()
     if (editingRule) {
       setRules(prev => prev.map(r => r.id === editingRule.id ? { ...r, ...values } : r))
-      message.success(`已更新評分項「${values.name}」`)
+      message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
     } else {
       const prefix = modalDimension === ScoreDimension.COMMERCIAL ? 'COM'
         : modalDimension === ScoreDimension.PLATFORM ? 'PLT' : 'ST'
@@ -188,7 +224,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         ...values,
       }
       setRules(prev => [...prev, newRule])
-      message.success(`已新增評分項「${values.name}」`)
+      message.success(t('organicTrafficScore.addSuccess', { name: values.name }))
     }
     setModalOpen(false)
   }
@@ -196,15 +232,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   /** 啟用/停用評分項 */
   const handleToggleStatus = (record: OrganicScoreRule) => {
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
-    const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
+    const actionText = newStatus === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')
     Modal.confirm({
-      title: `確認${actionText}`,
-      content: `確定要${actionText}評分項「${record.name}」嗎？停用後該項不再參與自然流量得分計算。`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('organicTrafficScore.confirmToggle', { action: actionText }),
+      content: t('organicTrafficScore.confirmToggleContent', { action: actionText, name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: () => {
         setRules(prev => prev.map(r => r.id === record.id ? { ...r, status: newStatus } : r))
-        message.success(`已${actionText}「${record.name}」`)
+        message.success(t('organicTrafficScore.toggleSuccess', { action: actionText, name: record.name }))
       },
     })
   }
@@ -212,14 +248,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   /** 刪除自定義評分項 */
   const handleDelete = (record: OrganicScoreRule) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除評分項「${record.name}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common.confirmDelete'),
+      content: t('organicTrafficScore.confirmDeleteContent', { name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
         setRules(prev => prev.filter(r => r.id !== record.id))
-        message.success('刪除成功')
+        message.success(t('common.deleteSuccess'))
       },
     })
   }
@@ -231,34 +267,34 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   }
 
   const buildColumns = (): ColumnsType<OrganicScoreRule> => [
-    { title: '評分項ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <Tag color="blue">{v}</Tag> },
+    { title: t('organicTrafficScore.colRuleId'), dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <Tag color="blue">{v}</Tag> },
     {
-      title: '評分項名稱', dataIndex: 'name', key: 'name', width: 200,
+      title: t('organicTrafficScore.colRuleName'), dataIndex: 'name', key: 'name', width: 200,
       render: (v: string, record) => (
         <Space size={4}>
           <span style={{ fontWeight: 500, color: '#262626' }}>{v}</span>
-          {!record.builtin && <Tag color="orange">自定義</Tag>}
+          {!record.builtin && <Tag color="orange">{t('organicTrafficScore.custom')}</Tag>}
         </Space>
       ),
     },
-    { title: '計分說明', dataIndex: 'description', key: 'description', render: (v: string) => <span style={{ color: '#8C8C8C', fontSize: 12 }}>{v}</span> },
+    { title: t('organicTrafficScore.colScoringDesc'), dataIndex: 'description', key: 'description', render: (v: string) => <span style={{ color: '#8C8C8C', fontSize: 12 }}>{v}</span> },
     {
-      title: '計分方式', dataIndex: 'mode', key: 'mode', width: 110,
-      render: (v: ScoreMode) => <Tag color={SCORE_MODE_COLOR[v]}>{SCORE_MODE_LABEL[v]}</Tag>,
+      title: t('organicTrafficScore.colScoringMode'), dataIndex: 'mode', key: 'mode', width: 110,
+      render: (v: ScoreMode) => <Tag color={SCORE_MODE_COLOR[v]}>{MODE_LABEL[v]}</Tag>,
     },
     {
-      title: '分值', dataIndex: 'score', key: 'score', width: 130,
+      title: t('organicTrafficScore.colScore'), dataIndex: 'score', key: 'score', width: 130,
       render: (v: number, record) => {
         if (record.rangeScores) {
           return (
             <Popover
-              title={<span style={{ fontSize: 13, fontWeight: 600 }}>{record.name} · 分層分值</span>}
+              title={<span style={{ fontSize: 13, fontWeight: 600 }}>{record.name} · {t('organicTrafficScore.tieredScore')}</span>}
               content={
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 20px', minWidth: 160 }}>
                   {RANGE_SCORE_KEYS.map(key => (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <span style={{ color: '#8C8C8C', fontSize: 12 }}>{RANGE_SCORE_LABELS[key]}</span>
-                      <span style={{ fontWeight: 600, color: '#262626' }}>{record.rangeScores![key]} 分</span>
+                      <span style={{ color: '#8C8C8C', fontSize: 12 }}>{RANGE_LABEL[key]}</span>
+                      <span style={{ fontWeight: 600, color: '#262626' }}>{record.rangeScores![key]} {t('organicTrafficScore.scoreUnit')}</span>
                     </div>
                   ))}
                 </div>
@@ -266,7 +302,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               trigger="hover"
             >
               <Button type="link" size="small" style={{ padding: '0 4px', fontSize: 12 }}>
-                查看分層
+                {t('organicTrafficScore.viewTiered')}
               </Button>
             </Popover>
           )
@@ -285,18 +321,18 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       },
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 90,
+      title: t('organicTrafficScore.colStatus'), dataIndex: 'status', key: 'status', width: 90,
       render: (v: ServiceStatus) => (
         <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
-          {v === ServiceStatus.ENABLED ? '啟用' : '停用'}
+          {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
         </Tag>
       ),
     },
     {
-      title: '操作', key: 'action', width: 170,
+      title: t('organicTrafficScore.colAction'), key: 'action', width: 170,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" disabled={readOnly} onClick={() => handleOpenEdit(record)}>編輯</Button>
+          <Button type="link" size="small" disabled={readOnly} onClick={() => handleOpenEdit(record)}>{t('common.edit')}</Button>
           <Button
             type="link"
             size="small"
@@ -305,10 +341,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
-            {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
+            {record.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
           </Button>
           {!record.builtin && (
-            <Button type="link" size="small" danger disabled={readOnly} onClick={() => handleDelete(record)}>刪除</Button>
+            <Button type="link" size="small" danger disabled={readOnly} onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
           )}
         </Space>
       ),
@@ -327,23 +363,23 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             allowClear
             value={keyword}
             prefix={<SearchOutlined style={{ color: '#BFBFBF' }} />}
-            placeholder="搜索評分項名稱 / ID / 計分說明"
+            placeholder={t('organicTrafficScore.searchPlaceholder')}
             style={{ width: 260 }}
             onChange={e => setKeyword(e.target.value)}
           />
           <Select
             allowClear
             value={statusFilter}
-            placeholder="全部狀態"
+            placeholder={t('organicTrafficScore.allStatus')}
             style={{ width: 130 }}
             options={[
-              { label: '啟用', value: ServiceStatus.ENABLED },
-              { label: '停用', value: ServiceStatus.DISABLED },
+              { label: t('common.enable'), value: ServiceStatus.ENABLED },
+              { label: t('common.disable'), value: ServiceStatus.DISABLED },
             ]}
             onChange={val => setStatusFilter(val)}
           />
           <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-            共 {total.length} 項 · 啟用 {enabledCount} 項{data.length !== total.length ? ` · 篩選出 ${data.length} 項` : ''}
+            {t('organicTrafficScore.statsTotal', { total: total.length, enabled: enabledCount })}{data.length !== total.length ? t('organicTrafficScore.statsFiltered', { count: data.length }) : ''}
           </span>
           {!readOnly && (
             <Button
@@ -352,7 +388,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               style={{ marginLeft: 'auto' }}
               onClick={() => handleOpenAdd(dimension)}
             >
-              新增配置
+              {t('organicTrafficScore.addConfig')}
             </Button>
           )}
         </div>
@@ -366,7 +402,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             pageSize: RULE_PAGE_SIZE,
             showSizeChanger: true,
             size: 'small',
-            showTotal: t => `共 ${t} 項`,
+            showTotal: (total) => t('common.total', { count: total }),
           }}
         />
       </>
@@ -384,12 +420,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       }}>
         <span style={{ fontSize: 15 }}>{SCORE_DIMENSION_ICON[dimension]}</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#262626', whiteSpace: 'nowrap' }}>
-          {SCORE_DIMENSION_LABEL[dimension]}
+          {DIM_LABEL[dimension]}
         </span>
         <Tag color={color} style={{ background: '#fff', color, border: `1px solid ${color}44`, margin: 0 }}>
-          權重 {dimensionWeight[dimension]}%
+          {t('organicTrafficScore.weightLabel')} {dimensionWeight[dimension]}%
         </Tag>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{SCORE_DIMENSION_DESC[dimension]}</span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{DIM_DESC[dimension]}</span>
       </div>
     )
   }
@@ -400,13 +436,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>算法參數</span>
-        <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>評分維度</Tag>
+        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.pageTitle')}</span>
+        <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('organicTrafficScore.scoringDimension')}</Tag>
         <Button size="small" icon={<QuestionCircleOutlined />} onClick={() => setRuleModalOpen(true)}>
-          自然流量排名規則說明
+          {t('organicTrafficScore.rankingRuleDesc')}
         </Button>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        <span style={{ fontSize: 12, color: '#8c8c8c' }}>自然流量按綜合得分高低排名</span>
+        <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('organicTrafficScore.rankingSummary')}</span>
       </div>
       {/* 3 個維度權重統計卡（帶計數動畫與 hover 動效） */}
       <div key={weightTotal} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
@@ -435,7 +471,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                 <AnimatedNumber value={dimensionWeight[dimension]} suffix="%" />
               </div>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
-                {SCORE_DIMENSION_LABEL[dimension]} · 啟用 {enabledCountMap[dimension]} 項
+                {DIM_LABEL[dimension]} · {t('organicTrafficScore.enabledCount', { count: enabledCountMap[dimension] })}
               </div>
             </div>
           )
@@ -449,15 +485,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>維度權重與計算配置</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.dimensionWeightConfig')}</span>
           <span style={{ fontSize: 12, color: weightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
-            當前合計 {weightTotal}%{weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（需等於 ${DIMENSION_WEIGHT_TOTAL}%）`}
+            {`${t('organicTrafficScore.currentTotal', { total: weightTotal })}${weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}）`}`}
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {DIMENSION_ORDER.map(dimension => (
             <div key={dimension}>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{SCORE_DIMENSION_LABEL[dimension]}</div>
+              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{DIM_LABEL[dimension]}</div>
               <InputNumber
                 value={dimensionWeight[dimension]}
                 min={0}
@@ -470,12 +506,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             </div>
           ))}
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>得分重算定時器</div>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('organicTrafficScore.scoreRecalcTimer')}</div>
             <InputNumber
               value={timerMinutes}
               min={1}
               max={1440}
-              addonAfter="分鐘"
+              addonAfter={t('organicTrafficScore.minutesUnit')}
               style={{ width: '100%' }}
               disabled={readOnly}
               onChange={val => setTimerMinutes(val ?? DEFAULT_SCORE_TIMER_MINUTES)}
@@ -496,7 +532,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             key: String(dimension),
             label: (
               <span style={{ fontSize: 13 }}>
-                {SCORE_DIMENSION_ICON[dimension]} {SCORE_DIMENSION_LABEL[dimension]}
+                {SCORE_DIMENSION_ICON[dimension]} {DIM_LABEL[dimension]}
                 <span style={{ color: '#8C8C8C', marginLeft: 4 }}>
                   ({getRules(dimension).length})
                 </span>
@@ -514,76 +550,76 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
 
       {/* 自然流量排名規則說明彈窗 */}
       <Modal
-        title="自然流量排名規則說明"
+        title={t('organicTrafficScore.rankingRuleTitle')}
         open={ruleModalOpen}
         width={680}
         onCancel={() => setRuleModalOpen(false)}
-        footer={<Button onClick={() => setRuleModalOpen(false)}>關閉</Button>}
+        footer={<Button onClick={() => setRuleModalOpen(false)}>{t('organicTrafficScore.close')}</Button>}
       >
         <div style={{ fontSize: 13, lineHeight: 2, color: '#595959', marginTop: 12 }}>
-          <div>1. 自然流量不售賣坑位，同一坑位內所有符合條件的商家<strong>靠綜合得分高低較量排名</strong>，得分越高排序越前。</div>
-          <div>2. 綜合得分 = Σ（維度權重 × 該維度得分率），維度得分率 = 該維度啟用項實得分之和 ÷ 啟用項滿分之和。</div>
-          <div>3. 扣分降權項為負分，命中後直接從對應維度得分中扣減；停用的評分項不參與計算，也不計入滿分分母。</div>
-          <div>4. 3 個維度權重合計必須等於 {DIMENSION_WEIGHT_TOTAL}%。</div>
-          <div>5. 得分由系統按定時器週期重算，同分商家按「店鋪評分 → 近30天訂單量 → 距離」依次比較。</div>
-          <div>6. 系統內置評分項不可刪除，僅可編輯、調整分值與啟用/停用；自定義項可刪除。</div>
+          <div dangerouslySetInnerHTML={{ __html: t('organicTrafficScore.rule1') }} />
+          <div>{t('organicTrafficScore.rule2')}</div>
+          <div>{t('organicTrafficScore.rule3')}</div>
+          <div>{t('organicTrafficScore.rule4', { total: DIMENSION_WEIGHT_TOTAL })}</div>
+          <div>{t('organicTrafficScore.rule5')}</div>
+          <div>{t('organicTrafficScore.rule6')}</div>
         </div>
       </Modal>
 
       {/* 新增/編輯評分項彈窗 */}
       <Modal
-        title={editingRule ? '編輯評分項' : '新增評分項'}
+        title={editingRule ? t('organicTrafficScore.editRule') : t('organicTrafficScore.addRule')}
         open={modalOpen}
         onOk={handleSaveRule}
         onCancel={() => setModalOpen(false)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         okButtonProps={{ icon: <SaveOutlined /> }}
         width={640}
         destroyOnClose
       >
         <Form form={ruleForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="所屬維度">
+          <Form.Item label={t('organicTrafficScore.dimension')}>
             <Input
               disabled
-              value={SCORE_DIMENSION_LABEL[modalDimension]}
+              value={DIM_LABEL[modalDimension]}
             />
           </Form.Item>
-          <Form.Item label="評分項名稱" name="name" rules={[{ required: true, message: '請輸入評分項名稱' }]}>
-            <Input placeholder="如：購買金字招牌廣告" maxLength={30} showCount />
+          <Form.Item label={t('organicTrafficScore.ruleName')} name="name" rules={[{ required: true, message: t('organicTrafficScore.ruleNameRequired') }]}>
+            <Input placeholder={t('organicTrafficScore.namePlaceholder')} maxLength={30} showCount />
           </Form.Item>
-          <Form.Item label="計分說明" name="description" rules={[{ required: true, message: '請輸入計分說明' }]}>
-            <Input.TextArea placeholder="說明該項的計分依據與取值口徑" rows={3} maxLength={120} showCount />
+          <Form.Item label={t('organicTrafficScore.scoringDesc')} name="description" rules={[{ required: true, message: t('organicTrafficScore.scoringDescRequired') }]}>
+            <Input.TextArea placeholder={t('organicTrafficScore.descPlaceholder')} rows={3} maxLength={120} showCount />
           </Form.Item>
-          <Form.Item label="計分方式" name="mode" rules={[{ required: true, message: '請選擇計分方式' }]}>
-            <Select options={SCORE_MODE_OPTIONS} placeholder="請選擇計分方式" />
+          <Form.Item label={t('organicTrafficScore.scoringMode')} name="mode" rules={[{ required: true, message: t('organicTrafficScore.scoringModeRequired') }]}>
+            <Select options={MODE_OPTIONS} placeholder={t('organicTrafficScore.selectScoringMode')} />
           </Form.Item>
           {!isDeliveryRange(editingRule?.id) && (
             <Form.Item
-              label="分值"
+              label={t('organicTrafficScore.score')}
               name="score"
-              rules={[{ required: !isDeliveryRange(editingRule?.id), message: '請輸入分值' }]}
+              rules={[{ required: !isDeliveryRange(editingRule?.id), message: t('organicTrafficScore.scoreRequired') }]}
               extra={ruleFormMode === ScoreMode.AMOUNT_MULTIPLIER
-                ? '金額倍率方式：此處填倍率值，得分 = 金額 × 倍率（如 2 表示金額×2）'
-                : '加分項填正值，扣分降權項填負值，取值範圍 -100 ~ 100'}
+                ? t('organicTrafficScore.scoreExtraMultiplier')
+                : t('organicTrafficScore.scoreExtraNormal')}
             >
-              <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder="請輸入分值" />
+              <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder={t('organicTrafficScore.scorePlaceholder')} />
             </Form.Item>
           )}
           {isDeliveryRange(editingRule?.id) && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#262626', marginBottom: 8 }}>配送範圍分層分值</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#262626', marginBottom: 8 }}>{t('organicTrafficScore.deliveryRangeTiered')}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
                 {RANGE_SCORE_KEYS.map(key => (
                   <Form.Item
                     key={key}
-                    label={RANGE_SCORE_LABELS[key]}
+                    label={RANGE_LABEL[key]}
                     name={['rangeScores', key]}
-                    rules={[{ required: true, message: `請輸入${RANGE_SCORE_LABELS[key]}分值` }]}
+                    rules={[{ required: true, message: t('organicTrafficScore.rangeScoreRequired', { label: RANGE_LABEL[key] }) }]}
                     style={{ marginBottom: 0 }}
                     initialValue={DEFAULT_RANGE_SCORES[key]}
                   >
-                    <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder="分值" addonAfter="分" />
+                    <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder={t('organicTrafficScore.scoreInputPlaceholder')} addonAfter={t('organicTrafficScore.scoreUnit')} />
                   </Form.Item>
                 ))}
               </div>
@@ -591,22 +627,22 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           )}
           {(editingRule ? needsStatDays(editingRule.id) : false) && (
             <Form.Item
-              label="統計天數"
+              label={t('organicTrafficScore.statDays')}
               name="statDays"
-              extra="設置後按該天數範圍內數據計算，留空則不限天數"
+              extra={t('organicTrafficScore.statDaysExtra')}
             >
-              <InputNumber min={1} max={365} style={{ width: '100%' }} placeholder="如 30" addonAfter="天" />
+              <InputNumber min={1} max={365} style={{ width: '100%' }} placeholder={t('organicTrafficScore.statDaysPlaceholder')} addonAfter={t('organicTrafficScore.daysUnit')} />
             </Form.Item>
           )}
           <Form.Item
-            label="狀態"
+            label={t('organicTrafficScore.status')}
             name="status"
             valuePropName="checked"
             getValueProps={v => ({ checked: v === ServiceStatus.ENABLED })}
             normalize={(checked: boolean) => checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED}
-            rules={[{ required: true, message: '請選擇狀態' }]}
+            rules={[{ required: true, message: t('organicTrafficScore.statusRequired') }]}
           >
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Menu } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { AppstoreOutlined, CoffeeOutlined, ShoppingOutlined, ShopOutlined } from '@ant-design/icons'
 import { RECOMMEND_CHANNEL_OPTIONS, RecommendChannel } from '../constants'
 
@@ -16,6 +17,7 @@ const iconMap: Record<RecommendChannel, React.ReactNode> = {
 }
 
 export default function ChannelSelector({ value = RecommendChannel.HOME, onChange }: ChannelSelectorProps) {
+  const { t } = useTranslation()
   return (
     <Menu
       mode="inline"
@@ -24,7 +26,7 @@ export default function ChannelSelector({ value = RecommendChannel.HOME, onChang
       items={RECOMMEND_CHANNEL_OPTIONS.map(opt => ({
         key: String(opt.value),
         icon: iconMap[opt.value],
-        label: opt.label,
+        label: t(opt.labelKey),
       }))}
       style={{ width: 180, borderRight: '1px solid #f0f0f0' }}
     />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Modal,
   Form,
@@ -54,6 +55,7 @@ interface RechargeModalProps {
 }
 
 export default function RechargeModal({ open, onClose, record }: RechargeModalProps) {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [_groupId, setGroupId] = useState<string>('')
   const [directAmount, setDirectAmount] = useState<string>('')
@@ -94,10 +96,10 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
     try {
       const values = await form.validateFields()
       if (!directAmount) {
-        message.warning('請填寫直觀賬戶充值金額')
+        message.warning(t('accountBalance.fillVisualAmount'))
         return
       }
-      message.success('充值提交成功！')
+      message.success(t('accountBalance.rechargeSuccess'))
       onClose()
     } catch {
       // 表单校验未通过
@@ -141,7 +143,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
       <div className="recharge-header">
         <div className="recharge-title">
           <span className="recharge-title-icon">💰</span>
-          推廣金充值
+          {t('accountBalance.rechargeModalTitle')}
         </div>
         <button className="recharge-close-btn" onClick={onClose}>
           <CloseOutlined />
@@ -151,16 +153,16 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
       <Form form={form} layout="vertical" className="recharge-form" requiredMark>
         {/* 基本信息 */}
         <div className="recharge-section">
-          <div className="recharge-section-title">基本信息</div>
+          <div className="recharge-section-title">{t('accountBalance.basicInfo')}</div>
           <div className="recharge-row">
             <Form.Item
-              label="集團ID"
+              label={t('accountBalance.colGroupId')}
               name="groupId"
-              rules={[{ required: true, message: '請選擇集團ID' }]}
+              rules={[{ required: true, message: t('accountBalance.selectGroupId') }]}
               className="recharge-col"
             >
               <Select
-                placeholder="請選擇集團ID"
+                placeholder={t('accountBalance.selectGroupId')}
                 options={groupIdOptions}
                 showSearch
                 onChange={(val) => {
@@ -170,15 +172,15 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
                 }}
               />
             </Form.Item>
-            <Form.Item label="集團名稱" name="groupName" className="recharge-col">
-              <Input disabled placeholder="選擇集團ID後自動填充" className="recharge-disabled-input" />
+            <Form.Item label={t('accountBalance.colGroupName')} name="groupName" className="recharge-col">
+              <Input disabled placeholder={t('accountBalance.autoFillAfterGroupId')} className="recharge-disabled-input" />
             </Form.Item>
           </div>
 
           <Form.Item
-            label="所屬品類"
+            label={t('accountBalance.category')}
             name="category"
-            rules={[{ required: true, message: '請選擇所屬品類' }]}
+            rules={[{ required: true, message: t('accountBalance.selectCategory') }]}
           >
             <Radio.Group>
               <Radio value="1mFood">@1mFood</Radio>
@@ -189,9 +191,9 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
 
           <div className="recharge-row">
             <Form.Item
-              label="業務類型"
+              label={t('accountBalance.businessType')}
               name="businessType"
-              rules={[{ required: true, message: '請選擇業務類型' }]}
+              rules={[{ required: true, message: t('accountBalance.selectBusinessType') }]}
               className="recharge-col"
             >
               <Radio.Group>
@@ -200,7 +202,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
               </Radio.Group>
             </Form.Item>
             <Form.Item
-              label="業務類別"
+              label={t('accountBalance.businessCategory')}
               name="businessCategory"
               className="recharge-col"
             >
@@ -213,12 +215,12 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
 
         {/* 充值金额 */}
         <div className="recharge-section">
-          <div className="recharge-section-title">充值金額</div>
+          <div className="recharge-section-title">{t('accountBalance.rechargeAmount')}</div>
           <Form.Item
             label={
               <span>
-                直觀賬戶充值
-                <Tooltip title="此欄位不可為空，請輸入充值金額">
+                {t('accountBalance.visualRecharge')}
+                <Tooltip title={t('accountBalance.visualRechargeTooltip')}>
                   <InfoCircleOutlined style={{ marginLeft: 4, color: '#999' }} />
                 </Tooltip>
               </span>
@@ -227,7 +229,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
             className="recharge-amount-item"
           >
             <Input
-              placeholder="請輸入充值金額"
+              placeholder={t('accountBalance.enterRechargeAmount')}
               value={directAmount}
               onChange={(e) => setDirectAmount(e.target.value)}
               className="recharge-amount-input"
@@ -244,16 +246,16 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
             )}
           </Form.Item>
 
-          <Form.Item label="歸還ID" name="returnId">
-            <Select placeholder="快速選擇ID" options={returnIdOptions} allowClear />
+          <Form.Item label={t('accountBalance.returnId')} name="returnId">
+            <Select placeholder={t('accountBalance.quickSelectId')} options={returnIdOptions} allowClear />
           </Form.Item>
 
-          <Form.Item label="是否實收" name="isActual" valuePropName="checked">
-            <Checkbox>是</Checkbox>
+          <Form.Item label={t('accountBalance.isActual')} name="isActual" valuePropName="checked">
+            <Checkbox>{t('accountBalance.yes')}</Checkbox>
           </Form.Item>
 
           <div className="recharge-row">
-            <Form.Item label="實收賬戶充值" name="actualPayMethod" className="recharge-col-sm">
+            <Form.Item label={t('accountBalance.actualPayLabel')} name="actualPayMethod" className="recharge-col-sm">
               <Select
                 options={actualPayOptions}
                 value={actualPayMethod}
@@ -262,7 +264,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
             </Form.Item>
             <Form.Item label=" " className="recharge-col">
               <Input
-                placeholder="請輸入實收金額"
+                placeholder={t('accountBalance.enterActualAmount')}
                 value={actualAmount}
                 onChange={(e) => setActualAmount(e.target.value)}
                 className="recharge-amount-input"
@@ -278,11 +280,11 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
           {/* 銀行轉賬 - 仅在選擇對公轉帳或銀行轉賬時顯示 */}
           {(actualPayMethod === 'corporate' || actualPayMethod === 'bank') && (
             <Form.Item
-              label="銀行轉賬"
+              label={t('accountBalance.bankTransfer')}
               className="recharge-amount-item"
             >
               <Input
-                placeholder="請輸入銀行轉賬金額"
+                placeholder={t('accountBalance.enterBankAmount')}
                 value={bankAmount}
                 onChange={(e) => setBankAmount(e.target.value)}
                 className="recharge-amount-input"
@@ -304,8 +306,8 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
         {/* 上傳合同憑證 */}
         <div className="recharge-section">
           <div className="recharge-section-title">
-            合併處理
-            <span className="recharge-section-desc">上傳合同憑證、付款憑證</span>
+            {t('accountBalance.mergedProcessing')}
+            <span className="recharge-section-desc">{t('accountBalance.mergedProcessingDesc')}</span>
           </div>
           <div className="recharge-upload-area">
             {uploadedFiles.map((file) => (
@@ -326,25 +328,25 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
               >
                 <div className="recharge-upload-add">
                   <UploadOutlined style={{ fontSize: 24, color: '#B0B0B0' }} />
-                  <span>上傳</span>
+                  <span>{t('accountBalance.upload')}</span>
                 </div>
               </Upload>
             )}
           </div>
           {uploadedFiles.length > 0 && (
             <div className="recharge-upload-tip">
-              已上傳 {uploadedFiles.length} 個文件，支持 PNG / JPG / PDF 格式
+              {t('accountBalance.uploadedFilesTip', { count: uploadedFiles.length })}
             </div>
           )}
         </div>
 
         {/* 備註信息 */}
         <div className="recharge-section">
-          <div className="recharge-section-title">付款建議</div>
+          <div className="recharge-section-title">{t('accountBalance.paymentAdvice')}</div>
           <div className="recharge-remark-wrap">
             <textarea
               className="recharge-remark"
-              placeholder="本次充值需要注意的事項可在此進行描述，限制200字！"
+              placeholder={t('accountBalance.remarkPlaceholder')}
               maxLength={200}
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
@@ -358,10 +360,10 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
       {/* 底部操作按钮 */}
       <div className="recharge-footer">
         <Button className="recharge-btn-cancel" onClick={onClose}>
-          返回
+          {t('accountBalance.rechargeBack')}
         </Button>
         <Button type="primary" className="recharge-btn-confirm" onClick={handleConfirm}>
-          確認
+          {t('accountBalance.rechargeConfirm')}
         </Button>
       </div>
     </Modal>

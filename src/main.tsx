@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { ConfigProvider } from 'antd'
 import zhTW from 'antd/locale/zh_TW'
+import enUS from 'antd/locale/en_US'
 import App from './App'
+import i18n from './i18n'
 import './styles/global.css'
 
 const themeConfig = {
@@ -39,10 +41,30 @@ const themeConfig = {
   },
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ConfigProvider locale={zhTW} theme={themeConfig}>
+/** 根 Providers：antd 組件內置文案（分頁/空數據/日期選擇器）隨 i18n 語言動態切換 */
+function AppProviders() {
+  const [locale, setLocale] = useState(zhTW)
+
+  useEffect(() => {
+    const syncLocale = () => {
+      setLocale(i18n.language?.startsWith('en') ? enUS : zhTW)
+    }
+    syncLocale()
+    i18n.on('languageChanged', syncLocale)
+    return () => {
+      i18n.off('languageChanged', syncLocale)
+    }
+  }, [])
+
+  return (
+    <ConfigProvider locale={locale} theme={themeConfig}>
       <App />
     </ConfigProvider>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <AppProviders />
   </React.StrictMode>,
 )

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Input, Tag, Empty, Card, Tabs } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Line, Column } from '@ant-design/charts'
 import { fetchMenuTree } from '../../api/menu'
 import type { MenuVO } from '../../api/menu'
+import { translateMenuName } from '../../i18n/menuNameEn'
 import {
   SearchOutlined,
   PlusOutlined,
@@ -28,11 +30,18 @@ import {
 } from '@ant-design/icons'
 import './index.css'
 
-/** 系统提示滚动文案 */
-const systemTips = [
-  '該原型系統部分菜單界面已實現前後端聯調，支持賬號密碼登錄並運行真實數據',
-  '數據庫可通過 SQLPUB 平台在線訪問，隨時查看最新業務數據',
-]
+/** 菜单分组英文名（首页分类 Tag，英文模式查映射） */
+const GROUP_NAME_EN: Record<string, string> = {
+  '推廣金管理': 'Promotion Funds',
+  '商戶通對賬': 'Merchant Reconciliation',
+  '審批管理': 'Approval Management',
+  '搜索配置': 'Search Config',
+  '搜索引导': 'Search Guide',
+  '搜索词库': 'Search Library',
+  '報表統計': 'Reports',
+  '商家推广工具': 'Merchant Promotion Tools',
+  '推广通': 'Promotion Pass',
+}
 
 /** 所有可用菜单 */
 const allMenus = [
@@ -79,25 +88,25 @@ const defaultFavorites = [
 
 /** 待办事项 */
 const todoItems = [
-  { id: 1, title: '推廣金充值申請審批', count: 3, type: 'warning' as const },
-  { id: 2, title: '推廣金扣款申請審批', count: 5, type: 'info' as const },
-  { id: 3, title: '推廣金轉賬申請審批', count: 2, type: 'info' as const },
-  { id: 4, title: '商戶合併申請審批', count: 1, type: 'error' as const },
+  { id: 1, count: 3, type: 'warning' as const },
+  { id: 2, count: 5, type: 'info' as const },
+  { id: 3, count: 2, type: 'info' as const },
+  { id: 4, count: 1, type: 'error' as const },
 ]
 
-/** 系统通知 */
+/** 系统通知（内容由语言包 home.notifList 提供） */
 const notifications = [
-  { id: 1, title: '用戶管理菜單新增日志查看通知', desc: '用戶管理功能增強,支持操作日志查看', time: '1小時前', read: false },
-  { id: 2, title: '權限管理支持授權多個國家數據權限通知', desc: '權限管理模塊升級,支持多國家數據權限配置', time: '3小時前', read: false },
-  { id: 3, title: '運營培訓會議事項', desc: '本週五下午3點運營培訓會議,請準時參加', time: '1天前', read: true },
-  { id: 4, title: '新增廣告無敵星星上線通知', desc: '新廣告形式無敵星星已上線,歡迎體驗', time: '2天前', read: true },
+  { id: 1, read: false },
+  { id: 2, read: false },
+  { id: 3, read: true },
+  { id: 4, read: true },
 ]
 
-/** 系统公告 */
+/** 系统公告（内容由语言包 home.announceList 提供） */
 const announcements = [
-  { id: 1, title: '12月績效數據公佈告知', desc: '12月績效考核數據已公佈,請查看', time: '2天前', read: false },
-  { id: 2, title: '團購策略調整公佈', desc: '團購業務策略調整方案已發佈,請相關人員查收', time: '3天前', read: true },
-  { id: 3, title: '電信新用戶推廣策略公佈', desc: '電信渠道新用戶推廣策略已更新', time: '5天前', read: true },
+  { id: 1, read: false },
+  { id: 2, read: true },
+  { id: 3, read: true },
 ]
 
 /** 订单趋势数据 */
@@ -166,6 +175,7 @@ const collectMenuNames = (menus: MenuVO[], map: Record<string, string>) => {
 
 export default function Home() {
   const navigate = useNavigate()
+  const { t, i18n: i18nInstance } = useTranslation()
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -217,16 +227,22 @@ export default function Home() {
     const hours = String(date.getHours()).padStart(2, '0')
     const minutes = String(date.getMinutes()).padStart(2, '0')
     const seconds = String(date.getSeconds()).padStart(2, '0')
-    return `${year}年${month}月${day}日 ${hours}:${minutes}:${seconds}`
+    return t('home.dateFormat', { year, month, day, hours, minutes, seconds })
   }
 
-  const getWeekday = (date: Date) => {
-    const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
-    return weekdays[date.getDay()]
-  }
+  const getWeekday = (date: Date) => t(`home.weekdays.${date.getDay()}`)
+
+  /** 菜单分组名：英文模式查映射 */
+  const translateGroup = (zh: string) => (
+    i18nInstance.language?.startsWith('en') ? (GROUP_NAME_EN[zh] ?? zh) : zh
+  )
 
   const filteredMenus = searchText
-    ? menuList.filter((m) => m.label.includes(searchText) || m.group.includes(searchText))
+    ? menuList.filter((m) => {
+        const label = translateMenuName(m.key, m.label)
+        const group = translateGroup(m.group)
+        return label.includes(searchText) || group.includes(searchText)
+      })
     : []
 
   const addFavorite = (key: string) => {
@@ -246,9 +262,9 @@ export default function Home() {
   const getLineData = () => {
     const result: unknown[] = []
     orderTrendData.forEach(item => {
-      result.push({ date: item.date, value: item.delivery, type: '外賣訂單' })
-      result.push({ date: item.date, value: item.groupBuy, type: '團購訂單' })
-      result.push({ date: item.date, value: item.supermarket, type: '超市訂單' })
+      result.push({ date: item.date, value: item.delivery, type: t('home.deliveryOrders') })
+      result.push({ date: item.date, value: item.groupBuy, type: t('home.groupBuyOrders') })
+      result.push({ date: item.date, value: item.supermarket, type: t('home.supermarketOrders') })
     })
     return result
   }
@@ -310,14 +326,14 @@ export default function Home() {
       {/* 欢迎横幅 */}
       <div className="home-welcome home-welcome--animated">
         <div className="home-welcome-left">
-          <h2>歡迎回來,小蜜蜂 <span className="home-welcome-emoji">🐝</span></h2>
+          <h2>{t('home.welcomeBack')} <span className="home-welcome-emoji">🐝</span></h2>
           <div className="home-welcome-marquee">
             <div className="home-welcome-marquee-track">
               <span className="home-welcome-marquee-text">
-                {systemTips.join('  ·  ')}
+                {[t('home.tips0'), t('home.tips1')].join('  ·  ')}
               </span>
               <span className="home-welcome-marquee-text" aria-hidden>
-                {systemTips.join('  ·  ')}
+                {[t('home.tips0'), t('home.tips1')].join('  ·  ')}
               </span>
             </div>
           </div>
@@ -333,12 +349,12 @@ export default function Home() {
         {/* 个人工作台 */}
         <div className="home-section">
           <div className="home-section-header">
-            <h3>📋 個人工作台</h3>
+            <h3>{t('home.workspaceTitle')}</h3>
           </div>
           <div className="home-workspace-search">
             <Input
               prefix={<SearchOutlined style={{ color: '#999', fontSize: 14 }} />}
-              placeholder="搜索系統菜單..."
+              placeholder={t('home.searchPlaceholder')}
               size="middle"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -355,10 +371,10 @@ export default function Home() {
                     onClick={() => !favorites.includes(menu.key) && addFavorite(menu.key)}
                   >
                     <span className="home-search-item-icon">{menu.icon}</span>
-                    <span className="home-search-item-label">{menu.label}</span>
-                    <Tag>{menu.group}</Tag>
+                    <span className="home-search-item-label">{translateMenuName(menu.key, menu.label)}</span>
+                    <Tag>{translateGroup(menu.group)}</Tag>
                     {favorites.includes(menu.key) ? (
-                      <span className="home-search-item-added">已添加</span>
+                      <span className="home-search-item-added">{t('home.added')}</span>
                     ) : (
                       <PlusOutlined className="home-search-item-add" />
                     )}
@@ -369,7 +385,7 @@ export default function Home() {
           </div>
           <div className="home-favorites home-favorites--compact">
             {favorites.length === 0 ? (
-              <Empty description="暫無常用菜單,請通過搜索添加" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description={t('home.emptyFavorites')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
               favorites.map((key) => {
                 const menu = getMenuInfo(key)
@@ -381,7 +397,7 @@ export default function Home() {
                     onClick={() => navigate(menu.path)}
                   >
                     <div className="home-fav-icon">{menu.icon}</div>
-                    <span className="home-fav-label">{menu.label}</span>
+                    <span className="home-fav-label">{translateMenuName(menu.key, menu.label)}</span>
                     <button
                       className="home-fav-remove"
                       onClick={(e) => {
@@ -397,7 +413,7 @@ export default function Home() {
             )}
             <div className="home-fav-add home-fav-add--compact" onClick={() => setShowAddMenu(true)}>
               <PlusOutlined style={{ fontSize: 20, color: '#B0B0B0' }} />
-              <span>添加菜單</span>
+              <span>{t('home.addMenu')}</span>
             </div>
           </div>
         </div>
@@ -405,7 +421,7 @@ export default function Home() {
         {/* 待办事项 */}
         <div className="home-section">
           <div className="home-section-header">
-            <h3>📌 待辦事項</h3>
+            <h3>{t('home.todoTitle')}</h3>
             <Tag color="red">{todoItems.reduce((s, t) => s + t.count, 0)}</Tag>
           </div>
           <div className="home-todo-list">
@@ -420,7 +436,7 @@ export default function Home() {
                   {item.type === 'error' && <ExclamationCircleOutlined style={{ color: '#E53935' }} />}
                   {item.type === 'warning' && <ClockCircleOutlined style={{ color: '#E8720C' }} />}
                   {item.type === 'info' && <CheckCircleOutlined style={{ color: '#1976D2' }} />}
-                  <span>{item.title}</span>
+                  <span>{t(`home.todos.${item.id - 1}.title`)}</span>
                 </div>
                 <Tag color={item.type === 'error' ? 'red' : item.type === 'warning' ? 'orange' : 'blue'}>
                   {item.count}
@@ -441,12 +457,12 @@ export default function Home() {
               <div className="home-stat-icon-badge" style={{ background: 'rgba(24,144,255,0.1)' }}>
                 <ShoppingOutlined style={{ color: '#1890ff', fontSize: 18 }} />
               </div>
-              <span className="home-stat-title">今日訂單</span>
+              <span className="home-stat-title">{t('home.todayOrders')}</span>
               <Tag color="blue" className="home-stat-live-tag">LIVE</Tag>
             </div>
             <div className="home-stat-content home-stat-content--horizontal">
               <div className="home-stat-item">
-                <div className="home-stat-label">外賣訂單</div>
+                <div className="home-stat-label">{t('home.deliveryOrders')}</div>
                 <div className="home-stat-value home-stat-value--animated" style={{ color: '#1890ff' }}>{orderDelivery}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +12%
@@ -454,7 +470,7 @@ export default function Home() {
               </div>
               <div className="home-stat-divider" />
               <div className="home-stat-item">
-                <div className="home-stat-label">團購訂單</div>
+                <div className="home-stat-label">{t('home.groupBuyOrders')}</div>
                 <div className="home-stat-value home-stat-value--animated" style={{ color: '#722ed1' }}>{orderGroupBuy}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +8%
@@ -462,7 +478,7 @@ export default function Home() {
               </div>
               <div className="home-stat-divider" />
               <div className="home-stat-item">
-                <div className="home-stat-label">超市訂單</div>
+                <div className="home-stat-label">{t('home.supermarketOrders')}</div>
                 <div className="home-stat-value home-stat-value--animated" style={{ color: '#fa8c16' }}>{orderSupermarket}</div>
                 <div className="home-stat-trend">
                   <RiseOutlined style={{ color: '#52c41a' }} /> +15%
@@ -477,14 +493,14 @@ export default function Home() {
               <div className="home-stat-icon-badge" style={{ background: 'rgba(82,196,26,0.1)' }}>
                 <UserAddOutlined style={{ color: '#52c41a', fontSize: 18 }} />
               </div>
-              <span className="home-stat-title">今日新用戶</span>
+              <span className="home-stat-title">{t('home.newUsersToday')}</span>
             </div>
             <div className="home-stat-content home-stat-content--single">
               <div className="home-stat-item">
-                <div className="home-stat-label">新增用戶</div>
+                <div className="home-stat-label">{t('home.newUsers')}</div>
                 <div className="home-stat-value home-stat-value--animated" style={{ color: '#52c41a', fontSize: 26 }}>{newUsers}</div>
                 <div className="home-stat-trend">
-                  <RiseOutlined style={{ color: '#52c41a' }} /> +18% 較昨日
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +18% {t('home.vsYesterday')}
                 </div>
               </div>
             </div>
@@ -496,18 +512,18 @@ export default function Home() {
               <div className="home-stat-icon-badge" style={{ background: 'rgba(250,173,20,0.1)' }}>
                 <WalletOutlined style={{ color: '#faad14', fontSize: 18 }} />
               </div>
-              <span className="home-stat-title">推廣金充值</span>
+              <span className="home-stat-title">{t('home.rechargeTitle')}</span>
             </div>
             <div className="home-stat-content home-stat-content--single">
               <div className="home-stat-item">
-                <div className="home-stat-label">今日充值</div>
+                <div className="home-stat-label">{t('home.todayRecharge')}</div>
                 <div className="home-stat-value home-stat-value--animated" style={{ color: '#faad14', fontSize: 24 }}>
                   MOP {rechargeAmount.toLocaleString()}
                 </div>
                 <div className="home-stat-trend">
-                  <RiseOutlined style={{ color: '#52c41a' }} /> +22% 較昨日
+                  <RiseOutlined style={{ color: '#52c41a' }} /> +22% {t('home.vsYesterday')}
                 </div>
-                <div className="home-stat-extra">充值筆數:12 筆</div>
+                <div className="home-stat-extra">{t('home.rechargeCount', { count: 12 })}</div>
               </div>
             </div>
           </Card>
@@ -521,16 +537,16 @@ export default function Home() {
             items={[
               {
                 key: '1',
-                label: <span><NotificationOutlined /> 通知</span>,
+                label: <span><NotificationOutlined /> {t('home.notifications')}</span>,
                 children: (
                   <div className="home-notification-list-compact">
                     {notifications.slice(0, 3).map((n) => (
                       <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
                         <div className="home-notification-title-compact">
                           {!n.read && <span className="home-notification-dot" />}
-                          {n.title}
+                          {t(`home.notifList.${n.id - 1}.title`)}
                         </div>
-                        <div className="home-notification-time-compact">{n.time}</div>
+                        <div className="home-notification-time-compact">{t(`home.notifList.${n.id - 1}.time`)}</div>
                       </div>
                     ))}
                   </div>
@@ -538,16 +554,16 @@ export default function Home() {
               },
               {
                 key: '2',
-                label: <span><BulbOutlined /> 公告</span>,
+                label: <span><BulbOutlined /> {t('home.announcements')}</span>,
                 children: (
                   <div className="home-notification-list-compact">
                     {announcements.slice(0, 3).map((n) => (
                       <div key={n.id} className={`home-notification-item-compact ${n.read ? '' : 'unread'}`}>
                         <div className="home-notification-title-compact">
                           {!n.read && <span className="home-notification-dot" />}
-                          {n.title}
+                          {t(`home.announceList.${n.id - 1}.title`)}
                         </div>
-                        <div className="home-notification-time-compact">{n.time}</div>
+                        <div className="home-notification-time-compact">{t(`home.announceList.${n.id - 1}.time`)}</div>
                       </div>
                     ))}
                   </div>
@@ -560,10 +576,10 @@ export default function Home() {
 
       {/* 数据图表区域 - 并排展示 */}
       <div className="home-charts-grid">
-        <Card title="訂單趨勢(近7天)" className="home-chart-card">
+        <Card title={t('home.orderTrend')} className="home-chart-card">
           <Line {...lineConfig} height={300} />
         </Card>
-        <Card title="充值趨勢(近7天)" className="home-chart-card">
+        <Card title={t('home.rechargeTrend')} className="home-chart-card">
           <Column {...columnConfig} height={300} />
         </Card>
       </div>

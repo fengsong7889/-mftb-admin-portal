@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import BrandTag from '../../../components/BrandTag'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, WalletOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { 
   AppType, 
   RecommendChannel, 
@@ -15,26 +16,13 @@ import {
   SERVICE_STATUS_OPTIONS,
   ALGORITHM_TYPE_OPTIONS,
   REGION_OPTIONS,
+  REGION_LABEL_KEY,
   ALGO_CARD_COLOR_MAP,
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
 import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
-
-/** 广告类型卡片配置 */
-const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
-  { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: '超級曝光位，首頁頂部黃金坑位，強勢引流' },
-  { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: '盤活熱門商家流量，提升店鋪曝光' },
-  { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: '人氣商家專屬推薦位，KA商家流量加持' },
-  { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: '獨家商家專屬展示位，彰顯品牌實力' },
-  { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: '精準流量投放，覆蓋目標用戶群體' },
-  { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: '智能推薦，個性化匹配用戶偏好' },
-  { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: '自然流量曝光，提升店鋪基礎流量' },
-  { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: '搜索算法優化，提升搜索轉化率' },
-  { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: '金字招牌商家，品質保證優先推薦' },
-  { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: '商品折扣秒殺活動，智能促銷匹配' },
-]
 
 /** 各業務類型（tab）對應的廣告類型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
@@ -62,54 +50,12 @@ const TAB_BIZ_CHANNELS: Record<string, string[]> = {
   groupBuy: ['groupBuy'],
 }
 
-const CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '大首頁-Feed',
-  [RecommendChannel.DELIVERY]: '外賣頻道-Feed',
-  [RecommendChannel.SUPERMARKET]: '超市頻道-Feed',
-  [RecommendChannel.GROUP_BUY]: '團購頻道-Feed',
-}
-
-/** 展示頁面選項（與廣告銷售一致） */
-const CHANNEL_OPTIONS = [
-  { label: '大首頁-Feed', value: RecommendChannel.HOME },
-  { label: '外賣頻道-Feed', value: RecommendChannel.DELIVERY },
-  { label: '超市頻道-Feed', value: RecommendChannel.SUPERMARKET },
-  { label: '團購頻道-Feed', value: RecommendChannel.GROUP_BUY },
-]
-
-/** 業務頻道映射（由展示頁面推导） */
 const CHANNEL_TO_BIZ: Record<number, string> = {
   [RecommendChannel.DELIVERY]: 'food',
   [RecommendChannel.SUPERMARKET]: 'supermarket',
   [RecommendChannel.GROUP_BUY]: 'groupBuy',
 }
 const BIZ_CHANNEL_POOL = ['food', 'supermarket', 'groupBuy']
-const BIZ_CHANNEL_LABEL: Record<string, string> = {
-  food: '美食外賣',
-  supermarket: '超市百貨',
-  groupBuy: '團購到店',
-}
-const BIZ_CHANNEL_OPTIONS = [
-  { label: '美食外賣', value: 'food' },
-  { label: '超市百貨', value: 'supermarket' },
-  { label: '團購到店', value: 'groupBuy' },
-]
-
-const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
-  [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
-  [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
-  [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
-  [AlgorithmType.TRAFFIC_AD]: '流量廣告',
-  [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
-  [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
-  [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
-  [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
-  [AlgorithmType.GOLD_AD]: '點金廣告',
-  [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
-  [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
-}
 
 const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: 'gold',
@@ -150,6 +96,7 @@ const toPricingRow = (vo: AdPricingStar, algoType: AlgorithmType): WaterfallSlot
 
 export default function Waterfall() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const urlType = searchParams.get('type') ? Number(searchParams.get('type')) as AlgorithmType : null
   const [searchForm] = Form.useForm()
@@ -167,14 +114,68 @@ export default function Waterfall() {
   const deliveryCardOrder = useCardOrder('waterfall-card-order-delivery', TAB_ALGORITHM_MAP.delivery)
   const groupBuyCardOrder = useCardOrder('waterfall-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy)
 
-  // 各算法类型对应的记录数
-  const _typeCountMap = useMemo(() => {
-    const map: Record<number, number> = {}
-    dataList.forEach(item => {
-      map[item.algorithmType] = (map[item.algorithmType] || 0) + 1
-    })
-    return map
-  }, [dataList])
+  /** 广告类型卡片配置（依赖 t，定义在组件内以便响应语言切换） */
+  const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
+    { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: t('algorithm.descInvincibleStar') },
+    { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: t('algorithm.descHotRevive') },
+    { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: t('waterfall.descPopularMerchant') },
+    { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: t('algorithm.descExclusiveMerchant') },
+    { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
+    { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: t('algorithm.descGuessYouLike') },
+    { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
+    { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: t('algorithm.descSearchAlgorithm') },
+    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
+    { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: t('algorithm.descProductPromo') },
+  ]
+
+  /** 算法类型标签映射（复用 algorithm 命名空间，依赖 t，定义在组件内以便响应语言切换） */
+  const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
+    [AlgorithmType.INVINCIBLE_STAR]: t('algorithm.typeInvincibleStar'),
+    [AlgorithmType.NEW_STORE_AD]: t('algorithm.typeNewStore'),
+    [AlgorithmType.HOT_REVIVE_AD]: t('algorithm.typeHotRevive'),
+    [AlgorithmType.EXCLUSIVE_MERCHANT]: t('algorithm.typeExclusiveMerchant'),
+    [AlgorithmType.POPULAR_MERCHANT_KA]: t('algorithm.typePopularMerchant'),
+    [AlgorithmType.TRAFFIC_AD]: t('algorithm.typeTraffic'),
+    [AlgorithmType.GUESS_YOU_LIKE]: t('algorithm.typeGuessYouLike'),
+    [AlgorithmType.ORGANIC_TRAFFIC]: t('algorithm.typeOrganicTraffic'),
+    [AlgorithmType.SEARCH_ALGORITHM]: t('algorithm.typeSearchAlgorithm'),
+    [AlgorithmType.BRAND_MERCHANT]: t('algorithm.typeBrandMerchant'),
+    [AlgorithmType.GOLD_AD]: t('algorithm.typeGoldAd'),
+    [AlgorithmType.GOLDEN_SIGNBOARD]: t('algorithm.typeGoldenSignboard'),
+    [AlgorithmType.PRODUCT_PROMO]: t('algorithm.typeProductPromo'),
+  }
+
+  /** 展示頁面映射（依赖 t，定义在组件内以便响应语言切换） */
+  const CHANNEL_LABEL: Record<RecommendChannel, string> = {
+    [RecommendChannel.HOME]: t('waterfall.chHome'),
+    [RecommendChannel.DELIVERY]: t('waterfall.chDelivery'),
+    [RecommendChannel.SUPERMARKET]: t('waterfall.chSupermarket'),
+    [RecommendChannel.GROUP_BUY]: t('waterfall.chGroupBuy'),
+  }
+  /** 展示頁面選項（與廣告銷售一致） */
+  const CHANNEL_OPTIONS = [
+    { label: t('waterfall.chHome'), value: RecommendChannel.HOME },
+    { label: t('waterfall.chDelivery'), value: RecommendChannel.DELIVERY },
+    { label: t('waterfall.chSupermarket'), value: RecommendChannel.SUPERMARKET },
+    { label: t('waterfall.chGroupBuy'), value: RecommendChannel.GROUP_BUY },
+  ]
+  /** 業務頻道映射（依赖 t，定义在组件内以便响应语言切换） */
+  const BIZ_CHANNEL_LABEL: Record<string, string> = {
+    food: t('waterfall.bizFood'),
+    supermarket: t('waterfall.bizSupermarket'),
+    groupBuy: t('waterfall.bizGroupBuy'),
+  }
+  const BIZ_CHANNEL_OPTIONS = [
+    { label: t('waterfall.bizFood'), value: 'food' },
+    { label: t('waterfall.bizSupermarket'), value: 'supermarket' },
+    { label: t('waterfall.bizGroupBuy'), value: 'groupBuy' },
+  ]
+
+  /** 翻譯後的常量選項（constants.ts 使用 labelKey） */
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tServiceStatusOptions = useMemo(() => SERVICE_STATUS_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tAlgorithmTypeOptions = useMemo(() => ALGORITHM_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tRegionOptions = useMemo(() => REGION_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
   /** 加載定價列表（無敵星星 + 盤活復蘇並行拉取後合併）+ 算法列表 */
   useEffect(() => {
@@ -315,7 +316,7 @@ export default function Waterfall() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      message.success(editingRecord ? '編輯成功' : '新增成功')
+      message.success(editingRecord ? t('waterfall.editSuccess') : t('waterfall.addSuccess'))
       setModalVisible(false)
       form.resetFields()
       setEditingRecord(null)
@@ -330,10 +331,10 @@ export default function Waterfall() {
   // 删除
   const handleDelete = (record: WaterfallSlotConfig) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除「${record.promotionName || `位置${record.slotPosition}`}」的定價配置嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common.confirmDelete'),
+      content: t('waterfall.confirmDeleteContent', { name: record.promotionName || `${t('waterfall.slotPositionPrefix')}${record.slotPosition}` }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         if (record.source === 'api') {
@@ -344,13 +345,13 @@ export default function Waterfall() {
               await deleteAdPricing(-record.id)
             }
           } catch (err) {
-            message.error((err as Error).message || '刪除失敗')
+            message.error((err as Error).message || t('waterfall.deleteFailed'))
             return
           }
           setDataList(prev => prev.filter(item => item.id !== record.id))
           setFilteredData(prev => prev.filter(item => item.id !== record.id))
         }
-        message.success('刪除成功')
+        message.success(t('common.deleteSuccess'))
       },
     })
   }
@@ -358,13 +359,13 @@ export default function Waterfall() {
   // 切换状态（启用/停用）
   const handleToggleStatus = (record: WaterfallSlotConfig) => {
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
-    const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
+    const actionText = newStatus === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')
 
     Modal.confirm({
-      title: `確認${actionText}`,
-      content: `確定要${actionText}「${record.promotionName || `位置${record.slotPosition}`}」的定價配置嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('waterfall.confirmToggleTitle', { action: actionText }),
+      content: t('waterfall.confirmToggleContent', { action: actionText, name: record.promotionName || `${t('waterfall.slotPositionPrefix')}${record.slotPosition}` }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         if (record.source === 'api') {
           try {
@@ -374,28 +375,28 @@ export default function Waterfall() {
               await updateAdPricingStatus(-record.id, newStatus)
             }
           } catch (err) {
-            message.error((err as Error).message || `${actionText}失敗`)
+            message.error((err as Error).message || t('waterfall.toggleFailed', { action: actionText }))
             return
           }
           setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
           setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
         }
-        message.success(`${actionText}成功`)
+        message.success(t('waterfall.toggleSuccess', { action: actionText }))
       },
     })
   }
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'adId', title: '配置ID' },
-    { key: 'promotionName', title: '算法名稱' },
-    { key: 'app', title: '所屬品牌' },
-    { key: 'bizChannel', title: '業務頻道' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'adId', title: t('waterfall.colConfigId') },
+    { key: 'promotionName', title: t('waterfall.colAlgorithmName') },
+    { key: 'app', title: t('common.colBrand') },
+    { key: 'bizChannel', title: t('waterfall.colBizChannel') },
+    { key: 'status', title: t('common.colStatus') },
+    { key: 'updatedBy', title: t('waterfall.colLastUpdater') },
+    { key: 'updatedAt', title: t('waterfall.colLastUpdateTime') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('waterfall', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -404,21 +405,21 @@ export default function Waterfall() {
   // 完整列定义（带自定义渲染）
   const columns: ColumnsType<WaterfallSlotConfig> = [
     { 
-      title: '配置ID',
+      title: t('waterfall.colConfigId'),
       dataIndex: 'adId',
       key: 'adId',
       width: 120,
       render: (text: string) => <Tag color="blue">{text}</Tag>,
     },
     { 
-      title: '算法名稱',
+      title: t('waterfall.colAlgorithmName'),
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 200,
       render: (text: string) => <strong>{text}</strong>,
     },
     { 
-      title: '所屬品牌', 
+      title: t('common.colBrand'), 
       dataIndex: 'app', 
       key: 'app', 
       width: 100,
@@ -427,7 +428,7 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '業務頻道',
+      title: t('waterfall.colBizChannel'),
       dataIndex: 'bizChannel',
       key: 'bizChannel',
       width: 120,
@@ -438,18 +439,18 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '狀態',
+      title: t('common.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (v: ServiceStatus) => (
         <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
-          {v === ServiceStatus.ENABLED ? '啟用' : '停用'}
+          {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
         </Tag>
       ),
     },
     {
-      title: '最後更新人',
+      title: t('waterfall.colLastUpdater'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
       width: 120,
@@ -458,7 +459,7 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '最後更新時間',
+      title: t('waterfall.colLastUpdateTime'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
@@ -467,7 +468,7 @@ export default function Waterfall() {
       ),
     },
     {
-      title: '操作',
+      title: t('common.colAction'),
       key: 'action',
       width: 200,
       fixed: 'right' as const,
@@ -478,14 +479,14 @@ export default function Waterfall() {
             size="small" 
             onClick={() => navigate(`/promotion-waterfall-add?id=${record.source === 'api' ? -record.id : record.id}&mode=detail&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
-            詳情
+            {t('common.detail')}
           </Button>
           <Button 
             type="link" 
             size="small" 
             onClick={() => navigate(`/promotion-waterfall-add?id=${record.source === 'api' ? -record.id : record.id}&type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
-            編輯
+            {t('common.edit')}
           </Button>
           <Button 
             type="link" 
@@ -494,7 +495,7 @@ export default function Waterfall() {
             style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
             onClick={() => handleToggleStatus(record)}
           >
-            {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
+            {record.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
           </Button>
           <Button 
             type="link" 
@@ -502,7 +503,7 @@ export default function Waterfall() {
             danger
             onClick={() => handleDelete(record)}
           >
-            刪除
+            {t('common.delete')}
           </Button>
         </Space>
       ),
@@ -529,10 +530,10 @@ export default function Waterfall() {
             <div>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
                 <WalletOutlined style={{ marginRight: 8 }} />
-                銷售定價
+                {t('waterfall.salesPricing')}
               </h2>
               <p style={{ margin: '6px 0 0', color: '#8c8c8c', fontSize: 12 }}>
-                管理各廣告類型的銷售定價配置，選擇類型查看詳情
+                {t('waterfall.salesPricingDesc')}
               </p>
             </div>
           </div>
@@ -544,7 +545,7 @@ export default function Waterfall() {
             onChange={(key) => setBizTypeTab(key)}
             items={['delivery', 'groupBuy'].map(tabKey => ({
               key: tabKey,
-              label: tabKey === 'delivery' ? '外賣到家' : '團購到店',
+              label: tabKey === 'delivery' ? t('waterfall.bizDelivery') : t('waterfall.bizGroupBuy'),
               children: (
                 <div style={{
                   display: 'grid',
@@ -570,9 +571,9 @@ export default function Waterfall() {
                             <p className="algo-card-desc">{card.description}</p>
                             <div className="algo-card-tag">
                               {enabled ? (
-                                <Tag color="blue">查看/調整定價</Tag>
+                                <Tag color="blue">{t('waterfall.viewAdjustPricing')}</Tag>
                               ) : (
-                                <Tag color="default">敬請期待</Tag>
+                                <Tag color="default">{t('waterfall.comingSoon')}</Tag>
                               )}
                             </div>
                           </div>
@@ -615,10 +616,10 @@ export default function Waterfall() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>定價列表</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('waterfall.pricingList')}</h2>
               {selectedAlgorithmType != null && (
                 <span style={{ fontSize: 14, color: '#595959' }}>
                   {ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon} {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]}
@@ -632,12 +633,12 @@ export default function Waterfall() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label="配置ID" name="adId">
-            <Input placeholder="請輸入配置ID" allowClear />
+          <Form.Item label={t('waterfall.colConfigId')} name="adId">
+            <Input placeholder={t('waterfall.placeholderConfigId')} allowClear />
           </Form.Item>
-          <Form.Item label="算法名稱" name="promotionName">
+          <Form.Item label={t('waterfall.colAlgorithmName')} name="promotionName">
             <Select 
-              placeholder="請輸入搜索" 
+              placeholder={t('waterfall.placeholderSearch')} 
               allowClear
               showSearch
               optionFilterProp="label"
@@ -654,19 +655,19 @@ export default function Waterfall() {
               ]}
             />
           </Form.Item>
-          <Form.Item label="業務頻道" name="bizChannel">
-            <Select placeholder="全部" options={bizChannelOptions} allowClear />
+          <Form.Item label={t('waterfall.colBizChannel')} name="bizChannel">
+            <Select placeholder={t('common.all')} options={bizChannelOptions} allowClear />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="app">
-            <Select placeholder="全部" options={APP_OPTIONS} allowClear />
+          <Form.Item label={t('common.colBrand')} name="app">
+            <Select placeholder={t('common.all')} options={tAppOptions} allowClear />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" options={SERVICE_STATUS_OPTIONS} allowClear />
+          <Form.Item label={t('common.colStatus')} name="status">
+            <Select placeholder={t('common.all')} options={tServiceStatusOptions} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>查詢</Button>
-              <Button onClick={handleReset} icon={<ReloadOutlined />}>重置</Button>
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button onClick={handleReset} icon={<ReloadOutlined />}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -680,7 +681,7 @@ export default function Waterfall() {
             icon={<PlusOutlined />}
             onClick={() => navigate(`/promotion-waterfall-add?type=${selectedAlgorithmType}&module=${bizTypeTab}`)}
           >
-            新增
+            {t('common.add')}
           </Button>
           {configComponent}
         </div>
@@ -695,7 +696,7 @@ export default function Waterfall() {
           scroll={{ x: 1300 }}
           pagination={{
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
             showQuickJumper: true,
@@ -705,7 +706,7 @@ export default function Waterfall() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingRecord ? '編輯坑位配置' : '新增坑位配置'}
+        title={editingRecord ? t('waterfall.editSlotConfig') : t('waterfall.addSlotConfig')}
         open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => {
@@ -717,47 +718,47 @@ export default function Waterfall() {
           setModalAlgoBrand(undefined)
         }}
         width={1100}
-        okText="確定"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
           {/* 基础信息区 */}
-          <Card title="基礎信息" size="small" style={{ marginBottom: 16 }}>
+          <Card title={t('waterfall.basicInfo')} size="small" style={{ marginBottom: 16 }}>
             <Form.Item 
-              label="所屬品牌" 
+              label={t('common.colBrand')} 
               name="app" 
-              rules={[{ required: true, message: '請選擇所屬品牌' }]}
+              rules={[{ required: true, message: t('waterfall.brandRequired') }]}
             >
-              <Select placeholder="請選擇" options={APP_OPTIONS} />
+              <Select placeholder={t('waterfall.selectPlaceholder')} options={APP_OPTIONS} />
             </Form.Item>
 
             <Form.Item 
-              label="展示頁面" 
+              label={t('waterfall.placementPage')} 
               name="channel" 
-              rules={[{ required: true, message: '請選擇展示頁面' }]}
+              rules={[{ required: true, message: t('waterfall.placementRequired') }]}
             >
-              <Select placeholder="請選擇" options={CHANNEL_OPTIONS} />
+              <Select placeholder={t('waterfall.selectPlaceholder')} options={CHANNEL_OPTIONS} />
             </Form.Item>
 
             <Form.Item 
-              label="廣告類型" 
-              rules={[{ required: true, message: '請選擇廣告類型' }]}
+              label={t('waterfall.adType')} 
+              rules={[{ required: true, message: t('waterfall.adTypeRequired') }]}
             >
               <Select 
-                placeholder="請選擇廣告類型" 
-                options={ALGORITHM_TYPE_OPTIONS}
+                placeholder={t('waterfall.selectAdTypePlaceholder')} 
+                options={tAlgorithmTypeOptions}
                 onChange={handleAlgorithmTypeChange}
                 value={algorithmType}
               />
             </Form.Item>
 
             <Form.Item 
-              label="算法名稱" 
+              label={t('waterfall.colAlgorithmName')} 
               name="algorithmId"
-              rules={[{ required: true, message: '請選擇算法' }]}
+              rules={[{ required: true, message: t('waterfall.algorithmRequired') }]}
             >
               <Select 
-                placeholder="請先選擇廣告類型" 
+                placeholder={t('waterfall.selectAlgorithmFirst')} 
                 options={algorithmOptions.map(alg => ({ label: alg.algoName, value: alg.id }))}
                 onChange={handleAlgorithmChange}
                 disabled={!algorithmType}
@@ -765,11 +766,11 @@ export default function Waterfall() {
             </Form.Item>
 
             <Form.Item 
-              label="廣告類型"
+              label={t('waterfall.adType')}
               name="algorithmType"
             >
               <Input 
-                placeholder="選擇算法後自動顯示" 
+                placeholder={t('waterfall.autoShowAfterSelect')} 
                 disabled 
                 suffix={
                   (() => {
@@ -784,20 +785,20 @@ export default function Waterfall() {
               />
             </Form.Item>
 
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('common.colBrand')}>
               {modalAlgoBrand ? (
                 <BrandTag value={modalAlgoBrand} />
               ) : (
-                <span style={{ color: '#bfbfbf' }}>請先選擇算法名稱</span>
+                <span style={{ color: '#bfbfbf' }}>{t('waterfall.selectAlgorithmNameFirst')}</span>
               )}
             </Form.Item>
           </Card>
 
           {/* 关键参数调整区 */}
-          <Card title="坑位參數配置" size="small" style={{ marginBottom: 16 }}>
+          <Card title={t('waterfall.slotParamsConfig')} size="small" style={{ marginBottom: 16 }}>
             <Alert
-              message="提示"
-              description="以下參數將覆蓋算法配置的默認值,僅對當前坑位生效。"
+              message={t('waterfall.tipTitle')}
+              description={t('waterfall.slotParamsTip')}
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
@@ -806,37 +807,37 @@ export default function Waterfall() {
             {/* 购买上限/间隔天数 */}
             {continuousPurchase === 'support' && (
               <Form.Item 
-                label="購買上限" 
+                label={t('waterfall.purchaseLimit')} 
                 name="purchaseLimit"
-                rules={[{ required: true, message: '請配置購買上限' }]}
+                rules={[{ required: true, message: t('waterfall.purchaseLimitRule') }]}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#595959', fontWeight: 500 }}>近</span>
-                  <InputNumber min={1} max={365} placeholder="天數" style={{ width: 100 }} />
-                  <span style={{ color: '#595959', fontWeight: 500 }}>天內,最多可購買</span>
-                  <InputNumber min={1} max={100} placeholder="數量" style={{ width: 100 }} />
-                  <span style={{ color: '#595959', fontWeight: 500 }}>個時段</span>
+                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.within')}</span>
+                  <InputNumber min={1} max={365} placeholder={t('waterfall.daysPlaceholder')} style={{ width: 100 }} />
+                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.daysInMaxBuy')}</span>
+                  <InputNumber min={1} max={100} placeholder={t('waterfall.quantity')} style={{ width: 100 }} />
+                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.slotsUnit')}</span>
                 </div>
               </Form.Item>
             )}
 
             {continuousPurchase === 'notSupport' && (
               <Form.Item 
-                label="間隔天數" 
+                label={t('waterfall.intervalDays')} 
                 name="purchaseInterval"
-                rules={[{ required: true, message: '請配置間隔天數' }]}
+                rules={[{ required: true, message: t('waterfall.intervalDaysRule') }]}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#595959', fontWeight: 500 }}>間隔</span>
-                  <InputNumber min={1} max={365} placeholder="天數" style={{ width: 100 }} />
-                  <span style={{ color: '#595959', fontWeight: 500 }}>天可購買</span>
+                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.interval')}</span>
+                  <InputNumber min={1} max={365} placeholder={t('waterfall.daysPlaceholder')} style={{ width: 100 }} />
+                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.daysCanBuy')}</span>
                 </div>
               </Form.Item>
             )}
 
             {/* 商家限制 */}
             <Form.Item 
-              label="商家限制" 
+              label={t('waterfall.merchantLimit')} 
               name="merchantLimit"
               valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 'unlimited' : 'limited'}
@@ -844,8 +845,8 @@ export default function Waterfall() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <Switch 
-                  checkedChildren="不限制" 
-                  unCheckedChildren="限制"
+                  checkedChildren={t('waterfall.unlimited')} 
+                  unCheckedChildren={t('waterfall.limited')}
                   defaultChecked
                 />
                 {merchantLimit === 'limited' && (
@@ -853,7 +854,7 @@ export default function Waterfall() {
                     size="small"
                     onClick={() => setMerchantModalVisible(true)}
                   >
-                    選擇商家
+                    {t('waterfall.selectMerchants')}
                   </Button>
                 )}
               </div>
@@ -861,7 +862,7 @@ export default function Waterfall() {
 
             {/* 销售区域 */}
             <Form.Item 
-              label="销售区域" 
+              label={t('waterfall.salesRegion')} 
               name="regionLimit"
               valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 'unlimited' : 'limited'}
@@ -869,12 +870,12 @@ export default function Waterfall() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <Switch 
-                  checkedChildren="不限制" 
-                  unCheckedChildren="限制"
+                  checkedChildren={t('waterfall.unlimited')} 
+                  unCheckedChildren={t('waterfall.limited')}
                   defaultChecked
                 />
                 {regionLimit === 'limited' && (
-                  <Checkbox.Group options={REGION_OPTIONS} />
+                  <Checkbox.Group options={tRegionOptions} />
                 )}
               </div>
             </Form.Item>
@@ -882,20 +883,20 @@ export default function Waterfall() {
 
           {/* 状态区 */}
           <Form.Item 
-            label="狀態" 
+            label={t('common.colStatus')} 
             name="status" 
             valuePropName="checked"
             getValueFromEvent={(checked) => checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED}
             getValueProps={(value) => ({ checked: value === ServiceStatus.ENABLED })}
           >
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" defaultChecked />
+            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} defaultChecked />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* 商家选择弹窗 */}
       <Modal
-        title="選擇商家"
+        title={t('waterfall.selectMerchants')}
         open={merchantModalVisible}
         onOk={() => {
           setMerchantModalVisible(false)
@@ -906,7 +907,7 @@ export default function Waterfall() {
       >
         <div style={{ padding: '16px 0' }}>
           <Alert
-            message="支持批量選擇商家,選中的商家將在當前坑位生效"
+            message={t('waterfall.selectMerchantTip')}
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
@@ -914,9 +915,9 @@ export default function Waterfall() {
           <Table
             rowKey="id"
             columns={[
-              { title: '商家ID', dataIndex: 'id', width: 100 },
-              { title: '商家名稱', dataIndex: 'name' },
-              { title: '所屬區域', dataIndex: 'region' },
+              { title: t('waterfall.colMerchantId'), dataIndex: 'id', width: 100 },
+              { title: t('waterfall.colMerchantName'), dataIndex: 'name' },
+              { title: t('waterfall.colRegion'), dataIndex: 'region' },
             ]}
             dataSource={[
               { id: 101, name: '商家A', region: '澳門' },
@@ -935,7 +936,7 @@ export default function Waterfall() {
 
       {/* 查看详情弹窗 */}
       <Modal
-        title="坑位配置詳情"
+        title={t('waterfall.configDetail')}
         open={detailVisible}
         onCancel={() => {
           setDetailVisible(false)
@@ -946,7 +947,7 @@ export default function Waterfall() {
             setDetailVisible(false)
             setViewingRecord(null)
           }}>
-            關閉
+            {t('common.close')}
           </Button>,
         ]}
         width={800}
@@ -954,78 +955,78 @@ export default function Waterfall() {
         {viewingRecord && (
           <>
             <Descriptions bordered column={2} size="small">
-              <Descriptions.Item label="所屬品牌" span={2}>
+              <Descriptions.Item label={t('common.colBrand')} span={2}>
                 <BrandTag value={viewingRecord.app} />
               </Descriptions.Item>
-              <Descriptions.Item label="展示頁面">
+              <Descriptions.Item label={t('waterfall.placementPage')}>
                 {CHANNEL_LABEL[viewingRecord.channel]}
               </Descriptions.Item>
-              <Descriptions.Item label="算法名稱" span={2}>
+              <Descriptions.Item label={t('waterfall.colAlgorithmName')} span={2}>
                 <strong>{viewingRecord.algorithmName}</strong>
               </Descriptions.Item>
-              <Descriptions.Item label="廣告類型">
+              <Descriptions.Item label={t('waterfall.adType')}>
                 <Tag color={ALGORITHM_TYPE_COLOR[viewingRecord.algorithmType]}>
                   {ALGORITHM_TYPE_LABEL[viewingRecord.algorithmType]}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="算法ID">
+              <Descriptions.Item label={t('algorithm.colAlgorithmId')}>
                 <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
                   {String(viewingRecord.algorithmId).padStart(6, '0')}
                 </code>
               </Descriptions.Item>
-              <Descriptions.Item label="狀態" span={2}>
+              <Descriptions.Item label={t('common.colStatus')} span={2}>
                 <Badge
                   status={viewingRecord.status === ServiceStatus.ENABLED ? 'success' : 'default'}
-                  text={viewingRecord.status === ServiceStatus.ENABLED ? '啟用' : '停用'}
+                  text={viewingRecord.status === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
                 />
               </Descriptions.Item>
             </Descriptions>
 
-            <Divider orientation="left">關鍵參數配置</Divider>
+            <Divider orientation="left">{t('waterfall.keyParamsConfig')}</Divider>
             <Card size="small">
               <Descriptions column={1} size="small">
                 {viewingRecord.purchaseLimit && (
-                  <Descriptions.Item label="購買上限">
-                    近 {viewingRecord.purchaseLimit.days} 天內,最多可購買 {viewingRecord.purchaseLimit.quantity} 個時段
+                  <Descriptions.Item label={t('waterfall.purchaseLimit')}>
+                    {t('waterfall.purchaseLimitDesc', { days: viewingRecord.purchaseLimit.days, quantity: viewingRecord.purchaseLimit.quantity })}
                   </Descriptions.Item>
                 )}
                 {viewingRecord.purchaseInterval && (
-                  <Descriptions.Item label="間隔天數">
-                    間隔 {viewingRecord.purchaseInterval} 天可購買
+                  <Descriptions.Item label={t('waterfall.intervalDays')}>
+                    {t('waterfall.intervalDaysDesc', { days: viewingRecord.purchaseInterval })}
                   </Descriptions.Item>
                 )}
-                <Descriptions.Item label="商家限制">
+                <Descriptions.Item label={t('waterfall.merchantLimit')}>
                   <Tag color={viewingRecord.merchantLimit === 'limited' ? 'red' : 'green'}>
-                    {viewingRecord.merchantLimit === 'limited' ? `限制(${viewingRecord.merchantIds?.length || 0}個商家)` : '不限制'}
+                    {viewingRecord.merchantLimit === 'limited' ? t('waterfall.limitedMerchants', { count: viewingRecord.merchantIds?.length || 0 }) : t('waterfall.unlimited')}
                   </Tag>
                   {viewingRecord.merchantLimit === 'limited' && viewingRecord.merchantIds && viewingRecord.merchantIds.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      已選商家ID: {viewingRecord.merchantIds.join(', ')}
+                      {t('waterfall.selectedMerchantIds')}{viewingRecord.merchantIds.join(', ')}
                     </div>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="销售區域">
+                <Descriptions.Item label={t('waterfall.salesRegion')}>
                   <Tag color={viewingRecord.regionLimit === 'limited' ? 'red' : 'green'}>
-                    {viewingRecord.regionLimit === 'limited' ? `限制(${viewingRecord.regionIds?.length || 0}個區域)` : '不限制'}
+                    {viewingRecord.regionLimit === 'limited' ? t('waterfall.limitedRegions', { count: viewingRecord.regionIds?.length || 0 }) : t('waterfall.unlimited')}
                   </Tag>
                   {viewingRecord.regionLimit === 'limited' && viewingRecord.regionIds && viewingRecord.regionIds.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      已選區域: {viewingRecord.regionIds.map(id => REGION_OPTIONS.find(opt => opt.value === id)?.label).join(', ')}
+                      {t('waterfall.selectedRegions')}{viewingRecord.regionIds.map(id => REGION_LABEL_KEY[id] ? t(REGION_LABEL_KEY[id]) : String(id)).join(', ')}
                     </div>
                   )}
                 </Descriptions.Item>
               </Descriptions>
             </Card>
 
-            <Divider orientation="left">更新信息</Divider>
+            <Divider orientation="left">{t('waterfall.updateInfo')}</Divider>
             <Descriptions bordered column={2} size="small">
-              <Descriptions.Item label="最後更新人">
+              <Descriptions.Item label={t('waterfall.colLastUpdater')}>
                 {viewingRecord.updatedBy}
               </Descriptions.Item>
-              <Descriptions.Item label="最後更新時間">
+              <Descriptions.Item label={t('waterfall.colLastUpdateTime')}>
                 {viewingRecord.updatedAt}
               </Descriptions.Item>
-              <Descriptions.Item label="創建時間" span={2}>
+              <Descriptions.Item label={t('waterfall.createdAt')} span={2}>
                 {viewingRecord.createdAt}
               </Descriptions.Item>
             </Descriptions>

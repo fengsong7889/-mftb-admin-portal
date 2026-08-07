@@ -1,6 +1,7 @@
 import { useState, Suspense, lazy } from 'react'
 import { Layout, Spin } from 'antd'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
@@ -86,14 +87,16 @@ const PromotionReportCompare = lazy(() => import('./pages/PromotionReport/Compar
 const MapPlanning = lazy(() => import('./pages/MapPlanning'))
 // 系統配置
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
+const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 
 const { Content } = Layout
 
 /** 页面加载中指示器 */
 function PageLoading() {
+  const { t } = useTranslation()
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 300 }}>
-      <Spin size="large" tip="加載中..." />
+      <Spin size="large" tip={t('common.loading')} />
     </div>
   )
 }
@@ -193,6 +196,7 @@ function AuthenticatedLayout() {
               <Route path="/map-planning" element={<MapPlanning />} />
               {/* 系統配置 */}
               <Route path="/menu-config" element={<MenuConfig />} />
+              <Route path="/translation-manage" element={<TranslationManage />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* PRD需求查看 */}

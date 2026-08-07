@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Tag, Button, Space, message, Table, Empty, Modal, Select, Card, Form, InputNumber, Alert } from 'antd'
 import {
   ShoppingCartOutlined,
@@ -10,7 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import type { InventoryItem } from './types'
 import { RECOMMEND_TYPE_CONFIGS } from './types'
 import GradientDiscountBanner from './GradientDiscountBanner'
-import { AlgorithmType, REGION_OPTIONS } from '../Recommend/constants'
+import { AlgorithmType, REGION_LABEL_KEY } from '../Recommend/constants'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import {
@@ -34,8 +35,7 @@ const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFoo
 /** 前端品牌值 → 后端品牌 */
 const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
 
-// 中文星期映射
-const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+// WEEKDAY_LABELS 移入組件內部以使用 t() 翻譯
 
 /** 可售天数兜底（真实数据以定价预售天数为准） */
 const DEFAULT_SELLABLE_DAYS = 180
@@ -99,6 +99,8 @@ interface DayPickerProps {
 }
 
 export default function DayPicker({ inventoryItem }: DayPickerProps) {
+  const { t } = useTranslation('adSales')
+  const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
   const navigate = useNavigate()
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [currentMonth, setCurrentMonth] = useState<Dayjs>(dayjs())
@@ -164,7 +166,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   // 当前商圈名称（跟随门店所在区域）
   const regionLabel = storeRegion != null
-    ? (REGION_OPTIONS.find(o => o.value === storeRegion)?.label ?? '')
+    ? (REGION_LABEL_KEY[storeRegion] ? t(`translation:${REGION_LABEL_KEY[storeRegion]}`) : '')
     : ''
   // 定价未覆盖门店所在商圈（查询后无可购格子）
   const regionNotConfigured = hasSearched && storeRegion != null
@@ -206,7 +208,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         setAlgorithmBrandOverrides(brandOverrides)
         if (searchAlgorithm && !options.some(o => o.value === searchAlgorithm)) {
           setSearchAlgorithm(null)
-          message.warning('當前算法已對該商家屏蔽，已清空選擇')
+          message.warning(t('currentAlgorithmBlocked'))
         }
       }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,7 +268,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     setSelectedDates([])
     setHasSearched(false)
     setInventoryData(null)
-    message.success('已清空已選日期，請重新查詢')
+    message.success(t('clearedReselect'))
   }
 
   // 取消切换
@@ -277,13 +279,13 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   // 查询：必须选择算法名称、品牌、门店名称，加载真实库存
   const handleSearch = () => {
-    if (!searchAlgorithm) { message.warning('請選擇算法名稱'); return }
-    if (!searchBrand) { message.warning('請選擇所屬品牌'); return }
-    if (!searchStoreName) { message.warning('請選擇門店名稱'); return }
+    if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
+    if (!searchBrand) { message.warning(t('selectBrand')); return }
+    if (!searchStoreName) { message.warning(t('selectStore')); return }
     const store = storeMap[searchStoreName]
     // 商圈跟随门店：门店未配置所在区域时拦截并提醒
     if (store && !store.region) {
-      message.warning('該門店未配置所在區域，請先到「門店管理」配置所在區域後再購買')
+      message.warning(t('storeNoRegion'))
       return
     }
     const algoId = Number(searchAlgorithm)
@@ -303,7 +305,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             setMerchantBalance(acc ? Number(acc.virtualBalance) : null)
           }).catch(() => setMerchantBalance(null))
       })
-      .catch(err => message.error(err instanceof Error ? err.message : '庫存查詢失敗'))
+      .catch(err => message.error(err instanceof Error ? err.message : t('inventoryQueryFailed')))
   }
 
   // 重置查询条件
@@ -328,7 +330,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     if (expiredItems.length > 0) {
       setCartItems(prev => prev.filter(item => currentTime - item.lockTime < LOCK_SECONDS * 1000))
       expiredItems.forEach(item => {
-        message.info(`${item.dates.length}天批次 鎖定已到期，自動釋放`)
+        message.info(t('lockExpiredBatch', { days: item.dates.length }))
       })
     }
   }, [currentTime, cartItems])
@@ -466,13 +468,13 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       setPresaleInfo({
         date: date.format('YYYY-MM-DD'),
         weekday: WEEKDAY_LABELS[date.day()],
-        openTime: getPresaleOpenTime(date, sellableDays).format('M月D日 HH:mm'),
+        openTime: getPresaleOpenTime(date, sellableDays).format(t('presaleDateFormat')),
       })
       return
     }
-    if (isDateUnavailable(date)) { message.warning('該日期不可售'); return }
-    if (isDateSoldOut(date)) { message.warning('該日期已售罄'); return }
-    if (isDateLocked(date.format('YYYY-MM-DD'))) { message.info('該日期已被鎖定'); return }
+    if (isDateUnavailable(date)) { message.warning(t('dateUnavailable')); return }
+    if (isDateSoldOut(date)) { message.warning(t('dateSoldOut')); return }
+    if (isDateLocked(date.format('YYYY-MM-DD'))) { message.info(t('dateLocked')); return }
     const dateStr = date.format('YYYY-MM-DD')
     if (selectedDates.includes(dateStr)) { setSelectedDates(selectedDates.filter(d => d !== dateStr)) }
     else { setSelectedDates([...selectedDates, dateStr].sort()) }
@@ -480,9 +482,9 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   // 加购（真实锁定 60 秒）
   const handleAddToCart = async () => {
-    if (selectedDates.length === 0) { message.warning('請先選擇購買日期'); return }
-    if (!searchAlgorithm || !searchStoreName) { message.warning('請先完成查詢'); return }
-    if (storeRegion == null) { message.warning('門店未配置所在區域，無法加購'); return }
+    if (selectedDates.length === 0) { message.warning(t('selectPurchaseDate')); return }
+    if (!searchAlgorithm || !searchStoreName) { message.warning(t('completeQueryFirst')); return }
+    if (storeRegion == null) { message.warning(t('storeNoRegionCannotAdd')); return }
     const store = storeMap[searchStoreName]
     const algoId = Number(searchAlgorithm)
     const cells = selectedDates.map(d => ({ bizDate: d, region: storeRegion }))
@@ -496,7 +498,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         cells,
       })
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '加購鎖定失敗')
+      message.error(err instanceof Error ? err.message : t('lockFailed'))
       // 锁定失败后刷新库存，同步售罄状态
       fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode).then(setInventoryData).catch(() => {})
       setLocking(false)
@@ -525,7 +527,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       setPresaleInfo({
         date: firstDay.format('YYYY-MM-DD'),
         weekday: WEEKDAY_LABELS[firstDay.day()],
-        openTime: getPresaleOpenTime(firstDay, sellableDays).format('M月D日 HH:mm'),
+        openTime: getPresaleOpenTime(firstDay, sellableDays).format(t('presaleDateFormat')),
       })
       return
     }
@@ -553,7 +555,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   // 确认支付：真实下单（推广金扣款 + 赠送天数抵扣）
   const handleConfirmPayment = async () => {
     if (!searchAlgorithm || !searchStoreName) return
-    if (storeRegion == null) { message.warning('門店未配置所在區域，無法下單'); return }
+    if (storeRegion == null) { message.warning(t('storeNoRegionCannotOrder')); return }
     const store = storeMap[searchStoreName]
     const algoId = Number(searchAlgorithm)
     const cells = cartItems.flatMap(item => item.dates.map(d => ({ bizDate: d, region: storeRegion })))
@@ -583,7 +585,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         fetchGiftAvailableDays(store.id, GIFT_AD_TYPE).then(setGiftDaysBalance).catch(() => {})
       }
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '下單失敗')
+      message.error(err instanceof Error ? err.message : t('orderFailed'))
       fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode).then(setInventoryData).catch(() => {})
     } finally {
       setPaying(false)
@@ -595,7 +597,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === inventoryItem.algorithmType)?.name || ''
     navigate(`/promotion-order-manage?type=${encodeURIComponent(typeName)}&from=ad-sales`)
   }
-  const handleContinuePurchase = () => { setIsSuccessModalVisible(false); message.success('繼續購買') }
+  const handleContinuePurchase = () => { setIsSuccessModalVisible(false); message.success(t('continueBuy')) }
 
   // 移除购物车日期（真实解锁）
   const handleRemoveCartDate = (cartKey: string, date: string) => {
@@ -608,7 +610,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       }
       return it
     }).filter(Boolean))
-    message.success('已移除')
+    message.success(t('common:remove'))
     if (item && searchAlgorithm && searchStoreName && storeRegion != null) {
       const store = storeMap[searchStoreName]
       unlockAdReviveCells({
@@ -635,26 +637,26 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
           <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-            <Form.Item label="算法名稱">
-              <Select placeholder="請選擇算法" value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+            <Form.Item label={t('algoNameLabel')}>
+              <Select placeholder={t('dpAlgoPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
                 options={algorithmOptions} />
             </Form.Item>
-            <Form.Item label="所屬品牌">
-              <Select placeholder="選擇算法後自動帶出" value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
-                options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
+            <Form.Item label={t('brandLabel')}>
+              <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
+                options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
             </Form.Item>
-            <Form.Item label="門店名稱">
-              <Select placeholder="支持ID和名稱搜索" value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
+            <Form.Item label={t('storeNameLabel')}>
+              <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
             </Form.Item>
-            <Form.Item label="歸屬BD">
-              <Select placeholder="選擇門店後自動帶出" value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
+            <Form.Item label={t('bdLabel')}>
+              <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
                 filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
                 options={bdOptions} />
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common:reset')}</Button>
               </div>
             </Form.Item>
           </Form>
@@ -662,31 +664,31 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
       {/* 购物车冲突提醒弹窗 */}
       <Modal
-        title="提示"
+        title={t('switchConfirmTitle')}
         open={isConflictModalVisible}
         onOk={handleConfirmSwitch}
         onCancel={handleCancelSwitch}
-        okText="確認切換"
-        cancelText="取消"
+        okText={t('switchConfirmOk')}
+        cancelText={t('common:cancel')}
         okButtonProps={{ danger: true }}
       >
         <div style={{ padding: '8px 0' }}>
           <p style={{ marginBottom: 12, fontSize: 14, color: '#262626' }}>
-            您當前已有加購數據，同一門店同一訂單僅支持選擇相同算法的廣告位。
+            {t('switchWarnLine1')}
           </p>
           <p style={{ marginBottom: 0, fontSize: 13, color: '#595959' }}>
-            切換算法或門店後，已選的日期將被清空。您可以：
+            {t('dpSwitchWarnLine2')}
           </p>
           <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#595959' }}>
-            <li>確認切換：清空已選日期，重新查詢</li>
-            <li>取消：保留當前選擇，先完成下單後再選擇其他門店或算法</li>
+            <li>{t('dpSwitchOption1')}</li>
+            <li>{t('dpSwitchOption2')}</li>
           </ul>
         </div>
       </Modal>
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
-          <Empty description="請先選擇所屬品牌、算法名稱、門店名稱，點擊查詢後展示可選購區域" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description={t('searchFirstHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : regionBlocked ? (
         // 商圈不可购：仅展示提醒，不展示折扣规则与购买日历，避免信息误导
@@ -696,11 +698,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
             showIcon
             style={{ maxWidth: 680, margin: '0 auto' }}
             message={storeRegion == null
-              ? '所選門店未配置所在區域'
-              : `當前算法定價未配置門店所在商圈（${regionLabel}）`}
+              ? t('storeRegionNotConfigured')
+              : t('pricingNotConfigured', { region: regionLabel })}
             description={storeRegion == null
-              ? '購買商圈跟隨門店所在區域，請先到「門店管理」為該門店配置所在區域後再重新查詢。'
-              : '暫無該商圈的可購庫存，請聯繫運營在「銷售定價」中配置該商圈的計價與每日銷售個數。'}
+              ? t('storeRegionHint')
+              : t('noInventoryInRegion')}
           />
         </Card>
       ) : (
@@ -708,7 +710,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       {/* 梯度折扣横幅：展示定价配置的多天折扣规则与退款警示 */}
       <GradientDiscountBanner
         tiers={dayTiers.map(g => ({ threshold: g.minDays, discount: g.discount }))}
-        unitLabel="天"
+        unitLabel={t('unitDay')}
         currentCount={selectedDates.length + cartSummary.totalDays}
         refundDisabled={currentAlgorithmRefundEnabled === false}
       />
@@ -717,11 +719,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         <div style={{ flex: 1 }}>
         {/* 当前商圈提示（跟随门店所在区域，不可手动选择） */}
         <div style={{ marginBottom: 12, fontSize: 13, color: '#595959' }}>
-          當前商圈：<Tag color="orange">{regionLabel}</Tag>
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>按天售賣，商圈跟隨門店所在區域（可在「門店管理」調整），每天銷售個數以定價庫存為準</span>
+          {t('currentRegion')}<Tag color="orange">{regionLabel}</Tag>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('sellByDayRegion')}</span>
         </div>
         {/* 月份横向选择器 */}
-        <Card title={<Space><CalendarOutlined /><span>選擇月份</span></Space>} style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 20px' }}>
+        <Card title={<Space><CalendarOutlined /><span>{t('selectMonth')}</span></Space>} style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Button
               size="small"
@@ -756,10 +758,10 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                   }}
                 >
                   <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                    {month.year() === dayjs().year() ? month.format('M月') : month.format('YY年M月')}
+                    {month.year() === dayjs().year() ? month.format(t('monthFormat')) : month.format(t('yearMonthFormat'))}
                   </span>
                   {monthPresale && (
-                    <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                    <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
                   )}
                   {hasSelectedDates && (
                     <div style={{
@@ -814,37 +816,37 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                           {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
                         </div>
                         {presale && (
-                          <span style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>
+                          <span style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
                         )}
                         {!presale && inCart && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 1 }}>
-                            <span style={{ fontSize: 9, color: '#722ed1' }}>已鎖定</span>
+                            <span style={{ fontSize: 9, color: '#722ed1' }}>{t('lockedTag')}</span>
                             <span style={{ fontSize: 11, fontWeight: 700, color: '#ff4d4f' }}>{remaining}</span>
-                            <span style={{ fontSize: 8, color: '#ff7875' }}>秒</span>
+                            <span style={{ fontSize: 8, color: '#ff7875' }}>{t('secondUnit')}</span>
                           </div>
                         )}
                         {!presale && !inCart && isDateSoldOut(date) && (
                           <>
-                            <span style={{ fontSize: 9, marginTop: 1 }}>已售罄</span>
+                            <span style={{ fontSize: 9, marginTop: 1 }}>{t('soldOutTag')}</span>
                             <span style={{ fontSize: 9, color: '#bfbfbf', textDecoration: 'line-through' }}>${realCell?.dailyPrice ?? ''}</span>
-                            <span style={{ fontSize: 9, color: '#bfbfbf' }}>庫存：0</span>
+                            <span style={{ fontSize: 9, color: '#bfbfbf' }}>{t('inventoryLabel')}：0</span>
                           </>
                         )}
                         {!presale && !inCart && !isDateSoldOut(date) && isDateUnavailable(date) && (
                           <>
-                            <span style={{ fontSize: 9, marginTop: 1 }}>不可售</span>
+                            <span style={{ fontSize: 9, marginTop: 1 }}>{t('unavailableTag')}</span>
                             <span style={{ fontSize: 9, color: '#bfbfbf' }}>—</span>
                           </>
                         )}
                         {!presale && !inCart && !isDateSoldOut(date) && !isDateUnavailable(date) && (
                           <>
                             {isSelected
-                              ? <span style={{ fontSize: 9, color: '#E8720C', marginTop: 1, fontWeight: 600 }}>已選擇</span>
-                              : <span style={{ fontSize: 9, color: '#52c41a', marginTop: 1 }}>可購買</span>
+                              ? <span style={{ fontSize: 9, color: '#E8720C', marginTop: 1, fontWeight: 600 }}>{t('selectedTag')}</span>
+                              : <span style={{ fontSize: 9, color: '#52c41a', marginTop: 1 }}>{t('availableTag')}</span>
                             }
                             <span style={{ fontSize: 9, color: '#ff4d4f', fontWeight: 500 }}>${realCell?.dailyPrice ?? ''}</span>
                             {realCell && (
-                              <span style={{ fontSize: 9, color: realCell.remaining <= 1 ? '#ff4d4f' : '#8c8c8c', fontWeight: realCell.remaining <= 1 ? 600 : 400 }}>庫存：{realCell.remaining}</span>
+                              <span style={{ fontSize: 9, color: realCell.remaining <= 1 ? '#ff4d4f' : '#8c8c8c', fontWeight: realCell.remaining <= 1 ? 600 : 400 }}>{t('inventoryLabel')}：{realCell.remaining}</span>
                             )}
                           </>
                         )}
@@ -861,7 +863,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       {/* 右侧面板 */}
       <div style={{ width: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* 当前所选 */}
-        <Card size="small" title={<Space><CalendarOutlined /><span>當前所選</span></Space>}>
+        <Card size="small" title={<Space><CalendarOutlined /><span>{t('currentSelection')}</span></Space>}>
           {selectedDates.length > 0 ? (
             <div>
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -869,42 +871,42 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 {datesByMonth.map(({ month, days }) => (
                   <div key={month} style={{ background: '#fafafa', borderRadius: 6, padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>所選月份：</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('selectedMonth')}</span>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{month}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>已選擇：</span>
-                      <span style={{ fontSize: 13, fontWeight: 500 }}>{days.map(d => `${d}號`).join('、')}</span>
+                      <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('selectedDatesLabel')}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>{days.map(d => `${d}${t('dayUnitSuffix')}`).join('、')}</span>
                     </div>
                   </div>
                 ))}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>選擇天數合計：</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#52c41a' }}>{selectedDates.length}天</span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('totalDaysSelected')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#52c41a' }}>{t('dayCount', { count: selectedDates.length })}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>折扣：</span>
-                  {currentDiscount ? <Tag color="green">{currentDiscount.discount % 10 === 0 ? currentDiscount.discount / 10 : currentDiscount.discount}折</Tag> : <Tag>無折扣</Tag>}
+                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('discount')}</span>
+                  {currentDiscount ? <Tag color="green">{currentDiscount.discount % 10 === 0 ? currentDiscount.discount / 10 : currentDiscount.discount}{t('discountUnit')}</Tag> : <Tag>{t('noDiscount')}</Tag>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>售賣價格：</span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('salePriceCol')}</span>
                   <span style={{ fontSize: 20, fontWeight: 700, color: '#ff4d4f' }}>${pendingPrice}</span>
                 </div>
               </Space>
               <Button type="primary" icon={<ShoppingCartOutlined />} block onClick={handleAddToCart} loading={locking}
                 style={{ marginTop: 12, height: 40, fontSize: 15, background: '#fa8c16', borderColor: '#fa8c16' }}>
-                加購
+                {t('addCart')}
               </Button>
             </div>
           ) : (
-            <Empty description="請在日曆中選擇日期" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <Empty description={t('selectDateInCalendar')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           )}
         </Card>
 
         {/* 已选择购买天数 */}
-        <Card size="small" title="已選擇購買天數">
+        <Card size="small" title={t('selectedDays')}>
           <div style={{ fontSize: 11, color: '#ff4d4f', marginBottom: 12, lineHeight: 1.4 }}>
-            (已加購的日期會被鎖定，鎖定狀態下其他商家無法購買，{LOCK_SECONDS}秒後自動釋放)
+            {t('lockWarningDay', { seconds: LOCK_SECONDS })}
           </div>
           {cartItems.length > 0 ? (
             <Table<CartRow>
@@ -916,67 +918,67 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
                 }))
               )}
               pagination={false} size="small"
-              locale={{ emptyText: <Empty description="暫無已選日期" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+              locale={{ emptyText: <Empty description={t('noSelectedDate')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
               columns={[
-                { title: '日期', dataIndex: 'date', key: 'date', width: 110, render: (text: string) => <span style={{ fontSize: 12 }}>{text}</span> },
-                { title: '鎖定時間', key: 'countdown', width: 100, align: 'center' as const,
+                { title: t('purchaseDateCol'), dataIndex: 'date', key: 'date', width: 110, render: (text: string) => <span style={{ fontSize: 12 }}>{text}</span> },
+                { title: t('cartColLockTime'), key: 'countdown', width: 100, align: 'center' as const,
                   render: (_, record) => {
                     const remaining = Math.max(0, LOCK_SECONDS - Math.floor((currentTime - record.lockTime) / 1000))
-                    if (remaining <= 0) return <span style={{ fontSize: 11, color: '#bfbfbf' }}>已釋放</span>
+                    if (remaining <= 0) return <span style={{ fontSize: 11, color: '#bfbfbf' }}>{t('lockReleased')}</span>
                     return (
                       <span style={{ fontSize: 12 }}>
                         <span style={{ fontWeight: 700, color: remaining <= 10 ? '#ff4d4f' : '#fa8c16' }}>{remaining}</span>
-                        <span style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 2 }}>秒</span>
+                        <span style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 2 }}>{t('secondUnit')}</span>
                       </span>
                     )
                   }
                 },
-                { title: '售價', dataIndex: 'salePrice', key: 'salePrice', width: 80, align: 'right' as const, render: (price: number) => <span style={{ fontSize: 12, color: '#ff4d4f', fontWeight: 600 }}>${price}</span> },
-                { title: '操作', key: 'action', width: 60, align: 'center' as const,
+                { title: t('salePriceCol'), dataIndex: 'salePrice', key: 'salePrice', width: 80, align: 'right' as const, render: (price: number) => <span style={{ fontSize: 12, color: '#ff4d4f', fontWeight: 600 }}>${price}</span> },
+                { title: t('common:action'), key: 'action', width: 60, align: 'center' as const,
                   render: (_, record) => (
                     <Button type="link" size="small" danger style={{ padding: 0, fontSize: 12 }}
                       onClick={() => handleRemoveCartDate(record.cartKey, record.date)}
-                    >移除</Button>
+                    >{t('common:remove')}</Button>
                   ),
                 },
               ]}
             />
           ) : (
-            <Empty description="暫無已選日期" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <Empty description={t('noSelectedDate')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           )}
         </Card>
 
         {/* 费用结算 */}
-        <Card size="small" title="費用結算">
+        <Card size="small" title={t('settlementTitle')}>
           <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>推廣金餘額</span>
+            <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
           </div>
           {/* 贈送天數抵扣：贈送管理發放的推廣天數可抵扣本單費用（按折後日均價折算） */}
           <div style={{ border: '1px solid #FFD591', background: '#FFF7E6', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>🎁 贈送天數抵扣</span>
-              <span style={{ fontSize: 11, color: '#8c8c8c' }}>可用餘額 <span style={{ fontWeight: 700, color: '#E8720C' }}>{giftDaysBalance}</span> 天</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>{t('giftDeductionTitle')}</span>
+              <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('availableBalance')} <span style={{ fontWeight: 700, color: '#E8720C' }}>{giftDaysBalance}</span> {t('dayUnitSuffix')}</span>
             </div>
             {giftDaysBalance === 0 ? (
-              <div style={{ fontSize: 11, color: '#bfbfbf' }}>暫無可用贈送天數，可在贈送管理獲得後使用</div>
+              <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('noGiftDaysAvailable')}</div>
             ) : cartSummary.totalDays === 0 ? (
-              <div style={{ fontSize: 11, color: '#bfbfbf' }}>加購日期後可選擇抵扣天數</div>
+              <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('addCartToDeduct')}</div>
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>抵扣</span>
+                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('deductLabel')}</span>
                   <InputNumber
                     size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
                     onChange={(v) => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
                     style={{ width: 72 }}
                   />
-                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>天</span>
+                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('dayUnitSuffix')}</span>
                   <Button size="small" type="link" style={{ padding: 0, fontSize: 12, marginLeft: 'auto' }}
-                    onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>全部抵扣</Button>
+                    onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>{t('deductAll')}</Button>
                 </div>
                 <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
-                  本單最多可抵 {maxGiftDaysUsable} 天，按折後日均價折算，當前抵扣 <span style={{ fontWeight: 700, color: '#E8720C' }}>-${giftDeduction}</span>
+                  {t('maxDeductHint', { max: maxGiftDaysUsable })} <span style={{ fontWeight: 700, color: '#E8720C' }}>-${giftDeduction}</span>
                 </div>
               </>
             )}
@@ -984,10 +986,10 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           <table style={{ width: '100%', fontSize: 12, marginBottom: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>訂單金額（原價）</th>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>訂單優惠</th>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#E8720C', fontSize: 12, fontWeight: 600 }}>贈送抵扣</th>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>實付總額</th>
+                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>{t('orderOriginal')}</th>
+                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>{t('orderDiscount')}</th>
+                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#E8720C', fontSize: 12, fontWeight: 600 }}>{t('giftDeductionCol')}</th>
+                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>{t('totalPayable')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1001,7 +1003,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           </table>
           <Button type="primary" block size="large" disabled={cartItems.length === 0} onClick={handlePayment}
             style={{ background: cartItems.length > 0 ? '#ff4d4f' : '#d9d9d9', borderColor: cartItems.length > 0 ? '#ff4d4f' : '#d9d9d9', height: 44, fontSize: 16, fontWeight: 600 }}>
-            訂單支付
+            {t('payButton')}
           </Button>
         </Card>
       </div>
@@ -1010,45 +1012,45 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       )}
 
       {/* 支付确认弹窗 */}
-      <Modal title="確認訂單" open={isPaymentModalVisible} onOk={handleConfirmPayment} onCancel={() => setIsPaymentModalVisible(false)}
-        okText="確定支付" cancelText="取消" confirmLoading={paying} okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }} width={600}>
+      <Modal title={t('confirmOrder')} open={isPaymentModalVisible} onOk={handleConfirmPayment} onCancel={() => setIsPaymentModalVisible(false)}
+        okText={t('confirmPay')} cancelText={t('common:cancel')} confirmLoading={paying} okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }} width={600}>
         <div style={{ marginBottom: 16 }}>
-          <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>購買明細：</h4>
+          <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead><tr style={{ background: '#fafafa' }}>
-              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>日期</th>
-              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>天數</th>
-              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>折扣</th>
-              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right' }}>售價</th>
+              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'left' }}>{t('purchaseDateCol')}</th>
+              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>{t('dayCountCol')}</th>
+              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>{t('discountCol')}</th>
+              <th style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right' }}>{t('salePriceCol')}</th>
             </tr></thead>
             <tbody>{cartItems.map(item => (
               <tr key={item.key}>
-                <td style={{ padding: '8px', border: '1px solid #e8e8e8' }}>{item.dates.length <= 3 ? item.dates.join(', ') : `${item.dates.slice(0, 3).join(', ')} ...共${item.dates.length}天`}</td>
-                <td style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>{item.days}天</td>
-                <td style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>{item.discount < 100 ? `${item.discount % 10 === 0 ? item.discount / 10 : item.discount}折` : '-'}</td>
+                <td style={{ padding: '8px', border: '1px solid #e8e8e8' }}>{item.dates.length <= 3 ? item.dates.join(', ') : `${item.dates.slice(0, 3).join(', ')} ...共${item.dates.length}${t('dayUnitSuffix')}`}</td>
+                <td style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>{item.days}{t('dayUnitSuffix')}</td>
+                <td style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>{item.discount < 100 ? `${item.discount % 10 === 0 ? item.discount / 10 : item.discount}${t('discountUnit')}` : '-'}</td>
                 <td style={{ padding: '8px', border: '1px solid #e8e8e8', textAlign: 'right', color: '#ff4d4f', fontWeight: 600 }}>${item.salePrice}</td>
               </tr>
             ))}</tbody>
           </table>
         </div>
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>訂單金額（原價）：</span><span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>訂單優惠：</span><span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span><span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>{t('orderDiscountLabel')}</span><span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span></div>
           {effectiveGiftDays > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#E8720C' }}><span>🎁 贈送天數抵扣（{effectiveGiftDays}天）：</span><span style={{ fontWeight: 600 }}>-${giftDeduction}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#E8720C' }}><span>{t('giftDaysDeductDetail', { days: effectiveGiftDays })}</span><span style={{ fontWeight: 600 }}>-${giftDeduction}</span></div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>實付金額：</span><span style={{ fontWeight: 700 }}>${payableAmount}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span><span style={{ fontWeight: 700 }}>${payableAmount}</span></div>
         </div>
       </Modal>
 
       {/* 支付成功弹窗 */}
-      <Modal title="購買成功" open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
-        footer={[<Button key="view" type="primary" onClick={handleViewOrder}>查看訂單</Button>, <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>繼續購買</Button>]} width={400}>
+      <Modal title={t('purchaseSuccess')} open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
+        footer={[<Button key="view" type="primary" onClick={handleViewOrder}>{t('viewOrder')}</Button>, <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>{t('continueBuy')}</Button>]} width={400}>
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>恭喜！購買成功</p>
+          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('successMessage')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8, marginBottom: 16 }}>
-            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已扣除推廣金</p>
+            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromoFull')}</p>
             <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidAmount}</p>
           </div>
         </div>
@@ -1059,14 +1061,14 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         title={
           <Space>
             <span style={{ fontSize: 18 }}>⏳</span>
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>該日期尚未開售</span>
+            <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('notYetOnSale')}</span>
           </Space>
         }
         open={!!presaleInfo}
         onCancel={() => setPresaleInfo(null)}
         footer={[
           <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
-            我知道了
+            {t('gotIt')}
           </Button>
         ]}
         width={420}
@@ -1077,11 +1079,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
               background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
               padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
             }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>⏰ 開售時間：</span>
+              <span style={{ fontSize: 13, color: '#595959' }}>{t('saleTimeLabel')}</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
             </div>
             <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
-              每日 {PRESALE_OPEN_HOUR}:00 會放出新一天的可購買日期，請屆時再來搶購。
+              {t('dailyReleaseHint', { hour: PRESALE_OPEN_HOUR })}
             </p>
           </div>
         )}

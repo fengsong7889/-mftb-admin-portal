@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, Tag, Button, message, Tabs } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -62,6 +63,7 @@ const getInitialState = (searchParams: URLSearchParams) => {
 }
 
 export default function AdSales() {
+  const { t } = useTranslation('adSales')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initial = getInitialState(searchParams)
@@ -78,7 +80,7 @@ export default function AdSales() {
   // 購買廣告 - 直接进入日期时段选择界面
   const handleGoToPurchase = (config: RecommendTypeConfig) => {
     if (!config.enabled) {
-      message.info('該類型暫未開放，敬請期待')
+      message.info(t('notAvailable'))
       return
     }
     // 新店广告：进入赠送天数选购界面；人气商家：进入皮肤套件选购界面（均无需库存数据）
@@ -109,7 +111,7 @@ export default function AdSales() {
       setSelectedInventory(filtered[0])
       setCurrentStep(1)
     } else {
-      message.info('暫無可購買的廣告庫存')
+      message.info(t('noInventory'))
     }
   }
 
@@ -147,13 +149,13 @@ export default function AdSales() {
                     display: 'flex', alignItems: 'center', gap: 6,
                     boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}>返回</Button>
+                  }}>{t('common:back')}</Button>
                 <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
               </>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType ? '購買廣告' : '廣告銷售'}
+                {currentStep >= 1 && selectedAlgorithmType ? t('buyAd') : t('adSalesTitle')}
               </h2>
               {currentStep >= 1 && selectedAlgorithmType && (
                 <div style={{
@@ -178,7 +180,7 @@ export default function AdSales() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 18px',
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}>查看訂單</Button>
+              }}>{t('viewOrders')}</Button>
           )}
         </div>
       </div>
@@ -192,7 +194,7 @@ export default function AdSales() {
             items={[
               {
                 key: 'delivery',
-                label: '外賣到家',
+                label: t('deliveryTab'),
                 children: (
                   <div style={{
                     display: 'grid',
@@ -216,7 +218,7 @@ export default function AdSales() {
                           <p className="algo-card-desc">{config.description}</p>
                           <div className="algo-card-tag">
                             {!config.enabled && (
-                              <Tag color="default">即將開放</Tag>
+                              <Tag color="default">{t('comingSoon')}</Tag>
                             )}
                             {config.enabled && (
                               <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
@@ -228,7 +230,7 @@ export default function AdSales() {
                                     navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}&from=ad-sales`)
                                   }}
                                 >
-                                  查看訂單
+                                  {t('viewOrders')}
                                 </Button>
                                 <Button
                                   type="primary"
@@ -239,7 +241,7 @@ export default function AdSales() {
                                     handleGoToPurchase(config)
                                   }}
                                 >
-                                  購買廣告
+                                  {t('buyAd')}
                                 </Button>
                               </div>
                             )}
@@ -252,7 +254,7 @@ export default function AdSales() {
               },
               {
                 key: 'groupBuy',
-                label: '團購到店',
+                label: t('groupBuyTab'),
                 children: (
                   <div style={{
                     display: 'grid',
@@ -276,7 +278,7 @@ export default function AdSales() {
                           <p className="algo-card-desc">{config.description}</p>
                           <div className="algo-card-tag">
                             {!config.enabled && (
-                              <Tag color="default">即將開放</Tag>
+                              <Tag color="default">{t('comingSoon')}</Tag>
                             )}
                             {config.enabled && (
                               <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
@@ -288,7 +290,7 @@ export default function AdSales() {
                                     navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}&from=ad-sales`)
                                   }}
                                 >
-                                  查看訂單
+                                  {t('viewOrders')}
                                 </Button>
                                 <Button
                                   type="primary"
@@ -299,7 +301,7 @@ export default function AdSales() {
                                     handleGoToPurchase(config)
                                   }}
                                 >
-                                  購買廣告
+                                  {t('buyAd')}
                                 </Button>
                               </div>
                             )}

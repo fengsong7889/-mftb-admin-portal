@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, Row, Col, Statistic, Select, DatePicker, Tag, Alert } from 'antd'
 import {
   ArrowUpOutlined,
@@ -26,6 +27,7 @@ const { RangePicker } = DatePicker
 
 export default function PromotionReportOverview() {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>([
     dayjs().subtract(6, 'day'),
     dayjs(),
@@ -48,14 +50,31 @@ export default function PromotionReportOverview() {
     return ((todayClicks - yesterdayClicks) / yesterdayClicks) * 100
   }, [])
 
+  // 枚舉標籤（依賴 t，定義在組件內以便響應語言切換）
+  const recommendTypeLabel = (v: ReportRecommendType) => {
+    const map: Partial<Record<ReportRecommendType, string>> = {
+      [ReportRecommendType.INVINCIBLE_STAR]: t('promotionReport.recTypeInvincibleStar'),
+      [ReportRecommendType.HOT_REVIVE_AD]: t('promotionReport.recTypeHotRevive'),
+      [ReportRecommendType.NEW_STORE_AD]: t('promotionReport.recTypeNewStore'),
+      [ReportRecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
+    }
+    return map[v] || String(v)
+  }
+  const appLabel = (v: ReportApp) => (v === ReportApp.SHANFENG ? t('common.flashBee') : 'mFood')
+  const channelLabel = (v: ReportChannel) => ({
+    [ReportChannel.FOOD_DELIVERY]: t('promotionReport.chFood'),
+    [ReportChannel.RETAIL]: t('promotionReport.chRetail'),
+    [ReportChannel.GROUP_BUY]: t('promotionReport.chGroupBuy'),
+  }[v])
+
   return (
     <div className="promotion-report-overview">
       {/* 查询区域 */}
       <div className="search-section">
-        <Alert message="數據概覽頁面" description="圖表功能開發中，當前顯示核心指標數據" type="info" showIcon style={{ marginBottom: 16 }} />
+        <Alert message={t('promotionReport.alertTitle')} description={t('promotionReport.alertDesc')} type="info" showIcon style={{ marginBottom: 16 }} />
         <form className="search-form" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px 12px', alignItems: 'flex-end' }}>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>時間範圍</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.timeRange')}</label>
             <RangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates)}
@@ -63,43 +82,43 @@ export default function PromotionReportOverview() {
             />
           </div>
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>推薦類型</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.recommendType')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={recommendType}
               onChange={setRecommendType}
-              options={Object.entries(REPORT_RECOMMEND_TYPE_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_RECOMMEND_TYPE_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: recommendTypeLabel(Number(value) as ReportRecommendType),
               }))}
             />
           </div>
           {canViewAllBrands && (
             <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>所屬品牌</label>
+              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.brand')}</label>
               <Select
-                placeholder="全部"
+                placeholder={t('common.all')}
                 allowClear
                 value={app}
                 onChange={setApp}
-                options={Object.entries(REPORT_APP_LABEL).map(([value, label]) => ({
+                options={Object.entries(REPORT_APP_LABEL).map(([value]) => ({
                   value: Number(value),
-                  label,
+                  label: appLabel(Number(value) as ReportApp),
                 }))}
               />
             </div>
           )}
           <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>業務頻道</label>
+            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.channel')}</label>
             <Select
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               value={channel}
               onChange={setChannel}
-              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value, label]) => ({
+              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value]) => ({
                 value: Number(value),
-                label,
+                label: channelLabel(Number(value) as ReportChannel),
               }))}
             />
           </div>
@@ -111,7 +130,7 @@ export default function PromotionReportOverview() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="今日曝光量"
+              title={t('promotionReport.todayImpressions')}
               value={mockOverviewMetrics.todayImpressions}
               prefix={<EyeOutlined />}
               suffix={
@@ -126,7 +145,7 @@ export default function PromotionReportOverview() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="今日點擊量"
+              title={t('promotionReport.todayClicks')}
               value={mockOverviewMetrics.todayClicks}
               prefix={<MehOutlined />}
               suffix={
@@ -141,7 +160,7 @@ export default function PromotionReportOverview() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="點擊成本 (CPC)"
+              title={t('promotionReport.cpc')}
               value={mockOverviewMetrics.todayCpc}
               prefix={<DollarOutlined />}
               suffix="MOP"
@@ -152,7 +171,7 @@ export default function PromotionReportOverview() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="轉化率 (CVR)"
+              title={t('promotionReport.cvr')}
               value={mockOverviewMetrics.todayCvr}
               suffix="%"
               precision={1}
@@ -162,7 +181,7 @@ export default function PromotionReportOverview() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="累計消耗"
+              title={t('promotionReport.totalCost')}
               value={mockOverviewMetrics.totalCost}
               prefix={<DollarOutlined />}
               suffix="MOP"
@@ -173,7 +192,7 @@ export default function PromotionReportOverview() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="平均 ROI"
+              title={t('promotionReport.avgRoi')}
               value={mockOverviewMetrics.avgRoi}
               prefix={<LineChartOutlined />}
               precision={2}
@@ -183,40 +202,40 @@ export default function PromotionReportOverview() {
       </Row>
 
       {/* 推荐类型效果对比 */}
-      <Card title="推薦類型效果對比" style={{ marginTop: 24 }}>
+      <Card title={t('promotionReport.recCompareTitle')} style={{ marginTop: 24 }}>
         <Row gutter={[16, 16]}>
           {mockRecommendTypeCompare.map(item => (
             <Col xs={24} sm={12} lg={6} key={item.recommendType}>
               <Card size="small" style={{ background: '#fafafa' }}>
                 <div style={{ marginBottom: 12 }}>
                   <Tag color={REPORT_RECOMMEND_TYPE_COLOR[item.recommendType]} style={{ fontSize: 14 }}>
-                    {item.recommendTypeLabel}
+                    {recommendTypeLabel(item.recommendType)}
                   </Tag>
-                  <span style={{ marginLeft: 8, color: '#999' }}>{item.orderCount} 個訂單</span>
+                  <span style={{ marginLeft: 8, color: '#999' }}>{t('promotionReport.orderCount', { count: item.orderCount })}</span>
                 </div>
                 <Row gutter={[8, 8]}>
                   <Col span={12}>
-                    <div style={{ fontSize: 12, color: '#999' }}>總曝光</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.totalImpressions')}</div>
                     <div style={{ fontSize: 16, fontWeight: 500 }}>{item.totalImpressions.toLocaleString()}</div>
                   </Col>
                   <Col span={12}>
-                    <div style={{ fontSize: 12, color: '#999' }}>總點擊</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.totalClicks')}</div>
                     <div style={{ fontSize: 16, fontWeight: 500 }}>{item.totalClicks.toLocaleString()}</div>
                   </Col>
                   <Col span={12}>
-                    <div style={{ fontSize: 12, color: '#999' }}>平均CTR</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.avgCtr')}</div>
                     <div style={{ fontSize: 16, fontWeight: 500 }}>{item.avgCtr}%</div>
                   </Col>
                   <Col span={12}>
-                    <div style={{ fontSize: 12, color: '#999' }}>平均CVR</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.avgCvr')}</div>
                     <div style={{ fontSize: 16, fontWeight: 500 }}>{item.avgCvr}%</div>
                   </Col>
                   <Col span={12}>
-                    <div style={{ fontSize: 12, color: '#999' }}>平均CPC</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.avgCpc')}</div>
                     <div style={{ fontSize: 16, fontWeight: 500 }}>MOP {item.avgCpc.toFixed(2)}</div>
                   </Col>
                   <Col span={12}>
-                    <div style={{ fontSize: 12, color: '#999' }}>平均ROI</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{t('promotionReport.avgRoiShort')}</div>
                     <div style={{ fontSize: 16, fontWeight: 500, color: item.avgRoi >= 3 ? '#52c41a' : '#faad14' }}>{item.avgRoi.toFixed(2)}</div>
                   </Col>
                 </Row>

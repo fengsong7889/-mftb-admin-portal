@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Form, Input, InputNumber, Select, Button, Space, message, Tag, Modal, Tree, Switch, Table, Card } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -14,24 +15,25 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
   APP_OPTIONS,
+  REGION_TREE_DATA,
 } from './constants'
 
 const CHANNEL_OPTIONS = [
-  { label: '大首頁瀑布流', value: RecommendChannel.HOME },
-  { label: '外賣頻道瀑布流', value: RecommendChannel.DELIVERY },
-  { label: '團購頻道瀑布流', value: RecommendChannel.GROUP_BUY },
-  { label: '超市頻道瀑布流', value: RecommendChannel.SUPERMARKET },
+  { labelKey: 'recommend.channelHomeWaterfall', value: RecommendChannel.HOME },
+  { labelKey: 'recommend.channelDeliveryWaterfall', value: RecommendChannel.DELIVERY },
+  { labelKey: 'recommend.channelGroupBuyWaterfall', value: RecommendChannel.GROUP_BUY },
+  { labelKey: 'recommend.channelSupermarketWaterfall', value: RecommendChannel.SUPERMARKET },
 ]
 
 const ALGORITHM_OPTIONS = [
-  { label: '無敵星星', value: AlgorithmType.INVINCIBLE_STAR },
-  { label: '新店廣告', value: AlgorithmType.NEW_STORE_AD },
-  { label: '盤活復蘇', value: AlgorithmType.HOT_REVIVE_AD },
-  { label: '獨家商家', value: AlgorithmType.EXCLUSIVE_MERCHANT },
-  { label: '流量廣告', value: AlgorithmType.TRAFFIC_AD },
-  { label: '猜你喜歡', value: AlgorithmType.GUESS_YOU_LIKE },
-  { label: '自然流量', value: AlgorithmType.ORGANIC_TRAFFIC },
-  { label: '搜索算法', value: AlgorithmType.SEARCH_ALGORITHM },
+  { labelKey: 'recommend.algoInvincibleStar', value: AlgorithmType.INVINCIBLE_STAR },
+  { labelKey: 'recommend.algoNewStoreAd', value: AlgorithmType.NEW_STORE_AD },
+  { labelKey: 'recommend.algoHotReviveAd', value: AlgorithmType.HOT_REVIVE_AD },
+  { labelKey: 'recommend.algoExclusiveMerchant', value: AlgorithmType.EXCLUSIVE_MERCHANT },
+  { labelKey: 'recommend.algoTrafficAd', value: AlgorithmType.TRAFFIC_AD },
+  { labelKey: 'recommend.algoGuessYouLike', value: AlgorithmType.GUESS_YOU_LIKE },
+  { labelKey: 'recommend.algoOrganicTraffic', value: AlgorithmType.ORGANIC_TRAFFIC },
+  { labelKey: 'recommend.algoSearchAlgorithm', value: AlgorithmType.SEARCH_ALGORITHM },
 ]
 
 // 商圈枚举
@@ -41,22 +43,6 @@ enum Region {
   TCMACAU = 3,
   HENGQIN = 4,
 }
-
-// 商圈树形数据
-const REGION_TREE = [
-  {
-    key: '1', title: '澳門區域', level: 1, children: [
-      { key: '1-1', title: '黑沙環區', level: 2 },
-      { key: '1-2', title: '氹仔區', level: 2 },
-      { key: '1-3', title: '路環區', level: 2 },
-    ],
-  },
-  {
-    key: '2', title: '珠海區域', level: 1, children: [
-      { key: '2-1', title: '橫琴區域', level: 2 },
-    ],
-  },
-]
 
 // 商圈配置接口
 interface DistrictPricing {
@@ -117,12 +103,23 @@ const mockData: PricingRecord[] = [
 ]
 
 export default function PricingAdd() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('id') || ''
   const modeParam = searchParams.get('mode') || ''
   const isDetailMode = modeParam === 'detail'
   const isEditMode = !!editId && !isDetailMode
+
+  /** 翻譯後的商圈樹形數據 */
+  const regionTreeData = useMemo(() => REGION_TREE_DATA.map(area => ({
+    key: String(area.value), title: t(area.titleKey), level: 1,
+    children: (area.children ?? []).map(c => ({ key: `${area.value}-${c.value}`, title: t(c.titleKey), level: 2 })),
+  })), [t])
+
+  const tAlgoOptions = useMemo(() => ALGORITHM_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tChannelOptions = useMemo(() => CHANNEL_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
   const [form] = Form.useForm()
   const [algorithmType, setAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
@@ -173,18 +170,18 @@ export default function PricingAdd() {
   }, [editId, form])
 
   const pageTitle = isDetailMode
-    ? '價格詳情'
+    ? t('recommend.pricingDetail')
     : isEditMode
-      ? '編輯價格'
-      : '新增定價'
+      ? t('recommend.editPrice')
+      : t('recommend.addPricing')
 
   const handleSave = () => {
     form.validateFields().then(() => {
       if (isReviveAlgorithm && districtPricings.length === 0) {
-        message.warning('請至少添加一個商圈計價配置')
+        message.warning(t('recommend.pleaseAddDistrictConfig'))
         return
       }
-      message.success('保存成功')
+      message.success(t('common:saveSuccess'))
       navigate('/recommend-pricing')
     })
   }
@@ -192,7 +189,7 @@ export default function PricingAdd() {
   // 商圈配置操作
   const handleAddDistrict = () => {
     if (!selectedRegionNode || selectedRegionNode.level !== 2) {
-      message.warning('請選擇一個商圈')
+      message.warning(t('recommend.selectADistrict'))
       return
     }
     const regionKey = selectedRegionNode.key
@@ -212,7 +209,7 @@ export default function PricingAdd() {
       setReplacingRegion(null)
     } else {
       if (districtPricings.some(d => d.region === region)) {
-        message.warning('該商圈已添加計價配置')
+        message.warning(t('recommend.districtAlreadyAdded'))
         return
       }
       setDistrictPricings(prev => [...prev, { region, regionLabel, dailyPrice: 0 }])
@@ -224,8 +221,8 @@ export default function PricingAdd() {
   const handleRemoveDistrict = (region: Region) => {
     if (districtPricings.length === 1) {
       Modal.confirm({
-        title: '確認刪除',
-        content: '這是最後一個商圈配置，刪除後需要重新添加商圈。是否繼續？',
+        title: t('common:confirmDelete'),
+        content: t('recommend.confirmDeleteLastDistrict'),
         onOk: () => setDistrictPricings([]),
       })
       return
@@ -263,11 +260,11 @@ export default function PricingAdd() {
   // 取消扣费表格列
   const cancelFeeColumns = [
     {
-      title: '廣告推廣',
+      title: t('recommend.adPromotionCol'),
       dataIndex: 'remainDays',
       render: (_: unknown, record: CancelFeeTier) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span>剩餘天數 ≤</span>
+          <span>{t('recommend.remainingDaysLE')}</span>
           <InputNumber
             size="small"
             min={0}
@@ -276,12 +273,12 @@ export default function PricingAdd() {
             style={{ width: 80 }}
             disabled={isDetailMode}
           />
-          <span>天</span>
+          <span>{t('recommend:dayUnit')}</span>
         </div>
       ),
     },
     {
-      title: '比例配置',
+      title: t('recommend.ratioConfigCol'),
       dataIndex: 'ratio',
       render: (_: unknown, record: CancelFeeTier) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -299,7 +296,7 @@ export default function PricingAdd() {
       ),
     },
     {
-      title: '操作',
+      title: t('common:action'),
       key: 'action',
       width: 160,
       render: (_: unknown, record: CancelFeeTier) => (
@@ -312,7 +309,7 @@ export default function PricingAdd() {
             disabled={isDetailMode}
             style={{ color: '#E8720C' }}
           >
-            新增梯度
+            {t('common:add')}
           </Button>
           <Button
             type="link"
@@ -321,7 +318,7 @@ export default function PricingAdd() {
             onClick={() => handleRemoveCancelTier(record.key)}
             disabled={isDetailMode}
           >
-            刪除
+            {t('common:delete')}
           </Button>
         </Space>
       ),
@@ -353,7 +350,7 @@ export default function PricingAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{pageTitle}</h2>
@@ -365,7 +362,7 @@ export default function PricingAdd() {
                   fontSize: 13, color: '#E8720C', fontWeight: 500,
                 }}>
                   <span style={{ fontSize: 14 }}>🔥</span>
-                  盤活復蘇
+                  {t('recommend.algoHotReviveAd')}
                 </div>
               )}
             </div>
@@ -377,7 +374,7 @@ export default function PricingAdd() {
                 borderRadius: 8, height: 36, padding: '0 18px',
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>保存</Button>
+              }}>{t('common:save')}</Button>
           )}
         </div>
       </div>
@@ -392,7 +389,7 @@ export default function PricingAdd() {
           title={
             <Space>
               <AppstoreOutlined style={{ fontSize: 16, color: '#1890ff' }} />
-              <span style={{ fontSize: 15, fontWeight: 500 }}>基礎信息</span>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.basicInfo')}</span>
             </Space>
           }
           style={{
@@ -410,10 +407,10 @@ export default function PricingAdd() {
         >
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="算法名稱" name="algorithmType" rules={[{ required: true, message: '請選擇算法' }]}>
+            <Form.Item label={t('recommend.algoName')} name="algorithmType" rules={[{ required: true, message: t('recommend.selectAlgo') }]}>
               <Select
-                placeholder="請選擇算法"
-                options={ALGORITHM_OPTIONS}
+                placeholder={t('recommend.selectAlgo')}
+                options={tAlgoOptions}
                 onChange={(value) => {
                   setAlgorithmType(value)
                   if (value !== AlgorithmType.HOT_REVIVE_AD) {
@@ -423,23 +420,23 @@ export default function PricingAdd() {
               />
             </Form.Item>
 
-            <Form.Item label="所屬品牌" name="app" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
-              <Select placeholder="請選擇所屬品牌" options={APP_OPTIONS} />
+            <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]}>
+              <Select placeholder={t('common:selectBrand')} options={tAppOptions} />
             </Form.Item>
 
-            <Form.Item label="業務頻道" name="channel" rules={[{ required: true, message: '請選擇業務頻道' }]}>
-              <Select placeholder="請選擇業務頻道" options={CHANNEL_OPTIONS} />
+            <Form.Item label={t('common:channel')} name="channel" rules={[{ required: true, message: t('common:selectChannel') }]}>
+              <Select placeholder={t('common:selectChannel')} options={tChannelOptions} />
             </Form.Item>
           </div>
 
-          <Form.Item label="詳情圖" style={{ marginBottom: 0 }}>
+          <Form.Item label={t('recommend.detailImage')} style={{ marginBottom: 0 }}>
             <div style={{
               width: 120, height: 120, border: '1px dashed #d9d9d9', borderRadius: 8,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: '#999', fontSize: 12,
             }}>
               <PlusOutlined style={{ fontSize: 20, marginBottom: 4 }} />
-              <span>上傳詳情圖</span>
+              <span>{t('recommend.uploadDetailImage')}</span>
             </div>
           </Form.Item>
         </Card>
@@ -449,10 +446,10 @@ export default function PricingAdd() {
           title={
             <Space>
               <SettingOutlined style={{ fontSize: 16, color: '#E8720C' }} />
-              <span style={{ fontSize: 15, fontWeight: 500 }}>銷售策略</span>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.salesStrategy')}</span>
             </Space>
           }
-          extra={<Tag color="orange" style={{ fontSize: 11 }}>策略配置</Tag>}
+          extra={<Tag color="orange" style={{ fontSize: 11 }}>{t('recommend.strategyConfigTag')}</Tag>}
           style={{
             marginTop: 16,
             backgroundColor: '#ffffff',
@@ -469,23 +466,23 @@ export default function PricingAdd() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, color: '#595959', minWidth: 80 }}>預售天數:</span>
+              <span style={{ fontSize: 14, color: '#595959', minWidth: 80 }}>{t('recommend.preSaleDaysLabel')}</span>
               <Form.Item name="minDays" style={{ marginBottom: 0 }}>
-                <InputNumber min={1} max={30} style={{ width: 100 }} addonAfter="天" />
+                <InputNumber min={1} max={30} style={{ width: 100 }} addonAfter={t('recommend:dayUnit')} />
               </Form.Item>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>系統持續銷售 7 天內的廣告，每過一天自動補充一天，循環銷售</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.preSaleDaysTip')}</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, color: '#595959', minWidth: 80 }}>屏蔽商家:</span>
+              <span style={{ fontSize: 14, color: '#595959', minWidth: 80 }}>{t('recommend.blockMerchantsLabel')}</span>
               <Form.Item name="status" style={{ marginBottom: 0 }}>
                 <Switch
-                  checkedChildren="屏蔽"
-                  unCheckedChildren="不屏蔽"
+                  checkedChildren={t('recommend.blockOn')}
+                  unCheckedChildren={t('recommend.blockOff')}
                   defaultChecked={false}
                 />
               </Form.Item>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>被屏蔽的商家，無法購買該算法廣告，並且商家在購買界面無法查詢到該算法，對商家不可見。</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.blockMerchantTip')}</span>
             </div>
           </div>
         </Card>
@@ -495,8 +492,8 @@ export default function PricingAdd() {
             title={
               <Space>
                 <span style={{ fontSize: 16 }}>🏪</span>
-                <span style={{ fontSize: 15, fontWeight: 500 }}>商圈計價配置</span>
-                <Tag color="purple" style={{ fontSize: 11 }}>分區定價</Tag>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.districtPricingConfig')}</span>
+                <Tag color="purple" style={{ fontSize: 11 }}>{t('recommend.zonePricingTag')}</Tag>
               </Space>
             }
             extra={
@@ -511,7 +508,7 @@ export default function PricingAdd() {
                 }}
                 style={{ borderRadius: 6 }}
               >
-                選擇商圈
+                {t('recommend.selectDistrictBtn')}
               </Button>
             }
             style={{
@@ -529,7 +526,7 @@ export default function PricingAdd() {
           >
             {districtPricings.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
-                請選擇商圈並點擊“新增”按鈕添加計價配置
+                {t('recommend.districtEmptyHint')}
               </div>
             ) : (
               districtPricings.map((config) => (
@@ -545,7 +542,7 @@ export default function PricingAdd() {
                         onClick={() => handleReplaceDistrict(config.region)}
                         style={{ fontSize: 12, color: '#1890FF', padding: '2px 6px' }}
                       >
-                        更換
+                        {t('common:edit')}
                       </Button>
                       <Button
                         type="text"
@@ -554,20 +551,20 @@ export default function PricingAdd() {
                         onClick={() => handleRemoveDistrict(config.region)}
                         style={{ fontSize: 12, padding: '2px 6px' }}
                       >
-                        刪除
+                        {t('common:delete')}
                       </Button>
                     </div>
                   </div>
                   <Form.Item
-                    label="每天售價"
+                    label={t('recommend.dailyPriceLabel')}
                     style={{ marginBottom: 0, maxWidth: 500 }}
                   >
                     <InputNumber
                       min={0}
                       precision={2}
-                      placeholder="請輸入每天售價"
+                      placeholder={t('recommend.dailyPricePh')}
                       style={{ width: '100%' }}
-                      addonAfter="MOP/天"
+                      addonAfter={t('recommend.mopPerDay')}
                       value={config.dailyPrice}
                       onChange={(value) => handleUpdateDistrictPrice(config.region, value || 0)}
                     />
@@ -584,12 +581,12 @@ export default function PricingAdd() {
             title={
               <Space>
                 <span style={{ fontSize: 16 }}>🎯</span>
-                <span style={{ fontSize: 15, fontWeight: 500 }}>購買多天折扣配置（梯度）</span>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.multiDayDiscount')}</span>
               </Space>
             }
             extra={
               <Space>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>購買多天時匹配以下折扣</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.matchDiscountTip')}</span>
                 <Switch checked={discountEnabled} onChange={setDiscountEnabled} />
               </Space>
             }
@@ -609,17 +606,17 @@ export default function PricingAdd() {
             {discountEnabled && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
                 <Form.Item
-                  label="最低購買天數"
+                  label={t('recommend.minPurchaseDays')}
                   name="minDays"
-                  rules={[{ required: true, message: '請輸入最低購買天數' }]}
+                  rules={[{ required: true, message: t('recommend.minPurchaseDaysReq') }]}
                 >
-                  <InputNumber placeholder="請輸入" min={1} style={{ width: '100%' }} addonAfter="天" />
+                  <InputNumber placeholder={t('recommend:inputRequired')} min={1} style={{ width: '100%' }} addonAfter={t('recommend:dayUnit')} />
                 </Form.Item>
                 <Form.Item
-                  label="折扣階梯"
+                  label={t('recommend.discountTierLabel')}
                   name="discountTiers"
                 >
-                  <Input placeholder="如：7天9折 / 15天8折 / 30天75折" />
+                  <Input placeholder={t('recommend.discountTierPh')} />
                 </Form.Item>
               </div>
             )}
@@ -632,7 +629,7 @@ export default function PricingAdd() {
             title={
               <Space>
                 <span style={{ fontSize: 16 }}>💰</span>
-                <span style={{ fontSize: 15, fontWeight: 500 }}>價格配置</span>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.priceConfig')}</span>
               </Space>
             }
             style={{
@@ -650,33 +647,33 @@ export default function PricingAdd() {
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
               <Form.Item
-                label="區域"
+                label={t('recommend.regionLabelCol')}
                 name="region"
-                rules={[{ required: true, message: '請輸入區域' }]}
+                rules={[{ required: true, message: t('recommend.regionPh') }]}
               >
-                <Input placeholder="請輸入區域" />
+                <Input placeholder={t('recommend.regionPh')} />
               </Form.Item>
               <Form.Item
-                label="單日單價 (MOP)"
+                label={t('recommend.dailyUnitPrice')}
                 name="dailyPrice"
-                rules={[{ required: true, message: '請輸入單日單價' }]}
+                rules={[{ required: true, message: t('recommend.dailyUnitPriceReq') }]}
               >
-                <InputNumber placeholder="請輸入" min={0} style={{ width: '100%' }} addonAfter="MOP" />
+                <InputNumber placeholder={t('recommend:inputRequired')} min={0} style={{ width: '100%' }} addonAfter="MOP" />
               </Form.Item>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
               <Form.Item
-                label="最低購買天數"
+                label={t('recommend.minPurchaseDays')}
                 name="minDays"
-                rules={[{ required: true, message: '請輸入最低購買天數' }]}
+                rules={[{ required: true, message: t('recommend.minPurchaseDaysReq') }]}
               >
-                <InputNumber placeholder="請輸入" min={1} style={{ width: '100%' }} addonAfter="天" />
+                <InputNumber placeholder={t('common:placeholderSelect')} min={1} style={{ width: '100%' }} addonAfter={t('recommend:dayUnit')} />
               </Form.Item>
               <Form.Item
-                label="折扣階梯"
+                label={t('recommend.discountTierLabel')}
                 name="discountTiers"
               >
-                <Input placeholder="如：7天9折 / 30天8折" />
+                <Input placeholder={t('recommend.discountTierPh2')} />
               </Form.Item>
             </div>
           </Card>
@@ -687,13 +684,13 @@ export default function PricingAdd() {
           title={
             <Space>
               <SettingOutlined style={{ fontSize: 16, color: '#F5222D' }} />
-              <span style={{ fontSize: 15, fontWeight: 500 }}>訂單退款，退費比例配置</span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>商家退款時會計算距離訂單推廣開始時間，按剩餘天數匹配退費比例；匹配成功按規則執行，反之不扣費</span>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.refundConfig')}</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.refundConfigDesc')}</span>
             </Space>
           }
           extra={
             <Space>
-              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? '允許退款' : '不允許退款'}</span>
+              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend.allowRefund') : t('recommend.denyRefund')}</span>
               <Switch
                 size="small"
                 checked={refundEnabled}
@@ -731,7 +728,7 @@ export default function PricingAdd() {
               background: '#fafafa', borderRadius: 8,
               border: '1px dashed #d9d9d9',
             }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>當前設置為不允許退款，開啟開關後可配置退費比例</span>
+              <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.denyRefundTip')}</span>
             </div>
           )}
         </Card>
@@ -739,7 +736,7 @@ export default function PricingAdd() {
 
       {/* 商圈选择弹窗 */}
       <Modal
-        title={replacingRegion ? '更換商圈' : '選擇商圈'}
+        title={replacingRegion ? t('recommend.replaceDistrict') : t('recommend.selectDistrictTitle')}
         open={regionSelectModalVisible}
         onCancel={() => {
           setRegionSelectModalVisible(false)
@@ -747,25 +744,25 @@ export default function PricingAdd() {
           setReplacingRegion(null)
         }}
         onOk={handleAddDistrict}
-        okText={replacingRegion ? '確認更換' : '確認添加'}
-        cancelText="取消"
+        okText={replacingRegion ? t('recommend.confirmReplace') : t('recommend.confirmAdd')}
+        cancelText={t('common:cancel')}
       >
         <Tree
-          treeData={REGION_TREE}
+          treeData={regionTreeData}
           selectedKeys={selectedRegionNode ? [selectedRegionNode.key] : []}
           onSelect={(keys, info) => {
             const node = info.node as unknown as { key: string; title: string; level: number }
             if (node.level === 2) {
               setSelectedRegionNode(node)
             } else {
-              message.warning('請選擇具體的商圈，而非區域')
+              message.warning(t('recommend.selectSpecificDistrict'))
             }
           }}
           style={{ marginTop: 16 }}
         />
         {selectedRegionNode && (
           <div style={{ marginTop: 12, padding: '8px 12px', background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
-            <span style={{ color: '#52c41a', fontSize: 13 }}>已選擇：</span>
+            <span style={{ color: '#52c41a', fontSize: 13 }}>{t('recommend.selectedLabel')}</span>
             <span style={{ fontWeight: 600, color: '#262626' }}>{selectedRegionNode.title}</span>
           </div>
         )}

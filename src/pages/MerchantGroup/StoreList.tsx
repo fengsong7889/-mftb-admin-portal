@@ -8,6 +8,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import BrandTag from '../../components/BrandTag'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -17,14 +18,14 @@ import type { StoreBdItem, StoreItem, StoreQueryParams } from '../../api/store'
 import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions, deleteStore } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS, formatBizChannel } from '../../constants/bizChannel'
-import { REGION_OPTIONS } from '../Recommend/constants'
+import { REGION_LABEL_KEY } from '../Recommend/constants'
 import { exportToCSV } from '../../utils/exportCSV'
 import StoreEditModal from './StoreEditModal'
 import StoreBindBdModal from './StoreBindBdModal'
 
 const { RangePicker } = DatePicker
 
-/** 品牌选项 */
+/** 品牌选项（内部使用，品牌名不翻译，由 BrandTag 组件处理） */
 const BRAND_OPTIONS = [
   { label: '闪蜂', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
@@ -45,6 +46,7 @@ interface StoreSearchValues {
 type StoreFilters = Omit<StoreQueryParams, 'page' | 'size'>
 
 export default function StoreList() {
+  const { t } = useTranslation('store')
   const [searchParams] = useSearchParams()
 
   // 从集团管理跳转过来时带集团信息（groupId 用于新增时预选集团）
@@ -91,7 +93,7 @@ export default function StoreList() {
       setDataSource(res.records || [])
       setTotal(res.total || 0)
     } catch {
-      message.error('查詢失敗')
+      message.error(t('common:queryFailed'))
     } finally {
       setLoading(false)
     }
@@ -148,20 +150,20 @@ export default function StoreList() {
 
   const handleDelete = (record: StoreItem) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除門店「${record.storeName}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common:confirmDelete'),
+      content: t('confirmDeleteStore', { name: record.storeName }),
+      okText: t('common:confirm'),
+      cancelText: t('common:cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await deleteStore(record.id)
-          message.success('門店已刪除')
+          message.success(t('storeDeleted'))
           setSelectedRowKeys([])
           setSelectedRows([])
           loadData()
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : '刪除失敗'
+          const msg = err instanceof Error ? err.message : t('common:deleteFailed')
           message.error(msg)
         }
       },
@@ -176,25 +178,25 @@ export default function StoreList() {
 
   const handleExport = () => {
     if (!dataSource.length) {
-      message.warning('暫無數據可導出')
+      message.warning(t('common:noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '所屬集團ID', dataIndex: 'groupCode' },
-      { title: '所屬集團名稱', dataIndex: 'groupName' },
-      { title: '門店ID', dataIndex: 'storeCode' },
-      { title: '門店名稱', dataIndex: 'storeName' },
-      { title: '所屬品牌', dataIndex: 'brand' },
-      { title: '業務頻道', dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
-      { title: '登錄主賬號', dataIndex: 'loginAccount' },
-      { title: '所在區域', dataIndex: 'region' },
-      { title: '綁定BD', dataIndex: 'bdList', render: (v: unknown) => (Array.isArray(v) ? (v as StoreBdItem[]).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') : '') },
-      { title: '最後更新人', dataIndex: 'updatedBy' },
-      { title: '最後更新時間', dataIndex: 'updatedAt' },
-      { title: '創建時間', dataIndex: 'createdAt' },
+      { title: t('colGroupId'), dataIndex: 'groupCode' },
+      { title: t('colGroupName'), dataIndex: 'groupName' },
+      { title: t('colStoreId'), dataIndex: 'storeCode' },
+      { title: t('colStoreName'), dataIndex: 'storeName' },
+      { title: t('common:brand'), dataIndex: 'brand' },
+      { title: t('colBizChannel'), dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
+      { title: t('colLoginAccount'), dataIndex: 'loginAccount' },
+      { title: t('colRegion'), dataIndex: 'region' },
+      { title: t('colBindBd'), dataIndex: 'bdList', render: (v: unknown) => (Array.isArray(v) ? (v as StoreBdItem[]).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') : '') },
+      { title: t('colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('colUpdatedAt'), dataIndex: 'updatedAt' },
+      { title: t('colCreatedAt'), dataIndex: 'createdAt' },
     ]
-    exportToCSV(`門店管理_${new Date().toISOString().slice(0, 10)}`, exportColumns, dataSource)
-    message.success('導出成功')
+    exportToCSV(`${t('exportFileName')}_${new Date().toISOString().slice(0, 10)}`, exportColumns, dataSource)
+    message.success(t('common:exportSuccess'))
   }
 
   const handleTableChange = (pagination: TablePaginationConfig) => {
@@ -209,60 +211,60 @@ export default function StoreList() {
 
   const columns: TableColumnsType<StoreItem> = [
     {
-      title: '所屬集團ID',
+      title: t('colGroupId'),
       dataIndex: 'groupCode',
       key: 'groupCode',
       width: 120,
     },
     {
-      title: '所屬集團名稱',
+      title: t('colGroupName'),
       dataIndex: 'groupName',
       key: 'groupName',
       width: 160,
     },
     {
-      title: '門店ID',
+      title: t('colStoreId'),
       dataIndex: 'storeCode',
       key: 'storeCode',
       width: 100,
     },
     {
-      title: '門店名稱',
+      title: t('colStoreName'),
       dataIndex: 'storeName',
       key: 'storeName',
       width: 160,
     },
     {
-      title: '所屬品牌',
+      title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 120,
       render: (val: string) => val ? <BrandTag value={val} /> : '-',
     },
     {
-      title: '業務頻道',
+      title: t('colBizChannel'),
       dataIndex: 'bizChannel',
       key: 'bizChannel',
       width: 140,
       render: (val: string) => formatBizChannel(val),
     },
     {
-      title: '登錄主賬號',
+      title: t('colLoginAccount'),
       dataIndex: 'loginAccount',
       key: 'loginAccount',
       width: 140,
       render: (val: string) => val || '-',
     },
     {
-      title: '所在區域',
+      title: t('colRegion'),
       dataIndex: 'region',
       key: 'region',
       width: 120,
       render: (val: number | null | undefined) =>
-        val ? (REGION_OPTIONS.find(o => o.value === val)?.label ?? String(val)) : '-',
+        val ? (REGION_LABEL_KEY[val] ? t(`translation:${REGION_LABEL_KEY[val]}`) : String(val)) : '-',
     },
     {
-      title: '綁定BD',
+      title: t('colBindBd'),
       dataIndex: 'bdList',
       key: 'bdList',
       width: 160,
@@ -272,41 +274,41 @@ export default function StoreList() {
           : '-',
     },
     {
-      title: '最後更新人',
+      title: t('colUpdatedBy'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
       width: 120,
       render: (val: string) => val || '-',
     },
     {
-      title: '最後更新時間',
+      title: t('colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
       render: (val: string) => val || '-',
     },
     {
-      title: '創建時間',
+      title: t('colCreatedAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
       render: (val: string) => val || '-',
     },
     {
-      title: '操作',
+      title: t('common:action'),
       key: 'action',
       width: 190,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>
-            編輯
+            {t('common:edit')}
           </Button>
           <Button type="link" size="small" onClick={() => handleBindBd(record)}>
-            綁定BD
+            {t('bindBd')}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
-            刪除
+            {t('common:delete')}
           </Button>
         </Space>
       ),
@@ -328,44 +330,44 @@ export default function StoreList() {
           layout="inline"
           initialValues={{ groupKeyword: presetGroupCode || undefined }}
         >
-          <Form.Item label="集團ID/名稱" name="groupKeyword">
+          <Form.Item label={t('searchGroupIdName')} name="groupKeyword">
             <RemoteSearchSelect
-              placeholder="搜索集團ID/名稱"
+              placeholder={t('searchGroupPlaceholder')}
               fetchOptions={fetchMerchantGroupOptions}
               initialOptions={presetGroupOptions}
             />
           </Form.Item>
-          <Form.Item label="門店ID/名稱" name="keyword">
+          <Form.Item label={t('searchStoreIdName')} name="keyword">
             <RemoteSearchSelect
-              placeholder="搜索門店ID/名稱"
+              placeholder={t('searchStorePlaceholder')}
               fetchOptions={fetchStoreOptions}
             />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="brand">
-            <Select placeholder="全部" allowClear options={BRAND_OPTIONS} />
+          <Form.Item label={t('common:brand')} name="brand">
+            <Select placeholder={t('common:all')} allowClear options={BRAND_OPTIONS} />
           </Form.Item>
-          <Form.Item label="業務頻道" name="bizChannel">
-            <Select placeholder="全部" allowClear options={BIZ_CHANNEL_OPTIONS} />
+          <Form.Item label={t('colBizChannel')} name="bizChannel">
+            <Select placeholder={t('common:all')} allowClear options={BIZ_CHANNEL_OPTIONS} />
           </Form.Item>
-          <Form.Item label="最後更新人" name="updatedBy">
+          <Form.Item label={t('searchUpdatedBy')} name="updatedBy">
             <RemoteSearchSelect
-              placeholder="搜索最後更新人"
+              placeholder={t('searchUpdatedByPlaceholder')}
               fetchOptions={fetchStoreUpdatedByOptions}
             />
           </Form.Item>
-          <Form.Item label="最後更新時間" name="updatedRange">
-            <RangePicker format="YYYY-MM-DD" placeholder={['開始日期', '結束日期']} allowClear />
+          <Form.Item label={t('searchUpdatedTime')} name="updatedRange">
+            <RangePicker format="YYYY-MM-DD" placeholder={[t('common:startDate'), t('common:endDate')]} allowClear />
           </Form.Item>
-          <Form.Item label="創建時間" name="createdRange">
-            <RangePicker format="YYYY-MM-DD" placeholder={['開始日期', '結束日期']} allowClear />
+          <Form.Item label={t('searchCreatedTime')} name="createdRange">
+            <RangePicker format="YYYY-MM-DD" placeholder={[t('common:startDate'), t('common:endDate')]} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查詢
+                {t('common:search')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
+                {t('common:reset')}
               </Button>
             </div>
           </Form.Item>
@@ -376,12 +378,12 @@ export default function StoreList() {
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            導出
+            {t('common:export')}
           </Button>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增
+            {t('common:add')}
           </Button>
           {configComponent}
         </div>
@@ -406,7 +408,7 @@ export default function StoreList() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條`,
+          showTotal: (total) => t('common:total', { count: total }),
         }}
         scroll={{ x: 1600 }}
       />

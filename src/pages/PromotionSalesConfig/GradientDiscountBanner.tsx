@@ -3,6 +3,7 @@
  * 无敌星星（按单日时段数）与盘活复苏（按购买天数）共用
  */
 import { Tooltip } from 'antd'
+import { useTranslation } from 'react-i18next'
 
 /** 单个梯度档位 */
 export interface DiscountTier {
@@ -18,20 +19,24 @@ interface GradientDiscountBannerProps {
   refundDisabled?: boolean // 算法不允许退款时，在同一行展示警示标签
 }
 
-/** 折扣展示文案：90 → 9折，95 → 95折 */
-function formatDiscount(discount: number): string {
-  return discount % 10 === 0 ? `${discount / 10}折` : `${discount}折`
-}
+/** 折扣展示文案：90 → 9折，95 → 95折 — 由组件内部使用 t() 生成 */
 
 export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = '', currentCount, refundDisabled = false }: GradientDiscountBannerProps) {
+  const { t } = useTranslation('adSales')
+
+  /** 折扣展示文案：90 → 9折，95 → 95折 */
+  const formatDiscount = (discount: number): string => {
+    return discount % 10 === 0 ? `${discount / 10}${t('discountUnit')}` : `${discount}${t('discountUnit')}`
+  }
+
   if (tiers.length === 0) return null
 
   // 按门槛升序排列
   const sorted = [...tiers].sort((a, b) => a.threshold - b.threshold)
   // 当前达成的最高档位
-  const achieved = [...sorted].reverse().find(t => currentCount >= t.threshold) || null
+  const achieved = [...sorted].reverse().find(tier => currentCount >= tier.threshold) || null
   // 下一个待达成档位
-  const next = sorted.find(t => currentCount < t.threshold) || null
+  const next = sorted.find(tier => currentCount < tier.threshold) || null
 
   return (
     <div style={{
@@ -42,7 +47,7 @@ export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = 
     }}>
       {/* 标题 */}
       <span style={{ fontSize: 13, fontWeight: 700, color: '#E8720C', whiteSpace: 'nowrap' }}>
-        🎁 多買多折
+        {t('multiDiscount')}
       </span>
 
       {/* 梯度档位药丸 */}
@@ -67,7 +72,7 @@ export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = 
                       background: '#fff', color: '#E8720C', border: '1px solid #FFD591',
                     }),
               }}>
-                {scopeLabel}滿{tier.threshold}{unitLabel} {formatDiscount(tier.discount)}
+                {t('tierFull')}{tier.threshold}{unitLabel} {formatDiscount(tier.discount)}
               </span>
             </span>
           )
@@ -77,24 +82,24 @@ export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = 
       {/* 实时凑单提示 */}
       <span style={{ marginLeft: 'auto', fontSize: 12, whiteSpace: 'nowrap' }}>
         {currentCount === 0 ? (
-          <span style={{ color: '#8C8C8C' }}>選購越多，優惠越大</span>
+          <span style={{ color: '#8C8C8C' }}>{t('shopMoreSaveMore')}</span>
         ) : next ? (
           <span style={{ color: '#595959' }}>
-            已選 <strong style={{ color: '#E8720C' }}>{currentCount}</strong> {unitLabel}
-            {achieved && <>，已享 <strong style={{ color: '#E8720C' }}>{formatDiscount(achieved.discount)}</strong></>}
-            ，再選 <strong style={{ color: '#FF4D4F' }}>{next.threshold - currentCount}</strong> {unitLabel}可享
+            {t('selected')} <strong style={{ color: '#E8720C' }}>{currentCount}</strong> {unitLabel}
+            {achieved && <>，{t('enjoying')} <strong style={{ color: '#E8720C' }}>{formatDiscount(achieved.discount)}</strong></>}
+            ，{t('moreFor')} <strong style={{ color: '#FF4D4F' }}>{next.threshold - currentCount}</strong> {unitLabel}{t('canGet')}
             <strong style={{ color: '#FF4D4F' }}> {formatDiscount(next.discount)}</strong>
           </span>
         ) : (
           <span style={{ color: '#52C41A', fontWeight: 600 }}>
-            已選 {currentCount} {unitLabel}，已享最高優惠 {formatDiscount(sorted[sorted.length - 1].discount)} 🎉
+            {t('selected')} {currentCount} {unitLabel}，{t('maxDiscount')} {formatDiscount(sorted[sorted.length - 1].discount)} 🎉
           </span>
         )}
       </span>
 
       {/* 不允许退款警示：合并在同一行，脉冲动效引起注意，悬停查看完整说明 */}
       {refundDisabled && (
-        <Tooltip title="當前選擇的算法不允許退款，下單後無法申請退款，請謹慎選擇。">
+        <Tooltip title={t('noRefundTooltip')}>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'help',
             fontSize: 14, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap',
@@ -103,7 +108,7 @@ export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = 
             border: '1px solid #ff4d4f',
             animation: 'refundWarnPulse 1.8s ease-in-out infinite',
           }}>
-            ⚠️ 不允許退款
+            ⚠️ {t('noRefund')}
           </span>
         </Tooltip>
       )}

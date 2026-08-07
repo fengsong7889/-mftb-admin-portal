@@ -3,6 +3,7 @@ import { Button, Space, Table, Tag, Card, Tabs, Modal, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '../constants'
 import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -32,23 +33,6 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
   ],
 }
 
-/** 广告类型卡片配置 */
-const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
-  { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: '超級曝光位，首頁頂部黃金坑位，強勢引流' },
-  { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: '盤活熱門商家流量，提升店鋪曝光' },
-  { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: '新店專屬推廣位，快速獲取首批顧客' },
-  { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: '人氣商家專屬推薦位，流量加持' },
-  { type: AlgorithmType.BRAND_MERCHANT, icon: '💎', description: '品牌商家專屬展示位，KA商家尊享' },
-  { type: AlgorithmType.GOLD_AD, icon: '💰', description: '點金廣告，精準投放高效轉化' },
-  { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: '獨家商家專屬展示位，彰顯品牌實力' },
-  { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: '精準流量投放，覆蓋目標用戶群體' },
-  { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: '智能推薦，個性化匹配用戶偏好' },
-  { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: '自然流量曝光，提升店鋪基礎流量' },
-  { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: '搜索算法優化，提升搜索轉化率' },
-  { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: '金字招牌商家，品質保證優先推薦' },
-  { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: '商品折扣秒殺活動，智能促銷匹配' },
-]
-
 export interface AlgorithmRecord {
   id: number
   name: string
@@ -59,61 +43,6 @@ export interface AlgorithmRecord {
   brand?: AppType  // 所属品牌
   status: ServiceStatus
   slotCount: number
-}
-
-const TYPE_LABEL: Record<AlgorithmType, string> = {
-  [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
-  [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
-  [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
-  [AlgorithmType.TRAFFIC_AD]: '流量廣告',
-  [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
-  [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
-  [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
-  [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
-  [AlgorithmType.GOLD_AD]: '點金廣告',
-  [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
-  [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
-} as Record<AlgorithmType, string>
-
-const _TYPE_COLOR: Record<AlgorithmType, string> = {
-  [AlgorithmType.INVINCIBLE_STAR]: 'gold',
-  [AlgorithmType.NEW_STORE_AD]: 'green',
-  [AlgorithmType.HOT_REVIVE_AD]: 'volcano',
-  [AlgorithmType.EXCLUSIVE_MERCHANT]: 'purple',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: 'geekblue',
-  [AlgorithmType.TRAFFIC_AD]: 'cyan',
-  [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
-  [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
-  [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
-  [AlgorithmType.BRAND_MERCHANT]: 'orange',
-  [AlgorithmType.GOLD_AD]: 'gold',
-  [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
-  [AlgorithmType.PRODUCT_PROMO]: 'red',
-} as Record<AlgorithmType, string>
-
-const _CHANNEL_LABEL: Record<RecommendChannel, string> = {
-  [RecommendChannel.HOME]: '美食外賣',
-  [RecommendChannel.DELIVERY]: '美食外賣',
-  [RecommendChannel.SUPERMARKET]: '超市百貨',
-  [RecommendChannel.GROUP_BUY]: '團購到店',
-}
-
-const _PLACEMENT_LABEL: Record<PlacementInterface, string> = {
-  [PlacementInterface.HOME]: '大首頁-Feed',
-  [PlacementInterface.DELIVERY]: '外賣頻道-Feed',
-  [PlacementInterface.SUPERMARKET]: '超市頻道-Feed',
-  [PlacementInterface.GROUP_BUY]: '團購頻道-Feed',
-}
-
-const _TIME_SLOT_LABEL: Record<string, string> = {
-  allDay: '全天',
-  breakfast: '早餐(06:00-09:00)',
-  lunch: '午餐(11:00-14:00)',
-  afternoon: '下午茶(14:00-17:00)',
-  dinner: '晚餐(17:00-20:00)',
-  nightSnack: '夜宵(20:00-02:00)',
 }
 
 /** 後端算法 VO → 前端列表記錄 */
@@ -131,6 +60,7 @@ const toAlgorithmRecord = (vo: AdAlgorithm): AlgorithmRecord => ({
 
 export default function Algorithm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // 从 URL 参数恢复列表状态（从新增页返回时）
@@ -144,6 +74,39 @@ export default function Algorithm() {
   // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
   const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery)
   const groupBuyCardOrder = useCardOrder('algorithm-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy)
+
+  /** 算法类型标签映射（依赖 t，定义在组件内以便响应语言切换） */
+  const TYPE_LABEL: Record<AlgorithmType, string> = {
+    [AlgorithmType.INVINCIBLE_STAR]: t('algorithm.typeInvincibleStar'),
+    [AlgorithmType.NEW_STORE_AD]: t('algorithm.typeNewStore'),
+    [AlgorithmType.HOT_REVIVE_AD]: t('algorithm.typeHotRevive'),
+    [AlgorithmType.EXCLUSIVE_MERCHANT]: t('algorithm.typeExclusiveMerchant'),
+    [AlgorithmType.POPULAR_MERCHANT_KA]: t('algorithm.typePopularMerchant'),
+    [AlgorithmType.TRAFFIC_AD]: t('algorithm.typeTraffic'),
+    [AlgorithmType.GUESS_YOU_LIKE]: t('algorithm.typeGuessYouLike'),
+    [AlgorithmType.ORGANIC_TRAFFIC]: t('algorithm.typeOrganicTraffic'),
+    [AlgorithmType.SEARCH_ALGORITHM]: t('algorithm.typeSearchAlgorithm'),
+    [AlgorithmType.BRAND_MERCHANT]: t('algorithm.typeBrandMerchant'),
+    [AlgorithmType.GOLD_AD]: t('algorithm.typeGoldAd'),
+    [AlgorithmType.GOLDEN_SIGNBOARD]: t('algorithm.typeGoldenSignboard'),
+    [AlgorithmType.PRODUCT_PROMO]: t('algorithm.typeProductPromo'),
+  }
+  /** 广告类型卡片配置（依赖 t，定义在组件内以便响应语言切换） */
+  const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
+    { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: t('algorithm.descInvincibleStar') },
+    { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: t('algorithm.descHotRevive') },
+    { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: t('algorithm.descNewStore') },
+    { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: t('algorithm.descPopularMerchant') },
+    { type: AlgorithmType.BRAND_MERCHANT, icon: '💎', description: t('algorithm.descBrandMerchant') },
+    { type: AlgorithmType.GOLD_AD, icon: '💰', description: t('algorithm.descGoldAd') },
+    { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: t('algorithm.descExclusiveMerchant') },
+    { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
+    { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: t('algorithm.descGuessYouLike') },
+    { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
+    { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: t('algorithm.descSearchAlgorithm') },
+    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
+    { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: t('algorithm.descProductPromo') },
+  ]
 
   /** 根据业务类型过滤数据 */
   const filterByBusinessType = (data: AlgorithmRecord[]) => {
@@ -172,15 +135,6 @@ export default function Algorithm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 统计每种广告类型的算法数量
-  const _typeCountMap = useMemo(() => {
-    const map: Record<number, number> = {}
-    dataList.forEach(item => {
-      map[item.type] = (map[item.type] || 0) + 1
-    })
-    return map
-  }, [dataList])
-
   // 点击卡片 → 进入列表（同步 type/tab 到 URL，使小蜜蜂 PRD 切换到列表界面）
   const handleSelectType = (type: AlgorithmType, tab: 'delivery' | 'groupBuy') => {
     setSelectedType(type)
@@ -201,22 +155,22 @@ export default function Algorithm() {
   // 启用/停用算法
   const handleToggleStatus = (record: AlgorithmRecord) => {
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
-    const actionText = newStatus === ServiceStatus.ENABLED ? '啟用' : '停用'
+    const actionText = newStatus === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')
     Modal.confirm({
-      title: `確認${actionText}`,
-      content: `確定要${actionText}算法「${record.name}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('algorithm.confirmToggleTitle', { action: actionText }),
+      content: t('algorithm.confirmToggleContent', { action: actionText, name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await updateAdAlgorithmStatus(record.id, newStatus)
         } catch (err) {
-          message.error((err as Error).message || `${actionText}失敗`)
+          message.error((err as Error).message || t('algorithm.toggleFailed', { action: actionText }))
           return
         }
         setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
         setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
-        message.success(`已${actionText}「${record.name}」`)
+        message.success(t('algorithm.toggleSuccess', { action: actionText, name: record.name }))
       },
     })
   }
@@ -224,21 +178,21 @@ export default function Algorithm() {
   // 删除算法
   const handleDelete = (record: AlgorithmRecord) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: `確定要刪除算法「${record.name}」嗎？`,
-      okText: '確定',
-      cancelText: '取消',
+      title: t('common.confirmDelete'),
+      content: t('algorithm.confirmDeleteContent', { name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await deleteAdAlgorithm(record.id)
         } catch (err) {
-          message.error((err as Error).message || '刪除失敗')
+          message.error((err as Error).message || t('algorithm.deleteFailed'))
           return
         }
         setDataList(prev => prev.filter(item => item.id !== record.id))
         setFilteredData(prev => prev.filter(item => item.id !== record.id))
-        message.success('刪除成功')
+        message.success(t('common.deleteSuccess'))
       },
     })
   }
@@ -258,43 +212,43 @@ export default function Algorithm() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'code', title: '算法ID' },
-    { key: 'name', title: '算法名稱' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'status', title: '狀態' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'code', title: t('algorithm.colAlgorithmId') },
+    { key: 'name', title: t('algorithm.colAlgorithmName') },
+    { key: 'brand', title: t('common.colBrand') },
+    { key: 'status', title: t('common.colStatus') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('algorithm', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
   const columns: ColumnsType<AlgorithmRecord> = [
-    { title: '算法ID', dataIndex: 'code', key: 'code', width: 120, render: (v) => <Tag color="blue">{v}</Tag> },
-    { title: '算法名稱', dataIndex: 'name', key: 'name', width: 200 },
+    { title: t('algorithm.colAlgorithmId'), dataIndex: 'code', key: 'code', width: 120, render: (v) => <Tag color="blue">{v}</Tag> },
+    { title: t('algorithm.colAlgorithmName'), dataIndex: 'name', key: 'name', width: 200 },
     {
-      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      title: t('common.colBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: AppType) => v ? <BrandTag value={v} /> : '-',
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
+      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
       render: (v: ServiceStatus) => (
         <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
-          {v === ServiceStatus.ENABLED ? '啟用' : '停用'}
+          {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
         </Tag>
       ),
     },
     {
-      title: '操作', key: 'action', width: 280,
+      title: t('common.colAction'), key: 'action', width: 280,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>詳情</Button>
-          <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED} style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
-            {record.status === ServiceStatus.ENABLED ? '停用' : '啟用'}
+            {record.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
-            刪除
+            {t('common.delete')}
           </Button>
         </Space>
       ),
@@ -318,9 +272,9 @@ export default function Algorithm() {
         <p className="algo-card-desc">{card.description}</p>
         <div className="algo-card-tag">
           {enabled ? (
-            <Tag color="blue">查看/調整算法</Tag>
+            <Tag color="blue">{t('algorithm.viewAdjustAlgorithm')}</Tag>
           ) : (
-            <Tag color="default">敬請期待</Tag>
+            <Tag color="default">{t('algorithm.comingSoon')}</Tag>
           )}
         </div>
       </div>
@@ -347,10 +301,10 @@ export default function Algorithm() {
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
               <AppstoreOutlined style={{ marginRight: 8 }} />
-              算法庫
+              {t('algorithm.algorithmLibrary')}
             </h2>
             <p style={{ margin: '6px 0 0', color: '#8c8c8c', fontSize: 12 }}>
-              管理各廣告類型的算法策略配置，選擇類型查看詳情
+              {t('algorithm.algorithmLibraryDesc')}
             </p>
           </div>
           <Button type="primary" icon={<ApartmentOutlined />}
@@ -360,7 +314,7 @@ export default function Algorithm() {
               borderRadius: 8, height: 36, padding: '0 18px',
               boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             }}
-          >業務流程</Button>
+          >{t('algorithm.businessFlow')}</Button>
         </div>
       </div>
 
@@ -370,7 +324,7 @@ export default function Algorithm() {
             items={[
               {
                 key: 'delivery',
-                label: '外賣到家',
+                label: t('algorithm.bizDelivery'),
                 children: (
                   <div style={{
                     display: 'grid',
@@ -389,7 +343,7 @@ export default function Algorithm() {
               },
               {
                 key: 'groupBuy',
-                label: '團購到店',
+                label: t('algorithm.bizGroupBuy'),
                 children: (
                   <div style={{
                     display: 'grid',
@@ -437,10 +391,10 @@ export default function Algorithm() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>算法列表</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('algorithm.algorithmList')}</h2>
               {selectedType != null && (
                 <span style={{ fontSize: 14, color: '#595959' }}>
                   {selectedTypeCard?.icon} {TYPE_LABEL[selectedType]}
@@ -454,7 +408,7 @@ export default function Algorithm() {
       {/* 功能区域 */}
       <div className="action-section">
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleGoToAdd}>新增算法</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleGoToAdd}>{t('algorithm.addAlgorithm')}</Button>
         </Space>
         {configComponent}
       </div>
@@ -467,7 +421,7 @@ export default function Algorithm() {
           dataSource={filteredData}
           pagination={{
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common.total', { count: total }),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
             showQuickJumper: true,

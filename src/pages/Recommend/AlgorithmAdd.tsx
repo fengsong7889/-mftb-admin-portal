@@ -1,28 +1,29 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, HolderOutlined, EyeOutlined, PictureOutlined } from '@ant-design/icons'
-import { AlgorithmType, APP_OPTIONS } from './constants'
+import { AlgorithmType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS } from './constants'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
 import './WeightSlider.css'
 
-/** 广告类型标签映射 */
-const TYPE_LABEL: Record<number, string> = {
-  [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
-  [AlgorithmType.NEW_STORE_AD]: '新店廣告',
-  [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
-  [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
-  [AlgorithmType.TRAFFIC_AD]: '流量廣告',
-  [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
-  [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
-  [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
-  [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
-  [AlgorithmType.GOLD_AD]: '點金廣告',
-  [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
-  [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
+/** 广告类型标签映射 - 使用 i18n key */
+const TYPE_LABEL_KEY: Record<number, string> = {
+  [AlgorithmType.INVINCIBLE_STAR]: 'recommend.algoInvincibleStar',
+  [AlgorithmType.NEW_STORE_AD]: 'recommend.algoNewStoreAd',
+  [AlgorithmType.HOT_REVIVE_AD]: 'recommend.algoHotReviveAd',
+  [AlgorithmType.EXCLUSIVE_MERCHANT]: 'recommend.algoExclusiveMerchant',
+  [AlgorithmType.TRAFFIC_AD]: 'recommend.algoTrafficAd',
+  [AlgorithmType.GUESS_YOU_LIKE]: 'recommend.algoGuessYouLike',
+  [AlgorithmType.ORGANIC_TRAFFIC]: 'recommend.algoOrganicTraffic',
+  [AlgorithmType.SEARCH_ALGORITHM]: 'recommend.algoSearchAlgorithm',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: 'recommend.algoPopularMerchant',
+  [AlgorithmType.BRAND_MERCHANT]: 'recommend.algoBrandMerchant',
+  [AlgorithmType.GOLD_AD]: 'recommend.algoGoldAd',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: 'recommend.algoGoldenSignboard',
+  [AlgorithmType.PRODUCT_PROMO]: 'recommend.algoProductPromo',
 }
 
 const TYPE_ICON: Record<number, string> = {
@@ -43,16 +44,18 @@ const TYPE_ICON: Record<number, string> = {
 
 /** 店鋪等級配置（獨家商家保障單量 / 品牌商家保障流量共用）：等級 / 標籤 / 標籤色 / 默認值 */
 const STORE_LEVEL_BLOCK_OPTIONS = [
-  { level: 'KA', label: '大KA', color: '#F5222D', defaultOrders: 30 },
-  { level: 'RECHARGE', label: '充值大戶', color: '#FAAD14', defaultOrders: 25 },
-  { level: 'A', label: 'A級', color: '#E8720C', defaultOrders: 20 },
-  { level: 'B', label: 'B級', color: '#1890FF', defaultOrders: 15 },
-  { level: 'C', label: 'C級', color: '#52C41A', defaultOrders: 10 },
-  { level: 'D', label: 'D級', color: '#722ED1', defaultOrders: 8 },
-  { level: 'E', label: 'E級', color: '#13C2C2', defaultOrders: 5 },
+  { level: 'KA', labelKey: 'recommend.storeLevelKa', color: '#F5222D', defaultOrders: 30 },
+  { level: 'RECHARGE', labelKey: 'recommend.storeLevelRecharge', color: '#FAAD14', defaultOrders: 25 },
+  { level: 'A', labelKey: 'recommend.storeLevelA', color: '#E8720C', defaultOrders: 20 },
+  { level: 'B', labelKey: 'recommend.storeLevelB', color: '#1890FF', defaultOrders: 15 },
+  { level: 'C', labelKey: 'recommend.storeLevelC', color: '#52C41A', defaultOrders: 10 },
+  { level: 'D', labelKey: 'recommend.storeLevelD', color: '#722ED1', defaultOrders: 8 },
+  { level: 'E', labelKey: 'recommend.storeLevelE', color: '#13C2C2', defaultOrders: 5 },
 ]
 
 export default function AlgorithmAdd() {
+  const { t } = useTranslation()
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const algorithmTypeParam = searchParams.get('type') || ''
@@ -71,10 +74,10 @@ export default function AlgorithmAdd() {
     weight: number | undefined
   }
   const DIMENSION_OPTIONS = [
-    { value: 'qualityScore', label: '商家質量分', desc: '滿分5分，歸一化至0-1' },
-    { value: 'orderCompletion', label: '訂單完成率', desc: '近30天訂單完成比例，歸一化至0-1' },
-    { value: 'newMerchant', label: '新商家扶持', desc: '首投7天內漸變：第1天=1，第7天=0.14，第8天=0' },
-    { value: 'distance', label: '距離維度', desc: '距離衰減：e^(-0.1×距離km)，越近分越高' },
+    { value: 'qualityScore', labelKey: 'recommend.dimQualityScore', descKey: 'recommend.dimQualityScoreDesc' },
+    { value: 'orderCompletion', labelKey: 'recommend.dimOrderCompletion', descKey: 'recommend.dimOrderCompletionDesc' },
+    { value: 'newMerchant', labelKey: 'recommend.dimNewMerchant', descKey: 'recommend.dimNewMerchantDesc' },
+    { value: 'distance', labelKey: 'recommend.dimDistance', descKey: 'recommend.dimDistanceDesc' },
   ]
   const [dimensionItems, setDimensionItems] = useState<DimensionItem[]>([])
   const [selectedDimension, setSelectedDimension] = useState<string | undefined>(undefined)
@@ -95,12 +98,12 @@ export default function AlgorithmAdd() {
 
   /** 人氣商家 - 展示佈局類型 */
   type PopularLayoutType = 'small' | 'grid' | 'carousel'
-  const POPULAR_LAYOUT_OPTIONS: { value: PopularLayoutType; label: string; icon: string; color: string; desc: string }[] = [
-    { value: 'small', label: '小圖模式', icon: '📱', color: '#1890FF', desc: '緊湊卡片，適合快速瀏覽' },
-    { value: 'grid', label: '大圖拼列（1大2小）', icon: '🖼️', color: '#52C41A', desc: '左側大圖 + 右側2張小圖' },
-    { value: 'carousel', label: '階梯輪播', icon: '🎠', color: '#722ED1', desc: '餐品卡片階梯堆疊輪播' },
+  const POPULAR_LAYOUT_OPTIONS: { value: PopularLayoutType; labelKey: string; icon: string; color: string; descKey: string }[] = [
+    { value: 'small', labelKey: 'recommend.layoutSmall', icon: '📱', color: '#1890FF', descKey: 'recommend.layoutSmall' },
+    { value: 'grid', labelKey: 'recommend.layoutGrid', icon: '🖼️', color: '#52C41A', descKey: 'recommend.layoutGridDesc' },
+    { value: 'carousel', labelKey: 'recommend.layoutCarousel', icon: '🎠', color: '#722ED1', descKey: 'recommend.layoutCarouselDesc' },
   ]
-  const POPULAR_LAYOUT_LABEL: Record<PopularLayoutType, string> = { small: '小圖模式', grid: '大圖拼列', carousel: '階梯輪播' }
+  const POPULAR_LAYOUT_LABEL_KEY: Record<PopularLayoutType, string> = { small: 'recommend.layoutSmallLabel', grid: 'recommend.layoutGridLabel', carousel: 'recommend.layoutCarouselLabel' }
   const POPULAR_LAYOUT_COLOR: Record<PopularLayoutType, string> = { small: '#1890FF', grid: '#52C41A', carousel: '#722ED1' }
   /** 人氣商家 - 展示樣式配置 */
   type LayoutMode = 'manual' | 'auto'
@@ -153,9 +156,9 @@ export default function AlgorithmAdd() {
   const WAVE_INTERVAL_DAYS = 5
   /** 配送範圍選項 */
   const WAVE_RANGE_OPTIONS = [
-    { value: 'short', label: '短程' },
-    { value: 'medium', label: '中程' },
-    { value: 'long', label: '遠程' },
+    { value: 'short', labelKey: 'recommend.waveShort' },
+    { value: 'medium', labelKey: 'recommend.waveMedium' },
+    { value: 'long', labelKey: 'recommend.waveLong' },
   ]
 
   interface WaveNode {
@@ -260,15 +263,15 @@ export default function AlgorithmAdd() {
   const handleConfirmMerchants = () => {
     form.setFieldsValue({ merchants: selectedMerchants })
     setMerchantModalVisible(false)
-    message.success(`已選擇 ${selectedMerchants.length} 個商家`)
+    message.success(t('recommend.selectedMerchants', { count: selectedMerchants.length }))
   }
 
   // 商家选择表格列
   const merchantColumns = [
-    { title: '商家ID', dataIndex: 'id', key: 'id', width: 100 },
-    { title: '商家名稱', dataIndex: 'name', key: 'name', width: 200 },
-    { title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 120 },
-    { title: '業務類型', dataIndex: 'businessType', key: 'businessType', width: 120 },
+    { title: t('recommend.merchantIdCol'), dataIndex: 'id', key: 'id', width: 100 },
+    { title: t('recommend.merchantNameCol'), dataIndex: 'name', key: 'name', width: 200 },
+    { title: t('common:brand'), dataIndex: 'brand', key: 'brand', width: 120 },
+    { title: t('common:colTradeType'), dataIndex: 'businessType', key: 'businessType', width: 120 },
   ]
 
   // Mock商家数据
@@ -289,7 +292,7 @@ export default function AlgorithmAdd() {
       const values = await form.validateFields()
       // 人气商家：校验
       if (Number(algorithmTypeParam) === AlgorithmType.POPULAR_MERCHANT_KA && layoutMode === 'manual' && manualRules.some(r => r.position < 1)) {
-        message.error('商家位置至少為 1')
+        message.error(t('recommend.merchantPosMin'))
         return
       }
       const payload: AdAlgorithmRequest = {
@@ -323,13 +326,13 @@ export default function AlgorithmAdd() {
       } else {
         await createAdAlgorithm(payload)
       }
-      message.success(isEditMode ? '算法更新成功' : '算法新增成功')
+      message.success(isEditMode ? t('recommend.algoUpdateSuccess') : t('recommend.algoAddSuccess'))
       setIsEditing(false)
       navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)
     } catch (error) {
       // 表单校验失败不提示（antd 已标红），接口业务错误提示后端返回信息
       if (error instanceof Error) {
-        message.error(error.message || '保存失败')
+        message.error(error.message || t('recommend.saveFailed'))
       }
     }
   }
@@ -358,15 +361,15 @@ export default function AlgorithmAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {isDetailMode ? '算法詳情' : isEditMode ? '編輯算法' : '新增算法'}
+                {isDetailMode ? t('recommend.algoDetail') : isEditMode ? t('recommend.editAlgo') : t('recommend.addAlgo')}
               </h2>
               {selectedAlgorithmType && (
                 <span style={{ fontSize: 14, color: '#595959' }}>
-                  {TYPE_ICON[selectedAlgorithmType]} {TYPE_LABEL[selectedAlgorithmType]}
+                  {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}
                 </span>
               )}
             </div>
@@ -392,28 +395,28 @@ export default function AlgorithmAdd() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>算法選擇</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.algoSelect')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
           <Form.Item
-            label="算法名稱"
+            label={t('recommend.algoName')}
             name="name"
-            rules={[{ required: true, message: '請輸入算法名稱' }]}
+            rules={[{ required: true, message: t('recommend.algoNamePh') }]}
             style={{ marginBottom: 0 }}
           >
-            <Input placeholder="請輸入算法名稱" />
+            <Input placeholder={t('recommend.algoNamePh')} />
           </Form.Item>
 
           <Form.Item
-            label="所屬品牌"
+            label={t('common:brand')}
             name="brand"
-            rules={[{ required: true, message: '請選擇所屬品牌' }]}
+            rules={[{ required: true, message: t('common:selectBrand') }]}
             style={{ marginBottom: 0 }}
           >
             <Select
-              placeholder="請選擇所屬品牌"
-              options={APP_OPTIONS}
+              placeholder={t('common:selectBrand')}
+              options={tAppOptions}
               disabled={isEditMode || isDetailMode}
             />
           </Form.Item>
@@ -430,10 +433,10 @@ export default function AlgorithmAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>算法參數</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>參數配置</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.algoParams')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('recommend.paramConfigTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>配置算法運行參數</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.configAlgoParams')}</span>
           </div>
 
 
@@ -442,13 +445,13 @@ export default function AlgorithmAdd() {
             <>
             {/* 數據一致性校驗定時器 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>定時器:</span>
+              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend.timerLabel')}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>每</span>
-                <Form.Item name="consistencyCheckInterval" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
-                  <InputNumber min={1} max={1440} placeholder="分鐘" style={{ width: 70 }} />
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.everyPrefix')}</span>
+                <Form.Item name="consistencyCheckInterval" noStyle initialValue={5} rules={[{ required: true, message: t('common:required') }]}>
+                  <InputNumber min={1} max={1440} placeholder={t('recommend.unitMinute')} style={{ width: 70 }} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘校驗數據一致性</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.verifyDataConsistency')}</span>
               </div>
             </div>
             {/* 商家展示樣式配置 */}
@@ -460,11 +463,11 @@ export default function AlgorithmAdd() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>商家展示樣式</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend.merchantDisplayStyle')}</span>
                     <PopularLayoutPreviewModal />
                   </div>
                   <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '18px' }}>
-                    未指定的位置默認為小圖模式。可選擇手動指定或系統自動計算分配方式。
+                    {t('recommend:merchantDisplayStyleHint')}
                   </div>
                 </div>
               </div>
@@ -472,8 +475,8 @@ export default function AlgorithmAdd() {
               {/* 模式切換 */}
               <div style={{ display: 'flex', gap: 0, marginBottom: 14 }}>
                 {([
-                  { value: 'manual' as LayoutMode, label: '指定風格', desc: '指定第幾個商家用什么樣式' },
-                  { value: 'auto' as LayoutMode, label: '系統計算', desc: '設定間隔，系統自動分配' },
+                  { value: 'manual' as LayoutMode, labelKey: 'recommend:manualMode', descKey: 'recommend:manualModeDesc' },
+                  { value: 'auto' as LayoutMode, labelKey: 'recommend:autoMode', descKey: 'recommend:autoModeDesc' },
                 ]).map(m => (
                   <div key={m.value}
                     onClick={() => !isDetailMode && setLayoutMode(m.value)}
@@ -483,8 +486,8 @@ export default function AlgorithmAdd() {
                       background: layoutMode === m.value ? '#f6ffed' : '#fafafa',
                       transition: 'all 0.2s',
                     }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: layoutMode === m.value ? '#52C41A' : '#595959' }}>{m.label}</div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>{m.desc}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: layoutMode === m.value ? '#52C41A' : '#595959' }}>{t(m.labelKey)}</div>
+                    <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>{t(m.descKey)}</div>
                   </div>
                 ))}
               </div>
@@ -493,17 +496,17 @@ export default function AlgorithmAdd() {
               {layoutMode === 'manual' && (
                 <div style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#595959' }}>指定規則（未指定的位置默認小圖）</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#595959' }}>{t('recommend:manualRuleHint')}</span>
                     {!isDetailMode && (
                       <Button type="dashed" size="small" icon={<PlusOutlined style={{ fontSize: 11 }} />}
                         onClick={() => setManualRules(prev => [...prev, { id: ruleIdSeed++, position: 1, layout: 'grid' }])}
                         style={{ fontSize: 12, borderRadius: 4 }}
-                      >添加規則</Button>
+                      >{t('recommend:addRule')}</Button>
                     )}
                   </div>
                   {manualRules.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '16px 0', color: '#bfbfbf', fontSize: 13 }}>
-                      尚未設定規則，所有商家默認展示小圖模式
+                      {t('recommend:noRulesSet')}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -512,14 +515,14 @@ export default function AlgorithmAdd() {
                           display: 'flex', alignItems: 'center', gap: 8,
                           background: '#fff', borderRadius: 6, padding: '8px 12px', border: '1px solid #f0f0f0',
                         }}>
-                          <span style={{ fontSize: 13, color: '#595959' }}>第</span>
+                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:nthMerchant')}</span>
                           <InputNumber min={1} max={999} value={rule.position} disabled={isDetailMode}
                             onChange={v => v && setManualRules(prev => prev.map(r => r.id === rule.id ? { ...r, position: v } : r))}
                             style={{ width: 60 }} size="small" />
-                          <span style={{ fontSize: 13, color: '#595959' }}>個商家展示</span>
+                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:merchantDisplay')}</span>
                           <Select value={rule.layout} disabled={isDetailMode} style={{ width: 170 }} size="small"
                             onChange={v => setManualRules(prev => prev.map(r => r.id === rule.id ? { ...r, layout: v } : r))}
-                            options={POPULAR_LAYOUT_OPTIONS.filter(o => o.value !== 'small').map(o => ({ label: `${o.icon} ${o.label}`, value: o.value }))}
+                            options={POPULAR_LAYOUT_OPTIONS.filter(o => o.value !== 'small').map(o => ({ label: `${o.icon} ${t(o.labelKey)}`, value: o.value }))}
                           />
                           {!isDetailMode && (
                             <Button type="text" size="small" danger
@@ -538,7 +541,7 @@ export default function AlgorithmAdd() {
               {layoutMode === 'auto' && (
                 <div style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#595959', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>配置循環鏈：樣式按順序出現，間隔小圖填充，最後一個回到第一個形成閉環</span>
+                    <span>{t('recommend:cycleChainHint')}</span>
                     {!isDetailMode && (
                       <Button type="dashed" size="small" icon={<PlusOutlined style={{ fontSize: 11 }} />}
                         onClick={() => {
@@ -548,13 +551,13 @@ export default function AlgorithmAdd() {
                         }}
                         disabled={autoLayouts.length >= bigLayoutOptions.length}
                         style={{ fontSize: 12, borderRadius: 4 }}
-                      >添加樣式</Button>
+                      >{t('recommend:addStyle')}</Button>
                     )}
                   </div>
 
                   {autoLayouts.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '16px 0', color: '#bfbfbf', fontSize: 13 }}>
-                      尚未添加樣式，所有商家默認展示小圖模式
+                      {t('recommend:noStylesAdded')}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -583,13 +586,13 @@ export default function AlgorithmAdd() {
                               {/* 樣式選擇 */}
                               <Select value={item.type} disabled={isDetailMode} style={{ width: 170 }} size="small"
                                 onChange={v => setAutoLayouts(prev => prev.map(a => a.id === item.id ? { ...a, type: v } : a))}
-                                options={bigLayoutOptions.map(o => ({ label: `${o.icon} ${o.label}`, value: o.value }))}
+                                options={bigLayoutOptions.map(o => ({ label: `${o.icon} ${t(o.labelKey)}`, value: o.value }))}
                               />
-                              <span style={{ fontSize: 13, color: '#595959' }}>出現後，間隔</span>
+                              <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:afterAppear')}</span>
                               <InputNumber min={1} max={999} value={item.interval} disabled={isDetailMode}
                                 onChange={v => v && setAutoLayouts(prev => prev.map(a => a.id === item.id ? { ...a, interval: v } : a))}
                                 style={{ width: 60 }} size="small" />
-                              <span style={{ fontSize: 13, color: '#595959' }}>個商家再展示下一個</span>
+                              <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:merchantsBeforeNext')}</span>
                               {!isDetailMode && (
                                 <Button type="text" size="small" danger
                                   onClick={() => setAutoLayouts(prev => prev.filter(a => a.id !== item.id))}
@@ -608,7 +611,7 @@ export default function AlgorithmAdd() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 4, fontSize: 12, color: '#8c8c8c', fontStyle: 'italic' }}>
                             <span style={{ fontSize: 14 }}>↻</span>
-                            循環閉環：第 {autoLayouts.length + 1} 個樣式重新從第 1 個開始（循環週期 {autoLayouts.reduce((s, a) => s + a.interval, 0)} 個商家）
+                            {t('recommend:cycleLoopHint', { count: autoLayouts.length + 1, total: autoLayouts.reduce((s, a) => s + a.interval, 0) })}
                           </div>
                         </>
                       )}
@@ -625,37 +628,37 @@ export default function AlgorithmAdd() {
             <>
           {/* 商家状态计算 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>商家狀態計算:</span>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:merchantStatusCalc')}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <Form.Item name="statusOpen" noStyle valuePropName="checked" initialValue={true}>
-                <Checkbox disabled>營業中</Checkbox>
+                <Checkbox disabled>{t('recommend:statusOpen')}</Checkbox>
               </Form.Item>
               <Form.Item name="statusRest" noStyle valuePropName="checked">
-                <Checkbox>休息一會，馬上回來<span style={{ fontSize: 12, color: '#8c8c8c' }}>（2小時後自動恢復）</span></Checkbox>
+                <Checkbox>{t('recommend:statusRest')}<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:statusRestHint')}</span></Checkbox>
               </Form.Item>
               <Form.Item name="statusOverwhelmed" noStyle valuePropName="checked">
-                <Checkbox>爆單了，暫停接單一會<span style={{ fontSize: 12, color: '#8c8c8c' }}>（2小時後自動恢復）</span></Checkbox>
+                <Checkbox>{t('recommend:statusOverwhelmed')}<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:statusOverwhelmedHint')}</span></Checkbox>
               </Form.Item>
               <Form.Item name="statusClosed" noStyle valuePropName="checked">
-                <Checkbox>休息打烊<span style={{ fontSize: 12, color: '#ff4d4f' }}>（需手動恢復，開啟已打烊會影響用戶體驗，請慎重）</span></Checkbox>
+                <Checkbox>{t('recommend:statusClosed')}<span style={{ fontSize: 12, color: '#ff4d4f' }}>{t('recommend:statusClosedHint')}</span></Checkbox>
               </Form.Item>
             </div>
           </div>
 
           {/* 定时器 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>定時器:</span>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:timerLabel')}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>每</span>
-              <Form.Item name="consistencyCheckInterval" noStyle rules={[{ required: true, message: '請輸入' }]}>
+              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:everyPrefix')}</span>
+              <Form.Item name="consistencyCheckInterval" noStyle rules={[{ required: true, message: t('recommend:inputRequired') }]}>
                 <InputNumber
                   min={1}
                   max={1440}
-                  placeholder="分鐘"
+                  placeholder={t('recommend:minutePlaceholder')}
                   style={{ width: 70 }}
                 />
               </Form.Item>
-              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>分鐘校驗數據一致性</span>
+              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:consistencyCheckSuffix')}</span>
             </div>
           </div>
             </>
@@ -664,43 +667,43 @@ export default function AlgorithmAdd() {
           {/* ===== 猜你喜歡：用戶興趣得分規則 ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
             <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>用戶興趣得分規則</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>{t('recommend:userInterestScoreRules')}</div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
-                收藏店鋪和下單店鋪的得分由用戶端記錄並賦予，此處僅配置得分有效期，獲取最近多少天的數據分數
+                {t('recommend:userInterestScoreHint')}
               </div>
           
               {/* 收藏店鋪得分 + 下單店鋪得分（並排只讀展示） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>收藏店鋪得分:</span>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:favoriteStoreScore')}</span>
                   <span style={{ fontSize: 15, fontWeight: 700, color: '#1890FF' }}>
                     <Form.Item name="favoriteScore" noStyle initialValue={5}>
                       <InputNumber min={1} max={100} precision={0} style={{ width: 40, border: 'none', background: 'transparent', padding: 0, fontWeight: 700, color: '#1890FF', fontSize: 15 }} className="no-spinner-input" disabled />
                     </Form.Item>
                   </span>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>分</span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>{t('recommend:scoreUnit')}</span>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>下單店鋪得分:</span>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:orderStoreScore')}</span>
                   <span style={{ fontSize: 15, fontWeight: 700, color: '#52C41A' }}>
                     <Form.Item name="orderScore" noStyle initialValue={10}>
                       <InputNumber min={1} max={100} precision={0} style={{ width: 40, border: 'none', background: 'transparent', padding: 0, fontWeight: 700, color: '#52C41A', fontSize: 15 }} className="no-spinner-input" disabled />
                     </Form.Item>
                   </span>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>分</span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>{t('recommend:scoreUnit')}</span>
                 </div>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（數據來源，業務側配置）</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:dataSourceBizConfig')}</span>
               </div>
           
               {/* 得分有效期 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>得分有效期:</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>僅計算近</span>
-                <Form.Item name="scoreValidDays" noStyle initialValue={30} rules={[{ required: true, message: '請輸入' }]}>
-                  <InputNumber min={1} max={365} precision={0} style={{ width: 80 }} addonAfter="天" disabled={isDetailMode} />
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:scoreValidDaysLabel')}</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:calcRecentPrefix')}</span>
+                <Form.Item name="scoreValidDays" noStyle initialValue={30} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
+                  <InputNumber min={1} max={365} precision={0} style={{ width: 80 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>內的收藏 / 下單行為數據</span>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>（滾動窗口，超期行為分數自動失效，保證推薦反映用戶近期偏好）</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:scoreValidSuffix')}</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:scoreValidHint')}</span>
               </div>
             </div>
           )}
@@ -708,20 +711,20 @@ export default function AlgorithmAdd() {
           {/* ===== 猜你喜歡：推送規則 ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
             <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 4 }}>推送規則</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 4 }}>{t('recommend:pushRules')}</div>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
-                興趣得分達到推送閾值的店鋪，才會進入該用戶瀑布流「猜你喜歡」坑位的曝光候選集
+                {t('recommend:pushRulesHint')}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>推送閾值:</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>當店鋪興趣得分 ≥</span>
-                <Form.Item name="pushThreshold" noStyle initialValue={5} rules={[{ required: true, message: '請輸入' }]}>
-                  <InputNumber min={1} max={9999} precision={0} style={{ width: 100 }} addonAfter="分" disabled={isDetailMode} />
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:pushThresholdLabel')}</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:whenScoreGe')}</span>
+                <Form.Item name="pushThreshold" noStyle initialValue={5} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
+                  <InputNumber min={1} max={9999} precision={0} style={{ width: 100 }} addonAfter={t('recommend:scoreUnit')} disabled={isDetailMode} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>時，推送至瀑布流「猜你喜歡」區域展示</span>
+                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:pushToWaterfall')}</span>
               </div>
               <div style={{ marginTop: 10, fontSize: 12, color: '#8c8c8c', paddingLeft: 108 }}>
-                低於閾值的店鋪不進入曝光候選集；得分因超出有效期回落至閾值以下時，系統自動將其移出候選集。
+                {t('recommend:belowThresholdHint')}
               </div>
             </div>
           )}
@@ -744,23 +747,23 @@ export default function AlgorithmAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 <SettingOutlined />
-                算法策略
+                {t('recommend:algoStrategy')}
               </div>
 
               <div style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                   <Form.Item
                     name="merchantExposureStrategy"
                     style={{ flex: 1, marginBottom: 0 }}
                     wrapperCol={{ span: 24 }}
                   >
                     <Select
-                      placeholder="請選擇"
+                      placeholder={t('recommend:selectPlaceholder')}
                       style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                       options={[
-                        { label: '輪詢計算', value: 'random' },
-                        { label: '加權隨機（輪盤賭）', value: 'weightedRandom' },
+                        { label: t('recommend:roundRobinCalc'), value: 'random' },
+                        { label: t('recommend:weightedRandomCalc'), value: 'weightedRandom' },
                       ]}
                       disabled={isDetailMode}
                     />
@@ -771,7 +774,7 @@ export default function AlgorithmAdd() {
                 {merchantExposureStrategy === 'random' && (
                   <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                     <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                      系統自動統計該用戶興趣得分達到推送閾值的店鋪，生成店鋪 ID 列表並按順序排列，然後逐個輪播展示，確保每個達標店鋪獲得均勻的曝光機會。過程中如有新達標店鋪，系統會自動納入候選集並加入排序展示；如店鋪得分回落至閾值以下，系統會自動剔除，後續店鋪依次往前頂補位。
+                      {t('recommend:roundRobinStrategyDesc')}
                     </span>
                   </div>
                 )}
@@ -780,25 +783,25 @@ export default function AlgorithmAdd() {
                 {merchantExposureStrategy === 'weightedRandom' && (
                   <div style={{ marginTop: 16, padding: '12px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6 }}>
                     <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
-                      每次用戶請求到達時，在達標店鋪中按興趣得分加權隨機抽取一個店鋪展示：分數越高，被抽中概率越大，但低分達標店鋪也有曝光機會，兼顧精準度與多樣性。
+                      {t('recommend:weightedRandomDesc')}
                     </div>
                     <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>分配公式：</span>
+                      <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>{t('recommend:allocationFormula')}</span>
                       <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(店鋪i) = score_i / Σ(達標店鋪得分)</span>
                       <Popover
                         trigger="click"
                         placement="right"
-                        title={<span style={{ fontWeight: 600, color: '#d46b08' }}>📊 分配示例</span>}
+                        title={<span style={{ fontWeight: 600, color: '#d46b08' }}>{t('recommend:allocationExampleTitle')}</span>}
                         content={
                           <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px' }}>
                             <div style={{ color: '#595959', marginBottom: 6 }}>
-                              假設 3 個達標店鋪得分：A=60, B=30, C=20，總分=110
+                              {t('recommend:allocationExampleDesc')}
                             </div>
                             <div style={{ color: '#595959' }}>
-                              A 曝光概率 54.5%、B 27.3%、C 18.2%
+                              {t('recommend:allocationExampleResult')}
                             </div>
                             <div style={{ marginTop: 8, padding: '6px 8px', background: '#fff7e6', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
-                              💡 請求 1000 次時，A 約 545 次、B 約 273 次、C 約 182 次
+                              {t('recommend:allocationExampleHint')}
                             </div>
                           </div>
                         }
@@ -818,16 +821,16 @@ export default function AlgorithmAdd() {
               {/* 策略类型模块区域 */}
               <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fafafa', padding: '16px 20px' }}>
                 <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600, color: '#262626', paddingBottom: 12, borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                  <span>策略類型：波浪計算</span>
-                  <span style={{ fontSize: 12, fontWeight: 400, color: '#d46b08' }}>⚠️ 新店週期結束後，商家將自動退出新店廣告計算範圍，不再參與新店曝光。</span>
+                  <span>{t('recommend:waveStrategyType')}</span>
+                  <span style={{ fontSize: 12, fontWeight: 400, color: '#d46b08' }}>{t('recommend:newStoreWaveWarning')}</span>
                 </div>
 
                 {/* 默認參數說明 + 清空操作（緊鄰說明文字，便於發現） */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, color: '#595959' }}>
-                    新店週期默認 <span style={{ fontWeight: 700, color: '#E8720C' }}>{NEW_STORE_CYCLE_DAYS}</span> 天，每 <span style={{ fontWeight: 700, color: '#E8720C' }}>{WAVE_INTERVAL_DAYS}</span> 天切換一次配送範圍，共 <span style={{ fontWeight: 700, color: '#262626' }}>{waveNodes.length}</span> 個節點（按剩餘天數由多到少）
+                    {t('recommend:newStoreCycleDesc', { days: NEW_STORE_CYCLE_DAYS, interval: WAVE_INTERVAL_DAYS, nodes: waveNodes.length })}
                   </span>
-                  <Button size="small" danger disabled={isDetailMode} onClick={handleClearWaveNodes}>清空全部</Button>
+                  <Button size="small" danger disabled={isDetailMode} onClick={handleClearWaveNodes}>{t('recommend:clearAll')}</Button>
                 </div>
 
                 {/* 波浪節點勾選矩陣：緊湊固定列寬 */}
@@ -838,9 +841,9 @@ export default function AlgorithmAdd() {
                     background: '#f0f5ff', borderBottom: '1px solid #d6e4ff',
                     padding: '8px 16px', alignItems: 'center',
                   }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1890ff' }}>剩餘天數</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1890ff' }}>{t('recommend:remainingDays')}</span>
                     {WAVE_RANGE_OPTIONS.map(opt => (
-                      <span key={opt.value} style={{ fontSize: 13, fontWeight: 600, color: '#1890ff', textAlign: 'center' }}>{opt.label}</span>
+                      <span key={opt.value} style={{ fontSize: 13, fontWeight: 600, color: '#1890ff', textAlign: 'center' }}>{t(opt.labelKey)}</span>
                     ))}
                   </div>
                   <div style={{ maxHeight: 360, overflowY: 'auto' }}>
@@ -853,7 +856,7 @@ export default function AlgorithmAdd() {
                         background: node.ranges.length > 0 ? '#fffcf5' : (idx % 2 === 0 ? '#ffffff' : '#fafafa'),
                         transition: 'background 0.2s',
                       }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{node.day} 天</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{node.day} {t('recommend:dayUnit')}</span>
                         {WAVE_RANGE_OPTIONS.map(opt => (
                           <div key={opt.value} style={{ textAlign: 'center' }}>
                             <Checkbox
@@ -868,7 +871,7 @@ export default function AlgorithmAdd() {
                   </div>
                 </div>
                 <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-                  勾選各節點對應的配送範圍；點擊「清空全部」可一鍵清除所有勾選。
+                  {t('recommend:waveHint')}
                 </div>
               </div>
             </div>
@@ -877,13 +880,13 @@ export default function AlgorithmAdd() {
           {/* 配送範圍計算（僅盤活復蘇） - 4 個固定參數 */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>配送範圍計算:</span>
+              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:deliveryRangeCalc')}</span>
               <Checkbox.Group
                 options={[
-                  { label: '短程', value: 'short' },
-                  { label: '中程', value: 'medium' },
-                  { label: '遠程', value: 'long' },
-                  { label: '跨橋', value: 'cross_bridge' },
+                  { label: t('recommend:rangeShort'), value: 'short' },
+                  { label: t('recommend:rangeMedium'), value: 'medium' },
+                  { label: t('recommend:rangeLong'), value: 'long' },
+                  { label: t('recommend:crossBridge'), value: 'cross_bridge' },
                 ]}
                 value={reviveDeliveryRange}
                 disabled={isDetailMode}
@@ -911,27 +914,27 @@ export default function AlgorithmAdd() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
                       <SettingOutlined />
-                      算法策略
+                      {t('recommend:algoStrategy')}
                     </div>
 
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                       <Form.Item
                         name="merchantExposureStrategy"
                         style={{ flex: 1, marginBottom: 0 }}
                         wrapperCol={{ span: 24 }}
                       >
                         <Select
-                          placeholder="請選擇"
+                          placeholder={t('recommend:selectPlaceholder')}
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                           options={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? [
-                            { label: '隨機計算', value: 'random' },
+                            { label: t('recommend:randomCalc'), value: 'random' },
                           ] : selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? [
-                            { label: '輪詢計算', value: 'random' },
+                            { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ] : [
-                            { label: '維度計算', value: 'merchant' },
-                            { label: '輪詢計算', value: 'random' },
+                            { label: t('recommend:dimensionCalc'), value: 'merchant' },
+                            { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
                           disabled={isDetailMode || selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD}
                         />
@@ -944,8 +947,8 @@ export default function AlgorithmAdd() {
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                               {selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR
-                                ? '系統自動統計各區域內購買廣告的商家，生成商家ID列表進行隨機展示。過程中如有新增購買商家，系統會自動納入隨機候選集；如有取消推廣的商家，系統會自動剔除。'
-                                : '系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。'}
+                                ? t('recommend:randomStrategyDesc')
+                                : t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
                         </div>
@@ -956,12 +959,12 @@ export default function AlgorithmAdd() {
                         <div style={{ marginTop: 16, padding: '12px 16px', background: '#ffffff', border: '1px solid #e8eaed', borderRadius: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                             <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>
-                              <span style={{ color: '#1890ff', fontWeight: 600 }}>*</span> 選擇維度:
+                              <span style={{ color: '#1890ff', fontWeight: 600 }}>*</span> {t('recommend:dimensionLabel')}
                             </span>
                             {dimensionItems.length < DIMENSION_OPTIONS.length && (
                               <>
                                 <Select
-                                  placeholder="選擇維度"
+                                  placeholder={t('recommend:selectDimension')}
                                   style={{ width: 140, height: 28 }}
                                   size="small"
                                   value={selectedDimension}
@@ -981,9 +984,9 @@ export default function AlgorithmAdd() {
                                     }
                                   }}
                                 >
-                                  新增
+                                  {t('recommend:addDimension')}
                                 </Button>
-                                <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>（至少一項，多項可設置權重，權重高的優先曝光）</span>
+                                <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('recommend:dimensionHint')}</span>
                               </>
                             )}
                           </div>
@@ -994,10 +997,10 @@ export default function AlgorithmAdd() {
                                 <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', padding: '10px 12px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
                                   {/* 第一行：参数名 + 描述 + 删除 */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 13, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>{opt?.label}</span>
+                                    <span style={{ fontSize: 13, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>{opt ? t(opt.labelKey) : ''}</span>
                                     {item.type === 'orderCompletion' ? (
                                       <span style={{ fontSize: 13, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        近
+                                        {t('recommend:recentPrefix')}
                                         <InputNumber
                                           min={1}
                                           max={365}
@@ -1007,29 +1010,29 @@ export default function AlgorithmAdd() {
                                           size="small"
                                           disabled={isDetailMode}
                                         />
-                                        天訂單完成比例（貝葉斯平滑）
+                                        {t('recommend:orderCompletionRatio')}
                                         <Popover
                                           trigger="click"
                                           placement="right"
-                                          title={<span style={{ fontWeight: 600, color: '#52c41a' }}>📊 貝葉斯平滑說明</span>}
+                                          title={<span style={{ fontWeight: 600, color: '#52c41a' }}>{t('recommend:bayesianTitle')}</span>}
                                           content={
                                             <div style={{ maxWidth: 280, fontSize: 12, lineHeight: '20px' }}>
                                               <div style={{ marginBottom: 6 }}>
-                                                <strong>修正完成率</strong> = (完成單數 + α) / (總單數 + β)
+                                                <strong>{t('recommend:bayesianFormula')}</strong> = (完成單數 + α) / (總單數 + β)
                                               </div>
                                               <div style={{ color: '#595959' }}>
-                                                • <strong>α</strong>：固定值 5，預設已完成訂單數
+                                                {t('recommend:bayesianAlpha')}
                                                 <br />
-                                                • <strong>β</strong>：固定值 10，預設總訂單數
+                                                {t('recommend:bayesianBeta')}
                                                 <br />
-                                                • <strong>作用</strong>：單量越少，完成率越被拉向 50%，避免小樣本偏差
+                                                {t('recommend:bayesianEffect')}
                                                 <br />
-                                                • <strong>單量越大</strong>，修正率越接近真實完成率
+                                                {t('recommend:bayesianLargeVolume')}
                                               </div>
                                               <div style={{ marginTop: 8, padding: '6px 8px', background: '#f6ffed', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
-                                                例：1單完成1單 → 修正率=(1+5)/(1+10)=54.5%
+                                                {t('recommend:bayesianExample1')}
                                                 <br />
-                                                20單完成10單 → 修正率=(10+5)/(20+10)=50%
+                                                {t('recommend:bayesianExample2')}
                                               </div>
                                             </div>
                                           }
@@ -1039,22 +1042,22 @@ export default function AlgorithmAdd() {
                                       </span>
                                     ) : item.type === 'distance' ? (
                                       <span style={{ fontSize: 13, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        {opt?.desc}
+                                        {opt ? t(opt.descKey) : ''}
                                         <Popover
                                           trigger="click"
                                           placement="right"
-                                          title={<span style={{ fontWeight: 600, color: '#722ed1' }}>📏 距離衰減說明</span>}
+                                          title={<span style={{ fontWeight: 600, color: '#722ed1' }}>{t('recommend:distanceDecayTitle')}</span>}
                                           content={
                                             <div style={{ maxWidth: 280, fontSize: 12, lineHeight: '20px' }}>
                                               <div style={{ marginBottom: 6 }}>
-                                                <strong>距離分</strong> = e<sup>-0.1 × 距離(km)</sup>
+                                                <strong>{t('recommend:distanceFormula')}</strong> = e<sup>-0.1 × 距離(km)</sup>
                                               </div>
                                               <div style={{ color: '#595959' }}>
-                                                • 距離越近，分數越接近 1
+                                                {t('recommend:distanceNear')}
                                                 <br />
-                                                • 距離越遠，分數指數衰減趨近 0
+                                                {t('recommend:distanceFar')}
                                                 <br />
-                                                • <strong>衰減係數 0.1</strong>：每增加 10km，分數約下降 63%
+                                                {t('recommend:distanceCoeff')}
                                               </div>
                                               <div style={{ marginTop: 8, padding: '6px 8px', background: '#f9f0ff', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
                                                 1km → 0.90 &nbsp; 3km → 0.74 &nbsp; 5km → 0.61
@@ -1068,7 +1071,7 @@ export default function AlgorithmAdd() {
                                         </Popover>
                                       </span>
                                     ) : (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c' }}>（{opt?.desc}）</span>
+                                      <span style={{ fontSize: 13, color: '#8c8c8c' }}>({opt ? t(opt.descKey) : ''})</span>
                                     )}
                                     {!isDetailMode && (
                                       <DeleteOutlined
@@ -1079,7 +1082,7 @@ export default function AlgorithmAdd() {
                                   </div>
                                   {/* 第二行：权重滑块 */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 0 }}>
-                                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>權重:</span>
+                                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:weightLabel')}</span>
                                     <div className="ws-wrapper">
                                       {/* 原生滑块 + 气泡 */}
                                       <div className="ws-slider-box">
@@ -1144,23 +1147,23 @@ export default function AlgorithmAdd() {
                           <div style={{ marginTop: 16, padding: '10px 12px', background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
                             <div style={{ display: 'flex', gap: 24, marginBottom: 12 }}>
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#1890ff' }}>計算公式：</div>
-                                <div>最終得分 = (質量分/5 × W₁) + (修正完成率 × W₂) + (扶持分 × W₃) + (距離分 × W₄)</div>
-                                <div style={{ marginTop: 4, color: '#8c8c8c' }}>扶持分 = max(0, (8-首投天數)/7)；距離分 = e^(-0.1×距離km)</div>
+                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#1890ff' }}>{t('recommend:calcFormula')}</div>
+                                <div>{t('recommend:finalScoreFormula')}</div>
+                                <div style={{ marginTop: 4, color: '#8c8c8c' }}>{t('recommend:supportScoreFormula')}</div>
                               </div>
                               <div style={{ flex: 1, borderLeft: '1px solid #e8e8e8', paddingLeft: 16 }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#52c41a' }}>示例：</div>
-                                <div style={{ marginBottom: 8 }}>假設權重：W₁=6, W₂=3, W₃=1, W₄=4（α=5, β=10 固定）</div>
+                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#52c41a' }}>{t('recommend:exampleTitle')}</div>
+                                <div style={{ marginBottom: 8 }}>{t('recommend:exampleWeight')}</div>
                                 <div style={{ display: 'flex', gap: 16 }}>
                                   <div style={{ flex: 1 }}>
-                                    <div>商家A：質量4分 + 20單完成10單 + 首投15天 + 距離2km</div>
-                                    <div style={{ color: '#8c8c8c' }}>修正率=(10+5)/(20+10)=50%，距離分=e^(-0.1×2)=0.82</div>
-                                    <div style={{ color: '#8c8c8c' }}>得分 = 0.8×6 + 0.5×3 + 0×1 + 0.82×4 = <span style={{ color: '#1890ff', fontWeight: 600 }}>9.58</span></div>
+                                    <div>{t('recommend:merchantA')}</div>
+                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantARate')}</div>
+                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantAScore')} <span style={{ color: '#1890ff', fontWeight: 600 }}>9.58</span></div>
                                   </div>
                                   <div style={{ flex: 1 }}>
-                                    <div>商家B：質量3分 + 1單完成1單 + 首投2天 + 距離8km</div>
-                                    <div style={{ color: '#8c8c8c' }}>修正率=(1+5)/(1+10)=54.5%，距離分=e^(-0.1×8)=0.45</div>
-                                    <div style={{ color: '#8c8c8c' }}>得分 = 0.6×6 + 0.545×3 + 0.857×1 + 0.45×4 = <span style={{ color: '#1890ff', fontWeight: 600 }}>7.7</span></div>
+                                    <div>{t('recommend:merchantB')}</div>
+                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantBRate')}</div>
+                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantBScore')} <span style={{ color: '#1890ff', fontWeight: 600 }}>7.7</span></div>
                                   </div>
                                 </div>
                               </div>
@@ -1169,23 +1172,23 @@ export default function AlgorithmAdd() {
                             {/* 曝光分配策略 */}
                             <div style={{ padding: '10px 12px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 4 }}>
                               <div style={{ fontWeight: 600, marginBottom: 8, color: '#d46b08', fontSize: 12 }}>
-                                🎯 曝光分配策略：加權隨機（輪盤賭）
+                                {t('recommend:exposureStrategyTitle')}
                               </div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                                單坑位場景下，每次用戶請求到達時，按商家得分權重隨機抽取一個商家展示。分數越高，被抽中概率越大，但低分商家也有機會曝光。
+                                {t('recommend:exposureStrategyDesc')}
                               </div>
                               <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                  <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>分配公式：</span>
+                                  <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>{t('recommend:allocationFormula')}</span>
                                   <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(商家i) = score_i / Σ(所有商家得分)</span>
                                   <Popover
                                     trigger="click"
                                     placement="right"
-                                    title={<span style={{ fontWeight: 600, color: '#d46b08' }}>📊 分配示例</span>}
+                                    title={<span style={{ fontWeight: 600, color: '#d46b08' }}>{t('recommend:allocationExampleTitle')}</span>}
                                     content={
                                       <div style={{ maxWidth: 320, fontSize: 12 }}>
                                         <div style={{ color: '#595959', marginBottom: 8 }}>
-                                          假設 5 個商家得分：A=6, B=7, C=10, D=5, E=9.5，總分=37.5
+                                          {t('recommend:allocationExample5')}
                                         </div>
                                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                                           {[
@@ -1196,14 +1199,14 @@ export default function AlgorithmAdd() {
                                             { name: 'D', score: 5, color: '#eb2f96' },
                                           ].map(m => (
                                             <div key={m.name} style={{ flex: '1 1 70px', padding: '4px 6px', background: '#fafafa', borderRadius: 4, border: '1px solid #f0f0f0', textAlign: 'center' }}>
-                                              <div style={{ fontWeight: 600, color: m.color, fontSize: 12 }}>商家{m.name}</div>
-                                              <div style={{ fontSize: 10, color: '#8c8c8c' }}>得分 {m.score}</div>
+                                              <div style={{ fontWeight: 600, color: m.color, fontSize: 12 }}>{t('recommend:merchantLabel')}{m.name}</div>
+                                              <div style={{ fontSize: 10, color: '#8c8c8c' }}>{t('recommend:scoreLabel')} {m.score}</div>
                                               <div style={{ fontSize: 11, fontWeight: 600, color: '#595959' }}>{(m.score / 37.5 * 100).toFixed(1)}%</div>
                                             </div>
                                           ))}
                                         </div>
                                         <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '18px', padding: '4px 6px', background: '#f6ffed', borderRadius: 4 }}>
-                                          💡 長期效果：請求 1000 次，C 約 267 次，E 約 253 次，B 約 187 次，A 約 160 次，D 約 133 次
+                                          {t('recommend:longTermEffect')}
                                         </div>
                                       </div>
                                     }
@@ -1226,25 +1229,25 @@ export default function AlgorithmAdd() {
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>計算訂單類型:</span>
+                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:calcOrderType')}</span>
                 <Form.Item name="orderTypeDelivery" noStyle valuePropName="checked">
-                  <Checkbox disabled={isDetailMode}>配送訂單</Checkbox>
+                  <Checkbox disabled={isDetailMode}>{t('recommend:deliveryOrder')}</Checkbox>
                 </Form.Item>
                 <Form.Item name="orderTypePickup" noStyle valuePropName="checked">
-                  <Checkbox disabled={isDetailMode}>自取訂單</Checkbox>
+                  <Checkbox disabled={isDetailMode}>{t('recommend:pickupOrder')}</Checkbox>
                 </Form.Item>
                 <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                  請選擇參與成交量統計的訂單履約方式，以保障商家訂單成交量統計的準確性
+                  {t('recommend:orderTypeHint')}
                 </span>
               </div>
               {/* 店鋪等級保障單量配置（樣式與品牌商家店鋪等級配置保持一致） */}
               <div style={{ marginTop: 12, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>店鋪等級保障單量</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>{t('recommend:storeLevelBlockOrders')}</div>
                 <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
-                  按店鋪等級單獨配置保障單量：當用戶在該門店的下單數量達到所配置單量時，該門店將不再在獨家區域展示
+                  {t('recommend:storeLevelBlockHint')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, label, color, defaultOrders }) => (
+                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, labelKey, color, defaultOrders }) => (
                     <div key={level} style={{
                       background: '#fff',
                       border: `1px solid ${color}33`,
@@ -1259,14 +1262,14 @@ export default function AlgorithmAdd() {
                           padding: '0 12px', height: 24, lineHeight: '24px', borderRadius: 12,
                           fontSize: 13, fontWeight: 700, color: '#fff',
                           background: color, display: 'inline-block', whiteSpace: 'nowrap',
-                        }}>{label}</span>
+                        }}>{t(labelKey)}</span>
                       </div>
                       <Form.Item name={['levelBlockOrders', level]} noStyle initialValue={defaultOrders}>
                         <InputNumber
                           min={1}
                           precision={0}
                           style={{ width: '100%' }}
-                          addonAfter="單"
+                          addonAfter={t('recommend:unitOrder')}
                           disabled={isDetailMode}
                         />
                       </Form.Item>
@@ -1295,22 +1298,22 @@ export default function AlgorithmAdd() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
                       <SettingOutlined />
-                      算法策略
+                      {t('recommend:algoStrategy')}
                     </div>
 
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                       <Form.Item
                         name="merchantExposureStrategy"
                         style={{ flex: 1, marginBottom: 0 }}
                         wrapperCol={{ span: 24 }}
                       >
                         <Select
-                          placeholder="請選擇"
+                          placeholder={t('recommend:selectPlaceholder')}
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                           options={[
-                            { label: '輪詢計算', value: 'random' },
+                            { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
                           disabled={isDetailMode}
                         />
@@ -1322,7 +1325,7 @@ export default function AlgorithmAdd() {
                         <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
+                              {t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
                         </div>
@@ -1345,18 +1348,18 @@ export default function AlgorithmAdd() {
                   }}>
                     <ShopOutlined />
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>店鋪等級保障流量</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend:storeLevelTraffic')}</span>
                   <span style={{
                     padding: '0 8px', height: 20, lineHeight: '20px', borderRadius: 10,
                     fontSize: 11, fontWeight: 500, color: '#E8720C',
                     background: 'rgba(232,114,12,0.08)', border: '1px solid rgba(232,114,12,0.3)',
-                  }}>按店鋪等級配置</span>
+                  }}>{t('recommend:byStoreLevelConfig')}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12, paddingLeft: 36 }}>
-                  店鋪等級不一樣，保障的流量不一樣：按店鋪等級單獨配置保障曝光流量，等級越高保障曝光越多
+                  {t('recommend:storeLevelTrafficHint')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, label, color, defaultOrders }) => (
+                  {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, labelKey, color, defaultOrders }) => (
                     <div key={level} style={{
                       background: '#fff',
                       border: `1px solid ${color}33`,
@@ -1371,14 +1374,14 @@ export default function AlgorithmAdd() {
                           padding: '0 12px', height: 24, lineHeight: '24px', borderRadius: 12,
                           fontSize: 13, fontWeight: 700, color: '#fff',
                           background: color, display: 'inline-block', whiteSpace: 'nowrap',
-                        }}>{label}</span>
+                        }}>{t(labelKey)}</span>
                       </div>
                       <Form.Item name={['brandLevelTraffic', level]} noStyle initialValue={defaultOrders * 100}>
                         <InputNumber
                           min={1}
                           precision={0}
                           style={{ width: '100%' }}
-                          addonAfter="次"
+                          addonAfter={t('recommend:unitTimes')}
                           disabled={isDetailMode}
                         />
                       </Form.Item>
@@ -1407,22 +1410,22 @@ export default function AlgorithmAdd() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
                       <SettingOutlined />
-                      算法策略
+                      {t('recommend:algoStrategy')}
                     </div>
 
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                       <Form.Item
                         name="merchantExposureStrategy"
                         style={{ flex: 1, marginBottom: 0 }}
                         wrapperCol={{ span: 24 }}
                       >
                         <Select
-                          placeholder="請選擇"
+                          placeholder={t('recommend:selectPlaceholder')}
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                           options={[
-                            { label: '輪詢計算', value: 'random' },
+                            { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
                           disabled={isDetailMode}
                         />
@@ -1434,7 +1437,7 @@ export default function AlgorithmAdd() {
                         <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
+                              {t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
                         </div>
@@ -1461,22 +1464,22 @@ export default function AlgorithmAdd() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
                       <SettingOutlined />
-                      算法策略
+                      {t('recommend:algoStrategy')}
                     </div>
 
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>大小圖展示策略</span>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:bigSmallStrategy')}</span>
                       <Form.Item
                         name="merchantExposureStrategy"
                         style={{ flex: 1, marginBottom: 0 }}
                         wrapperCol={{ span: 24 }}
                       >
                         <Select
-                          placeholder="請選擇"
+                          placeholder={t('recommend:selectPlaceholder')}
                           style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
                           options={[
-                            { label: '輪詢計算', value: 'random' },
+                            { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
                           disabled={isDetailMode}
                         />
@@ -1488,7 +1491,7 @@ export default function AlgorithmAdd() {
                         <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                              系統自動統計各區域內購買廣告的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保同一區域內每位廣告商家獲得均勻的曝光機會。過程中如有新增購買商家，系統會自動納入候選集並加入排序展示；如有取消推廣的商家，系統會自動剔除，後續商家依次往前頂補位。
+                              {t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
                         </div>
@@ -1515,17 +1518,17 @@ export default function AlgorithmAdd() {
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 <SettingOutlined />
-                算法策略
+                {t('recommend:algoStrategy')}
               </div>
 
               <div style={{ padding: '16px 20px' }}>
                 {/* 商家曝光策略 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>商家曝光策略</span>
+                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                   <Select
                     value="roundRobin"
                     style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
-                    options={[{ label: '輪詢計算', value: 'roundRobin' }]}
+                    options={[{ label: t('recommend:roundRobinCalc'), value: 'roundRobin' }]}
                     disabled={isDetailMode}
                   />
                 </div>
@@ -1533,7 +1536,7 @@ export default function AlgorithmAdd() {
                 {/* 輪詢說明 */}
                 <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
                   <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                    系統自動統計各區域內符合新店週期的商家，生成商家 ID 列表並按順序排列，然後逐個輪播展示，確保每位新店商家獲得均勻的曝光機會。過程中如有新開業商家，系統會自動納入候選集；如商家新店週期結束或取消推廣，系統會自動剔除，後續商家依次往前頂補位。
+                    {t('recommend:newStoreRoundRobinDesc')}
                   </span>
                 </div>
               </div>
@@ -1550,10 +1553,10 @@ export default function AlgorithmAdd() {
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚙️</div>
             <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
-              暫無參數配置
+              {t('recommend:noParamConfig')}
             </div>
             <div style={{ fontSize: 14 }}>
-              當前廣告類型暫未開放參數配置，請聯繫管理員
+              {t('recommend:noParamConfigHint')}
             </div>
           </div>
         </div>
@@ -1567,10 +1570,10 @@ export default function AlgorithmAdd() {
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>👆</div>
             <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, color: '#1890ff' }}>
-              請先選擇廣告類型
+              {t('recommend:selectAdTypeFirst')}
             </div>
             <div style={{ fontSize: 14 }}>
-              選擇廣告類型後，將顯示對應的參數配置項
+              {t('recommend:selectAdTypeHint')}
             </div>
           </div>
         </div>
@@ -1581,26 +1584,26 @@ export default function AlgorithmAdd() {
       {/* 底部操作按鈕（取消/保存） */}
       {selectedAlgorithmType && !isDetailMode && (
         <div className="form-footer">
-          <Button onClick={handleBack}>取消</Button>
+          <Button onClick={handleBack}>{t('common:cancel')}</Button>
           <Button
             type="primary"
             icon={<SaveOutlined />}
             onClick={handleSubmit}
           >
-            保存
+            {t('common:save')}
           </Button>
         </div>
       )}
 
       {/* 商家选择弹窗 */}
       <Modal
-        title="選擇商家"
+        title={t('recommend:selectMerchant')}
         open={merchantModalVisible}
         onOk={handleConfirmMerchants}
         onCancel={handleCloseMerchantModal}
         width={900}
-        okText="確認選擇"
-        cancelText="取消"
+        okText={t('recommend:confirmSelect')}
+        cancelText={t('common:cancel')}
       >
         <Table
           rowKey="id"
@@ -1614,7 +1617,7 @@ export default function AlgorithmAdd() {
           }}
           pagination={{
             pageSize: 10,
-            showTotal: (total) => `共 ${total} 條`,
+            showTotal: (total) => t('common:total', { count: total }),
           }}
         />
       </Modal>

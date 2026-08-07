@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -50,17 +51,17 @@ function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; su
   return <>{prefix}{animated.toLocaleString()}{suffix}</>
 }
 
-/** 品牌選項 */
+/** 品牌選項（labelKey 為 i18n key） */
 const brandOptions = [
-  { label: '閃蜂', value: 'flashBee' },
+  { labelKey: 'accountBalance.brandFlashBee', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
 ]
 
-/** 賬戶狀態文案/顏色映射 */
-const accountStatusMap: Record<string, { label: string; color: string }> = {
-  normal: { label: '正常', color: 'green' },
-  frozen: { label: '凍結', color: 'red' },
-  mergeFrozen: { label: '合併凍結', color: 'orange' },
+/** 賬戶狀態文案/顏色映射（labelKey 為 i18n key） */
+const accountStatusMap: Record<string, { labelKey: string; color: string }> = {
+  normal: { labelKey: 'accountBalance.statusNormal', color: 'green' },
+  frozen: { labelKey: 'accountBalance.statusFrozen', color: 'red' },
+  mergeFrozen: { labelKey: 'accountBalance.statusMergeFrozen', color: 'orange' },
 }
 
 /** 從門店選項文案末尾提取門店編碼，如「珠海前山分店(MD00007)」-> MD00007 */
@@ -78,6 +79,7 @@ interface RepayStoreRow {
 }
 
 export default function MergeAdd() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [form] = Form.useForm()
 
@@ -153,9 +155,12 @@ export default function MergeAdd() {
   /** 已選存續集團賬戶（賬戶按集團+品牌隔離，需同時匹配品牌） */
   const targetAccount = allAccounts.find(a => a.groupId === targetGroupId && a.brand === targetBrand)
 
+  /** 翻譯後的品牌選項 */
+  const tBrandOptions = brandOptions.map(o => 'labelKey' in o ? { label: t(o.labelKey || ''), value: o.value } : o)
+
   /** 集團選項：非正常狀態賬戶標註狀態且不可選 */
   const toGroupOption = (a: FinAccount) => ({
-    label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${accountStatusMap[a.status]?.label || a.status}）` : ''}`,
+    label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${t(accountStatusMap[a.status]?.labelKey || '') || a.status}）` : ''}`,
     value: a.groupId,
     disabled: a.status !== 'normal',
   })
@@ -164,7 +169,7 @@ export default function MergeAdd() {
 
   /** 存續集團選項：全品牌可選，value 用「集團ID|品牌」保證唯一，品牌在選中後由「所屬品牌」字段展示 */
   const toTargetOption = (a: FinAccount) => ({
-    label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${accountStatusMap[a.status]?.label || a.status}）` : ''}`,
+    label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${t(accountStatusMap[a.status]?.labelKey || '') || a.status}）` : ''}`,
     value: `${a.groupId}|${a.brand}`,
     disabled: a.status !== 'normal',
   })
@@ -188,7 +193,7 @@ export default function MergeAdd() {
   /** 添加償還門店行（直接添加空行） */
   const handleAddRepayRow = () => {
     if (!targetGroupId) {
-      message.warning('請先選擇存續集團')
+      message.warning(t('accountBalance.selectSurvivingGroupFirst'))
       return
     }
     setRepayRows(prev => [...prev, { key: `new_${Date.now()}`, storeId: '', storeLabel: '', amount: 0, bd: '' }])
@@ -225,28 +230,28 @@ export default function MergeAdd() {
   const handleSubmit = async () => {
     try {
       await form.validateFields()
-      if (!sourceGroupId) { message.warning('請選擇註銷集團'); return }
-      if (!targetGroupId) { message.warning('請選擇存續集團'); return }
+      if (!sourceGroupId) { message.warning(t('accountBalance.selectCancelGroup')); return }
+      if (!targetGroupId) { message.warning(t('accountBalance.selectSurvivingGroup')); return }
       // 欠款償還門店校驗
       if (sourceDebtAmount > 0) {
-        if (repayRows.length === 0) { message.warning('請添加欠款償還門店'); return }
+        if (repayRows.length === 0) { message.warning(t('accountBalance.addRepayStore')); return }
         const emptyStore = repayRows.find(r => !r.storeId)
-        if (emptyStore) { message.warning('請為所有償還門店選擇門店'); return }
+        if (emptyStore) { message.warning(t('accountBalance.selectAllRepayStores')); return }
         const emptyAmount = repayRows.find(r => !r.amount || r.amount <= 0)
-        if (emptyAmount) { message.warning('請為所有償還門店填寫金額'); return }
+        if (emptyAmount) { message.warning(t('accountBalance.fillAllRepayAmounts')); return }
         // 欠款償還金額校驗：必須恰好等於欠款總額
         const repayTotal = repayRows.reduce((sum, r) => sum + r.amount, 0)
-        if (repayTotal === 0) { message.warning('請添加欠款償還門店並填寫償還金額'); return }
+        if (repayTotal === 0) { message.warning(t('accountBalance.fillRepayAmount')); return }
         if (repayTotal < sourceDebtAmount) {
-          message.warning(`償還金額合計 MOP ${repayTotal.toLocaleString()} 低於欠款總額 MOP ${sourceDebtAmount.toLocaleString()}，請補足差額 MOP ${(sourceDebtAmount - repayTotal).toLocaleString()}`)
+          message.warning(t('accountBalance.repayBelowDebt', { repayTotal: repayTotal.toLocaleString(), debtAmount: sourceDebtAmount.toLocaleString(), diff: (sourceDebtAmount - repayTotal).toLocaleString() }))
           return
         }
         if (repayTotal > sourceDebtAmount) {
-          message.warning(`償還金額合計 MOP ${repayTotal.toLocaleString()} 超出欠款總額 MOP ${sourceDebtAmount.toLocaleString()}，請減少超出部分 MOP ${(repayTotal - sourceDebtAmount).toLocaleString()}`)
+          message.warning(t('accountBalance.repayAboveDebt', { repayTotal: repayTotal.toLocaleString(), debtAmount: sourceDebtAmount.toLocaleString(), diff: (repayTotal - sourceDebtAmount).toLocaleString() }))
           return
         }
       }
-      if (certificateFiles.length === 0) { message.warning('請上傳相關憑證'); return }
+      if (certificateFiles.length === 0) { message.warning(t('accountBalance.uploadCertificate')); return }
       // 提交審批記錄
       const payload: MergeApplyPayload = {
         sourceGroupId,
@@ -267,7 +272,7 @@ export default function MergeAdd() {
     } catch (err) {
       // 表單校驗未通過時 antd 已在字段標紅；財務接口為靜默請求，後端業務錯誤需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {
-        message.error(err instanceof Error && err.message ? err.message : '提交失敗，請稍後重試')
+        message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
       }
     } finally {
       setSubmitting(false)
@@ -277,8 +282,8 @@ export default function MergeAdd() {
   /** 文件上傳校驗 */
   const beforeUpload = (file: File) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
-    if (!validTypes.includes(file.type)) { message.error('僅支持 jpeg/jpg/png/PDF 格式'); return Upload.LIST_IGNORE }
-    if (file.size > 5 * 1024 * 1024) { message.error('文件大小不能超過 5MB'); return Upload.LIST_IGNORE }
+    if (!validTypes.includes(file.type)) { message.error(t('accountBalance.onlyFormatError')); return Upload.LIST_IGNORE }
+    if (file.size > 5 * 1024 * 1024) { message.error(t('accountBalance.fileSizeExceed')); return Upload.LIST_IGNORE }
     return false
   }
 
@@ -321,7 +326,7 @@ export default function MergeAdd() {
             onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
           >
             <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-            <span>上傳</span>
+            <span>{t('accountBalance.upload')}</span>
           </div>
         </Upload>
       )}
@@ -331,9 +336,9 @@ export default function MergeAdd() {
   /** 償還門店表格列 */
   const repayColumns = [
     {
-      title: '門店ID/名稱', dataIndex: 'storeLabel', width: 240,
+      title: t('common:colStoreId') + '/' + t('common:colStoreName'), dataIndex: 'storeLabel', width: 240,
       render: (_: string, record: RepayStoreRow) => (
-        <Select placeholder={repayStoreOptions.length ? '請選擇門店' : '存續集團下暫無門店'} options={repayStoreOptions} showSearch allowClear
+        <Select placeholder={repayStoreOptions.length ? t('accountBalance.selectSurvivingStore') : t('accountBalance.noStoreInSurviving')} options={repayStoreOptions} showSearch allowClear
           value={record.storeId || undefined}
           onChange={(v) => handleUpdateRepayRow(record.key, 'storeId', v || '')}
           filterOption={(input, option) => (option?.label ?? '').includes(input)}
@@ -342,16 +347,16 @@ export default function MergeAdd() {
       ),
     },
     {
-      title: '歸屬BD', dataIndex: 'bd', width: 120, align: 'center' as const,
+      title: t('common:colBd'), dataIndex: 'bd', width: 120, align: 'center' as const,
       render: (val: string) => val
         ? <Tag color="blue" style={{ fontSize: 12 }}>{val}</Tag>
-        : <span style={{ color: '#BFBFBF', fontSize: 12 }}>選擇門店後帶出</span>,
+        : <span style={{ color: '#BFBFBF', fontSize: 12 }}>{t('accountBalance.showBdAfterSelectStore')}</span>,
     },
     {
-      title: '償還金額', dataIndex: 'amount', width: 160, align: 'center' as const,
+      title: t('accountBalance.repayAmountLabel'), dataIndex: 'amount', width: 160, align: 'center' as const,
       render: (val: number, record: RepayStoreRow) => (
         <InputNumber
-          placeholder="請輸入金額"
+          placeholder={t('accountBalance.enterAmount')}
           value={val || undefined}
           min={0}
           precision={2}
@@ -362,11 +367,11 @@ export default function MergeAdd() {
       ),
     },
     {
-      title: '操作', width: 80, align: 'center' as const,
+      title: t('common:colAction'), width: 80, align: 'center' as const,
       render: (_: unknown, record: RepayStoreRow) => (
         <Button type="link" danger size="small"
           onClick={() => handleRemoveRepayRow(record.key)}
-        >刪除</Button>
+        >{t('accountBalance.deleteAction')}</Button>
       ),
     },
   ]
@@ -393,11 +398,11 @@ export default function MergeAdd() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#722ED1' }}>商戶合併</h2>
-              <Tag color="purple" style={{ fontSize: 11 }}>合併申請</Tag>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#722ED1' }}>{t('accountBalance.mergePageTitle')}</h2>
+              <Tag color="purple" style={{ fontSize: 11 }}>{t('accountBalance.mergeApplyTag')}</Tag>
             </div>
           </div>
         </div>
@@ -410,15 +415,15 @@ export default function MergeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MergeCellsOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>註銷集團</span>
-            <Tag color="red" style={{ marginLeft: 0, fontSize: 11 }}>即將關閉</Tag>
-            <Tag color="blue" style={{ marginLeft: 0, fontSize: 11 }}>集團選擇</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.cancelGroup')}</span>
+            <Tag color="red" style={{ marginLeft: 0, fontSize: 11 }}>{t('accountBalance.cancelGroupClosing')}</Tag>
+            <Tag color="blue" style={{ marginLeft: 0, fontSize: 11 }}>{t('accountBalance.groupSelectTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="所屬品牌" name="sourceBrand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
-              <Select placeholder="請選擇品牌" options={brandOptions} allowClear
+            <Form.Item label={t('common:colBrand')} name="sourceBrand" rules={[{ required: true, message: t('accountBalance.selectSourceBrand') }]}>
+              <Select placeholder={t('accountBalance.selectBrand')} options={tBrandOptions} allowClear
                 onChange={(val) => {
                   setSourceBrand(val)
                   setSourceGroupId(undefined)
@@ -428,19 +433,19 @@ export default function MergeAdd() {
                 }}
               />
             </Form.Item>
-            <Form.Item label="註銷集團" name="sourceGroupId" rules={[{ required: true, message: '請選擇註銷集團' }]}>
-              <Select placeholder={sourceBrand ? '請選擇即將關閉的集團' : '請先選擇品牌'} options={sourceGroupOptions}
+            <Form.Item label={t('accountBalance.cancelGroup')} name="sourceGroupId" rules={[{ required: true, message: t('accountBalance.selectCancelGroup') }]}>
+              <Select placeholder={sourceBrand ? t('accountBalance.selectClosingGroup') : t('accountBalance.selectBrandFirst')} options={sourceGroupOptions}
                 showSearch allowClear disabled={!sourceBrand}
                 onChange={(val) => { setSourceGroupId(val); setTargetGroupId(undefined); setTargetBrand(undefined); form.setFieldsValue({ targetGroupId: undefined }) }}
                 filterOption={(input, option) => (option?.label ?? '').includes(input)}
               />
             </Form.Item>
-            <Form.Item label="賬戶狀態">
+            <Form.Item label={t('accountBalance.accountStatusLabel')}>
               {sourceGroupId
                 ? <Tag color={accountStatusMap[sourceAccount?.status || 'normal']?.color || 'green'}>
-                    {accountStatusMap[sourceAccount?.status || 'normal']?.label || '正常'}
+                    {t(accountStatusMap[sourceAccount?.status || 'normal']?.labelKey || '') || '正常'}
                   </Tag>
-                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>{t('accountBalance.showAfterSelectGroup')}</span>}
             </Form.Item>
           </div>
 
@@ -461,7 +466,7 @@ export default function MergeAdd() {
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
                   <AnimatedNumber value={sourceVirtualBalance} prefix="MOP " />
                 </div>
-                <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>註銷集團 · 虛擬賬戶餘額（將轉入存續集團）</div>
+                <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{t('accountBalance.cancelGroupVirtualBalance')}</div>
               </div>
               <div
                 style={{
@@ -481,7 +486,7 @@ export default function MergeAdd() {
                 <div style={{ fontSize: 18, fontWeight: 700, color: sourceDebtAmount > 0 ? '#ff4d4f' : '#52c41a' }}>
                   <AnimatedNumber value={sourceDebtAmount} prefix="MOP " />
                 </div>
-                <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>註銷集團 · 欠款金額（需分配至存續集團門店償還）</div>
+                <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{t('accountBalance.cancelGroupDebt')}</div>
               </div>
             </div>
           )}
@@ -493,15 +498,15 @@ export default function MergeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AccountBookOutlined style={{ fontSize: 14, color: '#722ed1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>存續集團</span>
-            <Tag color="green" style={{ marginLeft: 0, fontSize: 11 }}>接收資產</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>接收註銷集團的全部資產與餘額，可選擇任意品牌的集團</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.survivingGroup')}</span>
+            <Tag color="green" style={{ marginLeft: 0, fontSize: 11 }}>{t('accountBalance.receiveAssets')}</Tag>
+            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('accountBalance.receiveAssetsDesc')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
-            <Form.Item label="存續集團" name="targetGroupId" rules={[{ required: true, message: '請選擇存續集團' }]}>
-              <Select placeholder={sourceGroupId ? '請選擇接收資產的集團' : '請先選擇註銷集團'} options={targetGroupOptions}
+            <Form.Item label={t('accountBalance.survivingGroup')} name="targetGroupId" rules={[{ required: true, message: t('accountBalance.selectSurvivingGroup') }]}>
+              <Select placeholder={sourceGroupId ? t('accountBalance.selectReceivingGroup') : t('accountBalance.selectCancelGroupFirst')} options={targetGroupOptions}
                 showSearch allowClear disabled={!sourceGroupId}
                 onChange={(val?: string) => {
                   const [gid, gbrand] = (val || '').split('|')
@@ -511,26 +516,26 @@ export default function MergeAdd() {
                 filterOption={(input, option) => (option?.label ?? '').includes(input)}
               />
             </Form.Item>
-            <Form.Item label="所屬品牌">
+            <Form.Item label={t('common:colBrand')}>
               {targetGroupId
                 ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     <BrandTag value={targetBrand || 'mFood'} />
                     {targetBrand && sourceBrand && targetBrand !== sourceBrand && (
                       <span style={{ color: '#FAAD14', fontSize: 12 }}>
-                        <ExclamationCircleOutlined style={{ marginRight: 4 }} />與註銷集團品牌不一致，請確認後再提交
+                        <ExclamationCircleOutlined style={{ marginRight: 4 }} />{t('accountBalance.brandMismatchWarn')}
                       </span>
                     )}
                   </span>
                 )
-                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>{t('accountBalance.showAfterSelectGroup')}</span>}
             </Form.Item>
-            <Form.Item label="賬戶狀態">
+            <Form.Item label={t('accountBalance.accountStatusLabel')}>
               {targetGroupId
                 ? <Tag color={accountStatusMap[targetAccount?.status || 'normal']?.color || 'green'}>
-                    {accountStatusMap[targetAccount?.status || 'normal']?.label || '正常'}
+                    {t(accountStatusMap[targetAccount?.status || 'normal']?.labelKey || '') || '正常'}
                   </Tag>
-                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>選擇集團後展示</span>}
+                : <span style={{ color: '#BFBFBF', fontSize: 13 }}>{t('accountBalance.showAfterSelectGroup')}</span>}
             </Form.Item>
           </div>
         </div>
@@ -542,21 +547,21 @@ export default function MergeAdd() {
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <PayCircleOutlined style={{ fontSize: 14, color: '#ff4d4f' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>欠款償還</span>
-              <Tag color="red" style={{ marginLeft: 4, fontSize: 11 }}>欠款 MOP {sourceDebtAmount.toLocaleString()}</Tag>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>註銷集團存在欠款，請選擇存續集團下的門店進行欠款償還分配</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.debtRepayment')}</span>
+              <Tag color="red" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.debtAmountTag', { amount: sourceDebtAmount.toLocaleString() })}</Tag>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.debtRepayHint')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
               <Button type="primary" size="small" icon={<PlusOutlined />}
                 onClick={() => handleAddRepayRow()}
                 style={{ borderRadius: 6 }}
-              >添加門店</Button>
+              >{t('accountBalance.addStore')}</Button>
             </div>
 
             <ConfigProvider componentSize="middle">
             <Table rowKey="key" bordered pagination={false}
               dataSource={repayRows}
               columns={repayColumns}
-              locale={{ emptyText: '暫無償還門店，請點擊「添加門店」' }}
+              locale={{ emptyText: t('accountBalance.emptyRepayStores') }}
             />
             </ConfigProvider>
 
@@ -565,22 +570,22 @@ export default function MergeAdd() {
               const diff = sourceDebtAmount - repayTotal
               return (
                 <div style={{ marginTop: 12, textAlign: 'right', fontSize: 13, color: '#262626' }}>
-                  已分配償還金額：<span style={{ fontWeight: 600, color: '#E8720C' }}>
+                  {t('accountBalance.allocatedRepayAmount')}<span style={{ fontWeight: 600, color: '#E8720C' }}>
                     MOP {repayTotal.toLocaleString()}
                   </span>
                   {diff > 0 && (
                     <span style={{ color: '#ff4d4f', marginLeft: 12, fontSize: 12 }}>
-                      尚有 MOP {diff.toLocaleString()} 未分配
+                      {t('accountBalance.unallocated', { amount: diff.toLocaleString() })}
                     </span>
                   )}
                   {diff < 0 && (
                     <span style={{ color: '#ff4d4f', marginLeft: 12, fontSize: 12 }}>
-                      超出 MOP {Math.abs(diff).toLocaleString()}，請調整
+                      {t('accountBalance.overAllocated', { amount: Math.abs(diff).toLocaleString() })}
                     </span>
                   )}
                   {diff === 0 && (
                     <span style={{ color: '#52C41A', marginLeft: 12, fontSize: 12 }}>
-                      ✓ 已全部分配完畢
+                      {t('accountBalance.allAllocated')}
                     </span>
                   )}
                 </div>
@@ -595,15 +600,15 @@ export default function MergeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileProtectOutlined style={{ fontSize: 14, color: '#722ed1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>相關憑證</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>憑證上傳</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.relatedVoucher')}</span>
+            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.voucherUploadTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>支持 jpeg/jpg/png/PDF</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportFormat')}</span>
           </div>
-          <Form.Item label="相關憑證" required style={{ marginBottom: 0 }}>
+          <Form.Item label={t('accountBalance.relatedVoucher')} required style={{ marginBottom: 0 }}>
             {renderFileList()}
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
-              限 jpeg/jpg/png/PDF 格式，5MB 內，最多可上傳 5 份
+              {t('accountBalance.voucherLimitHint')}
             </div>
           </Form.Item>
         </div>
@@ -614,20 +619,20 @@ export default function MergeAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>備註信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.remarkInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Form.Item name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea rows={4} maxLength={200} showCount
-              placeholder="本次合併相關說明，限制200字！" style={{ borderRadius: 8 }} />
+              placeholder={t('accountBalance.mergeRemarkPlaceholder')} style={{ borderRadius: 8 }} />
           </Form.Item>
         </div>
       </Form>
 
       {/* 底部操作按钮 */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>取消</Button>
-        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>提交申請</Button>
+        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>{t('accountBalance.submitApply')}</Button>
       </div>
 
       {/* ====== 提交成功彈窗 ====== */}
@@ -648,16 +653,16 @@ export default function MergeAdd() {
             }}>
               <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>提交成功</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>{t('accountBalance.submitSuccessTitle')}</h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
               {submittedFlowNo && (
-                <>流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
+                <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              該流程已經進入審批，可到<span style={{ color: '#E8720C', fontWeight: 500 }}>審批中心</span>菜單查看審批進度
+              {t('accountBalance.submitSuccessDesc')}
             </p>
             <Button type="primary" size="large" onClick={() => navigate('/account-balance')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}>
-              返回列表{countdown > 0 && ` (${countdown}s)`}
+              {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}
             </Button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Modal, Form, Input, Select, message, TreeSelect } from 'antd'
+import { useTranslation } from 'react-i18next'
 import type { StoreItem, StorePayload } from '../../api/store'
 import { createStore, updateStore } from '../../api/store'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
@@ -7,13 +8,9 @@ import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS } from '../../constants/bizChannel'
 import { REGION_TREE_DATA } from '../Recommend/constants'
 
-/** 所在区域树：父级（澳門區域/氹仔區域）仅作分组展示不可选，只能选具体商圈 */
-const STORE_REGION_TREE = REGION_TREE_DATA.map(node => ({
-  ...node,
-  selectable: false,
-}))
+/** 所在区域树：在组件内翻译 titleKey */
 
-/** 品牌选项 */
+/** 品牌选项（品牌名不翻译，由 BrandTag 组件处理） */
 const BRAND_OPTIONS = [
   { label: '闪蜂', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
@@ -32,6 +29,15 @@ interface StoreEditModalProps {
 export default function StoreEditModal({
   open, editingRecord, presetGroupId, onClose, onSuccess,
 }: StoreEditModalProps) {
+  const { t } = useTranslation('store')
+
+  /** 翻譯後的區域樹 */
+  const STORE_REGION_TREE = REGION_TREE_DATA.map(node => ({
+    ...node,
+    title: t(`translation:${node.titleKey}`),
+    selectable: false,
+    children: (node.children ?? []).map((c: any) => ({ ...c, title: t(`translation:${c.titleKey}`) })),
+  }))
   const [form] = Form.useForm<StorePayload>()
   const isEdit = !!editingRecord
   const [groups, setGroups] = useState<MerchantGroupItem[]>([])
@@ -43,7 +49,7 @@ export default function StoreEditModal({
       setGroupsLoading(true)
       fetchAllMerchantGroups()
         .then(setGroups)
-        .catch(() => message.error('加载集团列表失败'))
+        .catch(() => message.error(t('loadGroupFailed')))
         .finally(() => setGroupsLoading(false))
     }
   }, [open])
@@ -79,37 +85,37 @@ export default function StoreEditModal({
       }
       if (isEdit && editingRecord) {
         await updateStore(editingRecord.id, payload)
-        message.success('編輯成功')
+        message.success(t('common:editSuccess'))
       } else {
         await createStore(payload)
-        message.success('新增成功')
+        message.success(t('common:addSuccess'))
       }
       onSuccess()
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error('操作失敗，請重試')
+      message.error(t('common:operationFailed'))
     }
   }
 
   return (
     <Modal
-      title={isEdit ? '編輯門店' : '新增門店'}
+      title={isEdit ? t('editStoreTitle') : t('addStoreTitle')}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
-      okText="確認"
-      cancelText="取消"
+      okText={t('common:confirm')}
+      cancelText={t('common:cancel')}
       width={560}
       destroyOnClose
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item
           name="groupId"
-          label="所屬集團"
-          rules={[{ required: true, message: '請選擇所屬集團' }]}
+          label={t('groupLabel')}
+          rules={[{ required: true, message: t('groupRequired') }]}
         >
           <Select
-            placeholder="請選擇所屬集團"
+            placeholder={t('groupPlaceholder')}
             loading={groupsLoading}
             disabled={isEdit}
             showSearch
@@ -121,38 +127,38 @@ export default function StoreEditModal({
           />
         </Form.Item>
         {/* 門店ID 由系統自增生成，不可自主命名 */}
-        <Form.Item label="門店ID">
-          <Input value={editingRecord?.storeCode} placeholder="系統自動生成（如 MD00001）" disabled />
+        <Form.Item label={t('storeIdLabel')}>
+          <Input value={editingRecord?.storeCode} placeholder={t('storeIdAutoGen')} disabled />
         </Form.Item>
         <Form.Item
           name="storeName"
-          label="門店名稱"
+          label={t('storeNameLabel')}
           rules={[
-            { required: true, message: '請輸入門店名稱' },
-            { max: 128, message: '最多128個字符' },
+            { required: true, message: t('storeNameRequired') },
+            { max: 128, message: t('storeNameMax') },
           ]}
         >
-          <Input placeholder="請輸入門店名稱" />
+          <Input placeholder={t('storeNamePlaceholder')} />
         </Form.Item>
-        <Form.Item name="brand" label="所屬品牌" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
+        <Form.Item name="brand" label={t('common:brand')} rules={[{ required: true, message: t('brandRequired') }]}>
           <Select
-            placeholder="請選擇品牌"
+            placeholder={t('brandPlaceholder')}
             allowClear
             options={BRAND_OPTIONS}
           />
         </Form.Item>
-        <Form.Item name="bizChannel" label="業務頻道">
+        <Form.Item name="bizChannel" label={t('bizChannelLabel')}>
           <Select
-            placeholder="請選擇業務頻道（可多選）"
+            placeholder={t('bizChannelPlaceholder')}
             mode="multiple"
             allowClear
             options={BIZ_CHANNEL_OPTIONS}
           />
         </Form.Item>
         {/* 所在區域=商圈：按澳門區域/氹仔區域树形分组展示，購買按商圈定價的廣告時跟隨門店 */}
-        <Form.Item name="region" label="所在區域" tooltip="門店所在商圈，購買按商圈定價的廣告（如盤活復蘇）時自動匹配對應商圈的價格與庫存">
+        <Form.Item name="region" label={t('regionLabel')} tooltip={t('regionTooltip')}>
           <TreeSelect
-            placeholder="請選擇所在區域"
+            placeholder={t('regionPlaceholder')}
             allowClear
             showSearch
             treeNodeFilterProp="title"
@@ -162,10 +168,10 @@ export default function StoreEditModal({
         </Form.Item>
         <Form.Item
           name="loginAccount"
-          label="登錄主賬號"
-          rules={[{ max: 64, message: '最多64個字符' }]}
+          label={t('loginAccountLabel')}
+          rules={[{ max: 64, message: t('loginAccountMax') }]}
         >
-          <Input placeholder="請輸入登錄主賬號" />
+          <Input placeholder={t('loginAccountPlaceholder')} />
         </Form.Item>
       </Form>
     </Modal>

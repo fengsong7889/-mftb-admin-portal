@@ -4,6 +4,7 @@ import {
 } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 // ============================
 // 類型定義（與 SearchVerify 共用）
@@ -278,6 +279,7 @@ interface ThermometerProps {
 }
 
 const Thermometer = ({ score, maxScore, dimension, color }: ThermometerProps) => {
+  const { t } = useTranslation()
   const pct = maxScore > 0 ? Math.min(Math.max((score / maxScore) * 100, 0), 100) : 0
   const [animatedPct, setAnimatedPct] = useState(0)
   const [animatedAngle, setAnimatedAngle] = useState(-60)
@@ -464,7 +466,7 @@ const Thermometer = ({ score, maxScore, dimension, color }: ThermometerProps) =>
             color: '#999',
             marginBottom: 1,
           }}>
-            得分/滿分
+            {t('searchVerifyDetail.scoreLabel')}
           </div>
           {/* 分数框 */}
           <div style={{
@@ -581,7 +583,18 @@ function generateMerchantDetail(merchantId: string): MerchantResult {
 export default function SearchVerifyDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [animationKey, setAnimationKey] = useState(0)
+
+  /** 维度名称 -> i18n key */
+  const DIM_KEY_MAP: Record<string, string> = {
+    '搜索詞匹配得分': 'searchVerifyDetail.dimRel',
+    '商業得分': 'searchVerifyDetail.dimCom',
+    '店鋪得分': 'searchVerifyDetail.dimStore',
+    '用戶得分': 'searchVerifyDetail.dimUser',
+    '平台得分': 'searchVerifyDetail.dimPlt',
+  }
+  const dimLabel = (dim: string) => t(DIM_KEY_MAP[dim] || 'searchVerifyDetail.dimRel')
 
   // 優先查找靜態Mock數據，沒有則動態生成（確保每個商家都能查看明細）
   const merchant = MOCK_MERCHANTS.find(m => m.merchantId === id)
@@ -592,8 +605,8 @@ export default function SearchVerifyDetail() {
       <div className="content-area">
         <Card style={{ textAlign: 'center', padding: '60px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-          <div style={{ fontSize: 15, color: '#999', marginBottom: 16 }}>未找到該商家的得分數據</div>
-          <Button type="primary" onClick={() => navigate('/search-verify')}>返回搜索校驗</Button>
+          <div style={{ fontSize: 15, color: '#999', marginBottom: 16 }}>{t('searchVerifyDetail.notFound')}</div>
+          <Button type="primary" onClick={() => navigate('/search-verify')}>{t('searchVerifyDetail.backToVerify')}</Button>
         </Card>
       </div>
     )
@@ -625,12 +638,12 @@ export default function SearchVerifyDetail() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                  商家得分明細
+                  {t('searchVerifyDetail.title')}
                 </h2>
                 <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
                   {merchant.merchantName}（{merchant.merchantId}）· {merchant.category}
@@ -663,13 +676,13 @@ export default function SearchVerifyDetail() {
             }}
           >
             <div style={{ fontSize: 13, color: '#999', marginBottom: 6 }}>
-              加權總分
-              <span style={{ fontSize: 10, marginLeft: 4, color: '#1890ff', opacity: 0.6 }}>點擊刷新</span>
+              {t('searchVerifyDetail.weightedTotal')}
+              <span style={{ fontSize: 10, marginLeft: 4, color: '#1890ff', opacity: 0.6 }}>{t('searchVerifyDetail.clickRefresh')}</span>
             </div>
             <div style={{ fontSize: 44, fontWeight: 700, color: '#1890ff' }}>
               {merchant.dimensionScores.reduce((sum, ds) => sum + Math.round(ds.score * ds.weight / 100), 0)}
             </div>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>排名 第{merchant.rank}名</div>
+            <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{t('searchVerifyDetail.rank', { rank: merchant.rank })}</div>
           </div>
           <Divider type="vertical" style={{ height: 120 }} />
           <div style={{ flex: 1, display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'space-around' }}>
@@ -678,7 +691,7 @@ export default function SearchVerifyDetail() {
                 key={`${ds.dimension}-${animationKey}`}
                 score={ds.score}
                 maxScore={ds.maxScore}
-                dimension={ds.dimension}
+                dimension={dimLabel(ds.dimension)}
                 color={dimensionColors[ds.dimension] || '#999'}
               />
             ))}
@@ -687,7 +700,7 @@ export default function SearchVerifyDetail() {
       </Card>
 
       {/* 權重公式計算展示 */}
-      <Card title="權重公式計算" style={{ marginBottom: 16, borderRadius: 8 }} bodyStyle={{ padding: '20px' }}>
+      <Card title={t('searchVerifyDetail.formulaTitle')} style={{ marginBottom: 16, borderRadius: 8 }} bodyStyle={{ padding: '20px' }}>
         {/* 計算公式說明 - 單行 */}
         <div style={{ 
           padding: '8px 16px', 
@@ -700,10 +713,10 @@ export default function SearchVerifyDetail() {
           gap: 16,
         }}>
           <div style={{ fontSize: 13, color: '#52c41a', fontWeight: 600 }}>
-            計算公式:
+            {t('searchVerifyDetail.formulaLabel')}
           </div>
           <div style={{ fontSize: 12, color: '#666' }}>
-            加權總分 = Σ（維度得分 × 權重比例）
+            {t('searchVerifyDetail.formulaDesc')}
           </div>
         </div>
 
@@ -734,7 +747,7 @@ export default function SearchVerifyDetail() {
                   color: dimensionColors[ds.dimension],
                   marginBottom: 4,
                 }}>
-                  {ds.dimension.replace('得分', '')}
+                  {dimLabel(ds.dimension).replace('得分', '')}
                 </div>
 
                 {/* 計算過程 - 單行 */}
@@ -764,7 +777,10 @@ export default function SearchVerifyDetail() {
           border: '2px solid #1890ff',
         }}>
           <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }}>
-            原始得分: {merchant.dimensionScores.map((ds) => ds.score).join(' + ')} = {merchant.dimensionScores.reduce((sum, ds) => sum + ds.score, 0)}
+            {t('searchVerifyDetail.rawScore', {
+              expr: merchant.dimensionScores.map((ds) => ds.score).join(' + '),
+              total: merchant.dimensionScores.reduce((sum, ds) => sum + ds.score, 0),
+            })}
           </div>
           <div style={{ 
             fontSize: 14, 
@@ -775,7 +791,7 @@ export default function SearchVerifyDetail() {
             alignItems: 'center',
           }}>
             <div>
-              加權得分: {merchant.dimensionScores.map((ds) => {
+              {t('searchVerifyDetail.weightedScore')}{merchant.dimensionScores.map((ds) => {
                 const weightedScore = Math.round(ds.score * ds.weight / 100)
                 return (
                   <span key={ds.dimension} style={{ color: dimensionColors[ds.dimension], fontWeight: 700 }}>
@@ -806,7 +822,7 @@ export default function SearchVerifyDetail() {
                   display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
                   background: dimensionColors[ds.dimension] || '#999', marginRight: 6,
                 }} />
-                {ds.dimension}
+                {dimLabel(ds.dimension)}
                 <span style={{
                   marginLeft: 6, padding: '1px 8px', borderRadius: 10, fontSize: 11,
                   background: dimensionColors[ds.dimension] || '#999', color: '#fff',
@@ -821,7 +837,7 @@ export default function SearchVerifyDetail() {
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message={`${ds.dimension}：得分 ${ds.score} / ${ds.maxScore}，權重佔比 ${ds.weight}%`}
+                  message={t('searchVerifyDetail.dimAlert', { dim: dimLabel(ds.dimension), score: ds.score, max: ds.maxScore, weight: ds.weight })}
                 />
                 <Table
                   size="small"
@@ -829,11 +845,11 @@ export default function SearchVerifyDetail() {
                   dataSource={ds.details.filter(d => d.enabled)}
                   columns={[
                     {
-                      title: '計分项', dataIndex: 'name', width: 180,
+                      title: t('searchVerifyDetail.colItem'), dataIndex: 'name', width: 180,
                       render: (v: string) => <span style={{ fontWeight: 500 }}>{v}</span>,
                     },
                     {
-                      title: '得分', dataIndex: 'score', width: 100, align: 'center',
+                      title: t('searchVerifyDetail.colScore'), dataIndex: 'score', width: 100, align: 'center',
                       render: (v: number) => (
                         <span style={{
                           fontWeight: 700, fontSize: 15,
@@ -844,7 +860,7 @@ export default function SearchVerifyDetail() {
                       ),
                     },
                     {
-                      title: '得分說明', dataIndex: 'description',
+                      title: t('searchVerifyDetail.colDesc'), dataIndex: 'description',
                       render: (v: string) => <span style={{ color: '#666' }}>{v}</span>,
                     },
                   ]}
@@ -853,13 +869,13 @@ export default function SearchVerifyDetail() {
                     const total = ds.details.filter(d => d.enabled).reduce((sum, d) => sum + d.score, 0)
                     return (
                       <Table.Summary.Row style={{ background: '#fafafa', fontWeight: 600 }}>
-                        <Table.Summary.Cell index={0}>小計</Table.Summary.Cell>
+                        <Table.Summary.Cell index={0}>{t('searchVerifyDetail.subtotal')}</Table.Summary.Cell>
                         <Table.Summary.Cell index={1} align="center">
                           <span style={{ color: '#1890ff', fontWeight: 700 }}>{total}</span>
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={2}>
                           <span style={{ color: '#999' }}>
-                            {ds.dimension}維度共計 {ds.details.filter(d => d.enabled).length} 項計分因子
+                            {t('searchVerifyDetail.dimTotal', { dim: dimLabel(ds.dimension), count: ds.details.filter(d => d.enabled).length })}
                           </span>
                         </Table.Summary.Cell>
                       </Table.Summary.Row>

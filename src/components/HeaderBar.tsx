@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Layout, Dropdown, Badge, Popover, List, Avatar, Modal, Input, message, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -13,6 +13,12 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import PikachuFace from './PikachuFace'
+import { useTranslation } from 'react-i18next'
+import { changeAppLanguage, getCountryLanguage, SUPPORTED_LANGUAGES, injectTranslationBundle } from '../i18n'
+import type { AppLanguage } from '../i18n'
+import { LANG_INFO, langSysName, validateLanguageConfigured } from '../utils/translationConfig'
+import type { LangValidationResult } from '../utils/translationConfig'
+import { fetchCoverage, fetchTranslationBundle } from '../api/translation'
 
 const { Header } = Layout
 
@@ -44,49 +50,85 @@ const pikachuAvatars = [
 
 export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   const { user, logout, updateAvatar } = useAuth()
+  const { t, i18n: i18nInstance } = useTranslation()
   const navigate = useNavigate()
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [oldPwd, setOldPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
-  const [selectedCountry, setSelectedCountry] = useState<string>('china') // 默认中国
+  const [selectedCountry, setSelectedCountry] = useState<string>('en') // 默认英文
 
-  // 国家选项（带国旗图标）
-  const countryOptions = [
-    { value: 'china', label: '中国', flag: '🇨🇳' },
-    { value: 'hongkong', label: '香港', flag: '🇭🇰' },
-    { value: 'macau', label: '澳门', flag: '🇲🇴' },
-    { value: 'taiwan', label: '台湾', flag: '🇹🇼' },
-    { value: 'japan', label: '日本', flag: '🇯🇵' },
-    { value: 'south_korea', label: '韩国', flag: '🇰🇷' },
-    { value: 'singapore', label: '新加坡', flag: '🇸🇬' },
-    { value: 'malaysia', label: '马来西亚', flag: '🇲🇾' },
-    { value: 'thailand', label: '泰国', flag: '🇹🇭' },
-    { value: 'vietnam', label: '越南', flag: '🇻🇳' },
-    { value: 'philippines', label: '菲律宾', flag: '🇵🇭' },
-    { value: 'indonesia', label: '印度尼西亚', flag: '🇮🇩' },
-    { value: 'usa', label: '美国', flag: '🇺🇸' },
-    { value: 'uk', label: '英国', flag: '🇬🇧' },
-    { value: 'australia', label: '澳大利亚', flag: '🇦🇺' },
-  ]
+  // 国家/语言选项：默认展示语言代码库的所有语言和国旗，名称跟随全局语言
+  const countryOptions = useMemo(() =>
+    Object.keys(LANG_INFO).map(code => ({
+      value: code,
+      flag: LANG_INFO[code].flag,
+      label: langSysName(code, i18nInstance.language || 'en'),
+    })), [i18nInstance.language])
 
-  // 从 localStorage 读取国家选择
+  // 从 localStorage 读取国家选择（兼容旧版国家编码，如 usa/china → 对应语言代码）
   useEffect(() => {
     const savedCountry = localStorage.getItem('selected_country')
     if (savedCountry) {
-      setSelectedCountry(savedCountry)
+      if (LANG_INFO[savedCountry]) {
+        setSelectedCountry(savedCountry)
+      } else {
+        setSelectedCountry(getCountryLanguage(savedCountry))
+      }
     }
   }, [])
 
-  // 处理国家选择变化
-  const handleCountryChange = (country: string) => {
-    setSelectedCountry(country)
-    localStorage.setItem('selected_country', country)
-    const selected = countryOptions.find(c => c.value === country)
-    message.success(`已切换到${selected?.flag} ${selected?.label}`)
+  /** 执行国家/语言切换（含后端语言包注入） */
+  const doSwitchCountry = async (code: string) => {
+    const selected = countryOptions.find(c => c.value === code)
+    // 拉取后端数据库语言包注入 i18next（业务字段/菜单名等动态翻译）
+    const bundle = await fetchTranslationBundle(code)
+    if (bundle) {
+      injectTranslationBundle(code, bundle)
+    }
+    setSelectedCountry(code)
+    localStorage.setItem('selected_country', code)
+    if ((SUPPORTED_LANGUAGES as readonly string[]).includes(code)) {
+      changeAppLanguage(code as AppLanguage)
+      message.success(t('header.switchedCountry', { flag: selected?.flag ?? '', name: selected?.label ?? code }))
+    } else {
+      message.info(`已切换至 ${selected?.flag ?? ''} ${selected?.label ?? code}，该语言的界面文案将在翻译资源导入后生效`)
+    }
     // 触发全局事件，其他组件可以监听
-    window.dispatchEvent(new CustomEvent('countryChange', { detail: country }))
+    window.dispatchEvent(new CustomEvent('countryChange', { detail: code }))
+  }
+
+  // 处理国家选择：先校验该语言是否已在「多语言配置」完成配置（优先后端真实完成率）
+  const handleCountryChange = async (code: string) => {
+    const remote = await fetchCoverage(code)
+    const validation: LangValidationResult = remote ?? validateLanguageConfigured(code)
+    const selected = countryOptions.find(c => c.value === code)
+    const displayName = `${selected?.flag ?? ''} ${selected?.label ?? code}`
+
+    if (validation.status === 'not_configured') {
+      Modal.warning({
+        title: '该国家语言未配置',
+        content: `${displayName} 对应的语言尚未在多语言配置中完成配置，请先到「系统配置 → 多语言配置」添加该语言并补充翻译后再进行选择。`,
+        okText: '知道了',
+      })
+      return
+    }
+    if (validation.status === 'partial') {
+      Modal.confirm({
+        title: '该语言翻译未完整',
+        content: `${displayName} 的翻译完成率仅 ${Math.round(validation.rate * 100)}%（未达 60% 标准，已翻译 ${validation.translated}/${validation.total} 个字段），切换后未翻译的内容将以英文显示。是否仍要切换？`,
+        okText: '仍要切换',
+        cancelText: '取消',
+        onOk: () => doSwitchCountry(code),
+      })
+      return
+    }
+    doSwitchCountry(code)
+    // 达标但未 100%：提示未配置字段将回退英文展示
+    if (validation.rate < 1) {
+      message.info(`${displayName} 翻译完成率 ${Math.round(validation.rate * 100)}%，未配置的字段将以英文显示`)
+    }
   }
 
   /** 退出登录 */
@@ -97,11 +139,11 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
 
   /** 修改密码（TODO: 后端密码修改接口落地后替换当前演示逻辑） */
   const handleChangePwd = () => {
-    if (!oldPwd) { message.warning('請輸入原密碼'); return }
-    if (!newPwd) { message.warning('請輸入新密碼'); return }
-    if (newPwd !== confirmPwd) { message.error('兩次輸入的密碼不一致'); return }
-    if (newPwd.length < 6) { message.error('新密碼長度不能少於 6 位'); return }
-    message.success('密碼修改成功')
+    if (!oldPwd) { message.warning(t('header.pwdRequiredOld')); return }
+    if (!newPwd) { message.warning(t('header.pwdRequiredNew')); return }
+    if (newPwd !== confirmPwd) { message.error(t('header.pwdMismatch')); return }
+    if (newPwd.length < 6) { message.error(t('header.pwdTooShort')); return }
+    message.success(t('header.pwdChanged'))
     setPwdModalOpen(false)
     setOldPwd(''); setNewPwd(''); setConfirmPwd('')
   }
@@ -109,7 +151,7 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   /** 更换头像 */
   const handleChangeAvatar = (url: string) => {
     updateAvatar(url)
-    message.success('頭像已更換')
+    message.success(t('header.avatarChanged'))
     setAvatarModalOpen(false)
   }
 
@@ -118,20 +160,20 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
     {
       key: 'avatar',
       icon: <CameraOutlined />,
-      label: '更換頭像',
+      label: t('header.changeAvatar'),
       onClick: () => setAvatarModalOpen(true),
     },
     {
       key: 'password',
       icon: <KeyOutlined />,
-      label: '修改密碼',
+      label: t('header.changePassword'),
       onClick: () => setPwdModalOpen(true),
     },
     { type: 'divider' },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: '退出登錄',
+      label: t('header.logout'),
       danger: true,
       onClick: handleLogout,
     },
@@ -140,17 +182,17 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   /** 通知面板 */
   const notificationContent = (
     <div className="header-notification-panel">
-      <div className="header-notification-title">系統消息</div>
+      <div className="header-notification-title">{t('header.notifications')}</div>
       <List
         dataSource={notifications}
         renderItem={(item) => (
           <List.Item className="header-notification-item">
             <List.Item.Meta
-              title={<span className="header-notification-item-title">{item.title}</span>}
+              title={<span className="header-notification-item-title">{t(`header.notif${item.id}.title`)}</span>}
               description={
                 <div>
-                  <div className="header-notification-item-desc">{item.desc}</div>
-                  <div className="header-notification-item-time">{item.time}</div>
+                  <div className="header-notification-item-desc">{t(`header.notif${item.id}.desc`)}</div>
+                  <div className="header-notification-item-time">{t(`header.notif${item.id}.time`)}</div>
                 </div>
               }
             />
@@ -175,12 +217,26 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
         <div className="header-right">
           {/* 国家选择器 */}
           <Select
+            showSearch
             value={selectedCountry}
             onChange={handleCountryChange}
-            style={{ width: 140, marginRight: 16 }}
+            style={{ width: 160, marginRight: 12 }}
             options={countryOptions.map(option => ({
               value: option.value,
               label: `${option.flag} ${option.label}`,
+            }))}
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+          {/* 语言切换（选国家联动默认语言，可手动覆盖） */}
+          <Select
+            value={i18nInstance.language}
+            onChange={(lang) => changeAppLanguage(lang as AppLanguage)}
+            style={{ width: 120, marginRight: 16 }}
+            options={SUPPORTED_LANGUAGES.map((lang) => ({
+              value: lang,
+              label: t(`language.${lang}`),
             }))}
           />
 
@@ -237,23 +293,23 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
 
       {/* 修改密码弹窗 */}
       <Modal
-        title="修改密碼"
+        title={t('header.changePasswordTitle')}
         open={pwdModalOpen}
         onCancel={() => setPwdModalOpen(false)}
         onOk={handleChangePwd}
-        okText="確認"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
-          <Input.Password placeholder="請輸入原密碼" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} />
-          <Input.Password placeholder="請輸入新密碼" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-          <Input.Password placeholder="請確認新密碼" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+          <Input.Password placeholder={t('header.enterOldPwd')} value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} />
+          <Input.Password placeholder={t('header.enterNewPwd')} value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+          <Input.Password placeholder={t('header.confirmNewPwd')} value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
         </div>
       </Modal>
 
       {/* 更换头像弹窗 */}
       <Modal
-        title="更換頭像"
+        title={t('header.changeAvatarTitle')}
         open={avatarModalOpen}
         onCancel={() => setAvatarModalOpen(false)}
         footer={null}
@@ -272,13 +328,13 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
                 transition: 'all 0.2s',
               }}
               onClick={() => handleChangeAvatar(avatar.key)}
-              title={avatar.label}
+              title={t(`header.avatarNames.${avatar.key.replace('pikachu-', '')}`)}
             >
               <div style={{ width: 64, height: 64 }}>
                 <PikachuFace expression={avatar.key.replace('pikachu-', '') || 'happy'} size={64} />
               </div>
               <div style={{ textAlign: 'center', fontSize: 12, color: '#666', marginTop: 4 }}>
-                {avatar.label}
+                {t(`header.avatarNames.${avatar.key.replace('pikachu-', '')}`)}
               </div>
             </div>
           ))}

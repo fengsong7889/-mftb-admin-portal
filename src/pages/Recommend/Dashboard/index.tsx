@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, Col, Row, Statistic, Table, Select, Tag, Space } from 'antd'
 import { RiseOutlined, FundOutlined, EyeOutlined, DollarOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import { Line, Column } from '@ant-design/charts'
+import { useTranslation } from 'react-i18next'
 import AppTabs from '../components/AppTabs'
 import { AppType } from '../constants'
 
@@ -75,30 +76,32 @@ const AD_TYPE_COLORS: Record<string, string> = {
   '流量廣告': 'gold',
 }
 
-const STATUS_CONFIG = {
-  running: { color: 'success', text: '投放中' },
-  paused: { color: 'default', text: '已暫停' },
-  ended: { color: 'error', text: '已結束' },
-}
-
 export default function Dashboard() {
+  const { t } = useTranslation()
   const [activeApp, setActiveApp] = useState<AppType>(AppType.SHANFENG)
   const [selectedAd, setSelectedAd] = useState<string>('all')
   const [selectedRegion, setSelectedRegion] = useState<string>('all')
 
+  /** 广告状态配置（依赖 t，定义在组件内以便响应语言切换） */
+  const STATUS_CONFIG = {
+    running: { color: 'success' as const, text: t('recommendDashboard.statusRunning') },
+    paused: { color: 'default' as const, text: t('recommendDashboard.statusPaused') },
+    ended: { color: 'error' as const, text: t('recommendDashboard.statusEnded') },
+  }
+
   // 广告表格列
   const adColumns = [
-    { title: '廣告名稱', dataIndex: 'name', key: 'name', width: 180 },
+    { title: t('recommendDashboard.colAdName'), dataIndex: 'name', key: 'name', width: 180 },
     { 
-      title: '廣告類型', 
+      title: t('recommendDashboard.colAdType'), 
       dataIndex: 'type', 
       key: 'type',
       render: (type: string) => <Tag color={AD_TYPE_COLORS[type]}>{type}</Tag>
     },
-    { title: '頻道', dataIndex: 'channel', key: 'channel', width: 80 },
-    { title: '區域', dataIndex: 'region', key: 'region', width: 80 },
+    { title: t('recommendDashboard.colChannel'), dataIndex: 'channel', key: 'channel', width: 80 },
+    { title: t('recommendDashboard.colRegion'), dataIndex: 'region', key: 'region', width: 80 },
     { 
-      title: '預算/已消耗', 
+      title: t('recommendDashboard.colBudgetSpent'), 
       key: 'budget',
       render: (_: unknown, record: RunningAd) => (
         <span>
@@ -109,25 +112,25 @@ export default function Dashboard() {
       ),
     },
     { 
-      title: '曝光量', 
+      title: t('recommendDashboard.colImpressions'), 
       dataIndex: 'impressions', 
       key: 'impressions',
       render: (v: number) => v.toLocaleString(),
     },
     { 
-      title: '點擊量', 
+      title: t('recommendDashboard.colClicks'), 
       dataIndex: 'clicks', 
       key: 'clicks',
       render: (v: number) => v.toLocaleString(),
     },
     { 
-      title: 'CTR', 
+      title: t('recommendDashboard.colCtr'), 
       dataIndex: 'ctr', 
       key: 'ctr',
       render: (v: number) => `${v}%`,
     },
     { 
-      title: '狀態', 
+      title: t('common.colStatus'), 
       dataIndex: 'status', 
       key: 'status',
       render: (status: 'running' | 'paused' | 'ended') => (
@@ -138,9 +141,9 @@ export default function Dashboard() {
 
   // 区域表格列
   const regionColumns = [
-    { title: '區域', dataIndex: 'region', key: 'region', width: 100 },
+    { title: t('recommendDashboard.colRegion'), dataIndex: 'region', key: 'region', width: 100 },
     { 
-      title: '廣告營收', 
+      title: t('recommendDashboard.colAdRevenue'), 
       dataIndex: 'revenue', 
       key: 'revenue',
       render: (v: number) => (
@@ -149,21 +152,21 @@ export default function Dashboard() {
         </span>
       ),
     },
-    { title: '在投廣告數', dataIndex: 'ads', key: 'ads', width: 120 },
+    { title: t('recommendDashboard.colRunningAdsCount'), dataIndex: 'ads', key: 'ads', width: 120 },
     { 
-      title: '曝光總量', 
+      title: t('recommendDashboard.colTotalImpressions'), 
       dataIndex: 'impressions', 
       key: 'impressions',
       render: (v: number) => v.toLocaleString(),
     },
     { 
-      title: '點擊總量', 
+      title: t('recommendDashboard.colTotalClicks'), 
       dataIndex: 'clicks', 
       key: 'clicks',
       render: (v: number) => v.toLocaleString(),
     },
     { 
-      title: '平均CTR', 
+      title: t('recommendDashboard.colAvgCtr'), 
       dataIndex: 'avgCtr', 
       key: 'avgCtr',
       render: (v: number) => `${v}%`,
@@ -200,7 +203,7 @@ export default function Dashboard() {
     },
     tooltip: {
       formatter: (v: Record<string, number>) => ({
-        name: '廣告營收',
+        name: t('recommendDashboard.chartAdRevenue'),
         value: `MOP ${v.revenue.toLocaleString()}`,
       }),
     },
@@ -223,7 +226,7 @@ export default function Dashboard() {
     },
     tooltip: {
       formatter: (v: Record<string, number>) => ({
-        name: '廣告營收',
+        name: t('recommendDashboard.chartAdRevenue'),
         value: `MOP ${v.revenue.toLocaleString()}`,
       }),
     },
@@ -232,7 +235,7 @@ export default function Dashboard() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2>數據看板</h2>
+        <h2>{t('recommendDashboard.pageTitle')}</h2>
       </div>
       <AppTabs value={activeApp} onChange={setActiveApp} />
 
@@ -241,7 +244,7 @@ export default function Dashboard() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="今日營收"
+              title={t('recommendDashboard.statTodayRevenue')}
               value={REVENUE_STATS.today}
               precision={2}
               prefix={<DollarOutlined style={{ color: '#3f8600' }} />}
@@ -253,7 +256,7 @@ export default function Dashboard() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="本周營收"
+              title={t('recommendDashboard.statWeekRevenue')}
               value={REVENUE_STATS.week}
               precision={2}
               prefix={<RiseOutlined style={{ color: '#1677ff' }} />}
@@ -265,18 +268,18 @@ export default function Dashboard() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="在投廣告數"
+              title={t('recommendDashboard.statRunningAds')}
               value={RUNNING_ADS.filter(ad => ad.status === 'running').length}
               prefix={<FundOutlined style={{ color: '#722ed1' }} />}
               valueStyle={{ color: '#722ed1' }}
-              suffix="個"
+              suffix={t('recommendDashboard.statAdsSuffix')}
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
-              title="曝光總量"
+              title={t('recommendDashboard.statTotalImpressions')}
               value={RUNNING_ADS.reduce((sum, ad) => sum + ad.impressions, 0)}
               prefix={<EyeOutlined style={{ color: '#fa8c16' }} />}
               valueStyle={{ color: '#fa8c16' }}
@@ -287,18 +290,18 @@ export default function Dashboard() {
 
       {/* 2. 运行中的广告列表 */}
       <Card 
-        title="運行中的廣告" 
+        title={t('recommendDashboard.runningAdsTitle')} 
         style={{ marginBottom: 24 }}
         extra={
           <Space>
             <Select
-              placeholder="選擇廣告類型"
+              placeholder={t('recommendDashboard.placeholderAdType')}
               style={{ width: 150 }}
               allowClear
               value={selectedAd}
               onChange={setSelectedAd}
             >
-              <Option value="all">全部廣告</Option>
+              <Option value="all">{t('recommendDashboard.allAds')}</Option>
               <Option value="猜你喜歡">猜你喜歡</Option>
               <Option value="無敵星星">無敵星星</Option>
               <Option value="新店推送">新店推送</Option>
@@ -307,13 +310,13 @@ export default function Dashboard() {
               <Option value="流量廣告">流量廣告</Option>
             </Select>
             <Select
-              placeholder="選擇區域"
+              placeholder={t('recommendDashboard.placeholderRegion')}
               style={{ width: 120 }}
               allowClear
               value={selectedRegion}
               onChange={setSelectedRegion}
             >
-              <Option value="all">全部區域</Option>
+              <Option value="all">{t('recommendDashboard.allRegions')}</Option>
               <Option value="澳門">澳門</Option>
               <Option value="氹仔">氹仔</Option>
               <Option value="珠海">珠海</Option>
@@ -329,7 +332,7 @@ export default function Dashboard() {
             if (selectedRegion !== 'all' && ad.region !== selectedRegion) return false
             return true
           })}
-          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 條`, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true }}
+          pagination={{ pageSize: 10, showTotal: (total) => t('common.total', { count: total }), showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true }}
           size="small"
         />
       </Card>
@@ -337,12 +340,12 @@ export default function Dashboard() {
       {/* 3. 广告推广趋势图 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={16}>
-          <Card title="廣告營收趨勢" style={{ minHeight: 320 }}>
+          <Card title={t('recommendDashboard.chartRevenueTrend')} style={{ minHeight: 320 }}>
             <Line {...revenueChartConfig} height={260} />
           </Card>
         </Col>
         <Col span={8}>
-          <Card title="區域營收分佈" style={{ minHeight: 320 }}>
+          <Card title={t('recommendDashboard.chartRegionDistribution')} style={{ minHeight: 320 }}>
             <Column {...regionChartConfig} height={260} />
           </Card>
         </Col>
@@ -353,7 +356,7 @@ export default function Dashboard() {
         title={
           <span>
             <EnvironmentOutlined style={{ marginRight: 8, color: '#1677ff' }} />
-            區域數據概覽
+            {t('recommendDashboard.regionOverview')}
           </span>
         }
         style={{ marginBottom: 24 }}
@@ -372,8 +375,8 @@ export default function Dashboard() {
               overflow: 'hidden'
             }}>
               <div style={{ color: '#fff', textAlign: 'center', zIndex: 1 }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: 24 }}>澳門地區廣告投放熱力圖</h3>
-                <p style={{ margin: 0, opacity: 0.9 }}>覆蓋 3 個主要區域 | 86 個在投廣告</p>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: 24 }}>{t('recommendDashboard.heatmapTitle')}</h3>
+                <p style={{ margin: 0, opacity: 0.9 }}>{t('recommendDashboard.heatmapSubtitle', { count: 3, ads: 86 })}</p>
               </div>
               {/* 模拟区域标记 */}
               <div style={{

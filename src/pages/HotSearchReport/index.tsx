@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Input, Select, DatePicker, Table, Form, Card, Row, Col, Statistic } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -12,27 +13,6 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 
 const { RangePicker } = DatePicker
-
-const terminalOptions = [
-  { label: '全部', value: 'all' },
-  { label: 'APP', value: 'app' },
-  { label: '微信小程序', value: 'wechatMini' },
-  { label: 'Mpay小應用', value: 'mpayMini' },
-  { label: '微信H5', value: 'wechatH5' },
-]
-
-const regionOptions = [
-  { label: '全部', value: 'all' },
-  { label: '澳門', value: 'macau' },
-  { label: '氹仔', value: 'taipa' },
-]
-
-const promotionTypeOptions = [
-  { label: '全部', value: 'all' },
-  { label: '活動推廣', value: 'activity' },
-  { label: '商家推廣', value: 'merchant' },
-  { label: '運營推廣', value: 'operation' },
-]
 
 interface ReportData {
   key: string
@@ -109,21 +89,6 @@ const brandCompareData = [
   { brand: '閃蜂', type: '展示次數', value: 9450 },
   { brand: '閃蜂', type: '點擊次數', value: 1456 },
   { brand: '閃蜂', type: '店鋪訪問', value: 1123 },
-]
-const columns: TableColumnsType<ReportData> = [
-  { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-  { title: '熱搜詞', dataIndex: 'word', key: 'word', width: 150 },
-  { title: '推廣類型', dataIndex: 'promotionType', key: 'promotionType', width: 100 },
-  { title: '搜索界面', dataIndex: 'searchPage', key: 'searchPage', width: 100 },
-  { title: '品牌', dataIndex: 'brand', key: 'brand', width: 80 },
-  { title: '展示終端', dataIndex: 'terminal', key: 'terminal', width: 120 },
-  { title: '區域', dataIndex: 'region', key: 'region', width: 80 },
-  { title: '時段', dataIndex: 'timeSlot', key: 'timeSlot', width: 80 },
-  { title: '展示次數', dataIndex: 'showCount', key: 'showCount', width: 100, sorter: true },
-  { title: '點擊次數', dataIndex: 'clickCount', key: 'clickCount', width: 100, sorter: true },
-  { title: '點擊率', dataIndex: 'clickRate', key: 'clickRate', width: 100, sorter: true },
-  { title: '店鋪訪問次數', dataIndex: 'shopVisitCount', key: 'shopVisitCount', width: 120, sorter: true },
-  { title: '是否售賣', dataIndex: 'isSold', key: 'isSold', width: 90 },
 ]
 
 const trendConfig = {
@@ -230,20 +195,62 @@ const brandColumnConfig = {
 }
 
 export default function HotSearchReport() {
+  const { t } = useTranslation()
+
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'date', title: '日期' },
-    { key: 'word', title: '熱搜詞' },
-    { key: 'promotionType', title: '推廣類型' },
-    { key: 'searchPage', title: '搜索界面' },
-    { key: 'brand', title: '品牌' },
-    { key: 'terminal', title: '展示終端' },
-    { key: 'region', title: '區域' },
-    { key: 'timeSlot', title: '時段' },
-    { key: 'showCount', title: '展示次數' },
-    { key: 'clickCount', title: '點擊次數' },
-    { key: 'clickRate', title: '點擊率' },
-  ], [])
+    { key: 'date', title: t('hotSearchReport.colDate') },
+    { key: 'word', title: t('hotSearchReport.colWord') },
+    { key: 'promotionType', title: t('hotSearchReport.colPromotionType') },
+    { key: 'searchPage', title: t('hotSearchReport.colSearchPage') },
+    { key: 'brand', title: t('hotSearchReport.colBrand') },
+    { key: 'terminal', title: t('hotSearchReport.colTerminal') },
+    { key: 'region', title: t('hotSearchReport.colRegion') },
+    { key: 'timeSlot', title: t('hotSearchReport.colTimeSlot') },
+    { key: 'showCount', title: t('hotSearchReport.colShowCount') },
+    { key: 'clickCount', title: t('hotSearchReport.colClickCount') },
+    { key: 'clickRate', title: t('hotSearchReport.colClickRate') },
+  ], [t])
+
+  const columns: TableColumnsType<ReportData> = [
+    { title: t('hotSearchReport.colDate'), dataIndex: 'date', key: 'date', width: 120 },
+    { title: t('hotSearchReport.colWord'), dataIndex: 'word', key: 'word', width: 150 },
+    { title: t('hotSearchReport.colPromotionType'), dataIndex: 'promotionType', key: 'promotionType', width: 100 },
+    { title: t('hotSearchReport.colSearchPage'), dataIndex: 'searchPage', key: 'searchPage', width: 100 },
+    { title: t('hotSearchReport.colBrand'), dataIndex: 'brand', key: 'brand', width: 80 },
+    { title: t('hotSearchReport.colTerminal'), dataIndex: 'terminal', key: 'terminal', width: 120 },
+    { title: t('hotSearchReport.colRegion'), dataIndex: 'region', key: 'region', width: 80 },
+    { title: t('hotSearchReport.colTimeSlot'), dataIndex: 'timeSlot', key: 'timeSlot', width: 80 },
+    { title: t('hotSearchReport.colShowCount'), dataIndex: 'showCount', key: 'showCount', width: 100, sorter: true },
+    { title: t('hotSearchReport.colClickCount'), dataIndex: 'clickCount', key: 'clickCount', width: 100, sorter: true },
+    { title: t('hotSearchReport.colClickRate'), dataIndex: 'clickRate', key: 'clickRate', width: 100, sorter: true },
+    { title: t('hotSearchReport.colShopVisit'), dataIndex: 'shopVisitCount', key: 'shopVisitCount', width: 120, sorter: true },
+    {
+      title: t('hotSearchReport.colIsSold'), dataIndex: 'isSold', key: 'isSold', width: 90,
+      render: (v: string) => v === '已售' ? t('hotSearchReport.isSoldYes') : t('hotSearchReport.isSoldNo'),
+    },
+  ]
+
+  const terminalOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.terminal.app'), value: 'app' },
+    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
+    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
+    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
+  ]
+
+  const regionOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.region.macau'), value: 'macau' },
+    { label: t('dict.region.taipa'), value: 'taipa' },
+  ]
+
+  const promotionTypeOptions = [
+    { label: t('common.all'), value: 'all' },
+    { label: t('dict.promotionType.activity'), value: 'activity' },
+    { label: t('dict.promotionType.merchant'), value: 'merchant' },
+    { label: t('dict.promotionType.operation'), value: 'operation' },
+  ]
 
   const { configComponent, applyConfig } = useColumnConfig('hot-search-report', columnMeta)
 
@@ -252,28 +259,28 @@ export default function HotSearchReport() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="熱搜詞">
-            <Input placeholder="請輸入熱搜詞" allowClear style={{ height: 30 }} />
+          <Form.Item label={t('hotSearchReport.searchWord')}>
+            <Input placeholder={t('hotSearchReport.searchWordPlaceholder')} allowClear style={{ height: 30 }} />
           </Form.Item>
-          <Form.Item label="推廣類型">
-            <Select placeholder="請選擇" options={promotionTypeOptions} style={{ height: 30, width: 200 }} />
+          <Form.Item label={t('hotSearchReport.searchPromotionType')}>
+            <Select placeholder={t('common.all')} options={promotionTypeOptions} style={{ height: 30, width: 200 }} />
           </Form.Item>
-          <Form.Item label="所屬品牌">
-            <Select placeholder="請選擇" options={brandOptions} style={{ height: 30, width: 200 }} />
+          <Form.Item label={t('hotSearchReport.searchBrand')}>
+            <Select placeholder={t('common.all')} options={brandOptions} style={{ height: 30, width: 200 }} />
           </Form.Item>
-          <Form.Item label="展示終端">
-            <Select placeholder="請選擇" options={terminalOptions} style={{ height: 30, width: 200 }} />
+          <Form.Item label={t('hotSearchReport.searchTerminal')}>
+            <Select placeholder={t('common.all')} options={terminalOptions} style={{ height: 30, width: 200 }} />
           </Form.Item>
-          <Form.Item label="區域">
-            <Select placeholder="請選擇" options={regionOptions} style={{ height: 30, width: 200 }} />
+          <Form.Item label={t('hotSearchReport.searchRegion')}>
+            <Select placeholder={t('common.all')} options={regionOptions} style={{ height: 30, width: 200 }} />
           </Form.Item>
-          <Form.Item label="統計日期">
+          <Form.Item label={t('hotSearchReport.searchDate')}>
             <RangePicker style={{ height: 30 }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} style={{ height: 30 }}>查詢</Button>
-              <Button icon={<ReloadOutlined />} style={{ height: 30 }}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} style={{ height: 30 }}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} style={{ height: 30 }}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -282,7 +289,7 @@ export default function HotSearchReport() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {configComponent}
@@ -294,31 +301,31 @@ export default function HotSearchReport() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="總展示次數"
+              title={t('hotSearchReport.totalShow')}
               value={27890}
               precision={0}
               valueStyle={{ color: '#1890ff' }}
               prefix={<ArrowUpOutlined />}
-              suffix="次"
+              suffix={t('common.times')}
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
-              title="總點擊次數"
+              title={t('hotSearchReport.totalClick')}
               value={4320}
               precision={0}
               valueStyle={{ color: '#52c41a' }}
               prefix={<ArrowUpOutlined />}
-              suffix="次"
+              suffix={t('common.times')}
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
-              title="平均點擊率"
+              title={t('hotSearchReport.avgClickRate')}
               value={15.49}
               precision={2}
               valueStyle={{ color: '#fa8c16' }}
@@ -329,12 +336,12 @@ export default function HotSearchReport() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="店鋪訪問總次數"
+              title={t('hotSearchReport.totalShopVisit')}
               value={3234}
               precision={0}
               valueStyle={{ color: '#722ed1' }}
               prefix={<ArrowUpOutlined />}
-              suffix="次"
+              suffix={t('common.times')}
             />
           </Card>
         </Col>
@@ -343,12 +350,12 @@ export default function HotSearchReport() {
       {/* 图表区域 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col span={16}>
-          <Card title="📈 展示、點擊與店鋪訪問趨勢" bordered={false}>
+          <Card title={`📈 ${t('hotSearchReport.trendTitle')}`} bordered={false}>
             <Line {...trendConfig} height={300} />
           </Card>
         </Col>
         <Col span={8}>
-          <Card title="🥧 推廣類型分布" bordered={false}>
+          <Card title={`🥧 ${t('hotSearchReport.pieTitle')}`} bordered={false}>
             <Pie {...promotionPieConfig} height={300} />
           </Card>
         </Col>
@@ -356,12 +363,12 @@ export default function HotSearchReport() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col span={12}>
-          <Card title="🕐 時段分布對比" bordered={false}>
+          <Card title={`🕐 ${t('hotSearchReport.slotTitle')}`} bordered={false}>
             <Column {...timeSlotColumnConfig} height={280} />
           </Card>
         </Col>
         <Col span={12}>
-          <Card title="📊 時段展示趨勢" bordered={false}>
+          <Card title={`📊 ${t('hotSearchReport.slotTrendTitle')}`} bordered={false}>
             <Area {...timeSlotAreaConfig} height={280} />
           </Card>
         </Col>
@@ -369,7 +376,7 @@ export default function HotSearchReport() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col span={24}>
-          <Card title="🏢 品牌對比分析" bordered={false}>
+          <Card title={`🏢 ${t('hotSearchReport.brandTitle')}`} bordered={false}>
             <Column {...brandColumnConfig} height={280} />
           </Card>
         </Col>
@@ -377,14 +384,14 @@ export default function HotSearchReport() {
 
       {/* 列表区域 */}
       <div className="table-section">
-        <Card title="📋 明細數據" bordered={false}>
+        <Card title={`📋 ${t('hotSearchReport.detailTitle')}`} bordered={false}>
           <Table<ReportData>
             columns={applyConfig(columns)}
             dataSource={mockData}
             pagination={{
               total: mockData.length,
               pageSize: 10,
-              showTotal: (total) => `共 ${total} 條`,
+              showTotal: (total) => t('common.total', { count: total }),
               showSizeChanger: true,
               pageSizeOptions: ['10', '20', '50', '100'],
               defaultPageSize: 10,
