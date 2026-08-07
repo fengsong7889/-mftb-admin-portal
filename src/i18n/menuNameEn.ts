@@ -78,6 +78,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   // 系統配置
   'system-config': 'System Config',
   'menu-config': 'Menu Config',
+  'translation-manage': 'Translation Config',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
   'promotion-order-manage': 'Order Management',
@@ -85,12 +86,27 @@ export const MENU_NAME_EN: Record<string, string> = {
 
 /**
  * 根據當前語言翻譯菜單名稱：
- * - 英文模式：優先取映射表，未覆蓋時回退中文（數據庫菜單名）
- * - 中文模式：原樣返回
+ * 優先取靜態映射表（英文），再取 i18next 資源（含後端注入的語言包 menu.${menuKey}），
+ * 最後回退中文（數據庫菜單名）。
+ * - 非英文模式：原樣返回中文
  */
 export function translateMenuName(menuKey: string, zhName: string): string {
-  if (i18n.language?.startsWith('en')) {
-    return MENU_NAME_EN[menuKey] ?? zhName
-  }
+  if (!i18n.language?.startsWith('en')) return zhName
+
+  // 1. 靜態映射表（英文硬編碼，最高優先）
+  const staticEn = MENU_NAME_EN[menuKey]
+  if (staticEn) return staticEn
+
+  // 2. i18next 資源（後端 bundle 注入的動態翻譯，key 格式 menu.${menuKey}）
+  const bundleKey = `menu.${menuKey}`
+  const bundleVal = i18n.t(bundleKey)
+  // i18next 找不到 key 時返回 key 本身，需排除這種情況
+  if (bundleVal && bundleVal !== bundleKey) return bundleVal
+
+  // 3. 嘗試直接用 menuKey 查找（兼容不同 key 格式）
+  const directVal = i18n.t(menuKey)
+  if (directVal && directVal !== menuKey) return directVal
+
+  // 4. 回退中文
   return zhName
 }
