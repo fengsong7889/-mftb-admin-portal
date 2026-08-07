@@ -28,6 +28,9 @@ public class SysMenu {
     /** 菜单名称 */
     private String name;
 
+    /** 菜单英文名称 */
+    private String nameEn;
+
     /** 路由路径 */
     private String path;
 

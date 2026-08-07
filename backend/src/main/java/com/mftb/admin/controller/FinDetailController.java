@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.FinDetailQuery;
 import com.mftb.admin.dto.FinDetailVO;
@@ -22,6 +23,7 @@ public class FinDetailController {
 
     /** 交易明细列表（分页） */
     @GetMapping
+    @RequirePermission(menu = "detail-query")
     public Result<PageResult<FinDetailVO>> page(FinDetailQuery query) {
         return Result.success(finDetailService.page(query));
     }

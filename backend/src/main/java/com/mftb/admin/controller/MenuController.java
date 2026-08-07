@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.MenuRequest;
 import com.mftb.admin.dto.MenuVO;
@@ -30,36 +31,42 @@ public class MenuController {
 
     /** 查询全部菜单 (平铺列表) */
     @GetMapping
+    @RequirePermission(menu = "menu-config")
     public Result<List<MenuVO>> list() {
         return Result.success(menuService.list());
     }
 
     /** 查询菜单树 */
     @GetMapping("/tree")
+    @RequirePermission(menu = "menu-config")
     public Result<List<MenuVO>> tree() {
         return Result.success(menuService.tree());
     }
 
     /** 查询菜单详情 */
     @GetMapping("/{id}")
+    @RequirePermission(menu = "menu-config")
     public Result<MenuVO> detail(@PathVariable Long id) {
         return Result.success(menuService.detail(id));
     }
 
     /** 新增菜单 */
     @PostMapping
+    @RequirePermission(menu = "menu-config", action = "create")
     public Result<MenuVO> create(@Valid @RequestBody MenuRequest request) {
         return Result.success("菜单创建成功", menuService.create(request));
     }
 
     /** 编辑菜单 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "menu-config", action = "edit")
     public Result<MenuVO> update(@PathVariable Long id, @Valid @RequestBody MenuRequest request) {
         return Result.success("菜单信息已更新", menuService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
+    @RequirePermission(menu = "menu-config", action = "edit")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         menuService.updateStatus(id, status);
         return Result.success();
@@ -67,6 +74,7 @@ public class MenuController {
 
     /** 删除菜单 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "menu-config", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         menuService.delete(id);
         return Result.success();

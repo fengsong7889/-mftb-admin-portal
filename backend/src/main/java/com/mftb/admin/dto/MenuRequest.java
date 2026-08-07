@@ -23,6 +23,9 @@ public class MenuRequest {
     @NotBlank(message = "菜单名称不能为空")
     private String name;
 
+    /** 菜单英文名称 (可选, 留空时前端回退显示中文名称) */
+    private String nameEn;
+
     /** 路由路径 */
     private String path;
 

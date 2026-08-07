@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.LoginLogVO;
 import com.mftb.admin.dto.PageResult;
@@ -27,6 +28,7 @@ public class LoginLogController {
 
     /** 分页查询登录日志 */
     @GetMapping
+    @RequirePermission(menu = "login-log")
     public Result<PageResult<LoginLogVO>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
@@ -40,6 +42,7 @@ public class LoginLogController {
 
     /** 强制下线指定用户 */
     @PostMapping("/{id}/force-logout")
+    @RequirePermission(menu = "login-log", action = "edit")
     public Result<Void> forceLogout(@PathVariable Long id) {
         // 获取当前操作人信息
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -60,6 +63,7 @@ public class LoginLogController {
 
     /** 删除登录日志 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "login-log", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         try {
             loginLogService.deleteById(id);

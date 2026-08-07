@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmVO;
@@ -31,6 +32,7 @@ public class AdAlgorithmController {
 
     /** 算法分页查询 */
     @GetMapping
+    @RequirePermission(menu = "promotion-algorithm")
     public Result<PageResult<AdAlgorithmVO>> page(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -45,24 +47,28 @@ public class AdAlgorithmController {
 
     /** 算法详情 */
     @GetMapping("/{id}")
+    @RequirePermission(menu = "promotion-algorithm")
     public Result<AdAlgorithmVO> detail(@PathVariable Long id) {
         return Result.success(algorithmService.detail(id));
     }
 
     /** 新增算法 */
     @PostMapping
+    @RequirePermission(menu = "promotion-algorithm", action = "create")
     public Result<AdAlgorithmVO> create(@Valid @RequestBody AdAlgorithmRequest request) {
         return Result.success("算法新增成功", algorithmService.create(request));
     }
 
     /** 编辑算法 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "promotion-algorithm", action = "edit")
     public Result<AdAlgorithmVO> update(@PathVariable Long id, @Valid @RequestBody AdAlgorithmRequest request) {
         return Result.success("算法更新成功", algorithmService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
+    @RequirePermission(menu = "promotion-algorithm", action = "edit")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
         algorithmService.updateStatus(id, body.get("status"));
         return Result.success();
@@ -70,6 +76,7 @@ public class AdAlgorithmController {
 
     /** 删除算法 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "promotion-algorithm", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         algorithmService.delete(id);
         return Result.success();

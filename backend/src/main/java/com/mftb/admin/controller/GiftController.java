@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.GiftConsumeVO;
 import com.mftb.admin.dto.GiftDeductRequest;
@@ -29,6 +30,7 @@ public class GiftController {
 
     /** 推广赠送列表（分页） */
     @GetMapping
+    @RequirePermission(menu = "gift-detail")
     public Result<PageResult<GiftRecordVO>> listRecords(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -41,18 +43,21 @@ public class GiftController {
 
     /** 新增赠送申请 */
     @PostMapping
+    @RequirePermission(menu = "gift-detail", action = "create")
     public Result<GiftRecordVO> createRecord(@Valid @RequestBody GiftRecordRequest request) {
         return Result.success("赠送申请已提交", giftService.createRecord(request));
     }
 
     /** 赠送明细详情 */
     @GetMapping("/{id}")
+    @RequirePermission(menu = "gift-detail")
     public Result<GiftRecordVO> getRecordDetail(@PathVariable Long id) {
         return Result.success(giftService.getRecordDetail(id));
     }
 
     /** 扣除赠送天数 */
     @PostMapping("/{id}/deduct")
+    @RequirePermission(menu = "gift-detail", action = "edit")
     public Result<Void> deductDays(@PathVariable Long id, @Valid @RequestBody GiftDeductRequest request) {
         giftService.deductDays(id, request);
         return Result.success();
@@ -66,6 +71,7 @@ public class GiftController {
 
     /** 消费明细列表（分页） */
     @GetMapping("/consume")
+    @RequirePermission(menu = "gift-consume-detail")
     public Result<PageResult<GiftConsumeVO>> listConsume(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,

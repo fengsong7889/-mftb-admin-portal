@@ -11,6 +11,7 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysRoleMapper;
 import com.mftb.admin.mapper.SysRoleMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -44,6 +45,7 @@ public class RoleServiceImpl implements RoleService {
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
+    private final PermissionService permissionService;
 
     @Override
     public List<RoleVO> list() {
@@ -78,6 +80,7 @@ public class RoleServiceImpl implements RoleService {
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.insert(role);
         saveRoleMenus(role.getId(), request.getPermissions());
+        permissionService.evictAll();
         return toVO(role, 0L, loadPermissions(role.getId()));
     }
 
@@ -96,6 +99,7 @@ public class RoleServiceImpl implements RoleService {
     public void updatePermissions(Long id, List<MenuPermissionDTO> permissions) {
         requireRole(id);
         saveRoleMenus(id, permissions);
+        permissionService.evictAll();
     }
 
     @Override
@@ -104,6 +108,7 @@ public class RoleServiceImpl implements RoleService {
         role.setStatus(status);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.updateById(role);
+        permissionService.evictAll();
     }
 
     @Override
@@ -123,6 +128,7 @@ public class RoleServiceImpl implements RoleService {
                 sysUserMapper.updateById(user);
             }
         }
+        permissionService.evictAll();
     }
 
     @Override
@@ -156,6 +162,7 @@ public class RoleServiceImpl implements RoleService {
             user.setFunctionRoles(JsonUtils.toJson(roleIds));
             sysUserMapper.updateById(user);
         }
+        permissionService.evictAll();
     }
 
     @Override

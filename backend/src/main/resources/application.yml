@@ -46,8 +46,8 @@ jwt:
 
 # 会话空闲超时配置
 session:
-  # 空闲超时时间（毫秒），默认 30 分钟无操作自动登出
-  idle-timeout: ${SESSION_IDLE_TIMEOUT:1800000}
+  # 空闲超时时间（毫秒），默认 60 分钟无操作自动登出
+  idle-timeout: ${SESSION_IDLE_TIMEOUT:3600000}
 
 # CORS 跨域配置
 cors:

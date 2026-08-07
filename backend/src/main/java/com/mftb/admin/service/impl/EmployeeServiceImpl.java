@@ -16,6 +16,7 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.entity.SysLoginLog;
 import com.mftb.admin.mapper.SysLoginLogMapper;
 import com.mftb.admin.service.EmployeeService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
     private final OperatorResolver operatorResolver;
+    private final PermissionService permissionService;
 
     /** 内置管理员登录账号(工号), 禁止停用/删除 */
     private static final String BUILTIN_ADMIN = "MF00001";
@@ -115,6 +117,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
 
+        // 角色/部门变更影响操作权限, 清空权限缓存
+        permissionService.evictAll();
+
         // 姓名或部门变更时，同步更新登录日志中该员工的快照字段
         syncLoginLogSnapshot(user, oldName, oldDept);
 
@@ -178,6 +183,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             throw new BusinessException("内置管理员账号不允许删除");
         }
         sysUserMapper.deleteById(id);
+        permissionService.evictAll();
     }
 
     /**

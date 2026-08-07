@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.FinReconcileQuery;
 import com.mftb.admin.dto.FinReconcileVO;
@@ -21,6 +22,7 @@ public class FinReconcileController {
 
     /** 充消对账日报（分页 + 周期总账汇总） */
     @GetMapping("/writeoff")
+    @RequirePermission(menu = "writeoff-reconcile")
     public Result<FinReconcileVO> writeoff(FinReconcileQuery query) {
         return Result.success(finReconcileService.writeoff(query));
     }

@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdOrderDetailVO;
 import com.mftb.admin.dto.AdOrderVO;
@@ -25,6 +26,7 @@ public class AdOrderController {
 
     /** 订单分页查询 */
     @GetMapping
+    @RequirePermission(menu = "promotion-order-manage")
     public Result<PageResult<AdOrderVO>> page(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -41,12 +43,14 @@ public class AdOrderController {
 
     /** 订单详情（含明细） */
     @GetMapping("/{orderNo}")
+    @RequirePermission(menu = "promotion-order-manage")
     public Result<AdOrderDetailVO> detail(@PathVariable String orderNo) {
         return Result.success(orderService.detail(orderNo));
     }
 
     /** 退款 */
     @PostMapping("/{orderNo}/refund")
+    @RequirePermission(menu = "promotion-order-manage", action = "edit")
     public Result<AdOrderDetailVO> refund(@PathVariable String orderNo) {
         return Result.success("退款成功", orderService.refund(orderNo));
     }

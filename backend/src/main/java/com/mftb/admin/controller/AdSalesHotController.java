@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdHotInventoryVO;
 import com.mftb.admin.dto.AdHotOrderRequest;
@@ -26,6 +27,7 @@ public class AdSalesHotController {
 
     /** 查询可购买格子（皮肤 x 日期, 不限库存；storeCode/groupCode 用于屏蔽商家拦截与已购标记） */
     @GetMapping("/inventory")
+    @RequirePermission(menu = "ad-sales")
     public Result<AdHotInventoryVO> inventory(@RequestParam Long algoId,
                                               @RequestParam(required = false) String storeCode,
                                               @RequestParam(required = false) String groupCode) {
@@ -34,6 +36,7 @@ public class AdSalesHotController {
 
     /** 提交订单并从推广金账户扣款（同商家已购买的皮肤x日期不可重复购买） */
     @PostMapping("/order")
+    @RequirePermission(menu = "ad-sales", action = "create")
     public Result<AdOrderVO> placeOrder(@Valid @RequestBody AdHotOrderRequest request) {
         return Result.success("下單成功", salesService.placeOrder(request));
     }

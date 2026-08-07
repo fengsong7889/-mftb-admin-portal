@@ -41,7 +41,7 @@ public class LoginLogServiceImpl implements LoginLogService {
     private final SysUserMapper sysUserMapper;
 
     /** 空闲超时时间（毫秒），与 JwtAuthenticationFilter 保持一致 */
-    @Value("${session.idle-timeout:1800000}")
+    @Value("${session.idle-timeout:3600000}")
     private Long sessionIdleTimeout;
 
     @Override

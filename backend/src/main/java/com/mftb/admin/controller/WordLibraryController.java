@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.WordLibraryImportResult;
@@ -32,6 +33,7 @@ public class WordLibraryController {
 
     /** 词库列表（分页） */
     @GetMapping
+    @RequirePermission(menu = "promotion-word-library")
     public Result<PageResult<WordLibraryVO>> listWords(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -47,18 +49,21 @@ public class WordLibraryController {
 
     /** 新增词条 */
     @PostMapping
+    @RequirePermission(menu = "promotion-word-library", action = "create")
     public Result<WordLibraryVO> createWord(@Valid @RequestBody WordLibraryRequest request) {
         return Result.success("新增成功", wordLibraryService.createWord(request));
     }
 
     /** 编辑词条 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "promotion-word-library", action = "edit")
     public Result<WordLibraryVO> updateWord(@PathVariable Long id, @Valid @RequestBody WordLibraryRequest request) {
         return Result.success("编辑成功", wordLibraryService.updateWord(id, request));
     }
 
     /** 切换状态（启用/停用） */
     @PutMapping("/{id}/toggle")
+    @RequirePermission(menu = "promotion-word-library", action = "edit")
     public Result<Void> toggleStatus(@PathVariable Long id) {
         wordLibraryService.toggleStatus(id);
         return Result.success();
@@ -66,6 +71,7 @@ public class WordLibraryController {
 
     /** 删除词条 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "promotion-word-library", action = "delete")
     public Result<Void> deleteWord(@PathVariable Long id) {
         wordLibraryService.deleteWord(id);
         return Result.success();
@@ -73,6 +79,7 @@ public class WordLibraryController {
 
     /** 批量导入词条 */
     @PostMapping("/batch")
+    @RequirePermission(menu = "promotion-word-library", action = "import")
     public Result<WordLibraryImportResult> batchImport(@RequestBody List<WordLibraryRequest> requests) {
         return Result.success(wordLibraryService.batchImport(requests));
     }

@@ -78,6 +78,7 @@ public class MenuServiceImpl implements MenuService {
         menu.setParentId(normalizeParentId(request.getParentId()));
         menu.setMenuKey(request.getMenuKey().trim());
         menu.setName(request.getName().trim());
+        menu.setNameEn(StringUtils.hasText(request.getNameEn()) ? request.getNameEn().trim() : null);
         menu.setPath(StringUtils.hasText(request.getPath()) ? request.getPath().trim() : null);
         menu.setComponent(StringUtils.hasText(request.getComponent()) ? request.getComponent().trim() : null);
         menu.setIcon(StringUtils.hasText(request.getIcon()) ? request.getIcon().trim() : null);
@@ -107,6 +108,7 @@ public class MenuServiceImpl implements MenuService {
                 .set(SysMenu::getParentId, normalizeParentId(request.getParentId()))
                 .set(SysMenu::getMenuKey, menuKey)
                 .set(SysMenu::getName, name)
+                .set(SysMenu::getNameEn, StringUtils.hasText(request.getNameEn()) ? request.getNameEn().trim() : null)
                 .set(SysMenu::getPath, StringUtils.hasText(request.getPath()) ? request.getPath().trim() : null)
                 .set(SysMenu::getComponent, StringUtils.hasText(request.getComponent()) ? request.getComponent().trim() : null)
                 .set(SysMenu::getIcon, StringUtils.hasText(request.getIcon()) ? request.getIcon().trim() : null)

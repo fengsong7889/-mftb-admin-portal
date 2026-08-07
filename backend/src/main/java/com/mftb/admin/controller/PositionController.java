@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.PositionRequest;
 import com.mftb.admin.dto.PositionVO;
@@ -29,24 +30,28 @@ public class PositionController {
 
     /** 查询全部职位 */
     @GetMapping
+    @RequirePermission(menu = "position-management")
     public Result<List<PositionVO>> list() {
         return Result.success(positionService.list());
     }
 
     /** 新增职位 */
     @PostMapping
+    @RequirePermission(menu = "position-management", action = "create")
     public Result<PositionVO> create(@Valid @RequestBody PositionRequest request) {
         return Result.success("职位创建成功", positionService.create(request));
     }
 
     /** 编辑职位 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "position-management", action = "edit")
     public Result<PositionVO> update(@PathVariable Long id, @Valid @RequestBody PositionRequest request) {
         return Result.success("职位信息已更新", positionService.update(id, request));
     }
 
     /** 删除职位 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "position-management", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         positionService.delete(id);
         return Result.success();

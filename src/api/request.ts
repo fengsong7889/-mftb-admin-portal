@@ -23,6 +23,8 @@ export const SILENT_HEADER = 'X-Request-Silent'
 const SUCCESS_CODE = 200
 /** 未认证状态码 */
 const UNAUTHORIZED_CODE = 401
+/** 无权限状态码 */
+const FORBIDDEN_CODE = 403
 /** 空闲超时状态码（后端检测用户长时间无操作后返回） */
 const SESSION_IDLE_TIMEOUT_CODE = 1004
 
@@ -123,6 +125,11 @@ request.interceptors.response.use(
       handleUnauthorized(res.message || '您已长时间未操作，会话已过期')
       return Promise.reject(new Error(res.message))
     }
+    // 业务层无权限: 后端权限模块以业务码 403 返回（如菜单/数据未授权）
+    if (res.code === FORBIDDEN_CODE) {
+      if (!silent) message.error(res.message || '您没有权限执行此操作，请联系管理员授权')
+      return Promise.reject(new Error(res.message || '无权限'))
+    }
     // 其它业务错误: 弹出提示（除非调用方声明静默）
     if (!silent) {
       message.error(res.message || '请求失败')
@@ -136,8 +143,10 @@ request.interceptors.response.use(
     if (status === UNAUTHORIZED_CODE) {
       // 登录失效一律强制登出（handleUnauthorized 内部已做去重）
       handleUnauthorized()
-    } else if (status === 403) {
-      if (!silent) message.error('没有访问权限')
+    } else if (status === FORBIDDEN_CODE) {
+      // HTTP 403: 优先展示后端返回的提示信息（Spring Security 拦截时可能无 body）
+      const backendMsg = error?.response?.data?.message
+      if (!silent) message.error(backendMsg || '您没有权限执行此操作，请联系管理员授权')
     } else if (status >= 500) {
       if (!silent) message.error('服务器异常, 请稍后重试')
     } else {

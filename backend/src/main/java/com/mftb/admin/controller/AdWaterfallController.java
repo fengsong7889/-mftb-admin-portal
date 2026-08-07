@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdWaterfallRequest;
 import com.mftb.admin.dto.AdWaterfallVO;
@@ -33,6 +34,7 @@ public class AdWaterfallController {
 
     /** 策略分页查询 */
     @GetMapping
+    @RequirePermission(menu = "promotion-slot-config")
     public Result<PageResult<AdWaterfallVO>> page(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -46,24 +48,28 @@ public class AdWaterfallController {
 
     /** 策略详情（含坑位明细 + 自然流量兜底算法，APP 按配置ID引用） */
     @GetMapping("/{id}")
+    @RequirePermission(menu = "promotion-slot-config")
     public Result<AdWaterfallVO> detail(@PathVariable Long id) {
         return Result.success(waterfallService.detail(id));
     }
 
     /** 新增策略 */
     @PostMapping
+    @RequirePermission(menu = "promotion-slot-config", action = "create")
     public Result<AdWaterfallVO> create(@Valid @RequestBody AdWaterfallRequest request) {
         return Result.success("瀑布流策略新增成功", waterfallService.create(request));
     }
 
     /** 编辑策略（坑位明细整体替换） */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "promotion-slot-config", action = "edit")
     public Result<AdWaterfallVO> update(@PathVariable Long id, @Valid @RequestBody AdWaterfallRequest request) {
         return Result.success("瀑布流策略更新成功", waterfallService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
+    @RequirePermission(menu = "promotion-slot-config", action = "edit")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
         waterfallService.updateStatus(id, body.get("status"));
         return Result.success();
@@ -71,6 +77,7 @@ public class AdWaterfallController {
 
     /** 删除策略 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "promotion-slot-config", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         waterfallService.delete(id);
         return Result.success();

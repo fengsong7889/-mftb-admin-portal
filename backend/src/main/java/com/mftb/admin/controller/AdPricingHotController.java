@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdPricingHotRequest;
 import com.mftb.admin.dto.AdPricingHotVO;
@@ -31,6 +32,7 @@ public class AdPricingHotController {
 
     /** 计价配置分页查询 */
     @GetMapping
+    @RequirePermission(menu = "ad-sales")
     public Result<PageResult<AdPricingHotVO>> page(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -42,30 +44,35 @@ public class AdPricingHotController {
 
     /** 计价配置详情 */
     @GetMapping("/{id}")
+    @RequirePermission(menu = "ad-sales")
     public Result<AdPricingHotVO> detail(@PathVariable Long id) {
         return Result.success(pricingService.detail(id));
     }
 
     /** 按算法查询启用中的计价配置 */
     @GetMapping("/active")
+    @RequirePermission(menu = "ad-sales")
     public Result<AdPricingHotVO> activeByAlgo(@RequestParam Long algoId) {
         return Result.success(pricingService.activeByAlgo(algoId));
     }
 
     /** 新增计价配置 */
     @PostMapping
+    @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<AdPricingHotVO> create(@Valid @RequestBody AdPricingHotRequest request) {
         return Result.success("计价配置已保存", pricingService.create(request));
     }
 
     /** 编辑计价配置 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<AdPricingHotVO> update(@PathVariable Long id, @Valid @RequestBody AdPricingHotRequest request) {
         return Result.success("计价配置已更新", pricingService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
+    @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
         pricingService.updateStatus(id, body.get("status"));
         return Result.success();
@@ -73,6 +80,7 @@ public class AdPricingHotController {
 
     /** 删除计价配置 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<Void> delete(@PathVariable Long id) {
         pricingService.delete(id);
         return Result.success();

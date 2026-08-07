@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.FinAccountQuery;
 import com.mftb.admin.dto.FinAccountVO;
@@ -25,12 +26,14 @@ public class FinAccountController {
 
     /** 账户余额列表（分页） */
     @GetMapping
+    @RequirePermission(menu = "account-balance")
     public Result<PageResult<FinAccountVO>> page(FinAccountQuery query) {
         return Result.success(finAccountService.page(query));
     }
 
     /** 冻结账户（按集团+品牌） */
     @PutMapping("/{groupId}/freeze")
+    @RequirePermission(menu = "account-balance", action = "edit")
     public Result<Void> freeze(@PathVariable String groupId, @RequestParam String brand) {
         finAccountService.freeze(groupId, brand);
         return Result.success("账户已冻结", null);
@@ -38,6 +41,7 @@ public class FinAccountController {
 
     /** 解冻账户（按集团+品牌） */
     @PutMapping("/{groupId}/unfreeze")
+    @RequirePermission(menu = "account-balance", action = "edit")
     public Result<Void> unfreeze(@PathVariable String groupId, @RequestParam String brand) {
         finAccountService.unfreeze(groupId, brand);
         return Result.success("账户已解冻", null);

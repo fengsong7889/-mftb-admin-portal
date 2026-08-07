@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
@@ -35,6 +36,7 @@ public class StoreController {
 
     /** 分页查询门店（集团ID/名称、门店ID/名称、所属品牌、业务频道、最后更新人、最后更新时间、创建时间） */
     @GetMapping
+    @RequirePermission(menu = "store-list")
     public Result<PageResult<StoreVO>> list(StoreQuery query) {
         return Result.success(storeService.list(query));
     }
@@ -72,30 +74,35 @@ public class StoreController {
 
     /** 新增门店 */
     @PostMapping
+    @RequirePermission(menu = "store-list", action = "create")
     public Result<StoreVO> create(@Valid @RequestBody StoreRequest request) {
         return Result.success("门店创建成功", storeService.create(request));
     }
 
     /** 编辑门店 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "store-list", action = "edit")
     public Result<StoreVO> update(@PathVariable Long id, @Valid @RequestBody StoreRequest request) {
         return Result.success("门店信息已更新", storeService.update(id, request));
     }
 
     /** 查询门店已绑定的BD列表（含部门/职位/职级） */
     @GetMapping("/{id}/bds")
+    @RequirePermission(menu = "store-list")
     public Result<List<StoreBdVO>> listBds(@PathVariable Long id) {
         return Result.success(storeService.listBds(id));
     }
 
     /** 新增绑定BD */
     @PostMapping("/{id}/bds")
+    @RequirePermission(menu = "store-list", action = "edit")
     public Result<StoreBdVO> addBd(@PathVariable Long id, @RequestBody StoreBindBdRequest request) {
         return Result.success("BD绑定成功", storeService.addBd(id, request.getBdEmpId()));
     }
 
     /** 解除绑定BD */
     @DeleteMapping("/{id}/bds/{bindId}")
+    @RequirePermission(menu = "store-list", action = "edit")
     public Result<Void> removeBd(@PathVariable Long id, @PathVariable Long bindId) {
         storeService.removeBd(id, bindId);
         return Result.success("BD已解绑", null);
@@ -103,6 +110,7 @@ public class StoreController {
 
     /** 删除门店 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "store-list", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         storeService.delete(id);
         return Result.success("门店已删除", null);

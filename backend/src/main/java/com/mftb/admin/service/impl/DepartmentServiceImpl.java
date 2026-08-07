@@ -12,6 +12,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysDepartmentMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
+    private final PermissionService permissionService;
 
     /** 部门编码前缀: MT + 5位自增序号 */
     private static final String DEPT_CODE_PREFIX = "MT";
@@ -126,6 +128,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         dept.setStatus(status);
         dept.setUpdatedBy(operatorResolver.currentOperatorName());
         sysDepartmentMapper.updateById(dept);
+        permissionService.evictAll();
     }
 
     @Override
@@ -133,6 +136,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     public void updatePermissions(Long id, List<MenuPermissionDTO> permissions) {
         requireDept(id);
         saveDeptMenus(id, permissions);
+        permissionService.evictAll();
     }
 
     @Override
@@ -156,6 +160,7 @@ public class DepartmentServiceImpl implements DepartmentService {
             user.setDepartment(null);
             sysUserMapper.updateById(user);
         }
+        permissionService.evictAll();
     }
 
     @Override

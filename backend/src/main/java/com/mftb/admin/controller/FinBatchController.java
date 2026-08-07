@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.FinBatchQuery;
 import com.mftb.admin.dto.FinBatchVO;
@@ -24,12 +25,14 @@ public class FinBatchController {
 
     /** 批次列表（分页） */
     @GetMapping
+    @RequirePermission(menu = "batch-query")
     public Result<PageResult<FinBatchVO>> page(FinBatchQuery query) {
         return Result.success(finBatchService.page(query));
     }
 
     /** 批次明细（转账/合并批次双方共享批次号时可传 groupId 定位具体一方） */
     @GetMapping("/{batchNo}")
+    @RequirePermission(menu = "batch-query")
     public Result<FinBatchVO> detail(@PathVariable String batchNo,
                                     @RequestParam(required = false) String groupId) {
         return Result.success(finBatchService.detail(batchNo, groupId));

@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdReviveInventoryVO;
@@ -26,6 +27,7 @@ public class AdSalesReviveController {
 
     /** 查询可购买格子（商圈 x 日期；storeCode/groupCode 用于屏蔽商家拦截） */
     @GetMapping("/inventory")
+    @RequirePermission(menu = "ad-sales")
     public Result<AdReviveInventoryVO> inventory(@RequestParam Long algoId,
                                                  @RequestParam(required = false) String storeCode,
                                                  @RequestParam(required = false) String groupCode) {
@@ -34,6 +36,7 @@ public class AdSalesReviveController {
 
     /** 加购锁定格子 60 秒（占用库存额度，到期自动释放） */
     @PostMapping("/lock")
+    @RequirePermission(menu = "ad-sales", action = "create")
     public Result<Void> lockCells(@Valid @RequestBody AdReviveOrderRequest request) {
         salesService.lockCells(request);
         return Result.success();
@@ -41,6 +44,7 @@ public class AdSalesReviveController {
 
     /** 释放加购锁（移除购物车/取消时调用） */
     @PostMapping("/unlock")
+    @RequirePermission(menu = "ad-sales", action = "create")
     public Result<Void> unlockCells(@Valid @RequestBody AdReviveOrderRequest request) {
         salesService.unlockCells(request);
         return Result.success();
@@ -48,6 +52,7 @@ public class AdSalesReviveController {
 
     /** 提交订单并从推广金账户扣款（支持赠送天数抵扣） */
     @PostMapping("/order")
+    @RequirePermission(menu = "ad-sales", action = "create")
     public Result<AdOrderVO> placeOrder(@Valid @RequestBody AdReviveOrderRequest request) {
         return Result.success("下單成功", salesService.placeOrder(request));
     }

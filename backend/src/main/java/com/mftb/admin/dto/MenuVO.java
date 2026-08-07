@@ -20,6 +20,8 @@ public class MenuVO {
     private String parentName;
     private String menuKey;
     private String name;
+    /** 菜单英文名称 */
+    private String nameEn;
     private String path;
     private String component;
     private String icon;
@@ -47,6 +49,7 @@ public class MenuVO {
         vo.setParentName(parentName);
         vo.setMenuKey(menu.getMenuKey());
         vo.setName(menu.getName());
+        vo.setNameEn(menu.getNameEn());
         vo.setPath(menu.getPath());
         vo.setComponent(menu.getComponent());
         vo.setIcon(menu.getIcon());

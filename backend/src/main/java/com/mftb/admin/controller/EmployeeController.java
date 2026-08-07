@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.EmployeeRequest;
 import com.mftb.admin.dto.EmployeeVO;
@@ -30,6 +31,7 @@ public class EmployeeController {
 
     /** 分页查询员工 */
     @GetMapping
+    @RequirePermission(menu = "employee-management")
     public Result<PageResult<EmployeeVO>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -40,18 +42,21 @@ public class EmployeeController {
 
     /** 新增员工 */
     @PostMapping
+    @RequirePermission(menu = "employee-management", action = "create")
     public Result<EmployeeVO> create(@Valid @RequestBody EmployeeRequest request) {
         return Result.success("员工创建成功", employeeService.create(request));
     }
 
     /** 编辑员工 */
     @PutMapping("/{id}")
+    @RequirePermission(menu = "employee-management", action = "edit")
     public Result<EmployeeVO> update(@PathVariable Long id, @Valid @RequestBody EmployeeRequest request) {
         return Result.success("员工信息已更新", employeeService.update(id, request));
     }
 
     /** 重置密码 */
     @PutMapping("/{id}/password")
+    @RequirePermission(menu = "employee-management", action = "edit")
     public Result<Void> resetPassword(@PathVariable Long id, @Valid @RequestBody ResetPasswordRequest request) {
         employeeService.resetPassword(id, request.getPassword());
         return Result.success();
@@ -59,6 +64,7 @@ public class EmployeeController {
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
+    @RequirePermission(menu = "employee-management", action = "edit")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         employeeService.updateStatus(id, status);
         return Result.success();
@@ -66,6 +72,7 @@ public class EmployeeController {
 
     /** 删除员工 */
     @DeleteMapping("/{id}")
+    @RequirePermission(menu = "employee-management", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         employeeService.delete(id);
         return Result.success();

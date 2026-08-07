@@ -2,8 +2,8 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Modal } from 'antd'
 
-/** 空闲超时时间（毫秒）：30 分钟无操作自动退出 */
-const IDLE_TIMEOUT = 30 * 60 * 1000
+/** 空闲超时时间（毫秒）：60 分钟无操作自动退出 */
+const IDLE_TIMEOUT = 60 * 60 * 1000
 /** 倒计时警告提前时间（毫秒）：超时前 1 分钟弹出警告 */
 const WARNING_BEFORE = 60 * 1000
 
