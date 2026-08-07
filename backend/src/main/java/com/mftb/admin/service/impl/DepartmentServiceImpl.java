@@ -83,6 +83,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         SysDepartment dept = new SysDepartment();
         dept.setCode(code);
         dept.setName(request.getName().trim());
+        dept.setNameEn(request.getNameEn() != null ? request.getNameEn().trim() : null);
         dept.setParentId(request.getParentId());
         dept.setLeader(request.getLeader());
         dept.setPermissions("[]");
@@ -110,6 +111,7 @@ public class DepartmentServiceImpl implements DepartmentService {
             }
         }
         dept.setName(request.getName().trim());
+        dept.setNameEn(request.getNameEn() != null ? request.getNameEn().trim() : null);
         dept.setParentId(request.getParentId());
         dept.setLeader(request.getLeader());
         if (request.getSort() != null) {

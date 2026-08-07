@@ -15,6 +15,8 @@ public class DepartmentVO {
     private Long id;
     private String code;
     private String name;
+    /** 部门英文名称 */
+    private String nameEn;
     private Long parentId;
     /** 上级部门名称 */
     private String parentName;
@@ -37,6 +39,7 @@ public class DepartmentVO {
         vo.setId(dept.getId());
         vo.setCode(dept.getCode());
         vo.setName(dept.getName());
+        vo.setNameEn(dept.getNameEn());
         vo.setParentId(dept.getParentId());
         vo.setParentName(parentName);
         vo.setLeader(dept.getLeader());

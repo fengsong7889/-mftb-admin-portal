@@ -58,12 +58,13 @@ interface DeptTreeOption {
   children?: DeptTreeOption[]
 }
 
-function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
+function buildDeptTreeData(list: DepartmentItem[], getDeptName?: (dept: DepartmentItem) => string): DeptTreeOption[] {
+  const nameFn = getDeptName ?? ((d: DepartmentItem) => d.name)
   const nodeMap = new Map<number, DeptTreeOption>()
   list.forEach(dept => {
     nodeMap.set(dept.id, {
       value: dept.id,
-      title: dept.name,
+      title: nameFn(dept),
       disabled: dept.status !== DEPT_STATUS.ENABLED,
       children: [],
     })
@@ -89,7 +90,15 @@ interface AuthRow extends DataAuthorization {
 }
 
 export default function DataPermission() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  /** 當前是否非繁中語言 */
+  const isNonZh = !i18n.language?.startsWith('zh')
+
+  /** 獲取部門顯示名稱 */
+  const getDeptDisplayName = (dept: DepartmentItem) =>
+    isNonZh ? (dept.nameEn || dept.name) : dept.name
+
   // 功能权限校验（菜单 key: data-permission）
   const { user, hasPermission } = useAuth()
   const [roles, setRoles] = useState<RoleItem[]>([])
@@ -157,12 +166,12 @@ export default function DataPermission() {
         const dept = departments.find(d => d.id === a.targetId)
         return {
           ...a,
-          targetName: dept?.name ?? t('dataPermission.deptDeleted'),
+          targetName: dept ? getDeptDisplayName(dept) : t('dataPermission.deptDeleted'),
           parentName: dept?.parentName,
           userCount: dept?.userCount ?? 0,
         }
       }),
-    [authorizations, departments],
+    [authorizations, departments, isNonZh], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   /** 新增授权时可选的角色（启用中） */
@@ -448,7 +457,7 @@ export default function DataPermission() {
               disabled={editingId != null}
               value={targetId}
               onChange={(id) => setTargetId(id)}
-              treeData={buildDeptTreeData(departments)}
+              treeData={buildDeptTreeData(departments, getDeptDisplayName)}
             />
           )}
           <Tag color={activeTab === DATA_TARGET_TYPE.ROLE ? 'blue' : 'purple'}>

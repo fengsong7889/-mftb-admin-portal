@@ -23,6 +23,7 @@ import './index.css'
 interface DepartmentFormValues {
   parentId?: number
   name: string
+  nameEn?: string
   leader?: string
   sort?: number
 }
@@ -83,7 +84,14 @@ function collectDescendantIds(list: DepartmentItem[], rootId: number): Set<numbe
 }
 
 export default function OrganizationManagement() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  /** 當前是否非繁中語言（用於顯示英文名稱） */
+  const isNonZh = !i18n.language?.startsWith('zh')
+
+  /** 獲取部門顯示名稱：非繁中時取英文名，無則回退中文名 */
+  const getDeptDisplayName = (dept: DepartmentItem) =>
+    isNonZh ? (dept.nameEn || dept.name) : dept.name
 
   /** 狀態選項（依賴 t，定義在組件內以便響應語言切換） */
   const STATUS_OPTIONS = [
@@ -144,8 +152,25 @@ export default function OrganizationManagement() {
     fetchList()
   }, [fetchList])
 
-  /** 左侧组织架构树数据 */
-  const treeData = useMemo(() => buildTreeData(departments), [departments])
+  /** 左侧组织架构树数据（語言切換時使用對應語言名稱） */
+  const treeData = useMemo(() => {
+    const nodeMap = new Map<number, DeptTreeNode>()
+    departments.forEach(dept => {
+      nodeMap.set(dept.id, { key: dept.id, title: getDeptDisplayName(dept), value: dept.id, children: [] } as DeptTreeNode)
+    })
+    const roots: DeptTreeNode[] = []
+    departments.forEach(dept => {
+      const node = nodeMap.get(dept.id)!
+      const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+      if (parent) {
+        parent.children!.push(node)
+      } else {
+        roots.push(node)
+      }
+    })
+    return roots
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments, isNonZh])
 
   /** 数据加载完成后，默认仅展开根节点（MFTB集团），其它部门折叠 */
   useEffect(() => {
@@ -199,7 +224,7 @@ export default function OrganizationManagement() {
     }
     if (keyword) {
       const kw = keyword.toLowerCase()
-      list = list.filter(dept => dept.name.toLowerCase().includes(kw) || dept.code.toLowerCase().includes(kw))
+      list = list.filter(dept => dept.name.toLowerCase().includes(kw) || (dept.nameEn ?? '').toLowerCase().includes(kw) || dept.code.toLowerCase().includes(kw))
     }
     if (leaderKeyword) {
       const kw = leaderKeyword.toLowerCase()
@@ -244,6 +269,7 @@ export default function OrganizationManagement() {
     form.setFieldsValue({
       parentId: record.parentId ?? undefined,
       name: record.name,
+      nameEn: record.nameEn,
       leader: record.leader,
       sort: record.sort,
     })
@@ -256,6 +282,7 @@ export default function OrganizationManagement() {
     const values = await form.validateFields()
     const payload: DepartmentPayload = {
       name: values.name.trim(),
+      nameEn: values.nameEn?.trim(),
       parentId: values.parentId ?? null,
       leader: values.leader?.trim(),
       sort: values.sort,
@@ -314,6 +341,7 @@ export default function OrganizationManagement() {
       { title: t('organization.colDeptStatus'), dataIndex: 'status', render: (v: number) => v === DEPT_STATUS.ENABLED ? t('organization.statusValid') : t('organization.statusInvalid') },
       { title: t('organization.colDeptCode'), dataIndex: 'code' },
       { title: t('organization.colDeptName'), dataIndex: 'name' },
+      { title: t('organization.colDeptNameEn'), dataIndex: 'nameEn' },
       { title: t('organization.colLeader'), dataIndex: 'leader' },
       { title: t('organization.colParentDept'), dataIndex: 'parentName' },
       { title: t('organization.colUserCount'), dataIndex: 'userCount' },
@@ -335,6 +363,7 @@ export default function OrganizationManagement() {
     },
     { title: t('organization.colDeptCode'), dataIndex: 'code', key: 'code', width: 140 },
     { title: t('organization.colDeptName'), dataIndex: 'name', key: 'name', width: 180 },
+    { title: t('organization.colDeptNameEn'), dataIndex: 'nameEn', key: 'nameEn', width: 180, render: (v: string) => v || '-' },
     { title: t('organization.colLeader'), dataIndex: 'leader', key: 'leader', width: 130, render: (v: string) => v || '-' },
     { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 160, render: (v: string) => v || '-' },
     { title: t('organization.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 100 },
@@ -482,6 +511,9 @@ export default function OrganizationManagement() {
           </Form.Item>
           <Form.Item name="name" label={t('organization.deptNameLabel')} rules={[{ required: true, message: t('organization.deptNameRequired') }]}>
             <Input placeholder={t('organization.deptNamePlaceholder')} allowClear />
+          </Form.Item>
+          <Form.Item name="nameEn" label={t('organization.deptNameEnLabel')}>
+            <Input placeholder={t('organization.deptNameEnPlaceholder')} allowClear maxLength={100} />
           </Form.Item>
           <Form.Item name="leader" label={t('organization.leaderLabel')}>
             <Select

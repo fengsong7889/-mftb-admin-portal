@@ -15,6 +15,9 @@ public class DepartmentRequest {
     @NotBlank(message = "部门名称不能为空")
     private String name;
 
+    /** 部门英文名称 */
+    private String nameEn;
+
     /** 上级部门ID (顶级传 null) */
     private Long parentId;
 

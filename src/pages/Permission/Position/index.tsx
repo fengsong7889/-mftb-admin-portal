@@ -33,7 +33,14 @@ interface PositionFormValues {
 }
 
 export default function PositionManagement() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  /** 當前是否非繁中語言 */
+  const isNonZh = !i18n.language?.startsWith('zh')
+
+  /** 獲取職位顯示名稱：非繁中時取英文名，無則回退中文名 */
+  const getPositionDisplayName = (pos: PositionItem) =>
+    isNonZh ? (pos.nameEn || pos.name) : pos.name
   const [dataSource, setDataSource] = useState<PositionItem[]>([])
 
   /** 職級序列標籤（依賴 t，定義在組件內以便響應語言切換） */
@@ -82,7 +89,7 @@ export default function PositionManagement() {
     let list = dataSource
     if (keyword) {
       const kw = keyword.toLowerCase()
-      list = list.filter(item => item.name.toLowerCase().includes(kw))
+      list = list.filter(item => item.name.toLowerCase().includes(kw) || (item.nameEn ?? '').toLowerCase().includes(kw))
     }
     if (filterSequence) {
       list = list.filter(item => item.sequence === filterSequence)

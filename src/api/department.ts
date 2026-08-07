@@ -12,6 +12,7 @@ export interface DepartmentItem {
   id: number
   code: string
   name: string
+  nameEn?: string
   parentId?: number | null
   parentName?: string
   leader?: string
@@ -29,6 +30,7 @@ export interface DepartmentItem {
 /** 部门新增/编辑请求参数 */
 export interface DepartmentPayload {
   name: string
+  nameEn?: string
   parentId?: number | null
   leader?: string
   sort?: number

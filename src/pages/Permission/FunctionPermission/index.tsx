@@ -95,12 +95,13 @@ interface DeptTreeOption {
   children?: DeptTreeOption[]
 }
 
-function buildDeptTreeData(list: DepartmentItem[], disabledIds?: Set<number>): DeptTreeOption[] {
+function buildDeptTreeData(list: DepartmentItem[], disabledIds?: Set<number>, getDeptName?: (dept: DepartmentItem) => string): DeptTreeOption[] {
+  const nameFn = getDeptName ?? ((d: DepartmentItem) => d.name)
   const nodeMap = new Map<number, DeptTreeOption>()
   list.forEach(dept => {
     nodeMap.set(dept.id, {
       value: dept.id,
-      title: dept.name,
+      title: nameFn(dept),
       disabled: dept.status !== DEPT_STATUS.ENABLED || (disabledIds?.has(dept.id) ?? false),
       children: [],
     })
@@ -119,7 +120,15 @@ function buildDeptTreeData(list: DepartmentItem[], disabledIds?: Set<number>): D
 }
 
 export default function FunctionPermission() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  /** 當前是否非繁中語言 */
+  const isNonZh = !i18n.language?.startsWith('zh')
+
+  /** 獲取部門顯示名稱 */
+  const getDeptDisplayName = (dept: DepartmentItem) =>
+    isNonZh ? (dept.nameEn || dept.name) : dept.name
+
   const [roles, setRoles] = useState<RoleItem[]>([])
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -403,7 +412,7 @@ export default function FunctionPermission() {
   const editingName = editingId != null
     ? (activeTab === TARGET_TYPE.ROLE
       ? roles.find(r => r.id === editingId)?.name
-      : departments.find(d => d.id === editingId)?.name)
+      : departments.find(d => d.id === editingId) ? getDeptDisplayName(departments.find(d => d.id === editingId)!) : undefined)
     : undefined
 
   return (
@@ -462,7 +471,7 @@ export default function FunctionPermission() {
               disabled={editingId != null}
               value={targetId}
               onChange={(id) => setTargetId(id)}
-              treeData={buildDeptTreeData(departments, editingId != null ? undefined : authedDeptIds)}
+              treeData={buildDeptTreeData(departments, editingId != null ? undefined : authedDeptIds, getDeptDisplayName)}
             />
           )}
           <Tag color={activeTab === TARGET_TYPE.ROLE ? 'blue' : 'purple'}>

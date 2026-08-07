@@ -46,8 +46,15 @@ function formatDuration(seconds: number | null, t: (key: string, opts?: Record<s
 
 /** 員工動態頁面 */
 export default function LoginLog() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { hasPermission } = useAuth()
+
+  /** 當前是否非繁中語言 */
+  const isNonZh = !i18n.language?.startsWith('zh')
+
+  /** 獲取部門顯示名稱 */
+  const getDeptDisplayName = (dept: DepartmentItem) =>
+    isNonZh ? (dept.nameEn || dept.name) : dept.name
 
   /** 狀態標籤（依賴 t，定義在組件內以便響應語言切換） */
   const STATUS_LABEL: Record<string, string> = {
@@ -121,7 +128,8 @@ export default function LoginLog() {
     const map = new Map<number, DepartmentItem>()
     departments.forEach((d) => map.set(d.id, d))
     return map
-  }, [departments])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments, isNonZh])
 
   /** 獲取部門全路徑（跳過頂級部門 MFTB集團，從二級部門開始展示） */
   const _getDeptFullPath = useCallback((deptId?: number): string => {
@@ -130,7 +138,7 @@ export default function LoginLog() {
     let current = deptIdMap.get(deptId)
     const visited = new Set<number>()
     while (current && !visited.has(current.id)) {
-      path.unshift(current.name)
+      path.unshift(getDeptDisplayName(current))
       visited.add(current.id)
       if (current.parentId == null) break
       current = deptIdMap.get(current.parentId)
@@ -161,7 +169,7 @@ export default function LoginLog() {
   const deptTreeData = useMemo<DeptTreeNode[]>(() => {
     const nodeMap = new Map<number, DeptTreeNode>()
     departments.forEach(dept => {
-      nodeMap.set(dept.id, { value: dept.id, title: dept.name, children: [] })
+      nodeMap.set(dept.id, { value: dept.id, title: getDeptDisplayName(dept), children: [] })
     })
     const roots: DeptTreeNode[] = []
     departments.forEach(dept => {
@@ -174,7 +182,8 @@ export default function LoginLog() {
       }
     })
     return roots
-  }, [departments])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments, isNonZh])
 
   /** 查詢 */
   const handleSearch = () => {

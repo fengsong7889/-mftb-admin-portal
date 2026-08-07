@@ -25,6 +25,9 @@ public class SysDepartment {
     /** 部门名称 */
     private String name;
 
+    /** 部门英文名称 */
+    private String nameEn;
+
     /** 上级部门ID (顶级为 null) */
     private Long parentId;
 

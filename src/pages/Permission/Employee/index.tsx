@@ -54,12 +54,13 @@ interface DeptTreeOption {
   children?: DeptTreeOption[]
 }
 
-function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
+function buildDeptTreeData(list: DepartmentItem[], getDeptName?: (dept: DepartmentItem) => string): DeptTreeOption[] {
+  const nameFn = getDeptName ?? ((d: DepartmentItem) => d.name)
   const nodeMap = new Map<number, DeptTreeOption>()
   list.forEach(dept => {
     nodeMap.set(dept.id, {
       value: dept.id,
-      title: dept.name,
+      title: nameFn(dept),
       disabled: dept.status !== DEPT_STATUS.ENABLED,
       children: [],
     })
@@ -78,7 +79,18 @@ function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
 }
 
 export default function EmployeeManagement() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  /** 當前是否非繁中語言 */
+  const isNonZh = !i18n.language?.startsWith('zh')
+
+  /** 獲取部門顯示名稱 */
+  const getDeptDisplayName = (dept: DepartmentItem) =>
+    isNonZh ? (dept.nameEn || dept.name) : dept.name
+
+  /** 獲取職位顯示名稱 */
+  const getPositionDisplayName = (pos: PositionItem) =>
+    isNonZh ? (pos.nameEn || pos.name) : pos.name
 
   /** 狀態/序列選項（依賴 t，定義在組件內以便響應語言切換） */
   const STATUS_OPTIONS = [
@@ -189,7 +201,7 @@ export default function EmployeeManagement() {
     fetchPositionList()
   }, [fetchPositionList])
 
-  const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
+  const deptTreeData = useMemo(() => buildDeptTreeData(departments, getDeptDisplayName), [departments, isNonZh]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 当前所选职位（带出职级与英文名称） */
   const selectedPosition = useMemo(
@@ -626,7 +638,7 @@ export default function EmployeeManagement() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={filteredPositions.map(p => ({ value: p.id, label: `${p.name}（${p.jobLevel}）` }))}
+              options={filteredPositions.map(p => ({ value: p.id, label: `${getPositionDisplayName(p)}（${p.jobLevel}）` }))}
               onChange={handlePositionChange}
             />
           </Form.Item>
