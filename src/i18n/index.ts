@@ -1,4 +1,5 @@
 import i18n from 'i18next'
+import type { Resource, ResourceLanguage } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import zhTW from './locales/zh-TW.json'
 import en from './locales/en.json'
@@ -31,10 +32,25 @@ export function getSavedLanguage(): AppLanguage {
     : 'en'
 }
 
+/**
+ * 構建 resources：整個 JSON 註冊為 translation ns（點號寫法 t('section.key')），
+ * 同時每個頂層段額外註冊為獨立 ns（冒號寫法 t('section:key')）
+ * 兼容全系統兩種 t() 調用方式，避免冒號被 i18next 當作 ns 分隔符而查不到翻譯
+ */
+function buildResources(json: Record<string, unknown>): Resource {
+  const resources: Resource = { translation: json as ResourceLanguage }
+  for (const [section, value] of Object.entries(json)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      resources[section] = value as ResourceLanguage
+    }
+  }
+  return resources
+}
+
 i18n.use(initReactI18next).init({
   resources: {
-    'zh-TW': { translation: zhTW },
-    en: { translation: en },
+    'zh-TW': buildResources(zhTW),
+    en: buildResources(en),
   },
   lng: getSavedLanguage(),
   fallbackLng: 'en',
@@ -71,7 +87,14 @@ function toNestedBundle(flat: Record<string, string>): Record<string, unknown> {
  */
 export function injectTranslationBundle(lang: string, flat: Record<string, string>) {
   if (!flat || Object.keys(flat).length === 0) return
-  i18n.addResourceBundle(lang, 'translation', toNestedBundle(flat), true, false)
+  const nested = toNestedBundle(flat)
+  i18n.addResourceBundle(lang, 'translation', nested, true, false)
+  // 同步按頂層段注入獨立 ns，兼容 t('section:key') 冒號寫法
+  for (const [section, value] of Object.entries(nested)) {
+    if (value && typeof value === 'object') {
+      i18n.addResourceBundle(lang, section, value as Record<string, unknown>, true, false)
+    }
+  }
 }
 
 export default i18n
