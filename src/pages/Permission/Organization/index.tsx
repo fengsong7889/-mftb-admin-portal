@@ -18,7 +18,20 @@ import { fetchEmployees } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { translateText } from '../../../api/translation'
+import { pinyin } from 'pinyin-pro'
 import './index.css'
+
+/** 中文姓名转拼音英文（名在前姓在后，首字母大写） */
+function chineseNameToPinyinEnglish(name: string): string {
+  if (!name) return ''
+  if (!/[\u4e00-\u9fa5]/.test(name)) return name
+  const py = pinyin(name, { toneType: 'none', type: 'array' })
+  if (py.length <= 1) return name
+  const surname = py[0]
+  const givenName = py.slice(1).join('')
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  return `${capitalize(givenName)} ${capitalize(surname)}`
+}
 
 /** 新增/编辑表单值 */
 interface DepartmentFormValues {
@@ -376,8 +389,13 @@ export default function OrganizationManagement() {
     { title: t('organization.colDeptCode'), dataIndex: 'code', key: 'code', width: 140 },
     { title: t('organization.colDeptName'), dataIndex: 'name', key: 'name', width: 180 },
     { title: t('organization.colDeptNameEn'), dataIndex: 'nameEn', key: 'nameEn', width: 180, render: (v: string) => v || '-' },
-    { title: t('organization.colLeader'), dataIndex: 'leader', key: 'leader', width: 130, render: (v: string) => v || '-' },
-    { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 160, render: (v: string) => v || '-' },
+    { title: t('organization.colLeader'), dataIndex: 'leader', key: 'leader', width: 130, render: (v: string) => (v ? (isNonZh ? chineseNameToPinyinEnglish(v) : v) : '-') },
+    { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 160, render: (_: string, record: DepartmentItem) => {
+      if (!record.parentId) return '-'
+      const parent = departments.find(d => d.id === record.parentId)
+      if (!parent) return record.parentName || '-'
+      return isNonZh ? (parent.nameEn || parent.name) : parent.name
+    } },
     { title: t('organization.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 100 },
     {
       title: t('common.colAction'),
@@ -561,7 +579,7 @@ export default function OrganizationManagement() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={employees.map(emp => ({ value: emp.name, label: `${emp.name}（${emp.empId}）` }))}
+              options={employees.map(emp => ({ value: emp.name, label: `${isNonZh ? chineseNameToPinyinEnglish(emp.name) : emp.name}（${emp.empId}）` }))}
             />
           </Form.Item>
           <Form.Item name="sort" label={t('organization.sortLabel')} extra={t('organization.sortExtra')}>
