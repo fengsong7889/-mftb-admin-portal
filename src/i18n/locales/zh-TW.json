@@ -2363,6 +2363,7 @@
     "msgSyncCount": "已同步 {{count}} 个新字段（系统已自动翻译，请检查并补填空缺）",
     "msgMtCount": "已机翻 {{count}} 个空缺翻译，请检查修改",
     "msgBatchMtCount": "已一键机翻 {{count}} 个空缺翻译，请检查修改",
+    "msgMtFailed": "机翻失败，请稍后重试或人工填写",
     "fieldNameLabel": "字段名称",
     "fieldKeyLabel": "字段 Key",
     "fieldKeyExtra": "命名规范：小写英文、点号分层，如 common.add、biz.coupon。Key 全局唯一；同名不同义请用不同 Key 区分（如 door.open / start.begin）。留空则由系统自动生成",

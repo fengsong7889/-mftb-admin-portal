@@ -115,3 +115,21 @@ export async function createLanguage(data: Omit<LanguageVO, 'id'>) {
 export async function deleteLanguage(code: string) {
   return request.delete<unknown, void>(`/translations/languages/${code}`)
 }
+
+/* ========== 机翻 ========== */
+
+/** 机翻请求参数 */
+export interface MachineTranslatePayload {
+  ids: number[]
+  targetLangs?: string[]
+}
+
+/** 机翻响应 */
+export interface MachineTranslateResult {
+  filled: number
+}
+
+/** 机器翻译：调用 MyMemory API 填充空缺翻译，结果自动持久化 */
+export async function machineTranslate(data: MachineTranslatePayload) {
+  return request.post<unknown, MachineTranslateResult>('/translations/machine-translate', data)
+}

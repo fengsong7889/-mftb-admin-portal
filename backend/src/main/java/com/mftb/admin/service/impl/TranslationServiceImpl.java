@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.LanguageVO;
+import com.mftb.admin.dto.MachineTranslateRequest;
 import com.mftb.admin.dto.TranslationCoverageVO;
 import com.mftb.admin.dto.TranslationRequest;
 import com.mftb.admin.dto.TranslationVO;
@@ -19,11 +20,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,10 +65,35 @@ public class TranslationServiceImpl implements TranslationService {
     /** 语言代码格式: 2~3 位字母主标签 + 可选 2~4 位区域标签, 如 en / zh-TW */
     private static final Pattern LANG_CODE_PATTERN = Pattern.compile("^([a-zA-Z]{2,3})(?:-([a-zA-Z]{2,4}))?$");
 
+    /** MyMemory 免费翻译 API */
+    private static final String MYMEMORY_URL = "https://api.mymemory.translated.net/get";
+
+    /** MyMemory 请求超时 */
+    private static final Duration MT_TIMEOUT = Duration.ofSeconds(10);
+
+    /** MyMemory 免费额度: 匿名 5000 字符/天, 带 email 可提升至 50000 */
+    private static final int DAILY_CHAR_LIMIT = 5000;
+
+    /** MyMemory 单次请求最大字符数 */
+    private static final int MAX_REQUEST_CHARS = 500;
+
+    /** MyMemory 最大重试次数 */
+    private static final int MAX_RETRIES = 2;
+
+    /** MyMemory 账号 email（配置后可提升额度至 50000 字符/天） */
+    @org.springframework.beans.factory.annotation.Value("${translation.mymemory.email:}")
+    private String myMemoryEmail;
+
     private final SysTranslationMapper translationMapper;
     private final SysLanguageMapper languageMapper;
     private final OperatorResolver operatorResolver;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
+
+    /** 当日已用字符数（简单内存计数，重启归零） */
+    private final AtomicInteger dailyCharUsed = new AtomicInteger(0);
 
     /* ========== 翻译字段 ========== */
 
@@ -247,6 +282,178 @@ public class TranslationServiceImpl implements TranslationService {
         if (lang != null) {
             languageMapper.deleteById(lang.getId());
         }
+    }
+
+    /* ========== 机翻 ========== */
+
+    @Override
+    public int machineTranslate(MachineTranslateRequest request) {
+        if (request.getIds() == null || request.getIds().isEmpty()) {
+            throw new BusinessException("请选择需要机翻的字段");
+        }
+
+        // 确定目标语言：指定语言 或 所有已注册语言（排除 zh-TW 源语言）
+        List<String> targetLangs = resolveTargetLangs(request.getTargetLangs());
+        if (targetLangs.isEmpty()) {
+            throw new BusinessException("没有可翻译的目标语言");
+        }
+
+        // 批量查询翻译记录，避免 N+1
+        List<SysTranslation> entities = translationMapper.selectBatchIds(request.getIds());
+        String operator = operatorResolver.currentOperatorName();
+
+        int totalFilled = 0;
+        for (SysTranslation entity : entities) {
+            Map<String, String> translations = readJson(entity.getTranslationsJson());
+            // 源文本：优先繁中，回退字段名称
+            String sourceText = firstNonBlank(translations.get(FALLBACK_ZH), entity.getFieldName());
+            if (!StringUtils.hasText(sourceText)) continue;
+
+            boolean changed = false;
+            for (String lang : targetLangs) {
+                // 跳过源语言
+                if (FALLBACK_ZH.equals(lang)) continue;
+                // 只填充空缺
+                if (StringUtils.hasText(translations.get(lang))) continue;
+
+                // 配额检查
+                if (dailyCharUsed.get() >= DAILY_CHAR_LIMIT) {
+                    log.warn("MyMemory 每日字符配额已用尽 ({}/{}), 跳过剩余翻译", dailyCharUsed.get(), DAILY_CHAR_LIMIT);
+                    return totalFilled;
+                }
+
+                String translated = callMyMemory(sourceText, lang);
+                // 过滤无效结果：空值或与源文本相同（MyMemory 无翻译时原样返回）
+                if (StringUtils.hasText(translated) && !translated.equals(sourceText)) {
+                    translations.put(lang, translated);
+                    changed = true;
+                    totalFilled++;
+                }
+            }
+
+            if (changed) {
+                entity.setTranslationsJson(writeJson(translations));
+                entity.setUpdatedBy("machine(" + operator + ")");
+                translationMapper.updateById(entity);
+            }
+        }
+        return totalFilled;
+    }
+
+    /** 确定目标语言列表 */
+    private List<String> resolveTargetLangs(List<String> specified) {
+        if (specified != null && !specified.isEmpty()) {
+            return specified;
+        }
+        // 未指定则取所有已注册语言
+        return languageMapper.selectList(
+                        new LambdaQueryWrapper<SysLanguage>()
+                                .eq(SysLanguage::getStatus, 1)
+                                .ne(SysLanguage::getCode, FALLBACK_ZH))
+                .stream()
+                .map(SysLanguage::getCode)
+                .toList();
+    }
+
+    /**
+     * 调用 MyMemory 免费翻译 API
+     * <p>
+     * 接口文档: https://mymemory.translated.net/doc/spec.php
+     * 免费额度: 5000 字符/天（匿名），带 email 可提升至 50000
+     *
+     * @param text       源文本
+     * @param targetLang 目标语言代码
+     * @return 翻译结果，失败返回 null
+     */
+    private String callMyMemory(String text, String targetLang) {
+        // 截断源文本至 MyMemory 单次请求上限（500 字符）
+        String truncated = text.length() > MAX_REQUEST_CHARS
+                ? text.substring(0, MAX_REQUEST_CHARS)
+                : text;
+
+        int attempt = 0;
+        while (attempt <= MAX_RETRIES) {
+            try {
+                String langPair = FALLBACK_ZH + "|" + targetLang;
+                StringBuilder urlBuilder = new StringBuilder(MYMEMORY_URL)
+                        .append("?q=").append(URLEncoder.encode(truncated, StandardCharsets.UTF_8))
+                        .append("&langpair=").append(URLEncoder.encode(langPair, StandardCharsets.UTF_8));
+                if (StringUtils.hasText(myMemoryEmail)) {
+                    urlBuilder.append("&de=").append(URLEncoder.encode(myMemoryEmail, StandardCharsets.UTF_8));
+                }
+
+                HttpRequest httpRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(urlBuilder.toString()))
+                        .timeout(MT_TIMEOUT)
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+                // 429 限流 → 退避重试
+                if (response.statusCode() == 429 && attempt < MAX_RETRIES) {
+                    attempt++;
+                    log.warn("MyMemory API 限流(429), 第{}次重试, lang={}", attempt, targetLang);
+                    Thread.sleep(1000L * attempt);
+                    continue;
+                }
+
+                // 5xx 服务端错误 → 重试
+                if (response.statusCode() >= 500 && attempt < MAX_RETRIES) {
+                    attempt++;
+                    log.warn("MyMemory API 服务端错误: {}, 第{}次重试, lang={}", response.statusCode(), attempt, targetLang);
+                    Thread.sleep(1000L * attempt);
+                    continue;
+                }
+
+                if (response.statusCode() != 200) {
+                    log.warn("MyMemory API 返回异常状态: {} for lang={}", response.statusCode(), targetLang);
+                    return null;
+                }
+
+                // 解析响应: {"responseData":{"translatedText":"..."}, "responseStatus":200}
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
+                // 安全提取 responseStatus（Jackson 可能反序列化为 Integer 或 Long）
+                Object statusObj = result.get("responseStatus");
+                int status = statusObj instanceof Number ? ((Number) statusObj).intValue() : -1;
+                if (status != 200) {
+                    log.warn("MyMemory API 业务错误: status={}, response={}", status, response.body());
+                    return null;
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> responseData = (Map<String, Object>) result.get("responseData");
+                if (responseData == null) return null;
+
+                Object translated = responseData.get("translatedText");
+                String resultText = translated != null ? translated.toString() : null;
+
+                // 累计字符用量
+                if (StringUtils.hasText(resultText)) {
+                    dailyCharUsed.addAndGet(truncated.length());
+                }
+                return resultText;
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                log.warn("MyMemory API 重试被中断: lang={}", targetLang);
+                return null;
+            } catch (Exception e) {
+                // 网络异常等 → 重试
+                if (attempt < MAX_RETRIES) {
+                    attempt++;
+                    log.warn("MyMemory API 调用失败, 第{}次重试: lang={}, error={}", attempt, targetLang, e.getMessage());
+                    try { Thread.sleep(1000L * attempt); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                } else {
+                    log.warn("MyMemory API 调用最终失败: lang={}, error={}", targetLang, e.getMessage());
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     /* ========== 内部工具 ========== */

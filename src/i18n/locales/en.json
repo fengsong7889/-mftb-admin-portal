@@ -2363,6 +2363,7 @@
     "msgSyncCount": "Synced {{count}} new fields (auto-translated, please review and fill gaps)",
     "msgMtCount": "Machine translated {{count}} empty translations, please review",
     "msgBatchMtCount": "Batch machine translated {{count}} empty translations, please review",
+    "msgMtFailed": "Machine translation failed, please try again or fill in manually",
     "fieldNameLabel": "Field Name",
     "fieldKeyLabel": "Field Key",
     "fieldKeyExtra": "Naming convention: lowercase English, dots for hierarchy, e.g. common.add, biz.coupon. Key must be globally unique. Leave blank for auto-generation",

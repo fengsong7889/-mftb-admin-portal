@@ -3,6 +3,7 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.LanguageVO;
+import com.mftb.admin.dto.MachineTranslateRequest;
 import com.mftb.admin.dto.TranslationCoverageVO;
 import com.mftb.admin.dto.TranslationRequest;
 import com.mftb.admin.dto.TranslationVO;
@@ -97,5 +98,15 @@ public class TranslationController {
     public Result<Void> deleteLanguage(@PathVariable String code) {
         translationService.deleteLanguage(code);
         return Result.success("语言已移除", null);
+    }
+
+    /* ========== 机翻 ========== */
+
+    /** 机器翻译：调用 MyMemory 免费 API 填充空缺翻译，结果自动持久化 */
+    @PostMapping("/machine-translate")
+    @RequirePermission(menu = "translation-manage", action = "edit")
+    public Result<Map<String, Integer>> machineTranslate(@RequestBody MachineTranslateRequest request) {
+        int filled = translationService.machineTranslate(request);
+        return Result.success("机翻完成", Map.of("filled", filled));
     }
 }

@@ -1,6 +1,7 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.dto.LanguageVO;
+import com.mftb.admin.dto.MachineTranslateRequest;
 import com.mftb.admin.dto.TranslationCoverageVO;
 import com.mftb.admin.dto.TranslationRequest;
 import com.mftb.admin.dto.TranslationVO;
@@ -49,4 +50,16 @@ public interface TranslationService {
 
     /** 删除语言 */
     void deleteLanguage(String code);
+
+    /* ========== 机翻 ========== */
+
+    /**
+     * 调用 MyMemory 免费翻译 API 对指定字段进行机器翻译
+     * <p>
+     * 只填充空缺翻译，不覆盖已有内容；翻译结果自动持久化到 sys_translation
+     *
+     * @param request ids=字段ID列表, targetLangs=目标语言（留空=所有已注册语言）
+     * @return 本次新增的翻译条数
+     */
+    int machineTranslate(MachineTranslateRequest request);
 }

@@ -41,6 +41,7 @@ import {
   deleteTranslation as deleteTranslationApi,
   createLanguage as createLanguageApi,
   deleteLanguage as deleteLanguageApi,
+  machineTranslate as machineTranslateApi,
 } from '../../api/translation'
 import type { TranslationVO, LanguageVO } from '../../api/translation'
 import { useTranslation } from 'react-i18next'
@@ -291,19 +292,7 @@ const SYNC_INCOMING_FIELDS: Omit<TranslationField, 'id'>[] = [
   },
 ]
 
-/* ---- Mock 机翻词库（正式版由后端调用机翻 API 实现） ---- */
-const MOCK_MT_DICT: Record<string, Record<string, string>> = {
-  '商務拓展': { en: 'Business Development', ja: 'ビジネス開発', ko: '비즈니스 개발', ru: 'Развитие бизнеса' },
-  '人氣商家': { en: 'Popular Merchant', ja: '人気店舗', ko: '인기 매장', ru: 'Популярный магазин' },
-  '新店推廣': { en: 'New Store Promotion', ja: '新規店舗プロモーション', ko: '신규 매장 프로모션', ru: 'Продвижение нового магазина' },
-  '會員積分': { en: 'Member Points', ja: '会員ポイント', ko: '회원 포인트', ru: 'Баллы участника' },
-  '配送費減免': { en: 'Delivery Fee Discount', ja: '配達料割引', ko: '배달비 할인', ru: 'Скидка на доставку' },
-  '禮金卡': { en: 'Gift Card', ja: 'ギフトカード', ko: '기프트 카드', ru: 'Подарочная карта' },
-  '店鋪評分': { en: 'Store Rating', ja: '店舗評価', ko: '매장 평점', ru: 'Рейтинг магазина' },
-  '優惠券': { en: 'Coupon', ja: 'クーポン', ko: '쿠폰', ru: 'Купон' },
-  '會員等級': { en: 'Member Level', ja: '会員レベル', ko: '회원 등급', ru: 'Уровень участника' },
-  '滿減活動': { en: 'Spend & Save', ja: '割引キャンペーン', ko: '할인 이벤트', ru: 'Акция со скидкой' },
-}
+/* ---- Mock 机翻词库已废弃，正式版已对接后端 MyMemory 免费翻译 API ---- */
 
 /* ---- 后端 VO ↔ 前端模型映射 ---- */
 function voToField(vo: TranslationVO): TranslationField {
@@ -737,82 +726,42 @@ export default function TranslationManage() {
     message.success(t('translationManage:msgSyncCount', { count: incoming.length }))
   }
 
-  /* 机翻单行：填充该字段所有空缺翻译（正式版调用后端机翻 API） */
+  /* 机翻单行：调用后端 MyMemory API 填充该字段所有空缺翻译 */
   const machineTranslateRow = async (record: TranslationField) => {
-    const source = record.translations['zh-TW']?.trim() || record.description
-    const dict = MOCK_MT_DICT[source]
-    if (!dict) {
-      message.warning(t('translationManage:msgNotInDict'))
-      return
-    }
-    let filled = 0
-    const newData = data.map(item => {
-      if (item.id !== record.id) return item
-      const translations = { ...item.translations }
-      languages.forEach(l => {
-        if (l.code === 'zh-TW') return
-        if (!translations[l.code]?.trim() && dict[l.code]) {
-          translations[l.code] = dict[l.code]
-          filled++
-        }
-      })
-      return { ...item, translations }
-    })
-    if (filled === 0) {
-      message.info(t('translationManage:msgTranslationComplete'))
-      return
-    }
-    if (backendMode) {
-      const changed = newData.find(item => item.id === record.id)
-      if (changed) {
-        await updateTranslation(Number(changed.id), {
-          fieldName: changed.description,
-          category: changed.category,
-          fieldKey: changed.fieldKey,
-          translations: changed.translations,
-        })
-        await reloadFields()
+    try {
+      const result = await machineTranslateApi({ ids: [Number(record.id)] })
+      if (result.filled === 0) {
+        message.info(t('translationManage:msgTranslationComplete'))
+        return
       }
-    } else {
-      persistData(newData)
+      await reloadFields()
+      message.success(t('translationManage:msgMtCount', { count: result.filled }))
+    } catch {
+      message.error(t('translationManage:msgMtFailed'))
     }
-    message.success(t('translationManage:msgMtCount', { count: filled }))
   }
 
-  /* 一键机翻：填充全部字段的空缺翻译 */
+  /* 一键机翻：调用后端 API 填充全部字段的空缺翻译 */
   const handleMachineTranslateAll = async () => {
-    let filled = 0
-    const newData = data.map(item => {
-      const source = item.translations['zh-TW']?.trim() || item.description
-      const dict = MOCK_MT_DICT[source]
-      if (!dict) return item
-      const translations = { ...item.translations }
-      languages.forEach(l => {
-        if (l.code === 'zh-TW') return
-        if (!translations[l.code]?.trim() && dict[l.code]) {
-          translations[l.code] = dict[l.code]
-          filled++
-        }
-      })
-      return { ...item, translations }
-    })
-    if (filled === 0) {
+    // 收集所有有空缺的字段 ID
+    const incompleteIds = data
+      .filter(item => languages.some(l => l.code !== 'zh-TW' && !item.translations[l.code]?.trim()))
+      .map(item => Number(item.id))
+    if (incompleteIds.length === 0) {
       message.info(t('translationManage:msgNoMachineTranslate'))
       return
     }
-    if (backendMode) {
-      const changedList = newData.filter((item, idx) => item !== data[idx])
-      await Promise.all(changedList.map(item => updateTranslation(Number(item.id), {
-        fieldName: item.description,
-        category: item.category,
-        fieldKey: item.fieldKey,
-        translations: item.translations,
-      }).catch(() => null)))
+    try {
+      const result = await machineTranslateApi({ ids: incompleteIds })
+      if (result.filled === 0) {
+        message.info(t('translationManage:msgNoMachineTranslate'))
+        return
+      }
       await reloadFields()
-    } else {
-      persistData(newData)
+      message.success(t('translationManage:msgBatchMtCount', { count: result.filled }))
+    } catch {
+      message.error(t('translationManage:msgMtFailed'))
     }
-    message.success(t('translationManage:msgBatchMtCount', { count: filled }))
   }
 
   /* 重置为 Mock 数据（仅离线降级模式可用） */
