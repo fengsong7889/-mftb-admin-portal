@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Button, Tooltip, message, Modal, Select } from 'antd'
 import {
@@ -14,8 +14,15 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import BrandLogo from '../../components/BrandLogo'
 import { useTranslation } from 'react-i18next'
-import { changeAppLanguage, getCountryLanguage, SUPPORTED_LANGUAGES } from '../../i18n'
+import { changeAppLanguage, SUPPORTED_LANGUAGES } from '../../i18n'
 import type { AppLanguage } from '../../i18n'
+import {
+  COUNTRY_INFO,
+  countrySysName,
+  getCountryOfLanguage,
+  LANG_INFO,
+  langSysName,
+} from '../../utils/translationConfig'
 import '../../styles/components.css'
 
 /* ---- 动物验证码题库（key 化，渲染时按当前语言翻译） ---- */
@@ -118,36 +125,33 @@ function VideoBackground() {
 }
 
 
-/* ---- 国家选项（带国旗图标） ---- */
-const COUNTRY_OPTIONS = [
-  { value: 'china', label: '中国', flag: '🇨🇳' },
-  { value: 'hongkong', label: '香港', flag: '🇭🇰' },
-  { value: 'macau', label: '澳门', flag: '🇲🇴' },
-  { value: 'taiwan', label: '台湾', flag: '🇹🇼' },
-  { value: 'japan', label: '日本', flag: '🇯🇵' },
-  { value: 'south_korea', label: '韩国', flag: '🇰🇷' },
-  { value: 'singapore', label: '新加坡', flag: '🇸🇬' },
-  { value: 'malaysia', label: '马来西亚', flag: '🇲🇾' },
-  { value: 'thailand', label: '泰国', flag: '🇹🇭' },
-  { value: 'vietnam', label: '越南', flag: '🇻🇳' },
-  { value: 'philippines', label: '菲律宾', flag: '🇵🇭' },
-  { value: 'indonesia', label: '印度尼西亚', flag: '🇮🇩' },
-  { value: 'usa', label: '美国', flag: '🇺🇸' },
-  { value: 'uk', label: '英国', flag: '🇬🇧' },
-  { value: 'australia', label: '澳大利亚', flag: '🇦🇺' },
-]
-
 /* ========= 主登录组件 ========= */
 export default function Login() {
   const { t, i18n: i18nInstance } = useTranslation()
+  const sysLang = i18nInstance.language || 'en'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // 登录页独立的国家/语言选择（与首页互不干扰）
+  // 登录页独立的国家/语言选择（与首页互不干扰，数据与多语言配置一致）
   const [loginCountry, setLoginCountry] = useState('usa')
-  const [loginLanguage, setLoginLanguage] = useState<AppLanguage>('en')
+  const [loginLanguage, setLoginLanguage] = useState<string>('en')
+
+  // 国家选项：与顶部/多语言配置的国家数据一致，名称跟随全局语言
+  const countryOptions = useMemo(() =>
+    Object.keys(COUNTRY_INFO).map(code => ({
+      value: code,
+      flag: COUNTRY_INFO[code].flag,
+      label: countrySysName(code, sysLang),
+    })), [sysLang])
+
+  // 语言选项：全部语言可选（与国家独立），语言种类与多语言配置一致
+  const languageOptions = useMemo(() =>
+    Object.keys(LANG_INFO).map(code => ({
+      value: code,
+      label: `${LANG_INFO[code]?.flag ?? '🌐'} ${langSysName(code, sysLang)}`,
+    })), [sysLang])
 
   // 验证码状态
   const [captchaStage, setCaptchaStage] = useState<'checkbox' | 'quiz' | 'success'>('checkbox')
@@ -168,31 +172,41 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  /** 初始化：从登录页独立存储读取国家/语言 */
-  useEffect(() => {
-    const savedCountry = localStorage.getItem('login_country') || 'usa'
-    const savedLang = localStorage.getItem('login_language') as AppLanguage | null
-    const lang = savedLang || getCountryLanguage(savedCountry)
-    setLoginCountry(savedCountry)
+  /** 应用语言切换：持久化并在系统支持时生效 */
+  const applyLoginLanguage = (lang: string) => {
     setLoginLanguage(lang)
-    changeAppLanguage(lang)
+    localStorage.setItem('login_language', lang)
+    if ((SUPPORTED_LANGUAGES as readonly string[]).includes(lang)) {
+      changeAppLanguage(lang as AppLanguage)
+    }
+  }
+
+  /** 初始化：从登录页独立存储读取国家/语言（兼容旧版语言编码存储） */
+  useEffect(() => {
+    const savedCountry = localStorage.getItem('login_country')
+    let country = 'usa'
+    if (savedCountry) {
+      if (COUNTRY_INFO[savedCountry]) {
+        country = savedCountry
+      } else if (LANG_INFO[savedCountry]) {
+        country = getCountryOfLanguage(savedCountry)
+      }
+    }
+    const savedLang = localStorage.getItem('login_language')
+    const lang = savedLang && LANG_INFO[savedLang] ? savedLang : 'en'
+    setLoginCountry(country)
+    applyLoginLanguage(lang)
   }, [])
 
-  /** 登录页国家切换 → 联动默认语言 */
+  /** 登录页国家切换 → 仅保存国家，不联动语言（语言可独立选择任意语言） */
   const handleLoginCountryChange = (country: string) => {
     setLoginCountry(country)
     localStorage.setItem('login_country', country)
-    const lang = getCountryLanguage(country)
-    setLoginLanguage(lang)
-    localStorage.setItem('login_language', lang)
-    changeAppLanguage(lang)
   }
 
   /** 登录页语言手动切换 */
-  const handleLoginLanguageChange = (lang: AppLanguage) => {
-    setLoginLanguage(lang)
-    localStorage.setItem('login_language', lang)
-    changeAppLanguage(lang)
+  const handleLoginLanguageChange = (lang: string) => {
+    applyLoginLanguage(lang)
   }
 
   /** 点击验证码复选框 → 展示动物识别题目 */
@@ -306,9 +320,13 @@ export default function Login() {
               variant="borderless"
               className="login-locale-select"
               popupMatchSelectWidth={false}
-              options={COUNTRY_OPTIONS.map(opt => ({
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={countryOptions.map(opt => ({
                 value: opt.value,
-                label: `${opt.flag} ${t(`country.${opt.value}`)}`,
+                label: `${opt.flag} ${opt.label}`,
               }))}
               suffixIcon={<GlobalOutlined style={{ color: 'rgba(255,255,255,0.6)' }} />}
             />
@@ -319,10 +337,11 @@ export default function Login() {
               variant="borderless"
               className="login-locale-select"
               popupMatchSelectWidth={false}
-              options={SUPPORTED_LANGUAGES.map(lang => ({
-                value: lang,
-                label: t(`language.${lang}`),
-              }))}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={languageOptions}
             />
           </div>
 

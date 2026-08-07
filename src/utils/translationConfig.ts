@@ -207,3 +207,89 @@ export function langSysName(code: string, sysLang: string): string {
   const idx = SYS_LANG_ORDER.indexOf(sysLang)
   return idx >= 0 && info.names[idx] ? info.names[idx] : info.native
 }
+
+/* ==== 国家信息库（顶部国家/语言选择器与多语言配置共用） ==== */
+/**
+ * 国家信息：国旗 + 各系统语言显示名（顺序同 SYS_LANG_ORDER）+ 该国可选语言代码
+ * 语言代码与上方 LANG_INFO（多语言配置语言种类）一一对应
+ */
+export const COUNTRY_INFO: Record<string, { flag: string; names: string[]; languages: string[] }> = {
+  china: { flag: '🇨🇳', names: ['中國', 'China', '中国', '중국', 'Китай'], languages: ['zh-TW', 'zh-CN'] },
+  usa: { flag: '🇺🇸', names: ['美國', 'United States', 'アメリカ', '미국', 'США'], languages: ['en'] },
+  japan: { flag: '🇯🇵', names: ['日本', 'Japan', '日本', '일본', 'Япония'], languages: ['ja'] },
+  south_korea: { flag: '🇰🇷', names: ['韓國', 'South Korea', '韓国', '한국', 'Южная Корея'], languages: ['ko'] },
+  russia: { flag: '🇷🇺', names: ['俄羅斯', 'Russia', 'ロシア', '러시아', 'Россия'], languages: ['ru'] },
+  thailand: { flag: '🇹🇭', names: ['泰國', 'Thailand', 'タイ', '태국', 'Таиланд'], languages: ['th'] },
+  vietnam: { flag: '🇻🇳', names: ['越南', 'Vietnam', 'ベトナム', '베트남', 'Вьетнам'], languages: ['vi'] },
+  indonesia: { flag: '🇮🇩', names: ['印尼', 'Indonesia', 'インドネシア', '인도네시아', 'Индонезия'], languages: ['id'] },
+  malaysia: { flag: '🇲🇾', names: ['馬來西亞', 'Malaysia', 'マレーシア', '말레이시아', 'Малайзия'], languages: ['ms'] },
+  france: { flag: '🇫🇷', names: ['法國', 'France', 'フランス', '프랑스', 'Франция'], languages: ['fr'] },
+  germany: { flag: '🇩🇪', names: ['德國', 'Germany', 'ドイツ', '독일', 'Германия'], languages: ['de'] },
+  spain: { flag: '🇪🇸', names: ['西班牙', 'Spain', 'スペイン', '스페인', 'Испания'], languages: ['es', 'ca', 'eu', 'gl'] },
+  portugal: { flag: '🇵🇹', names: ['葡萄牙', 'Portugal', 'ポルトガル', '포르투갈', 'Португалия'], languages: ['pt'] },
+  italy: { flag: '🇮🇹', names: ['義大利', 'Italy', 'イタリア', '이탈리아', 'Италия'], languages: ['it'] },
+  saudi_arabia: { flag: '🇸🇦', names: ['沙烏地阿拉伯', 'Saudi Arabia', 'サウジアラビア', '사우디아라비아', 'Саудовская Аравия'], languages: ['ar'] },
+  india: { flag: '🇮🇳', names: ['印度', 'India', 'インド', '인도', 'Индия'], languages: ['hi', 'ta', 'te'] },
+  bangladesh: { flag: '🇧🇩', names: ['孟加拉', 'Bangladesh', 'バングラデシュ', '방글라데시', 'Бангладеш'], languages: ['bn'] },
+  turkey: { flag: '🇹🇷', names: ['土耳其', 'Turkey', 'トルコ', '터키', 'Турция'], languages: ['tr'] },
+  poland: { flag: '🇵🇱', names: ['波蘭', 'Poland', 'ポーランド', '폴란드', 'Польша'], languages: ['pl'] },
+  netherlands: { flag: '🇳🇱', names: ['荷蘭', 'Netherlands', 'オランダ', '네덜란드', 'Нидерланды'], languages: ['nl'] },
+  sweden: { flag: '🇸🇪', names: ['瑞典', 'Sweden', 'スウェーデン', '스웨덴', 'Швеция'], languages: ['sv'] },
+  denmark: { flag: '🇩🇰', names: ['丹麥', 'Denmark', 'デンマーク', '덴마크', 'Дания'], languages: ['da'] },
+  norway: { flag: '🇳🇴', names: ['挪威', 'Norway', 'ノルウェー', '노르웨이', 'Норвегия'], languages: ['no'] },
+  finland: { flag: '🇫🇮', names: ['芬蘭', 'Finland', 'フィンランド', '핀란드', 'Финляндия'], languages: ['fi'] },
+  ukraine: { flag: '🇺🇦', names: ['烏克蘭', 'Ukraine', 'ウクライナ', '우크라이나', 'Украина'], languages: ['uk'] },
+  romania: { flag: '🇷🇴', names: ['羅馬尼亞', 'Romania', 'ルーマニア', '루마니아', 'Румыния'], languages: ['ro'] },
+  hungary: { flag: '🇭🇺', names: ['匈牙利', 'Hungary', 'ハンガリー', '헝가리', 'Венгрия'], languages: ['hu'] },
+  czech: { flag: '🇨🇿', names: ['捷克', 'Czech Republic', 'チェコ', '체코', 'Чехия'], languages: ['cs'] },
+  greece: { flag: '🇬🇷', names: ['希臘', 'Greece', 'ギリシャ', '그리스', 'Греция'], languages: ['el'] },
+  israel: { flag: '🇮🇱', names: ['以色列', 'Israel', 'イスラエル', '이스라엘', 'Израиль'], languages: ['he'] },
+  iran: { flag: '🇮🇷', names: ['伊朗', 'Iran', 'イラン', '이란', 'Иран'], languages: ['fa'] },
+  pakistan: { flag: '🇵🇰', names: ['巴基斯坦', 'Pakistan', 'パキスタン', '파키스탄', 'Пакистан'], languages: ['ur'] },
+  myanmar: { flag: '🇲🇲', names: ['緬甸', 'Myanmar', 'ミャンマー', '미얀마', 'Мьянма'], languages: ['my'] },
+  cambodia: { flag: '🇰🇭', names: ['柬埔寨', 'Cambodia', 'カンボジア', '캄보디아', 'Камбоджа'], languages: ['km'] },
+  laos: { flag: '🇱🇦', names: ['寮國', 'Laos', 'ラオス', '라오스', 'Лаос'], languages: ['lo'] },
+  nepal: { flag: '🇳🇵', names: ['尼泊爾', 'Nepal', 'ネパール', '네팔', 'Непал'], languages: ['ne'] },
+  sri_lanka: { flag: '🇱🇰', names: ['斯里蘭卡', 'Sri Lanka', 'スリランカ', '스리랑카', 'Шри-Ланка'], languages: ['si'] },
+  kenya: { flag: '🇰🇪', names: ['肯亞', 'Kenya', 'ケニア', '케냐', 'Кения'], languages: ['sw'] },
+  south_africa: { flag: '🇿🇦', names: ['南非', 'South Africa', '南アフリカ', '남아프리카', 'ЮАР'], languages: ['af'] },
+  bulgaria: { flag: '🇧🇬', names: ['保加利亞', 'Bulgaria', 'ブルガリア', '불가리아', 'Болгария'], languages: ['bg'] },
+  croatia: { flag: '🇭🇷', names: ['克羅埃西亞', 'Croatia', 'クロアチア', '크로아티아', 'Хорватия'], languages: ['hr'] },
+  slovakia: { flag: '🇸🇰', names: ['斯洛伐克', 'Slovakia', 'スロバキア', '슬로바키아', 'Словакия'], languages: ['sk'] },
+  slovenia: { flag: '🇸🇮', names: ['斯洛維尼亞', 'Slovenia', 'スロベニア', '슬로베니아', 'Словения'], languages: ['sl'] },
+  serbia: { flag: '🇷🇸', names: ['塞爾維亞', 'Serbia', 'セルビア', '세르비아', 'Сербия'], languages: ['sr'] },
+  lithuania: { flag: '🇱🇹', names: ['立陶宛', 'Lithuania', 'リトアニア', '리투아니아', 'Литва'], languages: ['lt'] },
+  latvia: { flag: '🇱🇻', names: ['拉脫維亞', 'Latvia', 'ラトビア', '라트비아', 'Латвия'], languages: ['lv'] },
+  estonia: { flag: '🇪🇪', names: ['愛沙尼亞', 'Estonia', 'エストニア', '에스토니아', 'Эстония'], languages: ['et'] },
+  georgia: { flag: '🇬🇪', names: ['喬治亞', 'Georgia', 'ジョージア', '조지아', 'Грузия'], languages: ['ka'] },
+  iceland: { flag: '🇮🇸', names: ['冰島', 'Iceland', 'アイスランド', '아이슬란드', 'Исландия'], languages: ['is'] },
+  north_macedonia: { flag: '🇲🇰', names: ['北馬其頓', 'North Macedonia', '北マケドニア', '북마케도니아', 'Северная Македония'], languages: ['mk'] },
+  albania: { flag: '🇦🇱', names: ['阿爾巴尼亞', 'Albania', 'アルバニア', '알바니아', 'Албания'], languages: ['sq'] },
+  bosnia: { flag: '🇧🇦', names: ['波士尼亞', 'Bosnia and Herzegovina', 'ボスニア・ヘルツェゴビナ', '보스니아 헤르체고비나', 'Босния и Герцеговина'], languages: ['bs'] },
+  mongolia: { flag: '🇲🇳', names: ['蒙古', 'Mongolia', 'モンゴル', '몽골', 'Монголия'], languages: ['mn'] },
+  kazakhstan: { flag: '🇰🇿', names: ['哈薩克', 'Kazakhstan', 'カザフスタン', '카자흐스탄', 'Казахстан'], languages: ['kk'] },
+  uzbekistan: { flag: '🇺🇿', names: ['烏茲別克', 'Uzbekistan', 'ウズベキスタン', '우즈베키스탄', 'Узбекистан'], languages: ['uz'] },
+  azerbaijan: { flag: '🇦🇿', names: ['亞塞拜然', 'Azerbaijan', 'アゼルバイジャン', '아제르바이잔', 'Азербайджан'], languages: ['az'] },
+  armenia: { flag: '🇦🇲', names: ['亞美尼亞', 'Armenia', 'アルメニア', '아르메니아', 'Армения'], languages: ['hy'] },
+}
+
+/** 国家在指定系统语言下的显示名 */
+export function countrySysName(code: string, sysLang: string): string {
+  const info = COUNTRY_INFO[code]
+  if (!info) return code
+  const idx = SYS_LANG_ORDER.indexOf(sysLang)
+  return idx >= 0 && info.names[idx] ? info.names[idx] : info.names[1] || code
+}
+
+/** 国家对应的可选语言代码列表 */
+export function getCountryLanguages(country: string): string[] {
+  return COUNTRY_INFO[country]?.languages ?? []
+}
+
+/** 反查：语言所属国家（未知语言默认归属美国） */
+export function getCountryOfLanguage(langCode: string): string {
+  for (const [code, info] of Object.entries(COUNTRY_INFO)) {
+    if (info.languages.includes(langCode)) return code
+  }
+  return 'usa'
+}
