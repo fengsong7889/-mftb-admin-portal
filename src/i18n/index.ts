@@ -66,13 +66,12 @@ function toNestedBundle(flat: Record<string, string>): Record<string, unknown> {
 
 /**
  * 注入後端數據庫語言包（多語言配置模塊）
- * deep 合併且不覆蓋靜態 JSON 已有的 UI 文案，僅補充業務字段/菜單名等動態翻譯
- * dontOverwrite=true：保護靜態 JSON 中已有的正確翻譯，避免後端回退鏈（目標→en→zh-TW→字段名）
- * 返回的英文值覆蓋已本地化的 UI 文案
+ * deep 合併且不覆蓋靜態 JSON 已有的 UI 文案（overwrite=false），僅補充業務字段/菜單名等動態翻譯
+ * 避免後端回退鏈（目標→en→zh-TW→字段名）產生的英文/字段名值覆蓋已本地化的 UI 文案
  */
 export function injectTranslationBundle(lang: string, flat: Record<string, string>) {
   if (!flat || Object.keys(flat).length === 0) return
-  i18n.addResourceBundle(lang, 'translation', toNestedBundle(flat), true, true)
+  i18n.addResourceBundle(lang, 'translation', toNestedBundle(flat), true, false)
 }
 
 export default i18n
