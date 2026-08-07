@@ -202,6 +202,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (departmentId == null) {
             user.setDepartmentId(null);
             user.setDepartment(null);
+            user.setDepartmentEn(null);
             return;
         }
         SysDepartment dept = sysDepartmentMapper.selectById(departmentId);
@@ -210,6 +211,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         user.setDepartmentId(dept.getId());
         user.setDepartment(dept.getName());
+        user.setDepartmentEn(dept.getNameEn());
     }
 
     /** 设置员工职位: 校验职位存在并写入职位中英文名称/职级序列/职级快照/职等快照 */

@@ -46,6 +46,9 @@ public class SysUser {
     /** 所在部门名称快照 */
     private String department;
 
+    /** 所在部门英文名称快照 */
+    private String departmentEn;
+
     /** 职位ID (关联 sys_position) */
     private Long positionId;
 

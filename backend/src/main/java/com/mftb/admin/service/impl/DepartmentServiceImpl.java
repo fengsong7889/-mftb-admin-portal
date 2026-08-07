@@ -120,7 +120,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         dept.setUpdatedBy(operatorResolver.currentOperatorName());
         sysDepartmentMapper.updateById(dept);
         // 同步更新该部门下员工的部门名称快照
-        syncUserDepartmentName(id, dept.getName());
+        syncUserDepartmentName(id, dept.getName(), dept.getNameEn());
         return DepartmentVO.from(dept, null, null, loadPermissions(dept.getId()));
     }
 
@@ -269,11 +269,12 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     /** 部门名称变更后同步员工表的部门名称快照 */
-    private void syncUserDepartmentName(Long deptId, String deptName) {
+    private void syncUserDepartmentName(Long deptId, String deptName, String deptNameEn) {
         List<SysUser> users = sysUserMapper.selectList(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getDepartmentId, deptId));
         for (SysUser user : users) {
             user.setDepartment(deptName);
+            user.setDepartmentEn(deptNameEn);
             sysUserMapper.updateById(user);
         }
     }

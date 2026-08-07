@@ -26,8 +26,23 @@ import {
 } from '../utils/translationConfig'
 import type { LangValidationResult } from '../utils/translationConfig'
 import { fetchCoverage, fetchTranslationBundle } from '../api/translation'
+import { pinyin } from 'pinyin-pro'
 
 const { Header } = Layout
+
+/** 中文姓名转英文拼音格式：名在前、姓在后，首字母大写 */
+function chineseNameToPinyinEnglish(name: string): string {
+  if (!name) return ''
+  // 检查是否为纯中文
+  if (!/[\u4e00-\u9fa5]/.test(name)) return name
+  const py = pinyin(name, { toneType: 'none', type: 'array' })
+  if (py.length <= 1) return name
+  // 第一个为姓，其余为名
+  const surname = py[0]
+  const givenName = py.slice(1).join('')
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  return `${capitalize(givenName)} ${capitalize(surname)}`
+}
 
 interface HeaderBarProps {
   collapsed: boolean
@@ -59,6 +74,7 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   const { user, logout, updateAvatar } = useAuth()
   const { t, i18n: i18nInstance } = useTranslation()
   const navigate = useNavigate()
+  const isNonZh = !i18nInstance.language?.startsWith('zh')
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [oldPwd, setOldPwd] = useState('')
@@ -302,19 +318,21 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
                 <Avatar size={32} icon={<UserOutlined />} className="header-avatar" />
               )}
               <div className="header-user-text">
-                {/* 第一行: 姓名（工號）-職級 */}
+                {/* 第一行: 姓名（工號）-職級 — 英文模式显示拼音名 */}
                 <span className="header-user-name">
-                  {user?.name}（{user?.empId}）{user?.jobLevel ? `-${user.jobLevel}` : ''}
+                  {isNonZh ? chineseNameToPinyinEnglish(user?.name || '') : user?.name}（{user?.empId}）{user?.jobLevel ? `-${user.jobLevel}` : ''}
                 </span>
-                {/* 第二行: 職位名稱中文（職位名稱英文） */}
+                {/* 第二行: 職位名稱 — 英文模式只显示英文名 */}
                 {user?.position && (
                   <span className="header-user-department">
-                    {user.position}{user.positionEn ? `（${user.positionEn}）` : ''}
+                    {isNonZh ? (user.positionEn || user.position) : user.position}{!isNonZh && user.positionEn ? `（${user.positionEn}）` : ''}
                   </span>
                 )}
-                {/* 第三行: 部門名稱 */}
+                {/* 第三行: 部門名稱 — 英文模式显示英文名 */}
                 {user?.department && (
-                  <span className="header-user-id">{user.department}</span>
+                  <span className="header-user-id">
+                    {isNonZh ? (user.departmentEn || user.department) : user.department}
+                  </span>
                 )}
               </div>
             </div>

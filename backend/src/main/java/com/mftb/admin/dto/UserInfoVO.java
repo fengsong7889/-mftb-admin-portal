@@ -20,6 +20,8 @@ public class UserInfoVO {
     private String role;
     private Long departmentId;
     private String department;
+    /** 部门英文名称 */
+    private String departmentEn;
     private String position;
     /** 职位英文名称 */
     private String positionEn;
@@ -40,6 +42,7 @@ public class UserInfoVO {
         vo.setRole(user.getRole());
         vo.setDepartmentId(user.getDepartmentId());
         vo.setDepartment(user.getDepartment());
+        vo.setDepartmentEn(user.getDepartmentEn());
         vo.setPosition(user.getPosition());
         vo.setPositionEn(user.getPositionEn());
         vo.setJobLevel(user.getJobLevel());

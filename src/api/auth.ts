@@ -17,6 +17,8 @@ export interface UserInfo {
   avatar: string
   role: string
   department?: string
+  /** 部门英文名称 */
+  departmentEn?: string
   position?: string
   /** 职位英文名称 */
   positionEn?: string

@@ -13,6 +13,7 @@ export interface UserInfo {
   avatar: string
   role: 'admin' | 'guest' // 用户角色
   department?: string // 所在部门
+  departmentEn?: string // 所在部门英文名称
   position?: string // 职位
   positionEn?: string // 职位英文名称
   jobLevel?: string // 职级 (如 M10/T5)
@@ -215,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             avatar: prev?.avatar || info.avatar || 'pikachu-default',
             role: info.role === 'admin' ? 'admin' : 'guest',
             department: info.department,
+            departmentEn: info.departmentEn,
             position: info.position,
             positionEn: info.positionEn,
             jobLevel: info.jobLevel,
@@ -315,6 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         avatar: backendUser.avatar || 'pikachu-default',
         role: backendUser.role === 'admin' ? 'admin' : 'guest',
         department: backendUser.department,
+        departmentEn: backendUser.departmentEn,
         position: backendUser.position,
         positionEn: backendUser.positionEn,
         jobLevel: backendUser.jobLevel,
