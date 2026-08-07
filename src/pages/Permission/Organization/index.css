@@ -144,3 +144,15 @@
   flex: 1;
   min-width: 0;
 }
+
+/* 表单内翻译按钮 */
+.org-translate-btn {
+  color: #8c8c8c;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.org-translate-btn:hover {
+  color: #e8720c;
+  transform: scale(1.1);
+}

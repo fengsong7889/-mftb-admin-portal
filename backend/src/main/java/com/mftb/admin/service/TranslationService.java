@@ -62,4 +62,13 @@ public interface TranslationService {
      * @return 本次新增的翻译条数
      */
     int machineTranslate(MachineTranslateRequest request);
+
+    /**
+     * 单文本翻译：调用 MyMemory API 将源文本翻译为目标语言
+     *
+     * @param text       源文本（繁中）
+     * @param targetLang 目标语言代码（如 en）
+     * @return 翻译结果，失败返回 null
+     */
+    String translateText(String text, String targetLang);
 }

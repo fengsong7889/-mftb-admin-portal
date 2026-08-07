@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.SysDepartmentMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.service.TranslationService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
+    private final TranslationService translationService;
 
     /** 部门编码前缀: MT + 5位自增序号 */
     private static final String DEPT_CODE_PREFIX = "MT";
@@ -266,6 +268,31 @@ public class DepartmentServiceImpl implements DepartmentService {
             result.computeIfAbsent(deptId, k -> new ArrayList<>()).add(dto);
         }
         return result;
+    }
+
+    @Override
+    @Transactional
+    public int translateNames() {
+        // 查询所有 nameEn 为空的部门
+        List<SysDepartment> depts = sysDepartmentMapper.selectList(
+                new LambdaQueryWrapper<SysDepartment>()
+                        .isNotNull(SysDepartment::getName)
+                        .and(w -> w.isNull(SysDepartment::getNameEn).or().eq(SysDepartment::getNameEn, "")));
+        int count = 0;
+        for (SysDepartment dept : depts) {
+            String name = dept.getName();
+            if (!StringUtils.hasText(name)) continue;
+            String translated = translationService.translateText(name, "en");
+            if (StringUtils.hasText(translated)) {
+                dept.setNameEn(translated);
+                sysDepartmentMapper.updateById(dept);
+                // 同步更新该部门下员工的 departmentEn 快照
+                syncUserDepartmentName(dept.getId(), dept.getName(), translated);
+                count++;
+            }
+        }
+        log.info("批量翻译部门名称完成: 共翻译 {} 个部门", count);
+        return count;
     }
 
     /** 部门名称变更后同步员工表的部门名称快照 */

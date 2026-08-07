@@ -456,6 +456,12 @@ public class TranslationServiceImpl implements TranslationService {
         return null;
     }
 
+    @Override
+    public String translateText(String text, String targetLang) {
+        if (!StringUtils.hasText(text)) return null;
+        return callMyMemory(text, targetLang);
+    }
+
     /* ========== 内部工具 ========== */
 
     /** Key 规范化: 留空自动生成 分类前缀 + field 递增序号 */

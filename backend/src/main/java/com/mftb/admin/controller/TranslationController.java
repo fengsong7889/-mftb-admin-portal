@@ -109,4 +109,13 @@ public class TranslationController {
         int filled = translationService.machineTranslate(request);
         return Result.success("机翻完成", Map.of("filled", filled));
     }
+
+    /** 单文本翻译：将源文本翻译为目标语言（不持久化，仅返回翻译结果） */
+    @PostMapping("/translate-text")
+    public Result<String> translateText(@RequestBody Map<String, String> request) {
+        String text = request.get("text");
+        String targetLang = request.getOrDefault("targetLang", "en");
+        String translated = translationService.translateText(text, targetLang);
+        return Result.success(translated != null ? translated : "");
+    }
 }

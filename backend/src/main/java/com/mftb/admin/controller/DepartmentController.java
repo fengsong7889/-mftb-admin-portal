@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 集团组织架构-部门接口
@@ -73,5 +74,13 @@ public class DepartmentController {
     public Result<Void> delete(@PathVariable Long id) {
         departmentService.delete(id);
         return Result.success();
+    }
+
+    /** 批量翻译部门名称：将 nameEn 为空的部门按中文名自动翻译为英文 */
+    @PostMapping("/translate-names")
+    @RequirePermission(menu = "organization-management", action = "edit")
+    public Result<Map<String, Integer>> translateNames() {
+        int count = departmentService.translateNames();
+        return Result.success("翻译完成", Map.of("translated", count));
     }
 }

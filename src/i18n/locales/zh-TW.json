@@ -3074,6 +3074,14 @@
     "sortExtra": "數字越小越靠前",
     "sortPlaceholder": "請輸入排序值",
     "confirmDeleteContent": "確定要刪除部門「{{name}}」嗎？",
+    "confirmEnableTitle": "確認啟用",
+    "confirmDisableTitle": "確認停用",
+    "confirmEnableContent": "確定要啟用部門「{{name}}」嗎？",
+    "confirmDisableContent": "確定要停用部門「{{name}}」嗎？停用後該部門及其下級部門的賬號將無法登錄。",
+    "translateThisName": "根據中文名稱自動翻譯為英文",
+    "translateNeedName": "請先填寫部門中文名稱",
+    "translateDone": "翻譯完成",
+    "translateFailed": "翻譯失敗，請稍後重試",
     "deptDeleted": "（部門已刪除）"
   },
   "dataPermission": {

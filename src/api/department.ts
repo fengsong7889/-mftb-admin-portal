@@ -65,3 +65,8 @@ export function updateDepartmentPermissions(id: number, permissions: MenuPermiss
 export function deleteDepartment(id: number) {
   return request.delete<unknown, void>(`/departments/${id}`)
 }
+
+/** 批量翻译部门名称：将 nameEn 为空的部门按中文名自动翻译为英文 */
+export function translateDeptNames() {
+  return request.post<unknown, { translated: number }>('/departments/translate-names')
+}

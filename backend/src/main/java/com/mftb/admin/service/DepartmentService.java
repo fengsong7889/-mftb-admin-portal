@@ -31,4 +31,11 @@ public interface DepartmentService {
 
     /** 查询部门授权的菜单权限 (部门不存在或已停用返回空列表) */
     List<MenuPermissionDTO> permissionsOf(Long deptId);
+
+    /**
+     * 批量翻译部门名称：将 nameEn 为空的部门按中文名自动翻译为英文
+     *
+     * @return 本次翻译成功的部门数
+     */
+    int translateNames();
 }

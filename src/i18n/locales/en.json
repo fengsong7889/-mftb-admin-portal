@@ -3074,6 +3074,14 @@
     "sortExtra": "Lower number = higher priority",
     "sortPlaceholder": "Enter sort value",
     "confirmDeleteContent": "Delete department \"{{name}}\"?",
+    "confirmEnableTitle": "Confirm Enable",
+    "confirmDisableTitle": "Confirm Disable",
+    "confirmEnableContent": "Enable department \"{{name}}\"?",
+    "confirmDisableContent": "Disable department \"{{name}}\"? Accounts in this department and its sub-departments will be unable to log in.",
+    "translateThisName": "Auto-translate Chinese name to English",
+    "translateNeedName": "Please fill in the Chinese department name first",
+    "translateDone": "Translation complete",
+    "translateFailed": "Translation failed, please try again later",
     "deptDeleted": "(Dept deleted)"
   },
   "dataPermission": {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
-import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TranslationOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -17,6 +17,7 @@ import type { DepartmentItem, DepartmentPayload } from '../../../api/department'
 import { fetchEmployees } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
 import { exportToCSV } from '../../../utils/exportCSV'
+import { translateText } from '../../../api/translation'
 import './index.css'
 
 /** 新增/编辑表单值 */
@@ -305,16 +306,27 @@ export default function OrganizationManagement() {
     }
   }
 
-  /** 停用/启用 */
-  const handleToggleStatus = async (record: DepartmentItem) => {
-    const next = record.status === DEPT_STATUS.ENABLED ? DEPT_STATUS.DISABLED : DEPT_STATUS.ENABLED
-    try {
-      await updateDepartmentStatus(record.id, next)
-      message.success(next === DEPT_STATUS.ENABLED ? t('organization.enabled') : t('organization.disabled'))
-      fetchList()
-    } catch {
-      // 错误提示由请求层统一处理
-    }
+  /** 停用/启用（带确认弹窗） */
+  const handleToggleStatus = (record: DepartmentItem) => {
+    const isEnable = record.status === DEPT_STATUS.DISABLED
+    Modal.confirm({
+      title: isEnable ? t('organization.confirmEnableTitle') : t('organization.confirmDisableTitle'),
+      content: isEnable
+        ? t('organization.confirmEnableContent', { name: record.name })
+        : t('organization.confirmDisableContent', { name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        const next = isEnable ? DEPT_STATUS.ENABLED : DEPT_STATUS.DISABLED
+        try {
+          await updateDepartmentStatus(record.id, next)
+          message.success(next === DEPT_STATUS.ENABLED ? t('organization.enabled') : t('organization.disabled'))
+          fetchList()
+        } catch {
+          // 错误提示由请求层统一处理
+        }
+      },
+    })
   }
 
   /** 删除 */
@@ -513,7 +525,35 @@ export default function OrganizationManagement() {
             <Input placeholder={t('organization.deptNamePlaceholder')} allowClear />
           </Form.Item>
           <Form.Item name="nameEn" label={t('organization.deptNameEnLabel')}>
-            <Input placeholder={t('organization.deptNameEnPlaceholder')} allowClear maxLength={100} />
+            <Input
+              placeholder={t('organization.deptNameEnPlaceholder')}
+              allowClear
+              maxLength={100}
+              suffix={
+                <TranslationOutlined
+                  className="org-translate-btn"
+                  title={t('organization.translateThisName')}
+                  onClick={async () => {
+                    const name = form.getFieldValue('name')?.trim()
+                    if (!name) {
+                      message.warning(t('organization.translateNeedName'))
+                      return
+                    }
+                    try {
+                      const translated = await translateText(name, 'en')
+                      if (translated) {
+                        form.setFieldsValue({ nameEn: translated })
+                        message.success(t('organization.translateDone'))
+                      } else {
+                        message.error(t('organization.translateFailed'))
+                      }
+                    } catch {
+                      // 错误提示由请求层统一处理
+                    }
+                  }}
+                />
+              }
+            />
           </Form.Item>
           <Form.Item name="leader" label={t('organization.leaderLabel')}>
             <Select

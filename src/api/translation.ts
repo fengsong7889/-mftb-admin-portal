@@ -133,3 +133,8 @@ export interface MachineTranslateResult {
 export async function machineTranslate(data: MachineTranslatePayload) {
   return request.post<unknown, MachineTranslateResult>('/translations/machine-translate', data)
 }
+
+/** 单文本翻译：将源文本翻译为目标语言（不持久化，仅返回翻译结果） */
+export async function translateText(text: string, targetLang = 'en') {
+  return request.post<unknown, string>('/translations/translate-text', { text, targetLang })
+}
