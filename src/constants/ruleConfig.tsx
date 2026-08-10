@@ -75,6 +75,17 @@ const AD_SALES_RULES: RuleItem[] = [
     value: true,
     defaultValue: true,
   },
+  {
+    key: 'ad_click_cart_lock_seconds',
+    label: '廣告點擊加購鎖定時長',
+    description: '廣告銷售所有廣告點擊加購後鎖定的秒數，鎖定期間內不可重複加購',
+    type: 'number',
+    value: 60,
+    defaultValue: 60,
+    unit: '秒',
+    min: 1,
+    max: 3600,
+  },
 ]
 
 /** 贈送管理規則（按廣告類型獨立配置） */

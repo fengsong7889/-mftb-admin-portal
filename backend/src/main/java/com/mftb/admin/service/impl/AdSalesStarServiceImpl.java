@@ -29,6 +29,7 @@ import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,7 @@ import java.util.Set;
  * 默认 1 即独家占；退款/取消后释放可再售。
  * 格子单价 = 商圈日单价 / 5, 多选格子按梯度折扣计价后从推广金账户扣款。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdSalesStarServiceImpl implements AdSalesStarService {
@@ -262,7 +264,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
         }
 
-        // 6. 写订单主表 + 明细
+        // 6. 写订单主表 + 明细 + 财务扣款（非 BusinessException 一律转为友好提示，避免「系统繁忙」）
+        try {
         String orderNo = bizSeqService.next(BizSeqService.PREFIX_AD_ORDER);
         BizMerchantGroup group = groupMapper.selectOne(
                 new LambdaQueryWrapper<BizMerchantGroup>()
@@ -346,6 +349,17 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         // 8. 下单成功后释放本商家对这些格子的加购锁（规则4）
         releaseLocks(request.getAlgoId(), request.getGroupCode(), request.getCells());
         return AdOrderVO.from(order);
+        } catch (BusinessException e) {
+            throw e;  // 业务异常直接抛出，由全局处理器处理
+        } catch (DuplicateKeyException e) {
+            log.warn("下单并发冲突(订单号重复): algoId={}, groupCode={}", request.getAlgoId(), request.getGroupCode());
+            throw new BusinessException("訂單編號生成衝突，請稍後重試");
+        } catch (Exception e) {
+            log.error("广告下单异常: algoId={}, groupCode={}, storeCode={}, cells={}",
+                    request.getAlgoId(), request.getGroupCode(), request.getStoreCode(),
+                    request.getCells().size(), e);
+            throw new BusinessException("下單失敗: " + e.getMessage());
+        }
     }
 
     /* ==================== 加购锁定（规则4: 60秒） ==================== */

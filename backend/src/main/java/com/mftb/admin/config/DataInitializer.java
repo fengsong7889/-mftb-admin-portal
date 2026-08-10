@@ -40,6 +40,7 @@ public class DataInitializer implements CommandLineRunner {
         migrateEmpIdToMF();
         migrateDeptCodeToMT();
         resetPasswordIfNeeded("MF00001", "111222");
+        ensureDeptAdSalesPermission();
     }
 
     /** 内置账号迁移: 登录账号统一为工号, 移除 guest 账号 (旧库 admin 账号由 migrateEmpIdToMF 统一重编号) */
@@ -629,6 +630,26 @@ public class DataInitializer implements CommandLineRunner {
                 "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
                 Long.class, menuKey);
         return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    /** 确保所有部门拥有 ad-sales 菜单权限（view/create/edit/export） */
+    private void ensureDeptAdSalesPermission() {
+        Long adSalesMenuId = queryMenuIdByKey("ad-sales");
+        if (adSalesMenuId == null) {
+            return;
+        }
+        String actions = "[\"view\",\"create\",\"edit\",\"export\"]";
+        List<Long> deptIds = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_department WHERE deleted = 0 AND status = 1", Long.class);
+        for (Long deptId : deptIds) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_department_menu (dept_id, menu_id, actions) VALUES (?, ?, ?) "
+                            + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
+                    deptId, adSalesMenuId, actions);
+        }
+        if (!deptIds.isEmpty()) {
+            log.info("已确保 {} 个部门拥有 [ad-sales] 菜单权限", deptIds.size());
+        }
     }
 
     /** 若密码非合法 BCrypt 值(如 SQL 占位符), 则重置为默认密码的加密值 */

@@ -266,7 +266,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     return () => clearInterval(timer)
   }, [])
 
-  // 自动释放过期锁定（60秒后）
+  // 自动释放过期锁定（60秒后）；若支付弹窗打开中，自动关闭弹窗并刷新数据
   useEffect(() => {
     const expiredItems = cartItems.filter(item => currentTime - item.lockTime >= LOCK_DURATION_MS)
     if (expiredItems.length > 0) {
@@ -274,8 +274,18 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       expiredItems.forEach(item => {
         message.info(`${item.date} ${item.regionName} ${item.mealSlot} ${t('lockExpired')}`)
       })
+      // 支付确认弹窗打开时，锁定已过期 → 关闭弹窗，刷新库存与余额，让用户重新获取最新数据
+      if (isPaymentModalVisible) {
+        setIsPaymentModalVisible(false)
+        const apiId = searchAlgorithm ? algorithmMetaMap[searchAlgorithm]?.apiId : undefined
+        const store = searchStoreName ? storeMap[searchStoreName] : undefined
+        if (apiId && store) {
+          fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
+          loadMerchantBalance(store.groupCode, searchBrand)
+        }
+      }
     }
-  }, [currentTime, cartItems])
+  }, [currentTime, cartItems, isPaymentModalVisible])
 
   // 初始化：加载门店下拉
   useEffect(() => {
@@ -602,9 +612,13 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
         loadMerchantBalance(store.groupCode, searchBrand)
       } catch (err) {
-        message.error((err as Error).message || '下單失敗，請稍後再試')
-        // 格子可能已被其他商家搶購，刷新庫存
+        const errMsg = (err as Error).message || '下單失敗，請稍後再試'
+        message.error(errMsg)
+        // 下單失敗：關閉彈窗、清空購物車、刷新庫存與餘額，讓用戶重新操作
+        setIsPaymentModalVisible(false)
+        setCartItems([])
         fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
+        loadMerchantBalance(store.groupCode, searchBrand)
       } finally {
         setPaying(false)
       }
