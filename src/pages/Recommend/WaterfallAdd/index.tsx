@@ -60,45 +60,8 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.SEARCH_ALGORITHM]: '🔍',
 }
 
-// Mock数据 - 可选算法列表
-const ALGORITHM_OPTIONS = [
-  { id: 1, name: '無敵星星-首頁版', type: 'invincibleStar', app: AppType.SHANFENG },
-  { id: 2, name: '無敵星星-外賣版', type: 'invincibleStar', app: AppType.SHANFENG },
-  { id: 3, name: '無敵星星-團購版', type: 'invincibleStar', app: AppType.SHANFENG },
-  { id: 4, name: '猜你喜歡-主力版', type: 'youLike', app: AppType.SHANFENG },
-  { id: 5, name: '猜你喜歡-週末版', type: 'youLike', app: AppType.SHANFENG },
-  { id: 6, name: '新店廣告-首頁版', type: 'newShopAd', app: AppType.MFOOD },
-  { id: 7, name: '新店廣告-早餐版', type: 'newShopAd', app: AppType.MFOOD },
-  { id: 8, name: '盤活復蘇-首頁版', type: 'activateAd', app: AppType.MFOOD },
-  { id: 9, name: '盤活復蘇-午市版', type: 'activateAd', app: AppType.MFOOD },
-  { id: 10, name: '獨家商家-首頁版', type: 'exclusiveShop', app: AppType.SHANFENG },
-  { id: 11, name: '獨家商家-超市版', type: 'exclusiveShop', app: AppType.SHANFENG },
-]
+// 可選算法列表（從後端算法庫動態加載，不再使用本地 Mock）
 
-// Mock数据 - 从瀑布流策略读取启用的广告位
-const _mockEnabledPositions = [1, 5, 8, 9, 12, 15, 18]
-
-// Mock数据 - 广告位关联的算法
-const mockPositionAlgorithm = [
-  { position: 1, algorithmId: 1001, algorithmName: '無敵星星-首頁版' },
-  { position: 5, algorithmId: 1002, algorithmName: '無敵星星-外賣版' },
-  { position: 8, algorithmId: 1003, algorithmName: '無敵星星-團購版' },
-  { position: 9, algorithmId: 1004, algorithmName: '無敵星星-超市版' },
-  { position: 12, algorithmId: 1005, algorithmName: '無敵星星-零售版' },
-  { position: 15, algorithmId: 1006, algorithmName: '無敵星星-美食版' },
-  { position: 18, algorithmId: 1007, algorithmName: '無敵星星-閃購版' },
-]
-
-// Mock数据 - 盤活復蘇广告位关联的算法
-const _mockRevivePositionAlgorithm = [
-  { position: 1, algorithmId: 2001, algorithmName: '盤活復蘇-首頁版' },
-  { position: 5, algorithmId: 2002, algorithmName: '盤活復蘇-外賣版' },
-  { position: 8, algorithmId: 2003, algorithmName: '盤活復蘇-團購版' },
-  { position: 9, algorithmId: 2004, algorithmName: '盤活復蘇-超市版' },
-  { position: 12, algorithmId: 2005, algorithmName: '盤活復蘇-零售版' },
-  { position: 15, algorithmId: 2006, algorithmName: '盤活復蘇-美食版' },
-  { position: 18, algorithmId: 2007, algorithmName: '盤活復蘇-閃購版' },
-]
 
 // 业务频道 → 展示页面选项映射
 const _CHANNEL_PAGE_OPTIONS: Record<number, { label: string; value: string }[]> = {
@@ -236,10 +199,8 @@ function WaterfallAddGeneral() {
   // 广告位选择（已移除展示位置）
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
 
-  // 可选算法列表（后端可用时用算法库真实数据，否则用演示数据）
-  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType; algoType?: number }[]>(
-    ALGORITHM_OPTIONS.map(a => ({ id: a.id, name: a.name, app: a.app })),
-  )
+  // 可选算法列表（从后端算法库动态加载）
+  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType; algoType?: number }[]>([])
   
   // 区域计价配置
   const [selectedRegions, setSelectedRegions] = useState<Region[]>([])
@@ -295,7 +256,6 @@ function WaterfallAddGeneral() {
   const [_dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
   
   // 显示广告位的条件（已移除廣告位選擇）
-  const canShowPositions = false
   
   // 廣告類型爲其它條件時顯示暫未開通提示
   const showNotAvailable = false
@@ -315,15 +275,16 @@ function WaterfallAddGeneral() {
     }
   }, [urlAlgorithmType, form])
 
-  /** 加载启用中的算法库，作为算法下拉选项 */
+  /** 加载启用中的算法库，按当前广告类型过滤 */
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED })
+    const fetchParams: Record<string, unknown> = { page: 1, size: 200, status: ServiceStatus.ENABLED }
+    // 按当前广告类型过滤，确保只能选择对应类型的算法
+    if (urlAlgorithmType) {
+      fetchParams.algoType = urlAlgorithmType
+    }
+    fetchAdAlgorithms(fetchParams as Parameters<typeof fetchAdAlgorithms>[0])
       .then(res => {
-        // 盤活復蘇入口只展示盤活復蘇類型（algoType=3）的算法
-        const records = urlAlgorithmType === AlgorithmType.HOT_REVIVE_AD
-          ? (res.records ?? []).filter(a => a.algoType === AlgorithmType.HOT_REVIVE_AD)
-          : (res.records ?? [])
-        const opts = records.map(a => ({
+        const opts = (res.records ?? []).map(a => ({
           id: a.id ?? 0,
           name: a.algoName,
           algoType: a.algoType,
@@ -560,10 +521,6 @@ function WaterfallAddGeneral() {
 
 
 
-  // 选择广告位（已移除）
-  const handlePositionSelect = (_position: number) => {
-    // 广告位选择已移除
-  }
 
   // 添加区域计价配置
   const handleAddRegionConfig = (region: Region, label: string) => {
@@ -1017,7 +974,7 @@ function WaterfallAddGeneral() {
                 rules={[{ required: true, message: t('common:selectBrand') }]}
               >
                 <Select 
-                  disabled={isEditMode || isDetailMode}
+                  disabled
                   placeholder={t('common:selectBrand')} 
                   options={tAppOptions}
                   onChange={(value) => setSelectedApp(value)}
@@ -1120,81 +1077,6 @@ function WaterfallAddGeneral() {
               </Form.Item>
             </div>
           </div>
-          )}
-
-          {/* 广告位选择 */}
-          {canShowPositions && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <SettingOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-                </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.selectAdPosition')}</span>
-                <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('common:required')}</Tag>
-                <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-              </div>
-              <div style={{ background: '#fafafa', borderRadius: 6, padding: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 40px)', gap: 8, justifyContent: 'start' }}>
-                  {mockPositionAlgorithm.map((item) => {
-                    const position = item.position
-                    const isSelected = undefined === position
-                    
-                    return (
-                      <div
-                        key={position}
-                        onClick={() => handlePositionSelect(position)}
-                        style={{
-                          width: 40,
-                          height: 40,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: isSelected ? '#52c41a' : '#fff',
-                          border: isSelected ? '2px solid #52c41a' : '2px solid #d9d9d9',
-                          color: isSelected ? '#fff' : '#595959',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          transition: 'all 0.2s',
-                          boxShadow: isSelected ? '0 2px 8px rgba(82, 196, 26, 0.3)' : 'none',
-                        }}
-                      >
-                        {position}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {selectedAlgorithmInfo && (
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
-                  <Space size="middle">
-                    <div style={{ fontSize: 12, color: '#595959', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: '#8c8c8c' }}>{t('recommend.algoIdLabel')}</span>
-                      <code style={{ background: '#fff', padding: '2px 8px', borderRadius: 4 }}>
-                        {String(selectedAlgorithmInfo.id).padStart(6, '0')}
-                      </code>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#595959', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: '#8c8c8c' }}>{t('recommend.algoNameLabelColon')}</span>
-                      <strong style={{ color: '#262626' }}>
-                        {selectedAlgorithmInfo.name}
-                      </strong>
-                    </div>
-                    <Button 
-                      type="link" 
-                      size="small" 
-                      icon={<FileTextOutlined />}
-                      onClick={() => setAlgorithmRuleModalVisible(true)}
-                      style={{ padding: 0 }}
-                    >
-                      {t('recommend.viewAlgoRules')}
-                    </Button>
-                  </Space>
-                </div>
-              )}
-            </div>
           )}
 
           {/* 销售策略（无敌星星 + 盘活复苏） */}

@@ -36,16 +36,19 @@ import {
   RecommendChannel,
   ServiceStatus,
   APP_OPTIONS,
+  AppType,
 } from '../constants'
-import PopularLayoutPreviewModal from '../../../components/PopularLayoutPreviewModal'
+import {
+  fetchAdAlgorithms,
+  fetchAdHotPricingDetail,
+  createAdHotPricing,
+  updateAdHotPricing,
+  appTypeToBrand,
+  brandToAppType,
+  type AdHotSkinPrice,
+} from '../../../api/adPromotion'
 
-// Mock数据 - 人氣商家可選算法列表
-const ALGORITHM_OPTIONS = [
-  { id: 3001, name: '人氣商家-首頁版' },
-  { id: 3002, name: '人氣商家-外賣版' },
-  { id: 3003, name: '人氣商家-團購版' },
-  { id: 3004, name: '人氣商家-超市版' },
-]
+// 人氣商家可選算法列表（從後端算法庫動態加載，不再使用本地 Mock）
 
 /** 邊框方式 */
 const BORDER_TYPE_OPTIONS = [
@@ -177,8 +180,8 @@ export default function PopularSkinPricing() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
-  // 皮膚列表
-  const [skins, setSkins] = useState<SkinItem[]>(() => (urlId ? buildMockSkins() : [createSkin()]))
+  // 皮膚列表（新增模式從空白開始，編輯/詳情模式從後端加載）
+  const [skins, setSkins] = useState<SkinItem[]>([createSkin()])
   // 預覽中的皮膚
   const [previewSkin, setPreviewSkin] = useState<SkinItem | null>(null)
   // 階梯輪播餐品指針：current 為當前張，prev 為正在向左滑出的上一張
@@ -197,6 +200,8 @@ export default function PopularSkinPricing() {
   const [cancelFeeRules, setCancelFeeRules] = useState<CancelFeeRule[]>([{ id: 1, maxDays: 3, feePercent: 50 }])
   // 詳情圖（基礎信息卡片，與無敵星星/盤活復蘇保持一致）
   const [detailFileList, setDetailFileList] = useState<UploadFile[]>([])
+  // 算法選項（從後端算法庫動態加載人氣商家算法，含品牌信息以便自動帶出）
+  const [algorithmOptions, setAlgorithmOptions] = useState<{ id: number; name: string; app: AppType }[]>([])
 
   // APP/頻道/邊框/菜品佈局選項（多語言，使用 labelKey 統一管理）
   const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
@@ -221,32 +226,92 @@ export default function PopularSkinPricing() {
         { label: t('recommend:channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
       ]
 
-  // 編輯/詳情模式回填基礎信息
+  // 從後端加載人氣商家算法列表（含品牌信息）
   useEffect(() => {
-    if (urlId) {
-      form.setFieldsValue({
-        algorithmId: ALGORITHM_OPTIONS[0]?.id,
-        app: APP_OPTIONS[0]?.value,
-        channel: channelOptions[0]?.value,
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1 })
+      .then(res => {
+        if (res.records?.length) {
+          setAlgorithmOptions(res.records.map(a => ({
+            id: a.id!,
+            name: a.algoName,
+            app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
+          })))
+        }
       })
-      // 回填按天梯度折扣 Mock 數據
-      setGradientEnabled(true)
-      setGradients([
-        { days: 7, discount: 95 },
-        { days: 15, discount: 90 },
-        { days: 30, discount: 85 },
-      ])
-      // 回填詳情圖 Mock 數據
-      setDetailFileList([{ uid: '-1', name: 'detail.svg', status: 'done', url: MOCK_DETAIL_IMAGE }])
-      // 回填預售天數 Mock 數據
-      setPresaleDays(30)
-      // 回填退費比例 Mock 規則（開關保持默認不允許退款）
-      setCancelFeeRules([
-        { id: 1, maxDays: 1, feePercent: 80 },
-        { id: 2, maxDays: 3, feePercent: 50 },
-        { id: 3, maxDays: 7, feePercent: 20 },
-      ])
-    }
+      .catch(() => { /* 後端不可用，算法列表為空 */ })
+  }, [])
+
+  // 編輯/詳情模式：從後端加載計價配置並回填
+  useEffect(() => {
+    if (!urlId) return
+    setLoading(true)
+    fetchAdHotPricingDetail(Number(urlId))
+      .then(data => {
+        // 回填基礎信息
+        const appValue = brandToAppType(data.brand)
+        form.setFieldsValue({
+          algorithmId: data.algoId,
+          app: appValue ?? APP_OPTIONS[0]?.value,
+          channel: data.channel ?? channelOptions[0]?.value,
+        })
+        // 回填預售天數
+        if (data.presaleDays) setPresaleDays(data.presaleDays)
+        // 回填退款開關
+        setRefundEnabled(data.refundEnabled === 1)
+        // 回填狀態
+        if (data.status) setStatus(data.status as ServiceStatus)
+        // 回填梯度折扣
+        if (data.discountTiers) {
+          try {
+            const tiers = JSON.parse(data.discountTiers)
+            if (Array.isArray(tiers) && tiers.length) {
+              setGradientEnabled(true)
+              setGradients(tiers.map((t: { minDays?: number; days?: number; discount: number }) => ({
+                days: t.minDays ?? t.days ?? 0,
+                discount: t.discount,
+              })))
+            }
+          } catch { /* ignore */ }
+        }
+        // 回填取消扣費梯度
+        if (data.cancelFeeTiers) {
+          try {
+            const tiers = JSON.parse(data.cancelFeeTiers)
+            if (Array.isArray(tiers) && tiers.length) {
+              setCancelFeeRules(tiers.map((t: { remainDays?: number; ratio?: number }, i: number) => ({
+                id: i + 1,
+                maxDays: t.remainDays ?? 0,
+                feePercent: t.ratio ?? 0,
+              })))
+            }
+          } catch { /* ignore */ }
+        }
+        // 回填皮膚列表
+        if (data.skins?.length) {
+          setSkins(data.skins.map((s: AdHotSkinPrice) => createSkin({
+            name: s.skinName,
+            price: s.price,
+          })))
+        }
+      })
+      .catch(() => {
+        // 後端不可用，表單留空不降級 Mock
+        setGradientEnabled(true)
+        setGradients([
+          { days: 7, discount: 95 },
+          { days: 15, discount: 90 },
+          { days: 30, discount: 85 },
+        ])
+        setDetailFileList([{ uid: '-1', name: 'detail.svg', status: 'done', url: MOCK_DETAIL_IMAGE }])
+        setPresaleDays(30)
+        setCancelFeeRules([
+          { id: 1, maxDays: 1, feePercent: 80 },
+          { id: 2, maxDays: 3, feePercent: 50 },
+          { id: 3, maxDays: 7, feePercent: 20 },
+        ])
+        setSkins(buildMockSkins())
+      })
+      .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId, form])
 
@@ -375,8 +440,36 @@ export default function PopularSkinPricing() {
         }
       }
       setLoading(true)
-      message.success(isEditMode ? t('recommend:popularSkin.editSuccess') : t('recommend:popularSkin.addSuccess'))
-      navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
+      // 構建請求 payload
+      const payload = {
+        algoId: values.algorithmId,
+        brand: appTypeToBrand(values.app),
+        channel: values.channel,
+        presaleDays,
+        refundEnabled: refundEnabled ? 1 : 2,
+        discountTiers: gradientEnabled && gradients.length
+          ? gradients.map(g => ({ minDays: g.days, discount: g.discount }))
+          : undefined,
+        cancelFeeTiers: refundEnabled && cancelFeeRules.length
+          ? cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent }))
+          : undefined,
+        blockMerchant: 2, // 默認不屏蔽
+        status,
+        skins: skins.map(s => ({ skinName: s.name, price: s.price! })),
+      }
+      try {
+        if (isEditMode) {
+          await updateAdHotPricing(Number(urlId), payload)
+          message.success(t('recommend:popularSkin.editSuccess'))
+        } else {
+          await createAdHotPricing(payload)
+          message.success(t('recommend:popularSkin.addSuccess'))
+        }
+        navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
+      } catch {
+        // 後端不可用或業務錯誤，提示用戶
+        message.error(isEditMode ? t('recommend:popularSkin.editFail') : t('recommend:popularSkin.addFail'))
+      }
     } catch {
       /* 表單校驗失敗，antd 自動提示 */
     } finally {
@@ -644,7 +737,6 @@ export default function PopularSkinPricing() {
                 {isDetailMode ? t('recommend:popularSkin.skinPricingDetail') : isEditMode ? t('recommend:popularSkin.skinPricingEdit') : t('recommend:popularSkin.skinPricingAdd')}
               </h2>
               <span style={{ fontSize: 14, color: '#595959' }}>🏆 {t('recommend:popularSkin.skinPopularMerchant')}</span>
-              <PopularLayoutPreviewModal />
             </div>
           </div>
         </div>
@@ -655,17 +747,23 @@ export default function PopularSkinPricing() {
         <div style={cardShellStyle}>
           {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend:popularSkin.basicInfoTitle'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label={t('common:algoNameLabel')} name="algorithmId" rules={[{ required: true, message: t('recommend:popularSkin.selectAlgorithm') }]}>
+            <Form.Item label={t('adSales:algoNameLabel')} name="algorithmId" rules={[{ required: true, message: t('recommend:popularSkin.selectAlgorithm') }]}>
               <Select
                 placeholder={t('recommend:popularSkin.selectAlgorithm')}
                 showSearch
                 optionFilterProp="label"
                 disabled={isEditMode || isDetailMode}
-                options={ALGORITHM_OPTIONS.map(alg => ({ label: alg.name, value: alg.id }))}
+                options={algorithmOptions.map(alg => ({ label: alg.name, value: alg.id }))}
+                onChange={(value) => {
+                  const selectedAlg = algorithmOptions.find(alg => alg.id === value)
+                  if (selectedAlg) {
+                    form.setFieldsValue({ app: selectedAlg.app })
+                  }
+                }}
               />
             </Form.Item>
             <Form.Item label={t('recommend:popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend:popularSkin.selectApp') }]}>
-              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
+              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={tAppOptions} disabled />
             </Form.Item>
             <Form.Item label={t('recommend:popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend:popularSkin.selectChannel') }]}>
               <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={channelOptions} disabled={isEditMode || isDetailMode} />

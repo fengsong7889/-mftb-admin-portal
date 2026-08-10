@@ -349,7 +349,7 @@ export default function TranslationManage() {
 
   /* 状态 */
   const [data, setData] = useState<TranslationField[]>([])
-  const [languages, setLanguages] = useState<Language[]>(INITIAL_LANGUAGES)
+  const [languages, setLanguages] = useState<Language[]>([])
   const [loading, setLoading] = useState(false)
   const [searchKey, setSearchKey] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('')
@@ -380,7 +380,7 @@ export default function TranslationManage() {
 
   const reloadLanguages = useCallback(async () => {
     const list = await fetchLanguages()
-    if (list) setLanguages(mergeLangsWithLibrary(list.map(voToLang)))
+    if (list) setLanguages(list.map(voToLang))
   }, [])
 
   /* 初始化：优先后端真实数据，失败降级 localStorage / Mock */
@@ -391,7 +391,9 @@ export default function TranslationManage() {
         const [fields, langs] = await Promise.all([fetchTranslations(), fetchLanguages()])
         if (fields && langs) {
           setData(fields.map(voToField))
-          setLanguages(mergeLangsWithLibrary(langs.map(voToLang)))
+          // 语言列表以后端数据库为唯一来源，不再合并前端语言代码库
+          // 确保删除操作能持久生效，用户可通过「新增语言」按钮按需添加
+          setLanguages(langs.map(voToLang))
           setBackendMode(true)
           return
         }
@@ -410,7 +412,8 @@ export default function TranslationManage() {
           flag: l.code === 'zh-TW' ? (LANG_INFO['zh-TW']?.flag || l.flag) : l.flag,
           names: l.names && Object.keys(l.names).length > 0 ? l.names : langNamesOf(l.code),
         }))
-        setLanguages(mergeLangsWithLibrary(merged))
+        // 离线模式以 localStorage 为唯一来源，不再合并语言代码库
+        setLanguages(merged)
       }
       setBackendMode(false)
     })().finally(() => setLoading(false))

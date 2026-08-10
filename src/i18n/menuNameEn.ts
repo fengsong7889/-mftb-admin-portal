@@ -79,6 +79,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'system-config': 'System Config',
   'menu-config': 'Menu Config',
   'translation-manage': 'Translation Config',
+  'rule-config': 'Rule Config',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import TableColumnConfig, { type ColumnConfig, applyColumnConfig } from '../components/TableColumnConfig'
 
 /**
@@ -48,6 +48,23 @@ export function useColumnConfig(
   }, [allColumns, defaultConfig])
 
   const [config, setConfig] = useState<ColumnConfig[]>(initialConfig)
+
+  // 当可用列发生变化时（如删除语言列），同步更新 config 状态：
+  // 移除已不存在的列配置，保留已有列的可见性/锁定设置，新增列默认可见
+  useEffect(() => {
+    setConfig(prev => {
+      const synced = initialConfig.map(col => {
+        const existing = prev.find(c => c.key === col.key)
+        if (existing) return { ...existing, title: col.title }
+        return { key: col.key, title: col.title, visible: true, locked: null }
+      })
+      // 仅当配置实际发生变化时才更新，避免不必要的重渲染
+      if (synced.length !== prev.length || synced.some((c, i) => c.key !== prev[i]?.key)) {
+        return synced
+      }
+      return prev
+    })
+  }, [initialConfig])
 
   const handleChange = useCallback((newConfig: ColumnConfig[]) => {
     setConfig(newConfig)

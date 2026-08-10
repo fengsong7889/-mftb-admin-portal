@@ -88,6 +88,7 @@ const MapPlanning = lazy(() => import('./pages/MapPlanning'))
 // 系統配置
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
+const RuleConfig = lazy(() => import('./pages/RuleConfig'))
 
 const { Content } = Layout
 
@@ -197,6 +198,7 @@ function AuthenticatedLayout() {
               {/* 系統配置 */}
               <Route path="/menu-config" element={<MenuConfig />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
+              <Route path="/rule-config" element={<RuleConfig />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* PRD需求查看 */}

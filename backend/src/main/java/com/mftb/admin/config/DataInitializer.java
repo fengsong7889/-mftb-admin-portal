@@ -350,6 +350,8 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("data-permission", "Data Authorization"),
                 Map.entry("system-config", "System Config"),
                 Map.entry("menu-config", "Menu Config"),
+                Map.entry("translation-manage", "Translation Config"),
+                Map.entry("rule-config", "Rule Config"),
                 Map.entry("merchant-order-manage", "Order Management"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
@@ -546,6 +548,7 @@ public class DataInitializer implements CommandLineRunner {
         // ── 系統配置 ──
         menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
         menus.put("translation-manage",  new String[]{"多語言配置",         "system-config",      "2"});
+        menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "3"});
 
         int created = 0;
         int updated = 0;

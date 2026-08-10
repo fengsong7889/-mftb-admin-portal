@@ -377,6 +377,8 @@ export interface AdOrder {
   status: number
   /** 購買日期列表（盤活復蘇按天售賣，明細日期去重排序） */
   purchaseDays?: string[]
+  /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
+  skinNames?: string[]
   /** 後端 LocalDateTime 統一序列化為毫秒時間戳，保留字符串兼容 */
   orderTime?: string | number
   payTime?: string | number
@@ -385,13 +387,15 @@ export interface AdOrder {
   createdAt?: string
 }
 
-/** 訂單明細行（商圈 x 日期 x 餐段；盤活復蘇無 mealSlot） */
+/** 訂單明細行（商圈 x 日期 x 餐段；盤活復蘇無 mealSlot；人氣商家有 skinName） */
 export interface AdOrderItem {
   id?: number
   bizDate: string
   region: number
   /** 餐段時段；盤活復蘇按天售賣時為空 */
   mealSlot?: string | null
+  /** 皮膚名稱（人氣商家明細） */
+  skinName?: string | null
   originalPrice: number
   /** 折後實付分攤價 */
   salePrice: number
@@ -625,6 +629,155 @@ export function fetchAdNewStoreInventory(algoId: number, storeCode: string) {
 /** 提交新店廣告訂單（贈送天數全額抵扣） */
 export function placeAdNewStoreOrder(data: AdNewStoreOrderRequest) {
   return request.post<unknown, AdOrder>("/ad/sales/newstore/order", data, SILENT)
+}
+
+/* ==================== 銷售定價（人氣商家計價） ==================== */
+
+/** 人氣商家皮膚計價條目（與後端 SkinPriceItem 對齊） */
+export interface AdHotSkinPrice {
+  id?: number
+  /** 皮膚名稱 */
+  skinName: string
+  /** 皮膚日單價（MOP） */
+  price: number
+}
+
+/** 人氣商家計價配置（與後端 AdPricingHotVO 對齊） */
+export interface AdPricingHot {
+  id?: number
+  algoId: number
+  algoName?: string
+  brand?: AdBrand | string
+  channel?: number
+  /** 預售天數（今天起 N 天可售），默認 30 */
+  presaleDays: number
+  /** 退款開關: 1=允許退款 2=不允許 */
+  refundEnabled?: number
+  /** 多格梯度折扣 JSON 字符串，如 [{"minDays":3,"discount":95}] */
+  discountTiers?: string
+  /** 取消扣費梯度 JSON 字符串 */
+  cancelFeeTiers?: string
+  /** 屏蔽商家開關: 1=啟用 2=關閉 */
+  blockMerchant?: number
+  /** 屏蔽商家列表 JSON 字符串 */
+  blockList?: string
+  /** 服務狀態: 1=啟用 2=停用 */
+  status?: number
+  remark?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+  /** 皮膚計價明細 */
+  skins?: AdHotSkinPrice[]
+}
+
+/** 人氣商家計價配置新增/編輯請求 */
+export interface AdPricingHotRequest {
+  algoId: number
+  brand?: string
+  channel?: number
+  presaleDays: number
+  refundEnabled?: number
+  /** 多格梯度折扣: [{"minDays":3,"discount":95}] */
+  discountTiers?: Record<string, unknown>[]
+  /** 取消扣費梯度: [{"remainDays":0,"ratio":100}] */
+  cancelFeeTiers?: Record<string, unknown>[]
+  blockMerchant?: number
+  blockList?: Record<string, unknown>[]
+  status?: number
+  remark?: string
+  /** 皮膚計價配置（整體替換） */
+  skins: AdHotSkinPrice[]
+}
+
+/** 人氣商家計價配置查詢參數 */
+export interface AdPricingHotQuery {
+  page?: number
+  size?: number
+  algoId?: number
+  brand?: string
+  status?: number
+}
+
+/** 人氣商家計價配置分頁查詢 */
+export function fetchAdHotPricingList(params: AdPricingHotQuery) {
+  return request.get<unknown, AdPageResult<AdPricingHot>>('/ad/pricing/hot', { params, ...SILENT })
+}
+
+/** 人氣商家計價配置詳情 */
+export function fetchAdHotPricingDetail(id: number) {
+  return request.get<unknown, AdPricingHot>(`/ad/pricing/hot/${id}`, SILENT)
+}
+
+/** 按算法查詢啟用中的人氣商家計價配置 */
+export function fetchAdHotPricingActive(algoId: number) {
+  return request.get<unknown, AdPricingHot>('/ad/pricing/hot/active', { params: { algoId }, ...SILENT })
+}
+
+/** 新增人氣商家計價配置 */
+export function createAdHotPricing(data: AdPricingHotRequest) {
+  return request.post<unknown, AdPricingHot>('/ad/pricing/hot', data, SILENT)
+}
+
+/** 編輯人氣商家計價配置 */
+export function updateAdHotPricing(id: number, data: AdPricingHotRequest) {
+  return request.put<unknown, AdPricingHot>(`/ad/pricing/hot/${id}`, data, SILENT)
+}
+
+/** 人氣商家計價配置啟用/停用 */
+export function updateAdHotPricingStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/ad/pricing/hot/${id}/status`, { status }, SILENT)
+}
+
+/** 刪除人氣商家計價配置 */
+export function deleteAdHotPricing(id: number) {
+  return request.delete<unknown, void>(`/ad/pricing/hot/${id}`, SILENT)
+}
+
+/* ==================== 廣告銷售（人氣商家: 庫存 + 下單） ==================== */
+
+/** 人氣商家可售格子（皮膚 x 日期） */
+export interface AdHotInventoryCell {
+  /** 投放日期 YYYY-MM-DD */
+  bizDate: string
+  /** 皮膚名稱 */
+  skinName: string
+  /** 皮膚日單價 */
+  price: number
+  /** 格子狀態: available=可購買 purchased=本商家已購買 */
+  status: 'available' | 'purchased'
+}
+
+/** 人氣商家庫存查詢結果 */
+export interface AdHotInventoryVO {
+  algoId: number
+  presaleDays: number
+  /** 多格梯度折扣 JSON 字符串 */
+  discountTiers?: string
+  /** 退款開關: 1=允許退款 2=不允許 */
+  refundEnabled?: number
+  cells: AdHotInventoryCell[]
+}
+
+/** 查詢人氣商家可購買格子（皮膚 x 日期） */
+export function fetchAdHotInventory(algoId: number, storeCode?: string, groupCode?: string) {
+  return request.get<unknown, AdHotInventoryVO>('/ad/sales/hot/inventory', { params: { algoId, storeCode, groupCode }, ...SILENT })
+}
+
+/** 人氣商家下單請求（從推廣金賬戶扣款） */
+export interface AdHotOrderRequest {
+  algoId: number
+  groupCode: string
+  storeCode?: string
+  bdEmpId?: string
+  remark?: string
+  /** 選購的格子列表（皮膚 x 日期） */
+  cells: { bizDate: string; skinName: string }[]
+}
+
+/** 提交人氣商家訂單並從推廣金賬戶扣款 */
+export function placeAdHotOrder(data: AdHotOrderRequest) {
+  return request.post<unknown, AdOrder>('/ad/sales/hot/order', data, SILENT)
 }
 
 /* ==================== 瀑布流策略 ==================== */

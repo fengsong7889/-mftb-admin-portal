@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Button, Space, Table, Tag, Card, Tabs, Modal, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
@@ -70,6 +70,9 @@ export default function Algorithm() {
   const [selectedType, setSelectedType] = useState<AlgorithmType | null>(initialType)
   const [businessType, setBusinessType] = useState<'delivery' | 'groupBuy'>(tabParam || 'delivery')
   const [dataList, setDataList] = useState<AlgorithmRecord[]>([])
+  // 用 ref 追蹤當前選中類型，避免 async 回調中的閉包過期問題
+  const selectedTypeRef = useRef<AlgorithmType | null>(initialType)
+  const businessTypeRef = useRef<'delivery' | 'groupBuy'>(tabParam || 'delivery')
 
   // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
   const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery)
@@ -128,7 +131,19 @@ export default function Algorithm() {
         if (!mounted) return
         const list = (res.records ?? []).map(toAlgorithmRecord)
         setDataList(list)
-        setFilteredData(initialType ? filterByBusinessType(list.filter(item => item.type === initialType)) : list)
+        // 按當前選中的類型過濾（用 ref 獲取最新值，避免閉包過期）
+        const curType = selectedTypeRef.current
+        const curBiz = businessTypeRef.current
+        let filtered = list
+        if (curType) {
+          filtered = filtered.filter(item => item.type === curType)
+        }
+        if (curBiz === 'groupBuy') {
+          filtered = filtered.filter(item => item.channel === RecommendChannel.GROUP_BUY)
+        } else {
+          filtered = filtered.filter(item => item.channel !== RecommendChannel.GROUP_BUY)
+        }
+        setFilteredData(filtered)
       })
       .catch(() => {})
     return () => { mounted = false }
@@ -139,6 +154,9 @@ export default function Algorithm() {
   const handleSelectType = (type: AlgorithmType, tab: 'delivery' | 'groupBuy') => {
     setSelectedType(type)
     setBusinessType(tab)
+    // 同步更新 ref，確保 API 回調不會覆蓋當前選擇
+    selectedTypeRef.current = type
+    businessTypeRef.current = tab
     const data = filterByBusinessType(dataList.filter(item => item.type === type))
     setFilteredData(data)
     setSearchParams({ type: String(type), tab }, { replace: true })
@@ -149,6 +167,8 @@ export default function Algorithm() {
     setSelectedType(null)
     setFilteredData(dataList)
     setBusinessType('delivery')
+    selectedTypeRef.current = null
+    businessTypeRef.current = 'delivery'
     setSearchParams({}, { replace: true })
   }
 

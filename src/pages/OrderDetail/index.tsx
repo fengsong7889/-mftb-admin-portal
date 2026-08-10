@@ -288,6 +288,8 @@ function toDetailOrder(
     refundAmount: vo.refundAmount ? vo.refundAmount : undefined,
     refundEnabled: pricing?.refundEnabled ?? true,
     promoStartDate: firstBizDate,
+    purchaseDays: vo.purchaseDays,
+    skinName: vo.skinNames?.[0] || vo.items.find(i => i.skinName)?.skinName || undefined,
     source: 'api',
   }
 }

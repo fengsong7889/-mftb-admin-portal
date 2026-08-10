@@ -163,7 +163,8 @@ const keyToPath: Record<string, string> = {
   // 'promotion-tool': '/promotion-tool',
   // 系统配置
   'menu-config': '/menu-config',
-'translation-manage': '/translation-manage',
+  'translation-manage': '/translation-manage',
+  'rule-config': '/rule-config',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -534,6 +535,11 @@ const menuItems: MenuItem[] = [
         icon: <GlobalOutlined />,
         label: '多語言配置',
       },
+      {
+        key: 'rule-config',
+        icon: <SwapOutlined />,
+        label: '規則配置',
+      },
     ],
   },
 
@@ -608,7 +614,8 @@ const keyToIcon: Record<string, ReactNode> = {
   'data-permission': <DatabaseOutlined />,
   'system-config': <SettingOutlined />,
   'menu-config': <MenuOutlined />,
-'translation-manage': <GlobalOutlined />,
+  'translation-manage': <GlobalOutlined />,
+  'rule-config': <SwapOutlined />,
 }
 
 /** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */

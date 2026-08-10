@@ -26,10 +26,11 @@ export default function GiftAdd() {
   const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
 
-  /** 廣告類型（僅保留新店廣告與盤活復蘇） */
+  /** 廣告類型（新店廣告、盤活復蘇、人氣商家） */
   const adTypeOptions = [
     { label: t('adTypeNewStore'), value: 'new_store' },
     { label: t('adTypeRevival'), value: 'revival' },
+    { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
   ]
   const [successVisible, setSuccessVisible] = useState(false)
   const [countdown, setCountdown] = useState(5)
