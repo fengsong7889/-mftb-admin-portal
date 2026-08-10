@@ -1067,8 +1067,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                       const noDiscountSlots = getNoDiscountSlotsByRow(activeDateStr)
                       const hasNoDiscount = realCell ? true : meal.slots.some(slotIndex => noDiscountSlots.includes(slotIndex))
                       
-                      // 库存数量：真实模式独家占固定 1，Mock 模式按 hash 生成
-                      const mockInventory = realCell ? 1 : ((Number(region.key) * 7 + meal.slots[0] * 13) % 20) + 3
+                      // 库存数量：真实模式取后端返回的 remaining，Mock 模式按 hash 生成
+                      const displayInventory = realCell ? (realCell.remaining ?? 1) : ((Number(region.key) * 7 + meal.slots[0] * 13) % 20) + 3
                       
                       return (
                         <td 
@@ -1146,7 +1146,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                           {/* 库存 */}
                           {(isAvailable || isLockedStatus) && (
                             <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 1 }}>
-                              {t('inventoryLabel')}：<span style={{ color: mockInventory <= 5 ? '#ff4d4f' : '#595959', fontWeight: mockInventory <= 5 ? 600 : 400 }}>{mockInventory}</span>
+                              {t('inventoryLabel')}：<span style={{ color: displayInventory <= 5 ? '#ff4d4f' : '#595959', fontWeight: displayInventory <= 5 ? 600 : 400 }}>{displayInventory}</span>
                             </div>
                           )}
                           {isSoldOut && (

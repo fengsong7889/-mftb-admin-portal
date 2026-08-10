@@ -323,6 +323,7 @@ export default function ApprovalCenter() {
     { key: 'ops', title: t('approvalCenter.colOps') },
     { key: 'fin', title: t('approvalCenter.colFin') },
     { key: 'flowStatus', title: t('approvalCenter.colFlowStatus') },
+    { key: 'rejectReason', title: t('approvalCenter.colRejectReason') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 

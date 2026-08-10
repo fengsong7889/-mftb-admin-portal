@@ -95,12 +95,11 @@ export default function WordSegmentation() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'index', title: t('common.colIndex') },
     { key: 'word', title: t('common.colWord') },
     { key: 'segmented', title: t('wordSegmentation.colSegmented') },
     { key: 'corrected', title: t('wordSegmentation.colCorrected') },
-    { key: 'lastUpdater', title: t('wordSegmentation.colLastUpdater') },
-    { key: 'lastUpdateTime', title: t('wordSegmentation.colLastUpdateTime') },
+    { key: 'updatedBy', title: t('wordSegmentation.colLastUpdater') },
+    { key: 'updateTime', title: t('wordSegmentation.colLastUpdateTime') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 

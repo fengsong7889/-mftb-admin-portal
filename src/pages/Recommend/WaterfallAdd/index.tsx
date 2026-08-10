@@ -1322,6 +1322,7 @@ function WaterfallAddGeneral() {
                             placeholder={t('recommend.slotPricePh', { slot: t(slot.labelKey) })}
                             style={{ width: '100%' }}
                             addonAfter="MOP"
+                            value={config.pricing[slot.key]}
                             onChange={(value) => handleUpdateRegionPricing(config.region, slot.key, value)}
                           />
                         </Form.Item>

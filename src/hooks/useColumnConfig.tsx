@@ -12,6 +12,7 @@ function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[
         // 以保存的顺序为基准，补齐新增列、移除已删除列
         const defaultKeys = new Set(defaults.map(c => c.key))
         const result: ColumnConfig[] = []
+        let hasStaleKeys = false
         // 先按保存顺序排列
         for (const savedItem of parsed) {
           const def = defaults.find(d => d.key === savedItem.key)
@@ -21,6 +22,9 @@ function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[
               title: def.title, // 标题跟随最新（可能因语言切换而变化）
               locked: savedItem.locked ?? def.locked ?? null,
             })
+          } else {
+            // 发现已删除的旧 key，标记需要清理
+            hasStaleKeys = true
           }
         }
         // 新增列追加到末尾（非锁定区域末端）
@@ -28,6 +32,10 @@ function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[
           if (!result.some(r => r.key === def.key)) {
             result.push({ key: def.key, title: def.title, visible: true, locked: def.locked ?? null })
           }
+        }
+        // 如果存在已删除的旧 key，将清理后的配置写回 localStorage
+        if (hasStaleKeys) {
+          localStorage.setItem(`table-config-${storageKey}`, JSON.stringify(result))
         }
         return result
       }
@@ -155,11 +163,17 @@ export function useColumnConfig(
     return applyColumnConfig(columns, config)
   }, [columns, config])
 
+  // applyConfig 严格依赖 config 状态，确保保存后立即生效
+  const applyConfig = useMemo(
+    () => (tableColumns: unknown[]) => applyColumnConfig(tableColumns, config),
+    [config]
+  )
+
   return { 
     config, 
     configComponent, 
     columns: configuredColumns,
-    applyConfig: (tableColumns: unknown[]) => applyColumnConfig(tableColumns, config) 
+    applyConfig,
   }
 }
 

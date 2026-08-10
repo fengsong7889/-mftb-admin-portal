@@ -161,7 +161,7 @@ export default function HintReport() {
     { key: 'showCount', title: t('hintReport.colShowCount') },
     { key: 'clickCount', title: t('hintReport.colClickCount') },
     { key: 'clickRate', title: t('hintReport.colClickRate') },
-    { key: 'ctr', title: 'CTR' },
+    { key: 'jumpCount', title: t('hintReport.colJumpCount') },
   ], [t])
 
   const columns: TableColumnsType<ReportData> = [
