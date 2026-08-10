@@ -74,7 +74,7 @@ INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `
 ('STO_01', 2, '營業狀態', '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', 1, 100, NULL, NULL, NULL, NULL, 1, 1, 3, 'system'),
 ('STO_02A', 2, '好評得分', '統計天數內好評數量加分，好評越多得分越高', 1, 100, 30, NULL, NULL, NULL, 1, 1, 4, 'system'),
 ('STO_02B', 2, '差評得分', '統計天數內差評數量扣分，差評越多扣分越多', 3, -100, 30, NULL, NULL, NULL, 1, 1, 5, 'system'),
-('STO_03', 2, '店鋪銷量', '每晚統計過去30天有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, 30, NULL, '[{"threshold":50,"direction":"LESS_THAN","score":20},{"threshold":100,"direction":"LESS_THAN","score":40},{"threshold":200,"direction":"LESS_THAN","score":60},{"threshold":500,"direction":"LESS_THAN","score":80},{"threshold":500,"direction":"MORE_THAN","score":100}]', 'NIGHTLY', 1, 1, 6, 'system'),
+('STO_03', 2, '店鋪銷量扶持', '統計有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, NULL, NULL, '[{"threshold":50,"direction":"LESS_THAN","score":20,"statDays":30},{"threshold":100,"direction":"LESS_THAN","score":40,"statDays":30},{"threshold":200,"direction":"LESS_THAN","score":60,"statDays":30},{"threshold":500,"direction":"LESS_THAN","score":80,"statDays":30},{"threshold":500,"direction":"MORE_THAN","score":100,"statDays":30}]', NULL, 1, 1, 6, 'system'),
 ('STO_03B', 2, '當天訂單超量扣分', '按當天計算，訂單超過閾值按梯度扣分，防止刷單', 5, 0, NULL, NULL, '[{"threshold":200,"direction":"MORE_THAN","score":-10},{"threshold":500,"direction":"MORE_THAN","score":-30},{"threshold":1000,"direction":"MORE_THAN","score":-60}]', 'DAILY', 1, 1, 7, 'system'),
 ('STO_04', 2, '出餐速度', '平均出餐時長越短得分越高，店鋪自身效率指標', 2, 90, NULL, NULL, NULL, NULL, 1, 1, 8, 'system'),
 ('STO_05', 2, '拒絕訂單', '商家拒絕訂單按次扣分', 3, -80, NULL, NULL, NULL, NULL, 1, 1, 9, 'system'),

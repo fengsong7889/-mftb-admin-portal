@@ -135,6 +135,8 @@ export interface ScoreTier {
   direction: TierDirection
   /** 該檔位對應分值（正=加分，負=扣分） */
   score: number
+  /** 統計天數（可選，合併到每個梯度檔位中） */
+  statDays?: number
 }
 
 /** 單條評分規則 */
@@ -191,12 +193,12 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'STO_01', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
   { id: 'STO_02A', dimension: ScoreDimension.STORE, name: '好評得分', description: '統計天數內好評數量加分，好評越多得分越高', mode: ScoreMode.RULE_BONUS, score: 100, statDays: 30, status: ENABLED, builtin: true },
   { id: 'STO_02B', dimension: ScoreDimension.STORE, name: '差評得分', description: '統計天數內差評數量扣分，差評越多扣分越多', mode: ScoreMode.RULE_DEDUCTION, score: -100, statDays: 30, status: ENABLED, builtin: true },
-  { id: 'STO_03', dimension: ScoreDimension.STORE, name: '店鋪銷量', description: '每晚統計過去30天有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, statDays: 30, calcCycle: CalcCycle.NIGHTLY, tiers: [
-    { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 },
-    { threshold: 100, direction: TierDirection.LESS_THAN, score: 40 },
-    { threshold: 200, direction: TierDirection.LESS_THAN, score: 60 },
-    { threshold: 500, direction: TierDirection.LESS_THAN, score: 80 },
-    { threshold: 500, direction: TierDirection.MORE_THAN, score: 100 },
+  { id: 'STO_03', dimension: ScoreDimension.STORE, name: '店鋪銷量扶持', description: '統計有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, tiers: [
+    { threshold: 50, direction: TierDirection.LESS_THAN, score: 20, statDays: 30 },
+    { threshold: 100, direction: TierDirection.LESS_THAN, score: 40, statDays: 30 },
+    { threshold: 200, direction: TierDirection.LESS_THAN, score: 60, statDays: 30 },
+    { threshold: 500, direction: TierDirection.LESS_THAN, score: 80, statDays: 30 },
+    { threshold: 500, direction: TierDirection.MORE_THAN, score: 100, statDays: 30 },
   ], status: ENABLED, builtin: true },
   { id: 'STO_03B', dimension: ScoreDimension.STORE, name: '當天訂單超量扣分', description: '按當天計算，訂單超過閾值按梯度扣分，防止刷單', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.DAILY, tiers: [
     { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },

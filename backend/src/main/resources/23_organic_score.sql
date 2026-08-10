@@ -74,7 +74,7 @@ INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `
 ('STO_01', 2, '營業狀態', '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', 1, 100, NULL, NULL, NULL, NULL, 1, 1, 3, 'system'),
 ('STO_02A', 2, '好評得分', '統計天數內好評數量加分，好評越多得分越高', 1, 100, 30, NULL, NULL, NULL, 1, 1, 4, 'system'),
 ('STO_02B', 2, '差評得分', '統計天數內差評數量扣分，差評越多扣分越多', 3, -100, 30, NULL, NULL, NULL, 1, 1, 5, 'system'),
-('STO_03', 2, '店鋪銷量', '每晚統計過去30天有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, 30, NULL, '[{"threshold":50,"direction":"LESS_THAN","score":20},{"threshold":100,"direction":"LESS_THAN","score":40},{"threshold":200,"direction":"LESS_THAN","score":60},{"threshold":500,"direction":"LESS_THAN","score":80},{"threshold":500,"direction":"MORE_THAN","score":100}]', 'NIGHTLY', 1, 1, 6, 'system'),
+('STO_03', 2, '店鋪銷量扶持', '統計有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, NULL, NULL, '[{"threshold":50,"direction":"LESS_THAN","score":20,"statDays":30},{"threshold":100,"direction":"LESS_THAN","score":40,"statDays":30},{"threshold":200,"direction":"LESS_THAN","score":60,"statDays":30},{"threshold":500,"direction":"LESS_THAN","score":80,"statDays":30},{"threshold":500,"direction":"MORE_THAN","score":100,"statDays":30}]', NULL, 1, 1, 6, 'system'),
 ('STO_03B', 2, '當天訂單超量扣分', '按當天計算，訂單超過閾值按梯度扣分，防止刷單', 5, 0, NULL, NULL, '[{"threshold":200,"direction":"MORE_THAN","score":-10},{"threshold":500,"direction":"MORE_THAN","score":-30},{"threshold":1000,"direction":"MORE_THAN","score":-60}]', 'DAILY', 1, 1, 7, 'system'),
 ('STO_04', 2, '出餐速度', '平均出餐時長越短得分越高，店鋪自身效率指標', 2, 90, NULL, NULL, NULL, NULL, 1, 1, 8, 'system'),
 ('STO_05', 2, '拒絕訂單', '商家拒絕訂單按次扣分', 3, -80, NULL, NULL, NULL, NULL, 1, 1, 9, 'system'),
@@ -90,3 +90,11 @@ INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `
 ('PLT_02C', 4, '配送範圍-下午茶', '下午茶時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 4, 'system'),
 ('PLT_02D', 4, '配送範圍-晚餐', '晚餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 5, 'system'),
 ('PLT_02E', 4, '配送範圍-夜宵', '夜宵時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 6, 'system');
+
+-- ============================================================
+-- 數據遷移：更新已存在的 STO_03 記錄（重命名 + 梯度檔位增加 statDays）
+-- INSERT IGNORE 保證冪等：首次刪除後重新插入，後續運行 DELETE 無影響、INSERT 因唯一鍵跳過
+-- ============================================================
+DELETE FROM `biz_organic_score_rule` WHERE `rule_code` = 'STO_03';
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `range_scores`, `tiers`, `calc_cycle`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_03', 2, '店鋪銷量扶持', '統計有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, NULL, NULL, '[{"threshold":50,"direction":"LESS_THAN","score":20,"statDays":30},{"threshold":100,"direction":"LESS_THAN","score":40,"statDays":30},{"threshold":200,"direction":"LESS_THAN","score":60,"statDays":30},{"threshold":500,"direction":"LESS_THAN","score":80,"statDays":30},{"threshold":500,"direction":"MORE_THAN","score":100,"statDays":30}]', NULL, 1, 1, 6, 'system');
