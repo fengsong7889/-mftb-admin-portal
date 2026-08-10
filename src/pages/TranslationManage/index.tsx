@@ -739,8 +739,11 @@ export default function TranslationManage() {
       }
       await reloadFields()
       message.success(t('translationManage:msgMtCount', { count: result.filled }))
-    } catch {
-      message.error(t('translationManage:msgMtFailed'))
+    } catch (err: unknown) {
+      const isTimeout = err instanceof Error && /timeout/i.test(err.message)
+      message.error(isTimeout
+        ? '機翻請求超時，請稍後重試或減少字段數量'
+        : t('translationManage:msgMtFailed'))
     }
   }
 
@@ -762,8 +765,11 @@ export default function TranslationManage() {
       }
       await reloadFields()
       message.success(t('translationManage:msgBatchMtCount', { count: result.filled }))
-    } catch {
-      message.error(t('translationManage:msgMtFailed'))
+    } catch (err: unknown) {
+      const isTimeout = err instanceof Error && /timeout/i.test(err.message)
+      message.error(isTimeout
+        ? `機翻請求超時（共 ${incompleteIds.length} 個字段），請稍後重試或分批處理`
+        : t('translationManage:msgMtFailed'))
     }
   }
 

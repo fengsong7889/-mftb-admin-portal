@@ -72,7 +72,7 @@ public class TranslationServiceImpl implements TranslationService {
     private static final Duration MT_TIMEOUT = Duration.ofSeconds(10);
 
     /** MyMemory 免费额度: 匿名 5000 字符/天, 带 email 可提升至 50000 */
-    private static final int DAILY_CHAR_LIMIT = 5000;
+    private static final int DAILY_CHAR_LIMIT = 50000;
 
     /** MyMemory 单次请求最大字符数 */
     private static final int MAX_REQUEST_CHARS = 500;
@@ -375,6 +375,7 @@ public class TranslationServiceImpl implements TranslationService {
         while (attempt <= MAX_RETRIES) {
             try {
                 String langPair = FALLBACK_ZH + "|" + targetLang;
+                log.debug("MyMemory API 请求: langPair={}, text={}", langPair, truncated);
                 StringBuilder urlBuilder = new StringBuilder(MYMEMORY_URL)
                         .append("?q=").append(URLEncoder.encode(truncated, StandardCharsets.UTF_8))
                         .append("&langpair=").append(URLEncoder.encode(langPair, StandardCharsets.UTF_8));

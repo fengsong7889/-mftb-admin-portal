@@ -129,9 +129,12 @@ export interface MachineTranslateResult {
   filled: number
 }
 
-/** 机器翻译：调用 MyMemory API 填充空缺翻译，结果自动持久化 */
+/** 机器翻译：调用 MyMemory API 填充空缺翻译，结果自动持久化
+ *  批量翻译涉及多次外部 API 调用，耗时较长，单独设置 120s 超时 */
 export async function machineTranslate(data: MachineTranslatePayload) {
-  return request.post<unknown, MachineTranslateResult>('/translations/machine-translate', data)
+  return request.post<unknown, MachineTranslateResult>('/translations/machine-translate', data, {
+    timeout: 120000,
+  })
 }
 
 /** 单文本翻译：将源文本翻译为目标语言（不持久化，仅返回翻译结果） */
