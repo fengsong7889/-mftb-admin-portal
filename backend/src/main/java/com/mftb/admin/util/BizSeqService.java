@@ -33,11 +33,14 @@ public class BizSeqService {
     public static final String PREFIX_AD_ORDER = "GD";
     /** 门店编号 */
     public static final String PREFIX_STORE = "MD";
+    /** 赠送记录 */
+    public static final String PREFIX_GIFT = "GZ";
 
     /** 门店编号等非日期维度的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";
 
     private static final DateTimeFormatter DATE_KEY = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter MONTH_KEY = DateTimeFormatter.ofPattern("yyMM");
 
     private final BizSeqMapper bizSeqMapper;
 
@@ -57,6 +60,23 @@ public class BizSeqService {
         }
         // 表内序号从 1 开始计数，编号序号从 0000 起
         return prefix + dateKey + String.format("%04d", current - 1);
+    }
+
+    /**
+     * 生成月度维度业务编号（并发安全，行锁保证不重号）
+     *
+     * @param prefix 编号前缀
+     * @return 如 GZ2608-001
+     */
+    public String nextMonthly(String prefix) {
+        String monthKey = LocalDate.now().format(MONTH_KEY);
+        bizSeqMapper.initSeq(prefix, monthKey);
+        bizSeqMapper.increaseSeq(prefix, monthKey);
+        Integer current = bizSeqMapper.selectCurrentValue(prefix, monthKey);
+        if (current == null) {
+            throw new BusinessException("业务编号生成失败: " + prefix);
+        }
+        return prefix + monthKey + "-" + String.format("%03d", current);
     }
 
     /**

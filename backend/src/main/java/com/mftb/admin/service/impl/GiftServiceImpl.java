@@ -17,6 +17,7 @@ import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.GiftService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -47,6 +47,7 @@ public class GiftServiceImpl implements GiftService {
     private final BizMerchantGroupMapper groupMapper;
     private final BizStoreMapper storeMapper;
     private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<GiftRecordVO> listRecords(long page, long size, Long groupId, Long storeId, String brand, String adType) {
@@ -75,7 +76,7 @@ public class GiftServiceImpl implements GiftService {
         if (store == null) throw new BusinessException("门店不存在");
 
         BizGiftRecord record = new BizGiftRecord();
-        record.setGiftId(generateGiftId());
+        record.setGiftId(bizSeqService.nextMonthly(BizSeqService.PREFIX_GIFT));
         record.setGroupId(request.getGroupId());
         record.setGroupName(group.getGroupName());
         record.setStoreId(request.getStoreId());
@@ -112,7 +113,7 @@ public class GiftServiceImpl implements GiftService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deductDays(Long id, GiftDeductRequest request) {
         BizGiftRecord record = giftRecordMapper.selectById(id);
         if (record == null) throw new BusinessException("赠送记录不存在");
@@ -305,25 +306,5 @@ public class GiftServiceImpl implements GiftService {
         if (validIds.isEmpty()) return Map.of();
         return storeMapper.selectBatchIds(validIds).stream()
                 .collect(Collectors.toMap(BizStore::getId, Function.identity()));
-    }
-
-    /** 生成赠送ID: 格式 YYMM-序号 */
-    private String generateGiftId() {
-        String prefix = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMM"));
-        // 查询当月最大序号
-        LambdaQueryWrapper<BizGiftRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(BizGiftRecord::getGiftId, prefix + "-")
-                .orderByDesc(BizGiftRecord::getGiftId)
-                .last("LIMIT 1");
-        BizGiftRecord last = giftRecordMapper.selectOne(wrapper);
-        int seq = 1;
-        if (last != null && last.getGiftId() != null) {
-            try {
-                String lastSeq = last.getGiftId().substring(last.getGiftId().lastIndexOf('-') + 1);
-                seq = Integer.parseInt(lastSeq) + 1;
-            } catch (Exception ignored) {
-            }
-        }
-        return prefix + "-" + String.format("%03d", seq);
     }
 }

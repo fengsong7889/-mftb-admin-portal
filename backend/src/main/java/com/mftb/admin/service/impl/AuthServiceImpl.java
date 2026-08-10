@@ -29,6 +29,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 认证服务实现
@@ -49,22 +51,40 @@ public class AuthServiceImpl implements AuthService {
     @Value("${session.idle-timeout:3600000}")
     private long idleTimeout;
 
+    /** 登录失败频率限制: 同一账号 15 分钟内最多 5 次失败 */
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final long LOCK_DURATION_MS = 15 * 60 * 1000L;
+    private final ConcurrentHashMap<String, LoginAttempt> loginAttemptMap = new ConcurrentHashMap<>();
+
+    /** 登录失败记录 */
+    private static final class LoginAttempt {
+        final AtomicInteger count = new AtomicInteger(0);
+        volatile long firstFailTime;
+    }
+
     @Override
     public LoginResponse login(LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+        // 登录频率限制校验
+        checkLoginRateLimit(request.getUsername());
+
         // 查询用户
         SysUser user = sysUserMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername()));
         if (user == null) {
+            recordLoginFailure(request.getUsername());
             throw new BusinessException(ResultCode.ACCOUNT_NOT_EXIST);
         }
         // 校验密码
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            recordLoginFailure(request.getUsername());
             throw new BusinessException(ResultCode.LOGIN_ERROR);
         }
         // 校验状态
         if (user.getStatus() != null && user.getStatus() == 0) {
             throw new BusinessException(ResultCode.ACCOUNT_DISABLED);
         }
+        // 登录成功，清除失败记录
+        loginAttemptMap.remove(request.getUsername());
         // 生成 Token
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());
         // 提取客户端 IP（兼容代理）
@@ -175,5 +195,43 @@ public class AuthServiceImpl implements AuthService {
             result.add(dto);
         });
         return result;
+    }
+
+    /** 登录频率限制: 检查是否超过最大失败次数 */
+    private void checkLoginRateLimit(String username) {
+        LoginAttempt attempt = loginAttemptMap.get(username);
+        if (attempt == null) {
+            return;
+        }
+        long elapsed = System.currentTimeMillis() - attempt.firstFailTime;
+        if (elapsed > LOCK_DURATION_MS) {
+            // 超过锁定时间窗口，重置计数
+            loginAttemptMap.remove(username);
+            return;
+        }
+        if (attempt.count.get() >= MAX_LOGIN_ATTEMPTS) {
+            long remainMinutes = (LOCK_DURATION_MS - elapsed) / 60000 + 1;
+            throw new BusinessException("登录失败次数过多，请 " + remainMinutes + " 分钟后再试");
+        }
+    }
+
+    /** 记录登录失败 */
+    private void recordLoginFailure(String username) {
+        loginAttemptMap.compute(username, (key, existing) -> {
+            long now = System.currentTimeMillis();
+            if (existing == null || (now - existing.firstFailTime) > LOCK_DURATION_MS) {
+                LoginAttempt attempt = new LoginAttempt();
+                attempt.firstFailTime = now;
+                attempt.count.set(1);
+                return attempt;
+            }
+            existing.count.incrementAndGet();
+            return existing;
+        });
+        // 定期清理过期条目，防止内存泄漏
+        if (loginAttemptMap.size() > 200) {
+            long threshold = System.currentTimeMillis() - LOCK_DURATION_MS;
+            loginAttemptMap.entrySet().removeIf(e -> e.getValue().firstFailTime < threshold);
+        }
     }
 }

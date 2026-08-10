@@ -26,6 +26,7 @@ import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.FinExtras;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -613,29 +614,16 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
      */
     private static BigDecimal matchDiscountTier(String discountTiersJson, int cellCount) {
         List<Map<String, Object>> tiers = JsonUtils.parseMapList(discountTiersJson);
-        tiers.sort((a, b) -> Integer.compare(intOf(b, "minSlots"), intOf(a, "minSlots")));
+        tiers.sort((a, b) -> Integer.compare(FinExtras.intOf(b, "minSlots"), FinExtras.intOf(a, "minSlots")));
         for (Map<String, Object> tier : tiers) {
-            if (cellCount >= intOf(tier, "minSlots")) {
-                BigDecimal discount = decimalOf(tier, "discount");
+            if (cellCount >= FinExtras.intOf(tier, "minSlots")) {
+                BigDecimal discount = FinExtras.decimalOf(tier, "discount");
                 if (discount != null && discount.compareTo(BigDecimal.ZERO) > 0) {
                     return discount;
                 }
             }
         }
         return BigDecimal.valueOf(100);
-    }
-
-    private static int intOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value instanceof Number number ? number.intValue() : 0;
-    }
-
-    private static BigDecimal decimalOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number number) {
-            return new BigDecimal(number.toString());
-        }
-        return null;
     }
 
     private static BigDecimal round2(BigDecimal value) {

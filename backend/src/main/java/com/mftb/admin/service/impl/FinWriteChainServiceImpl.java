@@ -310,9 +310,9 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             parts.add(new DeductPart(batch.getBatchNo(), take));
             remaining = remaining.subtract(take);
         }
-        // 现有批次不足以覆盖扣款金额时，剩余部分挂在最近批次上（无批次则记 --）
+        // 现有批次不足以覆盖扣款金额时，剩余部分挂在虚拟批次（--）上，避免污染真实批次的扣款统计
         if (remaining.compareTo(BigDecimal.ZERO) > 0 || parts.isEmpty()) {
-            String fallback = batches.isEmpty() ? FinExtras.DASH : batches.get(batches.size() - 1).getBatchNo();
+            String fallback = FinExtras.DASH;
             parts.add(new DeductPart(fallback, remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : amount));
         }
         return parts;

@@ -32,6 +32,7 @@ import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.FinExtras;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -135,7 +136,14 @@ public class AdOrderServiceImpl implements AdOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdOrderDetailVO refund(String orderNo) {
-        AdOrder order = require(orderNo);
+        // 悲观锁: SELECT ... FOR UPDATE 防止并发退款
+        AdOrder order = orderMapper.selectOne(
+                new LambdaQueryWrapper<AdOrder>()
+                        .eq(AdOrder::getOrderNo, orderNo)
+                        .last("FOR UPDATE"));
+        if (order == null) {
+            throw new BusinessException("訂單不存在");
+        }
         if (order.getStatus() == null || order.getStatus() > 2) {
             throw new BusinessException("當前訂單狀態不可退款");
         }
@@ -250,6 +258,15 @@ public class AdOrderServiceImpl implements AdOrderService {
                 itemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
+        }
+
+        // 退款上限: 不超过订单实付金额减去已退款金额
+        BigDecimal maxRefundable = safe(order.getActualAmount()).subtract(safe(order.getRefundAmount()));
+        if (refundTotal.compareTo(maxRefundable) > 0) {
+            refundTotal = maxRefundable;
+        }
+        if (refundTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("可退款金額為 0，無法退款");
         }
 
         // 回补推广金账户 + 写退款明细（财务写入链: 回退原批次, 实收按批次比例等比例回补）
@@ -412,29 +429,16 @@ public class AdOrderServiceImpl implements AdOrderService {
      */
     private static BigDecimal matchCancelFeeRate(String cancelFeeTiersJson, long remainDays) {
         List<Map<String, Object>> tiers = JsonUtils.parseMapList(cancelFeeTiersJson);
-        tiers.sort(Comparator.comparingInt(t -> intOf(t, "remainDays")));
+        tiers.sort(Comparator.comparingInt(t -> FinExtras.intOf(t, "remainDays")));
         for (Map<String, Object> tier : tiers) {
-            if (remainDays <= intOf(tier, "remainDays")) {
-                BigDecimal ratio = decimalOf(tier, "ratio");
+            if (remainDays <= FinExtras.intOf(tier, "remainDays")) {
+                BigDecimal ratio = FinExtras.decimalOf(tier, "ratio");
                 if (ratio != null) {
                     return ratio.min(BigDecimal.valueOf(100)).max(BigDecimal.ZERO);
                 }
             }
         }
         return BigDecimal.ZERO;
-    }
-
-    private static int intOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value instanceof Number number ? number.intValue() : Integer.MAX_VALUE;
-    }
-
-    private static BigDecimal decimalOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number number) {
-            return new BigDecimal(number.toString());
-        }
-        return null;
     }
 
     private static BigDecimal safe(BigDecimal value) {

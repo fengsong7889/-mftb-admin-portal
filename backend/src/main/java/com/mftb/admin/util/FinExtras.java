@@ -112,4 +112,23 @@ public final class FinExtras {
     public static BigDecimal nonNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
+
+    /**
+     * 从 Map 中安全读取 int 值（缺失或非 Number 时返回 Integer.MAX_VALUE，用于排序占位）
+     */
+    public static int intOf(Map<String, Object> map, String key) {
+        Object value = map == null ? null : map.get(key);
+        return value instanceof Number number ? number.intValue() : Integer.MAX_VALUE;
+    }
+
+    /**
+     * 从 Map 中安全读取 BigDecimal 值（缺失或非数字时返回 null）
+     */
+    public static BigDecimal decimalOf(Map<String, Object> map, String key) {
+        Object value = map == null ? null : map.get(key);
+        if (value instanceof Number number) {
+            return new BigDecimal(number.toString());
+        }
+        return null;
+    }
 }

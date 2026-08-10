@@ -362,10 +362,11 @@ public class StoreServiceImpl implements StoreService {
     @Override
     public void delete(Long id) {
         BizStore store = requireStore(id);
-        // @TableLogic 字段会被 updateById 自动忽略, 必须用 deleteById 触发逻辑删除 (UPDATE SET deleted=1)
-        store.setUpdatedBy(operatorResolver.currentOperatorName());
-        storeMapper.updateById(store);
-        storeMapper.deleteById(id);
+        // 合并逻辑删除 + 更新人记录为一次操作，避免 deleteById 丢失 updatedBy
+        storeMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<BizStore>()
+                .eq(BizStore::getId, id)
+                .set(BizStore::getUpdatedBy, operatorResolver.currentOperatorName())
+                .set(BizStore::getDeleted, 1));
     }
 
     /**
