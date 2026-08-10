@@ -3621,6 +3621,8 @@
     "regionRHOTEL": "右酒店區",
     "regionUM": "澳大專區",
     "regionHACS": "黑沙灘區",
+    "regionGONGBEI": "拱北區域",
+    "regionHENGQIN": "橫琴區域",
     "dateLocked": "該日期已被鎖定",
     "sellByDayHint": "按天售賣，商圈跟隨門店所在區域（可在「門店管理」調整），每天銷售個數以定價庫存為準",
     "selectMonth": "選擇月份",

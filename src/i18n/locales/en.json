@@ -3621,6 +3621,8 @@
     "regionRHOTEL": "R Hotel",
     "regionUM": "UM",
     "regionHACS": "Hac Sa",
+    "regionGONGBEI": "Gongbei",
+    "regionHENGQIN": "Hengqin",
     "dateLocked": "This date has been locked",
     "sellByDayHint": "Sold by day, region follows store location (adjustable in Store Management). Daily sales subject to pricing inventory",
     "selectMonth": "Select Month",

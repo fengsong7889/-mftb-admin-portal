@@ -105,8 +105,8 @@ interface RegionPricingConfig {
 
 // 梯度配置接口
 interface TimeSlotGradient {
-  count: number
-  discount: number
+  count: number | undefined
+  discount: number | undefined
 }
 
 // 商家接口
@@ -319,7 +319,7 @@ function WaterfallAddGeneral() {
           setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
           // 多天梯度折扣（后端百分比记法 → 前端「折」记法）
           const tiers = parseJsonList(detail.discountTiers)
-          setGradients(tiers.map(t => ({ count: Number(t.minDays) || 0, discount: (Number(t.discount) || 0) / 10 })))
+          setGradients(tiers.map(t => ({ count: Number(t.minDays) || undefined, discount: (Number(t.discount) || 0) / 100 })))
           setGradientEnabled(tiers.length > 0)
           // 屏蔽商家回填
           setMerchantLimit(detail.blockMerchant === 1)
@@ -375,7 +375,7 @@ function WaterfallAddGeneral() {
         setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
         // 多时段梯度折扣（后端百分比记法 → 前端「折」记法）
         const tiers = parseJsonList(detail.discountTiers)
-        setGradients(tiers.map(t => ({ count: Number(t.minSlots) || 0, discount: (Number(t.discount) || 0) / 10 })))
+        setGradients(tiers.map(t => ({ count: Number(t.minSlots) || undefined, discount: (Number(t.discount) || 0) / 100 })))
         setGradientEnabled(tiers.length > 0)
         // 屏蔽商家回填
         setMerchantLimit(detail.blockMerchant === 1)
@@ -656,7 +656,7 @@ function WaterfallAddGeneral() {
 
   // 添加梯度
   const handleAddGradient = () => {
-    setGradients([...gradients, { count: 0, discount: 0 }])
+    setGradients([...gradients, { count: undefined, discount: undefined }])
   }
 
   // 删除梯度
@@ -702,9 +702,9 @@ function WaterfallAddGeneral() {
           channel: selectedChannel,
           presaleDays,
           refundEnabled: refundEnabled ? 1 : 2,
-          // 「折」记法 → 后端百分比记法（6折 = 60）
+          // 「折」记法 → 后端百分比记法（6折 = 600，支持2位小数）
           discountTiers: gradientEnabled
-            ? gradients.filter(g => g.count > 0).map(g => ({ minSlots: g.count, discount: Math.round(g.discount * 10) }))
+            ? gradients.filter(g => g.count && g.discount).map(g => ({ minSlots: g.count!, discount: Math.round(g.discount! * 100) }))
             : [],
           cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
           // 屏蔽商家（规则6）：开关+名单落库，销售端据此拦截
@@ -761,9 +761,9 @@ function WaterfallAddGeneral() {
           channel: selectedChannel,
           presaleDays,
           refundEnabled: refundEnabled ? 1 : 2,
-          // 多天梯度折扣：「折」记法 → 后端百分比记法（95折 = 95），维度为购买天数
+          // 多天梯度折扣：「折」记法 → 后端百分比记法（95折 = 9500，支持2位小数）
           discountTiers: gradientEnabled
-            ? gradients.filter(g => g.count > 0).map(g => ({ minDays: g.count, discount: Math.round(g.discount * 10) }))
+            ? gradients.filter(g => g.count && g.discount).map(g => ({ minDays: g.count!, discount: Math.round(g.discount! * 100) }))
             : [],
           cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
           // 屏蔽商家：开关+名单落库，销售端据此拦截
@@ -1423,7 +1423,7 @@ function WaterfallAddGeneral() {
                   onChange={(checked) => {
                     setGradientEnabled(checked)
                     if (checked && gradients.length === 0) {
-                      setGradients([{ count: 0, discount: 0 }])
+                      setGradients([{ count: undefined, discount: undefined }])
                     }
                   }}
                   size="small"
@@ -1454,20 +1454,21 @@ function WaterfallAddGeneral() {
                       <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.purchaseDaysGe')}</span>
                       <InputNumber
                         min={1}
-                        max={30}
+                        max={9999}
                         placeholder={t('recommend.daysPlaceholder')}
-                        style={{ width: 80 }}
-                        value={gradient.count}
+                        style={{ width: 110 }}
+                        value={gradient.count || undefined}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
                       <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.dayUnit')}{t('recommend.correspondingDiscount')}</span>
                       <InputNumber
-                        min={1}
-                        max={100}
+                        min={0.01}
+                        max={10}
+                        precision={2}
                         placeholder={t('recommend.discountPlaceholder')}
-                        style={{ width: 80 }}
+                        style={{ width: 120 }}
                         addonAfter={t('recommend.zheUnit')}
-                        value={gradient.discount}
+                        value={gradient.discount || undefined}
                         onChange={(value) => handleUpdateGradient(index, 'discount', value)}
                       />
                       <Button 
@@ -1500,7 +1501,7 @@ function WaterfallAddGeneral() {
                   onChange={(checked) => {
                     setGradientEnabled(checked)
                     if (checked && gradients.length === 0) {
-                      setGradients([{ count: 0, discount: 0 }])
+                      setGradients([{ count: undefined, discount: undefined }])
                     }
                   }}
                   size="small"
@@ -1533,20 +1534,21 @@ function WaterfallAddGeneral() {
                       <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotCountGe')}</span>
                       <InputNumber
                         min={1}
-                        max={6}
+                        max={9999}
                         placeholder={t('recommend.daysPlaceholder')}
-                        style={{ width: 80 }}
-                        value={gradient.count}
+                        style={{ width: 110 }}
+                        value={gradient.count || undefined}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
                       <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotCountUnit')}{t('recommend.correspondingDiscount')}</span>
                       <InputNumber
-                        min={1}
-                        max={100}
+                        min={0.01}
+                        max={10}
+                        precision={2}
                         placeholder={t('recommend.discountPlaceholder')}
-                        style={{ width: 80 }}
+                        style={{ width: 120 }}
                         addonAfter={t('recommend.zheUnit')}
-                        value={gradient.discount}
+                        value={gradient.discount || undefined}
                         onChange={(value) => handleUpdateGradient(index, 'discount', value)}
                       />
                       <Button 

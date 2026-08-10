@@ -82,8 +82,8 @@ const PREVIEW_DISHES = [
 
 /** 按天梯度折扣配置（購買天數≥ days 時享 discount 折，參考盤活復蘇梯度配置） */
 interface DayDiscountGradient {
-  days: number
-  discount: number
+  days: number | undefined
+  discount: number | undefined
 }
 
 /** 退費比例規則（剩餘天數 ≤ maxDays 時，退款按 feePercent% 扣費） */
@@ -267,8 +267,8 @@ export default function PopularSkinPricing() {
             if (Array.isArray(tiers) && tiers.length) {
               setGradientEnabled(true)
               setGradients(tiers.map((t: { minDays?: number; days?: number; discount: number }) => ({
-                days: t.minDays ?? t.days ?? 0,
-                discount: t.discount,
+                days: (t.minDays ?? t.days) || undefined,
+                discount: t.discount || undefined,
               })))
             }
           } catch { /* ignore */ }
@@ -366,7 +366,7 @@ export default function PopularSkinPricing() {
 
   // 添加折扣梯度
   const handleAddGradient = () => {
-    setGradients(prev => [...prev, { days: 0, discount: 0 }])
+    setGradients(prev => [...prev, { days: undefined, discount: undefined }])
   }
 
   // 刪除折扣梯度
@@ -448,7 +448,7 @@ export default function PopularSkinPricing() {
         presaleDays,
         refundEnabled: refundEnabled ? 1 : 2,
         discountTiers: gradientEnabled && gradients.length
-          ? gradients.map(g => ({ minDays: g.days, discount: g.discount }))
+          ? gradients.filter(g => g.days && g.discount).map(g => ({ minDays: g.days!, discount: g.discount! }))
           : undefined,
         cancelFeeTiers: refundEnabled && cancelFeeRules.length
           ? cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent }))
@@ -944,7 +944,7 @@ export default function PopularSkinPricing() {
                 onChange={checked => {
                   setGradientEnabled(checked)
                   if (checked && gradients.length === 0) {
-                    setGradients([{ days: 0, discount: 0 }])
+                    setGradients([{ days: undefined, discount: undefined }])
                   }
                 }}
               />
@@ -978,28 +978,28 @@ export default function PopularSkinPricing() {
                     <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.purchaseDaysGe')}</span>
                     <InputNumber
                       min={1}
-                      max={180}
+                      max={9999}
                       precision={0}
                       placeholder={t('recommend:daysPlaceholder')}
-                      style={{ width: 90 }}
+                      style={{ width: 110 }}
                       value={gradient.days || undefined}
                       disabled={isDetailMode}
                       onChange={value => handleUpdateGradient(index, 'days', value)}
                     />
                     <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.correspondingDiscount')}</span>
                     <InputNumber
-                      min={1}
-                      max={99}
-                      precision={0}
+                      min={0.01}
+                      max={10}
+                      precision={2}
                       placeholder={t('recommend:discountPlaceholder')}
-                      style={{ width: 100 }}
+                      style={{ width: 120 }}
                       addonAfter={t('recommend:zheUnit')}
                       value={gradient.discount || undefined}
                       disabled={isDetailMode}
                       onChange={value => handleUpdateGradient(index, 'discount', value)}
                     />
                     <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                      {gradient.days > 0 && gradient.discount > 0
+                      {(gradient.days ?? 0) > 0 && (gradient.discount ?? 0) > 0
                         ? t('recommend:popularSkin.gradientExample', { days: gradient.days, discount: gradient.discount })
                         : ''}
                     </span>

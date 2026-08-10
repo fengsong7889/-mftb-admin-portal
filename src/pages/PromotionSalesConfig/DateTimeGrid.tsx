@@ -114,6 +114,9 @@ const REGION_LIST = [
   { key: Region.RHOTEL, name: '右酒店區' },
   { key: Region.UM, name: '澳大專區' },
   { key: Region.HACS, name: '黑沙灘區' },
+  // 珠海區域
+  { key: Region.GONGBEI, name: '拱北區域' },
+  { key: Region.HENGQIN, name: '橫琴區域' },
 ]
 
 // WEEKDAY_LABELS 移入组件内部以使用 t() 翻譯
@@ -174,6 +177,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     [Region.RHOTEL]: t('regionRHOTEL'),
     [Region.UM]: t('regionUM'),
     [Region.HACS]: t('regionHACS'),
+    [Region.GONGBEI]: t('regionGONGBEI'),
+    [Region.HENGQIN]: t('regionHENGQIN'),
   }), [t])
 
   // 翻译后的商圈列表
@@ -236,7 +241,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
 
   // 加载算法库已启用的算法
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
+    fetchAdAlgorithms({ page: 1, size: 200, status: 1, hasPricing: true })
       .then(res => {
         if (!res) return
         const brandOverrides: Record<string, string> = {}

@@ -46,7 +46,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
 
     @Override
     public PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
-                                          Integer channel, Integer status, String keyword, String storeCode) {
+                                          Integer channel, Integer status, String keyword, String storeCode, Boolean hasPricing) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdAlgorithm> wrapper = new LambdaQueryWrapper<>();
@@ -70,9 +70,39 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
             records = records.stream()
                     .filter(algo -> !isBlockedForStore(algo.getId(), storeCode))
                     .toList();
-            return new PageResult<>(records, Math.max(0, result.getTotal() - (before - records.size())));
+            long adjustedTotal = Math.max(0, result.getTotal() - (before - records.size()));
+            // hasPricing: 进一步过滤无启用定价的算法
+            if (Boolean.TRUE.equals(hasPricing)) {
+                int beforePricing = records.size();
+                records = records.stream()
+                        .filter(algo -> hasActivePricing(algo.getId(), algo.getAlgoType()))
+                        .toList();
+                adjustedTotal = Math.max(0, adjustedTotal - (beforePricing - records.size()));
+            }
+            return new PageResult<>(records, adjustedTotal);
+        }
+        // hasPricing: 过滤无启用定价的算法
+        if (Boolean.TRUE.equals(hasPricing)) {
+            int before = records.size();
+            records = records.stream()
+                    .filter(algo -> hasActivePricing(algo.getId(), algo.getAlgoType()))
+                    .toList();
+            long adjustedTotal = Math.max(0, result.getTotal() - (before - records.size()));
+            return new PageResult<>(records, adjustedTotal);
         }
         return new PageResult<>(records, result.getTotal());
+    }
+
+    /** 判断算法是否有启用中的定价配置 */
+    private boolean hasActivePricing(Long algoId, Integer algoType) {
+        if (algoId == null || algoType == null) return false;
+        if (algoType == 3) {
+            return revivePricingService.activeByAlgo(algoId) != null;
+        } else if (algoType == 5) {
+            return hotPricingService.activeByAlgo(algoId) != null;
+        } else {
+            return pricingService.activeByAlgo(algoId) != null;
+        }
     }
 
     /** 该算法启用中的定价是否屏蔽了指定门店（含其所属集团），按算法类型取对应计价配置 */

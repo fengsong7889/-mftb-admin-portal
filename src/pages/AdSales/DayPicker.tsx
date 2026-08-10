@@ -200,7 +200,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
   // 真实算法下拉：规则6 选择门店后过滤掉对该商家屏蔽的算法
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.HOT_REVIVE_AD, status: 1, storeCode: searchStoreName || undefined })
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.HOT_REVIVE_AD, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
       .then(res => {
         if (!res) return
         const brandOverrides: Record<string, string> = {}

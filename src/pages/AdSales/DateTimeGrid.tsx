@@ -174,6 +174,9 @@ const REGION_LIST = [
   { key: Region.RHOTEL, name: '右酒店區' },
   { key: Region.UM, name: '澳大專區' },
   { key: Region.HACS, name: '黑沙灘區' },
+  // 珠海區域
+  { key: Region.GONGBEI, name: '拱北區域' },
+  { key: Region.HENGQIN, name: '橫琴區域' },
 ]
 
 // WEEKDAY_LABELS 移入组件内部以使用 t() 翻譯
@@ -234,6 +237,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     [Region.RHOTEL]: t('regionRHOTEL'),
     [Region.UM]: t('regionUM'),
     [Region.HACS]: t('regionHACS'),
+    [Region.GONGBEI]: t('regionGONGBEI'),
+    [Region.HENGQIN]: t('regionHENGQIN'),
   }), [t])
 
   // 翻译后的商圈列表
@@ -318,7 +323,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 规则6：选择门店后过滤掉对该商家屏蔽的算法（无法选择）
   useEffect(() => {
     if (inventoryItem.algorithmType !== AlgorithmType.INVINCIBLE_STAR) return
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, status: 1, storeCode: searchStoreName || undefined })
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
     .then(res => {
       if (!res) return
       const meta: Record<string, { apiId: number }> = {}
@@ -614,9 +619,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       } catch (err) {
         const errMsg = (err as Error).message || '下單失敗，請稍後再試'
         message.error(errMsg)
-        // 下單失敗：關閉彈窗、清空購物車、刷新庫存與餘額，讓用戶重新操作
+        // 下單失敗（如額度不足）：關閉彈窗，保留購物車讓用戶自行刪減，刷新庫存與餘額
         setIsPaymentModalVisible(false)
-        setCartItems([])
         fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
         loadMerchantBalance(store.groupCode, searchBrand)
       } finally {

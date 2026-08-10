@@ -372,7 +372,7 @@ export default function PopularSkinPicker() {
 
   // 真實算法下拉：人氣商家加載真實算法庫數據
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1 })
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1, hasPricing: true })
       .then(res => {
         if (!res) return
         const brandOverrides: Record<string, string> = {}

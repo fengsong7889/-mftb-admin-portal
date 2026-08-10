@@ -103,6 +103,8 @@ export interface AdAlgorithmQuery {
   keyword?: string
   /** 銷售菜單場景: 傳入後過濾掉對該門店屏蔽的算法 */
   storeCode?: string
+  /** 銷售菜單場景: true 時僅返回有啟用定價的算法 */
+  hasPricing?: boolean
 }
 
 /** 算法分頁查詢 */
