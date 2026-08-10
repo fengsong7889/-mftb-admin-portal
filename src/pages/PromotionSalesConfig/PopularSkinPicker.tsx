@@ -13,6 +13,11 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { AlgorithmType } from '../Recommend/constants'
+import { fetchAdAlgorithms } from '../../api/adPromotion'
+
+/** 後端品牌名 → UI 品牌值 映射 */
+const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
 
 /**
  * 人氣商家 - 購買廣告（皮膚售賣，店鋪推廣版）
@@ -179,11 +184,7 @@ const QUICK_DAY_OPTIONS = [7, 15, 30, 60, 90]
 const MIN_BUY_DAYS = 1
 const MAX_BUY_DAYS = 180
 
-/** 人氣商家算法選項（選擇後自動帶出品牌） */
-const ALGORITHM_OPTIONS = [
-  { label: '人氣商家-首頁版', value: 'popular_merchant_ka', brand: 'shanfeng' },
-  { label: '人氣商家-外賣版', value: 'popular_merchant_delivery', brand: 'mfood' },
-]
+/** 人氣商家算法選項：從算法庫 API 動態加載 */
 
 export default function PopularSkinPicker() {
   const { t } = useTranslation('adSales')
@@ -194,6 +195,30 @@ export default function PopularSkinPicker() {
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  // 真实算法下拉（從算法庫 API 動態加載）
+  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  const [algorithmNameMap, setAlgorithmNameMap] = useState<Record<string, string>>({})
+
+  // 加载算法库已启用的人气商家算法
+  useEffect(() => {
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1 })
+      .then(res => {
+        if (!res) return
+        const brandOverrides: Record<string, string> = {}
+        const nameMap: Record<string, string> = {}
+        const options = res.records.map(a => {
+          const value = String(a.id)
+          const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
+          if (uiBrand) brandOverrides[value] = uiBrand
+          nameMap[value] = a.algoName
+          return { label: a.algoName, value }
+        })
+        setAlgorithmOptions(options)
+        setAlgorithmBrandOverrides(brandOverrides)
+        setAlgorithmNameMap(nameMap)
+      }).catch(() => {})
+  }, [])
 
   // 選購狀態
   const [selectedSkinId, setSelectedSkinId] = useState<number | null>(null)
@@ -206,7 +231,7 @@ export default function PopularSkinPicker() {
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
 
   const selectedSkin = SALE_SKINS.find(s => s.id === selectedSkinId) || null
-  const selectedAlgorithm = ALGORITHM_OPTIONS.find(o => o.value === searchAlgorithm) || null
+  const selectedAlgorithm = searchAlgorithm ? { label: algorithmNameMap[searchAlgorithm] || '-', value: searchAlgorithm } : null
   const endDate = startDate.add(buyDays - 1, 'day')
 
   // 階梯輪播預覽：所選皮膚為階梯輪播佈局時逐張輪播，切換皮膚時重置
@@ -238,7 +263,7 @@ export default function PopularSkinPicker() {
   // 算法變更：自動帶出品牌
   const handleAlgorithmChange = (value: string | null) => {
     setSearchAlgorithm(value)
-    setSearchBrand(ALGORITHM_OPTIONS.find(o => o.value === value)?.brand ?? null)
+    setSearchBrand(value ? (algorithmBrandOverrides[value] ?? null) : null)
   }
 
   const handleSearch = () => {
@@ -501,7 +526,7 @@ export default function PopularSkinPicker() {
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
           <Form.Item label={t('algoNameLabel')}>
             <Select placeholder={t('algoSearchPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={ALGORITHM_OPTIONS.map(o => ({ label: o.label, value: o.value }))} />
+              options={algorithmOptions} />
           </Form.Item>
           <Form.Item label={t('brandLabel')}>
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={v => setSearchBrand(v)} allowClear

@@ -89,7 +89,7 @@ export default function PromotionSlotConfigAdd() {
   const [editingPosition, setEditingPosition] = useState<number | null>(null)
   const [totalPositions, setTotalPositions] = useState<number>(100)
   /** 算法库选项（来自「算法库」已启用算法） */
-  const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmOption[]>(MOCK_ALGORITHM_OPTIONS)
+  const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmOption[]>([])
   const [saving, setSaving] = useState(false)
   /** 弹窗中当前选中算法的品牌 */
   const [selectedAlgoBrand, setSelectedAlgoBrand] = useState<string | undefined>(undefined)

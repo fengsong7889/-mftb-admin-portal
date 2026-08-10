@@ -642,17 +642,7 @@ export default function Waterfall() {
               allowClear
               showSearch
               optionFilterProp="label"
-              options={[
-                { label: '無敵星星-首頁版', value: '無敵星星-首頁版' },
-                { label: '新店廣告-外賣版', value: '新店廣告-外賣版' },
-                { label: '盤活復蘇-團購版', value: '盤活復蘇-團購版' },
-                { label: '獨家商家-超市版', value: '獨家商家-超市版' },
-                { label: '流量廣告-全渠道', value: '流量廣告-全渠道' },
-                { label: '猜你喜歡-主力版', value: '猜你喜歡-主力版' },
-                { label: '自然流量-默認', value: '自然流量-默認' },
-                { label: '搜索算法-綜合版', value: '搜索算法-綜合版' },
-                { label: '人氣商家-首頁版', value: '人氣商家-首頁版' },
-              ]}
+              options={allAlgorithms.map(a => ({ label: a.algoName, value: a.algoName }))}
             />
           </Form.Item>
           <Form.Item label={t('waterfall.colBizChannel')} name="bizChannel">

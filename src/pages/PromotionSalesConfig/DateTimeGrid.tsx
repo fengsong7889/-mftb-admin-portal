@@ -19,6 +19,7 @@ import {
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
 import { Region, AlgorithmType } from '../Recommend/constants'
+import { fetchAdAlgorithms } from '../../api/adPromotion'
 
 interface CartItem {
   key: string
@@ -86,17 +87,8 @@ const STORE_OPTIONS = MOCK_STORES.map(s => ({
   bdName: s.bdName,
 }))
 
-/** 算法 → 品牌映射（选择算法后自动带出品牌） */
-const ALGORITHM_BRAND_MAP: Record<string, string> = {
-  invincible_star: 'shanfeng',
-  new_store_ad: 'mfood',
-  hot_revive: 'shanfeng',
-  exclusive_merchant: 'mfood',
-  traffic_ad: 'shanfeng',
-  guess_you_like: 'shanfeng',
-  organic_traffic: 'mfood',
-  search_algo: 'shanfeng',
-}
+/** 後端品牌名 → UI 品牌值 映射 */
+const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
 
 /** BD选项 */
 const _BD_OPTIONS = [
@@ -238,6 +230,26 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
   // 预售日期提醒弹窗
   const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
+  // 真实算法下拉（從算法庫 API 動態加載，value=算法ID）
+  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+
+  // 加载算法库已启用的算法
+  useEffect(() => {
+    fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
+      .then(res => {
+        if (!res) return
+        const brandOverrides: Record<string, string> = {}
+        const options = res.records.map(a => {
+          const value = String(a.id)
+          const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
+          if (uiBrand) brandOverrides[value] = uiBrand
+          return { label: a.algoName, value }
+        })
+        setAlgorithmOptions(options)
+        setAlgorithmBrandOverrides(brandOverrides)
+      }).catch(() => {})
+  }, [])
 
   // 当前活动日期的字符串
   const activeDateStr = activeDate?.format('YYYY-MM-DD') || ''
@@ -250,23 +262,13 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     if (hasCartItems && value !== searchAlgorithm) {
       setPendingAction(() => {
         setSearchAlgorithm(value)
-        // 自动带出品牌
-        if (value && ALGORITHM_BRAND_MAP[value]) {
-          setSearchBrand(ALGORITHM_BRAND_MAP[value])
-        } else {
-          setSearchBrand(null)
-        }
+        setSearchBrand(value ? (algorithmBrandOverrides[value] ?? null) : null)
       })
       setIsConflictModalVisible(true)
       return
     }
     setSearchAlgorithm(value)
-    // 自动带出品牌
-    if (value && ALGORITHM_BRAND_MAP[value]) {
-      setSearchBrand(ALGORITHM_BRAND_MAP[value])
-    } else {
-      setSearchBrand(null)
-    }
+    setSearchBrand(value ? (algorithmBrandOverrides[value] ?? null) : null)
   }
 
   // 门店名称变更处理：自动带出BD，并检查购物车冲突
@@ -554,16 +556,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                options={[
-                  { label: '無敵星星-首頁版', value: 'invincible_star' },
-                  { label: '新店廣告-外賣版', value: 'new_store_ad' },
-                  { label: '盤活復蘇-團購版', value: 'hot_revive' },
-                  { label: '獨家商家-超市版', value: 'exclusive_merchant' },
-                  { label: '流量廣告-全渠道', value: 'traffic_ad' },
-                  { label: '猜你喜歡-主力版', value: 'guess_you_like' },
-                  { label: '自然流量-默認', value: 'organic_traffic' },
-                  { label: '搜索算法-綜合版', value: 'search_algo' },
-                ]}
+                options={algorithmOptions}
               />
             </Form.Item>
             <Form.Item label={t('brandLabel')}>

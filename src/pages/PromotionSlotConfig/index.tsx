@@ -67,7 +67,7 @@ export default function PromotionSlotConfig() {
   /** 后端不可用降级标记: true 时查询走本地 Mock 过滤 */
   const [mockMode, setMockMode] = useState(false)
   /** 算法名称筛选选项（来自算法库） */
-  const [algoOptions, setAlgoOptions] = useState<{ label: string; value: number }[]>(MOCK_ALGO_OPTIONS)
+  const [algoOptions, setAlgoOptions] = useState<{ label: string; value: number }[]>([])
 
   /** 算法名称选项: 来自算法库已启用算法（当前仅无敌星星接入） */
   useEffect(() => {

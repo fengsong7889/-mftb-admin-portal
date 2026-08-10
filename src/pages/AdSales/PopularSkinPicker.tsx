@@ -269,9 +269,7 @@ export default function PopularSkinPicker() {
 
   // ===== 真實接口接線 =====
   // 算法下拉（人氣商家加載真實算法庫數據，value=算法ID）
-  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>(
-    FALLBACK_ALGORITHM_OPTIONS.map(o => ({ label: o.label, value: o.value })),
-  )
+  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
   const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
   const [algorithmRefundConfig, setAlgorithmRefundConfig] = useState<Record<string, boolean>>(FALLBACK_REFUND_CONFIG)
   // 門店下拉（真實門店，value=storeCode）

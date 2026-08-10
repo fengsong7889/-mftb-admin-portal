@@ -12,6 +12,8 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { AlgorithmType } from '../Recommend/constants'
+import { fetchAdAlgorithms } from '../../api/adPromotion'
 
 // 中文星期映射 → 移入組件內使用 t()
 // const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
@@ -66,17 +68,8 @@ const BD_OPTIONS = [
   { label: '劉敏', value: 'bd-004' },
 ]
 
-/** 新店廣告算法选项 */
-const NEW_STORE_ALGORITHM_OPTIONS = [
-  { label: '新店廣告-外賣版', value: 'new_store_delivery' },
-  { label: '新店廣告-超市版', value: 'new_store_market' },
-]
-
-/** 算法 → 品牌映射（选择算法后自动带出品牌） */
-const ALGORITHM_BRAND_MAP: Record<string, string> = {
-  new_store_delivery: 'mfood',
-  new_store_market: 'shanfeng',
-}
+/** 後端品牌名 → UI 品牌值 映射 */
+const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
 
 /** 门店赠送天数记录（来源：贈送管理菜單的贈送數據） */
 interface GiftDaysRecord {
@@ -105,6 +98,26 @@ export default function NewStoreDayPicker() {
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [queriedStoreId, setQueriedStoreId] = useState<string | null>(null)
+  // 真实算法下拉（從算法庫 API 動態加載，value=算法ID）
+  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+
+  // 加载算法库已启用的新店广告算法
+  useEffect(() => {
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.NEW_STORE_AD, status: 1 })
+      .then(res => {
+        if (!res) return
+        const brandOverrides: Record<string, string> = {}
+        const options = res.records.map(a => {
+          const value = String(a.id)
+          const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
+          if (uiBrand) brandOverrides[value] = uiBrand
+          return { label: a.algoName, value }
+        })
+        setAlgorithmOptions(options)
+        setAlgorithmBrandOverrides(brandOverrides)
+      }).catch(() => {})
+  }, [])
 
   // 各门店已额外消耗的赠送天数（本地提交订单后累加）
   const [extraUsedDays, setExtraUsedDays] = useState<Record<string, number>>({})
@@ -135,7 +148,7 @@ export default function NewStoreDayPicker() {
   // 算法名称变更处理：自动带出品牌
   const handleAlgorithmChange = (value: string | null) => {
     setSearchAlgorithm(value)
-    setSearchBrand(value ? ALGORITHM_BRAND_MAP[value] || null : null)
+    setSearchBrand(value ? (algorithmBrandOverrides[value] ?? null) : null)
   }
 
   // 门店名称变更处理：自动带出BD
@@ -284,7 +297,7 @@ export default function NewStoreDayPicker() {
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
           <Form.Item label={t('algoNameLabel')}>
             <Select placeholder={t('dpAlgoPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={NEW_STORE_ALGORITHM_OPTIONS} />
+              options={algorithmOptions} />
           </Form.Item>
           <Form.Item label={t('brandLabel')}>
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
