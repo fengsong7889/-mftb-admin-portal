@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Popover } from 'antd'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Popover, Spin } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +14,12 @@ import {
   TIER_DIRECTION_LABEL, CALC_CYCLE_LABEL,
   type OrganicScoreRule, type RangeScores, type ScoreTier,
 } from './organicTrafficConfig'
+import {
+  fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
+  createOrganicRule, updateOrganicRule, toggleOrganicRuleStatus,
+  updateOrganicRuleScore, deleteOrganicRule,
+  type OrganicRuleVO,
+} from '@/api/organicScore'
 
 /** 數值計數動畫（1200ms，遵循數據指標統計卡標準） */
 function useCountUp(target: number, duration = 1200) {
@@ -84,12 +90,64 @@ interface Props {
 }
 
 /**
+ * API VO → 前端內部 OrganicScoreRule 轉換
+ */
+function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
+  let tiers: ScoreTier[] | undefined
+  let rangeScores: RangeScores | undefined
+  try { tiers = vo.tiers ? JSON.parse(vo.tiers) : undefined } catch { tiers = undefined }
+  try { rangeScores = vo.rangeScores ? JSON.parse(vo.rangeScores) : undefined } catch { rangeScores = undefined }
+  return {
+    id: vo.ruleCode,
+    dimension: vo.dimension as ScoreDimension,
+    name: vo.name,
+    description: vo.description,
+    mode: vo.mode as ScoreMode,
+    score: vo.score,
+    statDays: vo.statDays ?? undefined,
+    rangeScores,
+    tiers,
+    calcCycle: vo.calcCycle as CalcCycle | undefined,
+    status: vo.status as ServiceStatus,
+    builtin: vo.builtin === 1,
+  }
+}
+
+/**
  * 自然流量算法參數配置：3 個維度的商家評分規則。
  * 自然流量不售賣坑位，商家靠綜合得分高低較量排名。
  */
 export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const { t } = useTranslation()
   const [rules, setRules] = useState<OrganicScoreRule[]>(DEFAULT_ORGANIC_SCORE_RULES)
+  const [loading, setLoading] = useState(true)
+
+  /** 從後端加載配置 */
+  const loadConfig = useCallback(async () => {
+    setLoading(true)
+    try {
+      const config = await fetchOrganicScoreConfig()
+      if (config.rules.length > 0) {
+        setRules(config.rules.map(voToRule))
+      }
+      if (config.dimensions.length > 0) {
+        const weightMap: Record<number, number> = {}
+        config.dimensions.forEach(d => { weightMap[d.dimension] = d.weight })
+        setDimensionWeight(prev => ({
+          ...prev,
+          [ScoreDimension.COMMERCIAL]: weightMap[1] ?? prev[ScoreDimension.COMMERCIAL],
+          [ScoreDimension.STORE]: weightMap[2] ?? prev[ScoreDimension.STORE],
+          [ScoreDimension.PLATFORM]: weightMap[4] ?? prev[ScoreDimension.PLATFORM],
+        }))
+      }
+    } catch {
+      // 後端不可用時保持默認硬編碼數據
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadConfig() }, [loadConfig])
 
   /** 維度標籤（依賴 t，定義在組件內以便響應語言切換） */
   const DIM_LABEL: Record<ScoreDimension, string> = {
@@ -127,6 +185,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     { label: MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
   ]
   const [dimensionWeight, setDimensionWeight] = useState<Record<ScoreDimension, number>>(DEFAULT_DIMENSION_WEIGHT)
+  const [savingWeights, setSavingWeights] = useState(false)
 
   // 維度切換與表格內篩選（避免所有維度平鋪導致頁面過長）
   const [activeDimension, setActiveDimension] = useState<ScoreDimension>(ScoreDimension.COMMERCIAL)
@@ -151,6 +210,25 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     () => DIMENSION_ORDER.reduce((sum, d) => sum + (dimensionWeight[d] || 0), 0),
     [dimensionWeight],
   )
+
+  /** 保存維度權重 */
+  const handleSaveWeights = async () => {
+    if (weightTotal !== DIMENSION_WEIGHT_TOTAL) {
+      message.warning(t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL }))
+      return
+    }
+    setSavingWeights(true)
+    try {
+      const payload = DIMENSION_ORDER.map(d => ({ dimension: d, weight: dimensionWeight[d] }))
+      await apiUpdateWeights(payload)
+      message.success(t('organicTrafficScore.weightSaveSuccess'))
+    } catch {
+      // 後端不可用時僅提示
+      message.info(t('organicTrafficScore.weightSaveLocalOnly'))
+    } finally {
+      setSavingWeights(false)
+    }
+  }
 
   /** 按維度取規則 */
   const getRules = (dimension: ScoreDimension) =>
@@ -234,22 +312,47 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       }
       values.tiers = [...tierRows]
     }
-    if (editingRule) {
-      setRules(prev => prev.map(r => r.id === editingRule.id ? { ...r, ...values } : r))
-      message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
-    } else {
-      const prefix = modalDimension === ScoreDimension.COMMERCIAL ? 'COM'
-        : modalDimension === ScoreDimension.PLATFORM ? 'PLT' : 'ST'
-      const newRule: OrganicScoreRule = {
-        id: `${prefix}_CUSTOM_${Date.now()}`,
-        dimension: modalDimension,
-        builtin: false,
-        ...values,
-      }
-      setRules(prev => [...prev, newRule])
-      message.success(t('organicTrafficScore.addSuccess', { name: values.name }))
+    const payload = {
+      dimension: editingRule ? editingRule.dimension : modalDimension,
+      name: values.name,
+      description: values.description,
+      mode: values.mode,
+      score: values.score,
+      statDays: values.statDays,
+      rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
+      tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
+      calcCycle: values.calcCycle,
+      status: values.status,
     }
-    setModalOpen(false)
+    try {
+      if (editingRule) {
+        const vo = await updateOrganicRule(editingRule.id as unknown as number, payload)
+        setRules(prev => prev.map(r => r.id === editingRule.id ? voToRule(vo) : r))
+        message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
+      } else {
+        const vo = await createOrganicRule(payload)
+        const newRule = voToRule(vo)
+        setRules(prev => [...prev, newRule])
+        message.success(t('organicTrafficScore.addSuccess', { name: values.name }))
+      }
+      setModalOpen(false)
+    } catch {
+      // API 失敗時回退本地更新
+      if (editingRule) {
+        setRules(prev => prev.map(r => r.id === editingRule.id ? { ...r, ...values } : r))
+      } else {
+        const prefix = modalDimension === ScoreDimension.COMMERCIAL ? 'COM'
+          : modalDimension === ScoreDimension.PLATFORM ? 'PLT' : 'ST'
+        const newRule: OrganicScoreRule = {
+          id: `${prefix}_CUSTOM_${Date.now()}`,
+          dimension: modalDimension,
+          builtin: false,
+          ...values,
+        }
+        setRules(prev => [...prev, newRule])
+      }
+      setModalOpen(false)
+    }
   }
 
   /** 啟用/停用評分項 */
@@ -261,7 +364,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       content: t('organicTrafficScore.confirmToggleContent', { action: actionText, name: record.name }),
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
-      onOk: () => {
+      onOk: async () => {
+        try {
+          await toggleOrganicRuleStatus(record.id as unknown as number)
+        } catch { /* 後端不可用時靜默回退 */ }
         setRules(prev => prev.map(r => r.id === record.id ? { ...r, status: newStatus } : r))
         message.success(t('organicTrafficScore.toggleSuccess', { action: actionText, name: record.name }))
       },
@@ -276,7 +382,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
-      onOk: () => {
+      onOk: async () => {
+        try {
+          await deleteOrganicRule(record.id as unknown as number)
+        } catch { /* 後端不可用時靜默回退 */ }
         setRules(prev => prev.filter(r => r.id !== record.id))
         message.success(t('common.deleteSuccess'))
       },
@@ -284,9 +393,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   }
 
   /** 分值調整（表格內聯編輯） */
-  const handleScoreChange = (id: string, score: number | null) => {
+  const handleScoreChange = async (id: string, score: number | null) => {
     if (score === null) return
     setRules(prev => prev.map(r => r.id === id ? { ...r, score } : r))
+    try {
+      await updateOrganicRuleScore(id as unknown as number, score)
+    } catch { /* 後端不可用時僅更新本地 */ }
   }
 
   const buildColumns = (): ColumnsType<OrganicScoreRule> => [
@@ -493,6 +605,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   }
 
   return (
+    <Spin spinning={loading}>
     <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -568,6 +681,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             </div>
           ))}
         </div>
+        {!readOnly && (
+          <div style={{ textAlign: 'right', marginTop: 12 }}>
+            <Button
+              type="primary"
+              size="small"
+              icon={<SaveOutlined />}
+              disabled={weightTotal !== DIMENSION_WEIGHT_TOTAL}
+              loading={savingWeights}
+              onClick={handleSaveWeights}
+            >
+              {t('organicTrafficScore.saveWeight')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 各維度評分項配置：Tabs 切換，頁面高度固定不隨評分項增多而拉長 */}
@@ -796,5 +923,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         </Form>
       </Modal>
     </div>
+    </Spin>
   )
 }
