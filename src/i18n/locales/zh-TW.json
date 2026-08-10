@@ -2112,6 +2112,7 @@
   "promotionOrderManage": {
     "orderListTitle": "訂單列表",
     "buyAd": "購買廣告",
+    "colOrderNo": "訂單編號",
     "colGroupInfo": "集團ID/集團名稱",
     "colStoreInfo": "門店ID/門店名稱",
     "colAlgoName": "算法名稱",

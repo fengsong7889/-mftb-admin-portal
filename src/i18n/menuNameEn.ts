@@ -81,7 +81,6 @@ export const MENU_NAME_EN: Record<string, string> = {
   'translation-manage': 'Translation Config',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
-  'promotion-order-manage': 'Order Management',
 }
 
 /**

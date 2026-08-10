@@ -350,8 +350,7 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("data-permission", "Data Authorization"),
                 Map.entry("system-config", "System Config"),
                 Map.entry("menu-config", "Menu Config"),
-                Map.entry("merchant-order-manage", "Order Management"),
-                Map.entry("promotion-order-manage", "Order Management"));
+                Map.entry("merchant-order-manage", "Order Management"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
                     "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
@@ -496,8 +495,6 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-manage",         new String[]{"贈送管理",         "merchant_promotion", "5"});
         menus.put("ad-sales",            new String[]{"廣告銷售",         "merchant_promotion", "6"});
         menus.put("promotion-word-library", new String[]{"詞庫管理",     "merchant_promotion", "7"});
-        // ── 商家推廣工具 > 廣告銷售 ──
-        menus.put("promotion-order-manage", new String[]{"訂單管理",    "ad-sales",           "1"});
         // ── 商家推廣工具 > 贈送管理 ──
         menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
@@ -611,6 +608,15 @@ public class DataInitializer implements CommandLineRunner {
         }
         if (updated > 0) {
             log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
+        }
+
+        // 清理已废弃的菜单：promotion-order-manage（广告销售下的订单管理已移除）
+        Long obsoleteId = queryMenuIdByKey("promotion-order-manage");
+        if (obsoleteId != null) {
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", obsoleteId);
+            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", obsoleteId);
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", obsoleteId);
+            log.info("已清理废弃菜单 [promotion-order-manage] 及其权限关联", obsoleteId);
         }
     }
 

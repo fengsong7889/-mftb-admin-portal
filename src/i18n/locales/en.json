@@ -2112,6 +2112,7 @@
   "promotionOrderManage": {
     "orderListTitle": "Order List",
     "buyAd": "Buy Ad",
+    "colOrderNo": "Order No.",
     "colGroupInfo": "Group ID / Group Name",
     "colStoreInfo": "Store ID / Store Name",
     "colAlgoName": "Algorithm Name",
