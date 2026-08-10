@@ -595,7 +595,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             return BigDecimal.valueOf(100);
         }
         String key = fullDayCovered ? "fullDay" : slot;
-        BigDecimal factor = decimalOf(entry, key);
+        BigDecimal factor = FinExtras.decimalOf(entry, key);
         if (factor == null || factor.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.valueOf(100);
         }
