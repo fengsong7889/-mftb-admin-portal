@@ -38,11 +38,11 @@ ALTER TABLE biz_ad_order
 INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, status, deleted)
 SELECT 'XD00001', '新店廣告-外賣版', 2, 'mFood', 2, 2, 1, 0
 WHERE NOT EXISTS (
-    SELECT 1 FROM biz_ad_algorithm WHERE algo_code = 'XD00001'
+    SELECT 1 FROM biz_ad_algorithm WHERE algo_code = 'XD00001' AND deleted = 0
 );
 
 INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, status, deleted)
 SELECT 'XD00002', '新店廣告-超市版', 2, 'flashBee', 3, 3, 1, 0
 WHERE NOT EXISTS (
-    SELECT 1 FROM biz_ad_algorithm WHERE algo_code = 'XD00002'
+    SELECT 1 FROM biz_ad_algorithm WHERE algo_code = 'XD00002' AND deleted = 0
 );

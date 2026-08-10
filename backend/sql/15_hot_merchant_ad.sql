@@ -88,4 +88,4 @@ SELECT 'RQ00001', '人氣商家-外賣版', 5, 'flashBee', 2, 2, 10,
            'purchaseLimitDays', 30
        ),
        1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'RQ00001') t);
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'RQ00001' AND deleted = 0) t);
