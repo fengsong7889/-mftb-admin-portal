@@ -401,6 +401,7 @@ export default function MenuConfig() {
   const columns: ColumnsType<MenuItem> = [
     {
       title: t('menuConfig.colSort'),
+      dataIndex: 'sortOrder',
       key: 'sortOrder',
       width: 70,
       align: 'center',

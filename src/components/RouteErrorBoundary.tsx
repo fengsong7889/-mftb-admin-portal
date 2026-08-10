@@ -42,15 +42,18 @@ export default class RouteErrorBoundary extends Component<
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     // chunk 加载失败：多为部署更新导致旧资源失效，自动重载一次拉取新资源
     if (isChunkLoadError(error) && !sessionStorage.getItem(RELOAD_FLAG)) {
       sessionStorage.setItem(RELOAD_FLAG, '1')
       window.location.reload()
       return
     }
-    // 记录错误便于排查
+    // 记录错误及组件堆栈便于排查
     console.error('[RouteErrorBoundary] 页面加载/渲染异常:', error)
+    if (info.componentStack) {
+      console.error('[RouteErrorBoundary] 组件堆栈:', info.componentStack)
+    }
   }
 
   handleReload = () => {

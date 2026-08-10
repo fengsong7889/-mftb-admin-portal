@@ -1,6 +1,6 @@
 import { useState, Suspense, lazy } from 'react'
 import { Layout, Spin } from 'antd'
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Sidebar from './components/Sidebar'
@@ -105,6 +105,7 @@ function PageLoading() {
 /** 需要认证的路由布局 */
 function AuthenticatedLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const location = useLocation()
 
   // 空闲超时自动登出
   useIdleTimeout()
@@ -115,7 +116,7 @@ function AuthenticatedLayout() {
       <Layout>
         <HeaderBar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
         <Content className="app-content">
-          <RouteErrorBoundary>
+          <RouteErrorBoundary key={location.pathname}>
             <Suspense fallback={<PageLoading />}>
               <MenuPermissionGuard>
               <Routes>
