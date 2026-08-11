@@ -27,11 +27,17 @@ function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[
             hasStaleKeys = true
           }
         }
-        // 新增列追加到末尾（非锁定区域末端）
+        // 新增列插入到 locked:'tail' 之前，而非追加到末尾
+        const newCols: ColumnConfig[] = []
         for (const def of defaults) {
           if (!result.some(r => r.key === def.key)) {
-            result.push({ key: def.key, title: def.title, visible: true, locked: def.locked ?? null })
+            newCols.push({ key: def.key, title: def.title, visible: true, locked: def.locked ?? null })
           }
+        }
+        if (newCols.length > 0) {
+          const tailIdx = result.findIndex(c => c.locked === 'tail')
+          const insertAt = tailIdx >= 0 ? tailIdx : result.length
+          result.splice(insertAt, 0, ...newCols)
         }
         // 如果存在已删除的旧 key，将清理后的配置写回 localStorage
         if (hasStaleKeys) {
@@ -120,7 +126,7 @@ export function useColumnConfig(
         })
       }
 
-      // 列集合有变化：按 prev 顺序保留已有列，新增列追加到末尾
+      // 列集合有变化：按 prev 顺序保留已有列，新增列插入到 locked: 'tail' 之前
       const synced: ColumnConfig[] = []
       for (const p of prev) {
         if (initialKeys.has(p.key)) {
@@ -128,11 +134,16 @@ export function useColumnConfig(
           synced.push({ ...p, title: ic?.title ?? p.title })
         }
       }
+      // 新增列：插入到第一个 locked:'tail' 列之前，而非追加到末尾
+      const tailIdx = synced.findIndex(c => c.locked === 'tail')
+      const insertAt = tailIdx >= 0 ? tailIdx : synced.length
+      const newCols: ColumnConfig[] = []
       for (const ic of initialConfig) {
         if (!prevKeys.has(ic.key)) {
-          synced.push({ key: ic.key, title: ic.title, visible: true, locked: ic.locked ?? null })
+          newCols.push({ key: ic.key, title: ic.title, visible: true, locked: ic.locked ?? null })
         }
       }
+      synced.splice(insertAt, 0, ...newCols)
       return synced
     })
   }, [initialConfig])

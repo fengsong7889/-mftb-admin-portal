@@ -755,7 +755,9 @@ export default function TranslationManage() {
     }
   }
 
-  /* 一键机翻：调用后端 API 填充全部字段的空缺翻译 */
+  /* 一键机翻：分批调用后端 API，避免大量字段一次性超时 */
+  const [mtProgress, setMtProgress] = useState<{ current: number; total: number; filled: number } | null>(null)
+
   const handleMachineTranslateAll = async () => {
     // 收集所有有空缺的字段 ID
     const incompleteIds = data
@@ -765,15 +767,31 @@ export default function TranslationManage() {
       message.info(t('translationManage:msgNoMachineTranslate'))
       return
     }
+
+    const BATCH_SIZE = 30
+    let totalFilled = 0
+    setMtProgress({ current: 0, total: incompleteIds.length, filled: 0 })
+
     try {
-      const result = await machineTranslateApi({ ids: incompleteIds })
-      if (result.filled === 0) {
-        message.info(t('translationManage:msgNoMachineTranslate'))
-        return
+      for (let i = 0; i < incompleteIds.length; i += BATCH_SIZE) {
+        const batch = incompleteIds.slice(i, i + BATCH_SIZE)
+        setMtProgress({ current: Math.min(i + BATCH_SIZE, incompleteIds.length), total: incompleteIds.length, filled: totalFilled })
+        const result = await machineTranslateApi({ ids: batch })
+        totalFilled += result.filled
+        // 批次间短暂延迟，避免 MyMemory API 限流
+        if (i + BATCH_SIZE < incompleteIds.length) {
+          await new Promise(r => setTimeout(r, 300))
+        }
       }
       await reloadFields()
-      message.success(t('translationManage:msgBatchMtCount', { count: result.filled }))
+      setMtProgress(null)
+      if (totalFilled === 0) {
+        message.info(t('translationManage:msgTranslationComplete'))
+      } else {
+        message.success(t('translationManage:msgBatchMtCount', { count: totalFilled }))
+      }
     } catch (err: unknown) {
+      setMtProgress(null)
       const isTimeout = err instanceof Error && /timeout/i.test(err.message)
       message.error(isTimeout
         ? `機翻請求超時（共 ${incompleteIds.length} 個字段），請稍後重試或分批處理`
@@ -1012,7 +1030,11 @@ export default function TranslationManage() {
       {/* 功能区域 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button icon={<TranslationOutlined />} onClick={handleMachineTranslateAll}>{t('translationManage:btnBatchTranslate')}</Button>
+          <Button icon={<TranslationOutlined />} onClick={handleMachineTranslateAll} disabled={mtProgress !== null}>
+            {mtProgress
+              ? `翻譯中… ${mtProgress.current}/${mtProgress.total}（已填充 ${mtProgress.filled}）`
+              : t('translationManage:btnBatchTranslate')}
+          </Button>
           <Button icon={<SyncOutlined />} onClick={handleSyncFields}>{t('translationManage:btnSyncFields')}</Button>
           <Button className="btn-export" icon={<ExportOutlined />}>{t('common:export')}</Button>
           <Button className="btn-import" icon={<ImportOutlined />}>{t('common:batchImport')}</Button>
