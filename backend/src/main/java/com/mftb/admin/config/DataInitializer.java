@@ -656,23 +656,46 @@ public class DataInitializer implements CommandLineRunner {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
-    /** 确保所有部门拥有 ad-sales 菜单权限（view/create/edit/export） */
+    /** 确保所有部门拥有 ad-sales 和 promotion-order-manage 菜单权限，并授权全量商家数据范围 */
     private void ensureDeptAdSalesPermission() {
-        Long adSalesMenuId = queryMenuIdByKey("ad-sales");
-        if (adSalesMenuId == null) {
-            return;
-        }
         String actions = "[\"view\",\"create\",\"edit\",\"export\"]";
         List<Long> deptIds = jdbcTemplate.queryForList(
                 "SELECT id FROM sys_department WHERE deleted = 0 AND status = 1", Long.class);
-        for (Long deptId : deptIds) {
-            jdbcTemplate.update(
-                    "INSERT INTO sys_department_menu (dept_id, menu_id, actions) VALUES (?, ?, ?) "
-                            + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
-                    deptId, adSalesMenuId, actions);
+        if (deptIds.isEmpty()) {
+            return;
         }
-        if (!deptIds.isEmpty()) {
-            log.info("已确保 {} 个部门拥有 [ad-sales] 菜单权限", deptIds.size());
+        // 1) 菜单权限: ad-sales + promotion-order-manage
+        for (String menuKey : new String[]{"ad-sales", "promotion-order-manage"}) {
+            Long menuId = queryMenuIdByKey(menuKey);
+            if (menuId == null) {
+                continue;
+            }
+            for (Long deptId : deptIds) {
+                jdbcTemplate.update(
+                        "INSERT INTO sys_department_menu (dept_id, menu_id, actions) VALUES (?, ?, ?) "
+                                + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
+                        deptId, menuId, actions);
+            }
+            log.info("已确保 {} 个部门拥有 [{}] 菜单权限", deptIds.size(), menuKey);
+        }
+        // 2) 数据范围授权: 将所有现存商家集团授权给各部门（幂等插入）
+        List<String> groupCodes = jdbcTemplate.queryForList(
+                "SELECT DISTINCT group_code FROM biz_merchant_group WHERE deleted = 0 AND group_code IS NOT NULL AND group_code != ''",
+                String.class);
+        if (groupCodes.isEmpty()) {
+            return;
+        }
+        int inserted = 0;
+        for (Long deptId : deptIds) {
+            for (String gc : groupCodes) {
+                int rows = jdbcTemplate.update(
+                        "INSERT IGNORE INTO sys_data_authorization (target_type, target_id, group_code, status, deleted) VALUES ('department', ?, ?, 1, 0)",
+                        deptId, gc);
+                inserted += rows;
+            }
+        }
+        if (inserted > 0) {
+            log.info("已补充 {} 条部门-商家集团数据授权记录", inserted);
         }
     }
 

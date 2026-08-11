@@ -151,8 +151,10 @@ function toOrderItem(vo: AdOrder): OrderItem {
   const regions = (vo.regions || []).map(r => r as Region)
   // 購買時段: 餐段 key → 時間段標籤（與演示數據樣式一致）
   const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
-  // 盤活復蘇按天售賣無時段維度：優先用後端返回的購買日期列表，無日期時以明細格子數佔位
-  const purchaseDays = vo.algoType === 3 && (vo.mealSlots || []).length === 0
+  // 盤活復蘇/新店廣告/人氣商家 按天售賣無時段維度：優先用後端返回的購買日期列表，無日期時以明細格子數佔位
+  const hasNoMealSlots = (vo.mealSlots || []).length === 0
+  const isDayBasedType = vo.algoType === 2 || vo.algoType === 3 || vo.algoType === 5
+  const purchaseDays = isDayBasedType && hasNoMealSlots
     ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
         ? vo.purchaseDays
         : Array.from({ length: vo.itemCount || 0 }, () => ''))

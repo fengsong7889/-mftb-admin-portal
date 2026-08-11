@@ -63,7 +63,7 @@ export default function NewStoreDayPicker() {
 
   const [algorithmOptions, setAlgorithmOptions] = useState<{ label: string; value: number; brand?: string }[]>([])
   const [storeOptions, setStoreOptions] = useState<{ label: string; value: string }[]>([])
-  const [fetchedStores, setFetchedStores] = useState<{ storeCode: string; storeName: string; id?: number; bdList?: { bdEmpId: string; bdName?: string }[] }[]>([])
+  const [fetchedStores, setFetchedStores] = useState<{ storeCode: string; storeName: string; groupCode?: string; id?: number; bdList?: { bdEmpId: string; bdName?: string }[] }[]>([])
   const [bdOptions, setBdOptions] = useState<{ label: string; value: string }[]>([])
   const [inventory, setInventory] = useState<AdNewStoreInventoryVO | null>(null)
   const [loading, setLoading] = useState(false)
@@ -112,7 +112,7 @@ export default function NewStoreDayPicker() {
           records.map(s => ({ label: `${s.storeName}（${s.storeCode}）`, value: s.storeCode }))
         )
         setFetchedStores(
-          records.map(s => ({ storeCode: s.storeCode, storeName: s.storeName, id: s.id, bdList: s.bdList || [] }))
+          records.map(s => ({ storeCode: s.storeCode, storeName: s.storeName, groupCode: s.groupCode, id: s.id, bdList: s.bdList || [] }))
         )
       }).catch(() => {})
     }
@@ -124,6 +124,7 @@ export default function NewStoreDayPicker() {
     setBdOptions([])
     if (value) {
       const store = fetchedStores.find(s => s.storeCode === value)
+      setQueriedGroupCode(store?.groupCode || null)
       if (store?.bdList && store.bdList.length > 0) {
         const opts = store.bdList.map(bd => ({
           label: bd.bdName ? `${bd.bdName}（${bd.bdEmpId}）` : bd.bdEmpId,
@@ -503,10 +504,7 @@ export default function NewStoreDayPicker() {
                       <span style={{ color: '#595959' }}>{t('afterSubmitRemaining')}</span>
                       <span style={{ fontWeight: 600, color: '#52c41a' }}>{giftInfo.remainingDays - selectedDates.length} {t('dayUnitSuffix')}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #d9d9d9', paddingTop: 8 }}>
-                      <span style={{ color: '#595959', fontWeight: 600 }}>{t('actualAmount')}</span>
-                      <span style={{ fontWeight: 700, fontSize: 16, color: '#ff4d4f' }}>$0<span style={{ fontSize: 11, fontWeight: 400, color: '#8c8c8c', marginLeft: 4 }}>{t('fullGiftDeduction')}</span></span>
-                    </div>
+
                   </div>
                   <Button type="primary" block size="large" disabled={selectedDates.length === 0} onClick={handleSubmitOrder}
                     style={{ background: selectedDates.length > 0 ? '#ff4d4f' : '#d9d9d9', borderColor: selectedDates.length > 0 ? '#ff4d4f' : '#d9d9d9', height: 44, fontSize: 16, fontWeight: 600 }}>
@@ -545,7 +543,7 @@ export default function NewStoreDayPicker() {
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>{t('promoDaysTotal')}</span><span style={{ fontWeight: 600 }}>{selectedDates.length} {t('dayUnitSuffix')}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>{t('giftDaysDeduction')}</span><span style={{ fontWeight: 600 }}>-{selectedDates.length} {t('dayUnitSuffix')}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>{t('actualAmount')}</span><span style={{ fontWeight: 700 }}>$0</span></div>
+
         </div>
       </Modal>
 
