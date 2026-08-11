@@ -448,7 +448,10 @@ export default function PopularSkinPicker() {
 
   // 贈送天數抵扣計算
   const maxGiftDaysUsable = Math.min(giftDaysBalance, effectiveDays)
-  const effectiveGiftDays = Math.min(giftDaysUsed, maxGiftDaysUsable)
+  // 非混合支付選擇贈送天數抵扣時自動全部抵扣（無需用戶操作）；混合支付時才允許用戶手動選擇抵扣天數
+  const effectiveGiftDays = !mixedPayment && paymentMode === 'gift'
+    ? maxGiftDaysUsable
+    : Math.min(giftDaysUsed, maxGiftDaysUsable)
   const giftDeduction = useMemo(() => {
     // 非混合支付且選擇推廣金模式時，不使用贈送天數抵扣
     if (!mixedPayment && paymentMode === 'promo') return 0
@@ -848,7 +851,7 @@ export default function PopularSkinPicker() {
           background: 'linear-gradient(135deg, #E8720C, #F59432)',
           borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
           boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-        }}>{t('adSales.yourStore')}</span>
+        }}>{t('yourStore')}</span>
         {skinCard}
       </div>
       <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
@@ -1204,8 +1207,8 @@ export default function PopularSkinPicker() {
               )}
             </Card>
 
-            {/* 訂單結算 */}
-            <Card size="small" title={t('settlementTitle')}>
+            {/* 訂單結算（與新店廣告購買頁訂單結算同款風格） */}
+            <Card size="small" title={t('orderSettlement')}>
               {/* 支付方式選擇（非混合支付時顯示） */}
               {!mixedPayment && (
                 <div style={{ marginBottom: 12, padding: '10px 12px', background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 6 }}>
@@ -1223,36 +1226,54 @@ export default function PopularSkinPicker() {
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
                 </div>
               )}
-              {/* 贈送天數抵扣（混合支付時或非混合支付選擇贈送天數時顯示） */}
+              {/* 贈送天數抵扣（與新店廣告購買頁訂單結算同款樣式：橙色橫幅 + 明細盒） */}
               {(mixedPayment || paymentMode === 'gift') && (
-                <div style={{ border: '1px solid #FFD591', background: '#FFF7E6', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>贈送天數抵扣</span>
-                    <span style={{ fontSize: 11, color: '#8c8c8c' }}>可用 <span style={{ fontWeight: 700, color: '#E8720C' }}>{giftDaysBalance}</span> 天</span>
+                <>
+                  <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('remainingGiftDays')}</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDaysBalance} {t('dayUnitSuffix')}</span>
                   </div>
-                  {giftDaysBalance === 0 ? (
-                    <div style={{ fontSize: 11, color: '#bfbfbf' }}>暫無可用贈送天數</div>
-                  ) : effectiveDays === 0 ? (
-                    <div style={{ fontSize: 11, color: '#bfbfbf' }}>請先選擇購買日期</div>
-                  ) : (
-                    <>
+                  <div style={{ background: '#fafafa', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ color: '#595959' }}>{t('useGiftDays')}</span>
+                      <span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays} {t('dayUnitSuffix')}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ color: '#595959' }}>{t('afterSubmitRemaining')}</span>
+                      <span style={{ fontWeight: 600, color: '#52c41a' }}>{giftDaysBalance - effectiveGiftDays} {t('dayUnitSuffix')}</span>
+                    </div>
+                    {giftDaysBalance === 0 ? (
+                      <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('noGiftDaysAvailable')}</div>
+                    ) : effectiveDays === 0 ? (
+                      <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('selectPurchaseDate')}</div>
+                    ) : mixedPayment ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>抵扣</span>
+                        <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('deductLabel')}</span>
                         <InputNumber
                           size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
                           onChange={(v) => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
                           style={{ width: 72 }}
                         />
-                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>天</span>
+                        <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('dayUnitSuffix')}</span>
                         <Button size="small" type="link" style={{ padding: 0, fontSize: 12, marginLeft: 'auto' }}
-                          onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>全部抵扣</Button>
+                          onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>{t('deductAll')}</Button>
                       </div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
-                        最多可抵扣 {maxGiftDaysUsable} 天 <span style={{ fontWeight: 700, color: '#E8720C' }}>-${giftDeduction}</span>
+                    ) : null}
+                    {/* 加購天數超出贈送天數餘額：超出部分需推廣金支付（規則不允許混合時提醒） */}
+                    {effectiveDays > effectiveGiftDays && (
+                      <div style={{ borderTop: '1px dashed #d9d9d9', marginTop: 8, paddingTop: 8 }}>
+                        {mixedPayment ? (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#595959' }}>{t('promoPayDays')}</span>
+                            <span style={{ fontWeight: 600, color: '#ff4d4f' }}>{effectiveDays - effectiveGiftDays} {t('dayUnitSuffix')}</span>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12, color: '#ff4d4f', lineHeight: 1.6 }}>{t('giftInsufficientNoMix', { days: effectiveDays - effectiveGiftDays })}</div>
+                        )}
                       </div>
-                    </>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </>
               )}
               {/* 價格明細（審批彈窗信息塊風格，按支付方式分支展示） */}
               <div style={{ marginBottom: 12, padding: 12, background: '#F8F8F8', borderRadius: 8 }}>

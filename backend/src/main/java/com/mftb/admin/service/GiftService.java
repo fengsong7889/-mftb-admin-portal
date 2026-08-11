@@ -6,13 +6,18 @@ import com.mftb.admin.dto.GiftRecordRequest;
 import com.mftb.admin.dto.GiftRecordVO;
 import com.mftb.admin.dto.PageResult;
 
+import java.util.List;
+
 /**
  * 赠送管理服务
  */
 public interface GiftService {
 
-    /** 分页查询赠送记录（推广赠送列表） */
+    /** 分页查询赠送记录（推广赠送列表，按门店+广告类型聚合为一行） */
     PageResult<GiftRecordVO> listRecords(long page, long size, Long groupId, Long storeId, String brand, String adType);
+
+    /** 查询指定门店+广告类型下的逐笔赠送记录（赠送明细页） */
+    List<GiftRecordVO> listRecordsByStore(Long storeId, String adType);
 
     /** 新增赠送申请 */
     GiftRecordVO createRecord(GiftRecordRequest request);

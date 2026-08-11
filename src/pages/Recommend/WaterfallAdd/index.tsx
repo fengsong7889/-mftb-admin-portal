@@ -318,9 +318,9 @@ function WaterfallAddGeneral() {
           setPresaleDays(detail.presaleDays ?? 180)
           setRefundEnabled(detail.refundEnabled === 1)
           setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
-          // 多天梯度折扣（后端百分比记法 → 前端「折」记法）
+          // 多天梯度折扣（后端百分比记法 → 前端「折」记法: 90=9折）
           const tiers = parseJsonList(detail.discountTiers)
-          setGradients(tiers.map(t => ({ count: Number(t.minDays) || undefined, discount: (Number(t.discount) || 0) / 100 })))
+          setGradients(tiers.map(t => ({ count: Number(t.minDays) || undefined, discount: (Number(t.discount) || 0) / 10 })))
           setGradientEnabled(tiers.length > 0)
           // 屏蔽商家回填
           setMerchantLimit(detail.blockMerchant === 1)
@@ -374,9 +374,9 @@ function WaterfallAddGeneral() {
         setPresaleDays(detail.presaleDays ?? 7)
         setRefundEnabled(detail.refundEnabled === 1)
         setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
-        // 多时段梯度折扣（后端百分比记法 → 前端「折」记法）
+        // 多时段梯度折扣（后端百分比记法 → 前端「折」记法: 90=9折）
         const tiers = parseJsonList(detail.discountTiers)
-        setGradients(tiers.map(t => ({ count: Number(t.minSlots) || undefined, discount: (Number(t.discount) || 0) / 100 })))
+        setGradients(tiers.map(t => ({ count: Number(t.minSlots) || undefined, discount: (Number(t.discount) || 0) / 10 })))
         setGradientEnabled(tiers.length > 0)
         // 屏蔽商家回填
         setMerchantLimit(detail.blockMerchant === 1)
@@ -703,9 +703,9 @@ function WaterfallAddGeneral() {
           channel: selectedChannel,
           presaleDays,
           refundEnabled: refundEnabled ? 1 : 2,
-          // 「折」记法 → 后端百分比记法（6折 = 600，支持2位小数）
+          // 「折」记法 → 后端百分比记法（6折 = 60，支持2位小数）
           discountTiers: gradientEnabled
-            ? gradients.filter(g => g.count && g.discount).map(g => ({ minSlots: g.count!, discount: Math.round(g.discount! * 100) }))
+            ? gradients.filter(g => g.count && g.discount).map(g => ({ minSlots: g.count!, discount: Math.round(g.discount! * 100) / 10 }))
             : [],
           cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
           // 屏蔽商家（规则6）：开关+名单落库，销售端据此拦截
@@ -762,9 +762,9 @@ function WaterfallAddGeneral() {
           channel: selectedChannel,
           presaleDays,
           refundEnabled: refundEnabled ? 1 : 2,
-          // 多天梯度折扣：「折」记法 → 后端百分比记法（95折 = 9500，支持2位小数）
+          // 多天梯度折扣：「折」记法 → 后端百分比记法（95折 = 95，支持2位小数）
           discountTiers: gradientEnabled
-            ? gradients.filter(g => g.count && g.discount).map(g => ({ minDays: g.count!, discount: Math.round(g.discount! * 100) }))
+            ? gradients.filter(g => g.count && g.discount).map(g => ({ minDays: g.count!, discount: Math.round(g.discount! * 100) / 10 }))
             : [],
           cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
           // 屏蔽商家：开关+名单落库，销售端据此拦截

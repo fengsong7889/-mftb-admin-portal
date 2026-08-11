@@ -235,7 +235,17 @@
     "paymentVoucher": "Payment Voucher",
     "rechargeRemarkPlaceholder": "Notes for this recharge, max 200 characters!",
     "rechargeAmountSection": "Recharge Amount",
-    "amountConfigTag": "Amount Config"
+    "amountConfigTag": "Amount Config",
+    "virtualAmount": "Virtual Account Recharge",
+    "settlementMethod": "Settlement Method",
+    "fromGroup": "Source Group",
+    "toGroup": "Target Group",
+    "consumeStoreLabel": "Store Name",
+    "batchNo": "Batch Number",
+    "deductConsume": "Consumption Deduction",
+    "deductBatch": "Recharge Batch Deduction",
+    "deductAccount": "Account Deduction",
+    "debtAmount": "Debt Amount"
   },
   "app": {
     "logoMain": "MFTB SRAS"
@@ -2313,6 +2323,13 @@
     "idSuffix": "(ID: {{id}})",
     "dateRangeTip": "({{start}} ~ {{end}})",
     "gradientDiscountLabel": "Gradient Discount",
+    "payModePromo": "Promo Balance Payment",
+    "payModeGift": "Gift Days Deduction",
+    "payModeMixed": "Mixed Payment",
+    "giftDeductLabel": "Gift Days Deduction",
+    "giftDeductTip": "({{days}} day(s) converted at discounted daily average)",
+    "giftDeductShort": "gift deduction {{days}}d",
+    "fullGiftHint": "Fully covered by gift days, no promo balance payment needed",
     "orderNo": "Order No."
   },
   "translationManage": {
@@ -3254,6 +3271,7 @@
     "colStoreInfo": "Store ID/Name",
     "colAdType": "Ad Type",
     "colRemainingDays": "Remaining Days",
+    "giftCountTip": "{{count}} gift record(s)",
     "dayUnit": "Day(s)",
     "queryFailed": "Query failed",
     "exportDev": "Export feature in development...",
@@ -3480,7 +3498,7 @@
     "presaleTip": "Presale Tip",
     "openTime": "Sale Opens",
     "dayUnit": "Day(s)",
-    "discount": "off",
+    "discount": "Discount",
     "yuan": "MOP",
     "selectStoreFirst": "Please select a store first",
     "selectDateFirst": "Please select a date first",
@@ -3709,6 +3727,8 @@
     "deductLabel": "Deduct",
     "deductAll": "Deduct all",
     "maxDeductHint": "Max {{max}} days deductible for this order, calculated at discounted daily average price, current deduction",
+    "promoPayDays": "Days to pay with promo balance:",
+    "giftInsufficientNoMix": "Insufficient gift days balance, {{days}} day(s) short. Mixed payment with promo balance is not allowed under current rules. Please reduce purchased days or switch to promo balance payment.",
     "giftDeductionCol": "Gift deduction",
     "storeNoRegionHint": "Store region not configured, cannot add to cart",
     "purchaseDateCol": "Date",

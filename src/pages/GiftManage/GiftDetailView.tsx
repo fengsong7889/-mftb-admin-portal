@@ -18,7 +18,8 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
 import type { GiftRecordItem } from '../../api/gift'
-import { fetchGiftRecords, fetchGiftRecordDetail, deductGiftDays } from '../../api/gift'
+import { fetchGiftRecordDetail, fetchGiftRecordsByStore, deductGiftDays } from '../../api/gift'
+import { fillGiftApprovalNoFallback } from '../../utils/approvalStore'
 
 const { RangePicker } = DatePicker
 
@@ -73,11 +74,11 @@ interface GiftRecord {
   credentials: string[]
 }
 
-function mapToRecord(item: GiftRecordItem): GiftRecord {
+function mapToRecord(item: GiftRecordItem, fallbackApprovalNo?: string): GiftRecord {
   return {
     key: String(item.id),
     giftId: item.giftId,
-    approvalNo: item.approvalNo || '',
+    approvalNo: item.approvalNo || fallbackApprovalNo || '',
     giftDate: item.giftDate || '',
     giftDays: item.totalDays,
     remainingDays: item.remainingDays,
@@ -98,6 +99,8 @@ export default function GiftDetailView() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const recordId = searchParams.get('id')
+  const storeIdParam = searchParams.get('storeId')
+  const adTypeParam = searchParams.get('adType')
 
   const adTypeMap: Record<string, string> = {
     new_store: t('adTypeNewStore'),
@@ -129,38 +132,42 @@ export default function GiftDetailView() {
   const [deductDays, setDeductDays] = useState<number>(1)
   const [deductReason, setDeductReason] = useState('')
 
-  // 加载数据：先获取详情记录，再查询同集团/门店/广告类型的所有记录
+  // 加载数据：以门店+广告类型加载逐笔赠送记录（兼容旧入口：仅传记录 ID 时先反查门店与广告类型）
   const loadData = useCallback(async () => {
-    if (!recordId) { setLoading(false); return }
     setLoading(true)
     try {
-      // 获取当前记录详情
-      const detail = await fetchGiftRecordDetail(Number(recordId))
-      setMerchantInfo({
-        groupId: detail.groupId,
-        groupCode: detail.groupCode,
-        groupName: detail.groupName,
-        storeId: detail.storeId,
-        storeCode: detail.storeCode,
-        storeName: detail.storeName,
-        brand: detail.brand,
-        adType: detail.adType,
-      })
+      let sid = storeIdParam ? Number(storeIdParam) : NaN
+      let adType = adTypeParam || ''
+      if ((!sid || !adType) && recordId) {
+        const detail = await fetchGiftRecordDetail(Number(recordId))
+        sid = detail.storeId
+        adType = detail.adType
+      }
+      if (!sid || !adType) { setLoading(false); return }
 
-      // 查询同集团下同广告类型的所有记录
-      const listRes = await fetchGiftRecords({
-        page: 1, size: 100,
-        groupId: detail.groupId,
-        storeId: detail.storeId,
-        adType: detail.adType,
-      })
-      setRecords((listRes.records || []).map(mapToRecord))
+      const list = await fetchGiftRecordsByStore({ storeId: sid, adType })
+      // 存量记录未写入流程编号时，以本地已通过审批流程兜底展示
+      const flowMap = fillGiftApprovalNoFallback(list)
+      if (list.length > 0) {
+        const first = list[0]
+        setMerchantInfo({
+          groupId: first.groupId,
+          groupCode: first.groupCode,
+          groupName: first.groupName,
+          storeId: first.storeId,
+          storeCode: first.storeCode,
+          storeName: first.storeName,
+          brand: first.brand,
+          adType: first.adType,
+        })
+      }
+      setRecords(list.map(item => mapToRecord(item, flowMap.get(item.id))))
     } catch {
       message.error(t('loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [recordId])
+  }, [recordId, storeIdParam, adTypeParam])
 
   useEffect(() => {
     loadData()

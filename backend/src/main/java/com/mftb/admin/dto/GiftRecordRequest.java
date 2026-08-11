@@ -35,4 +35,7 @@ public class GiftRecordRequest {
 
     /** 凭证URL列表 */
     private List<String> credentials;
+
+    /** 审批流程编号（赠送审批通过后写入，可选） */
+    private String approvalNo;
 }

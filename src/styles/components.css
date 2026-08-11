@@ -2416,11 +2416,12 @@
    + .ant-modal-body > .ant-modal-confirm-body-wrapper(内容+按钮 .ant-modal-confirm-btns)
    ======================================================================== */
 
-/* 弹窗容器 */
-.custom-confirm-modal .ant-modal {
+/* 弹窗容器（custom-confirm-modal / ant-modal-confirm 同在 .ant-modal 元素上，
+   叠加类名提升优先级以覆盖 antd cssinjs 默认规则） */
+.custom-confirm-modal.ant-modal {
   top: 0;
 }
-.custom-confirm-modal .ant-modal-content {
+.custom-confirm-modal.ant-modal-confirm .ant-modal-content {
   border-radius: 16px;
   padding: 0;
   overflow: hidden;
@@ -2433,7 +2434,7 @@
   align-items: flex-start;
   gap: 12px;
 }
-.custom-confirm-modal .ant-modal-confirm-title {
+.custom-confirm-modal.ant-modal-confirm .ant-modal-confirm-title {
   font-size: 17px;
   font-weight: 700;
   color: #1a1a1a;
@@ -2478,8 +2479,8 @@
   color: #595959;
 }
 
-/* 内容区：四周留白 */
-.custom-confirm-modal .ant-modal-body {
+/* 内容区：四周留白（优先级 (0,4,0) 覆盖 antd confirm 默认 padding: 0） */
+.custom-confirm-modal.ant-modal-confirm.ant-modal .ant-modal-body {
   padding: 28px 32px 24px;
 }
 .custom-confirm-modal .ant-modal-confirm-body-wrapper {
@@ -2531,7 +2532,7 @@
 }
 
 /* 底部按钮区（confirm 专用 .ant-modal-confirm-btns）：右对齐 */
-.custom-confirm-modal .ant-modal-confirm-btns {
+.custom-confirm-modal.ant-modal-confirm .ant-modal-confirm-btns {
   display: flex;
   justify-content: flex-end;
   gap: 12px;

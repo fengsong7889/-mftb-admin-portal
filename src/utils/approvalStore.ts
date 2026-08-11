@@ -317,7 +317,40 @@ function writeGiftApprovedRecord(record: ApprovalRecord): void {
     validDays: Number(extra.validDays) || 0,
     reason: String(extra.reason || extra.remark || ''),
     credentials: Array.isArray(extra.credentials) ? (extra.credentials as string[]) : [],
+    // 流程編號隨贈送記錄持久化，明細頁展示審批編號
+    approvalNo: record.flowNo,
   }).catch(() => { /* 贈送記錄寫入失敗不阻斷審批流轉 */ })
+}
+
+/**
+ * 存量贈送記錄審批編號兜底：
+ * 早期審批通過後未將流程編號寫入後端 approval_no，
+ * 按「門店+廣告類型+贈送天數」與本地已通過的贈送流程時序一對一匹配，返回 recordId → flowNo 映射
+ */
+export function fillGiftApprovalNoFallback(items: {
+  id: number; storeId: number; adType: string; totalDays: number; approvalNo?: string
+}[]): Map<number, string> {
+  const result = new Map<number, string>()
+  const missing = items.filter(i => !i.approvalNo)
+  if (missing.length === 0) return result
+  const flows = getApprovalRecords()
+    .filter(r => r.approvalType === 'gift' && r.flowStatus === 'approved')
+    .sort((a, b) => a.applyTime.localeCompare(b.applyTime))
+  const used = new Set<string>()
+  for (const item of [...missing].sort((a, b) => a.id - b.id)) {
+    const flow = flows.find(f => {
+      if (used.has(f.flowNo)) return false
+      const extra = (f.extra || {}) as Record<string, any>
+      return Number(extra.storeId) === item.storeId
+        && String(extra.adType || '') === item.adType
+        && Number(extra.giftDays) === item.totalDays
+    })
+    if (flow) {
+      used.add(flow.flowNo)
+      result.set(item.id, flow.flowNo)
+    }
+  }
+  return result
 }
 
 /**

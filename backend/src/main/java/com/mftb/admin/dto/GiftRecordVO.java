@@ -30,6 +30,8 @@ public class GiftRecordVO {
     private Integer validDays;
     private Integer usedDays;
     private Integer remainingDays;
+    /** 聚合行数：同一门店+广告类型下的赠送记录笔数（列表聚合行使用） */
+    private Integer recordCount;
     private LocalDate giftDate;
     private LocalDate expireDate;
     private Integer status;

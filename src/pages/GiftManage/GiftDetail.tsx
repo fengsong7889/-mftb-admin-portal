@@ -156,7 +156,8 @@ export default function GiftDetail() {
   }
 
   const handleViewDetail = (record: GiftRecordItem) => {
-    navigate(`/gift-detail-view?id=${record.id}`)
+    // 列表按门店+广告类型聚合，明细页以 storeId+adType 加载逐笔记录
+    navigate(`/gift-detail-view?storeId=${record.storeId}&adType=${record.adType}`)
   }
 
   const handleAdd = () => {
@@ -249,10 +250,17 @@ export default function GiftDetail() {
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
-      render: (days: number) => (
-        <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-          {days} {t('dayUnit')}
-        </span>
+      render: (days: number, record) => (
+        <Space direction="vertical" size={0}>
+          <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
+            {days} {t('dayUnit')}
+          </span>
+          {(record.recordCount ?? 1) > 1 && (
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+              {t('giftCountTip', { count: record.recordCount })}
+            </span>
+          )}
+        </Space>
       ),
     },
     {

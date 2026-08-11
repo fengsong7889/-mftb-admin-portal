@@ -103,9 +103,34 @@ export function mockFetchGiftRecords(params: {
   if (params.brand) list = list.filter(g => g.brand === params.brand)
   if (params.adType) list = list.filter(g => g.adType === params.adType)
 
+  // 与后端一致：同一门店+同一广告类型聚合为一行，天数字段求和
+  list = [...list].sort((a, b) => b.id - a.id)
+  const groups = new Map<string, GiftRecordItem[]>()
+  for (const item of list) {
+    const key = `${item.storeId}|${item.adType}`
+    const arr = groups.get(key)
+    if (arr) arr.push(item)
+    else groups.set(key, [item])
+  }
+  const aggregated = Array.from(groups.values()).map(items => {
+    const base = { ...items[0] }
+    base.totalDays = items.reduce((s, i) => s + i.totalDays, 0)
+    base.usedDays = items.reduce((s, i) => s + i.usedDays, 0)
+    base.remainingDays = items.reduce((s, i) => s + i.remainingDays, 0)
+    base.recordCount = items.length
+    return base
+  })
+
   const page = params.page || 1
   const size = params.size || 10
-  return { records: list.slice((page - 1) * size, page * size), total: list.length }
+  return { records: aggregated.slice((page - 1) * size, page * size), total: aggregated.length }
+}
+
+export function mockFetchGiftRecordsByStore(params: { storeId: number; adType: string }): GiftRecordItem[] {
+  const list = read<GiftRecordItem>(KEY_GIFTS)
+  return list
+    .filter(g => g.storeId === params.storeId && g.adType === params.adType)
+    .sort((a, b) => b.id - a.id)
 }
 
 export function mockCreateGiftRecord(data: GiftRecordPayload): GiftRecordItem {
@@ -138,7 +163,7 @@ export function mockCreateGiftRecord(data: GiftRecordPayload): GiftRecordItem {
     status: 1,
     reason: data.reason,
     credentials: data.credentials || [],
-    approvalNo: `AP${Date.now()}`,
+    approvalNo: data.approvalNo || `AP${Date.now()}`,
     applicant: currentOperator(),
     applyTime: now(),
     approvalStatus: 2,

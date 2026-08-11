@@ -512,7 +512,7 @@ export default function PopularSkinPicker() {
           background: 'linear-gradient(135deg, #E8720C, #F59432)',
           borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
           boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-        }}>{t('adSales.yourStore')}</span>
+        }}>{t('yourStore')}</span>
         {skinCard}
       </div>
       <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>

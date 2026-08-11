@@ -3,6 +3,7 @@ import {
   mockFetchGiftRecords,
   mockCreateGiftRecord,
   mockFetchGiftRecordDetail,
+  mockFetchGiftRecordsByStore,
   mockDeductGiftDays,
   mockFetchGiftConsume,
 } from './mock/giftMock'
@@ -25,6 +26,8 @@ export interface GiftRecordItem {
   validDays: number
   usedDays: number
   remainingDays: number
+  /** 聚合行数：同一门店+广告类型下的赠送记录笔数（列表聚合行） */
+  recordCount?: number
   giftDate?: string
   expireDate?: string
   status: number
@@ -53,6 +56,8 @@ export interface GiftRecordPayload {
   validDays: number
   reason: string
   credentials?: string[]
+  /** 审批流程编号（赠送审批通过后随记录写入） */
+  approvalNo?: string
 }
 
 /** 扣除天数请求 */
@@ -124,6 +129,16 @@ export async function fetchGiftRecordDetail(id: number) {
     return await request.get<unknown, GiftRecordItem>(`/gifts/${id}`, SILENT)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockFetchGiftRecordDetail(id)
+    throw err
+  }
+}
+
+/** 指定门店+广告类型的逐笔赠送记录（赠送明细页；后端不可用时自动降级到本地 Mock 数据） */
+export async function fetchGiftRecordsByStore(params: { storeId: number; adType: string }) {
+  try {
+    return await request.get<unknown, GiftRecordItem[]>('/gifts/records', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockFetchGiftRecordsByStore(params)
     throw err
   }
 }

@@ -150,6 +150,8 @@ interface OrderItem {
   promoData?: PromoRecord[] // 推广数据
   purchaseDays?: string[] // 新店廣告/人氣商家：推廣日期列表
   skinName?: string // 人氣商家：皮膚套件名稱
+  giftDays?: number // 贈送天數抵扣快照（抵扣天數）
+  giftAmount?: number // 贈送抵扣金額快照
   terminalTime?: string // 終態（已退款/已取消/已中止/已完成）發生的日期時間
   operatorName?: string // 操作人姓名
   operatorId?: string // 操作人工號
@@ -245,9 +247,14 @@ function toDetailOrder(
   const tierPct = matchedTier ? matchedTier.discount : 100
   // 明细 salePrice 已是梯度折後價（含實付分攤）：還原為折前價再參與費用明細計算，
   // 避免梯度折扣在 finalPrice = subtotal × 梯度倍率 中被重複乘兩次
+  // 贈送抵扣分攤還原：明細 salePrice 按抵扣後實付分攤，有抵扣時先還原為抵扣前（折後）價再還原梯度
+  const actualTotalVo = vo.actualAmount ?? 0
+  const giftTotalVo = vo.giftAmount ?? 0
+  const sumSaleVo = vo.items.reduce((s, i) => s + i.salePrice, 0)
+  const giftRatio = sumSaleVo > 0 && actualTotalVo + giftTotalVo > 0 ? (actualTotalVo + giftTotalVo) / sumSaleVo : 1
   const slotPrices: SlotPriceItem[] = vo.items.map(item => {
-    // 明细实付含梯度折上折 → 还原时段折扣后价格，展示定价配置的时段折扣
-    const afterSlot = tierPct > 0 ? (item.salePrice / tierPct) * 100 : item.salePrice
+    // 明细实付含梯度折上折与赠送分摊 → 逐步还原为折前价，展示定价配置的折扣
+    const afterSlot = tierPct > 0 ? (item.salePrice * giftRatio / tierPct) * 100 : item.salePrice * giftRatio
     const discount = item.originalPrice > 0
       ? Math.min(10, Math.max(1, Math.round((afterSlot / item.originalPrice) * 10)))
       : 10
@@ -291,6 +298,8 @@ function toDetailOrder(
     promoStartDate: firstBizDate,
     purchaseDays: vo.purchaseDays,
     skinName: vo.skinNames?.[0] || vo.items.find(i => i.skinName)?.skinName || undefined,
+    giftDays: vo.giftDays ?? 0,
+    giftAmount: vo.giftAmount ?? 0,
     source: 'api',
   }
 }
@@ -932,11 +941,18 @@ export default function OrderDetail() {
   const slotSubtotal = order.slotPrices.reduce((s, sp) => s + sp.actualPrice, 0)
   const slotDiscountSaved = totalOriginal - slotSubtotal
   const gradientMultiplier = order.gradientDiscount ? order.gradientDiscount.discount / 10 : 1
+  // finalPrice = 梯度折後總額（贈送抵扣前）；明細已還原為抵扣前口徑，梯度步得出折後總額
   const finalPrice = Math.round(slotSubtotal * gradientMultiplier)
-  const totalSaved = totalOriginal - finalPrice
+  // 贈送天數抵扣快照：區分純推廣金 / 純贈送抵扣 / 混合支付三種展示
+  const giftDays = order.giftDays ?? 0
+  const giftAmount = order.giftAmount ?? 0
+  // 實付推廣金（贈送抵扣後）
+  const actualPaid = Math.max(0, finalPrice - giftAmount)
+  const totalSaved = totalOriginal - actualPaid
+  const payMode: 'promo' | 'gift' | 'mixed' = giftDays > 0 ? (actualPaid > 0 ? 'mixed' : 'gift') : 'promo'
 
-  // 已退款：以「實付推廣金額」(finalPrice) 為基準計算退款，保證與費用明細一致，一目了然
-  const refundAmountByPaid = Math.round(finalPrice * (1 - (refundInfo?.feePercent ?? 0) / 100))
+  // 已退款：以「實付推廣金額」(actualPaid) 為基準計算退款，保證與費用明細一致，一目了然
+  const refundAmountByPaid = Math.round(actualPaid * (1 - (refundInfo?.feePercent ?? 0) / 100))
 
   const handleRefund = () => {
     setRefundModalVisible(true)
@@ -1562,6 +1578,12 @@ export default function OrderDetail() {
           {/* 标题 */}
           <div style={{ fontSize: 14, fontWeight: 700, color: '#E8720C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 16 }}>💰</span> {t('orderDetail.feeDetail')}
+            {/* 盤活復蘇/人氣商家：標註支付方式（純推廣金 / 純贈送抵扣 / 混合支付） */}
+            {(isRevive || isPopular) && (
+              <Tag color={payMode === 'gift' ? 'orange' : payMode === 'mixed' ? 'green' : 'gold'} style={{ margin: 0, fontSize: 11, borderRadius: 4, padding: '0 8px', lineHeight: '20px' }}>
+                {payMode === 'gift' ? t('orderDetail.payModeGift') : payMode === 'mixed' ? t('orderDetail.payModeMixed') : t('orderDetail.payModePromo')}
+              </Tag>
+            )}
           </div>
 
           {/* 分步计算 */}
@@ -1604,6 +1626,15 @@ export default function OrderDetail() {
               </div>
             )}
 
+            {/* 贈送天數抵扣（訂單使用贈送天數時展示；混合支付時超出部分由推廣金承擔） */}
+            {giftDays > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>🎁 {t('orderDetail.giftDeductLabel')}</span>
+                <span style={{ fontSize: 13, color: '#595959' }}>{t('orderDetail.giftDeductTip', { days: giftDays })}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>→ -MOP {giftAmount}</span>
+              </div>
+            )}
+
             {/* 分隔线 */}
             <div style={{ height: 1, background: '#FFE0B2', margin: '4px 0' }} />
 
@@ -1611,6 +1642,9 @@ export default function OrderDetail() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.actualPaid')}</span>
+                {payMode === 'gift' && (
+                  <span style={{ fontSize: 11, color: '#52C41A', background: '#F6FFED', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>{t('orderDetail.fullGiftHint')}</span>
+                )}
                 <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                   {order.gradientDiscount
                     ? ((isPopular || isRevive)
@@ -1625,14 +1659,14 @@ export default function OrderDetail() {
                   padding: '5px 18px', background: '#FFF7E6', border: '1px solid #FFD591',
                   borderRadius: 8,
                 }}>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: '#E8720C' }}>MOP {finalPrice}</span>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: '#E8720C' }}>MOP {actualPaid}</span>
                 </div>
               ) : (
                 <div style={{
                   padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
                   borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
                 }}>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {finalPrice}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {actualPaid}</span>
                 </div>
               )}
             </div>
@@ -1650,6 +1684,9 @@ export default function OrderDetail() {
                 {t('orderDetail.dailyCalc', { count: order.slotPrices.length, price: order.slotPrices[0]?.originalPrice || 0 })}<strong style={{ color: '#262626' }}>{totalOriginal}</strong>
                 {order.gradientDiscount && (
                   <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: '#E8720C' }}>{finalPrice}</strong></>
+                )}
+                {giftDays > 0 && (
+                  <> - {t('orderDetail.giftDeductShort', { days: giftDays })} <strong style={{ color: '#E8720C' }}>{giftAmount}</strong> = <strong style={{ color: '#FF4D4F' }}>{actualPaid}</strong></>
                 )}
                 <span style={{ color: '#BFBFBF' }}>{t('orderDetail.mopUnit')}</span>
               </>

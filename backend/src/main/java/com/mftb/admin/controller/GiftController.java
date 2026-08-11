@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * 赠送管理接口
  */
@@ -46,6 +48,15 @@ public class GiftController {
     @RequirePermission(menu = "gift-detail", action = "create")
     public Result<GiftRecordVO> createRecord(@Valid @RequestBody GiftRecordRequest request) {
         return Result.success("赠送申请已提交", giftService.createRecord(request));
+    }
+
+    /** 指定门店+广告类型的逐笔赠送记录（赠送明细页） */
+    @GetMapping("/records")
+    @RequirePermission(menu = "gift-detail")
+    public Result<List<GiftRecordVO>> listRecordsByStore(
+            @RequestParam Long storeId,
+            @RequestParam String adType) {
+        return Result.success(giftService.listRecordsByStore(storeId, adType));
     }
 
     /** 赠送明细详情 */

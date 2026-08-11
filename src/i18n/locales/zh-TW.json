@@ -235,7 +235,17 @@
     "paymentVoucher": "付款憑證",
     "rechargeRemarkPlaceholder": "本次充值需要注意的事項可在此進行描述，限制200字！",
     "rechargeAmountSection": "充值金額",
-    "amountConfigTag": "金額配置"
+    "amountConfigTag": "金額配置",
+    "virtualAmount": "虛擬賬戶充值",
+    "settlementMethod": "結算方式",
+    "fromGroup": "轉出集團",
+    "toGroup": "轉入集團",
+    "consumeStoreLabel": "門店名稱",
+    "batchNo": "批次號",
+    "deductConsume": "消費扣款",
+    "deductBatch": "充值批次扣款",
+    "deductAccount": "賬戶扣款",
+    "debtAmount": "欠款金額"
   },
   "app": {
     "logoMain": "MFTB搜廣推系統"
@@ -2313,6 +2323,13 @@
     "idSuffix": "（ID：{{id}}）",
     "dateRangeTip": "（{{start}} ~ {{end}}）",
     "gradientDiscountLabel": "梯度折扣",
+    "payModePromo": "推廣金支付",
+    "payModeGift": "贈送天數抵扣",
+    "payModeMixed": "混合支付",
+    "giftDeductLabel": "贈送天數抵扣",
+    "giftDeductTip": "（{{days}} 天按折後日均價折算）",
+    "giftDeductShort": "贈送抵扣 {{days}} 天",
+    "fullGiftHint": "贈送天數全額抵扣，無需支付推廣金",
     "orderNo": "訂單編號"
   },
   "translationManage": {
@@ -3255,6 +3272,7 @@
     "colStoreInfo": "門店ID/門店名稱",
     "colAdType": "廣告類型",
     "colRemainingDays": "剩餘天數",
+    "giftCountTip": "共 {{count}} 筆贈送記錄",
     "dayUnit": "天",
     "queryFailed": "查詢失敗",
     "exportDev": "導出功能開發中...",
@@ -3481,7 +3499,7 @@
     "presaleTip": "預售提示",
     "openTime": "開售時間",
     "dayUnit": "天",
-    "discount": "折",
+    "discount": "享受折扣",
     "yuan": "元",
     "selectStoreFirst": "請先選擇門店",
     "selectDateFirst": "請先選擇日期",
@@ -3710,6 +3728,8 @@
     "deductLabel": "抵扣",
     "deductAll": "全部抵扣",
     "maxDeductHint": "本單最多可抵 {{max}} 天，按折後日均價折算，當前抵扣",
+    "promoPayDays": "需推廣金支付天數：",
+    "giftInsufficientNoMix": "贈送天數餘額不足，尚差 {{days}} 天；當前規則不允許與推廣金混合支付，請減少加購天數或改用推廣金支付",
     "giftDeductionCol": "贈送抵扣",
     "storeNoRegionHint": "門店未配置所在區域，無法加購",
     "purchaseDateCol": "日期",

@@ -27,8 +27,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,19 +55,64 @@ public class GiftServiceImpl implements GiftService {
     public PageResult<GiftRecordVO> listRecords(long page, long size, Long groupId, Long storeId, String brand, String adType) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
+
+        // 同一门店+同一广告类型的多笔赠送聚合为一行，逐笔记录在明细页查看
+        List<GiftRecordVO> grouped = groupByStoreAdType(queryRecords(groupId, storeId, brand, adType));
+
+        int total = grouped.size();
+        int from = (int) Math.min((page - 1) * size, total);
+        int to = (int) Math.min(from + size, total);
+        List<GiftRecordVO> records = grouped.subList(from, to);
+        enrichRecordGroupStore(records);
+        return new PageResult<>(records, (long) total);
+    }
+
+    @Override
+    public List<GiftRecordVO> listRecordsByStore(Long storeId, String adType) {
+        List<BizGiftRecord> records = giftRecordMapper.selectList(
+                new LambdaQueryWrapper<BizGiftRecord>()
+                        .eq(BizGiftRecord::getStoreId, storeId)
+                        .eq(BizGiftRecord::getAdType, adType)
+                        .orderByDesc(BizGiftRecord::getId));
+        List<GiftRecordVO> vos = records.stream().map(GiftRecordVO::from).toList();
+        enrichRecordGroupStore(vos);
+        return vos;
+    }
+
+    /** 按筛选条件查询全部赠送记录（最新在前） */
+    private List<BizGiftRecord> queryRecords(Long groupId, Long storeId, String brand, String adType) {
         LambdaQueryWrapper<BizGiftRecord> wrapper = new LambdaQueryWrapper<>();
         if (groupId != null) wrapper.eq(BizGiftRecord::getGroupId, groupId);
         if (storeId != null) wrapper.eq(BizGiftRecord::getStoreId, storeId);
         if (StringUtils.hasText(brand)) wrapper.eq(BizGiftRecord::getBrand, brand);
         if (StringUtils.hasText(adType)) wrapper.eq(BizGiftRecord::getAdType, adType);
         wrapper.orderByDesc(BizGiftRecord::getId);
+        return giftRecordMapper.selectList(wrapper);
+    }
 
-        Page<BizGiftRecord> pageResult = giftRecordMapper.selectPage(new Page<>(page, size), wrapper);
-        List<GiftRecordVO> records = pageResult.getRecords().stream()
-                .map(GiftRecordVO::from)
-                .toList();
-        enrichRecordGroupStore(records);
-        return new PageResult<>(records, pageResult.getTotal());
+    /** 按门店+广告类型聚合：天数字段求和、记录笔数计数，组间按最新记录排序 */
+    private List<GiftRecordVO> groupByStoreAdType(List<BizGiftRecord> records) {
+        Map<String, List<BizGiftRecord>> groups = new LinkedHashMap<>();
+        for (BizGiftRecord record : records) {
+            groups.computeIfAbsent(record.getStoreId() + "|" + record.getAdType(), k -> new ArrayList<>())
+                    .add(record);
+        }
+        return groups.values().stream().map(list -> {
+            GiftRecordVO vo = GiftRecordVO.from(list.get(0)); // 最新一笔作为行基础信息
+            int totalDays = 0;
+            int usedDays = 0;
+            int remainingDays = 0;
+            for (BizGiftRecord r : list) {
+                totalDays += r.getTotalDays() == null ? 0 : r.getTotalDays();
+                usedDays += r.getUsedDays() == null ? 0 : r.getUsedDays();
+                remainingDays += r.getRemainingDays() == null ? 0 : r.getRemainingDays();
+            }
+            vo.setTotalDays(totalDays);
+            vo.setUsedDays(usedDays);
+            vo.setRemainingDays(remainingDays);
+            vo.setRecordCount(list.size());
+            return vo;
+        }).toList();
     }
 
     @Override
@@ -92,6 +139,7 @@ public class GiftServiceImpl implements GiftService {
         record.setStatus(1); // 可用
         record.setReason(request.getReason());
         record.setCredentials(JsonUtils.toJson(request.getCredentials()));
+        record.setApprovalNo(request.getApprovalNo());
         record.setApplicant(operatorResolver.currentOperatorName());
         record.setApplyTime(LocalDateTime.now());
         record.setApprovalStatus(1); // 未审批
