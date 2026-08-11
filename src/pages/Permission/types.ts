@@ -1086,6 +1086,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 系統配置
   '/menu-config': 'menu-config',
   '/translation-manage': 'translation-manage',
+  '/rule-config': 'rule-config',
 }
 
 /**

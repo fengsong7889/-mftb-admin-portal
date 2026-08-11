@@ -353,6 +353,7 @@ export default function TranslationManage() {
   const [loading, setLoading] = useState(false)
   const [searchKey, setSearchKey] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string>('')
   const [editingCell, setEditingCell] = useState<{ rowId: string; langCode: string } | null>(null)
   const [editValue, setEditValue] = useState('')
 
@@ -434,6 +435,13 @@ export default function TranslationManage() {
   const filteredData = useMemo(() => {
     return data.filter(item => {
       if (filterCategory && item.category !== filterCategory) return false
+      if (filterStatus === 'complete') {
+        const isComplete = languages.every(l => item.translations[l.code]?.trim())
+        if (!isComplete) return false
+      } else if (filterStatus === 'incomplete') {
+        const isComplete = languages.every(l => item.translations[l.code]?.trim())
+        if (isComplete) return false
+      }
       if (searchKey) {
         const kw = searchKey.toLowerCase()
         return (
@@ -444,7 +452,7 @@ export default function TranslationManage() {
       }
       return true
     })
-  }, [data, filterCategory, searchKey])
+  }, [data, filterCategory, filterStatus, searchKey, languages])
 
   const tCategories = useMemo(() => CATEGORIES.map(c => ({ value: c.value, label: t(c.labelKey) })), [t])
 
@@ -773,17 +781,6 @@ export default function TranslationManage() {
     }
   }
 
-  /* 重置为 Mock 数据（仅离线降级模式可用） */
-  const handleReset = () => {
-    if (backendMode) {
-      message.info('在线模式下数据由后端管理，无需重置')
-      return
-    }
-    persistData(MOCK_DATA)
-    persistLanguages(INITIAL_LANGUAGES)
-    message.success(t('translationManage:msgResetDone'))
-  }
-
   /* 表格列 */
   const baseColumns = [
     {
@@ -955,8 +952,12 @@ export default function TranslationManage() {
             />
           </Form.Item>
           <Form.Item label={t('translationManage:statusLabel')}>
-            <Select placeholder={t('common:all')} allowClear>
-              <Select.Option value="">{t('translationManage:statusAll')}</Select.Option>
+            <Select
+              placeholder={t('common:all')}
+              allowClear
+              value={filterStatus || undefined}
+              onChange={v => setFilterStatus(v || '')}
+            >
               <Select.Option value="incomplete">{t('translationManage:statusIncomplete')}</Select.Option>
               <Select.Option value="complete">{t('translationManage:statusComplete')}</Select.Option>
             </Select>
@@ -964,7 +965,7 @@ export default function TranslationManage() {
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />}>{t('common:search')}</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common:reset')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => { setSearchKey(''); setFilterCategory(''); setFilterStatus('') }}>{t('common:reset')}</Button>
             </div>
           </Form.Item>
         </Form>
