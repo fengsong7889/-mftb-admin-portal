@@ -31,4 +31,7 @@ public interface DataAuthorizationService {
 
     /** 全部商家集团下拉选项 (groupCode, groupName) */
     List<Map<String, Object>> merchantGroupOptions();
+
+    /** 诊断：检查数据授权相关表与字段是否就绪 */
+    List<Map<String, Object>> diagnose();
 }

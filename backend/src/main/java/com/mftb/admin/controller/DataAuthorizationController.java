@@ -81,4 +81,11 @@ public class DataAuthorizationController {
     public Result<List<Map<String, Object>>> merchantGroupOptions() {
         return Result.success(dataAuthorizationService.merchantGroupOptions());
     }
+
+    /** 诊断接口：检查数据授权相关表与字段是否就绪 */
+    @GetMapping("/diagnose")
+    @RequirePermission(menu = "data-permission")
+    public Result<List<Map<String, Object>>> diagnose() {
+        return Result.success(dataAuthorizationService.diagnose());
+    }
 }

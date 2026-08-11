@@ -28,19 +28,30 @@
   width: 260px;
 }
 
-/* 指定商家选择面板 */
-.data-auth-merchant-panel {
-  padding: 12px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-}
-
-.data-auth-merchant-search {
-  margin-bottom: 12px;
+/* 商家集团多选 — 占满弹窗宽度 */
+.data-auth-group-select {
+  flex: 1;
+  min-width: 0;
 }
 
 .data-auth-tip {
   margin-top: 8px;
   font-size: 12px;
   color: #8c8c8c;
+}
+
+/* 详情弹窗：商家集团标签列表 */
+.data-auth-group-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.data-auth-group-tag {
+  margin: 0;
 }

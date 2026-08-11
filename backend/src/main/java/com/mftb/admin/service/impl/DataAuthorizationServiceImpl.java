@@ -246,4 +246,84 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
                 });
         return result;
     }
+
+    /* ==================== 诊断 ==================== */
+
+    @Override
+    public List<Map<String, Object>> diagnose() {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        // 1. 检查关键表是否存在
+        checkTable(result, "sys_department");
+        checkTable(result, "sys_data_authorization");
+        checkTable(result, "biz_merchant_group");
+        checkTable(result, "sys_role");
+        checkTable(result, "sys_user");
+
+        // 2. 检查关键字段
+        checkColumn(result, "sys_department", "name_en");
+        checkColumn(result, "sys_department", "deleted");
+        checkColumn(result, "sys_user", "function_roles");
+        checkColumn(result, "sys_user", "department_id");
+        checkColumn(result, "sys_data_authorization", "group_code");
+
+        // 3. 逐个测试实际查询
+        testQuery(result, "roleOptions", "SELECT r.id, r.name, (SELECT COUNT(*) FROM sys_user u WHERE u.deleted = 0 AND FIND_IN_SET(r.id, u.function_roles)) AS user_count FROM sys_role r WHERE r.deleted = 0 AND r.status = 1 ORDER BY r.id");
+        testQuery(result, "departmentOptions", "SELECT d.id, d.name, d.name_en, d.parent_id, d.status, (SELECT COUNT(*) FROM sys_user u WHERE u.department_id = d.id AND u.deleted = 0) AS user_count FROM sys_department d WHERE d.deleted = 0 ORDER BY d.sort, d.id");
+        testQuery(result, "merchantGroupOptions", "SELECT group_code, group_name FROM biz_merchant_group WHERE deleted = 0 ORDER BY group_code");
+        testQuery(result, "list", "SELECT id, target_type, target_id, group_code, status FROM sys_data_authorization WHERE deleted = 0 LIMIT 1");
+
+        return result;
+    }
+
+    private void checkTable(List<Map<String, Object>> result, String tableName) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+                    Integer.class, tableName);
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "table:" + tableName);
+            item.put("exists", count != null && count > 0);
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "table:" + tableName);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
+    }
+
+    private void checkColumn(List<Map<String, Object>> result, String tableName, String columnName) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                    Integer.class, tableName, columnName);
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "column:" + tableName + "." + columnName);
+            item.put("exists", count != null && count > 0);
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "column:" + tableName + "." + columnName);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
+    }
+
+    private void testQuery(List<Map<String, Object>> result, String name, String sql) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "query:" + name);
+            item.put("ok", true);
+            item.put("rowCount", rows.size());
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "query:" + name);
+            item.put("ok", false);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
+    }
 }

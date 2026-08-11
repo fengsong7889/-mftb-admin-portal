@@ -8,9 +8,8 @@ import { DATA_TARGET_TYPE } from '../types'
 import { DEPT_STATUS } from '../../../api/department'
 import {
   fetchDataAuthorizations,
-  createDataAuthorization,
-  updateDataAuthorization,
-  deleteDataAuthorization,
+  batchCreateAuthorizations,
+  batchDeleteAuthorizations,
   fetchDataAuthRoleOptions,
   fetchDataAuthDepartmentOptions,
   fetchDataAuthMerchantGroupOptions,
@@ -25,11 +24,17 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import './index.css'
 
-/** 列表行（授权记录 + 授权对象信息） */
-interface AuthRow extends DataAuthorizationItem {
+/** 分组后的列表行（一个角色/部门 = 一行） */
+interface GroupedAuthRow {
+  targetType: string
+  targetId: number
   targetName: string
   parentName?: string
   userCount: number
+  groups: { id: number; groupCode: string; groupName?: string; status: number; updatedAt?: string }[]
+  groupCount: number
+  latestUpdatedAt?: string
+  latestUpdatedBy?: string
 }
 
 /** 平铺部门列表构建 TreeSelect 树数据 */
@@ -85,13 +90,14 @@ export default function DataPermission() {
 
   // 新增/编辑授权弹窗
   const [modalVisible, setModalVisible] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingTargetId, setEditingTargetId] = useState<number | null>(null) // null=新增, number=编辑某target
   const [targetId, setTargetId] = useState<number>()
-  const [groupCode, setGroupCode] = useState<string>()
+  const [groupCodes, setGroupCodes] = useState<string[]>([])
+  const [existingAuthIds, setExistingAuthIds] = useState<number[]>([]) // 编辑时已有记录的ID
   const [submitting, setSubmitting] = useState(false)
 
-  // 授权详情弹窗
-  const [detailRecord, setDetailRecord] = useState<AuthRow | null>(null)
+  // 授权详情弹窗（显示某target下所有商家集团）
+  const [detailGroup, setDetailGroup] = useState<GroupedAuthRow | null>(null)
 
   /** 加载角色、部门、商家集团列表 */
   const fetchList = useCallback(async () => {
@@ -127,84 +133,143 @@ export default function DataPermission() {
     loadAuthorizations()
   }, [fetchList, loadAuthorizations])
 
-  /** 角色授权列表 */
-  const roleRows = useMemo<AuthRow[]>(
-    () => authorizations
+  /** 按授权对象分组：一个角色/部门 = 一行，聚合其下所有商家集团 */
+  const groupedRoleRows = useMemo<GroupedAuthRow[]>(() => {
+    const map = new Map<string, GroupedAuthRow>()
+    authorizations
       .filter(a => a.targetType === DATA_TARGET_TYPE.ROLE)
-      .map(a => {
-        const role = roles.find(r => r.id === a.targetId)
-        return {
-          ...a,
-          targetName: a.targetName || role?.name || t('dataPermission.roleDeleted'),
-          userCount: role?.userCount ?? 0,
+      .forEach(a => {
+        const key = `${a.targetType}_${a.targetId}`
+        let group = map.get(key)
+        if (!group) {
+          const role = roles.find(r => r.id === a.targetId)
+          group = {
+            targetType: a.targetType,
+            targetId: a.targetId,
+            targetName: role?.name || t('dataPermission.roleDeleted'),
+            userCount: role?.userCount ?? 0,
+            groups: [],
+            groupCount: 0,
+          }
+          map.set(key, group)
         }
-      }),
-    [authorizations, roles, t],
-  )
+        group.groups.push({
+          id: a.id,
+          groupCode: a.groupCode,
+          groupName: a.groupName,
+          status: a.status,
+          updatedAt: a.updatedAt,
+        })
+        if (!group.latestUpdatedAt || (a.updatedAt && a.updatedAt > group.latestUpdatedAt)) {
+          group.latestUpdatedAt = a.updatedAt
+          group.latestUpdatedBy = a.updatedBy
+        }
+      })
+    return Array.from(map.values()).map(g => ({ ...g, groupCount: g.groups.length }))
+      .sort((a, b) => (b.latestUpdatedAt || '').localeCompare(a.latestUpdatedAt || ''))
+  }, [authorizations, roles, t])
 
-  /** 部门授权列表 */
-  const deptRows = useMemo<AuthRow[]>(
-    () => authorizations
+  const groupedDeptRows = useMemo<GroupedAuthRow[]>(() => {
+    const map = new Map<string, GroupedAuthRow>()
+    authorizations
       .filter(a => a.targetType === DATA_TARGET_TYPE.DEPARTMENT)
-      .map(a => {
-        const dept = departments.find(d => d.id === a.targetId)
-        return {
-          ...a,
-          targetName: a.targetName || (dept ? getDeptDisplayName(dept) : t('dataPermission.deptDeleted')),
-          parentName: (() => { const p = dept?.parentId ? departments.find(d => d.id === dept.parentId) : undefined; return p ? getDeptDisplayName(p) : undefined })(),
-          userCount: dept?.userCount ?? 0,
+      .forEach(a => {
+        const key = `${a.targetType}_${a.targetId}`
+        let group = map.get(key)
+        if (!group) {
+          const dept = departments.find(d => d.id === a.targetId)
+          group = {
+            targetType: a.targetType,
+            targetId: a.targetId,
+            targetName: dept ? getDeptDisplayName(dept) : t('dataPermission.deptDeleted'),
+            parentName: (() => { const p = dept?.parentId ? departments.find(d => d.id === dept.parentId) : undefined; return p ? getDeptDisplayName(p) : undefined })(),
+            userCount: dept?.userCount ?? 0,
+            groups: [],
+            groupCount: 0,
+          }
+          map.set(key, group)
         }
-      }),
-    [authorizations, departments, isNonZh, t], // eslint-disable-line react-hooks/exhaustive-deps
-  )
+        group.groups.push({
+          id: a.id,
+          groupCode: a.groupCode,
+          groupName: a.groupName,
+          status: a.status,
+          updatedAt: a.updatedAt,
+        })
+        if (!group.latestUpdatedAt || (a.updatedAt && a.updatedAt > group.latestUpdatedAt)) {
+          group.latestUpdatedAt = a.updatedAt
+          group.latestUpdatedBy = a.updatedBy
+        }
+      })
+    return Array.from(map.values()).map(g => ({ ...g, groupCount: g.groups.length }))
+      .sort((a, b) => (b.latestUpdatedAt || '').localeCompare(a.latestUpdatedAt || ''))
+  }, [authorizations, departments, isNonZh, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 新增授权时可选的角色（后端已只返回启用状态） */
   const availableRoles = roles
 
   /** 打开新增授权弹窗 */
   const handleCreate = () => {
-    setEditingId(null)
+    setEditingTargetId(null)
     setTargetId(undefined)
-    setGroupCode(undefined)
+    setGroupCodes([])
+    setExistingAuthIds([])
     setModalVisible(true)
   }
 
-  /** 打开编辑授权弹窗 */
-  const handleEdit = (record: AuthRow) => {
-    setEditingId(record.id)
+  /** 打开配置授权弹窗（编辑某角色/部门的商家授权） */
+  const handleConfigure = (record: GroupedAuthRow) => {
+    setEditingTargetId(record.targetId)
     setTargetId(record.targetId)
-    setGroupCode(record.groupCode)
+    setGroupCodes(record.groups.map(g => g.groupCode))
+    setExistingAuthIds(record.groups.map(g => g.id))
     setModalVisible(true)
   }
 
-  /** 保存授权（调用后端 API） */
+  /** 保存授权（批量创建 + 批量删除 diff） */
   const handleSave = async () => {
     if (targetId == null) {
       message.warning(activeTab === DATA_TARGET_TYPE.ROLE ? t('dataPermission.selectRole') : t('dataPermission.selectDept'))
       return
     }
-    if (!groupCode) {
+    if (groupCodes.length === 0) {
       message.warning(t('dataPermission.selectGroup'))
       return
     }
 
     setSubmitting(true)
     try {
-      if (editingId) {
-        await updateDataAuthorization(editingId, {
-          targetType: activeTab,
-          targetId,
-          groupCode,
-        })
-        message.success(t('dataPermission.authUpdated'))
-      } else {
-        await createDataAuthorization({
-          targetType: activeTab,
-          targetId,
-          groupCode,
-        })
-        message.success(t('dataPermission.authCreated'))
+      const oldCodes = new Set(
+        authorizations
+          .filter(a => a.targetType === activeTab && a.targetId === targetId)
+          .map(a => a.groupCode)
+      )
+      const newCodes = new Set(groupCodes)
+
+      // 需要新增的（在新选中但不在旧数据中）
+      const toCreate = groupCodes.filter(c => !oldCodes.has(c))
+      // 需要删除的（在旧数据中但不在新选中）
+      const toDeleteIds = authorizations
+        .filter(a => a.targetType === activeTab && a.targetId === targetId && !newCodes.has(a.groupCode))
+        .map(a => a.id)
+
+      const ops: Promise<unknown>[] = []
+      if (toCreate.length > 0) {
+        ops.push(batchCreateAuthorizations({ targetType: activeTab, targetId, groupCodes: toCreate }))
       }
+      if (toDeleteIds.length > 0) {
+        ops.push(batchDeleteAuthorizations(toDeleteIds))
+      }
+
+      if (ops.length > 0) {
+        await Promise.all(ops)
+        message.success(
+          editingTargetId != null
+            ? t('dataPermission.authUpdated')
+            : t('dataPermission.batchAuthCreated', { count: toCreate.length })
+        )
+      }
+
       setModalVisible(false)
       loadAuthorizations()
     } catch {
@@ -214,10 +279,11 @@ export default function DataPermission() {
     }
   }
 
-  /** 删除授权 */
-  const handleDelete = async (record: AuthRow) => {
+  /** 删除某角色/部门的全部授权 */
+  const handleDeleteAll = async (record: GroupedAuthRow) => {
     try {
-      await deleteDataAuthorization(record.id)
+      const ids = record.groups.map(g => g.id)
+      await batchDeleteAuthorizations(ids)
       message.success(t('common.deleteSuccess'))
       loadAuthorizations()
     } catch {
@@ -225,22 +291,22 @@ export default function DataPermission() {
     }
   }
 
-  /** 操作列（角色/部门通用） */
-  const renderActions = (record: AuthRow) => (
+  /** 操作列 */
+  const renderActions = (record: GroupedAuthRow) => (
     <Space size={4}>
-      <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
+      <Button type="link" size="small" onClick={() => setDetailGroup(record)}>
         {t('common.detail')}
       </Button>
       {hasPermission('data-permission:edit') && (
-        <Button type="link" size="small" onClick={() => handleEdit(record)}>
+        <Button type="link" size="small" onClick={() => handleConfigure(record)}>
           {t('common.edit')}
         </Button>
       )}
       {hasPermission('data-permission:delete') && (
         <Popconfirm
           title={t('common.confirmDelete')}
-          description={t('dataPermission.confirmDeleteContent', { name: record.targetName, groupName: record.groupName || record.groupCode })}
-          onConfirm={() => handleDelete(record)}
+          description={t('dataPermission.confirmDeleteAllContent', { name: record.targetName, count: record.groupCount })}
+          onConfirm={() => handleDeleteAll(record)}
           okText={t('common.confirm')}
           cancelText={t('common.cancel')}
         >
@@ -252,9 +318,17 @@ export default function DataPermission() {
     </Space>
   )
 
-  /** 商家集团名称列 */
-  const renderGroupTag = (_: unknown, record: AuthRow) => (
-    <Tag color="blue">{record.groupName || record.groupCode}</Tag>
+  /** 授权商家列（显示数量 + 前几个标签） */
+  const renderGroupSummary = (_: unknown, record: GroupedAuthRow) => (
+    <Space wrap size={[4, 4]}>
+      <Tag color="blue">{t('dataPermission.groupCountLabel', { count: record.groupCount })}</Tag>
+      {record.groups.slice(0, 3).map(g => (
+        <Tag key={g.id} color="geekblue">{g.groupName || g.groupCode}</Tag>
+      ))}
+      {record.groupCount > 3 && (
+        <Tag color="default">+{record.groupCount - 3}</Tag>
+      )}
+    </Space>
   )
 
   /** 状态列 */
@@ -264,33 +338,31 @@ export default function DataPermission() {
     </Tag>
   )
 
-  const roleColumns: TableColumnsType<AuthRow> = [
+  const roleColumns: TableColumnsType<GroupedAuthRow> = [
     { title: t('dataPermission.colRoleName'), dataIndex: 'targetName', key: 'targetName', width: 180 },
-    { title: t('dataPermission.colGroupName'), key: 'groupName', width: 200, render: renderGroupTag },
-    { title: t('dataPermission.colStatus'), dataIndex: 'status', key: 'status', width: 90, render: renderStatus },
+    { title: t('dataPermission.colGroupName'), key: 'groupName', render: renderGroupSummary },
     { title: t('dataPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => t('dataPermission.personCount', { count: v }) },
-    { title: t('dataPermission.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('dataPermission.colUpdatedBy'), dataIndex: 'latestUpdatedBy', key: 'latestUpdatedBy', width: 120, render: (v: string) => v || '-' },
     {
       title: t('dataPermission.colUpdatedAt'),
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
+      dataIndex: 'latestUpdatedAt',
+      key: 'latestUpdatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
 
-  const deptColumns: TableColumnsType<AuthRow> = [
+  const deptColumns: TableColumnsType<GroupedAuthRow> = [
     { title: t('dataPermission.colDeptName'), dataIndex: 'targetName', key: 'targetName', width: 180 },
     { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 150, render: (v: string) => v || '-' },
-    { title: t('dataPermission.colGroupName'), key: 'groupName', width: 200, render: renderGroupTag },
-    { title: t('dataPermission.colStatus'), dataIndex: 'status', key: 'status', width: 90, render: renderStatus },
+    { title: t('dataPermission.colGroupName'), key: 'groupName', render: renderGroupSummary },
     { title: t('dataPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => t('dataPermission.personCount', { count: v }) },
-    { title: t('dataPermission.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    { title: t('dataPermission.colUpdatedBy'), dataIndex: 'latestUpdatedBy', key: 'latestUpdatedBy', width: 120, render: (v: string) => v || '-' },
     {
       title: t('dataPermission.colUpdatedAt'),
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
+      dataIndex: 'latestUpdatedAt',
+      key: 'latestUpdatedAt',
       width: 170,
       render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
     },
@@ -308,41 +380,53 @@ export default function DataPermission() {
   ])
 
   /** 授权列表（角色/部门 Tab 内容） */
-  const renderTabContent = (type: DataTargetType) => (
-    <div>
-      <div className="action-section">
-        <div className="action-section-right">
-          {hasPermission('data-permission:create') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              {t('common.add')}
-            </Button>
-          )}
-          {type === DATA_TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent}
+  const renderTabContent = (type: DataTargetType) => {
+    const rows = type === DATA_TARGET_TYPE.ROLE ? groupedRoleRows : groupedDeptRows
+    const cols = type === DATA_TARGET_TYPE.ROLE ? roleColumns : deptColumns
+    const apply = type === DATA_TARGET_TYPE.ROLE ? roleApplyConfig : deptApplyConfig
+    const config = type === DATA_TARGET_TYPE.ROLE ? roleConfigComponent : deptConfigComponent
+    return (
+      <div>
+        <div className="action-section">
+          <div className="action-section-right">
+            {hasPermission('data-permission:create') && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                {t('common.add')}
+              </Button>
+            )}
+            {config}
+          </div>
         </div>
+        <Table
+          columns={apply(cols)}
+          dataSource={rows}
+          rowKey={(r) => `${r.targetType}_${r.targetId}`}
+          loading={loading}
+          pagination={{
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => t('common.total', { count: total }),
+          }}
+          locale={{
+            emptyText: type === DATA_TARGET_TYPE.ROLE
+              ? t('dataPermission.emptyRole')
+              : t('dataPermission.emptyDept'),
+          }}
+        />
       </div>
-      <Table
-        columns={type === DATA_TARGET_TYPE.ROLE ? roleApplyConfig(roleColumns) : deptApplyConfig(deptColumns)}
-        dataSource={type === DATA_TARGET_TYPE.ROLE ? roleRows : deptRows}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total) => t('common.total', { count: total }),
-        }}
-        locale={{
-          emptyText: type === DATA_TARGET_TYPE.ROLE
-            ? t('dataPermission.emptyRole')
-            : t('dataPermission.emptyDept'),
-        }}
-      />
-    </div>
-  )
+    )
+  }
 
   /** 弹窗中编辑对象的名称（编辑模式展示） */
-  const editingName = editingId != null
-    ? (activeTab === DATA_TARGET_TYPE.ROLE ? roleRows : deptRows).find(r => r.id === editingId)?.targetName
+  const editingName = editingTargetId != null
+    ? (activeTab === DATA_TARGET_TYPE.ROLE ? groupedRoleRows : groupedDeptRows).find(r => r.targetId === editingTargetId)?.targetName
     : undefined
+
+  /** 商家集团下拉选项 */
+  const groupSelectOptions = merchantGroups.map(g => ({
+    value: g.groupCode,
+    label: `${g.groupName}（${g.groupCode}）`,
+  }))
 
   return (
     <div className="content-area">
@@ -355,10 +439,10 @@ export default function DataPermission() {
         ]}
       />
 
-      {/* 新增/编辑授权弹窗 */}
+      {/* 新增/编辑授权弹窗 — 多选商家集团 */}
       <Modal
         title={
-          editingId
+          editingTargetId != null
             ? t('dataPermission.editTitle', { name: editingName ?? '' })
             : (activeTab === DATA_TARGET_TYPE.ROLE ? t('dataPermission.addRoleTitle') : t('dataPermission.addDeptTitle'))
         }
@@ -368,7 +452,7 @@ export default function DataPermission() {
         okText={t('common.save')}
         cancelText={t('common.cancel')}
         confirmLoading={submitting}
-        width={600}
+        width={680}
         destroyOnClose
       >
         {/* 授权对象选择（编辑模式锁定） */}
@@ -382,10 +466,10 @@ export default function DataPermission() {
               placeholder={t('dataPermission.selectRolePlaceholder')}
               showSearch
               optionFilterProp="label"
-              disabled={editingId != null}
+              disabled={editingTargetId != null}
               value={targetId}
               onChange={(id) => setTargetId(id)}
-              options={(editingId != null ? roles : availableRoles).map(r => ({
+              options={(editingTargetId != null ? roles : availableRoles).map(r => ({
                 value: r.id,
                 label: r.name,
               }))}
@@ -397,7 +481,7 @@ export default function DataPermission() {
               showSearch
               treeDefaultExpandAll
               treeNodeFilterProp="title"
-              disabled={editingId != null}
+              disabled={editingTargetId != null}
               value={targetId}
               onChange={(id) => setTargetId(id)}
               treeData={buildDeptTreeData(departments, getDeptDisplayName)}
@@ -410,49 +494,59 @@ export default function DataPermission() {
           </Tag>
         </div>
 
-        {/* 授权商家集团 */}
+        {/* 授权商家集团 — 多选 */}
         <div className="data-auth-field">
           <span className="data-auth-label">{t('dataPermission.groupLabel')}</span>
           <Select
-            className="data-auth-target-select"
-            placeholder={t('dataPermission.groupPlaceholder')}
+            mode="multiple"
+            className="data-auth-group-select"
+            placeholder={t('dataPermission.groupMultiPlaceholder')}
             showSearch
             optionFilterProp="label"
-            value={groupCode}
-            onChange={(code) => setGroupCode(code)}
-            options={merchantGroups.map(g => ({
-              value: g.groupCode,
-              label: `${g.groupName}（${g.groupCode}）`,
-            }))}
+            value={groupCodes}
+            onChange={(codes) => setGroupCodes(codes)}
+            options={groupSelectOptions}
+            maxTagCount="responsive"
+            filterOption={(input, option) =>
+              (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
+            }
           />
+        </div>
+        <div className="data-auth-tip">
+          {editingTargetId != null
+            ? t('dataPermission.editGroupTip', { count: groupCodes.length })
+            : t('dataPermission.createGroupTip', { count: groupCodes.length })}
         </div>
       </Modal>
 
-      {/* 授权详情弹窗 */}
+      {/* 授权详情弹窗 — 显示该角色/部门下所有商家集团 */}
       <Modal
-        title={t('dataPermission.detailTitle', { name: detailRecord?.targetName ?? '' })}
-        open={detailRecord != null}
-        onCancel={() => setDetailRecord(null)}
+        title={t('dataPermission.detailTitle', { name: detailGroup?.targetName ?? '' })}
+        open={detailGroup != null}
+        onCancel={() => setDetailGroup(null)}
         footer={null}
-        width={520}
+        width={640}
       >
-        {detailRecord && (
+        {detailGroup && (
           <>
             <div className="data-auth-field">
-              <span className="data-auth-label">{t('dataPermission.groupLabel')}</span>
-              <Tag color="blue">{detailRecord.groupName || detailRecord.groupCode}</Tag>
+              <span className="data-auth-label">{t('dataPermission.colGroupName')}</span>
+              <Tag color="blue">{t('dataPermission.groupCountLabel', { count: detailGroup.groupCount })}</Tag>
             </div>
-            <div className="data-auth-field">
-              <span className="data-auth-label">{t('dataPermission.colStatus')}</span>
-              {renderStatus(detailRecord.status)}
+            <div className="data-auth-group-list">
+              {detailGroup.groups.map(g => (
+                <Tag key={g.id} color="geekblue" className="data-auth-group-tag">
+                  {g.groupName || g.groupCode}
+                </Tag>
+              ))}
             </div>
-            <div className="data-auth-field">
+            <div className="data-auth-field" style={{ marginTop: 16 }}>
               <span className="data-auth-label">{t('dataPermission.colUpdatedBy')}</span>
-              <span>{detailRecord.updatedBy || '-'}</span>
+              <span>{detailGroup.latestUpdatedBy || '-'}</span>
             </div>
             <div className="data-auth-field">
               <span className="data-auth-label">{t('dataPermission.colUpdatedAt')}</span>
-              <span>{detailRecord.updatedAt ? new Date(detailRecord.updatedAt).toLocaleString('zh-TW', { hour12: false }) : '-'}</span>
+              <span>{detailGroup.latestUpdatedAt ? new Date(detailGroup.latestUpdatedAt).toLocaleString('zh-TW', { hour12: false }) : '-'}</span>
             </div>
           </>
         )}

@@ -49,6 +49,21 @@ export function deleteDataAuthorization(id: number) {
   return request.delete<unknown, void>(`/data-authorizations/${id}`)
 }
 
+/** 批量新增数据授权 */
+export function batchCreateAuthorizations(data: { targetType: string; targetId: number; groupCodes: string[] }) {
+  return request.post<unknown, DataAuthorizationItem[]>('/data-authorizations/batch', data)
+}
+
+/** 批量删除数据授权 */
+export function batchDeleteAuthorizations(ids: number[]) {
+  return request.delete<unknown, void>('/data-authorizations/batch', { data: { ids } })
+}
+
+/** 诊断：检查数据授权相关表与字段是否就绪 */
+export function diagnoseDataAuth() {
+  return request.get<unknown, Record<string, unknown>[]>('/data-authorizations/diagnose')
+}
+
 /* ==================== 数据权限页面专用下拉选项 ==================== */
 
 /** 角色下拉选项（仅启用状态） */
