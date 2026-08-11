@@ -2303,6 +2303,7 @@
     "refundSuccess": "Refunded, amount returned to promotion account per fee tiers",
     "refundFail": "Refund failed, please try again later",
     "cancelSuccess": "Promotion cancelled",
+    "cancelFail": "Cancel failed, please try again later",
     "refundSuccessShort": "Refund successful",
     "dailyCalc": "{{count}} days × daily price MOP {{price}} = ",
     "mopUnit": "(MOP)",

@@ -8,6 +8,7 @@ import {
   ShoppingCartOutlined,
   GiftOutlined,
   DollarOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -195,6 +196,28 @@ const FINANCE_RULES: RuleItem[] = [
   },
 ]
 
+/** 系統安全規則（管理員配置） */
+const SYSTEM_SECURITY_RULES: RuleItem[] = [
+  {
+    key: 'session_idle_timeout_minutes',
+    label: '空閒超時自動退出',
+    description: '系統無任何操作超過設定時長後，將自動強制退出登錄',
+    type: 'select',
+    value: 60,
+    defaultValue: 60,
+    unit: '分鐘',
+    options: [
+      { label: '15 分鐘', value: 15 },
+      { label: '30 分鐘', value: 30 },
+      { label: '1 小時', value: 60 },
+      { label: '2 小時', value: 120 },
+      { label: '3 小時', value: 180 },
+      { label: '6 小時', value: 360 },
+      { label: '8 小時', value: 480 },
+    ],
+  },
+]
+
 /* ==================== 分組配置 ==================== */
 
 /** 默認規則分組（含默認值） */
@@ -222,6 +245,14 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
     color: '#FF4D4F',
     description: '財務審批流程與預警閾值相關規則',
     rules: FINANCE_RULES,
+  },
+  {
+    key: 'system_security',
+    title: '系統安全規則',
+    icon: <SafetyCertificateOutlined />,
+    color: '#722ED1',
+    description: '會話安全與空閒超時相關規則（僅管理員可配置）',
+    rules: SYSTEM_SECURITY_RULES,
   },
 ]
 

@@ -14,6 +14,7 @@ import {
   fetchAdPricingActive,
   fetchAdRevivePricingActive,
   refundAdOrder,
+  cancelAdOrder,
   brandToAppType,
   type AdOrderDetail,
 } from '../../api/adPromotion'
@@ -358,7 +359,7 @@ const slotDefs = [
   { slot: '宵夜', originalPrice: 60 },
 ] as const
 
-const dates = ['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20']
+const dates = ['2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15']
 const pastDates = ['2025-06-20', '2025-06-21', '2025-06-22', '2025-06-23', '2025-06-24']
 
 // 操作人（用於終態訂單：已取消 / 已中止 / 已退款）
@@ -462,7 +463,7 @@ function genOrder(
     recommendType: recType, slotPosition: slotPos, groupId: gid, groupName: gname,
     storeId: sid, storeName: sname, purchaseDate: pdate, originalPrice: orig,
     discountPrice: disc, actualPrice: actual, status, orderTime: otime, payTime: ptime,
-    promoStartDate: isPast ? '2025-06-15' : '2026-07-16',
+    promoStartDate: isPast ? '2025-06-15' : '2026-08-11',
     slotPrices, gradientDiscount: gradDisc, cancelFeeRules, promoData,
     ...(refundAmt !== undefined ? { refundAmount: refundAmt } : {}),
     refundEnabled,
@@ -472,7 +473,7 @@ function genOrder(
 
 const mockOrders: OrderItem[] = [
   // 無敵星星訂單 (id: 1-15)
-  genOrder('1','ORD20250705001','ALG001','無敵星星·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,[1,6,4],RecommendType.INVINCIBLE_STAR,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-05',2000,1800,1440,OrderStatus.PROMOTING,'2025-07-05 10:30:00','2025-07-05 10:35:00',[0,1,2,3,4,0,1,2,3,4],0,{count:10,discount:8},undefined,true,[[1,6,4],[2,3]]),
+  genOrder('1','ORD20250705001','ALG001','無敵星星·黃金展位',AppType.SHANFENG,RecommendChannel.DELIVERY,[1,6,4],RecommendType.INVINCIBLE_STAR,3,'G10001','澳門美食集團','S20001','澳門總店','2025-07-05',2000,1800,1440,OrderStatus.PENDING_PROMOTION,'2025-07-05 10:30:00','2025-07-05 10:35:00',[0,1,2,3,4,0,1,2,3,4],0,{count:10,discount:8},undefined,true,[[1,6,4],[2,3]]),
   genOrder('2','ORD20250706002','ALG002','無敵星星·首頁推薦',AppType.MFOOD,RecommendChannel.DELIVERY,6,RecommendType.INVINCIBLE_STAR,5,'G10002','閃蜂餐飲連鎖','S20002','氹仔分店','2025-07-06',1500,1350,1350,OrderStatus.PENDING_PROMOTION,'2025-07-06 14:20:00','2025-07-06 14:25:00',[3],0,null,undefined,false),
   genOrder('3','ORD20250707003','ALG003','盤活復蘇·外賣熱推',AppType.SHANFENG,RecommendChannel.GROUP_BUY,3,RecommendType.INVINCIBLE_STAR,2,'G10003','大灣區餐飲集團','S20003','珠海旗艦店','2025-07-08',3000,2700,2700,OrderStatus.PROMOTED,'2025-07-07 09:15:00',undefined,[0,1,2,3,4],0,null),
   genOrder('4','ORD20250703004','ALG004','流量廣告·團購精選',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.INVINCIBLE_STAR,4,'G10001','澳門美食集團','S20004','黑沙環店','2025-07-03',1000,900,900,OrderStatus.REFUNDED,'2025-07-03 16:40:00','2025-07-03 16:45:00',[0],0,null,180),
@@ -697,17 +698,22 @@ export default function OrderDetail() {
   }
   // 餐段時段名（數據層 key → 展示名，響應語言切換）
   const slotLabel = (v: string) => {
-    if (v === '全天') return t('orderDetail.allDay')
-    const key = Object.entries(MEAL_SLOT_LABEL).find(([, label]) => label === v)?.[0]
-    if (!key) return v
-    const map: Record<string, string> = {
+    // 1. 全天
+    if (v === '全天' || v === 'All Day') return t('orderDetail.allDay')
+    // 2. API 原始 key（breakfast/lunch/afternoon/dinner/supper）→ 直接翻譯
+    const keyMap: Record<string, string> = {
       breakfast: t('orderDetail.slotBreakfast'),
       lunch: t('orderDetail.slotLunch'),
       afternoon: t('orderDetail.slotAfternoon'),
       dinner: t('orderDetail.slotDinner'),
       supper: t('orderDetail.slotSupper'),
     }
-    return map[key] || v
+    if (keyMap[v]) return keyMap[v]
+    // 3. 中文標籤（mock 數據 / 已轉換數據）→ 反查 key 再翻譯
+    const key = Object.entries(MEAL_SLOT_LABEL).find(([, label]) => label === v)?.[0]
+    if (key && keyMap[key]) return keyMap[key]
+    // 4. 無法識別 → 原樣返回
+    return v
   }
   const [searchParams] = useSearchParams()
   const orderId = searchParams.get('id')
@@ -937,16 +943,21 @@ export default function OrderDetail() {
   }
 
   const confirmRefund = async () => {
-    // 真實訂單：調用後端退款接口（按取消扣費梯度回補推廣金賬戶）
+    // 真實訂單：調用後端退款/取消接口
     if (order?.source === 'api') {
       try {
-        await refundAdOrder(order.orderNo)
+        // 新店廣告調用取消接口（狀態→已取消），其它類型調用退款接口（狀態→已退款）
+        if (isNewStore) {
+          await cancelAdOrder(order.orderNo)
+        } else {
+          await refundAdOrder(order.orderNo)
+        }
         const fresh = await loadApiOrder(order.orderNo)
         setOrder(fresh)
         setRefundModalVisible(false)
-        message.success(t('orderDetail.refundSuccess'))
+        message.success(isNewStore ? t('orderDetail.cancelSuccess') : t('orderDetail.refundSuccess'))
       } catch (err) {
-        message.error((err as Error).message || t('orderDetail.refundFail'))
+        message.error((err as Error).message || (isNewStore ? t('orderDetail.cancelFail') : t('orderDetail.refundFail')))
       }
       return
     }

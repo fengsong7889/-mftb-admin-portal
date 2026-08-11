@@ -149,15 +149,19 @@ function toOrderItem(vo: AdOrder): OrderItem {
   }
   // 所屬商圈: 後端由訂單明細去重聚合返回
   const regions = (vo.regions || []).map(r => r as Region)
-  // 購買時段: 餐段 key → 時間段標籤（與演示數據樣式一致）
-  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
-  // 盤活復蘇/新店廣告/人氣商家 按天售賣無時段維度：優先用後端返回的購買日期列表，無日期時以明細格子數佔位
+  // 購買時段: 餐段 key → 中文名稱（早餐/午餐/下午茶/晚餐/宵夜）
+  const MEAL_SLOT_CN: Record<string, string> = {
+    breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
+  }
+  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_CN[s] || MEAL_SLOT_TIME_LABEL[s] || s)
+  // 購買日期: 無敵星星和按天售賣類型均傳遞日期列表，用於列表頁展示
   const hasNoMealSlots = (vo.mealSlots || []).length === 0
   const isDayBasedType = vo.algoType === 2 || vo.algoType === 3 || vo.algoType === 5
-  const purchaseDays = isDayBasedType && hasNoMealSlots
+  const isStarType = vo.algoType === 1
+  const purchaseDays = (isDayBasedType && hasNoMealSlots) || isStarType
     ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
         ? vo.purchaseDays
-        : Array.from({ length: vo.itemCount || 0 }, () => ''))
+        : isDayBasedType ? Array.from({ length: vo.itemCount || 0 }, () => '') : undefined)
     : undefined
   return {
     id: vo.orderNo,
@@ -403,7 +407,7 @@ export default function PromotionOrderManage() {
     { key: 'action', title: t('common.colAction') },
   ], [orderType, t])
 
-  const { configComponent, applyConfig } = useColumnConfig('promotion-order-manage', columnMeta, [
+  const { configComponent, applyConfig } = useColumnConfig('promotion-order-manage-standalone', columnMeta, [
     { key: 'orderNo', visible: true, locked: 'head' as const },
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
@@ -550,12 +554,19 @@ export default function PromotionOrderManage() {
           }
           return <span style={{ color: '#bfbfbf' }}>-</span>
         }
-        // 無敵星星：展示時段，最多2個，超出顯示弹窗
+        // 無敵星星：展示日期 + 時段，最多2個時段，超出顯示弹窗
         if (record.mealSlots && record.mealSlots.length > 0) {
           const maxShow = 2
           const visibleSlots = record.mealSlots.slice(0, maxShow)
           const hiddenSlots = record.mealSlots.slice(maxShow)
           const hasMore = hiddenSlots.length > 0
+          // 日期展示：如果有購買日期列表，展示日期範圍
+          const hasDates = record.purchaseDays && record.purchaseDays.length > 0 && record.purchaseDays.some(d => !!d)
+          const firstDate = hasDates ? record.purchaseDays![0] : null
+          const lastDate = hasDates ? record.purchaseDays![record.purchaseDays!.length - 1] : null
+          const dateRangeText = firstDate && lastDate
+            ? (firstDate === lastDate ? firstDate.slice(5) : `${firstDate.slice(5)} ~ ${lastDate.slice(5)}`)
+            : null
 
           const slotContent = (
             <Space direction="vertical" size={4}>
@@ -569,6 +580,9 @@ export default function PromotionOrderManage() {
 
           return (
             <Space direction="vertical" size={2}>
+              {dateRangeText && (
+                <span style={{ fontSize: 12, color: '#595959' }}>{dateRangeText}</span>
+              )}
               {visibleSlots.map((slot, index) => (
                 <Tag key={index} color="blue" style={{ margin: 0 }}>
                   {slot}

@@ -121,13 +121,19 @@ function toOrderItem(vo: AdOrder): OrderItem {
   }
   // 所屬商圈: 後端由訂單明細去重聚合返回
   const regions = (vo.regions || []).map(r => r as Region)
-  // 購買時段: 餐段 key → 時間段標籤
-  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_TIME_LABEL[s] || s)
-  // 盤活復蘇按天售賣無時段維度：優先用後端返回的購買日期列表，無日期時以明細格子數佔位
-  const purchaseDays = vo.algoType === 3 && (vo.mealSlots || []).length === 0
+  // 購買時段: 餐段 key → 中文名稱
+  const MEAL_SLOT_CN: Record<string, string> = {
+    breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
+  }
+  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_CN[s] || MEAL_SLOT_TIME_LABEL[s] || s)
+  // 購買日期: 無敵星星和盤活復蘇均傳遞日期列表
+  const hasNoMealSlots = (vo.mealSlots || []).length === 0
+  const isDayBasedType = vo.algoType === 3
+  const isStarType = vo.algoType === 1
+  const purchaseDays = (isDayBasedType && hasNoMealSlots) || isStarType
     ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
         ? vo.purchaseDays
-        : Array.from({ length: vo.itemCount || 0 }, () => ''))
+        : isDayBasedType ? Array.from({ length: vo.itemCount || 0 }, () => '') : undefined)
     : undefined
   return {
     id: vo.orderNo,
@@ -448,10 +454,21 @@ export default function PromotionOrderManage() {
           }
           return <span style={{ color: '#bfbfbf' }}>-</span>
         }
-        // 無敵星星：只展示時段
+        // 無敵星星：展示日期 + 時段
         if (record.mealSlots && record.mealSlots.length > 0) {
+          // 日期展示
+          const hasDates = record.purchaseDays && record.purchaseDays.length > 0 && record.purchaseDays.some(d => !!d)
+          const firstDate = hasDates ? record.purchaseDays![0] : null
+          const lastDate = hasDates ? record.purchaseDays![record.purchaseDays!.length - 1] : null
+          const dateRangeText = firstDate && lastDate
+            ? (firstDate === lastDate ? firstDate.slice(5) : `${firstDate.slice(5)} ~ ${lastDate.slice(5)}`)
+            : null
+
           return (
             <Space direction="vertical" size={2}>
+              {dateRangeText && (
+                <span style={{ fontSize: 12, color: '#595959' }}>{dateRangeText}</span>
+              )}
               {record.mealSlots.map((slot, index) => (
                 <Tag key={index} color="blue" style={{ margin: 0 }}>
                   {slot}

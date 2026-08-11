@@ -436,9 +436,14 @@ export function fetchAdOrderDetail(orderNo: string) {
   return request.get<unknown, AdOrderDetail>(`/ad/orders/${orderNo}`, SILENT)
 }
 
-/** 退款（按取消扣費梯度計算後回補推廣金賬戶） */
+/** 退款（按取消扣费梯度計算後回補推廣金賬戶） */
 export function refundAdOrder(orderNo: string) {
   return request.post<unknown, AdOrderDetail>(`/ad/orders/${orderNo}/refund`, null, SILENT)
+}
+
+/** 取消訂單（狀態變為已取消，釋放格子並回補推廣金） */
+export function cancelAdOrder(orderNo: string) {
+  return request.post<unknown, AdOrderDetail>(`/ad/orders/${orderNo}/cancel`, null, SILENT)
 }
 
 /* ==================== 銷售定價（盤活復蘇計價） ==================== */

@@ -2303,6 +2303,7 @@
     "refundSuccess": "退款成功，已按扣費梯度退回推廣金賬戶",
     "refundFail": "退款失敗，請稍後再試",
     "cancelSuccess": "已取消推廣",
+    "cancelFail": "取消失敗，請稍後再試",
     "refundSuccessShort": "退款成功",
     "dailyCalc": "{{count}} 天 × 每日單價 MOP {{price}} = ",
     "mopUnit": "（MOP）",

@@ -1,11 +1,19 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Modal } from 'antd'
+import { getSystemRuleValue } from './useSystemRules'
 
-/** 空闲超时时间（毫秒）：60 分钟无操作自动退出 */
-const IDLE_TIMEOUT = 60 * 60 * 1000
-/** 倒计时警告提前时间（毫秒）：超时前 1 分钟弹出警告 */
+/** 默認空閒超時（毫秒）：60 分鐘，管理員可在規則配置中修改 */
+const DEFAULT_IDLE_TIMEOUT = 60 * 60 * 1000
+/** 倒計時警告提前時間（毫秒）：超時前 1 分鐘彈出警告 */
 const WARNING_BEFORE = 60 * 1000
+
+/** 從規則配置中讀取管理員設定的空閒超時（分鐘 → 毫秒） */
+function getIdleTimeout(): number {
+  const minutes = getSystemRuleValue<number>('session_idle_timeout_minutes')
+  if (minutes && minutes > 0) return minutes * 60 * 1000
+  return DEFAULT_IDLE_TIMEOUT
+}
 
 /** 用户活动事件列表 */
 const ACTIVITY_EVENTS: (keyof DocumentEventMap)[] = [
@@ -101,15 +109,18 @@ export function useIdleTimeout() {
     clearAllTimers()
     closeWarningModal()
 
-    // 设置警告定时器：超时前 N 秒弹出警告
+    // 動態讀取管理員配置的空閒超時值
+    const idleTimeout = getIdleTimeout()
+
+    // 設置警告定時器：超時前 N 秒彈出警告
     warningTimerRef.current = setTimeout(() => {
       showWarningModal()
-    }, IDLE_TIMEOUT - WARNING_BEFORE)
+    }, idleTimeout - WARNING_BEFORE)
 
-    // 设置空闲超时定时器：到期后自动登出
+    // 設置空閒超時定時器：到期後自動登出
     idleTimerRef.current = setTimeout(() => {
       doLogout()
-    }, IDLE_TIMEOUT)
+    }, idleTimeout)
   }, [clearAllTimers, closeWarningModal, showWarningModal, doLogout])
 
   // 保持 ref 指向最新的 resetTimer，供 showWarningModal 通过 ref 调用

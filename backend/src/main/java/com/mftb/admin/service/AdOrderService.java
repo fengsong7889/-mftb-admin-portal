@@ -19,4 +19,7 @@ public interface AdOrderService {
 
     /** 退款：按取消扣费梯度计算应退金额，回补推广金账户并释放格子 */
     AdOrderDetailVO refund(String orderNo);
+
+    /** 取消订单：状态变为已取消(5)，释放格子并回补推广金 */
+    AdOrderDetailVO cancel(String orderNo);
 }

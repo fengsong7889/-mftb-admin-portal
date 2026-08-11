@@ -54,4 +54,11 @@ public class AdOrderController {
     public Result<AdOrderDetailVO> refund(@PathVariable String orderNo) {
         return Result.success("退款成功", orderService.refund(orderNo));
     }
+
+    /** 取消订单 */
+    @PostMapping("/{orderNo}/cancel")
+    @RequirePermission(menu = "promotion-order-manage", action = "edit")
+    public Result<AdOrderDetailVO> cancel(@PathVariable String orderNo) {
+        return Result.success("取消成功", orderService.cancel(orderNo));
+    }
 }

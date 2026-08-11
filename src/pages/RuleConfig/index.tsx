@@ -25,8 +25,10 @@ export default function RuleConfig() {
   const { t } = useTranslation()
   const { groups, updateRule, saveAll, resetAll } = useSystemRules()
 
-  /* 每個分組獨立折疊 + 髢標記 */
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  /* 每個分組獨立折疊 + 髢標記（全部默認折疊） */
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(groups.map(g => [g.key, true]))
+  )
   const [dirty, setDirty] = useState<Record<string, boolean>>({})
 
   /* 編輯模式：每個分組獨立控制，默認全部只讀 */

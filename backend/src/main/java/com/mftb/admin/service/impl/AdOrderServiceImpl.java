@@ -15,6 +15,7 @@ import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdAlgorithm;
+import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
@@ -23,6 +24,7 @@ import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
+import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
 import com.mftb.admin.service.AdPricingHotService;
@@ -75,6 +77,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final DataScopeService dataScopeService;
+    private final BizStoreMapper storeMapper;
 
     @Override
     public PageResult<AdOrderVO> page(long page, long size, String orderNo, Integer algoType,
@@ -105,6 +108,10 @@ public class AdOrderServiceImpl implements AdOrderService {
                 .map(AdOrderVO::from)
                 .toList();
         fillSummaries(records);
+        // 动态计算订单真实状态（基于当前时间 + 订单明细的日期/时段）
+        for (AdOrderVO vo : records) {
+            vo.setStatus(computeEffectiveStatus(vo));
+        }
         return new PageResult<>(records, result.getTotal());
     }
 
@@ -113,6 +120,8 @@ public class AdOrderServiceImpl implements AdOrderService {
         AdOrder order = require(orderNo);
         AdOrderDetailVO vo = AdOrderDetailVO.from(AdOrderVO.from(order));
         fillSummaries(List.of(vo));
+        // 动态计算订单真实状态
+        vo.setStatus(computeEffectiveStatus(vo));
         if (isNewStore(order)) {
             List<AdOrderItemNewStore> items = newStoreItemMapper.selectList(
                     new LambdaQueryWrapper<AdOrderItemNewStore>()
@@ -297,6 +306,240 @@ public class AdOrderServiceImpl implements AdOrderService {
         return detail(orderNo);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AdOrderDetailVO cancel(String orderNo) {
+        // 悲观锁: SELECT ... FOR UPDATE 防止并发取消
+        AdOrder order = orderMapper.selectOne(
+                new LambdaQueryWrapper<AdOrder>()
+                        .eq(AdOrder::getOrderNo, orderNo)
+                        .last("FOR UPDATE"));
+        if (order == null) {
+            throw new BusinessException("訂單不存在");
+        }
+        if (order.getStatus() == null || order.getStatus() > 2) {
+            throw new BusinessException("當前訂單狀態不可取消");
+        }
+
+        // 新店广告取消: 标记明细 deliveryStatus=3，无推广金回补
+        if (isNewStore(order)) {
+            List<AdOrderItemNewStore> items = newStoreItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemNewStore>()
+                            .eq(AdOrderItemNewStore::getOrderId, order.getId())
+                            .in(AdOrderItemNewStore::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可取消的明細");
+            }
+            for (AdOrderItemNewStore item : items) {
+                item.setDeliveryStatus(3);
+                newStoreItemMapper.updateById(item);
+            }
+            order.setStatus(5); // 已取消
+            order.setUpdatedBy(operatorResolver.currentOperatorName());
+            orderMapper.updateById(order);
+            return detail(orderNo);
+        }
+
+        // 取消扣费梯度配置
+        String cancelFeeTiersJson = null;
+        if (isRevive(order)) {
+            AdPricingReviveVO pricing = revivePricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
+        } else if (isHot(order)) {
+            AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
+        } else {
+            AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
+        }
+
+        FinAccount account = accountService.find(order.getGroupCode(), order.getBrand());
+        if (account == null) {
+            throw new BusinessException("推廣金賬戶不存在，無法取消");
+        }
+
+        // 按取消扣费梯度逐格计算应退金额
+        LocalDate today = LocalDate.now();
+        BigDecimal refundTotal = BigDecimal.ZERO;
+        if (isRevive(order)) {
+            List<AdOrderItemRevive> items = reviveItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemRevive>()
+                            .eq(AdOrderItemRevive::getOrderId, order.getId())
+                            .in(AdOrderItemRevive::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
+            for (AdOrderItemRevive item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                reviveItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isHot(order)) {
+            List<AdOrderItemHot> items = hotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemHot>()
+                            .eq(AdOrderItemHot::getOrderId, order.getId())
+                            .in(AdOrderItemHot::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
+            for (AdOrderItemHot item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                hotItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else {
+            List<AdOrderItemStar> items = itemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemStar>()
+                            .eq(AdOrderItemStar::getOrderId, order.getId())
+                            .in(AdOrderItemStar::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
+            for (AdOrderItemStar item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                itemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        }
+
+        BigDecimal maxRefundable = safe(order.getActualAmount()).subtract(safe(order.getRefundAmount()));
+        if (refundTotal.compareTo(maxRefundable) > 0) refundTotal = maxRefundable;
+        if (refundTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("可退款金額為 0，無法取消");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        String changeType = AdAlgoTypeNames.of(order.getAlgoType());
+        String finChannel = order.getChannel() != null && order.getChannel() == 4 ? "團購" : "外賣";
+        finWriteChainService.writeAdRefund(
+                order.getGroupCode(), order.getGroupName(), order.getBrand(),
+                order.getStoreCode(), order.getStoreName(), finChannel,
+                refundTotal, changeType, order.getBdEmpId(),
+                changeType + "廣告取消 訂單" + order.getOrderNo(), order.getOrderNo(), now);
+
+        order.setRefundAmount(round2(safe(order.getRefundAmount()).add(refundTotal)));
+        order.setStatus(5); // 已取消
+        order.setUpdatedBy(operatorResolver.currentOperatorName());
+        orderMapper.updateById(order);
+        return detail(orderNo);
+    }
+
+    /* ==================== 订单状态动态计算 ==================== */
+
+    /**
+     * 根据当前时间和订单明细动态计算订单真实状态。
+     * <p>
+     * 规则:
+     * - 终态(已退款/已取消)直接返回;
+     * - 无敌星星(按时段): 最早时段开始时间到达 → 推广中; 最晚时段结束时间已过 → 已推广;
+     * - 按天(盘活复苏/新店广告/人气商家): 首日00:00到达 → 推广中; 末日结束 → 已推广。
+     */
+    private Integer computeEffectiveStatus(AdOrderVO vo) {
+        Integer status = vo.getStatus();
+        if (status == null) return 1;
+        // 终态: 已退款(4) / 已取消(5) 直接返回
+        if (status >= 4) return status;
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        if (isStarType(vo.getAlgoType())) {
+            // 无敌星星: 按时段判定
+            List<AdOrderItemStar> items = itemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemStar>()
+                            .eq(AdOrderItemStar::getOrderId, vo.getId()));
+            return computeStarEffectiveStatus(items, today, now, status);
+        } else if (isReviveType(vo.getAlgoType())) {
+            List<AdOrderItemRevive> items = reviveItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemRevive>()
+                            .eq(AdOrderItemRevive::getOrderId, vo.getId()));
+            return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemRevive::getBizDate).toList(), today, status);
+        } else if (isNewStoreType(vo.getAlgoType())) {
+            List<AdOrderItemNewStore> items = newStoreItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemNewStore>()
+                            .eq(AdOrderItemNewStore::getOrderId, vo.getId()));
+            return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemNewStore::getBizDate).toList(), today, status);
+        } else if (isHotType(vo.getAlgoType())) {
+            List<AdOrderItemHot> items = hotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemHot>()
+                            .eq(AdOrderItemHot::getOrderId, vo.getId()));
+            return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemHot::getBizDate).toList(), today, status);
+        }
+        return status;
+    }
+
+    /**
+     * 无敌星星(按时段)订单状态计算:
+     * - 当前时间 < 最早时段开始时间 → 待推广(1)
+     * - 当前时间 > 最晚时段结束时间 → 已推广(3)
+     * - 否则 → 推广中(2)
+     */
+    private static int computeStarEffectiveStatus(List<AdOrderItemStar> items, LocalDate today, LocalDateTime now, int currentStatus) {
+        if (items.isEmpty()) return currentStatus;
+
+        // 时段开始小时映射
+        Map<String, Integer> slotStartHours = Map.of(
+                "breakfast", 6, "lunch", 10, "afternoon", 13, "dinner", 17, "supper", 21);
+        // 时段结束小时(下一时段开始): supper结束=24:00
+        Map<String, Integer> slotEndHours = Map.of(
+                "breakfast", 10, "lunch", 13, "afternoon", 17, "dinner", 21, "supper", 24);
+
+        // 找最早的推广开始时间和最晚的推广结束时间
+        LocalDate minDate = items.stream().map(AdOrderItemStar::getBizDate).min(LocalDate::compareTo).orElse(null);
+        LocalDate maxDate = items.stream().map(AdOrderItemStar::getBizDate).max(LocalDate::compareTo).orElse(null);
+        if (minDate == null || maxDate == null) return currentStatus;
+
+        // 最早日期上的最早时段
+        String earliestSlot = items.stream()
+                .filter(i -> i.getBizDate().equals(minDate))
+                .map(AdOrderItemStar::getMealSlot)
+                .min(Comparator.comparingInt(s -> slotStartHours.getOrDefault(s, 0)))
+                .orElse("breakfast");
+        // 最晚日期上的最晚时段
+        String latestSlot = items.stream()
+                .filter(i -> i.getBizDate().equals(maxDate))
+                .map(AdOrderItemStar::getMealSlot)
+                .max(Comparator.comparingInt(s -> slotEndHours.getOrDefault(s, 0)))
+                .orElse("supper");
+
+        LocalDateTime promoStart = minDate.atTime(slotStartHours.getOrDefault(earliestSlot, 6), 0);
+        int endHour = slotEndHours.getOrDefault(latestSlot, 24);
+        LocalDateTime promoEnd = maxDate.atTime(endHour == 24 ? 23 : endHour, endHour == 24 ? 59 : 0, 59);
+
+        if (now.isBefore(promoStart)) return 1; // 待推广
+        if (now.isAfter(promoEnd)) return 3;    // 已推广
+        return 2;                                // 推广中
+    }
+
+    /**
+     * 按天订单(盘活复苏/新店广告/人气商家)状态计算:
+     * - 今天 < 最早日期 → 待推广(1)
+     * - 今天 > 最晚日期 → 已推广(3)
+     * - 否则 → 推广中(2)
+     */
+    private static int computeDayBasedEffectiveStatus(List<LocalDate> dates, LocalDate today, int currentStatus) {
+        if (dates.isEmpty()) return currentStatus;
+        LocalDate minDate = dates.stream().min(LocalDate::compareTo).orElse(null);
+        LocalDate maxDate = dates.stream().max(LocalDate::compareTo).orElse(null);
+        if (minDate == null || maxDate == null) return currentStatus;
+
+        if (today.isBefore(minDate)) return 1; // 待推广
+        if (today.isAfter(maxDate)) return 3;   // 已推广
+        return 2;                                // 推广中
+    }
+
     /* ==================== 内部方法 ==================== */
 
     /**
@@ -337,7 +580,7 @@ public class AdOrderServiceImpl implements AdOrderService {
         for (AdOrderVO vo : records) {
             if (isNewStoreType(vo.getAlgoType())) {
                 List<AdOrderItemNewStore> items = newStoreByOrder.getOrDefault(vo.getId(), List.of());
-                vo.setRegions(new ArrayList<>());   // 新店广告无商圈
+                // 新店廣告無明細商圈 → 回查門店綁定的所在區域
                 vo.setMealSlots(new ArrayList<>()); // 新店广告无餐段
                 vo.setPurchaseDays(items.stream().map(AdOrderItemNewStore::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
@@ -377,6 +620,25 @@ public class AdOrderServiceImpl implements AdOrderService {
                 }
             }
             vo.setMealSlots(slots);
+        }
+        // 新店廣告：從門店綁定區域回填商圈
+        List<String> newStoreCodes = records.stream()
+                .filter(r -> isNewStoreType(r.getAlgoType()) && StringUtils.hasText(r.getStoreCode()))
+                .map(AdOrderVO::getStoreCode).distinct().toList();
+        if (!newStoreCodes.isEmpty()) {
+            Map<String, Integer> storeRegionMap = storeMapper.selectList(
+                    new LambdaQueryWrapper<BizStore>()
+                            .in(BizStore::getStoreCode, newStoreCodes)
+                            .select(BizStore::getStoreCode, BizStore::getRegion))
+                    .stream()
+                    .filter(s -> s.getRegion() != null)
+                    .collect(Collectors.toMap(BizStore::getStoreCode, BizStore::getRegion, (a, b) -> a));
+            records.stream()
+                    .filter(r -> isNewStoreType(r.getAlgoType()) && StringUtils.hasText(r.getStoreCode()))
+                    .forEach(vo -> {
+                        Integer region = storeRegionMap.get(vo.getStoreCode());
+                        vo.setRegions(region != null ? List.of(region) : new ArrayList<>());
+                    });
         }
         // 存量订单无 algo_code 快照 → 回查算法表补齐
         List<Long> missingAlgoIds = records.stream()
@@ -431,6 +693,11 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private static boolean isHotType(Integer algoType) {
         return algoType != null && algoType == 5;
+    }
+
+    /** 无敌星星订单（algo_type=1） */
+    private static boolean isStarType(Integer algoType) {
+        return algoType != null && algoType == 1;
     }
 
     /**

@@ -186,11 +186,6 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
                         .last("LIMIT 1"))
                 : null;
 
-        LocalDate minDate = request.getCells().stream()
-                .map(AdHotOrderRequest.CellSelection::getBizDate).min(LocalDate::compareTo).orElse(today);
-        LocalDate maxDate = request.getCells().stream()
-                .map(AdHotOrderRequest.CellSelection::getBizDate).max(LocalDate::compareTo).orElse(today);
-
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
         order.setAlgoType(algorithm.getAlgoType());
@@ -216,7 +211,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         order.setDiscountAmount(discountAmount);
         order.setActualAmount(actualTotal);
         order.setRefundAmount(BigDecimal.ZERO);
-        order.setStatus(!minDate.isAfter(today) && !maxDate.isBefore(today) ? 2 : 1);
+        order.setStatus(1); // 初始状态=待推广，查询时动态计算真实状态
         order.setOrderTime(now);
         order.setPayTime(now);
         order.setRemark(request.getRemark());

@@ -6,7 +6,8 @@ import java.util.Set;
  * 数据范围服务: 解析当前登录用户可见的商家集团编码集合
  * <p>
  * 权限来源: 功能角色授权(role) ∪ 部门授权(department),
- * 超管(role=admin) 返回 null 表示不限制; 无授权返回空集合(严格模式).
+ * 超管(sys_user.role=admin 或 functionRoles 绑定 sys_admin 角色) 返回 null 不限制;
+ * 无授权返回空集合(严格模式).
  */
 public interface DataScopeService {
 

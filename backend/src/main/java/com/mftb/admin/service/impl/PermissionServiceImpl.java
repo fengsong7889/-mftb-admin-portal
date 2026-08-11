@@ -33,8 +33,8 @@ public class PermissionServiceImpl implements PermissionService {
 
     /** 系统内置超管标识: sys_user.role 字段值 */
     private static final String SUPER_ADMIN_ROLE = "admin";
-    /** 系统内置超管标识: sys_role.code 字段值 */
-    private static final String SUPER_ADMIN_ROLE_CODE = "sys_admin";
+    /** 系统内置超管标识: sys_role.code 字段值（与 sys_role 种子数据对齐） */
+    private static final String SUPER_ADMIN_ROLE_CODE = "admin";
 
     private final JdbcTemplate jdbcTemplate;
 

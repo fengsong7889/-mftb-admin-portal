@@ -165,11 +165,6 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
                         .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
                         .last("LIMIT 1"));
 
-        LocalDate minDate = request.getCells().stream()
-                .map(AdNewStoreOrderRequest.CellSelection::getBizDate).min(LocalDate::compareTo).orElse(today);
-        LocalDate maxDate = request.getCells().stream()
-                .map(AdNewStoreOrderRequest.CellSelection::getBizDate).max(LocalDate::compareTo).orElse(today);
-
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
         order.setAlgoType(algorithm.getAlgoType());
@@ -197,7 +192,7 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
         order.setRefundAmount(BigDecimal.ZERO);
         order.setGiftDays(giftDays);
         order.setGiftAmount(BigDecimal.ZERO);
-        order.setStatus(!minDate.isAfter(today) && !maxDate.isBefore(today) ? 2 : 1);
+        order.setStatus(1); // 初始状态=待推广，查询时动态计算真实状态
         order.setOrderTime(now);
         order.setPayTime(now);
         order.setRemark(request.getRemark());
