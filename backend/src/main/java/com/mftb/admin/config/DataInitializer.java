@@ -109,6 +109,8 @@ public class DataInitializer implements CommandLineRunner {
         createDepartmentTableIfAbsent();
         addColumnIfAbsent("sys_department", "updated_by",
                 "ALTER TABLE sys_department ADD COLUMN updated_by VARCHAR(64) NULL COMMENT '最后更新人' AFTER sort");
+        addColumnIfAbsent("sys_department", "name_en",
+                "ALTER TABLE sys_department ADD COLUMN name_en VARCHAR(128) NULL COMMENT '部门英文名称' AFTER name");
         createPositionTableIfAbsent();
         addColumnIfAbsent("sys_position", "name_en",
                 "ALTER TABLE sys_position ADD COLUMN name_en VARCHAR(128) NULL COMMENT '职位英文名称' AFTER name");
