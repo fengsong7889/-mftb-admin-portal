@@ -2,6 +2,7 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.BatchDataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationVO;
 import com.mftb.admin.entity.BizMerchantGroup;
@@ -137,6 +138,56 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
         dataAuthMapper.deleteById(id);
         dataScopeService.evictAll();
         log.info("删除数据授权#{}: {}#{} → {}", id, entity.getTargetType(), entity.getTargetId(), entity.getGroupCode());
+    }
+
+    /* ==================== 批量操作 ==================== */
+
+    @Override
+    public List<DataAuthorizationVO> batchCreate(BatchDataAuthorizationRequest request) {
+        String operator = operatorResolver.currentOperatorName();
+        int status = request.getStatus() != null ? request.getStatus() : 1;
+
+        // 查询已存在的组合，避免重复插入
+        LambdaQueryWrapper<SysDataAuthorization> existWrapper = new LambdaQueryWrapper<SysDataAuthorization>()
+                .eq(SysDataAuthorization::getTargetType, request.getTargetType())
+                .eq(SysDataAuthorization::getTargetId, request.getTargetId())
+                .in(SysDataAuthorization::getGroupCode, request.getGroupCodes());
+        List<String> existingCodes = dataAuthMapper.selectList(existWrapper)
+                .stream().map(SysDataAuthorization::getGroupCode).toList();
+
+        List<DataAuthorizationVO> created = new ArrayList<>();
+        for (String groupCode : request.getGroupCodes()) {
+            if (existingCodes.contains(groupCode)) {
+                log.debug("批量创建跳过已存在: {}#{} → {}", request.getTargetType(), request.getTargetId(), groupCode);
+                continue;
+            }
+            SysDataAuthorization entity = new SysDataAuthorization();
+            entity.setTargetType(request.getTargetType());
+            entity.setTargetId(request.getTargetId());
+            entity.setGroupCode(groupCode);
+            entity.setStatus(status);
+            entity.setCreatedBy(operator);
+            entity.setUpdatedBy(operator);
+            dataAuthMapper.insert(entity);
+            created.add(enrichSingle(entity));
+        }
+
+        if (!created.isEmpty()) {
+            dataScopeService.evictAll();
+            log.info("批量新增数据授权: {}#{} → {} 条 (跳过 {} 条)",
+                    request.getTargetType(), request.getTargetId(), created.size(), existingCodes.size());
+        }
+        return created;
+    }
+
+    @Override
+    public void batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        int deleted = dataAuthMapper.deleteBatchIds(ids);
+        dataScopeService.evictAll();
+        log.info("批量删除数据授权: {} 条, ids={}", deleted, ids);
     }
 
     /* ==================== 内部方法 ==================== */

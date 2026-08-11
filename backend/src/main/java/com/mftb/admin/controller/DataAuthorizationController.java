@@ -2,6 +2,7 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.BatchDataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationVO;
 import com.mftb.admin.service.DataAuthorizationService;
@@ -87,5 +88,21 @@ public class DataAuthorizationController {
     @RequirePermission(menu = "data-permission")
     public Result<List<Map<String, Object>>> diagnose() {
         return Result.success(dataAuthorizationService.diagnose());
+    }
+
+    /** 批量新增数据授权 */
+    @PostMapping("/batch")
+    @RequirePermission(menu = "data-permission", action = "create")
+    public Result<List<DataAuthorizationVO>> batchCreate(@Valid @RequestBody BatchDataAuthorizationRequest request) {
+        return Result.success("批量數據授權創建成功", dataAuthorizationService.batchCreate(request));
+    }
+
+    /** 批量删除数据授权 */
+    @DeleteMapping("/batch")
+    @RequirePermission(menu = "data-permission", action = "delete")
+    public Result<Void> batchDelete(@RequestBody Map<String, List<Long>> body) {
+        List<Long> ids = body.get("ids");
+        dataAuthorizationService.batchDelete(ids);
+        return Result.success();
     }
 }

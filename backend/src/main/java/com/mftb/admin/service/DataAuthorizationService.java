@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.BatchDataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationVO;
 
@@ -34,4 +35,10 @@ public interface DataAuthorizationService {
 
     /** 诊断：检查数据授权相关表与字段是否就绪 */
     List<Map<String, Object>> diagnose();
+
+    /** 批量新增数据授权（跳过已存在的组合） */
+    List<DataAuthorizationVO> batchCreate(BatchDataAuthorizationRequest request);
+
+    /** 批量删除数据授权 */
+    void batchDelete(List<Long> ids);
 }
