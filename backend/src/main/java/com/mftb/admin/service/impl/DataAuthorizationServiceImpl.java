@@ -324,7 +324,85 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
         testQuery(result, "merchantGroupOptions", "SELECT group_code, group_name FROM biz_merchant_group WHERE deleted = 0 ORDER BY group_code");
         testQuery(result, "list", "SELECT id, target_type, target_id, group_code, status FROM sys_data_authorization WHERE deleted = 0 LIMIT 1");
 
+        // 4. 测试批量操作相关
+        testBatchCreateSteps(result);
+
         return result;
+    }
+
+    private void testBatchCreateSteps(List<Map<String, Object>> result) {
+        // 4a. 测试 selectList with IN clause
+        try {
+            LambdaQueryWrapper<SysDataAuthorization> wrapper = new LambdaQueryWrapper<SysDataAuthorization>()
+                    .eq(SysDataAuthorization::getTargetType, "role")
+                    .in(SysDataAuthorization::getGroupCode, List.of("TEST_NONEXISTENT"));
+            dataAuthMapper.selectList(wrapper);
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:selectListWithIn");
+            item.put("ok", true);
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:selectListWithIn");
+            item.put("ok", false);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
+        // 4b. 测试 insert
+        try {
+            SysDataAuthorization testEntity = new SysDataAuthorization();
+            testEntity.setTargetType("role");
+            testEntity.setTargetId(99999L);
+            testEntity.setGroupCode("TEST_DIAG");
+            testEntity.setStatus(1);
+            testEntity.setCreatedBy("diag");
+            testEntity.setUpdatedBy("diag");
+            dataAuthMapper.insert(testEntity);
+            // 清理测试数据
+            if (testEntity.getId() != null) {
+                dataAuthMapper.deleteById(testEntity.getId());
+            }
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:insert");
+            item.put("ok", true);
+            item.put("generatedId", testEntity.getId());
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:insert");
+            item.put("ok", false);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
+        // 4c. 测试 operatorResolver
+        try {
+            String op = operatorResolver.currentOperatorName();
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:operatorResolver");
+            item.put("ok", true);
+            item.put("operator", op);
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:operatorResolver");
+            item.put("ok", false);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
+        // 4d. 测试 deleteBatchIds
+        try {
+            dataAuthMapper.deleteBatchIds(List.of(99999L));
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:deleteBatchIds");
+            item.put("ok", true);
+            result.add(item);
+        } catch (Exception e) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("check", "batchStep:deleteBatchIds");
+            item.put("ok", false);
+            item.put("error", e.getMessage());
+            result.add(item);
+        }
     }
 
     private void checkTable(List<Map<String, Object>> result, String tableName) {
