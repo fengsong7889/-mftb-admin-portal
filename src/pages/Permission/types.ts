@@ -345,6 +345,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 規則配置
+  'rule-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
   // 系统模板
   'system-template': [
     { key: 'view', label: '查看' },
@@ -924,6 +929,7 @@ export const menuPermissionTree: PermissionModule[] = [
     children: [
       { key: 'menu-config', name: '菜單配置' },
       { key: 'translation-manage', name: '多語言配置' },
+      { key: 'rule-config', name: '規則配置' },
     ],
   },
 ]
@@ -992,6 +998,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // 系統配置
   'menu-config',
   'translation-manage',
+  'rule-config',
 ]
 
 /**
