@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 public interface FinDetailMapper extends BaseMapper<FinDetail> {
 
     /** 某批次上已发生的扣减合计（绝对值） */
-    @Select("SELECT IFNULL(SUM(ABS(virtual_change)), 0) FROM fin_detail "
+    @Select("SELECT IFNULL(SUM(ABS(virtual_change)), 0) FROM biz_fin_detail "
             + "WHERE batch_no = #{batchNo} AND virtual_change < 0 AND deleted = 0")
     BigDecimal sumDeductedByBatchNo(@Param("batchNo") String batchNo);
 }
