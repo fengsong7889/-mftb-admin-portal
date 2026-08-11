@@ -93,7 +93,7 @@ public class DataAuthorizationController {
     /** 批量新增数据授权 */
     @PostMapping("/batch")
     @RequirePermission(menu = "data-permission", action = "create")
-    public Result<List<DataAuthorizationVO>> batchCreate(@Valid @RequestBody BatchDataAuthorizationRequest request) {
+    public Result<List<DataAuthorizationVO>> batchCreate(@RequestBody BatchDataAuthorizationRequest request) {
         return Result.success("批量數據授權創建成功", dataAuthorizationService.batchCreate(request));
     }
 

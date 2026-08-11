@@ -147,17 +147,15 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
         String operator = operatorResolver.currentOperatorName();
         int status = request.getStatus() != null ? request.getStatus() : 1;
 
-        // 查询已存在的组合，避免重复插入
-        LambdaQueryWrapper<SysDataAuthorization> existWrapper = new LambdaQueryWrapper<SysDataAuthorization>()
-                .eq(SysDataAuthorization::getTargetType, request.getTargetType())
-                .eq(SysDataAuthorization::getTargetId, request.getTargetId())
-                .in(SysDataAuthorization::getGroupCode, request.getGroupCodes());
-        List<String> existingCodes = dataAuthMapper.selectList(existWrapper)
-                .stream().map(SysDataAuthorization::getGroupCode).toList();
-
         List<DataAuthorizationVO> created = new ArrayList<>();
         for (String groupCode : request.getGroupCodes()) {
-            if (existingCodes.contains(groupCode)) {
+            // 单条唯一性检查，避免重复插入
+            Long existCount = dataAuthMapper.selectCount(
+                    new LambdaQueryWrapper<SysDataAuthorization>()
+                            .eq(SysDataAuthorization::getTargetType, request.getTargetType())
+                            .eq(SysDataAuthorization::getTargetId, request.getTargetId())
+                            .eq(SysDataAuthorization::getGroupCode, groupCode));
+            if (existCount > 0) {
                 log.debug("批量创建跳过已存在: {}#{} → {}", request.getTargetType(), request.getTargetId(), groupCode);
                 continue;
             }
@@ -174,8 +172,8 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
 
         if (!created.isEmpty()) {
             dataScopeService.evictAll();
-            log.info("批量新增数据授权: {}#{} → {} 条 (跳过 {} 条)",
-                    request.getTargetType(), request.getTargetId(), created.size(), existingCodes.size());
+            log.info("批量新增数据授权: {}#{} → {} 条",
+                    request.getTargetType(), request.getTargetId(), created.size());
         }
         return created;
     }
@@ -303,6 +301,13 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
     @Override
     public List<Map<String, Object>> diagnose() {
         List<Map<String, Object>> result = new ArrayList<>();
+
+        // 0. 版本标识
+        Map<String, Object> version = new HashMap<>();
+        version.put("check", "version");
+        version.put("build", "20260811-v3-batchFix");
+        version.put("timestamp", System.currentTimeMillis());
+        result.add(version);
 
         // 1. 检查关键表是否存在
         checkTable(result, "sys_department");
