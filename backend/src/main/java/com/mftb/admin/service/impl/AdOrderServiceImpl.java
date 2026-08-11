@@ -28,6 +28,7 @@ import com.mftb.admin.service.AdOrderService;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingStarService;
+import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.util.AdAlgoTypeNames;
@@ -49,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -72,6 +74,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
+    private final DataScopeService dataScopeService;
 
     @Override
     public PageResult<AdOrderVO> page(long page, long size, String orderNo, Integer algoType,
@@ -80,6 +83,14 @@ public class AdOrderServiceImpl implements AdOrderService {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdOrder> wrapper = new LambdaQueryWrapper<>();
+        // 数据范围过滤: 非超管只能看到已授权的商家数据
+        Set<String> authorizedGroups = dataScopeService.resolveAuthorizedGroupCodes();
+        if (authorizedGroups != null) {
+            if (authorizedGroups.isEmpty()) {
+                return new PageResult<>(List.of(), 0L);
+            }
+            wrapper.in(AdOrder::getGroupCode, authorizedGroups);
+        }
         if (StringUtils.hasText(orderNo)) wrapper.like(AdOrder::getOrderNo, orderNo);
         if (algoType != null) wrapper.eq(AdOrder::getAlgoType, algoType);
         if (StringUtils.hasText(groupCode)) wrapper.eq(AdOrder::getGroupCode, groupCode);

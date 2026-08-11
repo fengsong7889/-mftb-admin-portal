@@ -130,6 +130,7 @@ public class DataInitializer implements CommandLineRunner {
         backfillUserSequence();
         migrateRoleMenuTable();
         migrateDepartmentMenuTable();
+        createDataAuthorizationTable();
         seedSystemMenus();
         // 再回填一次英文名: 确保本次新种子化的菜单也能拿到 name_en
         seedMenuEnglishNames();
@@ -353,6 +354,7 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("menu-config", "Menu Config"),
                 Map.entry("translation-manage", "Translation Config"),
                 Map.entry("rule-config", "Rule Config"),
+                Map.entry("promotion-order-manage", "Order Management"),
                 Map.entry("merchant-order-manage", "Order Management"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
@@ -400,6 +402,32 @@ public class DataInitializer implements CommandLineRunner {
             log.info("已自动创建部门菜单关联表 sys_department_menu");
         }
         migrateDepartmentPermissions();
+    }
+
+    /** 数据授权表: 不存在则创建 */
+    private void createDataAuthorizationTable() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_data_authorization'",
+                Integer.class);
+        if (count != null && count > 0) {
+            return;
+        }
+        jdbcTemplate.execute(
+                "CREATE TABLE sys_data_authorization ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "target_type VARCHAR(20) NOT NULL COMMENT '授权对象类型: role / department', "
+                        + "target_id BIGINT NOT NULL COMMENT '角色ID 或 部门ID', "
+                        + "group_code VARCHAR(50) NOT NULL COMMENT '授权商家集团编码', "
+                        + "status TINYINT DEFAULT 1 COMMENT '1=启用 0=停用', "
+                        + "created_by VARCHAR(64) NULL COMMENT '创建人', "
+                        + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
+                        + "deleted TINYINT DEFAULT 0 COMMENT '逻辑删除', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "UNIQUE KEY uk_target_group (target_type, target_id, group_code)"
+                        + ") COMMENT='数据授权表：角色/部门 → 可见商家范围'");
+        log.info("已自动创建数据授权表 sys_data_authorization");
     }
 
     /** 将 sys_role.permissions 旧 JSON 迁移到 sys_role_menu (按角色幂等) */
@@ -503,7 +531,8 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
         // ── 推廣通 ──
         menus.put("promotion-sales-config", new String[]{"店鋪推廣",     "promotion_tool",     "1"});
-        menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "2"});
+        menus.put("promotion-order-manage", new String[]{"訂單管理",     "promotion_tool",     "2"});
+        menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "3"});
         menus.put("promotion-report-overview", new String[]{"數據概覽",  "promotion-report-group", "1"});
         menus.put("promotion-report-order", new String[]{"訂單效果報表", "promotion-report-group", "2"});
         menus.put("promotion-report-compare", new String[]{"推薦類型對比", "promotion-report-group", "3"});
@@ -614,14 +643,7 @@ public class DataInitializer implements CommandLineRunner {
             log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
         }
 
-        // 清理已废弃的菜单：promotion-order-manage（广告销售下的订单管理已移除）
-        Long obsoleteId = queryMenuIdByKey("promotion-order-manage");
-        if (obsoleteId != null) {
-            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", obsoleteId);
-            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", obsoleteId);
-            jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", obsoleteId);
-            log.info("已清理废弃菜单 [promotion-order-manage] 及其权限关联", obsoleteId);
-        }
+        // promotion-order-manage 已纳入种子菜单，无需清理
     }
 
     /** 根据 menu_key 查询菜单ID (不存在返回 null) */

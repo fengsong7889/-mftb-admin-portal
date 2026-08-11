@@ -1127,15 +1127,17 @@ export const DATA_TARGET_TYPE = {
 
 export type DataTargetType = typeof DATA_TARGET_TYPE[keyof typeof DATA_TARGET_TYPE]
 
-/** 数据授权记录（一条 = 角色/部门 + 地区 + 商家范围） */
+/** 数据授权记录（一条 = 角色/部门 → 一个商家集团） */
 export interface DataAuthorization {
-  id: string
+  id: number
   targetType: DataTargetType
   targetId: number
-  country: string // 授权地区（countryOptions.key）
-  allMerchants: boolean // 是否授权该地区全部商家
-  merchants: string[] // 指定商家ID（allMerchants 为 false 时生效）
-  createdAt: string
-  updatedBy?: string // 最后更新人
-  updatedAt?: string // 最后更新时间
+  targetName?: string      // 角色/部门名称（后端填充）
+  groupCode: string        // 商家集团编码
+  groupName?: string       // 商家集团名称（后端填充）
+  status: number           // 1=启用 0=停用
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
 }
