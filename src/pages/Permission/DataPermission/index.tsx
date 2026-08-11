@@ -33,7 +33,7 @@ interface GroupedAuthRow {
   userCount: number
   groups: { id: number; groupCode: string; groupName?: string; status: number; updatedAt?: string }[]
   groupCount: number
-  latestUpdatedAt?: string
+  latestUpdatedAt?: string | number
   latestUpdatedBy?: string
 }
 
@@ -166,7 +166,7 @@ export default function DataPermission() {
         }
       })
     return Array.from(map.values()).map(g => ({ ...g, groupCount: g.groups.length }))
-      .sort((a, b) => (b.latestUpdatedAt || '').localeCompare(a.latestUpdatedAt || ''))
+      .sort((a, b) => String(b.latestUpdatedAt || '').localeCompare(String(a.latestUpdatedAt || '')))
   }, [authorizations, roles, t])
 
   const groupedDeptRows = useMemo<GroupedAuthRow[]>(() => {
@@ -202,7 +202,7 @@ export default function DataPermission() {
         }
       })
     return Array.from(map.values()).map(g => ({ ...g, groupCount: g.groups.length }))
-      .sort((a, b) => (b.latestUpdatedAt || '').localeCompare(a.latestUpdatedAt || ''))
+      .sort((a, b) => String(b.latestUpdatedAt || '').localeCompare(String(a.latestUpdatedAt || '')))
   }, [authorizations, departments, isNonZh, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 新增授权时可选的角色（后端已只返回启用状态） */
