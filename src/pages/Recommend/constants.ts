@@ -45,11 +45,11 @@ export enum AlgorithmType {
   NEW_STORE_AD = 2,       // 新店广告
   HOT_REVIVE_AD = 3,      // 盘活复苏
   EXCLUSIVE_MERCHANT = 4, // 独家商家
-  TRAFFIC_AD = 5,         // 流量广告
+  TRAFFIC_AD = 15,        // 流量广告（後端未定義，前端預留）
   GUESS_YOU_LIKE = 6,     // 猜你喜欢
   ORGANIC_TRAFFIC = 7,    // 自然流量
   SEARCH_ALGORITHM = 9,   // 搜索算法
-  POPULAR_MERCHANT_KA = 10, // 人气商家
+  POPULAR_MERCHANT_KA = 5, // 人气商家
   BRAND_MERCHANT = 11,       // 品牌商家(KA)
   GOLD_AD = 12,              // 点金广告
   GOLDEN_SIGNBOARD = 13,     // 金字招牌

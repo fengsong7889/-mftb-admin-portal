@@ -1565,45 +1565,26 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             </span>
           </div>
 
-          {/* 折扣汇总：时段折扣 + 时段个数梯度折上折 */}
+          {/* 價格明細（審批彈窗信息塊風格） */}
           {(() => {
-            const { totalOriginal, slotDiscountAmount: _slotDiscountAmount, tier: _tier, totalFinal } = computeCartSettlement()
+            const { totalOriginal, tier, totalFinal } = computeCartSettlement()
             const totalDiscount = Math.round((totalOriginal - totalFinal) * 100) / 100
             return (
-              <table style={{ width: '100%', fontSize: 12, marginBottom: 12 }}>
-                <thead>
-                  <tr style={{ background: '#fafafa' }}>
-                    <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>
-                      {t('orderOriginal')}
-                    </th>
-                    <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>
-                      {t('orderDiscount')}
-                    </th>
-                    <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>
-                      {t('totalPayable')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>
-                      <span style={{ fontSize: 16, fontWeight: 600, color: '#595959' }}>
-                        ${totalOriginal}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>
-                      <span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>
-                        -${totalDiscount}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center', background: '#fff7f7' }}>
-                      <span style={{ fontSize: 20, fontWeight: 700, color: '#ff4d4f' }}>
-                        ${totalFinal}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ marginBottom: 12, padding: 12, background: '#F8F8F8', borderRadius: 8 }}>
+                <div style={{ fontSize: 13, color: '#666', lineHeight: 2 }}>
+                  <div><span style={{ color: '#999' }}>{t('orderOriginal')}：</span>${totalOriginal}</div>
+                  <div>
+                    <span style={{ color: '#999' }}>享受折扣：</span>
+                    {tier ? (
+                      <span style={{ fontWeight: 600, color: '#52C41A' }}>满{tier.minSlots}个时段{tier.discount / 10}折</span>
+                    ) : (
+                      <span style={{ color: '#BFBFBF' }}>无折扣</span>
+                    )}
+                  </div>
+                  <div><span style={{ color: '#999' }}>{t('orderDiscount')}：</span><span style={{ fontWeight: 600, color: '#FA8C16' }}>-${totalDiscount}</span></div>
+                  <div><span style={{ color: '#999' }}>{t('totalPayable')}：</span><span style={{ fontSize: 15, fontWeight: 700, color: '#FF4D4F' }}>${totalFinal}</span></div>
+                </div>
+              </div>
             )
           })()}
           <Button 

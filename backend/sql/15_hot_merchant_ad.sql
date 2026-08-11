@@ -76,16 +76,8 @@ CREATE TABLE IF NOT EXISTS biz_ad_order_item_hot (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='人气商家订单明细表(皮肤x日期)';
 
 -- ============================================================
--- 四、预置人气商家算法数据（幂等: NOT EXISTS 保护）
+-- 四、预置人气商家算法数据（已废弃，不再自动插入测试数据）
+-- 说明：RQ00001 编码已由用户手动创建「澳門人氣-第一」占用，
+--       不再自动插入「人氣商家-外賣版」测试数据。
+--       如需新建人气商家算法，请通过前端「算法库」界面操作。
 -- ============================================================
-INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, slot_count, params, status, remark, updated_by)
-SELECT 'RQ00001', '人氣商家-外賣版', 5, 'flashBee', 2, 2, 10,
-       JSON_OBJECT(
-           'recallDimension', 1,
-           'rankingStage', 2,
-           'bidMode', 2,
-           'continuousPurchase', true,
-           'purchaseLimitDays', 30
-       ),
-       1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'RQ00001' AND deleted = 0) t);

@@ -25,6 +25,7 @@ export interface UserInfo {
   /** 职级 (如 M10/T5) */
   jobLevel?: string
   functionRoleIds?: number[] // 绑定的功能角色ID
+  functionRoleCodes?: string[] // 绑定的功能角色编码（如 FIN_BIZ_APPROVER）
   permissions?: MenuPermission[] // 登录时下发的合并菜单权限
 }
 

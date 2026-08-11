@@ -194,6 +194,21 @@ public class RoleServiceImpl implements RoleService {
         return result;
     }
 
+    @Override
+    public List<String> codesOf(List<Long> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) {
+            return List.of();
+        }
+        List<SysRole> roles = sysRoleMapper.selectList(
+                new LambdaQueryWrapper<SysRole>()
+                        .in(SysRole::getId, roleIds)
+                        .eq(SysRole::getStatus, 1));
+        return roles.stream()
+                .map(SysRole::getCode)
+                .filter(code -> code != null && !code.isBlank())
+                .toList();
+    }
+
     /** 保存角色菜单权限: 先清空再批量写入 */
     private void saveRoleMenus(Long roleId, List<MenuPermissionDTO> permissions) {
         sysRoleMenuMapper.delete(

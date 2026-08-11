@@ -18,6 +18,7 @@ export interface UserInfo {
   positionEn?: string // 职位英文名称
   jobLevel?: string // 职级 (如 M10/T5)
   functionRoles?: string[] // 绑定的功能角色ID数组
+  functionRoleCodes?: string[] // 绑定的功能角色编码（如 FIN_BIZ_APPROVER）
   permissions?: MenuPermission[] // 后端登录时下发的合并菜单权限
   dataPermissions?: {
     locations?: string[] // 有权限的地点
@@ -221,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             positionEn: info.positionEn,
             jobLevel: info.jobLevel,
             functionRoles: info.functionRoleIds?.map(String),
+            functionRoleCodes: info.functionRoleCodes,
             permissions: info.permissions,
           }
           localStorage.setItem('user_info', JSON.stringify(refreshed))
@@ -322,6 +324,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         positionEn: backendUser.positionEn,
         jobLevel: backendUser.jobLevel,
         functionRoles: backendUser.functionRoleIds?.map(String),
+        functionRoleCodes: backendUser.functionRoleCodes,
         permissions: backendUser.permissions,
       }
       setIsAuthenticated(true)

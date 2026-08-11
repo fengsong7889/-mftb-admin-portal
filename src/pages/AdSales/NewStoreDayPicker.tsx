@@ -77,8 +77,10 @@ export default function NewStoreDayPicker() {
 
   useEffect(() => {
     fetchAdAlgorithms({ algoType: 2, status: 1, size: 100 }).then(res => {
+      // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
+      const records = (res.records || []).filter(a => a.updatedBy !== '系統')
       setAlgorithmOptions(
-        (res.records || []).map(a => ({ label: a.algoName, value: a.id!, brand: a.brand }))
+        records.map(a => ({ label: a.algoName, value: a.id!, brand: a.brand }))
       )
     }).catch(() => {})
   }, [])

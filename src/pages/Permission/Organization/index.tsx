@@ -324,6 +324,12 @@ export default function OrganizationManagement() {
     const isEnable = record.status === DEPT_STATUS.DISABLED
     Modal.confirm({
       title: isEnable ? t('organization.confirmEnableTitle') : t('organization.confirmDisableTitle'),
+      icon: (
+        <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+      ),
+      centered: true,
+      className: 'custom-confirm-modal',
+      width: 520,
       content: isEnable
         ? t('organization.confirmEnableContent', { name: record.name })
         : t('organization.confirmDisableContent', { name: record.name }),

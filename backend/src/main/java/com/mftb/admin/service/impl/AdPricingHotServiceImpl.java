@@ -179,6 +179,8 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             entity.setPricingId(pricingId);
             entity.setSkinName(skin.getSkinName());
             entity.setPrice(skin.getPrice() == null ? BigDecimal.ZERO : skin.getPrice());
+            entity.setBorderType(StringUtils.hasText(skin.getBorderType()) ? skin.getBorderType() : "color");
+            entity.setBorderColor(skin.getBorderColor());
             entity.setDeleted(0);
             skinMapper.insert(entity);
         }
@@ -195,6 +197,8 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             item.setId(skin.getId());
             item.setSkinName(skin.getSkinName());
             item.setPrice(skin.getPrice());
+            item.setBorderType(skin.getBorderType());
+            item.setBorderColor(skin.getBorderColor());
             vo.getSkins().add(item);
         }
         return vo;

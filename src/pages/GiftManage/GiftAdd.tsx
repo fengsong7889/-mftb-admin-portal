@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Button, Form, Input, Select, Tag, InputNumber, Upload, message } from 'antd'
+import { Button, Form, Input, Select, Tag, InputNumber, Upload, message, Modal } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -120,33 +120,80 @@ export default function GiftAdd() {
       const certificateFiles = form.getFieldValue('certificate') || []
       const credentials = certificateFiles.map((f: { name?: string }) => f.name || '').filter(Boolean)
 
-      // 提交審批記錄（TG 流程號）：審批全部通過後才寫入贈送記錄/剩餘天數
       const group = groups.find(g => g.id === values.groupId)
       const store = stores.find(s => s.id === values.storeId)
-      const flowNo = mockSubmitApproval({
-        approvalType: 'gift',
-        groupId: group?.groupCode || String(values.groupId),
-        groupName: group?.groupName || '',
-        brand: values.brand,
-        extra: {
-          groupId: values.groupId,
-          groupCode: group?.groupCode,
-          groupName: group?.groupName,
-          storeId: values.storeId,
-          storeCode: store?.storeCode,
-          storeName: store?.storeName,
-          adType: values.adType,
-          giftDays: values.giftDays,
-          validDays: values.validDays,
-          reason: values.reason,
-          remark: values.reason,
-          credentials,
+      const adLabel = adTypeOptions.find(o => o.value === values.adType)?.label || values.adType
+
+      // ====== 二次確認彈窗 ======
+      Modal.confirm({
+        title: t('confirmSubmit'),
+        icon: (
+          <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+        ),
+        centered: true,
+        className: 'custom-confirm-modal',
+        width: 520,
+        okText: t('common:confirmSubmit'),
+        cancelText: t('common:cancel'),
+        content: (
+          <div>
+            <div className="confirm-info-card">
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('common:colGroupName')}</span>
+                <span className="confirm-info-value">{group?.groupName || '-'}</span>
+              </div>
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('common:colStoreName')}</span>
+                <span className="confirm-info-value">{store?.storeName || '-'}</span>
+              </div>
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('adType')}</span>
+                <span className="confirm-info-value">{adLabel}</span>
+              </div>
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('giftDays')}</span>
+                <span className="confirm-info-value highlight">{values.giftDays} {t('dayUnit')}</span>
+              </div>
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('validDays')}</span>
+                <span className="confirm-info-value">{values.validDays} {t('dayUnit')}</span>
+              </div>
+            </div>
+          </div>
+        ),
+        onOk: async () => {
+          try {
+            // 提交審批記錄（TG 流程號）：審批全部通過後才寫入贈送記錄/剩餘天數
+            const flowNo = mockSubmitApproval({
+              approvalType: 'gift',
+              groupId: group?.groupCode || String(values.groupId),
+              groupName: group?.groupName || '',
+              brand: values.brand,
+              extra: {
+                groupId: values.groupId,
+                groupCode: group?.groupCode,
+                groupName: group?.groupName,
+                storeId: values.storeId,
+                storeCode: store?.storeCode,
+                storeName: store?.storeName,
+                adType: values.adType,
+                giftDays: values.giftDays,
+                validDays: values.validDays,
+                reason: values.reason,
+                remark: values.reason,
+                credentials,
+              },
+            })
+
+            setSubmittedFlowNo(flowNo)
+            setCountdown(5)
+            // 等待確認彈窗完全關閉後再顯示成功彈窗
+            setTimeout(() => setSuccessVisible(true), 350)
+          } catch (err: unknown) {
+            message.error(t('submitFailed'))
+          }
         },
       })
-
-      setSubmittedFlowNo(flowNo)
-      setCountdown(5)
-      setSuccessVisible(true)
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
       message.error(t('submitFailed'))

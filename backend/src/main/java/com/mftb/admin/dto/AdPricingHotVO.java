@@ -64,5 +64,9 @@ public class AdPricingHotVO {
         private Long id;
         private String skinName;
         private BigDecimal price;
+        /** 边框方式: none=无边框 color=选择配色 image=上传边框图 */
+        private String borderType;
+        /** 边框颜色(HEX, borderType=color时生效) */
+        private String borderColor;
     }
 }

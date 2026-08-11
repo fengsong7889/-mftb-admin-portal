@@ -231,7 +231,8 @@ export default function PopularSkinPricing() {
     fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1 })
       .then(res => {
         if (res.records?.length) {
-          setAlgorithmOptions(res.records.map(a => ({
+          // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
+          setAlgorithmOptions(res.records.filter(a => a.updatedBy !== '系統').map(a => ({
             id: a.id!,
             name: a.algoName,
             app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
@@ -286,11 +287,13 @@ export default function PopularSkinPricing() {
             }
           } catch { /* ignore */ }
         }
-        // 回填皮膚列表
+        // 回填皮膚列表（含邊框方式與顏色）
         if (data.skins?.length) {
           setSkins(data.skins.map((s: AdHotSkinPrice) => createSkin({
             name: s.skinName,
             price: s.price,
+            borderType: (s.borderType === 'none' || s.borderType === 'color' || s.borderType === 'image') ? s.borderType : 'color',
+            borderColor: s.borderColor || '#FF4D4F',
           })))
         }
       })
@@ -455,7 +458,12 @@ export default function PopularSkinPricing() {
           : undefined,
         blockMerchant: 2, // 默認不屏蔽
         status,
-        skins: skins.map(s => ({ skinName: s.name, price: s.price! })),
+        skins: skins.map(s => ({
+          skinName: s.name,
+          price: s.price!,
+          borderType: s.borderType,
+          borderColor: s.borderType === 'color' ? s.borderColor : undefined,
+        })),
       }
       try {
         if (isEditMode) {

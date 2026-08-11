@@ -15,6 +15,9 @@ import {
   rejectCurrentNode,
   getApprovalRecordByFlowNo,
   updateApprovalRecord,
+  hasNodeApprovalRole,
+  getRequiredApprovalRole,
+  APPROVAL_NODE_LABELS,
 } from '../../utils/approvalStore'
 import {
   fetchFinApprovalDetail,
@@ -581,6 +584,17 @@ export default function ApprovalDetail() {
   }, [flowNo, fallbackDetail])
 
   const handleApprove = () => {
+    // 推廣贈送 TG 流程為前端審批，需校驗當前人是否具備當前節點角色權限
+    if (type === 'gift') {
+      const localRecord = getApprovalRecordByFlowNo(flowNo)
+      if (localRecord) {
+        const check = hasNodeApprovalRole(localRecord)
+        if (!check.ok) {
+          message.error(`您沒有「${check.nodeName}」節點的角色權限，無法審批`)
+          return
+        }
+      }
+    }
     Modal.confirm({
       title: t('approvalDetail.approveConfirm'),
       content: t('approvalDetail.approveContent'),
@@ -621,6 +635,17 @@ export default function ApprovalDetail() {
   const handleRejectConfirm = async () => {
     if (!rejectReason.trim()) {
       return
+    }
+    // 推廣贈送 TG 流程為前端審批，需校驗當前人是否具備當前節點角色權限
+    if (type === 'gift') {
+      const localRecord = getApprovalRecordByFlowNo(flowNo)
+      if (localRecord) {
+        const check = hasNodeApprovalRole(localRecord)
+        if (!check.ok) {
+          message.error(`您沒有「${check.nodeName}」節點的角色權限，無法駁回`)
+          return
+        }
+      }
     }
     setSubmitting(true)
     try {
@@ -1289,6 +1314,26 @@ export default function ApprovalDetail() {
         )}
         {isPending && (
           <>
+            {/* 赠送审批角色权限提示：显示当前节点所需角色 */}
+            {type === 'gift' && (() => {
+              const localRecord = getApprovalRecordByFlowNo(flowNo)
+              if (!localRecord) return null
+              const requiredRole = getRequiredApprovalRole(localRecord)
+              if (!requiredRole) return null
+              const nodeName = APPROVAL_NODE_LABELS[requiredRole] || requiredRole
+              // 检查当前用户是否有该角色
+              let hasRole = false
+              try {
+                const info = JSON.parse(localStorage.getItem('user_info') || '{}')
+                if (info.role === 'admin') hasRole = true
+                else hasRole = (info.functionRoleCodes || []).includes(requiredRole)
+              } catch { /* ignore */ }
+              return (
+                <Tag color={hasRole ? 'green' : 'red'} style={{ marginRight: 4 }}>
+                  當前節點：{nodeName}{hasRole ? ' ✓' : ' ✗'}
+                </Tag>
+              )
+            })()}
             <Button type="primary" loading={submitting} onClick={handleApprove}>{t('approvalCenter.statusApproved')}</Button>
             <Button danger loading={submitting} onClick={handleReject}>{t('approvalCenter.statusRejected')}</Button>
           </>

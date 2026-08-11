@@ -647,6 +647,10 @@ export interface AdHotSkinPrice {
   skinName: string
   /** 皮膚日單價（MOP） */
   price: number
+  /** 邊框方式: none=無邊框 color=選擇配色 image=上傳邊框圖 */
+  borderType?: string
+  /** 邊框顏色(HEX, borderType=color 時生效) */
+  borderColor?: string
 }
 
 /** 人氣商家計價配置（與後端 AdPricingHotVO 對齊） */
@@ -751,6 +755,10 @@ export interface AdHotInventoryCell {
   skinName: string
   /** 皮膚日單價 */
   price: number
+  /** 邊框方式: none=無邊框 color=選擇配色 image=上傳邊框圖 */
+  borderType?: string
+  /** 邊框顏色(HEX, borderType=color 時生效) */
+  borderColor?: string
   /** 格子狀態: available=可購買 purchased=本商家已購買 */
   status: 'available' | 'purchased'
 }
@@ -763,6 +771,8 @@ export interface AdHotInventoryVO {
   discountTiers?: string
   /** 退款開關: 1=允許退款 2=不允許 */
   refundEnabled?: number
+  /** 皮膚銷量統計: 皮膚名稱 → 售出的訂單數 */
+  skinSoldCounts?: Record<string, number>
   cells: AdHotInventoryCell[]
 }
 

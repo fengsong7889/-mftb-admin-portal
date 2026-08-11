@@ -20,7 +20,7 @@ import {
   ALGO_CARD_COLOR_MAP,
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdAlgorithm } from '../../../api/adPromotion'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
 
@@ -76,7 +76,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
 /** 後端計價配置 → 定價列表行（按來源設置算法類型） */
 const toPricingRow = (vo: AdPricingStar, algoType: AlgorithmType): WaterfallSlotConfig => ({
   id: -(vo.id ?? 0),
-  adId: `${algoType === AlgorithmType.HOT_REVIVE_AD ? 'RV' : 'PR'}${String(vo.id ?? 0).padStart(6, '0')}`,
+  adId: `${algoType === AlgorithmType.HOT_REVIVE_AD ? 'RV' : algoType === AlgorithmType.POPULAR_MERCHANT_KA ? 'HT' : 'PR'}${String(vo.id ?? 0).padStart(6, '0')}`,
   promotionName: vo.algoName || '-',
   app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
   channel: (vo.channel ?? RecommendChannel.DELIVERY) as RecommendChannel,
@@ -177,19 +177,21 @@ export default function Waterfall() {
   const tAlgorithmTypeOptions = useMemo(() => ALGORITHM_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const tRegionOptions = useMemo(() => REGION_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
-  /** 加載定價列表（無敵星星 + 盤活復蘇並行拉取後合併）+ 算法列表 */
+  /** 加載定價列表（無敵星星 + 盤活復蘇 + 人氣商家並行拉取後合併）+ 算法列表 */
   useEffect(() => {
     let mounted = true
     Promise.all([
       fetchAdPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
       fetchAdRevivePricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
+      fetchAdHotPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingHot[], total: 0 })),
       fetchAdAlgorithms({ page: 1, size: 500 }).catch(() => ({ records: [] as AdAlgorithm[], total: 0 })),
     ])
-      .then(([starRes, reviveRes, algoRes]) => {
+      .then(([starRes, reviveRes, hotRes, algoRes]) => {
         if (!mounted) return
         const list = [
           ...(starRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.INVINCIBLE_STAR)),
           ...(reviveRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.HOT_REVIVE_AD)),
+          ...(hotRes.records ?? []).map(vo => toPricingRow(vo as unknown as AdPricingStar, AlgorithmType.POPULAR_MERCHANT_KA)),
         ]
         setDataList(list)
         // 缓存全量算法列表供新增/编辑弹窗筛选
@@ -341,6 +343,8 @@ export default function Waterfall() {
           try {
             if (record.algorithmType === AlgorithmType.HOT_REVIVE_AD) {
               await deleteAdRevivePricing(-record.id)
+            } else if (record.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA) {
+              await deleteAdHotPricing(-record.id)
             } else {
               await deleteAdPricing(-record.id)
             }
@@ -371,6 +375,8 @@ export default function Waterfall() {
           try {
             if (record.algorithmType === AlgorithmType.HOT_REVIVE_AD) {
               await updateAdRevivePricingStatus(-record.id, newStatus)
+            } else if (record.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA) {
+              await updateAdHotPricingStatus(-record.id, newStatus)
             } else {
               await updateAdPricingStatus(-record.id, newStatus)
             }

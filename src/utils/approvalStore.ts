@@ -108,6 +108,53 @@ function currentOperatorSignature(): string {
   return '系統管理員'
 }
 
+/* ==================== 審批節點角色校驗 ==================== */
+
+/** 三個審批節點對應的角色編碼（與後端 FinApprovalServiceImpl 一致） */
+export const APPROVAL_ROLE_CODES = {
+  BIZ: 'FIN_BIZ_APPROVER',   // 業務主管審批
+  OPS: 'FIN_OPS_APPROVER',   // 運營主管審批
+  FIN: 'FIN_FIN_APPROVER',   // 財務主管審批
+} as const
+
+/** 節點名稱映射（校驗失敗時展示用） */
+export const APPROVAL_NODE_LABELS: Record<string, string> = {
+  [APPROVAL_ROLE_CODES.BIZ]: '業務主管審批',
+  [APPROVAL_ROLE_CODES.OPS]: '運營主管審批',
+  [APPROVAL_ROLE_CODES.FIN]: '財務主管審批',
+}
+
+/**
+ * 根據審批記錄定位當前待審節點所需的角色編碼
+ * @returns 所需角色編碼，若無待審節點返回 null
+ */
+export function getRequiredApprovalRole(record: ApprovalRecord): string | null {
+  if (record.bizApproveStatus === 'pending') return APPROVAL_ROLE_CODES.BIZ
+  if (record.opsApproveStatus === 'pending') return APPROVAL_ROLE_CODES.OPS
+  if (record.finApproveStatus === 'pending') return APPROVAL_ROLE_CODES.FIN
+  return null
+}
+
+/**
+ * 校驗當前登錄人是否具備審批指定節點的角色權限
+ * - admin 角色直接放行（與後端 requireNodeRole 一致）
+ * - 否則檢查 functionRoleCodes 是否包含所需角色編碼
+ */
+export function hasNodeApprovalRole(record: ApprovalRecord): { ok: boolean; requiredRole?: string; nodeName?: string } {
+  try {
+    const info = JSON.parse(localStorage.getItem('user_info') || '{}')
+    // admin 全放行
+    if (info.role === 'admin') return { ok: true }
+    const roleCodes: string[] = info.functionRoleCodes || []
+    const requiredRole = getRequiredApprovalRole(record)
+    if (!requiredRole) return { ok: false, nodeName: '未知節點' }
+    if (roleCodes.includes(requiredRole)) return { ok: true, requiredRole }
+    return { ok: false, requiredRole, nodeName: APPROVAL_NODE_LABELS[requiredRole] || requiredRole }
+  } catch {
+    return { ok: false, nodeName: '未知節點' }
+  }
+}
+
 /** 審批節點推進結果 */
 export interface ApproveNodeResult {
   nodeName: string // 本次通過的節點名稱

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider, type UploadFile } from 'antd'
+import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider, Modal, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -252,23 +252,64 @@ export default function MergeAdd() {
         }
       }
       if (certificateFiles.length === 0) { message.warning(t('accountBalance.uploadCertificate')); return }
-      // 提交審批記錄
-      const payload: MergeApplyPayload = {
-        sourceGroupId,
-        sourceGroupName: sourceAccount?.groupName || '',
-        brand: sourceBrand || 'mFood',
-        sourceVirtualBalance,
-        sourceDebtAmount,
-        targetGroupId,
-        targetGroupName: targetAccount?.groupName || '',
-        repayStores: repayRows.map(r => ({ storeId: storeCodeOf(r.storeLabel), storeLabel: r.storeLabel, bd: r.bd, amount: r.amount })),
-        remark: form.getFieldValue('remark') || '',
-      }
-      setSubmitting(true)
-      const flowNo = await submitMergeApply(payload)
-      setSubmittedFlowNo(flowNo)
-      setCountdown(5)
-      setSuccessVisible(true)
+      // ====== 二次確認彈窗 ======
+      const sourceName = sourceAccount?.groupName || ''
+      const targetName = targetAccount?.groupName || ''
+      Modal.confirm({
+        title: t('accountBalance.confirmSubmitTitle'),
+        icon: (
+          <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+        ),
+        centered: true,
+        className: 'custom-confirm-modal',
+        width: 520,
+        okText: t('common:confirmSubmit'),
+        cancelText: t('common:cancel'),
+        content: (
+          <div>
+            <div className="confirm-info-card">
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.cancelGroup')}</span>
+              <span className="confirm-info-value">{sourceName}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.survivingGroup')}</span>
+              <span className="confirm-info-value">{targetName}</span>
+            </div>
+            {sourceVirtualBalance > 0 && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.virtualBalance')}</span>
+              <span className="confirm-info-value highlight">MOP {sourceVirtualBalance.toLocaleString()}</span>
+            </div>}
+            {sourceDebtAmount > 0 && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.debtAmount')}</span>
+              <span className="confirm-info-value danger">MOP {sourceDebtAmount.toLocaleString()}</span>
+            </div>}
+            </div>
+          </div>
+        ),
+        onOk: async () => {
+          try {
+            const payload: MergeApplyPayload = {
+              sourceGroupId,
+              sourceGroupName: sourceAccount?.groupName || '',
+              brand: sourceBrand || 'mFood',
+              sourceVirtualBalance,
+              sourceDebtAmount,
+              targetGroupId,
+              targetGroupName: targetAccount?.groupName || '',
+              repayStores: repayRows.map(r => ({ storeId: storeCodeOf(r.storeLabel), storeLabel: r.storeLabel, bd: r.bd, amount: r.amount })),
+              remark: form.getFieldValue('remark') || '',
+            }
+            const flowNo = await submitMergeApply(payload)
+            setSubmittedFlowNo(flowNo)
+            setCountdown(5)
+            // 等待確認彈窗完全關閉後再顯示成功彈窗
+            setTimeout(() => setSuccessVisible(true), 350)
+          } catch (err) {
+            message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
+          }
+        },
+      })
     } catch (err) {
       // 表單校驗未通過時 antd 已在字段標紅；財務接口為靜默請求，後端業務錯誤需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {

@@ -37,4 +37,7 @@ public interface RoleService {
 
     /** 合并多个角色的菜单权限 (仅启用状态角色) */
     List<MenuPermissionDTO> mergePermissions(List<Long> roleIds);
+
+    /** 根据角色ID列表查询对应的角色编码列表 (仅启用状态角色) */
+    List<String> codesOf(List<Long> roleIds);
 }

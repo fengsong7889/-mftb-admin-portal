@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Tag, Button, Space, message, Table, Empty, Modal, Select, Card, Form, InputNumber, Alert } from 'antd'
+import { Tag, Button, Space, message, Table, Empty, Modal, Select, Card, Form, InputNumber, Alert, Radio } from 'antd'
 import {
   ShoppingCartOutlined,
   CalendarOutlined,
@@ -26,6 +26,7 @@ import {
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
 import { fetchGiftAvailableDays } from '../../api/gift'
+import { usePaymentRule } from '../../hooks/usePaymentRule'
 
 /** 赠送管理中盘活复苏的广告类型标识（与后端一致） */
 const GIFT_AD_TYPE = 'revival'
@@ -121,6 +122,10 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
   const [paying, setPaying] = useState(false)
   const [locking, setLocking] = useState(false)
+  // 支付規則（是否支持混合支付）
+  const { mixedPayment } = usePaymentRule(GIFT_AD_TYPE)
+  // 非混合支付時的選擇模式：'promo' = 推廣金支付, 'gift' = 贈送天數抵扣
+  const [paymentMode, setPaymentMode] = useState<'promo' | 'gift'>('promo')
 
   // 查询条件状态
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
@@ -198,7 +203,9 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       .then(res => {
         if (!res) return
         const brandOverrides: Record<string, string> = {}
-        const options = res.records.map(a => {
+        // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
+        const records = res.records.filter(a => a.updatedBy !== '系統')
+        const options = records.map(a => {
           const value = String(a.id)
           const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
           if (uiBrand) brandOverrides[value] = uiBrand
@@ -441,9 +448,11 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const maxGiftDaysUsable = Math.min(giftDaysBalance, cartSummary.totalDays)
   const effectiveGiftDays = Math.min(giftDaysUsed, maxGiftDaysUsable)
   const giftDeduction = useMemo(() => {
+    // 非混合支付且選擇推廣金模式時，不使用贈送天數抵扣
+    if (!mixedPayment && paymentMode === 'promo') return 0
     if (effectiveGiftDays <= 0 || cartSummary.totalDays === 0) return 0
     return Math.min(cartSummary.totalSale, Math.round(cartSummary.totalSale / cartSummary.totalDays * effectiveGiftDays))
-  }, [effectiveGiftDays, cartSummary])
+  }, [effectiveGiftDays, cartSummary, mixedPayment, paymentMode])
   const payableAmount = cartSummary.totalSale - giftDeduction
 
   // 按月分组已选日期
@@ -550,7 +559,27 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     return { background: '#fff', cursor: 'pointer', border: '1px solid #e8e8e8', color: '#333' }
   }
 
-  const handlePayment = () => { setIsPaymentModalVisible(true) }
+  const handlePayment = () => {
+    if (cartItems.length === 0) return
+    // 校驗餘額是否充足
+    if (!mixedPayment && paymentMode === 'promo') {
+      if (cartSummary.totalSale > (merchantBalance ?? 0)) {
+        message.error('推廣金餘額不足，請充值後再試')
+        return
+      }
+    } else if (!mixedPayment && paymentMode === 'gift') {
+      if (giftDaysBalance < cartSummary.totalDays) {
+        message.error('贈送天數餘額不足，無法抵扣')
+        return
+      }
+    } else if (mixedPayment) {
+      if (payableAmount > (merchantBalance ?? 0)) {
+        message.error('推廣金餘額不足，請充值後再試')
+        return
+      }
+    }
+    setIsPaymentModalVisible(true)
+  }
 
   // 确认支付：真实下单（推广金扣款 + 赠送天数抵扣）
   const handleConfirmPayment = async () => {
@@ -950,58 +979,93 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
 
         {/* 费用结算 */}
         <Card size="small" title={t('settlementTitle')}>
-          <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
-          </div>
-          {/* 贈送天數抵扣：贈送管理發放的推廣天數可抵扣本單費用（按折後日均價折算） */}
-          <div style={{ border: '1px solid #FFD591', background: '#FFF7E6', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>{t('giftDeductionTitle')}</span>
-              <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('availableBalance')} <span style={{ fontWeight: 700, color: '#E8720C' }}>{giftDaysBalance}</span> {t('dayUnitSuffix')}</span>
+          {/* 支付方式選擇（非混合支付時顯示） */}
+          {!mixedPayment && (
+            <div style={{ marginBottom: 12, padding: '10px 12px', background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, color: '#595959', marginBottom: 8, fontWeight: 500 }}>支付方式選擇</div>
+              <Radio.Group value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
+                <Radio value="promo">推廣金支付</Radio>
+                <Radio value="gift">贈送天數抵扣</Radio>
+              </Radio.Group>
             </div>
-            {giftDaysBalance === 0 ? (
-              <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('noGiftDaysAvailable')}</div>
-            ) : cartSummary.totalDays === 0 ? (
-              <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('addCartToDeduct')}</div>
-            ) : (
+          )}
+          {/* 推廣金餘額（混合支付時或非混合支付選擇推廣金時顯示） */}
+          {(mixedPayment || paymentMode === 'promo') && (
+            <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
+            </div>
+          )}
+          {/* 贈送天數抵扣（混合支付時或非混合支付選擇贈送天數時顯示） */}
+          {(mixedPayment || paymentMode === 'gift') && (
+            <div style={{ border: '1px solid #FFD591', background: '#FFF7E6', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>{t('giftDeductionTitle')}</span>
+                <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('availableBalance')} <span style={{ fontWeight: 700, color: '#E8720C' }}>{giftDaysBalance}</span> {t('dayUnitSuffix')}</span>
+              </div>
+              {giftDaysBalance === 0 ? (
+                <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('noGiftDaysAvailable')}</div>
+              ) : cartSummary.totalDays === 0 ? (
+                <div style={{ fontSize: 11, color: '#bfbfbf' }}>{t('addCartToDeduct')}</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('deductLabel')}</span>
+                    <InputNumber
+                      size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
+                      onChange={(v) => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
+                      style={{ width: 72 }}
+                    />
+                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('dayUnitSuffix')}</span>
+                    <Button size="small" type="link" style={{ padding: 0, fontSize: 12, marginLeft: 'auto' }}
+                      onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>{t('deductAll')}</Button>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
+                    {t('maxDeductHint', { max: maxGiftDaysUsable })} <span style={{ fontWeight: 700, color: '#E8720C' }}>-${giftDeduction}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {/* 價格明細（按支付方式分支展示） */}
+          <div style={{ background: '#FAFAFA', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ color: '#8C8C8C' }}>{t('orderOriginal')}</span>
+              <span style={{ fontWeight: 600, color: '#595959' }}>${cartSummary.totalOriginal}</span>
+            </div>
+            {/* 混合支付 / 推廣金支付：顯示享受折扣 */}
+            {(mixedPayment || paymentMode === 'promo') && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#8C8C8C' }}>享受折扣</span>
+                {currentDiscount ? (
+                  <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentDiscount.minDays}天{currentDiscount.discount / 10}折</span>
+                ) : (
+                  <span style={{ fontWeight: 600, color: '#BFBFBF' }}>无折扣</span>
+                )}
+              </div>
+            )}
+            {/* 混合支付 / 贈送天數支付：顯示贈送天數抵扣 */}
+            {(mixedPayment || paymentMode === 'gift') && effectiveGiftDays > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#8C8C8C' }}>赠送天数抵扣</span>
+                <span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天（-${giftDeduction}）</span>
+              </div>
+            )}
+            {/* 混合支付 / 推廣金支付：顯示訂單優惠和實付總額 */}
+            {(mixedPayment || paymentMode === 'promo') && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('deductLabel')}</span>
-                  <InputNumber
-                    size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
-                    onChange={(v) => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
-                    style={{ width: 72 }}
-                  />
-                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('dayUnitSuffix')}</span>
-                  <Button size="small" type="link" style={{ padding: 0, fontSize: 12, marginLeft: 'auto' }}
-                    onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>{t('deductAll')}</Button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ color: '#8C8C8C' }}>{t('orderDiscount')}</span>
+                  <span style={{ fontWeight: 600, color: '#FA8C16' }}>-${cartSummary.totalDiscount}</span>
                 </div>
-                <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
-                  {t('maxDeductHint', { max: maxGiftDaysUsable })} <span style={{ fontWeight: 700, color: '#E8720C' }}>-${giftDeduction}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #E8E8E8', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ color: '#262626', fontWeight: 600 }}>{t('totalPayable')}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#FF4D4F' }}>${payableAmount}</span>
                 </div>
               </>
             )}
           </div>
-          <table style={{ width: '100%', fontSize: 12, marginBottom: 12, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#fafafa' }}>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>{t('orderOriginal')}</th>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>{t('orderDiscount')}</th>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#E8720C', fontSize: 12, fontWeight: 600 }}>{t('giftDeductionCol')}</th>
-                <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>{t('totalPayable')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 15, fontWeight: 600, color: '#595959' }}>${cartSummary.totalOriginal}</span></td>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 15, fontWeight: 600, color: '#fa8c16' }}>-${cartSummary.totalDiscount}</span></td>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}><span style={{ fontSize: 15, fontWeight: 600, color: '#E8720C' }}>-${giftDeduction}</span></td>
-                <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center', background: '#fff7f7' }}><span style={{ fontSize: 20, fontWeight: 700, color: '#ff4d4f' }}>${payableAmount}</span></td>
-              </tr>
-            </tbody>
-          </table>
-          <Button type="primary" block size="large" disabled={cartItems.length === 0} onClick={handlePayment}
+          <Button type="primary" block size="large" icon={<ShoppingCartOutlined />} disabled={cartItems.length === 0} onClick={handlePayment}
             style={{ background: cartItems.length > 0 ? '#ff4d4f' : '#d9d9d9', borderColor: cartItems.length > 0 ? '#ff4d4f' : '#d9d9d9', height: 44, fontSize: 16, fontWeight: 600 }}>
             {t('payButton')}
           </Button>
@@ -1036,7 +1100,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span><span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>{t('orderDiscountLabel')}</span><span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span></div>
-          {effectiveGiftDays > 0 && (
+          {giftDeduction > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#E8720C' }}><span>{t('giftDaysDeductDetail', { days: effectiveGiftDays })}</span><span style={{ fontWeight: 600 }}>-${giftDeduction}</span></div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span><span style={{ fontWeight: 700 }}>${payableAmount}</span></div>

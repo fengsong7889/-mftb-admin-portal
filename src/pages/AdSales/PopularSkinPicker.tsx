@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode, CSSProperties } from 'react'
-import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, Tag, message, InputNumber, Radio } from 'antd'
+import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, message, InputNumber, Radio } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -138,7 +138,7 @@ const posterSlogan = (skinId: number) => POSTER_SLOGANS[skinId % POSTER_SLOGANS.
 const SALE_SKINS: SaleSkin[] = [
   {
     id: 1, name: '紅運當頭', pricePerDay: 28, borderType: 'color', borderColor: '#FF4D4F',
-    tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', desc: '喜慶紅框，節慶檔期首選', sold: 386, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', desc: '喜慶紅框，節慶檔期首選', sold: 386, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 2, name: '橙意滿滿', pricePerDay: 18, borderType: 'color', borderColor: '#E8720C',
@@ -146,11 +146,11 @@ const SALE_SKINS: SaleSkin[] = [
   },
   {
     id: 3, name: '紫氣東來', pricePerDay: 22, borderType: 'color', borderColor: '#722ED1',
-    tagBg: 'linear-gradient(135deg, #722ED1, #9254DE)', desc: '高級紫框，品質商家氛圍感', sold: 208, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #722ED1, #9254DE)', desc: '高級紫框，品質商家氛圍感', sold: 208, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 4, name: '簡約無框', pricePerDay: 8, borderType: 'none',
-    tagBg: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', desc: '無邊框輕量款，入門首選', sold: 655, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', desc: '無邊框輕量款，入門首選', sold: 655, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 5, name: '金碧輝煌', pricePerDay: 32, borderType: 'color', borderColor: '#FAAD14',
@@ -158,27 +158,27 @@ const SALE_SKINS: SaleSkin[] = [
   },
   {
     id: 6, name: '碧海藍天', pricePerDay: 20, borderType: 'color', borderColor: '#1890FF',
-    tagBg: 'linear-gradient(135deg, #1890FF, #40A9FF)', desc: '清爽藍框，飲品甜品百搭', sold: 294, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #1890FF, #40A9FF)', desc: '清爽藍框，飲品甜品百搭', sold: 294, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 7, name: '翠綠生機', pricePerDay: 20, borderType: 'color', borderColor: '#52C41A',
-    tagBg: 'linear-gradient(135deg, #52C41A, #73D13D)', desc: '健康綠框，輕食沙拉首選', sold: 231, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #52C41A, #73D13D)', desc: '健康綠框，輕食沙拉首選', sold: 231, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 8, name: '青峰翡翠', pricePerDay: 24, borderType: 'color', borderColor: '#13C2C2',
-    tagBg: 'linear-gradient(135deg, #13C2C2, #36CFC9)', desc: '青碧色框，清新耳目一新', sold: 156, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #13C2C2, #36CFC9)', desc: '青碧色框，清新耳目一新', sold: 156, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 9, name: '粉黛甜心', pricePerDay: 26, borderType: 'color', borderColor: '#EB2F96',
-    tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayouts: ['carousel'],
+    tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 10, name: '暗夜黑金', pricePerDay: 30, borderType: 'color', borderColor: '#8B6D3B',
-    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayouts: ['grid'],
+    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 11, name: '橘光暮色', pricePerDay: 25, borderType: 'color', borderColor: '#FA541C',
-    tagBg: 'linear-gradient(135deg, #FA541C, #FF7A45)', desc: '暮色橘框，宵夜燒烤氛圍感', sold: 267, dishLayouts: ['carousel'],
+    tagBg: 'linear-gradient(135deg, #FA541C, #FF7A45)', desc: '暮色橘框，宵夜燒烤氛圍感', sold: 267, dishLayouts: ['grid', 'carousel'],
   },
   {
     id: 12, name: '極光幻彩', pricePerDay: 36, borderType: 'color', borderColor: '#2F54EB',
@@ -280,8 +280,40 @@ export default function PopularSkinPicker() {
   const [inventoryData, setInventoryData] = useState<AdHotInventoryVO | null>(null)
   const [paying, setPaying] = useState(false)
 
-  const selectedSkin = SALE_SKINS.find(s => s.id === selectedSkinId) || null
   const selectedStore = searchStoreName ? storeMap[searchStoreName] : undefined
+
+  // 皮膚列表：優先從庫存 API 返回的 cells 提取真實皮膚（名稱+價格+邊框配置+銷量），後端不可用時兜底 Mock
+  const effectiveSkins: SaleSkin[] = useMemo(() => {
+    if (inventoryData?.cells && inventoryData.cells.length > 0) {
+      // 從庫存 cells 中提取去重的皮膚列表（保持定價配置順序）
+      const seen = new Set<string>()
+      const skins: SaleSkin[] = []
+      inventoryData.cells.forEach(cell => {
+        if (seen.has(cell.skinName)) return
+        seen.add(cell.skinName)
+        const idx = skins.length
+        const palette = SKIN_COLOR_PALETTE[idx % SKIN_COLOR_PALETTE.length]
+        // 邊框配置以定價配置為準：配色邊框用真實顏色；無邊框/上傳邊框圖無顏色數據時以色板兜底
+        const useRealColor = cell.borderType === 'color' && !!cell.borderColor
+        skins.push({
+          id: idx + 1,
+          name: cell.skinName,
+          pricePerDay: cell.price,
+          borderType: cell.borderType === 'none' ? 'none' : 'color',
+          borderColor: useRealColor ? cell.borderColor : palette.borderColor,
+          tagBg: palette.tagBg,
+          // 定價頁大圖模式佈局默認全選（大圖拼列 + 階梯輪播），購買頁預覽支持 tab 切換展示
+          dishLayouts: ['grid', 'carousel'],
+          desc: cell.skinName,
+          sold: inventoryData.skinSoldCounts?.[cell.skinName] ?? 0,
+        })
+      })
+      return skins
+    }
+    return SALE_SKINS
+  }, [inventoryData])
+
+  const selectedSkin = effectiveSkins.find(s => s.id === selectedSkinId) || null
 
   // 可售天數：真實庫存以預售天數為準，否則兜底 MAX_BUY_DAYS 天
   const sellableDays = inventoryData ? inventoryData.presaleDays : MAX_BUY_DAYS
@@ -375,10 +407,12 @@ export default function PopularSkinPicker() {
     fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1, hasPricing: true })
       .then(res => {
         if (!res) return
+        // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
+        const records = res.records.filter(a => a.updatedBy !== '系統')
         const brandOverrides: Record<string, string> = {}
         const refundConfig: Record<string, boolean> = {}
         const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
-        const options = res.records.map(a => {
+        const options = records.map(a => {
           const value = String(a.id)
           const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
           if (uiBrand) brandOverrides[value] = uiBrand
@@ -883,7 +917,7 @@ export default function PopularSkinPicker() {
               style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 20px' }}
             >
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                {SALE_SKINS.map(skin => {
+                {effectiveSkins.map(skin => {
                   const isSelected = selectedSkinId === skin.id
                   return (
                     <div
@@ -914,14 +948,8 @@ export default function PopularSkinPicker() {
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>{skin.name}</span>
                       </div>
-                      {/* 支持的菜品展示佈局（系統自動分配，商家不可選擇）+ 已售 + 價格 */}
+                      {/* 銷量（訂單數據：售出一個訂單記一次）+ 價格 */}
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-                        {skin.dishLayouts.map(l => (
-                          <span key={l} style={{
-                            fontSize: 9, color: '#595959', background: '#F0F0F0', borderRadius: 3,
-                            padding: '1px 5px', flexShrink: 0,
-                          }}>{DISH_LAYOUT_LABEL[l]}</span>
-                        ))}
                         <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>{t('soldCount', { count: skin.sold })}</span>
                         <div style={{ flex: 1 }} />
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#FF4D4F' }}>${skinPriceMap[skin.name] ?? skin.pricePerDay}</span>
@@ -1064,31 +1092,42 @@ export default function PopularSkinPicker() {
                     {customCalendarGrid.map((week, wi) => (
                       <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                         {week.map((date, di) => {
-                          if (!date) return <div key={di} style={{ height: 48 }} />
+                          if (!date) return <div key={di} style={{ minHeight: 56, margin: 2, borderRadius: 6, background: '#fafafa' }} />
                           const dateKey = date.format('YYYY-MM-DD')
                           const isPast = date.isBefore(customMinDate, 'day')
                           // 待開售：超出可購窗口的日期，標記待開售（同盤活復蘇）
                           const isPresale = date.isAfter(customMaxDate, 'day')
                           const isSelected = customDates.includes(dateKey)
+                          const isToday = date.isSame(dayjs(), 'day')
+                          const isAvailable = !isPast && !isPresale
                           return (
                             <div
                               key={di}
                               onClick={() => handleCustomDateClick(date)}
                               style={{
-                                height: 48, margin: 2, borderRadius: 6,
+                                minHeight: 56, margin: 2, borderRadius: 6, padding: '4px 2px',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
                                 cursor: isPast ? 'not-allowed' : 'pointer',
-                                border: isSelected ? '2px solid #52C41A' : isPresale ? '1px dashed #d9d9d9' : '1px solid transparent',
-                                background: isSelected ? '#F6FFED' : isPast || isPresale ? '#FAFAFA' : '#fff',
-                                color: isPast ? '#D9D9D9' : isPresale ? '#bfbfbf' : isSelected ? '#389E0D' : '#262626',
-                                fontSize: 13, fontWeight: isSelected ? 600 : 400,
+                                // 单元格样式同盤活復蘇日曆：可購買白底灰邊易辨識，選中綠邊綠底，待開售虛線灰底（人氣無庫存數據）
+                                border: isSelected ? '2px solid #52c41a' : isPresale ? '1px dashed #d9d9d9' : isPast ? '1px solid #e8e8e8' : '1px solid #e8e8e8',
+                                background: isSelected ? '#f6ffed' : isPast || isPresale ? '#fafafa' : '#fff',
+                                color: isPast ? '#D9D9D9' : isPresale ? '#bfbfbf' : isSelected ? '#52c41a' : '#333',
                                 transition: 'all 0.2s',
                               }}
                             >
-                              <span>{date.date()}</span>
-                              {isSelected && <span style={{ fontSize: 9, lineHeight: 1, color: '#52C41A' }}>{t('selectedTag')}</span>}
+                              <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : isToday ? 600 : 400, position: 'relative', lineHeight: 1.2 }}>
+                                {date.date()}
+                                {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
+                              </span>
                               {isPresale && (
                                 <span style={{ fontSize: 9, lineHeight: '12px', color: '#8c8c8c', border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
+                              )}
+                              {isAvailable && (isSelected
+                                ? <span style={{ fontSize: 9, lineHeight: 1, color: '#E8720C', fontWeight: 600 }}>{t('selectedTag')}</span>
+                                : <span style={{ fontSize: 9, lineHeight: 1, color: '#52c41a' }}>{t('availableTag')}</span>
+                              )}
+                              {isAvailable && selectedSkin && (
+                                <span style={{ fontSize: 9, lineHeight: 1.2, color: '#ff4d4f', fontWeight: 500 }}>${effectiveSkinPricePerDay}</span>
                               )}
                             </div>
                           )
@@ -1136,7 +1175,7 @@ export default function PopularSkinPicker() {
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '12px 0 6px' }}>
                     <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('bigMode')}</span>
-                    {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
+                    {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位（同定價頁預覽 tab） */}
                     {selectedSkin.dishLayouts.length > 1 && selectedSkin.dishLayouts.map((l, idx) => {
                       const isActive = idx === Math.min(previewLayoutIndex, selectedSkin.dishLayouts.length - 1)
                       return (
@@ -1144,7 +1183,7 @@ export default function PopularSkinPicker() {
                           key={l}
                           onClick={() => setPreviewLayoutIndex(idx)}
                           style={{
-                            fontSize: 10, cursor: 'pointer', borderRadius: 3, padding: '1px 6px', lineHeight: '16px',
+                            fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
                             color: isActive ? '#E8720C' : '#8C8C8C',
                             background: isActive ? '#FFF7E6' : '#F0F0F0',
                             border: `1px solid ${isActive ? '#E8720C' : 'transparent'}`,
@@ -1215,42 +1254,32 @@ export default function PopularSkinPicker() {
                   )}
                 </div>
               )}
-              <div style={{ fontSize: 13, color: '#595959', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{t('purchaseStore')}</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedStore?.storeName || '-'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{t('skinKit')}</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{selectedSkin ? `${selectedSkin.name}（$${effectiveSkinPricePerDay}${t('perDay')}）` : t('notSelected')}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{t('deliveryPeriod')}</span>
-                  <span style={{ color: '#262626', fontWeight: 500 }}>{periodText}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{t('tierDiscountRate')}</span>
-                  {currentTier ? <Tag color="green" style={{ marginRight: 0 }}>{currentTier.discount / 10}{t('discount')}</Tag> : <Tag style={{ marginRight: 0 }}>{t('noDiscount')}</Tag>}
-                </div>
-              </div>
-              <div style={{ background: '#FAFAFA', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>{t('orderOriginal')}</span>
-                  <span style={{ fontWeight: 600, color: '#595959' }}>${priceSummary.original}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>{t('orderDiscount')}</span>
-                  <span style={{ fontWeight: 600, color: '#FA8C16' }}>-${priceSummary.saved}</span>
-                </div>
-                {giftDeduction > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ color: '#8C8C8C' }}>贈送天數抵扣</span>
-                    <span style={{ fontWeight: 600, color: '#E8720C' }}>-${giftDeduction}</span>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #E8E8E8', paddingTop: 8, marginTop: 8 }}>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>{t('totalPayable')}</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#FF4D4F' }}>${priceSummary.payable}</span>
+              {/* 價格明細（審批彈窗信息塊風格，按支付方式分支展示） */}
+              <div style={{ marginBottom: 12, padding: 12, background: '#F8F8F8', borderRadius: 8 }}>
+                <div style={{ fontSize: 13, color: '#666', lineHeight: 2 }}>
+                  <div><span style={{ color: '#999' }}>{t('orderOriginal')}：</span>${priceSummary.original}</div>
+                  {/* 混合支付 / 推廣金支付：顯示享受折扣 */}
+                  {(mixedPayment || paymentMode === 'promo') && (
+                    <div>
+                      <span style={{ color: '#999' }}>享受折扣：</span>
+                      {currentTier ? (
+                        <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount / 10}折</span>
+                      ) : (
+                        <span style={{ color: '#BFBFBF' }}>无折扣</span>
+                      )}
+                    </div>
+                  )}
+                  {/* 混合支付 / 贈送天數支付：顯示贈送天數抵扣 */}
+                  {(mixedPayment || paymentMode === 'gift') && effectiveGiftDays > 0 && (
+                    <div><span style={{ color: '#999' }}>赠送天数抵扣：</span><span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天（-${giftDeduction}）</span></div>
+                  )}
+                  {/* 混合支付 / 推廣金支付：顯示訂單優惠和實付總額 */}
+                  {(mixedPayment || paymentMode === 'promo') && (
+                    <>
+                      <div><span style={{ color: '#999' }}>{t('orderDiscount')}：</span><span style={{ fontWeight: 600, color: '#FA8C16' }}>-${priceSummary.saved}</span></div>
+                      <div><span style={{ color: '#999' }}>{t('totalPayable')}：</span><span style={{ fontSize: 15, fontWeight: 700, color: '#FF4D4F' }}>${priceSummary.payable}</span></div>
+                    </>
+                  )}
                 </div>
               </div>
               <Button
@@ -1293,7 +1322,7 @@ export default function PopularSkinPicker() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
                 <span>{t('orderDiscountColon')}</span>
-                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}{currentTier ? `（${currentTier.discount / 10}${t('discount')}）` : ''}</span>
+                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                 <span style={{ fontWeight: 600 }}>{t('actualAmountColon')}</span>

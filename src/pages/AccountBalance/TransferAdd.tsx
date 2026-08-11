@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, type UploadFile } from 'antd'
+import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Modal, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -156,22 +156,57 @@ export default function TransferAdd() {
         message.warning(t('accountBalance.uploadCertificate'))
         return
       }
-      // 提交審批記錄
-      const payload: TransferApplyPayload = {
-        fromGroupId: groupIdParam,
-        fromGroupName: groupNameParam,
-        brand: brandParam,
-        fromVirtualBalance: sourceVirtualBalance,
-        toGroupId: targetGroupId || '',
-        toGroupName: targetAccount?.groupName || '',
-        transferAmount,
-        remark: form.getFieldValue('remark') || '',
-      }
-      setSubmitting(true)
-      const flowNo = await submitTransferApply(payload)
-      setSubmittedFlowNo(flowNo)
-      setCountdown(5)
-      setSuccessVisible(true)
+      // ====== 二次確認彈窗 ======
+      Modal.confirm({
+        title: t('accountBalance.confirmSubmitTitle'),
+        icon: (
+          <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+        ),
+        centered: true,
+        className: 'custom-confirm-modal',
+        width: 520,
+        okText: t('common:confirmSubmit'),
+        cancelText: t('common:cancel'),
+        content: (
+          <div>
+            <div className="confirm-info-card">
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.fromGroup')}</span>
+              <span className="confirm-info-value">{groupNameParam}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.toGroup')}</span>
+              <span className="confirm-info-value">{targetAccount?.groupName || '-'}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.transferAmountLabel')}</span>
+              <span className="confirm-info-value highlight">MOP {transferAmount.toLocaleString()}</span>
+            </div>
+            </div>
+          </div>
+        ),
+        onOk: async () => {
+          try {
+            const payload: TransferApplyPayload = {
+              fromGroupId: groupIdParam,
+              fromGroupName: groupNameParam,
+              brand: brandParam,
+              fromVirtualBalance: sourceVirtualBalance,
+              toGroupId: targetGroupId || '',
+              toGroupName: targetAccount?.groupName || '',
+              transferAmount,
+              remark: form.getFieldValue('remark') || '',
+            }
+            const flowNo = await submitTransferApply(payload)
+            setSubmittedFlowNo(flowNo)
+            setCountdown(5)
+            // 等待確認彈窗完全關閉後再顯示成功彈窗
+            setTimeout(() => setSuccessVisible(true), 350)
+          } catch (err) {
+            message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
+          }
+        },
+      })
     } catch (err) {
       // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {

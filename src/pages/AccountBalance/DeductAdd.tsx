@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Popover, type UploadFile } from 'antd'
+import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Popover, Modal, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -235,33 +235,77 @@ export default function DeductAdd() {
         message.warning(t('accountBalance.uploadCertificate'))
         return
       }
-      // 提交審批記錄
+      // ====== 二次確認彈窗 ======
       const consumeStoreId = form.getFieldValue('consumeStore')
       const consumeStoreOpt = storeOptions.find(s => s.value === consumeStoreId)
       const consumeTypeVal = form.getFieldValue('consumeType')
       const consumeChannelVal = form.getFieldValue('consumeChannel')
       const consumeBdVal = form.getFieldValue('consumeBd')
-      const payload: DeductApplyPayload = {
-        groupId: groupIdParam,
-        groupName: groupNameParam,
-        brand: brandParam,
-        deductMethod,
-        deductAmount,
-        virtualBalance: sourceVirtualBalance,
-        consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.labelKey ? t(businessChannelOptions.find(c => c.value === consumeChannelVal)!.labelKey) : '',
-        consumeStore: consumeStoreOpt?.label || '',
-        consumeType: consumeTypeOptions.find(o => o.value === consumeTypeVal)?.labelKey ? t(consumeTypeOptions.find(o => o.value === consumeTypeVal)!.labelKey) : '',
-        consumeBd: bdOptions.find(o => o.value === consumeBdVal)?.label || consumeBdVal || '--',
-        batchNo: deductMethod === 'batch' ? (selectedBatch || '') : '',
-        batchDeductible: deductMethod === 'batch' ? (currentBatch?.deductible || 0) : 0,
-        batchSettlement: deductMethod === 'batch' ? (settlementKeyMap[currentBatch?.settlement || ''] ? t(settlementKeyMap[currentBatch?.settlement || '']) : '') : '',
-        remark: form.getFieldValue('remark') || '',
-      }
-      setSubmitting(true)
-      const flowNo = await submitDeductApply(payload)
-      setSubmittedFlowNo(flowNo)
-      setCountdown(5)
-      setSuccessVisible(true)
+      const deductMethodLabel = deductMethod === 'consume' ? t('accountBalance.deductConsume') : deductMethod === 'batch' ? t('accountBalance.deductBatch') : t('accountBalance.deductAccount')
+      Modal.confirm({
+        title: t('accountBalance.confirmSubmitTitle'),
+        icon: (
+          <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+        ),
+        centered: true,
+        className: 'custom-confirm-modal',
+        width: 520,
+        okText: t('common:confirmSubmit'),
+        cancelText: t('common:cancel'),
+        content: (
+          <div>
+            <div className="confirm-info-card">
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('common:colGroupName')}</span>
+              <span className="confirm-info-value">{groupNameParam}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.deductAmountLabel')}</span>
+              <span className="confirm-info-value danger">MOP {deductAmount.toLocaleString()}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.deductMethodLabel')}</span>
+              <span className="confirm-info-value">{deductMethodLabel}</span>
+            </div>
+            {deductMethod === 'consume' && consumeStoreOpt && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.consumeStoreLabel')}</span>
+              <span className="confirm-info-value">{consumeStoreOpt.label}</span>
+            </div>}
+            {deductMethod === 'batch' && selectedBatch && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.batchNo')}</span>
+              <span className="confirm-info-value">{selectedBatch}</span>
+            </div>}
+            </div>
+          </div>
+        ),
+        onOk: async () => {
+          try {
+            const payload: DeductApplyPayload = {
+              groupId: groupIdParam,
+              groupName: groupNameParam,
+              brand: brandParam,
+              deductMethod,
+              deductAmount,
+              virtualBalance: sourceVirtualBalance,
+              consumeChannel: businessChannelOptions.find(c => c.value === consumeChannelVal)?.labelKey ? t(businessChannelOptions.find(c => c.value === consumeChannelVal)!.labelKey) : '',
+              consumeStore: consumeStoreOpt?.label || '',
+              consumeType: consumeTypeOptions.find(o => o.value === consumeTypeVal)?.labelKey ? t(consumeTypeOptions.find(o => o.value === consumeTypeVal)!.labelKey) : '',
+              consumeBd: bdOptions.find(o => o.value === consumeBdVal)?.label || consumeBdVal || '--',
+              batchNo: deductMethod === 'batch' ? (selectedBatch || '') : '',
+              batchDeductible: deductMethod === 'batch' ? (currentBatch?.deductible || 0) : 0,
+              batchSettlement: deductMethod === 'batch' ? (settlementKeyMap[currentBatch?.settlement || ''] ? t(settlementKeyMap[currentBatch?.settlement || '']) : '') : '',
+              remark: form.getFieldValue('remark') || '',
+            }
+            const flowNo = await submitDeductApply(payload)
+            setSubmittedFlowNo(flowNo)
+            setCountdown(5)
+            // 等待確認彈窗完全關閉後再顯示成功彈窗
+            setTimeout(() => setSuccessVisible(true), 350)
+          } catch (err) {
+            message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
+          }
+        },
+      })
     } catch (err) {
       // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {

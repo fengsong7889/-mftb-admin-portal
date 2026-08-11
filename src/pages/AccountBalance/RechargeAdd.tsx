@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider, type UploadFile } from 'antd'
+import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider, Modal, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
@@ -227,33 +227,81 @@ export default function RechargeAdd() {
         message.warning(t('accountBalance.uploadPaymentVoucher'))
         return
       }
-      // 提交審批記錄
+      // ====== 二次確認彈窗 ======
       const group = groupOptions.find(g => g.value === groupIdParam)
-      const payload: RechargeApplyPayload = {
-        groupId: groupIdParam,
-        groupName: group?.name || groupNameParam || '',
-        brand: brandParam || 'flashBee',
-        businessType,
-        businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.labelKey ? t((businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))!.labelKey) : '--',
-        isActual,
-        payMethod,
-        virtualAmount,
-        actualTotal,
-        discountAmount,
-        bankAmount: isActual && (payMethod === 'corporate' || payMethod === 'mixed') ? bankAmount : 0,
-        revenueAmount: isActual && (payMethod === 'mixed' || payMethod === 'revenue') ? revenueAmount : 0,
-        deductStores: deductRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, amount: r.amount })),
-        bd: (() => {
-          const bdVal = form.getFieldValue('bd')
-          return bdOptions.find(o => o.value === bdVal)?.label || bdVal || '--'
-        })(),
-        remark: form.getFieldValue('remark') || '',
-      }
-      setSubmitting(true)
-      const flowNo = await submitRechargeApply(payload)
-      setSubmittedFlowNo(flowNo)
-      setCountdown(5)
-      setSuccessVisible(true)
+      const payMethodLabel = payMethod === 'corporate' ? t('accountBalance.settlementCorporate') : payMethod === 'mixed' ? t('accountBalance.settlementMixed') : t('accountBalance.settlementRevenue')
+      Modal.confirm({
+        title: t('accountBalance.confirmSubmitTitle'),
+        icon: (
+          <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+        ),
+        centered: true,
+        className: 'custom-confirm-modal',
+        width: 520,
+        okText: t('common:confirmSubmit'),
+        cancelText: t('common:cancel'),
+        content: (
+          <div>
+            <div className="confirm-info-card">
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('common:colGroupName')}</span>
+              <span className="confirm-info-value">{group?.name || groupNameParam}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('common:colBrand')}</span>
+              <span className="confirm-info-value">{brandParam}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.virtualAmount')}</span>
+              <span className="confirm-info-value highlight">MOP {virtualAmount.toLocaleString()}</span>
+            </div>
+            {isActual && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.settlementMethod')}</span>
+              <span className="confirm-info-value">{payMethodLabel}</span>
+            </div>}
+            {isActual && (payMethod === 'corporate' || payMethod === 'mixed') && bankAmount > 0 && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.bankTransfer')}</span>
+              <span className="confirm-info-value">MOP {bankAmount.toLocaleString()}</span>
+            </div>}
+            {isActual && (payMethod === 'mixed' || payMethod === 'revenue') && revenueAmount > 0 && <div className="confirm-info-row">
+              <span className="confirm-info-label">{t('accountBalance.revenueDeduction')}</span>
+              <span className="confirm-info-value">MOP {revenueAmount.toLocaleString()}</span>
+            </div>}
+            </div>
+          </div>
+        ),
+        onOk: async () => {
+          try {
+            const payload: RechargeApplyPayload = {
+              groupId: groupIdParam,
+              groupName: group?.name || groupNameParam || '',
+              brand: brandParam || 'flashBee',
+              businessType,
+              businessChannelLabel: (businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))?.labelKey ? t((businessChannelMap[businessType] || []).find(o => o.value === form.getFieldValue('businessChannel'))!.labelKey) : '--',
+              isActual,
+              payMethod,
+              virtualAmount,
+              actualTotal,
+              discountAmount,
+              bankAmount: isActual && (payMethod === 'corporate' || payMethod === 'mixed') ? bankAmount : 0,
+              revenueAmount: isActual && (payMethod === 'mixed' || payMethod === 'revenue') ? revenueAmount : 0,
+              deductStores: deductRows.map(r => ({ storeId: r.storeId, storeLabel: r.storeLabel, amount: r.amount })),
+              bd: (() => {
+                const bdVal = form.getFieldValue('bd')
+                return bdOptions.find(o => o.value === bdVal)?.label || bdVal || '--'
+              })(),
+              remark: form.getFieldValue('remark') || '',
+            }
+            const flowNo = await submitRechargeApply(payload)
+            setSubmittedFlowNo(flowNo)
+            setCountdown(5)
+            // 等待確認彈窗完全關閉後再顯示成功彈窗
+            setTimeout(() => setSuccessVisible(true), 350)
+          } catch (err) {
+            message.error(err instanceof Error && err.message ? err.message : t('accountBalance.submitFailed'))
+          }
+        },
+      })
     } catch (err) {
       // 表单校验未通过时 antd 已在字段标红；财务接口为静默请求，后端业务错误需在此提示
       if (!(err && typeof err === 'object' && 'errorFields' in err)) {

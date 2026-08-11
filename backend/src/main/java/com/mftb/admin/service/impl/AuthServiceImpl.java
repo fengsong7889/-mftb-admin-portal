@@ -171,6 +171,8 @@ public class AuthServiceImpl implements AuthService {
         List<MenuPermissionDTO> rolePerms = roleService.mergePermissions(vo.getFunctionRoleIds());
         List<MenuPermissionDTO> deptPerms = departmentService.permissionsOf(user.getDepartmentId());
         vo.setPermissions(mergePermissionLists(rolePerms, deptPerms));
+        // 下发角色编码，供前端审批流程校验节点权限
+        vo.setFunctionRoleCodes(roleService.codesOf(vo.getFunctionRoleIds()));
         return vo;
     }
 

@@ -29,6 +29,8 @@ public class UserInfoVO {
     private String jobLevel;
     /** 绑定的功能角色ID */
     private List<Long> functionRoleIds;
+    /** 绑定的功能角色编码（如 FIN_BIZ_APPROVER） */
+    private List<String> functionRoleCodes;
     /** 合并后的菜单权限 (登录时下发, 前端据此做权限判断) */
     private List<MenuPermissionDTO> permissions;
 

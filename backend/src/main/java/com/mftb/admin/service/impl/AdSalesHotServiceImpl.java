@@ -92,6 +92,8 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
                 cell.setBizDate(date);
                 cell.setSkinName(skin.getSkinName());
                 cell.setPrice(skin.getPrice());
+                cell.setBorderType(skin.getBorderType());
+                cell.setBorderColor(skin.getBorderColor());
                 boolean bought = StringUtils.hasText(groupCode)
                         && purchased.contains(cellKey(date, skin.getSkinName()));
                 cell.setStatus(bought ? "purchased" : "available");
@@ -101,6 +103,8 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         // 保证前端按日期/皮肤稳定渲染
         vo.getCells().sort(Comparator.comparing(AdHotInventoryVO.Cell::getBizDate)
                 .thenComparing(AdHotInventoryVO.Cell::getSkinName));
+        // 皮肤销量统计: 有效订单(未退款未取消)每单每个皮肤记一次
+        vo.setSkinSoldCounts(skinSoldCounts(algoId));
         return vo;
     }
 
@@ -311,6 +315,32 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
             purchased.add(cellKey(item.getBizDate(), item.getSkinName()));
         }
         return purchased;
+    }
+
+    /** 皮膚銷量統計: 有效訂單(待推廣/推廣中/已推廣)中每單每個皮膚記一次 */
+    private Map<String, Integer> skinSoldCounts(Long algoId) {
+        Map<String, Integer> soldCounts = new LinkedHashMap<>();
+        List<Long> orderIds = orderMapper.selectList(
+                new LambdaQueryWrapper<AdOrder>()
+                        .select(AdOrder::getId)
+                        .eq(AdOrder::getAlgoId, algoId)
+                        .in(AdOrder::getStatus, 1, 2, 3))
+                .stream().map(AdOrder::getId).toList();
+        if (orderIds.isEmpty()) {
+            return soldCounts;
+        }
+        List<AdOrderItemHot> items = itemMapper.selectList(
+                new LambdaQueryWrapper<AdOrderItemHot>()
+                        .in(AdOrderItemHot::getOrderId, orderIds)
+                        .in(AdOrderItemHot::getDeliveryStatus, 1, 2));
+        // 同一訂單同一皮膚只記一次（一單多天只算一單銷量）
+        Set<String> counted = new HashSet<>();
+        for (AdOrderItemHot item : items) {
+            if (counted.add(item.getOrderId() + "|" + item.getSkinName())) {
+                soldCounts.merge(item.getSkinName(), 1, Integer::sum);
+            }
+        }
+        return soldCounts;
     }
 
     /** 屏蔽商家校验: 开关启用且命中屏蔽名单时禁止购买 */

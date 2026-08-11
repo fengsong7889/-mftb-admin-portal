@@ -205,9 +205,11 @@ export default function PopularSkinPicker() {
     fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1, hasPricing: true })
       .then(res => {
         if (!res) return
+        // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
+        const records = res.records.filter(a => a.updatedBy !== '系統')
         const brandOverrides: Record<string, string> = {}
         const nameMap: Record<string, string> = {}
-        const options = res.records.map(a => {
+        const options = records.map(a => {
           const value = String(a.id)
           const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
           if (uiBrand) brandOverrides[value] = uiBrand
