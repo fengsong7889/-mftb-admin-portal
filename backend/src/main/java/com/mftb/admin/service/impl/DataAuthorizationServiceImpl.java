@@ -286,7 +286,8 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
         jdbcTemplate.query(
                 "SELECT r.id, r.name, "
                         + "(SELECT COUNT(*) FROM sys_user u WHERE u.deleted = 0 "
-                        + "AND FIND_IN_SET(r.id, u.function_roles)) AS user_count "
+                        + "AND u.function_roles IS NOT NULL "
+                        + "AND JSON_CONTAINS(u.function_roles, JSON_ARRAY(r.id))) AS user_count "
                         + "FROM sys_role r WHERE r.deleted = 0 AND r.status = 1 "
                         + "ORDER BY r.id",
                 rs -> {
@@ -361,7 +362,7 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
         checkColumn(result, "sys_data_authorization", "group_code");
 
         // 3. 逐个测试实际查询
-        testQuery(result, "roleOptions", "SELECT r.id, r.name, (SELECT COUNT(*) FROM sys_user u WHERE u.deleted = 0 AND FIND_IN_SET(r.id, u.function_roles)) AS user_count FROM sys_role r WHERE r.deleted = 0 AND r.status = 1 ORDER BY r.id");
+        testQuery(result, "roleOptions", "SELECT r.id, r.name, (SELECT COUNT(*) FROM sys_user u WHERE u.deleted = 0 AND u.function_roles IS NOT NULL AND JSON_CONTAINS(u.function_roles, JSON_ARRAY(r.id))) AS user_count FROM sys_role r WHERE r.deleted = 0 AND r.status = 1 ORDER BY r.id");
         testQuery(result, "departmentOptions", "SELECT d.id, d.name, d.name_en, d.parent_id, d.status, (SELECT COUNT(*) FROM sys_user u WHERE u.department_id = d.id AND u.deleted = 0) AS user_count FROM sys_department d WHERE d.deleted = 0 ORDER BY d.sort, d.id");
         testQuery(result, "merchantGroupOptions", "SELECT group_code, group_name FROM biz_merchant_group WHERE deleted = 0 ORDER BY group_code");
         testQuery(result, "list", "SELECT id, target_type, target_id, group_code, status FROM sys_data_authorization WHERE deleted = 0 LIMIT 1");
