@@ -77,13 +77,16 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
 
     @Override
     public DataAuthorizationVO create(DataAuthorizationRequest request) {
-        // 唯一性校验
-        Long existCount = dataAuthMapper.selectCount(
-                new LambdaQueryWrapper<SysDataAuthorization>()
-                        .eq(SysDataAuthorization::getTargetType, request.getTargetType())
-                        .eq(SysDataAuthorization::getTargetId, request.getTargetId())
-                        .eq(SysDataAuthorization::getGroupCode, request.getGroupCode()));
-        if (existCount > 0) {
+        // 唯一性校验（包含逻辑删除记录，避免唯一键冲突）
+        SysDataAuthorization existing = findByUniqueKey(request.getTargetType(), request.getTargetId(), request.getGroupCode());
+        if (existing != null) {
+            if (existing.getDeleted() != null && existing.getDeleted() == 1) {
+                // 已逻辑删除，恢复并更新
+                restoreRecord(existing, request.getStatus(), operatorResolver.currentOperatorName());
+                dataScopeService.evictAll();
+                log.info("恢复已删除的数据授权#{}: {}#{} → {}", existing.getId(), request.getTargetType(), request.getTargetId(), request.getGroupCode());
+                return enrichSingle(existing);
+            }
             throw new BusinessException("該授權對象已存在相同的商家數據授權");
         }
         SysDataAuthorization entity = new SysDataAuthorization();
@@ -149,14 +152,17 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
 
         List<DataAuthorizationVO> created = new ArrayList<>();
         for (String groupCode : request.getGroupCodes()) {
-            // 单条唯一性检查，避免重复插入
-            Long existCount = dataAuthMapper.selectCount(
-                    new LambdaQueryWrapper<SysDataAuthorization>()
-                            .eq(SysDataAuthorization::getTargetType, request.getTargetType())
-                            .eq(SysDataAuthorization::getTargetId, request.getTargetId())
-                            .eq(SysDataAuthorization::getGroupCode, groupCode));
-            if (existCount > 0) {
-                log.debug("批量创建跳过已存在: {}#{} → {}", request.getTargetType(), request.getTargetId(), groupCode);
+            // 检查包含逻辑删除记录的完整唯一性
+            SysDataAuthorization existing = findByUniqueKey(request.getTargetType(), request.getTargetId(), groupCode);
+            if (existing != null) {
+                if (existing.getDeleted() != null && existing.getDeleted() == 1) {
+                    // 已逻辑删除，恢复并更新
+                    restoreRecord(existing, status, operator);
+                    created.add(enrichSingle(existing));
+                } else {
+                    // 活跃记录，跳过
+                    log.debug("批量创建跳过已存在: {}#{} → {}", request.getTargetType(), request.getTargetId(), groupCode);
+                }
                 continue;
             }
             SysDataAuthorization entity = new SysDataAuthorization();
@@ -189,6 +195,37 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
     }
 
     /* ==================== 内部方法 ==================== */
+
+    /** 查找唯一键匹配的记录（包含逻辑删除记录，绕过 @TableLogic 过滤） */
+    private SysDataAuthorization findByUniqueKey(String targetType, Long targetId, String groupCode) {
+        List<SysDataAuthorization> records = jdbcTemplate.query(
+                "SELECT id, target_type, target_id, group_code, status, created_by, updated_by, deleted, created_at, updated_at " +
+                "FROM sys_data_authorization WHERE target_type = ? AND target_id = ? AND group_code = ? LIMIT 1",
+                (rs, rowNum) -> {
+                    SysDataAuthorization e = new SysDataAuthorization();
+                    e.setId(rs.getLong("id"));
+                    e.setTargetType(rs.getString("target_type"));
+                    e.setTargetId(rs.getLong("target_id"));
+                    e.setGroupCode(rs.getString("group_code"));
+                    e.setStatus(rs.getInt("status"));
+                    e.setCreatedBy(rs.getString("created_by"));
+                    e.setUpdatedBy(rs.getString("updated_by"));
+                    e.setDeleted(rs.getInt("deleted"));
+                    return e;
+                },
+                targetType, targetId, groupCode);
+        return records.isEmpty() ? null : records.get(0);
+    }
+
+    /** 恢复逻辑删除的记录 */
+    private void restoreRecord(SysDataAuthorization entity, Integer status, String operator) {
+        jdbcTemplate.update(
+                "UPDATE sys_data_authorization SET deleted = 0, status = ?, updated_by = ?, updated_at = NOW() WHERE id = ?",
+                status != null ? status : 1, operator, entity.getId());
+        entity.setDeleted(0);
+        entity.setStatus(status != null ? status : 1);
+        entity.setUpdatedBy(operator);
+    }
 
     private DataAuthorizationVO enrichSingle(SysDataAuthorization entity) {
         DataAuthorizationVO vo = DataAuthorizationVO.from(entity);
