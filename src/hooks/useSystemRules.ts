@@ -28,15 +28,35 @@ function persistValues(values: Record<string, unknown>) {
   localStorage.setItem(SYSTEM_RULE_STORAGE_KEY, JSON.stringify(values))
 }
 
+/** 解析表格類型規則的復合配置 */
+function parseTableCfg(v: unknown): { prefix: string; dateFormat: string; min: number } {
+  if (v && typeof v === 'object') return v as { prefix: string; dateFormat: string; min: number }
+  return { prefix: String(v ?? '-'), dateFormat: '', min: 4 }
+}
+/** 序列化表格類型規則的復合配置 */
+function stringifyTableCfg(prefix: string, dateFormat: string, min: number) {
+  return JSON.stringify({ prefix, dateFormat, min })
+}
+
 /** 構建帶當前值的規則分組（合併 localStorage 已存值與默認值） */
 function buildGroups(): RuleGroup[] {
   const saved = loadSavedValues()
   return DEFAULT_RULE_GROUPS.map(group => ({
     ...group,
-    rules: group.rules.map(rule => ({
-      ...rule,
-      value: rule.key in saved ? saved[rule.key] : rule.defaultValue,
-    })),
+    rules: group.rules.map(rule => {
+      if (group.type === 'table') {
+        const raw = saved[rule.key]
+        if (raw && typeof raw === 'object' && raw !== null) {
+          const cfg = parseTableCfg(raw)
+          return { ...rule, value: cfg.prefix, dateFormat: cfg.dateFormat, min: cfg.min }
+        }
+        return { ...rule }
+      }
+      return {
+        ...rule,
+        value: rule.key in saved ? saved[rule.key] : rule.defaultValue,
+      }
+    }),
   }))
 }
 
@@ -45,13 +65,26 @@ function buildGroups(): RuleGroup[] {
 export function useSystemRules() {
   const [groups, setGroups] = useState<RuleGroup[]>(buildGroups)
 
-  /** 更新單條規則的值 */
-  const updateRule = useCallback((key: string, value: unknown) => {
+  /** 更新單條規則的值（表格類型支持更新 dateFormat / min 字段） */
+  const updateRule = useCallback((key: string, value: unknown, field?: string) => {
     setGroups(prev =>
-      prev.map(g => ({
-        ...g,
-        rules: g.rules.map(r => r.key === key ? { ...r, value } : r),
-      })),
+      prev.map(g => {
+        if (g.type === 'table' && field) {
+          return {
+            ...g,
+            rules: g.rules.map(r => {
+              if (r.key !== key) return r
+              if (field === 'dateFormat') return { ...r, dateFormat: value as string }
+              if (field === 'min') return { ...r, min: value as number }
+              return r
+            }),
+          }
+        }
+        return {
+          ...g,
+          rules: g.rules.map(r => r.key === key ? { ...r, value } : r),
+        }
+      }),
     )
   }, [])
 
@@ -64,7 +97,17 @@ export function useSystemRules() {
   /** 持久化當前所有規則到 localStorage */
   const saveAll = useCallback(() => {
     const values: Record<string, unknown> = {}
-    groups.forEach(g => g.rules.forEach(r => { values[r.key] = r.value }))
+    groups.forEach(g => g.rules.forEach(r => {
+      if (g.type === 'table') {
+        values[r.key] = stringifyTableCfg(
+          (r.value as string) || '-',
+          r.dateFormat || '',
+          r.min ?? 4,
+        )
+      } else {
+        values[r.key] = r.value
+      }
+    }))
     persistValues(values)
   }, [groups])
 

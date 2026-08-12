@@ -221,7 +221,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     }
 
     /**
-     * 生成算法编码：拼音首字母前缀 + 5位自增序号（每个算法模块独立排序）
+     * 生成算法ID：拼音首字母前缀 + 5位自增序号（每个算法模块独立排序）
      * <p>
      * 规则：
      * 1. 取算法名称前2个汉字的拼音首字母作为前缀（如「無敵星星」→ WD）

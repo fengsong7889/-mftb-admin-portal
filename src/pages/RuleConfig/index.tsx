@@ -237,6 +237,107 @@ export default function RuleConfig() {
                 {/* 規則列表（支持 subGroup 子分組） */}
                 <div style={{ padding: '8px 24px 0' }}>
                   {(() => {
+                    /* 表格類型：以表格形式展示編號生成規則 */
+                    if (group.type === 'table') {
+                      const bdr = (i: number) => i < group.rules.length - 1 ? '1px solid #f5f5f5' : 'none'
+                      const DATE_FMT_OPTS = [
+                        { label: '年月日', value: 'YYYYMMDD' },
+                        { label: '年月', value: 'YYMM' },
+                        { label: '无', value: 'NONE' },
+                      ]
+                      const SEQ_LEN_OPTS = [
+                        { label: '4 位', value: 4 },
+                        { label: '5 位', value: 5 },
+                        { label: '6 位', value: 6 },
+                      ]
+                      const computeExample = (prefix: string, df: string | undefined, sl: number | undefined) => {
+                        if (prefix === '-') return ''
+                        const seq = sl ? '0'.repeat(sl) : '0000'
+                        const datePart = df === 'YYYYMMDD' ? '20260812' : df === 'YYMM' ? '2608-' : ''
+                        return `${prefix}${datePart}${seq}`
+                      }
+                      return (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            <thead>
+                              <tr style={{ background: '#FAFAFA' }}>
+                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>業務類型</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>所屬菜單</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>前綴</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>日期格式</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>自增序號</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>示例</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0' }}>備註</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.rules.map((rule, idx) => {
+                                const prefix = (rule.value as string) || '-'
+                                const isSpecial = prefix === '-'
+                                const canEdit = isEditing && !isSpecial
+                                const dfValue = rule.dateFormat || 'NONE'
+                                const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
+                                const remark = isSpecial
+                                  ? (rule.remark || '')
+                                  : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
+                                return (
+                                  <tr key={rule.key} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                                    {/* 1. 業務類型 */}
+                                    <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: bdr(idx) }}>{rule.label}</td>
+                                    {/* 2. 所屬菜單 */}
+                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
+                                      <span style={{ fontSize: 12, color: '#1890FF', fontWeight: 500 }}>{rule.menu || '—'}</span>
+                                    </td>
+                                    {/* 2. 前綴（只讀） */}
+                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
+                                      <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
+                                    </td>
+                                    {/* 3. 日期格式 */}
+                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
+                                      {canEdit ? (
+                                        <Select
+                                          value={dfValue}
+                                          onChange={v => { updateRule(rule.key, v, 'dateFormat'); markDirty(group.key) }}
+                                          options={DATE_FMT_OPTS}
+                                          style={{ width: 100 }}
+                                          size="small"
+                                        />
+                                      ) : (
+                                        <span style={{ fontSize: 12, color: '#595959' }}>
+                                          {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
+                                        </span>
+                                      )}
+                                    </td>
+                                    {/* 4. 自增序號 */}
+                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
+                                      {canEdit ? (
+                                        <Select
+                                          value={slValue}
+                                          onChange={v => { updateRule(rule.key, v, 'min'); markDirty(group.key) }}
+                                          options={SEQ_LEN_OPTS}
+                                          style={{ width: 90 }}
+                                          size="small"
+                                        />
+                                      ) : (
+                                        <span style={{ fontSize: 12, color: '#595959' }}>
+                                          {isSpecial ? '—' : `${slValue} 位`}
+                                        </span>
+                                      )}
+                                    </td>
+                                    {/* 5. 示例 */}
+                                    <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: bdr(idx) }}>
+                                      {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
+                                    </td>
+                                    {/* 6. 備註 */}
+                                    <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: bdr(idx) }}>{remark || ''}</td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    }
                     const hasSubGroups = group.rules.some(r => r.subGroup)
                     if (!hasSubGroups) {
                       /* 無子分組：平鋪渲染 */
@@ -250,7 +351,7 @@ export default function RuleConfig() {
                             <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>
                               {rule.label}
                             </div>
-                            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description}</div>
+                            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                           </div>
                           <div style={{ marginLeft: 16, flexShrink: 0 }}>
                             {renderControl(rule, group.key, !isEditing)}
@@ -281,7 +382,7 @@ export default function RuleConfig() {
                               <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>
                                 {rule.label}
                               </div>
-                              <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description}</div>
+                              <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                             </div>
                             <div style={{ marginLeft: 16, flexShrink: 0 }}>
                               {renderControl(rule, group.key, !isEditing)}
@@ -323,7 +424,7 @@ export default function RuleConfig() {
                                     <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>
                                       {rule.label}
                                     </div>
-                                    <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description}</div>
+                                    <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                                   </div>
                                   <div style={{ marginLeft: 16, flexShrink: 0 }}>
                                     {renderControl(rule, group.key, !isEditing)}

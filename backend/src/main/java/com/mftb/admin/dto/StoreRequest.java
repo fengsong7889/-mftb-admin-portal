@@ -7,7 +7,7 @@ import lombok.Data;
 /**
  * 门店新增/编辑请求
  * <p>
- * 门店ID（store_code）由系统按 MD+5位序号自增生成，不接受前端传入
+ * 门店ID（store_code）由系统按 MD+6位序号自增生成，不接受前端传入
  */
 @Data
 public class StoreRequest {

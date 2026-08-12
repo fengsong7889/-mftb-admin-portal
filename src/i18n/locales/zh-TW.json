@@ -3444,7 +3444,7 @@
     "groupRequired": "請選擇所屬集團",
     "groupPlaceholder": "請選擇所屬集團",
     "storeIdLabel": "門店ID",
-    "storeIdAutoGen": "系統自動生成（如 MD00001）",
+    "storeIdAutoGen": "系統自動生成（如 MD000001）",
     "storeNameLabel": "門店名稱",
     "storeNameRequired": "請輸入門店名稱",
     "storeNamePlaceholder": "請輸入門店名稱",

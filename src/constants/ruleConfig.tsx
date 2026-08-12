@@ -9,12 +9,13 @@ import {
   GiftOutlined,
   DollarOutlined,
   SafetyCertificateOutlined,
+  OrderedListOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
 /* ==================== 類型定義 ==================== */
 
-export type RuleValueType = 'switch' | 'number' | 'select' | 'text'
+export type RuleValueType = 'switch' | 'number' | 'select' | 'text' | 'table'
 
 export interface RuleItem {
   /** 唯一標識 */
@@ -22,7 +23,7 @@ export interface RuleItem {
   /** 顯示名稱 */
   label: string
   /** 規則說明 */
-  description: string
+  description?: string
   /** 控件類型 */
   type: RuleValueType
   /** 當前值（運行時由 Hook 注入） */
@@ -39,6 +40,12 @@ export interface RuleItem {
   options?: { label: string; value: string | number }[]
   /** 子分組（用於在分組內再按維度歸類，如廣告類型） */
   subGroup?: string
+  /** 備註（用於 table 類型的補充說明） */
+  remark?: string
+  /** 日期格式（用於 table 類型的編號規則：'YYYYMMDD' | 'YYMM' | ''） */
+  dateFormat?: string
+  /** 觸發菜單（用於 table 類型的編號規則，展示該業務在哪個菜單觸發） */
+  menu?: string
 }
 
 export interface RuleGroup {
@@ -54,6 +61,8 @@ export interface RuleGroup {
   description: string
   /** 規則列表 */
   rules: RuleItem[]
+  /** 渲染類型（默認逐行渲染，table 為表格展示） */
+  type?: RuleValueType
 }
 
 /* ==================== 默認規則定義 ==================== */
@@ -253,6 +262,40 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
     color: '#722ED1',
     description: '會話安全與空閒超時相關規則（僅管理員可配置）',
     rules: SYSTEM_SECURITY_RULES,
+  },
+  {
+    key: 'id_generation',
+    title: '編號生成規則',
+    icon: <OrderedListOutlined />,
+    color: '#1890FF',
+    description: '後端 BizSeqService 統一管理，支持調整前綴與序號規則',
+    type: 'table' as RuleValueType,
+    rules: [
+      { key: 'recharge', label: '充值流程編號', type: 'table', value: 'CZ', defaultValue: 'CZ', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'CZ202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
+      { key: 'deduct', label: '扣款流程編號', type: 'table', value: 'KK', defaultValue: 'KK', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'KK202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
+      { key: 'transfer', label: '轉賬流程編號', type: 'table', value: 'ZZ', defaultValue: 'ZZ', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'ZZ202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
+      { key: 'merge', label: '合併流程編號', type: 'table', value: 'HB', defaultValue: 'HB', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'HB202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
+      { key: 'batch', label: '批次號', type: 'table', value: 'PC', defaultValue: 'PC', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PC202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '批次查詢' },
+      { key: 'detail', label: '交易明細編號', type: 'table', value: 'MX', defaultValue: 'MX', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'MX202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '明細查詢' },
+      { key: 'debt', label: '欠款單編號', type: 'table', value: 'QK', defaultValue: 'QK', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'QK202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '欠款對賬' },
+      { key: 'ad_order_star', label: '無敵星星訂單', type: 'table', value: 'DDWD', defaultValue: 'DDWD', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDWD202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'ad_order_new_store', label: '新店廣告訂單', type: 'table', value: 'DDXD', defaultValue: 'DDXD', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDXD202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'ad_order_revive', label: '盤活復蘇訂單', type: 'table', value: 'DDPH', defaultValue: 'DDPH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDPH202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'ad_order_traffic', label: '流量廣告訂單', type: 'table', value: 'DDLL', defaultValue: 'DDLL', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDLL202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'ad_order_popular', label: '人氣商家訂單', type: 'table', value: 'DDRQ', defaultValue: 'DDRQ', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDRQ202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'gift', label: '贈送記錄編號', type: 'table', value: 'ZS', defaultValue: 'ZS', dateFormat: 'YYMM', min: 4, max: 4, unit: 'ZS26080001', remark: '{prefix} + YYMM + {n}位自增序號（按月維度）', menu: '審批中心' },
+      { key: 'merchant_group', label: '集團ID', type: 'table', value: 'JT', defaultValue: 'JT', dateFormat: '', min: 6, max: 6, unit: 'JT000001', remark: '{prefix} + {n}位自增序號（取表內最大序號+1）', menu: '門店管理' },
+      { key: 'store', label: '門店ID', type: 'table', value: 'MD', defaultValue: 'MD', dateFormat: '', min: 6, max: 6, unit: 'MD000001', remark: '{prefix} + {n}位固定序號（無日期維度，全局自增）', menu: '門店管理' },
+      { key: 'algo_star', label: '無敵星星算法ID', type: 'table', value: 'SFWD', defaultValue: 'SFWD', dateFormat: 'YYMM', min: 3, max: 3, unit: 'SFWD2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_new_store', label: '新店廣告算法ID', type: 'table', value: 'SFXD', defaultValue: 'SFXD', dateFormat: 'YYMM', min: 3, max: 3, unit: 'SFXD2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_revive', label: '盤活復蘇算法ID', type: 'table', value: 'SFPH', defaultValue: 'SFPH', dateFormat: 'YYMM', min: 3, max: 3, unit: 'SFPH2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_traffic', label: '流量廣告算法ID', type: 'table', value: 'SFLL', defaultValue: 'SFLL', dateFormat: 'YYMM', min: 3, max: 3, unit: 'SFLL2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_popular', label: '人氣商家算法ID', type: 'table', value: 'SFRQ', defaultValue: 'SFRQ', dateFormat: 'YYMM', min: 3, max: 3, unit: 'SFRQ2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '算法庫' },
+      { key: 'config_waterfall', label: '瀑布流策略', type: 'table', value: 'PB', defaultValue: 'PB', dateFormat: 'YYMM', min: 3, max: 3, unit: 'PB2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '瀑布流配置' },
+      { key: 'config_pricing_star', label: '無敵星星定價', type: 'table', value: 'DJWD', defaultValue: 'DJWD', dateFormat: 'YYMM', min: 3, max: 3, unit: 'DJWD2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'config_pricing_hot', label: '人氣商家定價', type: 'table', value: 'DJRQ', defaultValue: 'DJRQ', dateFormat: 'YYMM', min: 3, max: 3, unit: 'DJRQ2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'config_pricing_revive', label: '盤活復蘇定價', type: 'table', value: 'DJPH', defaultValue: 'DJPH', dateFormat: 'YYMM', min: 3, max: 3, unit: 'DJPH2608001', remark: '{prefix} + YYMM + {n}位自增序號', menu: '廣告銷售' },
+    ],
   },
 ]
 

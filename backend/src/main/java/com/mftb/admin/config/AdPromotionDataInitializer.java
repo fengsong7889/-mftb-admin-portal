@@ -274,7 +274,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
      */
     private void ensureOrderExtraColumns() {
         addColumnIfAbsent("biz_ad_order", "algo_code",
-                "ALTER TABLE biz_ad_order ADD COLUMN algo_code VARCHAR(64) COMMENT '算法编码快照' AFTER algo_name");
+                "ALTER TABLE biz_ad_order ADD COLUMN algo_code VARCHAR(64) COMMENT '算法ID快照' AFTER algo_name");
         addColumnIfAbsent("biz_ad_order", "operator_type",
                 "ALTER TABLE biz_ad_order ADD COLUMN operator_type TINYINT COMMENT '下单人类型: 1=商家 2=业务人员' AFTER bd_emp_id");
         addColumnIfAbsent("biz_ad_order", "operator_id",

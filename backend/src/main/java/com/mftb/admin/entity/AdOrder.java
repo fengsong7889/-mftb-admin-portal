@@ -20,7 +20,7 @@ public class AdOrder {
     @TableId
     private Long id;
 
-    /** 订单编号: GD + 年月日 + 4位自增 */
+    /** 订单编号: 算法前缀 + 年月日 + 4位自增（如 WD202608120000） */
     private String orderNo;
 
     /** 算法类型快照 */
@@ -32,7 +32,7 @@ public class AdOrder {
     /** 算法名称快照 */
     private String algoName;
 
-    /** 算法编码快照 */
+    /** 算法ID快照 */
     private String algoCode;
 
     /** 所属品牌: flashBee / mFood */

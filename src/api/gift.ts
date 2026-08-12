@@ -17,7 +17,7 @@ export interface GiftRecordItem {
   groupCode?: string
   groupName: string
   storeId: number
-  /** 门店业务编号（如 MD00001，实时关联门店表） */
+  /** 门店业务编号（如 MD000001，实时关联门店表） */
   storeCode?: string
   storeName: string
   brand: string
@@ -76,7 +76,7 @@ export interface GiftConsumeItem {
   groupCode?: string
   groupName: string
   storeId: number
-  /** 门店业务编号（如 MD00001，实时关联门店表） */
+  /** 门店业务编号（如 MD000001，实时关联门店表） */
   storeCode?: string
   storeName: string
   brand: string

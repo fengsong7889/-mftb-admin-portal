@@ -53,10 +53,10 @@ public class BizDataInitializer implements CommandLineRunner {
         log.info("已将 {} 条存量集团ID迁移为 JT 自增序列", ids.size());
     }
 
-    /** 存量门店ID迁移: 非 MD+5位数字 格式的编号按 id 顺序重编为 MD 序列 */
+    /** 存量门店ID迁移: 非 MD+6位数字 格式的编号按 id 顺序重编为 MD 序列 */
     private void migrateLegacyStoreCodes() {
         List<Long> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM biz_store WHERE store_code NOT REGEXP '^MD[0-9]{5}$' ORDER BY id",
+                "SELECT id FROM biz_store WHERE store_code NOT REGEXP '^MD[0-9]{6}$' ORDER BY id",
                 Long.class);
         if (ids.isEmpty()) {
             return;
@@ -64,7 +64,7 @@ public class BizDataInitializer implements CommandLineRunner {
         int seq = maxCodeSeq("biz_store", "store_code", "MD");
         for (Long id : ids) {
             jdbcTemplate.update("UPDATE biz_store SET store_code = ? WHERE id = ?",
-                    String.format("MD%05d", ++seq), id);
+                    String.format("MD%06d", ++seq), id);
         }
         log.info("已将 {} 条存量门店ID迁移为 MD 自增序列", ids.size());
     }

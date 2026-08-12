@@ -546,7 +546,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     /**
      * 列表/详情补充展示字段:
      * 1) 商圈/时段由订单明细去重聚合（盘活复苏无时段维度）;
-     * 2) 存量订单无算法编码快照时回查算法表填充
+     * 2) 存量订单无算法ID快照时回查算法表填充
      */
     private void fillSummaries(List<AdOrderVO> records) {
         if (records.isEmpty()) {

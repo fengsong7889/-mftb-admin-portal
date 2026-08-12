@@ -16,7 +16,7 @@ public interface AdAlgorithmService {
     /** 算法详情 */
     AdAlgorithmVO detail(Long id);
 
-    /** 新增算法（自动生成算法编码） */
+    /** 新增算法（自动生成算法ID） */
     AdAlgorithmVO create(AdAlgorithmRequest request);
 
     /** 编辑算法 */

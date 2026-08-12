@@ -223,7 +223,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         }
 
         // 7. 写订单主表 + 明细
-        String orderNo = bizSeqService.next(BizSeqService.PREFIX_AD_ORDER);
+        String orderNo = bizSeqService.next(BizSeqService.extractAlgoPrefix(algorithm.getAlgoCode()));
         BizMerchantGroup group = groupMapper.selectOne(
                 new LambdaQueryWrapper<BizMerchantGroup>()
                         .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())

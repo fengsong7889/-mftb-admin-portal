@@ -355,7 +355,7 @@ export interface AdOrder {
   algoType: number
   algoId: number
   algoName: string
-  /** 算法编码（如 ALG00001） */
+  /** 算法ID（如 WD00001） */
   algoCode?: string
   brand?: string
   channel?: number

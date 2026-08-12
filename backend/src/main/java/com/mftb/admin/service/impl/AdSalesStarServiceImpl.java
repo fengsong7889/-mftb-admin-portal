@@ -267,7 +267,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
 
         // 6. 写订单主表 + 明细 + 财务扣款（非 BusinessException 一律转为友好提示，避免「系统繁忙」）
         try {
-        String orderNo = bizSeqService.next(BizSeqService.PREFIX_AD_ORDER);
+        String orderNo = bizSeqService.next(BizSeqService.extractAlgoPrefix(algorithm.getAlgoCode()));
         BizMerchantGroup group = groupMapper.selectOne(
                 new LambdaQueryWrapper<BizMerchantGroup>()
                         .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())

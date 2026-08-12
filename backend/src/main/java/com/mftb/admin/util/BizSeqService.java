@@ -29,12 +29,12 @@ public class BizSeqService {
     public static final String PREFIX_DETAIL = "MX";
     /** 欠款单 */
     public static final String PREFIX_DEBT = "QK";
-    /** 广告订单 */
+    /** 广告订单默认前缀（当算法ID无法提取时使用） */
     public static final String PREFIX_AD_ORDER = "GD";
     /** 门店编号 */
     public static final String PREFIX_STORE = "MD";
     /** 赠送记录 */
-    public static final String PREFIX_GIFT = "GZ";
+    public static final String PREFIX_GIFT = "ZS";
 
     /** 门店编号等非日期维度的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";
@@ -51,6 +51,17 @@ public class BizSeqService {
      * @return 如 CZ202606160000
      */
     public String next(String prefix) {
+        return next(prefix, 4);
+    }
+
+    /**
+     * 生成业务编号（自定义序号位数）
+     *
+     * @param prefix   编号前缀
+     * @param seqLength 序号位数，如 4 → 0000~9999
+     * @return 如 CZ2026061600000（5位时）
+     */
+    public String next(String prefix, int seqLength) {
         String dateKey = LocalDate.now().format(DATE_KEY);
         bizSeqMapper.initSeq(prefix, dateKey);
         bizSeqMapper.increaseSeq(prefix, dateKey);
@@ -59,14 +70,33 @@ public class BizSeqService {
             throw new BusinessException("业务编号生成失败: " + prefix);
         }
         // 表内序号从 1 开始计数，编号序号从 0000 起
-        return prefix + dateKey + String.format("%04d", current - 1);
+        return prefix + dateKey + String.format("%0" + seqLength + "d", current - 1);
+    }
+
+    /**
+     * 从算法ID中提取字母前缀（如 "WD00001" → "WD"）
+     * 用于广告订单编号前缀跟随算法ID前缀
+     */
+    public static String extractAlgoPrefix(String algoCode) {
+        if (algoCode == null || algoCode.isEmpty()) {
+            return PREFIX_AD_ORDER;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (char c : algoCode.toCharArray()) {
+            if (Character.isLetter(c)) {
+                sb.append(c);
+            } else {
+                break;
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : PREFIX_AD_ORDER;
     }
 
     /**
      * 生成月度维度业务编号（并发安全，行锁保证不重号）
      *
      * @param prefix 编号前缀
-     * @return 如 GZ2608-001
+     * @return 如 ZS26080001
      */
     public String nextMonthly(String prefix) {
         String monthKey = LocalDate.now().format(MONTH_KEY);
@@ -76,7 +106,7 @@ public class BizSeqService {
         if (current == null) {
             throw new BusinessException("业务编号生成失败: " + prefix);
         }
-        return prefix + monthKey + "-" + String.format("%03d", current);
+        return prefix + monthKey + String.format("%04d", current);
     }
 
     /**
@@ -91,7 +121,7 @@ public class BizSeqService {
         if (current == null) {
             throw new BusinessException("门店编号生成失败");
         }
-        return String.format("%s%05d", PREFIX_STORE, current);
+        return String.format("%s%06d", PREFIX_STORE, current);
     }
 
     /** 按审批类型取流程编号前缀 */

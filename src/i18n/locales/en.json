@@ -3442,7 +3442,7 @@
     "groupRequired": "Please select a group",
     "groupPlaceholder": "Please select a group",
     "storeIdLabel": "Store ID",
-    "storeIdAutoGen": "Auto-generated (e.g. MD00001)",
+    "storeIdAutoGen": "Auto-generated (e.g. MD000001)",
     "storeNameLabel": "Store Name",
     "storeNameRequired": "Please enter store name",
     "storeNamePlaceholder": "Enter store name",
