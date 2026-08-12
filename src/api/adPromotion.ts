@@ -341,6 +341,12 @@ export const MEAL_SLOT_TIME_LABEL: Record<string, string> = {
   supper: '21:00-02:00',
 }
 
+/** 按日期分组的购买时段 */
+export interface DateSlotGroup {
+  date: string
+  slots: string[]
+}
+
 /** 廣告訂單（與後端 AdOrderVO 對齊） */
 export interface AdOrder {
   id?: number
@@ -366,6 +372,8 @@ export interface AdOrder {
   regions?: number[]
   /** 购买时段（明细去重聚合, breakfast/lunch/afternoon/dinner/supper） */
   mealSlots?: string[]
+  /** 按日期分组的购买时段（無敵星星：每个日期对应的时段列表） */
+  dateSlots?: DateSlotGroup[]
   itemCount?: number
   originalAmount: number
   discountAmount: number

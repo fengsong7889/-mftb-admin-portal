@@ -50,6 +50,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -620,6 +621,19 @@ public class AdOrderServiceImpl implements AdOrderService {
                 }
             }
             vo.setMealSlots(slots);
+            // 按日期分组时段：供列表页展示每个日期对应的购买时段
+            Map<String, List<String>> dateSlotMap = new LinkedHashMap<>();
+            items.stream()
+                    .filter(i -> i.getBizDate() != null && i.getMealSlot() != null)
+                    .sorted(java.util.Comparator.comparing(AdOrderItemStar::getBizDate)
+                            .thenComparing(i -> AdSalesStarServiceImpl.MEAL_SLOTS.indexOf(i.getMealSlot())))
+                    .forEach(i -> {
+                        String date = i.getBizDate().toString();
+                        dateSlotMap.computeIfAbsent(date, k -> new ArrayList<>()).add(i.getMealSlot());
+                    });
+            List<AdOrderVO.DateSlotGroup> dateSlots = new ArrayList<>();
+            dateSlotMap.forEach((date, slotList) -> dateSlots.add(new AdOrderVO.DateSlotGroup(date, slotList)));
+            vo.setDateSlots(dateSlots);
         }
         // 新店廣告：從門店綁定區域回填商圈
         List<String> newStoreCodes = records.stream()

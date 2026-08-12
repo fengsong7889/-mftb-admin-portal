@@ -21,7 +21,7 @@ enum OrderStatus {
 
 import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
 import { AlgorithmType } from '../Recommend/constants'
-import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder } from '../../api/adPromotion'
+import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup } from '../../api/adPromotion'
 
 // 品牌枚举
 enum AppType {
@@ -102,6 +102,7 @@ interface OrderItem {
   storeId: string             // 門店ID
   storeName: string           // 門店名稱
   mealSlots: string[]       // 無敵星星：購買時段
+  dateSlots?: DateSlotGroup[] // 無敵星星：按日期分組的購買時段
   purchaseDays?: string[]    // 盤活復蘇/人氣商家：購買日期列表
   skinName?: string          // 人氣商家：皮膚套件名稱
   purchaseDate: string
@@ -154,6 +155,11 @@ function toOrderItem(vo: AdOrder): OrderItem {
     breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
   }
   const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_CN[s] || MEAL_SLOT_TIME_LABEL[s] || s)
+  // 按日期分組時段：後端返回每個日期對應的時段列表
+  const dateSlots = vo.dateSlots?.map(g => ({
+    date: g.date,
+    slots: g.slots.map(s => MEAL_SLOT_CN[s] || MEAL_SLOT_TIME_LABEL[s] || s),
+  }))
   // 購買日期: 無敵星星和按天售賣類型均傳遞日期列表，用於列表頁展示
   const hasNoMealSlots = (vo.mealSlots || []).length === 0
   const isDayBasedType = vo.algoType === 2 || vo.algoType === 3 || vo.algoType === 5
@@ -178,6 +184,7 @@ function toOrderItem(vo: AdOrder): OrderItem {
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
     mealSlots,
+    dateSlots,
     purchaseDays,
     purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
@@ -554,52 +561,72 @@ export default function PromotionOrderManage() {
           }
           return <span style={{ color: '#bfbfbf' }}>-</span>
         }
-        // 無敵星星：展示日期 + 時段，最多2個時段，超出顯示弹窗
+        // 無敵星星：按日期分組展示時段（每個日期標注對應的購買時段）
         if (record.mealSlots && record.mealSlots.length > 0) {
-          const maxShow = 2
-          const visibleSlots = record.mealSlots.slice(0, maxShow)
-          const hiddenSlots = record.mealSlots.slice(maxShow)
-          const hasMore = hiddenSlots.length > 0
-          // 日期展示：如果有購買日期列表，展示日期範圍
-          const hasDates = record.purchaseDays && record.purchaseDays.length > 0 && record.purchaseDays.some(d => !!d)
-          const firstDate = hasDates ? record.purchaseDays![0] : null
-          const lastDate = hasDates ? record.purchaseDays![record.purchaseDays!.length - 1] : null
-          const dateRangeText = firstDate && lastDate
-            ? (firstDate === lastDate ? firstDate.slice(5) : `${firstDate.slice(5)} ~ ${lastDate.slice(5)}`)
-            : null
+          const hasDateSlots = record.dateSlots && record.dateSlots.length > 0
+          // 按日期分組的詳細內容（弹窗展示）
+          const dateSlotDetail = hasDateSlots ? (
+            <Space direction="vertical" size={6}>
+              {record.dateSlots!.map((g, gi) => (
+                <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: '#595959', minWidth: 48 }}>{g.date.slice(5)}</span>
+                  {g.slots.map((slot, si) => (
+                    <Tag key={si} color="blue" style={{ margin: 0 }}>{slot}</Tag>
+                  ))}
+                </div>
+              ))}
+            </Space>
+          ) : null
 
-          const slotContent = (
-            <Space direction="vertical" size={4}>
+          // 主列展示：優先按日期分組簡要展示（最多3排日期，每排最多2個時段）
+          if (hasDateSlots && record.dateSlots!.length > 0) {
+            const maxShowDates = 3
+            const maxSlotsPerDate = 2
+            const visibleDates = record.dateSlots!.slice(0, maxShowDates)
+            const hiddenDates = record.dateSlots!.slice(maxShowDates)
+            return (
+              <Space direction="vertical" size={2}>
+                {visibleDates.map((g, i) => {
+                  const visibleSlots = g.slots.slice(0, maxSlotsPerDate)
+                  const hiddenSlots = g.slots.slice(maxSlotsPerDate)
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 11, color: '#8C8C8C', minWidth: 40 }}>{g.date.slice(5)}</span>
+                      {visibleSlots.map((slot, si) => (
+                        <Tag key={si} color="blue" style={{ margin: 0, fontSize: 11 }}>{slot}</Tag>
+                      ))}
+                      {hiddenSlots.length > 0 && (
+                        <Popover
+                          content={<Space wrap size={4}>{g.slots.map((s, si) => <Tag key={si} color="blue" style={{ margin: 0 }}>{s}</Tag>)}</Space>}
+                          title={`${g.date.slice(5)} 全部時段`}
+                          trigger="click"
+                          placement="bottomLeft"
+                        >
+                          <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{hiddenSlots.length}</span>
+                        </Popover>
+                      )}
+                    </div>
+                  )
+                })}
+                {hiddenDates.length > 0 && dateSlotDetail && (
+                  <Popover content={dateSlotDetail} title={t('promotionOrderManage.allSlots')} trigger="click" placement="bottomLeft">
+                    <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
+                      {t('promotionOrderManage.moreLabel', { count: hiddenDates.length })}
+                    </Button>
+                  </Popover>
+                )}
+              </Space>
+            )
+          }
+
+          // 降級：無 dateSlots 時保持原邏輯
+          return (
+            <Space direction="vertical" size={2}>
               {record.mealSlots.map((slot, index) => (
                 <Tag key={index} color="blue" style={{ margin: 0 }}>
                   {slot}
                 </Tag>
               ))}
-            </Space>
-          )
-
-          return (
-            <Space direction="vertical" size={2}>
-              {dateRangeText && (
-                <span style={{ fontSize: 12, color: '#595959' }}>{dateRangeText}</span>
-              )}
-              {visibleSlots.map((slot, index) => (
-                <Tag key={index} color="blue" style={{ margin: 0 }}>
-                  {slot}
-                </Tag>
-              ))}
-              {hasMore && (
-                <Popover
-                  content={slotContent}
-                  title={t('promotionOrderManage.allSlots')}
-                  trigger="click"
-                  placement="bottomLeft"
-                >
-                  <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
-                    {t('promotionOrderManage.moreLabel', { count: hiddenSlots.length })}
-                  </Button>
-                </Popover>
-              )}
             </Space>
           )
         }

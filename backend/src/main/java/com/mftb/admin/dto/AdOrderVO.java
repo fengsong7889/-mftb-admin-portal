@@ -5,7 +5,10 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 广告订单列表行 VO
@@ -31,8 +34,10 @@ public class AdOrderVO {
     private String operatorName;
     /** 所属商圈（明细去重聚合） */
     private List<Integer> regions;
-    /** 购买时段（明细去重聚合, 如 breakfast/lunch） */
+    /** 購買時段（明細去重聚合, 如 breakfast/lunch） */
     private List<String> mealSlots;
+    /** 按日期分組的購買時段（無敵星星：每個日期對應的時段列表） */
+    private List<DateSlotGroup> dateSlots;
     /** 購買日期列表（盤活復蘇按天售賣，明細 biz_date 去重排序） */
     private List<String> purchaseDays;
     /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
@@ -52,6 +57,19 @@ public class AdOrderVO {
     private String flowNo;
     private String remark;
     private LocalDateTime createdAt;
+
+    /** 按日期分組的時段 */
+    @Data
+    public static class DateSlotGroup {
+        private String date;
+        private List<String> slots;
+
+        public DateSlotGroup() {}
+        public DateSlotGroup(String date, List<String> slots) {
+            this.date = date;
+            this.slots = slots;
+        }
+    }
 
     public static AdOrderVO from(AdOrder entity) {
         AdOrderVO vo = new AdOrderVO();

@@ -42,6 +42,7 @@ public class AdOrderDetailVO extends AdOrderVO {
         vo.setOperatorName(order.getOperatorName());
         vo.setRegions(order.getRegions());
         vo.setMealSlots(order.getMealSlots());
+        vo.setDateSlots(order.getDateSlots());
         vo.setPurchaseDays(order.getPurchaseDays());
         vo.setSkinNames(order.getSkinNames());
         vo.setItemCount(order.getItemCount());

@@ -269,6 +269,24 @@ function toDetailOrder(
   })
   const regions = Array.from(new Set(vo.items.map(i => i.region)))
   const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || fmt(vo.orderTime).slice(0, 10)
+  // 生成推廣數據：推廣中/已推廣/已退款（推廣後退款）的訂單才有推廣數據
+  const mappedStatus = mapAdStatus(vo.status)
+  const hasPromoData = mappedStatus === OrderStatus.PROMOTING
+    || mappedStatus === OrderStatus.PROMOTED
+    || mappedStatus === OrderStatus.REFUNDED
+  let promoData: PromoRecord[] | undefined
+  if (hasPromoData && slotPrices.length > 0) {
+    const primaryRegion = regions[0] ?? 1
+    const regionName = REGION_LABEL_KEY[primaryRegion] ? i18n.t(REGION_LABEL_KEY[primaryRegion]) : '未知'
+    if (vo.algoType === AlgorithmType.NEW_STORE_AD) {
+      const pDays = vo.purchaseDays && vo.purchaseDays.length > 0 ? vo.purchaseDays : slotPrices.map(s => s.date)
+      promoData = genNewStorePromoData(regionName, pDays)
+    } else if (vo.algoType === AlgorithmType.HOT_REVIVE_AD) {
+      promoData = genRevivePromoData(regionName, slotPrices)
+    } else {
+      promoData = genInvincibleStarPromoData(regionName, slotPrices)
+    }
+  }
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
@@ -300,6 +318,7 @@ function toDetailOrder(
     skinName: vo.skinNames?.[0] || vo.items.find(i => i.skinName)?.skinName || undefined,
     giftDays: vo.giftDays ?? 0,
     giftAmount: vo.giftAmount ?? 0,
+    promoData,
     source: 'api',
   }
 }
