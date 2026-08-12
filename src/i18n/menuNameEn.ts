@@ -86,16 +86,20 @@ export const MENU_NAME_EN: Record<string, string> = {
 
 /**
  * 根據當前語言翻譯菜單名稱：
- * 優先取靜態映射表（英文），再取 i18next 資源（含後端注入的語言包 menu.${menuKey}），
- * 最後回退中文（數據庫菜單名）。
- * - 非英文模式：原樣返回中文
+ * - 中文（zh-TW/zh-CN）：原樣返回
+ * - 英文：優先取靜態映射表 MENU_NAME_EN，再取 i18next 資源
+ * - 其它語言（ja/ko/ru 等）：取 i18next 資源（後端 bundle 注入的動態翻譯）
+ * - 最終回退中文（數據庫菜單名）
  */
 export function translateMenuName(menuKey: string, zhName: string): string {
-  if (!i18n.language?.startsWith('en')) return zhName
+  // 中文模式直接返回
+  if (i18n.language?.startsWith('zh')) return zhName
 
-  // 1. 靜態映射表（英文硬編碼，最高優先）
-  const staticEn = MENU_NAME_EN[menuKey]
-  if (staticEn) return staticEn
+  // 1. 英文靜態映射表（最高優先，僅英文使用）
+  if (i18n.language?.startsWith('en')) {
+    const staticEn = MENU_NAME_EN[menuKey]
+    if (staticEn) return staticEn
+  }
 
   // 2. i18next 資源（後端 bundle 注入的動態翻譯，key 格式 menu.${menuKey}）
   const bundleKey = `menu.${menuKey}`
@@ -107,6 +111,12 @@ export function translateMenuName(menuKey: string, zhName: string): string {
   const directVal = i18n.t(menuKey)
   if (directVal && directVal !== menuKey) return directVal
 
-  // 4. 回退中文
+  // 4. 英文模式可再回退 MENU_NAME_EN（上面已處理，此处兜底）
+  if (i18n.language?.startsWith('en')) {
+    const fallback = MENU_NAME_EN[menuKey]
+    if (fallback) return fallback
+  }
+
+  // 5. 回退中文
   return zhName
 }

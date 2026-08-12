@@ -36,6 +36,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         migrateSchema();
+        fixFinBatchUniqueKey();
         migrateBuiltinAccounts();
         migrateEmpIdToMF();
         migrateDeptCodeToMT();
@@ -650,6 +651,24 @@ public class DataInitializer implements CommandLineRunner {
             jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", pomId);
             jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", pomId);
             log.info("已清理 promotion-order-manage 菜单及关联权限记录");
+        }
+    }
+
+    /** 修复转账/合并流程批次号唯一约束：从 (batch_no) 改为 (batch_no, group_code) */
+    private void fixFinBatchUniqueKey() {
+        try {
+            // 检查旧索引是否存在
+            Integer oldIdx = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.STATISTICS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_fin_batch' AND INDEX_NAME = 'uk_fin_batch_no'",
+                    Integer.class);
+            if (oldIdx != null && oldIdx > 0) {
+                jdbcTemplate.execute("ALTER TABLE biz_fin_batch DROP INDEX uk_fin_batch_no");
+                jdbcTemplate.execute("ALTER TABLE biz_fin_batch ADD UNIQUE KEY uk_fin_batch_no_group (batch_no, group_code)");
+                log.info("已修复 biz_fin_batch 唯一约束: (batch_no) → (batch_no, group_code)");
+            }
+        } catch (Exception e) {
+            log.warn("修复 biz_fin_batch 唯一约束时出错: {}", e.getMessage());
         }
     }
 
