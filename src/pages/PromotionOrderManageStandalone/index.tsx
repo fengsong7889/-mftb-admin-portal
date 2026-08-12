@@ -109,10 +109,14 @@ interface OrderItem {
   originalPrice: number
   discountPrice: number
   actualPrice: number
+  discountAmount?: number    // 定價折扣（梯度/時段折扣）
+  giftDays?: number          // 贈送天數抵扣
+  giftAmount?: number        // 贈送抵扣金額
   status: OrderStatus
   orderTime: string
   payTime?: string
   refundAmount?: number       // 退款推廣金額
+  refundGiftDays?: number     // 退款退回贈送天數
   refundTime?: string         // 退款時間
   refundOperatorType?: OrderOperatorType  // 退款人類型
   refundOperatorId?: string   // 退款人ID
@@ -190,10 +194,14 @@ function toOrderItem(vo: AdOrder): OrderItem {
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
     actualPrice: vo.actualAmount,
+    discountAmount: vo.discountAmount,
+    giftDays: vo.giftDays ?? undefined,
+    giftAmount: vo.giftAmount ?? undefined,
     status: statusMap[vo.status] ?? OrderStatus.PENDING_PROMOTION,
     orderTime: fmt(vo.orderTime),
     payTime: vo.payTime ? fmt(vo.payTime) : undefined,
     refundAmount: vo.refundAmount || undefined,
+    refundGiftDays: vo.refundGiftDays ?? undefined,
     operatorType: vo.operatorType as OrderOperatorType | undefined,
     operatorId: vo.operatorId,
     operatorName: vo.operatorName,
@@ -395,6 +403,8 @@ export default function PromotionOrderManage() {
     ...(orderType !== '新店廣告' ? [
       { key: 'originalPrice', title: t('promotionOrderManage.colOrderAmount') },
       { key: 'discount', title: t('promotionOrderManage.colDiscount') },
+      { key: 'payMode', title: t('promotionOrderManage.colPayMode') },
+      { key: 'giftDays', title: t('promotionOrderManage.colGiftDays') },
       { key: 'actualPrice', title: t('promotionOrderManage.colActualPay') },
     ] : []),
     { key: 'status', title: t('promotionOrderManage.colOrderStatus') },
@@ -406,6 +416,7 @@ export default function PromotionOrderManage() {
       { key: 'refundTime', title: t('promotionOrderManage.colRefundTime') },
     ] : [
       { key: 'refundAmount', title: t('promotionOrderManage.colRefundAmount') },
+      { key: 'refundGiftDays', title: t('promotionOrderManage.colRefundGiftDays') },
       { key: 'refundOperator', title: t('promotionOrderManage.colRefundOperator') },
       { key: 'refundTime', title: t('promotionOrderManage.colRefundTime') },
     ]),
@@ -645,11 +656,34 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colDiscount'),
       key: 'discount',
       width: 120,
-      render: (_: unknown, record: OrderItem) => (
-        <span style={{ color: '#fa8c16' }}>
-          -${record.originalPrice - record.actualPrice}
-        </span>
-      ),
+      render: (_: unknown, record: OrderItem) => {
+        const disc = record.discountAmount ?? (record.originalPrice - record.actualPrice)
+        return disc > 0 ? <span style={{ color: '#fa8c16' }}>-${disc}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+      },
+    },
+    {
+      title: t('promotionOrderManage.colPayMode'),
+      key: 'payMode',
+      width: 110,
+      render: (_: unknown, record: OrderItem) => {
+        const gd = record.giftDays ?? 0
+        const isGift = gd > 0 && record.actualPrice === 0
+        const isMixed = gd > 0 && record.actualPrice > 0
+        if (isGift) return <Tag color="orange">{t('promotionOrderManage.payModeGift')}</Tag>
+        if (isMixed) return <Tag color="green">{t('promotionOrderManage.payModeMixed')}</Tag>
+        return <Tag color="gold">{t('promotionOrderManage.payModePromo')}</Tag>
+      },
+    },
+    {
+      title: t('promotionOrderManage.colGiftDays'),
+      key: 'giftDays',
+      width: 90,
+      render: (_: unknown, record: OrderItem) => {
+        const gd = record.giftDays ?? 0
+        return gd > 0
+          ? <span style={{ color: '#E8720C', fontWeight: 600 }}>{gd} {t('promotionOrderManage.dayUnit')}</span>
+          : <span style={{ color: '#bfbfbf' }}>-</span>
+      },
     },
     {
       title: t('promotionOrderManage.colActualPay'),
@@ -686,6 +720,16 @@ export default function PromotionOrderManage() {
       render: (amount: number | undefined) => {
         if (amount === undefined || amount === null) return <span style={{ color: '#bfbfbf' }}>-</span>
         return <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${amount}</span>
+      },
+    },
+    {
+      title: t('promotionOrderManage.colRefundGiftDays'),
+      key: 'refundGiftDays',
+      width: 100,
+      render: (_: unknown, record: OrderItem) => {
+        const days = record.refundGiftDays
+        if (days === undefined || days === null) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return <span style={{ color: '#E8720C', fontWeight: 600 }}>{days} {t('promotionOrderManage.dayUnit')}</span>
       },
     }] : []),
     // 退款人 - 無敵星星/盤活復蘇/人氣商家顯示

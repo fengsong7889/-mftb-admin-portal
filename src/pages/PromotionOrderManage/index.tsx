@@ -100,6 +100,9 @@ interface OrderItem {
   originalPrice: number
   discountPrice: number
   actualPrice: number
+  discountAmount?: number    // 定價折扣
+  giftDays?: number          // 贈送天數抵扣
+  giftAmount?: number        // 贈送抵扣金額
   status: OrderStatus
   orderTime: string
   payTime?: string
@@ -161,6 +164,9 @@ function toOrderItem(vo: AdOrder): OrderItem {
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
     actualPrice: vo.actualAmount,
+    discountAmount: vo.discountAmount,
+    giftDays: vo.giftDays ?? undefined,
+    giftAmount: vo.giftAmount ?? undefined,
     status: vo.status as OrderStatus,
     orderTime: fmt(vo.orderTime),
     payTime: vo.payTime ? fmt(vo.payTime) : undefined,
@@ -327,6 +333,8 @@ export default function PromotionOrderManage() {
     { key: 'purchaseContent', title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : orderType === '盤活復蘇' ? t('promotionOrderManage.purchaseDaysTitle') : t('promotionOrderManage.purchaseContent') },
     { key: 'originalPrice', title: t('promotionOrderManage.colOrderAmount') },
     { key: 'discount', title: t('promotionOrderManage.colDiscount') },
+    { key: 'payMode', title: t('promotionOrderManage.colPayMode') },
+    { key: 'giftDays', title: t('promotionOrderManage.colGiftDays') },
     { key: 'actualPrice', title: t('promotionOrderManage.colActualPay') },
     { key: 'status', title: t('promotionOrderManage.colOrderStatus') },
     { key: 'orderTime', title: t('promotionOrderManage.colOrderTime') },
@@ -544,11 +552,34 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colDiscount'),
       key: 'discount',
       width: 120,
-      render: (_, record) => (
-        <span style={{ color: '#fa8c16' }}>
-          -${record.originalPrice - record.actualPrice}
-        </span>
-      ),
+      render: (_, record) => {
+        const disc = record.discountAmount ?? (record.originalPrice - record.actualPrice)
+        return disc > 0 ? <span style={{ color: '#fa8c16' }}>-${disc}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+      },
+    },
+    {
+      title: t('promotionOrderManage.colPayMode'),
+      key: 'payMode',
+      width: 110,
+      render: (_, record) => {
+        const gd = record.giftDays ?? 0
+        const isGift = gd > 0 && record.actualPrice === 0
+        const isMixed = gd > 0 && record.actualPrice > 0
+        if (isGift) return <Tag color="orange">{t('promotionOrderManage.payModeGift')}</Tag>
+        if (isMixed) return <Tag color="green">{t('promotionOrderManage.payModeMixed')}</Tag>
+        return <Tag color="gold">{t('promotionOrderManage.payModePromo')}</Tag>
+      },
+    },
+    {
+      title: t('promotionOrderManage.colGiftDays'),
+      key: 'giftDays',
+      width: 90,
+      render: (_, record) => {
+        const gd = record.giftDays ?? 0
+        return gd > 0
+          ? <span style={{ color: '#E8720C', fontWeight: 600 }}>{gd} {t('promotionOrderManage.dayUnit')}</span>
+          : <span style={{ color: '#bfbfbf' }}>-</span>
+      },
     },
     {
       title: t('promotionOrderManage.colActualPay'),

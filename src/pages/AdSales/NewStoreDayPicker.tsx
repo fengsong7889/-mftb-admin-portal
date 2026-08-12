@@ -550,11 +550,11 @@ export default function NewStoreDayPicker() {
       </Modal>
 
       {/* 支付成功弹窗 */}
-      <Modal title={t('submitSuccess')} open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
+      <Modal title={t('purchaseSuccess')} open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
         footer={[<Button key="view" type="primary" onClick={handleViewOrder}>{t('viewOrder')}</Button>, <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>{t('continueBuy')}</Button>]} width={400}>
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('submitSuccessMsg')}</p>
+          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('successMessage')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8, marginBottom: 16 }}>
             <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
             <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{lastSubmitDays} {t('dayUnitSuffix')}</p>

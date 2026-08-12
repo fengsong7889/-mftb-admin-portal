@@ -379,6 +379,8 @@ export interface AdOrder {
   discountAmount: number
   actualAmount: number
   refundAmount: number
+  /** 退款退回贈送天數（盤活復蘇/無敵星星：贈送或混合支付退款時退回的天數） */
+  refundGiftDays?: number | null
   /** 贈送天數抵扣快照 */
   giftDays?: number | null
   /** 贈送抵扣金額快照 */

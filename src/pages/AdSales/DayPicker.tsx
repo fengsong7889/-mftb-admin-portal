@@ -115,6 +115,8 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const [giftDaysUsed, setGiftDaysUsed] = useState(0)
   // 支付成功彈窗展示的實付金額
   const [paidAmount, setPaidAmount] = useState(0)
+  // 支付成功彈窗展示的贈送天數抵扣
+  const [paidGiftDays, setPaidGiftDays] = useState(0)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -606,6 +608,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         cells,
       })
       setPaidAmount(payableAmount)
+      setPaidGiftDays(effectiveGiftDays)
       setGiftDaysUsed(0)
       setIsPaymentModalVisible(false)
       setCartItems([])
@@ -1069,7 +1072,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
               )}
               {/* 混合支付 / 贈送天數支付：顯示贈送天數抵扣 */}
               {(mixedPayment || paymentMode === 'gift') && effectiveGiftDays > 0 && (
-                <div><span style={{ color: '#999' }}>赠送天数抵扣：</span><span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天（-${giftDeduction}）</span></div>
+                <div><span style={{ color: '#999' }}>抵扣天數：</span><span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天（-${giftDeduction}）</span></div>
               )}
               {/* 混合支付 / 推廣金支付：顯示訂單優惠和實付總額 */}
               {(mixedPayment || paymentMode === 'promo') && (
@@ -1129,8 +1132,18 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
           <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('successMessage')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8, marginBottom: 16 }}>
-            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromoFull')}</p>
-            <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidAmount}</p>
+            {paidGiftDays > 0 && (
+              <>
+                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
+                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitSuffix')}</p>
+              </>
+            )}
+            {paidGiftDays === 0 && (
+              <>
+                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromoFull')}</p>
+                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidAmount}</p>
+              </>
+            )}
           </div>
         </div>
       </Modal>
