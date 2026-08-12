@@ -92,7 +92,7 @@ interface ApprovalDetailData {
   repayStores?: { storeId: string; storeName: string; bd: string; amount: number }[]
   debtNote?: string
   repaymentStores?: { store: string; channel: string; amount: number; bd: string }[]
-  // 推广赠送
+  // 赠送
   giftGroupId?: string
   giftGroupName?: string
   giftStoreId?: string
@@ -320,7 +320,7 @@ const mockDetails: Record<string, ApprovalDetailData> = {
     approvalType: 'gift',
     applicant: '朱棣(002)',
     applyDate: '2026-07-17 10:00:00',
-    flowNo: 'TG202607170000',
+    flowNo: 'ZS202607170000',
     flowStatus: 'pending',
     brand: '閃蜂',
     giftGroupId: 'G001',
@@ -590,7 +590,7 @@ export default function ApprovalDetail() {
   }, [flowNo, fallbackDetail])
 
   const handleApprove = () => {
-    // 推廣贈送 TG 流程為前端審批，需校驗當前人是否具備當前節點角色權限
+    // 贈送 ZS 流程為前端審批，需校驗當前人是否具備當前節點角色權限
     if (type === 'gift') {
       const localRecord = getApprovalRecordByFlowNo(flowNo)
       if (localRecord) {
@@ -642,7 +642,7 @@ export default function ApprovalDetail() {
     if (!rejectReason.trim()) {
       return
     }
-    // 推廣贈送 TG 流程為前端審批，需校驗當前人是否具備當前節點角色權限
+    // 贈送 ZS 流程為前端審批，需校驗當前人是否具備當前節點角色權限
     if (type === 'gift') {
       const localRecord = getApprovalRecordByFlowNo(flowNo)
       if (localRecord) {
@@ -1206,7 +1206,7 @@ export default function ApprovalDetail() {
             </>
           )}
 
-          {/* 推广赠送类型 */}
+          {/* 赠送类型 */}
           {type === 'gift' && (
             <div className="approval-section">
               <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.giftConfig')}</div>

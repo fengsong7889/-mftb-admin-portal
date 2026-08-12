@@ -159,7 +159,7 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
 
         // 4. 写订单主表（actualAmount=0, giftDays=N, giftAmount=0）
         LocalDateTime now = LocalDateTime.now();
-        String orderNo = bizSeqService.next(BizSeqService.extractAlgoPrefix(algorithm.getAlgoCode()));
+        String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_NEW_STORE);
         BizMerchantGroup group = groupMapper.selectOne(
                 new LambdaQueryWrapper<BizMerchantGroup>()
                         .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())

@@ -109,7 +109,7 @@ function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boole
   return true
 }
 
-/** 推廣贈送（TG）審批暫為前端流程：後端查詢結果需合併本地贈送審批記錄 */
+/** 贈送（ZS）審批暫為前端流程：後端查詢結果需合併本地贈送審批記錄 */
 function localGiftApprovals(query: FinApprovalQuery): ApprovalRecord[] {
   return (getApprovalRecords() as ApprovalRecord[])
     .filter(r => r.approvalType === 'gift' && matchesApprovalQuery(r, query))

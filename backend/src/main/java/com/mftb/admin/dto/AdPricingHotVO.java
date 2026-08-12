@@ -15,6 +15,8 @@ import java.util.List;
 public class AdPricingHotVO {
 
     private Long id;
+    /** 定价编号（按编号生成规则 config_pricing_hot 生成，如 DJRQ20260812000） */
+    private String pricingNo;
     private Long algoId;
     private String algoName;
     private String brand;
@@ -40,6 +42,7 @@ public class AdPricingHotVO {
     public static AdPricingHotVO from(AdPricingHot entity) {
         AdPricingHotVO vo = new AdPricingHotVO();
         vo.setId(entity.getId());
+        vo.setPricingNo(entity.getPricingNo());
         vo.setAlgoId(entity.getAlgoId());
         vo.setAlgoName(entity.getAlgoName());
         vo.setBrand(entity.getBrand());

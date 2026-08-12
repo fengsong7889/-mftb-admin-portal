@@ -123,7 +123,12 @@ public class GiftServiceImpl implements GiftService {
         if (store == null) throw new BusinessException("门店不存在");
 
         BizGiftRecord record = new BizGiftRecord();
-        record.setGiftId(bizSeqService.nextMonthly(BizSeqService.PREFIX_GIFT));
+        // 赠送ID按广告类型取对应编号规则（如 XDZS/RQZS/PHZS + 年月日 + 4位序号）
+        String giftRuleKey = BizSeqService.giftRuleKey(request.getAdType());
+        if (giftRuleKey == null) {
+            throw new BusinessException("未知廣告類型，無法生成贈送ID: " + request.getAdType());
+        }
+        record.setGiftId(bizSeqService.next(giftRuleKey));
         record.setGroupId(request.getGroupId());
         record.setGroupName(group.getGroupName());
         record.setStoreId(request.getStoreId());

@@ -20,6 +20,7 @@ import com.mftb.admin.service.AdAlgorithmService;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingStarService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
@@ -221,9 +223,10 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     }
 
     /**
-     * 生成算法ID：拼音首字母前缀 + 5位自增序号（每个算法模块独立排序）
+     * 生成算法ID：优先按「编号生成规则」(algo_* 规则，如 SFWD + YYYYMMDD + 3位序号)；
+     * 未配置规则的算法类型退回旧规则：拼音首字母前缀 + 5位自增序号（每个算法模块独立排序）
      * <p>
-     * 规则：
+     * 旧规则：
      * 1. 取算法名称前2个汉字的拼音首字母作为前缀（如「無敵星星」→ WD）
      * 2. 若不同 algoType 模块前缀冲突，追加第3个字的首字母（如 WDG）
      * 3. 仍冲突则追加 algoType 数字（如 WD1）
@@ -231,6 +234,10 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
      * 5. 若名称非中文导致无法提取字母前缀，则按 algoType 使用固定兜底前缀
      */
     private String generateCode(String algoName, Integer algoType) {
+        String ruleKey = BizSeqService.algoRuleKey(algoType);
+        if (ruleKey != null) {
+            return bizSeqService.next(ruleKey);
+        }
         String prefix = buildPrefix(algoName, algoType);
         int maxSeq = maxSeqForPrefix(prefix);
         return prefix + String.format("%05d", maxSeq + 1);

@@ -20,6 +20,9 @@ public class AdWaterfall {
     @TableId
     private Long id;
 
+    /** 策略编号（按编号生成规则 config_waterfall 生成，如 PB20260812000） */
+    private String strategyCode;
+
     /** 瀑布流名称 */
     private String strategyName;
 

@@ -15,6 +15,8 @@ import java.util.List;
 public class AdPricingStarVO {
 
     private Long id;
+    /** 定价编号（按编号生成规则 config_pricing_star 生成，如 DJWD20260812000） */
+    private String pricingNo;
     private Long algoId;
     private String algoName;
     private String brand;
@@ -44,6 +46,7 @@ public class AdPricingStarVO {
     public static AdPricingStarVO from(AdPricingStar entity) {
         AdPricingStarVO vo = new AdPricingStarVO();
         vo.setId(entity.getId());
+        vo.setPricingNo(entity.getPricingNo());
         vo.setAlgoId(entity.getAlgoId());
         vo.setAlgoName(entity.getAlgoName());
         vo.setBrand(entity.getBrand());

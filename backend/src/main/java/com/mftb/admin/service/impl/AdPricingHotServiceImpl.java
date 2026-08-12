@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdPricingHotMapper;
 import com.mftb.admin.mapper.AdPricingHotSkinMapper;
 import com.mftb.admin.service.AdPricingHotService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
     private final AdPricingHotSkinMapper skinMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<AdPricingHotVO> page(long page, long size, Long algoId, String brand, Integer status) {
@@ -79,6 +81,8 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
         AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
 
         AdPricingHot entity = new AdPricingHot();
+        // 定价编号：按编号生成规则 config_pricing_hot（DJRQ + YYYYMMDD + 3位）
+        entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_HOT));
         applyRequest(entity, request, algorithm);
         if (entity.getStatus() == null) {
             entity.setStatus(1);

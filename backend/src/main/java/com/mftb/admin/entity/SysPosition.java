@@ -19,6 +19,9 @@ public class SysPosition {
     @TableId
     private Long id;
 
+    /** 职位ID（按编号生成规则 position_id 生成，如 ZW00001） */
+    private String code;
+
     /** 职位名称 */
     private String name;
 

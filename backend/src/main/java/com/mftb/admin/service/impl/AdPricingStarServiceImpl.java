@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdPricingStarMapper;
 import com.mftb.admin.mapper.AdPricingStarRegionMapper;
 import com.mftb.admin.service.AdPricingStarService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
     private final AdPricingStarRegionMapper regionMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<AdPricingStarVO> page(long page, long size, Long algoId, String brand, Integer status) {
@@ -76,6 +78,8 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
         AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
 
         AdPricingStar entity = new AdPricingStar();
+        // 定价编号：按编号生成规则 config_pricing_star（DJWD + YYYYMMDD + 3位）
+        entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_STAR));
         applyRequest(entity, request, algorithm);
         if (entity.getStatus() == null) {
             entity.setStatus(1);

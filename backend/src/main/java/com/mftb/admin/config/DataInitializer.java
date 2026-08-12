@@ -39,7 +39,7 @@ public class DataInitializer implements CommandLineRunner {
         fixFinBatchUniqueKey();
         migrateBuiltinAccounts();
         migrateEmpIdToMF();
-        migrateDeptCodeToMT();
+        migrateDeptCodeToBM();
         resetPasswordIfNeeded("MF00001", "111222");
         ensureDeptAdSalesPermission();
     }
@@ -75,25 +75,25 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 存量部门编码迁移: 将所有非 MT 格式编码的部门(含逻辑删除记录)按 id 升序重编号为 MT00001+;
-     * 已是 MT 格式的记录不变, 重复启动幂等
+     * 存量部门编码迁移: 将所有非 BM 格式编码的部门(含逻辑删除记录)按 id 升序重编号为 BM00001+
+     * (对应编号生成规则 dept_code); 已是 BM 格式的记录不变, 重复启动幂等
      */
-    private void migrateDeptCodeToMT() {
+    private void migrateDeptCodeToBM() {
         List<Long> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM sys_department WHERE code NOT REGEXP '^MT[0-9]+$' ORDER BY id", Long.class);
+                "SELECT id FROM sys_department WHERE code NOT REGEXP '^BM[0-9]+$' ORDER BY id", Long.class);
         if (ids.isEmpty()) {
             return;
         }
         Integer maxSeq = jdbcTemplate.queryForObject(
                 "SELECT IFNULL(MAX(CAST(SUBSTRING(code, 3) AS UNSIGNED)), 0) FROM sys_department "
-                        + "WHERE code REGEXP '^MT[0-9]+$'",
+                        + "WHERE code REGEXP '^BM[0-9]+$'",
                 Integer.class);
         int seq = maxSeq == null ? 0 : maxSeq;
         for (Long id : ids) {
-            String code = String.format("MT%05d", ++seq);
+            String code = String.format("BM%05d", ++seq);
             jdbcTemplate.update("UPDATE sys_department SET code = ? WHERE id = ?", code, id);
         }
-        log.info("已将 {} 个存量部门编码迁移为 MT 自增格式", ids.size());
+        log.info("已将 {} 个存量部门编码迁移为 BM 自增格式", ids.size());
     }
 
     /** 幂等字段迁移: 列不存在时自动 ALTER TABLE (免手动执行 SQL 脚本) */
@@ -173,6 +173,7 @@ public class DataInitializer implements CommandLineRunner {
         jdbcTemplate.execute(
                 "CREATE TABLE sys_position ("
                         + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                        + "code VARCHAR(32) NULL COMMENT '职位ID（按编号生成规则 position_id 生成）', "
                         + "name VARCHAR(128) NOT NULL COMMENT '职位名称', "
                         + "name_en VARCHAR(128) NULL COMMENT '职位英文名称', "
                         + "sequence VARCHAR(8) NOT NULL COMMENT '职级序列: M=管理 T=技术 P=专业', "

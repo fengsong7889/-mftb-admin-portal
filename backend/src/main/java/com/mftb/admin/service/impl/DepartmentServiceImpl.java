@@ -8,12 +8,14 @@ import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysDepartmentMenu;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysDepartmentMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.TranslationService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -46,9 +48,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
     private final TranslationService translationService;
-
-    /** 部门编码前缀: MT + 5位自增序号 */
-    private static final String DEPT_CODE_PREFIX = "MT";
+    private final BizSeqService bizSeqService;
 
     @Override
     public List<DepartmentVO> list() {
@@ -77,7 +77,7 @@ public class DepartmentServiceImpl implements DepartmentService {
 
     @Override
     public DepartmentVO create(DepartmentRequest request) {
-        // 部门编码由系统自动生成 (MT + 5位自增), 不接受前端传入
+        // 部门编码由系统按编号生成规则 dept_code 自动生成, 不接受前端传入
         String code = generateDeptCode();
         if (request.getParentId() != null) {
             requireDept(request.getParentId());
@@ -180,14 +180,18 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     /**
-     * 生成下一个部门编码: 取当前最大 MT 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除部门的编码)
+     * 生成下一个部门编码: 按编号生成规则 dept_code（前缀 + n位自增序号，取表内最大序号+1）
+     * 原生 SQL 包含逻辑删除记录, 避免复用已删除部门的编码
      */
     private String generateDeptCode() {
+        SysBizSeqRule rule = bizSeqService.getRule(BizSeqService.RULE_DEPT_CODE);
+        String prefix = rule.getPrefix();
+        int seqLength = rule.getSeqLength() == null ? 5 : rule.getSeqLength();
         Integer maxSeq = jdbcTemplate.queryForObject(
-                "SELECT IFNULL(MAX(CAST(SUBSTRING(code, 3) AS UNSIGNED)), 0) FROM sys_department "
-                        + "WHERE code REGEXP '^MT[0-9]+$'",
-                Integer.class);
-        return String.format("%s%05d", DEPT_CODE_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(code, " + (prefix.length() + 1) + ") AS UNSIGNED)), 0) "
+                        + "FROM sys_department WHERE code REGEXP ?",
+                Integer.class, "^" + prefix + "[0-9]+$");
+        return String.format("%s%0" + seqLength + "d", prefix, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
     /** 保存部门菜单权限: 先清空再批量写入 */

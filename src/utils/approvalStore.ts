@@ -969,7 +969,7 @@ export function generateFlowNo(type: string): string {
     deduct: 'KK',
     transfer: 'ZZ',
     merge: 'HB',
-    gift: 'TG',
+    gift: 'ZS',
   }
   const prefix = prefixMap[type] || 'SP'
   const now = new Date()

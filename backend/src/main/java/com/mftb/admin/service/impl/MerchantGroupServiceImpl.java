@@ -10,9 +10,11 @@ import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
+import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.MerchantGroupService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,9 +33,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MerchantGroupServiceImpl implements MerchantGroupService {
 
-    /** 集团ID前缀（系统自增，如 JT000001） */
-    private static final String GROUP_CODE_PREFIX = "JT";
-
     /** 搜索下拉框返回的最大选项数 */
     private static final int OPTION_LIMIT = 50;
 
@@ -41,6 +40,7 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
     private final BizStoreMapper storeMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<MerchantGroupVO> list(MerchantGroupQuery query) {
@@ -159,14 +159,18 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
     }
 
     /**
-     * 生成下一个集团ID: 取当前最大 JT 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除集团的编号)
+     * 生成下一个集团ID: 按编号生成规则 merchant_group（前缀 + n位自增序号，取表内最大序号+1）
+     * 原生 SQL 包含逻辑删除记录, 避免复用已删除集团的编号
      */
     private String generateGroupCode() {
+        SysBizSeqRule rule = bizSeqService.getRule(BizSeqService.RULE_MERCHANT_GROUP);
+        String prefix = rule.getPrefix();
+        int seqLength = rule.getSeqLength() == null ? 6 : rule.getSeqLength();
         Integer maxSeq = jdbcTemplate.queryForObject(
-                "SELECT IFNULL(MAX(CAST(SUBSTRING(group_code, 3) AS UNSIGNED)), 0) FROM biz_merchant_group "
-                        + "WHERE group_code REGEXP '^JT[0-9]+$'",
-                Integer.class);
-        return String.format("%s%06d", GROUP_CODE_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(group_code, " + (prefix.length() + 1) + ") AS UNSIGNED)), 0) "
+                        + "FROM biz_merchant_group WHERE group_code REGEXP ?",
+                Integer.class, "^" + prefix + "[0-9]+$");
+        return String.format("%s%0" + seqLength + "d", prefix, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
     private BizMerchantGroup requireGroup(Long id) {

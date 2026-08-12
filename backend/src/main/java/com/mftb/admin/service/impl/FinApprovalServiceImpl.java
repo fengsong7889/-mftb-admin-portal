@@ -289,8 +289,12 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private String createApproval(String approvalType, String groupCode, String groupName,
                                   String brand, Map<String, Object> extra) {
         SysUser current = operatorResolver.currentUser();
+        String flowRuleKey = BizSeqService.flowRuleKey(approvalType);
+        if (flowRuleKey == null) {
+            throw new BusinessException("未知的审批类型: " + approvalType);
+        }
         FinApproval approval = new FinApproval();
-        approval.setFlowNo(bizSeqService.next(BizSeqService.flowPrefix(approvalType)));
+        approval.setFlowNo(bizSeqService.next(flowRuleKey));
         approval.setApprovalType(approvalType);
         approval.setGroupCode(groupCode);
         approval.setGroupName(groupName);

@@ -1,14 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Switch, InputNumber, Select, Input, Tag, Button, message } from 'antd'
+import { Switch, InputNumber, Select, Input, Tag } from 'antd'
 import {
-  SaveOutlined,
-  UndoOutlined,
   SettingOutlined,
   DownOutlined,
   UpOutlined,
-  EditOutlined,
-  CloseOutlined,
   LockOutlined,
 } from '@ant-design/icons'
 import { useSystemRules } from '../../hooks/useSystemRules'
@@ -23,75 +19,31 @@ const SUB_GROUP_META: Record<string, { label: string; color: string }> = {
 
 export default function RuleConfig() {
   const { t } = useTranslation()
-  const { groups, updateRule, saveAll, resetAll } = useSystemRules()
+  const { groups } = useSystemRules()
 
   /* 每個分組獨立折疊 + 髢標記（全部默認折疊） */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(groups.map(g => [g.key, true]))
   )
-  const [dirty, setDirty] = useState<Record<string, boolean>>({})
-
-  /* 編輯模式：每個分組獨立控制，默認全部只讀 */
-  const [editing, setEditing] = useState<Record<string, boolean>>({})
-  /* 進入編輯模式前的快照，用於取消時恢復 */
-  const [snapshot, setSnapshot] = useState<Record<string, Record<string, unknown>>>({})
 
   const toggleCollapse = (key: string) =>
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
 
-  const markDirty = (groupKey: string) =>
-    setDirty(prev => ({ ...prev, [groupKey]: true }))
+  /* 編號生成表格：按菜單分組展開/收起 */
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
+  const toggleMenu = (menu: string) =>
+    setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }))
 
-  /** 進入編輯模式：快照當前值 */
-  const handleEnterEdit = (group: RuleGroup) => {
-    const snap: Record<string, unknown> = {}
-    group.rules.forEach(r => { snap[r.key] = r.value })
-    setSnapshot(prev => ({ ...prev, [group.key]: snap }))
-    setEditing(prev => ({ ...prev, [group.key]: true }))
-  }
-
-  /** 取消編輯：恢復快照值 */
-  const handleCancelEdit = (group: RuleGroup) => {
-    const snap = snapshot[group.key]
-    if (snap) {
-      group.rules.forEach(r => {
-        if (r.key in snap) updateRule(r.key, snap[r.key])
-      })
-    }
-    setEditing(prev => ({ ...prev, [group.key]: false }))
-  }
-
-  const handleUpdate = useCallback((groupKey: string, ruleKey: string, value: unknown) => {
-    updateRule(ruleKey, value)
-    markDirty(groupKey)
-  }, [updateRule])
-
-  /* 分組級保存 */
-  const handleSaveGroup = (group: RuleGroup) => {
-    saveAll()
-    setDirty(prev => ({ ...prev, [group.key]: false }))
-    setEditing(prev => ({ ...prev, [group.key]: false }))
-    message.success(`${group.title} 已保存`)
-  }
-
-  /* 分組級恢復默認 */
-  const handleResetGroup = (group: RuleGroup) => {
-    group.rules.forEach(r => updateRule(r.key, r.defaultValue))
-    setDirty(prev => ({ ...prev, [group.key]: false }))
-    message.info(`${group.title} 已恢復默認`)
-  }
-
-  /* 控件渲染 */
-  const renderControl = (rule: RuleItem, groupKey: string, disabled: boolean) => {
+  /* 控件渲染（只讀模式，全部禁用） */
+  const renderControl = (rule: RuleItem) => {
     switch (rule.type) {
       case 'switch':
         return (
           <Switch
             checked={rule.value as boolean}
-            onChange={v => handleUpdate(groupKey, rule.key, v)}
             checkedChildren="開"
             unCheckedChildren="關"
-            disabled={disabled}
+            disabled
           />
         )
       case 'number':
@@ -99,11 +51,10 @@ export default function RuleConfig() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <InputNumber
               value={rule.value as number}
-              onChange={v => handleUpdate(groupKey, rule.key, v ?? rule.defaultValue)}
               min={rule.min}
               max={rule.max}
               style={{ width: 120 }}
-              disabled={disabled}
+              disabled
             />
             {rule.unit && <span style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.unit}</span>}
           </div>
@@ -112,19 +63,17 @@ export default function RuleConfig() {
         return (
           <Select
             value={rule.value as string | number}
-            onChange={v => handleUpdate(groupKey, rule.key, v)}
             options={rule.options}
             style={{ width: 160 }}
-            disabled={disabled}
+            disabled
           />
         )
       case 'text':
         return (
           <Input
             value={rule.value as string}
-            onChange={e => handleUpdate(groupKey, rule.key, e.target.value)}
             style={{ width: 200 }}
-            disabled={disabled}
+            disabled
           />
         )
       default:
@@ -173,17 +122,13 @@ export default function RuleConfig() {
       {/* ── 分組卡片 ── */}
       {groups.map(group => {
         const isCollapsed = collapsed[group.key] ?? false
-        const isDirty = dirty[group.key] ?? false
-        const isEditing = editing[group.key] ?? false
 
         return (
           <div key={group.key} style={{
-            border: `1px solid ${isEditing ? '#E8720C' : '#e8eaed'}`,
+            border: '1px solid #e8eaed',
             borderRadius: 8, background: '#fff',
             marginBottom: 16,
-            boxShadow: isEditing
-              ? '0 2px 12px rgba(232,114,12,0.12)'
-              : '0 2px 8px rgba(0,0,0,0.04)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             overflow: 'hidden',
             transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
@@ -212,15 +157,7 @@ export default function RuleConfig() {
               <Tag color={group.color} style={{ marginLeft: 8, fontSize: 11 }}>
                 {group.rules.length} 項
               </Tag>
-              {isDirty && (
-                <Tag color="warning" style={{ marginLeft: 4, fontSize: 11 }}>未保存</Tag>
-              )}
-              {isEditing && (
-                <Tag color="processing" style={{ marginLeft: 4, fontSize: 11 }}>編輯中</Tag>
-              )}
-              {!isEditing && !isDirty && (
-                <Tag icon={<LockOutlined />} style={{ marginLeft: 4, fontSize: 11, color: '#8C8C8C', borderColor: '#d9d9d9', background: '#FAFAFA' }}>已鎖定</Tag>
-              )}
+              <Tag icon={<LockOutlined />} style={{ marginLeft: 4, fontSize: 11, color: '#8C8C8C', borderColor: '#d9d9d9', background: '#FAFAFA' }}>已鎖定</Tag>
               <div style={{ flex: 1 }} />
               <span style={{ fontSize: 12, color: '#8C8C8C', marginRight: 4 }}>
                 {group.description}
@@ -239,30 +176,45 @@ export default function RuleConfig() {
                   {(() => {
                     /* 表格類型：以表格形式展示編號生成規則 */
                     if (group.type === 'table') {
-                      const bdr = (i: number) => i < group.rules.length - 1 ? '1px solid #f5f5f5' : 'none'
-                      const DATE_FMT_OPTS = [
-                        { label: '年月日', value: 'YYYYMMDD' },
-                        { label: '年月', value: 'YYMM' },
-                        { label: '无', value: 'NONE' },
-                      ]
-                      const SEQ_LEN_OPTS = [
-                        { label: '4 位', value: 4 },
-                        { label: '5 位', value: 5 },
-                        { label: '6 位', value: 6 },
-                      ]
                       const computeExample = (prefix: string, df: string | undefined, sl: number | undefined) => {
                         if (prefix === '-') return ''
                         const seq = sl ? '0'.repeat(sl) : '0000'
-                        const datePart = df === 'YYYYMMDD' ? '20260812' : df === 'YYMM' ? '2608-' : ''
+                        const datePart = df === 'YYYYMMDD' ? '20260812' : df === 'YYMM' ? '2608' : ''
                         return `${prefix}${datePart}${seq}`
                       }
+
+                      /* 根據 rule key / menu 推導分類標籤 */
+                      const getCategoryTag = (key: string, menu?: string): { label: string; color: string } | null => {
+                        if (menu === '審批中心') return { label: '流程', color: '#FF4D4F' }
+                        if (menu === '明細查詢') return { label: '明細', color: '#13C2C2' }
+                        if (menu === '欠款對賬') return { label: '欠款', color: '#EB2F96' }
+                        if (menu === '商戶集團管理') return { label: '門店', color: '#FA8C16' }
+                        if (menu === '瀑布流配置') return { label: '策略', color: '#2F54EB' }
+                        if (menu === '推廣贈送') return { label: '贈送', color: '#F5222D' }
+                        if (menu === '員工管理' || menu === '組織管理' || menu === '職位管理') return { label: '人事', color: '#FAAD14' }
+                        if (key.startsWith('ad_order_')) return { label: '訂單', color: '#1890FF' }
+                        if (key.startsWith('config_pricing_')) return { label: '定價', color: '#E8720C' }
+                        if (key.startsWith('algo_')) return { label: '算法', color: '#722ED1' }
+                        if (key.startsWith('batch_')) return { label: '批次', color: '#52C41A' }
+                        return null
+                      }
+
+                      /* 按 menu 字段分組，保持原始順序 */
+                      const menuGroupMap = new Map<string, RuleItem[]>()
+                      group.rules.forEach(rule => {
+                        const menu = rule.menu || '—'
+                        if (!menuGroupMap.has(menu)) menuGroupMap.set(menu, [])
+                        menuGroupMap.get(menu)!.push(rule)
+                      })
+                      const menuGroups = Array.from(menuGroupMap.entries())
+
                       return (
                         <div style={{ overflowX: 'auto' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                             <thead>
                               <tr style={{ background: '#FAFAFA' }}>
+                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>所屬菜單</th>
                                 <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>業務類型</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>所屬菜單</th>
                                 <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>前綴</th>
                                 <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>日期格式</th>
                                 <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>自增序號</th>
@@ -271,66 +223,97 @@ export default function RuleConfig() {
                               </tr>
                             </thead>
                             <tbody>
-                              {group.rules.map((rule, idx) => {
-                                const prefix = (rule.value as string) || '-'
-                                const isSpecial = prefix === '-'
-                                const canEdit = isEditing && !isSpecial
-                                const dfValue = rule.dateFormat || 'NONE'
-                                const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
-                                const remark = isSpecial
-                                  ? (rule.remark || '')
-                                  : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
+                              {menuGroups.map(([menu, menuRules]) => {
+                                const isExpanded = expandedMenus[menu] ?? false
                                 return (
-                                  <tr key={rule.key} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                                    {/* 1. 業務類型 */}
-                                    <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: bdr(idx) }}>{rule.label}</td>
-                                    {/* 2. 所屬菜單 */}
-                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
-                                      <span style={{ fontSize: 12, color: '#1890FF', fontWeight: 500 }}>{rule.menu || '—'}</span>
-                                    </td>
-                                    {/* 2. 前綴（只讀） */}
-                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
-                                      <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
-                                    </td>
-                                    {/* 3. 日期格式 */}
-                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
-                                      {canEdit ? (
-                                        <Select
-                                          value={dfValue}
-                                          onChange={v => { updateRule(rule.key, v, 'dateFormat'); markDirty(group.key) }}
-                                          options={DATE_FMT_OPTS}
-                                          style={{ width: 100 }}
-                                          size="small"
-                                        />
-                                      ) : (
-                                        <span style={{ fontSize: 12, color: '#595959' }}>
-                                          {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
-                                        </span>
-                                      )}
-                                    </td>
-                                    {/* 4. 自增序號 */}
-                                    <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: bdr(idx) }}>
-                                      {canEdit ? (
-                                        <Select
-                                          value={slValue}
-                                          onChange={v => { updateRule(rule.key, v, 'min'); markDirty(group.key) }}
-                                          options={SEQ_LEN_OPTS}
-                                          style={{ width: 90 }}
-                                          size="small"
-                                        />
-                                      ) : (
-                                        <span style={{ fontSize: 12, color: '#595959' }}>
-                                          {isSpecial ? '—' : `${slValue} 位`}
-                                        </span>
-                                      )}
-                                    </td>
-                                    {/* 5. 示例 */}
-                                    <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: bdr(idx) }}>
-                                      {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
-                                    </td>
-                                    {/* 6. 備註 */}
-                                    <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: bdr(idx) }}>{remark || ''}</td>
-                                  </tr>
+                                  <>
+                                    {/* 菜單分組行（可點擊展開/收起） */}
+                                    <tr
+                                      key={`menu-${menu}`}
+                                      onClick={() => toggleMenu(menu)}
+                                      style={{
+                                        background: isExpanded ? '#E6F4FF' : '#FAFAFA',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.2s',
+                                      }}
+                                      onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#F0F5FF' }}
+                                      onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#FAFAFA' }}
+                                    >
+                                      <td colSpan={7} style={{ padding: '10px 12px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <span style={{
+                                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                            width: 20, height: 20, borderRadius: 4,
+                                            background: isExpanded ? '#1890FF' : '#E8E8E8',
+                                            transition: 'all 0.2s',
+                                          }}>
+                                            {isExpanded
+                                              ? <UpOutlined style={{ fontSize: 10, color: '#fff' }} />
+                                              : <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
+                                            }
+                                          </span>
+                                          <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{menu}</span>
+                                          <Tag color="#1890FF" style={{ fontSize: 11, marginLeft: 4, borderRadius: 10 }}>
+                                            {menuRules.length} 項規則
+                                          </Tag>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    {/* 展開後顯示該菜單下所有編號規則 */}
+                                    {isExpanded && menuRules.map((rule, idx) => {
+                                      const prefix = (rule.value as string) || '-'
+                                      const isSpecial = prefix === '-'
+                                      const dfValue = rule.dateFormat || 'NONE'
+                                      const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
+                                      const remark = isSpecial
+                                        ? (rule.remark || '')
+                                        : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
+                                      const rowBorder = idx < menuRules.length - 1 ? '1px solid #f0f0f0' : '1px solid #d6e4ff'
+                                      return (
+                                        <tr key={rule.key} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                                          <td style={{ padding: '8px 12px 8px 44px', borderBottom: rowBorder }}>
+                                            <span style={{
+                                              display: 'inline-block', width: 4, height: 4,
+                                              borderRadius: '50%', background: '#1890FF', marginRight: 8,
+                                            }} />
+                                          </td>
+                                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: rowBorder }}>
+                                            {(() => {
+                                              const cat = getCategoryTag(rule.key, rule.menu)
+                                              return cat ? (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                  <span style={{
+                                                    display: 'inline-block', fontSize: 10, lineHeight: '16px',
+                                                    padding: '0 4px', borderRadius: 3,
+                                                    background: `${cat.color}15`, color: cat.color,
+                                                    fontWeight: 600, border: `1px solid ${cat.color}30`,
+                                                  }}>{cat.label}</span>
+                                                  {rule.label}
+                                                </span>
+                                              ) : rule.label
+                                            })()}
+                                          </td>
+                                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                                            <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
+                                          </td>
+                                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                                            <span style={{ fontSize: 12, color: '#595959' }}>
+                                              {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
+                                            </span>
+                                          </td>
+                                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                                            <span style={{ fontSize: 12, color: '#595959' }}>
+                                              {isSpecial ? '—' : `${slValue} 位`}
+                                            </span>
+                                          </td>
+                                          <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: rowBorder }}>
+                                            {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
+                                          </td>
+                                          <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: rowBorder }}>{remark || ''}</td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </>
                                 )
                               })}
                             </tbody>
@@ -354,7 +337,7 @@ export default function RuleConfig() {
                             <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                           </div>
                           <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                            {renderControl(rule, group.key, !isEditing)}
+                            {renderControl(rule)}
                           </div>
                         </div>
                       ))
@@ -385,7 +368,7 @@ export default function RuleConfig() {
                               <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                             </div>
                             <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                              {renderControl(rule, group.key, !isEditing)}
+                              {renderControl(rule)}
                             </div>
                           </div>
                         ))}
@@ -427,7 +410,7 @@ export default function RuleConfig() {
                                     <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                                   </div>
                                   <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                                    {renderControl(rule, group.key, !isEditing)}
+                                    {renderControl(rule)}
                                   </div>
                                 </div>
                               ))}
@@ -437,61 +420,6 @@ export default function RuleConfig() {
                       </>
                     )
                   })()}
-                </div>
-
-                {/* 分組底部操作欄 */}
-                <div style={{
-                  padding: '12px 24px', display: 'flex', justifyContent: 'flex-end', gap: 8,
-                  borderTop: '1px solid #f0f0f0',
-                  background: isEditing ? '#FFF7E6' : '#FAFAFA',
-                  transition: 'background 0.25s',
-                }}>
-                  {isEditing ? (
-                    <>
-                      <Button
-                        size="small"
-                        icon={<UndoOutlined />}
-                        onClick={() => handleResetGroup(group)}
-                        style={{ borderRadius: 6 }}
-                      >
-                        恢復默認
-                      </Button>
-                      <Button
-                        size="small"
-                        icon={<CloseOutlined />}
-                        onClick={() => handleCancelEdit(group)}
-                        style={{ borderRadius: 6 }}
-                      >
-                        取消
-                      </Button>
-                      <Button
-                        type="primary"
-                        size="small"
-                        icon={<SaveOutlined />}
-                        onClick={() => handleSaveGroup(group)}
-                        style={{
-                          borderRadius: 6,
-                          background: '#E8720C',
-                          borderColor: '#E8720C',
-                        }}
-                      >
-                        保存
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={() => handleEnterEdit(group)}
-                      style={{
-                        borderRadius: 6,
-                        color: '#E8720C',
-                        borderColor: '#E8720C',
-                      }}
-                    >
-                      編輯
-                    </Button>
-                  )}
                 </div>
               </>
             )}

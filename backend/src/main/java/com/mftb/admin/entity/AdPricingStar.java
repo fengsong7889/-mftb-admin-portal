@@ -19,6 +19,9 @@ public class AdPricingStar {
     @TableId
     private Long id;
 
+    /** 定价编号（按编号生成规则 config_pricing_star 生成，如 DJWD20260812000） */
+    private String pricingNo;
+
     /** 关联算法ID（biz_ad_algorithm.id） */
     private Long algoId;
 

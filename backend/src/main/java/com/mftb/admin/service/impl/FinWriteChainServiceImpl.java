@@ -95,7 +95,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         BigDecimal actualTotal = isActual ? FinExtras.amount(extra, "actualTotal") : null;
         String bd = FinExtras.textOrDash(extra, "bd");
         String remark = FinExtras.textOrDash(extra, "remark");
-        String batchNo = bizSeqService.next(BizSeqService.PREFIX_BATCH);
+        String batchNo = bizSeqService.next(BizSeqService.RULE_BATCH_RECHARGE);
 
         // 首次充值自动建户
         accountService.getOrCreate(approval.getGroupCode(), approval.getGroupName(), approval.getBrand());
@@ -135,7 +135,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
 
             if (isActual) {
                 FinDebtBill bill = new FinDebtBill();
-                bill.setBillNo(bizSeqService.next(BizSeqService.PREFIX_DEBT));
+                bill.setBillNo(bizSeqService.next(BizSeqService.RULE_DEBT));
                 bill.setGroupCode(approval.getGroupCode());
                 bill.setGroupName(approval.getGroupName());
                 bill.setBrand(approval.getBrand());
@@ -182,7 +182,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         accountService.getOrCreate(toGroup, toGroupName, approval.getBrand());
 
         // 仅为转入方创建 1 条批次
-        String batchNo = bizSeqService.next(BizSeqService.PREFIX_BATCH);
+        String batchNo = bizSeqService.next(BizSeqService.RULE_BATCH_TRANSFER);
         FinBatch inBatch = baseBatch(approval, tradeTime, batchNo, "transfer");
         inBatch.setGroupCode(toGroup);
         inBatch.setGroupName(toGroupName);
@@ -420,7 +420,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
                                     String bd, String tradeType, String changeType,
                                     BigDecimal virtualChange, BigDecimal actualChange, String remark) {
         FinDetail row = new FinDetail();
-        row.setDetailId(bizSeqService.next(BizSeqService.PREFIX_DETAIL));
+        row.setDetailId(bizSeqService.next(BizSeqService.RULE_DETAIL));
         row.setGroupCode(groupCode);
         row.setGroupName(groupName);
         row.setBrand(brand);
@@ -471,7 +471,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         BigDecimal ratio = groupActualRatio(sourceGroup);
 
         accountService.getOrCreate(targetGroup, targetGroupName, approval.getBrand());
-        String batchNo = bizSeqService.next(BizSeqService.PREFIX_BATCH);
+        String batchNo = bizSeqService.next(BizSeqService.RULE_BATCH_MERGE);
 
         FinBatch outBatch = baseBatch(approval, tradeTime, batchNo, "merge");
         outBatch.setGroupCode(sourceGroup);
@@ -540,7 +540,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         for (Map<String, Object> store : repayStores) {
             BigDecimal amount = FinExtras.amount(store, "amount");
             FinDebtBill bill = new FinDebtBill();
-            bill.setBillNo(bizSeqService.next(BizSeqService.PREFIX_DEBT));
+            bill.setBillNo(bizSeqService.next(BizSeqService.RULE_DEBT));
             bill.setGroupCode(targetGroup);
             bill.setGroupName(targetGroupName);
             bill.setBrand(approval.getBrand());
@@ -671,7 +671,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
     /** 明细公共字段（默认集团维度：无门店、外賣频道） */
     private FinDetail baseDetail(FinApproval approval, LocalDateTime tradeTime, String batchNo) {
         FinDetail detail = new FinDetail();
-        detail.setDetailId(bizSeqService.next(BizSeqService.PREFIX_DETAIL));
+        detail.setDetailId(bizSeqService.next(BizSeqService.RULE_DETAIL));
         detail.setGroupCode(approval.getGroupCode());
         detail.setGroupName(approval.getGroupName());
         detail.setBrand(approval.getBrand());

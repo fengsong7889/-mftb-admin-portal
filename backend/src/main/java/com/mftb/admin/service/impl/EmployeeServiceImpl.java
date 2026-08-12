@@ -10,6 +10,7 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysPosition;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -17,6 +18,7 @@ import com.mftb.admin.entity.SysLoginLog;
 import com.mftb.admin.mapper.SysLoginLogMapper;
 import com.mftb.admin.service.EmployeeService;
 import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -45,12 +47,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final JdbcTemplate jdbcTemplate;
     private final OperatorResolver operatorResolver;
     private final PermissionService permissionService;
+    private final BizSeqService bizSeqService;
 
     /** 内置管理员登录账号(工号), 禁止停用/删除 */
     private static final String BUILTIN_ADMIN = "MF00001";
-
-    /** 工号前缀: 工号由系统自动生成, 规则 MF + 5位自增序号 */
-    private static final String EMP_ID_PREFIX = "MF";
 
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, Integer status) {
@@ -78,7 +78,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (!StringUtils.hasText(request.getPassword()) || request.getPassword().length() < 6) {
             throw new BusinessException("登录密码不能为空且长度不少于 6 位");
         }
-        // 工号由系统自动生成 (MT + 4位自增), 同时作为登录账号, 不接受前端传入
+        // 工号由系统按编号生成规则 employee_no 自动生成, 同时作为登录账号, 不接受前端传入
         String empId = generateEmpId();
         SysUser user = new SysUser();
         user.setUsername(empId);
@@ -187,14 +187,18 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     /**
-     * 生成下一个工号: 取当前最大 MF 序号 + 1 (原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号)
+     * 生成下一个工号: 按编号生成规则 employee_no（前缀 + n位自增序号，取表内最大序号+1）
+     * 原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号
      */
     private String generateEmpId() {
+        SysBizSeqRule rule = bizSeqService.getRule(BizSeqService.RULE_EMPLOYEE_NO);
+        String prefix = rule.getPrefix();
+        int seqLength = rule.getSeqLength() == null ? 5 : rule.getSeqLength();
         Integer maxSeq = jdbcTemplate.queryForObject(
-                "SELECT IFNULL(MAX(CAST(SUBSTRING(username, 3) AS UNSIGNED)), 0) FROM sys_user "
-                        + "WHERE username REGEXP '^MF[0-9]+$'",
-                Integer.class);
-        return String.format("%s%05d", EMP_ID_PREFIX, (maxSeq == null ? 0 : maxSeq) + 1);
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(username, " + (prefix.length() + 1) + ") AS UNSIGNED)), 0) "
+                        + "FROM sys_user WHERE username REGEXP ?",
+                Integer.class, "^" + prefix + "[0-9]+$");
+        return String.format("%s%0" + seqLength + "d", prefix, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
     /** 设置员工所在部门: 校验部门存在并写入部门名称快照 */

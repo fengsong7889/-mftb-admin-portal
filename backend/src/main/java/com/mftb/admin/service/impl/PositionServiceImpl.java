@@ -6,11 +6,14 @@ import com.mftb.admin.dto.PositionRequest;
 import com.mftb.admin.dto.PositionVO;
 import com.mftb.admin.entity.SysPosition;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.PositionService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,8 @@ public class PositionServiceImpl implements PositionService {
     private final SysPositionMapper sysPositionMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
+    private final JdbcTemplate jdbcTemplate;
+    private final BizSeqService bizSeqService;
 
     @Override
     public List<PositionVO> list() {
@@ -45,6 +50,8 @@ public class PositionServiceImpl implements PositionService {
         validate(request);
         requireNameUnique(request.getName(), null);
         SysPosition position = new SysPosition();
+        // 职位ID由系统按编号生成规则 position_id 自动生成, 不接受前端传入
+        position.setCode(generatePositionCode());
         position.setName(request.getName().trim());
         position.setNameEn(request.getNameEn() != null ? request.getNameEn().trim() : null);
         position.setSequence(request.getSequence());
@@ -62,6 +69,7 @@ public class PositionServiceImpl implements PositionService {
         validate(request);
         SysPosition position = requirePosition(id);
         requireNameUnique(request.getName(), id);
+        // 职位ID由系统生成, 不可修改
         position.setName(request.getName().trim());
         position.setNameEn(request.getNameEn() != null ? request.getNameEn().trim() : null);
         position.setSequence(request.getSequence());
@@ -90,6 +98,21 @@ public class PositionServiceImpl implements PositionService {
         if (!VALID_SEQUENCES.contains(request.getSequence())) {
             throw new BusinessException("职级序列只能为 M(管理)/T(技术)/P(专业)");
         }
+    }
+
+    /**
+     * 生成下一个职位ID: 按编号生成规则 position_id（前缀 + n位自增序号，取表内最大序号+1）
+     * 原生 SQL 包含逻辑删除记录, 避免复用已删除职位的编号
+     */
+    private String generatePositionCode() {
+        SysBizSeqRule rule = bizSeqService.getRule(BizSeqService.RULE_POSITION_ID);
+        String prefix = rule.getPrefix();
+        int seqLength = rule.getSeqLength() == null ? 5 : rule.getSeqLength();
+        Integer maxSeq = jdbcTemplate.queryForObject(
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(code, " + (prefix.length() + 1) + ") AS UNSIGNED)), 0) "
+                        + "FROM sys_position WHERE code REGEXP ?",
+                Integer.class, "^" + prefix + "[0-9]+$");
+        return String.format("%s%0" + seqLength + "d", prefix, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
     /** 职位名称唯一性校验 (excludeId 为编辑时排除自身) */

@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdWaterfallMapper;
 import com.mftb.admin.mapper.AdWaterfallSlotMapper;
 import com.mftb.admin.service.AdWaterfallService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
     private final AdWaterfallSlotMapper slotMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
 
     @Override
     public PageResult<AdWaterfallVO> page(long page, long size, Long id, String strategyName,
@@ -89,6 +91,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
         Map<Long, AdAlgorithm> algorithms = validateSlots(request);
 
         AdWaterfall entity = new AdWaterfall();
+        entity.setStrategyCode(bizSeqService.next(BizSeqService.RULE_WATERFALL));
         applyRequest(entity, request, algorithms);
         if (entity.getStatus() == null) {
             entity.setStatus(1);

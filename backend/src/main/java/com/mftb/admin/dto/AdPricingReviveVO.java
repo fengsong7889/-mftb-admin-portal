@@ -15,6 +15,8 @@ import java.util.List;
 public class AdPricingReviveVO {
 
     private Long id;
+    /** 定价编号（按编号生成规则 config_pricing_revive 生成，如 DJPH20260812000） */
+    private String pricingNo;
     private Long algoId;
     private String algoName;
     private String brand;
@@ -40,6 +42,7 @@ public class AdPricingReviveVO {
     public static AdPricingReviveVO from(AdPricingRevive entity) {
         AdPricingReviveVO vo = new AdPricingReviveVO();
         vo.setId(entity.getId());
+        vo.setPricingNo(entity.getPricingNo());
         vo.setAlgoId(entity.getAlgoId());
         vo.setAlgoName(entity.getAlgoName());
         vo.setBrand(entity.getBrand());

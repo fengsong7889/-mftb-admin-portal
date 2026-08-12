@@ -1,137 +1,222 @@
 package com.mftb.admin.util;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.BizSeqMapper;
+import com.mftb.admin.mapper.SysBizSeqRuleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * 业务编号生成器: 前缀 + 年月日 + 4位自增序号（当日从 0000 起，与前端编号规则一致）
+ * 业务编号生成器（规则驱动）
+ * <p>
+ * 编号格式统一由 sys_biz_seq_rule 表配置（对应前端「规则配置 > 编号生成规则」界面）：
+ * 前缀 + 日期段(YYYYMMDD/YYMM/无) + N位自增序号，如 DDWD202608120000、JT000001。
+ * 序号行锁自增，同事务内并发不重号。
  */
 @Component
 @RequiredArgsConstructor
 public class BizSeqService {
 
-    /** 充值流程 */
-    public static final String PREFIX_RECHARGE = "CZ";
-    /** 扣款流程 */
-    public static final String PREFIX_DEDUCT = "KK";
-    /** 转账流程 */
-    public static final String PREFIX_TRANSFER = "ZZ";
-    /** 合并流程 */
-    public static final String PREFIX_MERGE = "HB";
-    /** 批次 */
-    public static final String PREFIX_BATCH = "PC";
-    /** 交易明细 */
-    public static final String PREFIX_DETAIL = "MX";
-    /** 欠款单 */
-    public static final String PREFIX_DEBT = "QK";
-    /** 广告订单默认前缀（当算法ID无法提取时使用） */
-    public static final String PREFIX_AD_ORDER = "GD";
-    /** 门店编号 */
-    public static final String PREFIX_STORE = "MD";
-    /** 赠送记录 */
-    public static final String PREFIX_GIFT = "ZS";
+    /* ==================== 规则 key（与 sys_biz_seq_rule.rule_key / 前端 key 一致） ==================== */
 
-    /** 门店编号等非日期维度的固定 dateKey */
+    /** 集团ID */
+    public static final String RULE_MERCHANT_GROUP = "merchant_group";
+    /** 门店ID */
+    public static final String RULE_STORE = "store";
+    /** 瀑布流策略 */
+    public static final String RULE_WATERFALL = "config_waterfall";
+    /** 无敌星星订单 */
+    public static final String RULE_AD_ORDER_STAR = "ad_order_star";
+    /** 新店广告订单 */
+    public static final String RULE_AD_ORDER_NEW_STORE = "ad_order_new_store";
+    /** 盘活复苏订单 */
+    public static final String RULE_AD_ORDER_REVIVE = "ad_order_revive";
+    /** 流量广告订单 */
+    public static final String RULE_AD_ORDER_TRAFFIC = "ad_order_traffic";
+    /** 人气商家订单 */
+    public static final String RULE_AD_ORDER_POPULAR = "ad_order_popular";
+    /** 无敌星星定价 */
+    public static final String RULE_PRICING_STAR = "config_pricing_star";
+    /** 人气商家定价 */
+    public static final String RULE_PRICING_HOT = "config_pricing_hot";
+    /** 盘活复苏定价 */
+    public static final String RULE_PRICING_REVIVE = "config_pricing_revive";
+    /** 新店广告赠送ID */
+    public static final String RULE_GIFT_NEW_STORE = "gift_new_store";
+    /** 人气商家赠送ID */
+    public static final String RULE_GIFT_POPULAR = "gift_popular";
+    /** 盘活复苏赠送ID */
+    public static final String RULE_GIFT_REVIVE = "gift_revive";
+    /** 充值批次 */
+    public static final String RULE_BATCH_RECHARGE = "batch_recharge";
+    /** 转账批次 */
+    public static final String RULE_BATCH_TRANSFER = "batch_transfer";
+    /** 合并批次 */
+    public static final String RULE_BATCH_MERGE = "batch_merge";
+    /** 交易明细编号 */
+    public static final String RULE_DETAIL = "detail";
+    /** 欠款单编号 */
+    public static final String RULE_DEBT = "debt";
+    /** 工号 */
+    public static final String RULE_EMPLOYEE_NO = "employee_no";
+    /** 部门编码 */
+    public static final String RULE_DEPT_CODE = "dept_code";
+    /** 职位ID */
+    public static final String RULE_POSITION_ID = "position_id";
+
+    /** 无日期维度规则在序号表中的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";
 
-    private static final DateTimeFormatter DATE_KEY = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private static final DateTimeFormatter MONTH_KEY = DateTimeFormatter.ofPattern("yyMM");
+    private static final DateTimeFormatter FMT_DAY = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter FMT_MONTH = DateTimeFormatter.ofPattern("yyMM");
 
     private final BizSeqMapper bizSeqMapper;
+    private final SysBizSeqRuleMapper ruleMapper;
+
+    /** 规则缓存（规则表数据量小且极少变更，首次使用时加载） */
+    private volatile Map<String, SysBizSeqRule> ruleCache;
 
     /**
-     * 生成业务编号（需在调用方事务内执行，自增语句行锁保证并发不重号）
+     * 按规则 key 生成业务编号（需在调用方事务内执行，自增语句行锁保证并发不重号）
      *
-     * @param prefix 编号前缀，如 CZ / PC / MX / QK
-     * @return 如 CZ202606160000
+     * @param ruleKey sys_biz_seq_rule.rule_key，如 ad_order_star
+     * @return 如 DDWD202608120000
      */
-    public String next(String prefix) {
-        return next(prefix, 4);
-    }
+    public String next(String ruleKey) {
+        SysBizSeqRule rule = requireRule(ruleKey);
+        String datePart = formatDate(rule.getDateFormat());
+        String seqDateKey = datePart.isEmpty() ? FIXED_DATE_KEY : datePart;
 
-    /**
-     * 生成业务编号（自定义序号位数）
-     *
-     * @param prefix   编号前缀
-     * @param seqLength 序号位数，如 4 → 0000~9999
-     * @return 如 CZ2026061600000（5位时）
-     */
-    public String next(String prefix, int seqLength) {
-        String dateKey = LocalDate.now().format(DATE_KEY);
-        bizSeqMapper.initSeq(prefix, dateKey);
-        bizSeqMapper.increaseSeq(prefix, dateKey);
-        Integer current = bizSeqMapper.selectCurrentValue(prefix, dateKey);
+        bizSeqMapper.initSeq(rule.getPrefix(), seqDateKey);
+        bizSeqMapper.increaseSeq(rule.getPrefix(), seqDateKey);
+        Integer current = bizSeqMapper.selectCurrentValue(rule.getPrefix(), seqDateKey);
         if (current == null) {
-            throw new BusinessException("业务编号生成失败: " + prefix);
+            throw new BusinessException("业务编号生成失败: " + ruleKey);
         }
-        // 表内序号从 1 开始计数，编号序号从 0000 起
-        return prefix + dateKey + String.format("%0" + seqLength + "d", current - 1);
+        // seq_start=0 时表内从 1 计数、编号从 0000 起；seq_start=1 时编号直接用表内值（如 JT000001）
+        int seq = current - (rule.getSeqStart() == null || rule.getSeqStart() == 0 ? 1 : 0);
+        int length = rule.getSeqLength() == null ? 4 : rule.getSeqLength();
+        return rule.getPrefix() + datePart + String.format("%0" + length + "d", seq);
     }
 
-    /**
-     * 从算法ID中提取字母前缀（如 "WD00001" → "WD"）
-     * 用于广告订单编号前缀跟随算法ID前缀
-     */
-    public static String extractAlgoPrefix(String algoCode) {
-        if (algoCode == null || algoCode.isEmpty()) {
-            return PREFIX_AD_ORDER;
+    /** 生成门店编号（规则 store，无日期维度全局自增，如 MD000007） */
+    public String nextStoreCode() {
+        return next(RULE_STORE);
+    }
+
+    /** 读取规则配置（供集团ID等按「表内最大序号+1」生成的场景取前缀与位数） */
+    public SysBizSeqRule getRule(String ruleKey) {
+        return requireRule(ruleKey);
+    }
+
+    /** 规则表变更后刷新缓存 */
+    public void refreshRules() {
+        ruleCache = null;
+    }
+
+    /* ==================== 业务类型 → 规则 key 映射 ==================== */
+
+    /** 按审批类型取流程编号规则 key */
+    public static String flowRuleKey(String approvalType) {
+        return switch (approvalType) {
+            case "recharge" -> "recharge";
+            case "deduct" -> "deduct";
+            case "transfer" -> "transfer";
+            case "merge" -> "merge";
+            case "gift" -> "gift_approval";
+            default -> null;
+        };
+    }
+
+    /** 按批次类型取批次编号规则 key */
+    public static String batchRuleKey(String batchType) {
+        return switch (batchType) {
+            case "recharge" -> RULE_BATCH_RECHARGE;
+            case "transfer" -> RULE_BATCH_TRANSFER;
+            case "merge" -> RULE_BATCH_MERGE;
+            default -> null;
+        };
+    }
+
+    /** 按算法类型取算法ID规则 key（前端 AlgorithmType 枚举值） */
+    public static String algoRuleKey(Integer algoType) {
+        if (algoType == null) {
+            return null;
         }
-        StringBuilder sb = new StringBuilder();
-        for (char c : algoCode.toCharArray()) {
-            if (Character.isLetter(c)) {
-                sb.append(c);
-            } else {
-                break;
+        return switch (algoType) {
+            case 1 -> "algo_star";
+            case 2 -> "algo_new_store";
+            case 3 -> "algo_revive";
+            case 15 -> "algo_traffic";
+            case 5 -> "algo_popular";
+            case 4 -> "algo_exclusive";
+            case 6 -> "algo_guess";
+            case 7 -> "algo_organic";
+            case 11 -> "algo_brand";
+            default -> null;
+        };
+    }
+
+    /** 按广告类型取赠送ID规则 key */
+    public static String giftRuleKey(String adType) {
+        if (adType == null) {
+            return null;
+        }
+        return switch (adType) {
+            case "new_store" -> RULE_GIFT_NEW_STORE;
+            case "revival" -> RULE_GIFT_REVIVE;
+            case "ka" -> RULE_GIFT_POPULAR;
+            default -> null;
+        };
+    }
+
+    /* ==================== 内部方法 ==================== */
+
+    private SysBizSeqRule requireRule(String ruleKey) {
+        SysBizSeqRule rule = loadRules().get(ruleKey);
+        if (rule == null || rule.getStatus() == null || rule.getStatus() != 1) {
+            throw new BusinessException("编号生成规则未配置或已停用: " + ruleKey);
+        }
+        return rule;
+    }
+
+    private Map<String, SysBizSeqRule> loadRules() {
+        Map<String, SysBizSeqRule> cache = ruleCache;
+        if (cache == null) {
+            synchronized (this) {
+                cache = ruleCache;
+                if (cache == null) {
+                    List<SysBizSeqRule> rules = ruleMapper.selectList(
+                            new LambdaQueryWrapper<SysBizSeqRule>().eq(SysBizSeqRule::getStatus, 1));
+                    cache = new HashMap<>();
+                    for (SysBizSeqRule rule : rules) {
+                        cache.put(rule.getRuleKey(), rule);
+                    }
+                    ruleCache = cache;
+                }
             }
         }
-        return sb.length() > 0 ? sb.toString() : PREFIX_AD_ORDER;
+        return cache;
     }
 
-    /**
-     * 生成月度维度业务编号（并发安全，行锁保证不重号）
-     *
-     * @param prefix 编号前缀
-     * @return 如 ZS26080001
-     */
-    public String nextMonthly(String prefix) {
-        String monthKey = LocalDate.now().format(MONTH_KEY);
-        bizSeqMapper.initSeq(prefix, monthKey);
-        bizSeqMapper.increaseSeq(prefix, monthKey);
-        Integer current = bizSeqMapper.selectCurrentValue(prefix, monthKey);
-        if (current == null) {
-            throw new BusinessException("业务编号生成失败: " + prefix);
+    /** 规则日期格式 → 当日日期段（空串表示无日期维度） */
+    private String formatDate(String dateFormat) {
+        if (dateFormat == null || dateFormat.isEmpty()) {
+            return "";
         }
-        return prefix + monthKey + String.format("%04d", current);
-    }
-
-    /**
-     * 生成门店编号（并发安全，行锁保证不重号）
-     *
-     * @return 如 MD00001
-     */
-    public String nextStoreCode() {
-        bizSeqMapper.initSeq(PREFIX_STORE, FIXED_DATE_KEY);
-        bizSeqMapper.increaseSeq(PREFIX_STORE, FIXED_DATE_KEY);
-        Integer current = bizSeqMapper.selectCurrentValue(PREFIX_STORE, FIXED_DATE_KEY);
-        if (current == null) {
-            throw new BusinessException("门店编号生成失败");
-        }
-        return String.format("%s%06d", PREFIX_STORE, current);
-    }
-
-    /** 按审批类型取流程编号前缀 */
-    public static String flowPrefix(String approvalType) {
-        return switch (approvalType) {
-            case "recharge" -> PREFIX_RECHARGE;
-            case "deduct" -> PREFIX_DEDUCT;
-            case "transfer" -> PREFIX_TRANSFER;
-            case "merge" -> PREFIX_MERGE;
-            default -> "SP";
+        LocalDate today = LocalDate.now();
+        return switch (dateFormat) {
+            case "YYYYMMDD" -> today.format(FMT_DAY);
+            case "YYMM" -> today.format(FMT_MONTH);
+            default -> throw new BusinessException("不支持的编号日期格式: " + dateFormat);
         };
     }
 }

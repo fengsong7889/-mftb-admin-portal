@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 public class PositionVO {
 
     private Long id;
+    /** 职位ID（如 ZW00001） */
+    private String code;
     private String name;
     private String nameEn;
     /** 职级序列: M=管理 T=技术 P=专业 */
@@ -28,6 +30,7 @@ public class PositionVO {
     public static PositionVO from(SysPosition position) {
         PositionVO vo = new PositionVO();
         vo.setId(position.getId());
+        vo.setCode(position.getCode());
         vo.setName(position.getName());
         vo.setNameEn(position.getNameEn());
         vo.setSequence(position.getSequence());

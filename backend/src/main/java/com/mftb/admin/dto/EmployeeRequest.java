@@ -20,7 +20,7 @@ public class EmployeeRequest {
     @NotBlank(message = "姓名不能为空")
     private String name;
 
-    /** 员工工号 (由后端按 MT 前缀自增生成, 前端传入将被忽略) */
+    /** 员工工号 (由后端按编号生成规则 employee_no 自增生成, 前端传入将被忽略) */
     private String empId;
 
     /** 所在部门ID */

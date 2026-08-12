@@ -211,7 +211,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         }
 
         // 7. 写订单主表 + 明细
-        String orderNo = bizSeqService.next(BizSeqService.extractAlgoPrefix(algorithm.getAlgoCode()));
+        String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_POPULAR);
         BizMerchantGroup group = groupMapper.selectOne(
                 new LambdaQueryWrapper<BizMerchantGroup>()
                         .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())

@@ -15,6 +15,8 @@ import java.util.List;
 public class AdWaterfallVO {
 
     private Long id;
+    /** 策略编号（按编号生成规则 config_waterfall 生成，如 PB20260812000） */
+    private String strategyCode;
     private String strategyName;
     private String brand;
     /** 自然流量兜底算法ID（未配置坑位读取该算法数据） */
@@ -34,6 +36,7 @@ public class AdWaterfallVO {
     public static AdWaterfallVO from(AdWaterfall entity) {
         AdWaterfallVO vo = new AdWaterfallVO();
         vo.setId(entity.getId());
+        vo.setStrategyCode(entity.getStrategyCode());
         vo.setStrategyName(entity.getStrategyName());
         vo.setBrand(entity.getBrand());
         vo.setNaturalAlgoId(entity.getNaturalAlgoId());
