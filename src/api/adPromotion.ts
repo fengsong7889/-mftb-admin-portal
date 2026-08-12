@@ -798,6 +798,8 @@ export interface AdHotOrderRequest {
   storeCode?: string
   bdEmpId?: string
   remark?: string
+  /** 贈送天數抵扣（來自贈送管理發放的余額） */
+  giftDays?: number
   /** 選購的格子列表（皮膚 x 日期） */
   cells: { bizDate: string; skinName: string }[]
 }

@@ -895,8 +895,6 @@ export default function OrderDetail() {
   const isNewStore = order.recommendType === RecommendType.NEW_STORE_AD
   const isPopular = order.recommendType === RecommendType.POPULAR_MERCHANT_KA
   const isRevive = order.recommendType === RecommendType.HOT_REVIVE_AD
-  // 是否有時段/每日折扣步驟（僅無敵星星有）
-  const hasSlotDiscount = !isNewStore && !isPopular && !isRevive
 
   // 新店廣告已取消：保留「待推廣 / 推廣中」節點展示，但因未推廣即取消，兩節點以另色標記並打叉
   const isCancelledBeforePromo = isNewStore && order.status === OrderStatus.CANCELLED
@@ -964,7 +962,6 @@ export default function OrderDetail() {
 
   const totalOriginal = order.slotPrices.reduce((s, sp) => s + sp.originalPrice, 0)
   const slotSubtotal = order.slotPrices.reduce((s, sp) => s + sp.actualPrice, 0)
-  const slotDiscountSaved = totalOriginal - slotSubtotal
   const gradientMultiplier = order.gradientDiscount ? order.gradientDiscount.discount / 10 : 1
   // finalPrice = 梯度折後總額（贈送抵扣前）；明細已還原為抵扣前口徑，梯度步得出折後總額
   const finalPrice = Math.round(slotSubtotal * gradientMultiplier)
@@ -1619,49 +1616,37 @@ export default function OrderDetail() {
               <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>MOP {totalOriginal}</span>
             </div>
 
-            {/* 第2步：時段/每日折扣（僅無敵星星顯示） */}
-            {hasSlotDiscount && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{t('orderDetail.step2SlotDiscount')}</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#52C41A' }}>MOP {slotSubtotal}</span>
-              {slotDiscountSaved > 0 && (
-                <span style={{ fontSize: 11, color: '#52C41A', background: '#F6FFED', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>
-                  {t('orderDetail.savedAmount', { amount: slotDiscountSaved })}
-                </span>
-              )}
-            </div>
-            )}
-
-            {/* 盤活復蘇/人氣商家：享受折扣（②）——無梯度折扣時顯示「無折扣」 */}
-            {(isPopular || isRevive) && !order.gradientDiscount && (
+            {/* ② 梯度折扣（所有訂單類型統一展示，固定第二步） */}
+            {!order.gradientDiscount && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
                 <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('orderDetail.noDiscount')}</span>
               </div>
             )}
 
-            {/* 梯度折扣（有梯度時顯示） */}
             {order.gradientDiscount && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{(hasSlotDiscount ? '③' : '②')} {t('orderDetail.gradientDiscountLabel')}</span>
+                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
                 <span style={{ fontSize: 13, color: '#595959' }}>
                   {t('orderDetail.gradientRulePrefix', { count: order.gradientDiscount.count, unit: (isPopular || isRevive) ? t('orderDetail.daysSuffix') : t('orderDetail.slotsSuffix') })} <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}{t('orderDetail.foldSuffix')}</strong>
                 </span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>
-                  → MOP {finalPrice}
-                </span>
-                {hasSlotDiscount && totalSaved > slotDiscountSaved && (
-                  <span style={{ fontSize: 11, color: '#E8720C', background: '#FFF7E6', padding: '1px 8px', borderRadius: 4, border: '1px solid #FFD591' }}>
-                    {t('orderDetail.savedMore', { amount: totalSaved - slotDiscountSaved })}
-                  </span>
-                )}
               </div>
             )}
 
-            {/* 盤活復蘇/人氣商家：折後價格（③） */}
-            {(isPopular || isRevive) && (
+            {/* ③ 訂單優惠（折扣金額，無折扣時顯示 0） */}
+            {!isNewStore && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'③'} {t('orderDetail.step3FinalPrice')}</span>
+                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'③'} {t('orderDetail.orderDiscountLabel')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}>
+                  {order.gradientDiscount ? `MOP ${totalOriginal - finalPrice}` : 'MOP 0'}
+                </span>
+              </div>
+            )}
+
+            {/* ④ 折後價格（所有訂單類型統一展示） */}
+            {!isNewStore && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'④'} {t('orderDetail.step3FinalPrice')}</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>MOP {order.gradientDiscount ? finalPrice : totalOriginal}</span>
                 {(order.gradientDiscount ? totalSaved > 0 : false) && (
                   <span style={{ fontSize: 11, color: '#52C41A', background: '#F6FFED', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>

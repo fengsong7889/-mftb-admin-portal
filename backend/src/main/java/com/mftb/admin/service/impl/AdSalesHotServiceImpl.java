@@ -22,6 +22,7 @@ import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdSalesHotService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
+import com.mftb.admin.service.GiftService;
 import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
@@ -53,6 +54,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AdSalesHotServiceImpl implements AdSalesHotService {
 
+    /** 赠送管理中人气商家的广告类型标识（biz_gift_record.ad_type） */
+    public static final String GIFT_AD_TYPE = "ka";
+
     private final AdAlgorithmMapper algorithmMapper;
     private final AdOrderMapper orderMapper;
     private final AdOrderItemHotMapper itemMapper;
@@ -61,6 +65,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     private final AdPricingHotService pricingService;
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
+    private final GiftService giftService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -122,9 +127,6 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         // 屏蔽商家拦截
         requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
 
-        // 1. 推广金账户可用校验
-        FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
-
         // 2. 格子去重 + 窗口/皮肤定价校验
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
@@ -169,26 +171,51 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         BigDecimal discountPercent = matchCellTier(pricing.getDiscountTiers(), request.getCells().size());
         BigDecimal discountedTotal = round2(originalTotal.multiply(discountPercent)
                 .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
-        BigDecimal actualTotal = discountedTotal;
-        BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
-        // 5. 余额校验
-        BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
-        if (balance.compareTo(actualTotal) < 0) {
-            throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
-        }
-
-        // 6. 写订单主表 + 明细
-        String orderNo = bizSeqService.next(BizSeqService.PREFIX_AD_ORDER);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
+        // 5. 赠送天数抵扣: 按折后日均价折算，封顶折后总额（赠送部分不走推广金，退款不返还）
+        int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
         BizStore store = StringUtils.hasText(request.getStoreCode())
                 ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
                         .eq(BizStore::getStoreCode, request.getStoreCode())
                         .last("LIMIT 1"))
                 : null;
+        BigDecimal giftDeduction = BigDecimal.ZERO;
+        if (giftDays > 0) {
+            if (store == null) {
+                throw new BusinessException("請選擇門店後再使用贈送天數抵扣");
+            }
+            int available = giftService.availableDays(store.getId(), GIFT_AD_TYPE);
+            if (available < giftDays) {
+                throw new BusinessException("贈送天數餘額不足，當前可用 " + available + " 天");
+            }
+            if (giftDays > request.getCells().size()) {
+                throw new BusinessException("抵扣天數不能超過購買天數");
+            }
+            giftDeduction = round2(discountedTotal
+                    .multiply(BigDecimal.valueOf(giftDays))
+                    .divide(BigDecimal.valueOf(request.getCells().size()), RoundingMode.HALF_UP));
+            if (giftDeduction.compareTo(discountedTotal) > 0) {
+                giftDeduction = discountedTotal;
+            }
+        }
+        BigDecimal actualTotal = discountedTotal.subtract(giftDeduction);
+        BigDecimal discountAmount = originalTotal.subtract(actualTotal);
+
+        // 6. 推广金账户校验 + 余额校验（仅实际需要推广金时才检查账户状态）
+        if (actualTotal.signum() > 0) {
+            FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
+            BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
+            if (balance.compareTo(actualTotal) < 0) {
+                throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
+            }
+        }
+
+        // 7. 写订单主表 + 明细
+        String orderNo = bizSeqService.next(BizSeqService.PREFIX_AD_ORDER);
+        BizMerchantGroup group = groupMapper.selectOne(
+                new LambdaQueryWrapper<BizMerchantGroup>()
+                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
+                        .last("LIMIT 1"));
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
@@ -215,6 +242,8 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         order.setDiscountAmount(discountAmount);
         order.setActualAmount(actualTotal);
         order.setRefundAmount(BigDecimal.ZERO);
+        order.setGiftDays(giftDays);
+        order.setGiftAmount(giftDeduction);
         order.setStatus(1); // 初始状态=待推广，查询时动态计算真实状态
         order.setOrderTime(now);
         order.setPayTime(now);
@@ -253,7 +282,13 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
             itemMapper.insert(item);
         }
 
-        // 7. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=广告类型）
+        // 8. 扣减赠送天数余额并写消费流水（与订单同事务）
+        if (giftDays > 0 && store != null) {
+            giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
+                    algorithm.getAlgoCode(), algorithm.getAlgoName());
+        }
+
+        // 9. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=广告类型）
         String changeType = AdAlgoTypeNames.of(algorithm.getAlgoType());
         String finChannel = algorithm.getChannel() != null && algorithm.getChannel() == 4 ? "團購" : "外賣";
         if (actualTotal.signum() > 0) {

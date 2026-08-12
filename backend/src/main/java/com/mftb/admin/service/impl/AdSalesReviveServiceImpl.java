@@ -133,9 +133,6 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         // 屏蔽商家拦截
         requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
 
-        // 1. 推广金账户可用校验
-        FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
-
         // 2. 格子去重 + 窗口/定价校验
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
@@ -216,10 +213,13 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         BigDecimal actualTotal = discountedTotal.subtract(giftDeduction);
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
-        // 6. 余额校验（仅扣实付部分）
-        BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
-        if (balance.compareTo(actualTotal) < 0) {
-            throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
+        // 6. 推广金账户校验 + 余额校验（仅实际需要推广金时才检查账户状态）
+        if (actualTotal.signum() > 0) {
+            FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
+            BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
+            if (balance.compareTo(actualTotal) < 0) {
+                throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
+            }
         }
 
         // 7. 写订单主表 + 明细

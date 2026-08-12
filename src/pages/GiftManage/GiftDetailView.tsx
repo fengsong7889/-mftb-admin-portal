@@ -54,7 +54,7 @@ const adTypeColorMap: Record<string, string> = {
   revival: '#E8720C',
   exclusive: '#722ED1',
   gold: '#FAAD14',
-  ka: '#1890FF',
+  popular_merchant: '#1890FF',
 }
 
 const IMG_FALLBACK =
@@ -107,7 +107,7 @@ export default function GiftDetailView() {
     revival: t('adTypeRevival'),
     exclusive: t('adTypeExclusive'),
     gold: t('adTypeGold'),
-    ka: t('adTypeKa'),
+    popular_merchant: t('adTypePopularMerchant'),
   }
 
   const [loading, setLoading] = useState(true)

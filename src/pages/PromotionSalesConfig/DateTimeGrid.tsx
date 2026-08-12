@@ -1269,56 +1269,43 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             </span>
           </div>
 
-          {/* 多时段折扣汇总 */}
+          {/* 價格明細（無敵星星風格：flex 左右佈局） */}
           {(() => {
-            const grouped: Record<string, CartItem[]> = {}
-            cartItems.forEach(item => {
-              if (!grouped[item.date]) grouped[item.date] = []
-              grouped[item.date].push(item)
-            })
             const totalOriginal = cartItems.reduce((sum, item) => sum + item.originalPrice, 0)
             let totalFinal = 0
-            Object.entries(grouped).forEach(([dateStr, items]) => {
-              const subtotal = items.reduce((sum, item) => sum + item.salePrice, 0)
-              const discount = getDateDiscount(dateStr)
-              totalFinal += discount ? Math.round(subtotal * discount.discount / 100) : subtotal
+            cartItems.forEach(item => {
+              const dateDiscount = getDateDiscount(item.date)
+              totalFinal += dateDiscount ? Math.round(item.salePrice * dateDiscount.discount) / 100 : item.salePrice
             })
             const totalDiscount = totalOriginal - totalFinal
+            const allSlots = cartItems.length
+            let maxTier: { minSlots: number; discount: number } | null = null
+            for (const tier of MULTI_SLOT_DISCOUNT_TIERS) {
+              if (allSlots >= tier.minSlots) { maxTier = tier; break }
+            }
             return (
-              <table style={{ width: '100%', fontSize: 12, marginBottom: 12 }}>
-                <thead>
-                  <tr style={{ background: '#fafafa' }}>
-                    <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#595959', fontSize: 12, fontWeight: 600 }}>
-                      {t('orderOriginal')}
-                    </th>
-                    <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#fa8c16', fontSize: 12, fontWeight: 600 }}>
-                      {t('orderDiscount')}
-                    </th>
-                    <th style={{ padding: '10px 8px', border: '1px solid #e8e8e8', color: '#ff4d4f', fontSize: 12, fontWeight: 600 }}>
-                      {t('totalPayable')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>
-                      <span style={{ fontSize: 16, fontWeight: 600, color: '#595959' }}>
-                        ${totalOriginal}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center' }}>
-                      <span style={{ fontSize: 16, fontWeight: 600, color: '#fa8c16' }}>
-                        -${totalDiscount}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 8px', border: '1px solid #e8e8e8', textAlign: 'center', background: '#fff7f7' }}>
-                      <span style={{ fontSize: 20, fontWeight: 700, color: '#ff4d4f' }}>
-                        ${totalFinal}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>{t('orderOriginal')}：</span>
+                  <span style={{ fontWeight: 600 }}>${totalOriginal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>享受折扣：</span>
+                  {maxTier ? (
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{maxTier.minSlots}个时段{maxTier.discount > 10 ? maxTier.discount / 10 : maxTier.discount}折</span>
+                  ) : (
+                    <span style={{ color: '#BFBFBF' }}>无折扣</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                  <span>{t('orderDiscount')}：</span>
+                  <span style={{ fontWeight: 600 }}>-${totalDiscount}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{t('totalPayable')}：</span>
+                  <span style={{ fontWeight: 700 }}>${totalFinal}</span>
+                </div>
+              </div>
             )
           })()}
           <Button 
@@ -1380,49 +1367,44 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         </div>
 
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span>
-            <span style={{ fontWeight: 600 }}>${cartItems.reduce((sum, item) => sum + item.originalPrice, 0)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-            <span>{t('orderDiscountMulti')}</span>
-            <span style={{ fontWeight: 600 }}>
-              {(() => {
-                const grouped: Record<string, CartItem[]> = {}
-                cartItems.forEach(item => {
-                  if (!grouped[item.date]) grouped[item.date] = []
-                  grouped[item.date].push(item)
-                })
-                const totalOriginal = cartItems.reduce((sum, item) => sum + item.originalPrice, 0)
-                let totalFinal = 0
-                Object.entries(grouped).forEach(([dateStr, items]) => {
-                  const subtotal = items.reduce((sum, item) => sum + item.salePrice, 0)
-                  const discount = getDateDiscount(dateStr)
-                  totalFinal += discount ? Math.round(subtotal * discount.discount / 100) : subtotal
-                })
-                return `-${totalOriginal - totalFinal}`
-              })()}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-            <span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span>
-            <span style={{ fontWeight: 700 }}>
-              {(() => {
-                const grouped: Record<string, CartItem[]> = {}
-                cartItems.forEach(item => {
-                  if (!grouped[item.date]) grouped[item.date] = []
-                  grouped[item.date].push(item)
-                })
-                let totalFinal = 0
-                Object.entries(grouped).forEach(([dateStr, items]) => {
-                  const subtotal = items.reduce((sum, item) => sum + item.salePrice, 0)
-                  const discount = getDateDiscount(dateStr)
-                  totalFinal += discount ? Math.round(subtotal * discount.discount / 100) : subtotal
-                })
-                return `$${totalFinal}`
-              })()}
-            </span>
-          </div>
+          {(() => {
+            const totalOriginal = cartItems.reduce((sum, item) => sum + item.originalPrice, 0)
+            let totalFinal = 0
+            cartItems.forEach(item => {
+              const dateDiscount = getDateDiscount(item.date)
+              totalFinal += dateDiscount ? Math.round(item.salePrice * dateDiscount.discount) / 100 : item.salePrice
+            })
+            const totalDiscount = totalOriginal - totalFinal
+            const allSlots = cartItems.length
+            let maxTier: { minSlots: number; discount: number } | null = null
+            for (const tier of MULTI_SLOT_DISCOUNT_TIERS) {
+              if (allSlots >= tier.minSlots) { maxTier = tier; break }
+            }
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span>
+                  <span style={{ fontWeight: 600 }}>${totalOriginal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>享受折扣：</span>
+                  {maxTier ? (
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{maxTier.minSlots}个时段{maxTier.discount > 10 ? maxTier.discount / 10 : maxTier.discount}折</span>
+                  ) : (
+                    <span style={{ color: '#BFBFBF' }}>无折扣</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                  <span>{t('orderDiscountMulti')}</span>
+                  <span style={{ fontWeight: 600 }}>-${totalDiscount}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span>
+                  <span style={{ fontWeight: 700 }}>${totalFinal}</span>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </Modal>
 

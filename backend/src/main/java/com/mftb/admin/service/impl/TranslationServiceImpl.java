@@ -322,9 +322,11 @@ public class TranslationServiceImpl implements TranslationService {
                     return totalFilled;
                 }
 
-                String translated = callMyMemory(sourceText, lang);
-                // 过滤无效结果：空值或与源文本相同（MyMemory 无翻译时原样返回）
-                if (StringUtils.hasText(translated) && !translated.equals(sourceText)) {
+                String translated = callMyMemory(sourceText, lang, sourceText);
+                // 过滤无效结果：空值，或与源文本相同且目标语言非 CJK 语言
+                // 注: zh-TW→ja/ko 时翻译结果常与源文本相同（汉字共用），属正常翻译应予接受
+                if (StringUtils.hasText(translated)
+                        && (!translated.equals(sourceText) || isCJKTargetLang(lang))) {
                     translations.put(lang, translated);
                     changed = true;
                     totalFilled++;
@@ -360,12 +362,16 @@ public class TranslationServiceImpl implements TranslationService {
      * <p>
      * 接口文档: https://mymemory.translated.net/doc/spec.php
      * 免费额度: 5000 字符/天（匿名），带 email 可提升至 50000
+     * <p>
+     * 智能去重: 当 MyMemory 返回与源文本相同的结果时（常见于 CJK 短文本），
+     * 自动从 matches 数组中寻找更优翻译，避免无效填充。
      *
      * @param text       源文本
      * @param targetLang 目标语言代码
+     * @param sourceText 源文本（用于去重比对，传 null 则不做智能去重）
      * @return 翻译结果，失败返回 null
      */
-    private String callMyMemory(String text, String targetLang) {
+    private String callMyMemory(String text, String targetLang, String sourceText) {
         // 截断源文本至 MyMemory 单次请求上限（500 字符）
         String truncated = text.length() > MAX_REQUEST_CHARS
                 ? text.substring(0, MAX_REQUEST_CHARS)
@@ -430,6 +436,25 @@ public class TranslationServiceImpl implements TranslationService {
                 Object translated = responseData.get("translatedText");
                 String resultText = translated != null ? translated.toString() : null;
 
+                // 智能去重: 若顶部翻译结果与源文本相同，从 matches 中寻找更优翻译
+                if (StringUtils.hasText(resultText) && resultText.equals(sourceText)) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> matches = (List<Map<String, Object>>) result.get("matches");
+                    if (matches != null) {
+                        for (Map<String, Object> match : matches) {
+                            Object mt = match.get("translation");
+                            if (mt != null) {
+                                String candidate = mt.toString().trim();
+                                if (StringUtils.hasText(candidate) && !candidate.equals(sourceText)) {
+                                    log.debug("MyMemory 智能去重: 原结果='{}' → 替换为='{}' (lang={})", resultText, candidate, targetLang);
+                                    resultText = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 累计字符用量
                 if (StringUtils.hasText(resultText)) {
                     dailyCharUsed.addAndGet(truncated.length());
@@ -460,7 +485,7 @@ public class TranslationServiceImpl implements TranslationService {
     @Override
     public String translateText(String text, String targetLang) {
         if (!StringUtils.hasText(text)) return null;
-        return callMyMemory(text, targetLang);
+        return callMyMemory(text, targetLang, text);
     }
 
     /* ========== 内部工具 ========== */
@@ -552,5 +577,13 @@ public class TranslationServiceImpl implements TranslationService {
             }
         }
         return "";
+    }
+
+    /**
+     * 判断目标语言是否为 CJK 语言（与繁中共用汉字，翻译结果可能与源文本相同）
+     * 包含日文 (ja) 和韩文 (ko)；英文、俄文等非 CJK 语言返回 false
+     */
+    private boolean isCJKTargetLang(String langCode) {
+        return "ja".equalsIgnoreCase(langCode) || "ko".equalsIgnoreCase(langCode);
     }
 }

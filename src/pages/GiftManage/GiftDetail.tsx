@@ -35,7 +35,7 @@ export default function GiftDetail() {
     { label: t('adTypeRevival'), value: 'revival' },
     { label: t('adTypeExclusive'), value: 'exclusive' },
     { label: t('adTypeGold'), value: 'gold' },
-    { label: t('adTypeKa'), value: 'ka' },
+    { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
   ]
 
   const adTypeMap: Record<string, string> = {
@@ -43,7 +43,7 @@ export default function GiftDetail() {
     revival: t('adTypeRevival'),
     exclusive: t('adTypeExclusive'),
     gold: t('adTypeGold'),
-    ka: t('adTypeKa'),
+    popular_merchant: t('adTypePopularMerchant'),
   }
   const [form] = Form.useForm()
   const [deductModalVisible, setDeductModalVisible] = useState(false)
@@ -250,17 +250,10 @@ export default function GiftDetail() {
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
-      render: (days: number, record) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-            {days} {t('dayUnit')}
-          </span>
-          {(record.recordCount ?? 1) > 1 && (
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              {t('giftCountTip', { count: record.recordCount })}
-            </span>
-          )}
-        </Space>
+      render: (days: number) => (
+        <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
+          {days} {t('dayUnit')}
+        </span>
       ),
     },
     {

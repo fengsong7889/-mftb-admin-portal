@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button, Form, Input, Select, Tag, InputNumber, Upload, message, Modal } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -8,6 +8,9 @@ import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import type { StoreItem } from '../../api/store'
 import { fetchStoresByGroup } from '../../api/store'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
+import { createGiftRecord } from '../../api/gift'
+import { getApprovalRecords } from '../../utils/approvalStore'
+import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import BrandTag from '../../components/BrandTag'
 
 const { TextArea } = Input
@@ -41,6 +44,34 @@ export default function GiftAdd() {
   const [groups, setGroups] = useState<MerchantGroupItem[]>([])
   const [stores, setStores] = useState<StoreItem[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<number | undefined>()
+
+  // 监控广告类型选择，动态读取规则配置
+  const selectedAdType = Form.useWatch('adType', form) as string | undefined
+
+  /** 当前广告类型的赠送上限（每日次数，0=不限） */
+  const giftLimit = useMemo(() => {
+    if (!selectedAdType) return 0
+    const key = `gift_limit_${selectedAdType}`
+    return getSystemRuleValue<number>(key) ?? 10
+  }, [selectedAdType])
+
+  /** 当前广告类型是否需要审批 */
+  const needApproval = useMemo(() => {
+    if (!selectedAdType) return true
+    const key = `gift_approval_${selectedAdType}`
+    return getSystemRuleValue<boolean>(key) ?? true
+  }, [selectedAdType])
+
+  /** 今日已提交的赠送申请数（按广告类型） */
+  const todaySubmittedCount = useMemo(() => {
+    if (!selectedAdType) return 0
+    const today = new Date().toISOString().slice(0, 10)
+    return getApprovalRecords().filter(r =>
+      r.approvalType === 'gift' &&
+      r.extra?.adType === selectedAdType &&
+      r.applyTime?.startsWith(today)
+    ).length
+  }, [selectedAdType, submitting])
 
   // 從 URL 參數判斷是否為贈送模式
   const isGiftMode = searchParams.get('mode') === 'gift'
@@ -116,6 +147,13 @@ export default function GiftAdd() {
       const values = await form.validateFields()
       setSubmitting(true)
 
+      // 检查每日赠送上限（0=不限）
+      if (giftLimit > 0 && todaySubmittedCount >= giftLimit) {
+        message.error(t('dailyLimitReached', { limit: giftLimit, adType: adTypeOptions.find(o => o.value === values.adType)?.label || values.adType }))
+        setSubmitting(false)
+        return
+      }
+
       // 处理凭证文件（目前仅前端占位，实际上传需要文件上传服务）
       const certificateFiles = form.getFieldValue('certificate') || []
       const credentials = certificateFiles.map((f: { name?: string }) => f.name || '').filter(Boolean)
@@ -163,29 +201,43 @@ export default function GiftAdd() {
         ),
         onOk: async () => {
           try {
-            // 提交審批記錄（TG 流程號）：審批全部通過後才寫入贈送記錄/剩餘天數
-            const flowNo = mockSubmitApproval({
-              approvalType: 'gift',
-              groupId: group?.groupCode || String(values.groupId),
-              groupName: group?.groupName || '',
-              brand: values.brand,
-              extra: {
+            if (needApproval) {
+              // 需要审批：提交審批記錄（TG 流程號），審批全部通過後才寫入贈送記錄/剩餘天數
+              const flowNo = mockSubmitApproval({
+                approvalType: 'gift',
+                groupId: group?.groupCode || String(values.groupId),
+                groupName: group?.groupName || '',
+                brand: values.brand,
+                extra: {
+                  groupId: values.groupId,
+                  groupCode: group?.groupCode,
+                  groupName: group?.groupName,
+                  storeId: values.storeId,
+                  storeCode: store?.storeCode,
+                  storeName: store?.storeName,
+                  adType: values.adType,
+                  giftDays: values.giftDays,
+                  validDays: values.validDays,
+                  reason: values.reason,
+                  remark: values.reason,
+                  credentials,
+                },
+              })
+              setSubmittedFlowNo(flowNo)
+            } else {
+              // 无需审批：直接创建赠送记录，立即生效
+              await createGiftRecord({
                 groupId: values.groupId,
-                groupCode: group?.groupCode,
-                groupName: group?.groupName,
                 storeId: values.storeId,
-                storeCode: store?.storeCode,
-                storeName: store?.storeName,
+                brand: values.brand,
                 adType: values.adType,
                 giftDays: values.giftDays,
                 validDays: values.validDays,
                 reason: values.reason,
-                remark: values.reason,
                 credentials,
-              },
-            })
-
-            setSubmittedFlowNo(flowNo)
+              })
+              setSubmittedFlowNo('') // 无流程号
+            }
             setCountdown(5)
             // 等待確認彈窗完全關閉後再顯示成功彈窗
             setTimeout(() => setSuccessVisible(true), 350)
@@ -340,10 +392,26 @@ export default function GiftAdd() {
             <ClockCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
           </div>
           <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('giftConfig')}</span>
-          <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('approvalRequired')}</Tag>
+          {selectedAdType && (
+            <>
+              {needApproval ? (
+                <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('approvalRequired')}</Tag>
+              ) : (
+                <Tag color="green" style={{ marginLeft: 4, fontSize: 11 }}>{t('noApprovalRequired')}</Tag>
+              )}
+              {giftLimit > 0 && (
+                <Tag color={todaySubmittedCount >= giftLimit ? 'red' : 'blue'} style={{ marginLeft: 4, fontSize: 11 }}>
+                  {t('dailyLimit')}: {todaySubmittedCount}/{giftLimit}
+                </Tag>
+              )}
+            </>
+          )}
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <span style={{ fontSize: 12, color: '#8C6D1F' }}>
-            {t('approvalTip')}
+            {selectedAdType
+              ? (needApproval ? t('approvalTip') : t('noApprovalTip'))
+              : t('selectAdTypeFirst')
+            }
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
@@ -476,10 +544,14 @@ export default function GiftAdd() {
               {t('submitSuccess')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && (
-                <>{t('flowNo')}：<span style={{ color: '#E8720C', fontWeight: 600 }}>{submittedFlowNo}</span><br /></>
+              {submittedFlowNo ? (
+                <>
+                  {t('flowNo')}：<span style={{ color: '#E8720C', fontWeight: 600 }}>{submittedFlowNo}</span><br />
+                  {t('approvalProgressTip')}
+                </>
+              ) : (
+                t('directSuccessTip')
               )}
-              {t('approvalProgressTip')}
             </p>
             <Button
               type="primary"

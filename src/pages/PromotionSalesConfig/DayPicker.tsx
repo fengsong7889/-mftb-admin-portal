@@ -27,6 +27,7 @@ import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
 import { fetchGiftAvailableDays } from '../../api/gift'
 import { usePaymentRule } from '../../hooks/usePaymentRule'
+import { getSystemRuleValue } from '../../hooks/useSystemRules'
 
 /** 赠送管理中盘活复苏的广告类型标识（与后端一致） */
 const GIFT_AD_TYPE = 'revival'
@@ -44,8 +45,8 @@ const DEFAULT_SELLABLE_DAYS = 180
 const MONTHS_PER_PAGE = 6
 /** 开售时间（火车票式，每日该时点放出新一天的可购买日期） */
 const PRESALE_OPEN_HOUR = 10
-/** 加购锁定时长（秒） */
-const LOCK_SECONDS = 60
+/** 加购锁定时长（秒），从规则配置动态读取 */
+const DEFAULT_LOCK_SECONDS = 60
 
 /** 计算某日期相对今天的天数偏移（今天=0） */
 function getDayOffset(date: Dayjs): number {
@@ -103,6 +104,8 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   const { t } = useTranslation('adSales')
   const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
   const navigate = useNavigate()
+  // 从规则配置动态读取锁定时长
+  const LOCK_SECONDS = getSystemRuleValue<number>('ad_click_cart_lock_seconds') || DEFAULT_LOCK_SECONDS
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [currentMonth, setCurrentMonth] = useState<Dayjs>(dayjs())
   const [hoveredMonth, setHoveredMonth] = useState<string | null>(null)
@@ -1048,42 +1051,59 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
               </div>
             </>
           )}
-          {/* 價格明細（按支付方式分支展示） */}
-          <div style={{ background: '#FAFAFA', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ color: '#8C8C8C' }}>{t('orderOriginal')}</span>
-              <span style={{ fontWeight: 600, color: '#595959' }}>${cartSummary.totalOriginal}</span>
+          {/* 價格明細（無敵星星風格：flex 左右佈局） */}
+          <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ color: '#595959' }}>{t('orderOriginal')}：</span>
+              <span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span>
             </div>
-            {/* 混合支付 / 推廣金支付：顯示享受折扣 */}
-            {(mixedPayment || paymentMode === 'promo') && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#8C8C8C' }}>享受折扣</span>
-                {currentDiscount ? (
-                  <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentDiscount.minDays}天{currentDiscount.discount / 10}折</span>
-                ) : (
-                  <span style={{ fontWeight: 600, color: '#BFBFBF' }}>无折扣</span>
-                )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ color: '#595959' }}>享受折扣：</span>
+              {currentDiscount ? (
+                <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentDiscount.minDays}天{currentDiscount.discount > 10 ? currentDiscount.discount / 10 : currentDiscount.discount}折</span>
+              ) : (
+                <span style={{ color: '#BFBFBF' }}>无折扣</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+              <span>{t('orderDiscount')}：</span>
+              <span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span>
+            </div>
+            {/* 混合支付：抵扣天數（borderTop 之後） */}
+            {mixedPayment && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                <span style={{ color: '#595959' }}>抵扣天數：</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {giftDaysBalance === 0 || cartSummary.totalDays === 0 ? (
+                    <span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天</span>
+                  ) : (
+                    <>
+                      <InputNumber
+                        size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
+                        onChange={(v) => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
+                        style={{ width: 64 }}
+                      />
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>天</span>
+                      <Button size="small" type="link" style={{ padding: 0, fontSize: 12 }}
+                        onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>{t('deductAll')}</Button>
+                    </>
+                  )}
+                </span>
               </div>
             )}
-            {/* 混合支付 / 贈送天數支付：顯示贈送天數抵扣 */}
-            {(mixedPayment || paymentMode === 'gift') && effectiveGiftDays > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#8C8C8C' }}>赠送天数抵扣</span>
-                <span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天（-${giftDeduction}）</span>
+            {/* 赠送天数抵扣（borderTop 之後） */}
+            {paymentMode === 'gift' && !mixedPayment && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                <span style={{ color: '#595959' }}>抵扣天數：</span>
+                <span style={{ fontWeight: 600, color: '#E8720C' }}>{effectiveGiftDays}天</span>
               </div>
             )}
-            {/* 混合支付 / 推廣金支付：顯示訂單優惠和實付總額 */}
+            {/* 實付總額（推廣金 / 混合支付） */}
             {(mixedPayment || paymentMode === 'promo') && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>{t('orderDiscount')}</span>
-                  <span style={{ fontWeight: 600, color: '#FA8C16' }}>-${cartSummary.totalDiscount}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #E8E8E8', paddingTop: 8, marginTop: 8 }}>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>{t('totalPayable')}</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#FF4D4F' }}>${payableAmount}</span>
-                </div>
-              </>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                <span style={{ fontWeight: 600 }}>{t('totalPayable')}：</span>
+                <span style={{ fontWeight: 700 }}>${payableAmount}</span>
+              </div>
             )}
           </div>
           <Button type="primary" block size="large" icon={<ShoppingCartOutlined />} disabled={cartItems.length === 0} onClick={handlePayment}
@@ -1119,12 +1139,26 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
           </table>
         </div>
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span><span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>{t('orderDiscountLabel')}</span><span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span></div>
-          {giftDeduction > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#E8720C' }}><span>{t('giftDaysDeductDetail', { days: effectiveGiftDays })}</span><span style={{ fontWeight: 600 }}>-${giftDeduction}</span></div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}><span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span><span style={{ fontWeight: 700 }}>${payableAmount}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ color: '#595959' }}>{t('orderOriginalFull')}</span>
+            <span style={{ fontWeight: 600 }}>${cartSummary.totalOriginal}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ color: '#595959' }}>享受折扣：</span>
+            {currentDiscount ? (
+              <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentDiscount.minDays}天{currentDiscount.discount > 10 ? currentDiscount.discount / 10 : currentDiscount.discount}折</span>
+            ) : (
+              <span style={{ color: '#BFBFBF' }}>无折扣</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+            <span>{t('orderDiscountLabel')}</span>
+            <span style={{ fontWeight: 600 }}>-${cartSummary.totalDiscount}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+            <span style={{ fontWeight: 600 }}>{t('actualAmountFull')}</span>
+            <span style={{ fontWeight: 700 }}>${payableAmount}</span>
+          </div>
         </div>
       </Modal>
 

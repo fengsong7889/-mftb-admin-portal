@@ -31,6 +31,9 @@ public class AdHotOrderRequest {
     /** 备注 */
     private String remark;
 
+    /** 赠送天数抵扣（来自赠送管理发放的余额） */
+    private Integer giftDays;
+
     /** 选购的格子列表（皮肤 x 日期） */
     @NotEmpty(message = "请至少选择一个格子")
     private List<CellSelection> cells;

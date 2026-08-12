@@ -726,18 +726,26 @@ export default function PopularSkinPicker() {
                   {currentTier ? <Tag color="green" style={{ marginRight: 0 }}>{currentTier.discount / 10}{t('discountSuffix')}</Tag> : <Tag style={{ marginRight: 0 }}>{t('noDiscount')}</Tag>}
                 </div>
               </div>
-              <div style={{ background: '#FAFAFA', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>{t('orderOriginalPrice')}</span>
-                  <span style={{ fontWeight: 600, color: '#595959' }}>${priceSummary.original}</span>
+              <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>{t('orderOriginalPrice')}</span>
+                  <span style={{ fontWeight: 600 }}>${priceSummary.original}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#8C8C8C' }}>{t('orderDiscount')}</span>
-                  <span style={{ fontWeight: 600, color: '#FA8C16' }}>-${priceSummary.saved}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>享受折扣：</span>
+                  {currentTier ? (
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
+                  ) : (
+                    <span style={{ color: '#BFBFBF' }}>{t('noDiscount')}</span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #E8E8E8', paddingTop: 8, marginTop: 8 }}>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>{t('totalPayable')}</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#FF4D4F' }}>${priceSummary.sale}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                  <span>{t('orderDiscount')}</span>
+                  <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{t('totalPayable')}</span>
+                  <span style={{ fontWeight: 700 }}>${priceSummary.sale}</span>
                 </div>
               </div>
               <Button
@@ -756,34 +764,38 @@ export default function PopularSkinPicker() {
         </div>
       )}
 
-      {/* 支付確認彈窗 */}
+      {/* 支付確認彈窗（對齊 AdSales 版本風格） */}
       <Modal
         title={t('confirmOrder')} open={isPaymentModalVisible}
         onOk={handleConfirmPayment} onCancel={() => setIsPaymentModalVisible(false)}
         okText={t('confirmPay')} cancelText={t('cancel')}
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
-        width={480}
+        width={600}
       >
         {selectedSkin && (
           <div>
             <div style={{ background: '#F5F5F5', borderRadius: 8, padding: 12, marginBottom: 16 }}>
               {renderSkinPreview(selectedSkin, true)}
             </div>
-            <div style={{ background: '#fafafa', padding: 16, borderRadius: 6, fontSize: 13 }}>
+            <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#595959' }}>{t('skinKitColon')}</span>
-                <span style={{ fontWeight: 600 }}>{selectedSkin.name}（$${selectedSkin.pricePerDay}/{t('unitDay')}）</span>
+                <span style={{ color: '#595959' }}>{t('orderOriginalPrice')}</span>
+                <span style={{ fontWeight: 600 }}>${priceSummary.original}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#595959' }}>{t('deliveryPeriodColon')}</span>
-                <span style={{ fontWeight: 600 }}>{startDate.format('YYYY-MM-DD')} ~ {endDate.format('YYYY-MM-DD')}（{buyDays}{t('unitDay')}）</span>
+                <span style={{ color: '#595959' }}>享受折扣：</span>
+                {currentTier ? (
+                  <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
+                ) : (
+                  <span style={{ color: '#BFBFBF' }}>{t('noDiscount')}</span>
+                )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-                <span>{t('orderDiscountColon')}</span>
-                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}{currentTier ? `（${currentTier.discount / 10}${t('discountSuffix')}）` : ''}</span>
+                <span>{t('orderDiscount')}</span>
+                <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                <span style={{ fontWeight: 600 }}>{t('actualAmountColon')}</span>
+                <span style={{ fontWeight: 600 }}>{t('totalPayable')}</span>
                 <span style={{ fontWeight: 700 }}>${priceSummary.sale}</span>
               </div>
             </div>

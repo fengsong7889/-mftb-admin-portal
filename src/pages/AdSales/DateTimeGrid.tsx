@@ -18,6 +18,7 @@ import {
 } from './types'
 import { Region, AlgorithmType } from '../Recommend/constants'
 import GradientDiscountBanner from './GradientDiscountBanner'
+import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import {
   fetchAdAlgorithms,
   fetchAdInventory,
@@ -151,7 +152,7 @@ function parseDiscountTiers(json?: string): Array<{ minSlots: number; discount: 
     if (!Array.isArray(arr)) return []
     return (arr as Array<{ minSlots?: number; discount?: number }>)
       .filter(t => t && Number(t.minSlots) > 0 && Number(t.discount) > 0)
-      .map(t => ({ minSlots: Number(t.minSlots), discount: Number(t.discount), label: `${Number(t.discount) / 10}折` }))
+      .map(t => ({ minSlots: Number(t.minSlots), discount: Number(t.discount), label: `${Number(t.discount) > 10 ? Number(t.discount) / 10 : Number(t.discount)}折` }))
       .sort((a, b) => b.minSlots - a.minSlots)
   } catch {
     return []
@@ -181,9 +182,8 @@ const REGION_LIST = [
 
 // WEEKDAY_LABELS 移入组件内部以使用 t() 翻譯
 
-/** 时段锁定时长（秒），调整此值即可同步更新倒计时、过期释放、弹窗提示 */
-const LOCK_DURATION_SECONDS = 60
-const LOCK_DURATION_MS = LOCK_DURATION_SECONDS * 1000
+/** 时段锁定时长（秒），从规则配置动态读取 */
+const DEFAULT_LOCK_SECONDS = 60
 
 /** 可售天数（含当天），超出该窗口即为待开售日期：盘活复苏 180 天，其他类型 12 天 */
 const REVIVE_SELLABLE_DAYS = 180
@@ -212,6 +212,9 @@ function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
 export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const { t } = useTranslation('adSales')
   const navigate = useNavigate()
+  // 从规则配置动态读取锁定时长
+  const LOCK_DURATION_SECONDS = getSystemRuleValue<number>('ad_click_cart_lock_seconds') || DEFAULT_LOCK_SECONDS
+  const LOCK_DURATION_MS = LOCK_DURATION_SECONDS * 1000
   // 时段定义（含翻译）
   const MEAL_TIME_SLOTS = useMemo(() => [
     { key: 'breakfast', label: t('breakfast'), timeRange: '06:00-10:00', startHour: 6, slots: [14, 15, 16, 17, 18, 19] },
@@ -361,7 +364,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [inventoryData, setInventoryData] = useState<AdInventoryVO | null>(null)
   // 多时段折扣梯度（默认演示配置，查询后由定价配置覆盖）—— label 由翻译生成
   const [multiSlotTiers, setMultiSlotTiers] = useState(() =>
-    DEFAULT_MULTI_SLOT_DISCOUNT_TIERS.map(tier => ({ ...tier, label: `${tier.discount / 10}${t('discountUnit')}` }))
+    DEFAULT_MULTI_SLOT_DISCOUNT_TIERS.map(tier => ({ ...tier, label: `${tier.discount > 10 ? tier.discount / 10 : tier.discount}${t('discountUnit')}` }))
   )
   const [lastPaidAmount, setLastPaidAmount] = useState(0)
   const [paying, setPaying] = useState(false)
@@ -1565,24 +1568,31 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             </span>
           </div>
 
-          {/* 價格明細（審批彈窗信息塊風格） */}
+          {/* 價格明細（無敵星星風格：flex 左右佈局） */}
           {(() => {
             const { totalOriginal, tier, totalFinal } = computeCartSettlement()
             const totalDiscount = Math.round((totalOriginal - totalFinal) * 100) / 100
             return (
-              <div style={{ marginBottom: 12, padding: 12, background: '#F8F8F8', borderRadius: 8 }}>
-                <div style={{ fontSize: 13, color: '#666', lineHeight: 2 }}>
-                  <div><span style={{ color: '#999' }}>{t('orderOriginal')}：</span>${totalOriginal}</div>
-                  <div>
-                    <span style={{ color: '#999' }}>享受折扣：</span>
-                    {tier ? (
-                      <span style={{ fontWeight: 600, color: '#52C41A' }}>满{tier.minSlots}个时段{tier.discount / 10}折</span>
-                    ) : (
-                      <span style={{ color: '#BFBFBF' }}>无折扣</span>
-                    )}
-                  </div>
-                  <div><span style={{ color: '#999' }}>{t('orderDiscount')}：</span><span style={{ fontWeight: 600, color: '#FA8C16' }}>-${totalDiscount}</span></div>
-                  <div><span style={{ color: '#999' }}>{t('totalPayable')}：</span><span style={{ fontSize: 15, fontWeight: 700, color: '#FF4D4F' }}>${totalFinal}</span></div>
+              <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>{t('orderOriginal')}：</span>
+                  <span style={{ fontWeight: 600 }}>${totalOriginal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>享受折扣：</span>
+                  {tier ? (
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{tier.minSlots}个时段{tier.discount > 10 ? tier.discount / 10 : tier.discount}折</span>
+                  ) : (
+                    <span style={{ color: '#BFBFBF' }}>无折扣</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                  <span>{t('orderDiscount')}：</span>
+                  <span style={{ fontWeight: 600 }}>-${totalDiscount}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{t('totalPayable')}：</span>
+                  <span style={{ fontWeight: 700 }}>${totalFinal}</span>
                 </div>
               </div>
             )
@@ -1648,30 +1658,34 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         </div>
 
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#595959' }}>{t('orderOriginal')}：</span>
-            <span style={{ fontWeight: 600 }}>${cartItems.reduce((sum, item) => sum + item.originalPrice, 0)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-            <span>{t('slotDiscount')}：</span>
-            <span style={{ fontWeight: 600 }}>-${computeCartSettlement().slotDiscountAmount}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-            <span>{t('tierDiscount')}：</span>
-            <span style={{ fontWeight: 600 }}>
-              {(() => {
-                const s = computeCartSettlement()
-                const tierAmount = Math.round((s.slotDiscounted - s.totalFinal) * 100) / 100
-                return `-$${tierAmount}${s.tier ? `（${s.tier.discount / 10}折）` : ''}`
-              })()}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-            <span style={{ fontWeight: 600 }}>{t('actualAmount')}：</span>
-            <span style={{ fontWeight: 700 }}>
-              ${computeCartSettlement().totalFinal}
-            </span>
-          </div>
+          {(() => {
+            const s = computeCartSettlement()
+            const totalDiscount = Math.round((s.totalOriginal - s.totalFinal) * 100) / 100
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>{t('orderOriginal')}：</span>
+                  <span style={{ fontWeight: 600 }}>${s.totalOriginal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#595959' }}>享受折扣：</span>
+                  {s.tier ? (
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{s.tier.minSlots}个时段{s.tier.discount > 10 ? s.tier.discount / 10 : s.tier.discount}折</span>
+                  ) : (
+                    <span style={{ color: '#BFBFBF' }}>无折扣</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                  <span>{t('orderDiscount')}：</span>
+                  <span style={{ fontWeight: 600 }}>-${totalDiscount}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{t('actualAmount')}：</span>
+                  <span style={{ fontWeight: 700 }}>${s.totalFinal}</span>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </Modal>
 

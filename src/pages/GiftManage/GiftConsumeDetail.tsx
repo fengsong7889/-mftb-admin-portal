@@ -27,7 +27,7 @@ const adTypeColorMap: Record<string, string> = {
   revival: '#E8720C',
   exclusive: '#722ED1',
   gold: '#FAAD14',
-  ka: '#1890FF',
+  popular_merchant: '#1890FF',
 }
 
 const tradeTypeColorMap: Record<string, string> = {
@@ -50,7 +50,7 @@ export default function GiftConsumeDetail() {
     { label: t('adTypeRevival'), value: 'revival' },
     { label: t('adTypeExclusive'), value: 'exclusive' },
     { label: t('adTypeGold'), value: 'gold' },
-    { label: t('adTypeKa'), value: 'ka' },
+    { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
   ]
 
   const adTypeMap: Record<string, string> = {
@@ -58,7 +58,7 @@ export default function GiftConsumeDetail() {
     revival: t('adTypeRevival'),
     exclusive: t('adTypeExclusive'),
     gold: t('adTypeGold'),
-    ka: t('adTypeKa'),
+    popular_merchant: t('adTypePopularMerchant'),
   }
 
   /** 交易類型 */
