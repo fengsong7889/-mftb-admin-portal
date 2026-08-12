@@ -356,7 +356,6 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("menu-config", "Menu Config"),
                 Map.entry("translation-manage", "Translation Config"),
                 Map.entry("rule-config", "Rule Config"),
-                Map.entry("promotion-order-manage", "Order Management"),
                 Map.entry("merchant-order-manage", "Order Management"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
@@ -533,8 +532,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
         // ── 推廣通 ──
         menus.put("promotion-sales-config", new String[]{"店鋪推廣",     "promotion_tool",     "1"});
-        menus.put("promotion-order-manage", new String[]{"訂單管理",     "promotion_tool",     "2"});
-        menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "3"});
+        menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "2"});
         menus.put("promotion-report-overview", new String[]{"數據概覽",  "promotion-report-group", "1"});
         menus.put("promotion-report-order", new String[]{"訂單效果報表", "promotion-report-group", "2"});
         menus.put("promotion-report-compare", new String[]{"推薦類型對比", "promotion-report-group", "3"});
@@ -645,7 +643,14 @@ public class DataInitializer implements CommandLineRunner {
             log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
         }
 
-        // promotion-order-manage 已纳入种子菜单，无需清理
+        // 清理 promotion-order-manage 菜单残留（已从推广通二级菜单中移除）
+        Long pomId = queryMenuIdByKey("promotion-order-manage");
+        if (pomId != null) {
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", pomId);
+            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", pomId);
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", pomId);
+            log.info("已清理 promotion-order-manage 菜单及关联权限记录");
+        }
     }
 
     /** 根据 menu_key 查询菜单ID (不存在返回 null) */
@@ -656,7 +661,7 @@ public class DataInitializer implements CommandLineRunner {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
-    /** 确保所有部门拥有 ad-sales 和 promotion-order-manage 菜单权限，并授权全量商家数据范围 */
+    /** 确保所有部门拥有 ad-sales 菜单权限，并授权全量商家数据范围 */
     private void ensureDeptAdSalesPermission() {
         String actions = "[\"view\",\"create\",\"edit\",\"export\"]";
         List<Long> deptIds = jdbcTemplate.queryForList(
@@ -664,8 +669,8 @@ public class DataInitializer implements CommandLineRunner {
         if (deptIds.isEmpty()) {
             return;
         }
-        // 1) 菜单权限: ad-sales + promotion-order-manage
-        for (String menuKey : new String[]{"ad-sales", "promotion-order-manage"}) {
+        // 1) 菜单权限: ad-sales
+        for (String menuKey : new String[]{"ad-sales"}) {
             Long menuId = queryMenuIdByKey(menuKey);
             if (menuId == null) {
                 continue;
