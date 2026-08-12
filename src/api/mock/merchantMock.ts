@@ -227,7 +227,7 @@ export function mockFetchStoresByGroupCode(groupCode: string, brand?: string): O
   if (brand) {
     stores = stores.filter(s => s.brand === brand)
   }
-  return stores.map(s => ({ value: String(s.id), label: `${s.storeName}(${s.storeCode})` }))
+  return stores.map(s => ({ value: s.storeCode, label: s.storeName }))
 }
 
 export function mockFetchStoreOptions(keyword: string): OptionItem[] {

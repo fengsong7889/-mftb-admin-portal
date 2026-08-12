@@ -114,6 +114,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
 
         Map<String, BalanceDelta> deltas = new LinkedHashMap<>();
 
+        // 充值明细：只记录充值本身，不生成扣款门店明细（门店扣款仅在欠款对账中体现）
         FinDetail rechargeRow = baseDetail(approval, tradeTime, batchNo);
         rechargeRow.setTradeType(TRADE_RECHARGE);
         rechargeRow.setChangeType(CHANGE_RECHARGE);
@@ -123,7 +124,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         rechargeRow.setRemark(remark);
         saveDetail(rechargeRow, deltas);
 
-        // 营业额支付：按门店写入充值批次扣款明细 + 生成欠款单
+        // 实收充值含营业额支付时，每个扣款门店生成一条欠款单（不写入批次交易明细）
         List<Map<String, Object>> stores = FinExtras.rows(extra, "deductStores");
         String channelLabel = FinExtras.textOrDash(extra, "businessChannelLabel");
         LocalDate loanDate = tradeTime.toLocalDate();
@@ -132,18 +133,6 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             String storeCode = FinExtras.storeId(store);
             String storeName = FinExtras.storeName(store);
 
-            FinDetail row = baseDetail(approval, tradeTime, batchNo);
-            row.setStoreCode(storeCode);
-            row.setStoreName(storeName);
-            row.setTradeType(TRADE_DEDUCT);
-            row.setChangeType(CHANGE_BATCH_DEDUCT);
-            row.setVirtualChange(amount.negate());
-            row.setActualChange(amount.negate());
-            row.setBd(bd);
-            row.setRemark(REMARK_REVENUE_PAYMENT);
-            saveDetail(row, deltas);
-
-            // 实收充值含营业额支付时，每个扣款门店生成一条欠款单
             if (isActual) {
                 FinDebtBill bill = new FinDebtBill();
                 bill.setBillNo(bizSeqService.next(BizSeqService.PREFIX_DEBT));
@@ -172,7 +161,9 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
     /* ==================== 转账 ==================== */
 
     /**
-     * 转账：双方共享批次号各写 1 条批次（转出负数/转入正数）+ 双方明细 + 双方余额增减
+     * 转账：仅为转入方创建 1 条批次 + 1 条转入明细；
+     * 转出方不创建批次，按 FIFO 从已有批次扣减，每个被扣批次各写 1 条转出明细。
+     * 转账金额全部在虚拟账户，实收账户不变动。
      */
     private void writeTransfer(FinApproval approval, Map<String, Object> extra, LocalDateTime tradeTime) {
         String fromGroup = approval.getGroupCode();
@@ -190,18 +181,8 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         }
         accountService.getOrCreate(toGroup, toGroupName, approval.getBrand());
 
-        // 转出/转入按转出集团的综合实收比例同步变动实收账户
-        BigDecimal ratio = groupActualRatio(fromGroup);
+        // 仅为转入方创建 1 条批次
         String batchNo = bizSeqService.next(BizSeqService.PREFIX_BATCH);
-
-        FinBatch outBatch = baseBatch(approval, tradeTime, batchNo, "transfer");
-        outBatch.setGroupCode(fromGroup);
-        outBatch.setGroupName(approval.getGroupName());
-        outBatch.setVirtualAmount(amount.negate());
-        outBatch.setRemark(remark);
-        outBatch.setExtra(JsonUtils.toJson(withDirection(extra, "out")));
-        batchMapper.insert(outBatch);
-
         FinBatch inBatch = baseBatch(approval, tradeTime, batchNo, "transfer");
         inBatch.setGroupCode(toGroup);
         inBatch.setGroupName(toGroupName);
@@ -212,21 +193,30 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
 
         Map<String, BalanceDelta> deltas = new LinkedHashMap<>();
 
-        FinDetail outRow = baseDetail(approval, tradeTime, batchNo);
-        outRow.setTradeType(TRADE_OUT);
-        outRow.setChangeType(CHANGE_TRANSFER_OUT);
-        outRow.setVirtualChange(amount.negate());
-        outRow.setActualChange(calcActualChange(amount.negate(), ratio));
-        outRow.setRemark(remark);
-        saveDetail(outRow, deltas);
+        // 转出方按 FIFO 从已有批次扣减，每个被扣批次各写 1 条转出明细
+        List<DeductPart> parts = splitByFifo(fromGroup, amount);
+        boolean multi = parts.size() > 1;
+        for (int i = 0; i < parts.size(); i++) {
+            DeductPart part = parts.get(i);
+            String splitTag = multi ? "（跨批次转账 " + (i + 1) + "/" + parts.size() + "）" : "";
 
+            FinDetail outRow = baseDetail(approval, tradeTime, part.batchNo());
+            outRow.setTradeType(TRADE_OUT);
+            outRow.setChangeType(CHANGE_TRANSFER_OUT);
+            outRow.setVirtualChange(part.amount().negate());
+            outRow.setActualChange(calcActualChange(part.amount().negate(), batchActualRatio(part.batchNo())));
+            outRow.setRemark(remark + splitTag);
+            saveDetail(outRow, deltas);
+        }
+
+        // 转入方 1 条转入明细
         FinDetail inRow = baseDetail(approval, tradeTime, batchNo);
         inRow.setGroupCode(toGroup);
         inRow.setGroupName(toGroupName);
         inRow.setTradeType(TRADE_IN);
         inRow.setChangeType(CHANGE_TRANSFER_IN);
         inRow.setVirtualChange(amount);
-        inRow.setActualChange(calcActualChange(amount, ratio));
+        inRow.setActualChange(null); // 转账不涉及实收账户变动
         inRow.setRemark(remark);
         saveDetail(inRow, deltas);
 

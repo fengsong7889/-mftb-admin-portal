@@ -217,6 +217,33 @@ export default function RechargeAdd() {
             message.warning(t('accountBalance.fillAllDeductAmounts'))
             return
           }
+          // 扣款门店去重校验
+          const storeIds = deductRows.map(r => r.storeId).filter(Boolean)
+          if (new Set(storeIds).size !== storeIds.length) {
+            message.warning(t('accountBalance.duplicateDeductStore'))
+            return
+          }
+          // 扣款门店合计金额必须等于营业额扣款金额
+          const deductTotal = deductRows.reduce((sum, r) => sum + (r.amount || 0), 0)
+          if (Math.abs(deductTotal - revenueAmount) > 0.01) {
+            message.warning(t('accountBalance.deductTotalNotEqualRevenue'))
+            return
+          }
+        }
+        // 营业额支付：营业额支付金额不能大于虚拟账户充值金额
+        if (payMethod === 'revenue' && revenueAmount > virtualAmount) {
+          message.warning(t('accountBalance.revenueExceedVirtual'))
+          return
+        }
+        // 混合支付：银行转账 + 营业额扣款不能大于虚拟账户充值金额
+        if (payMethod === 'mixed' && (bankAmount + revenueAmount) > virtualAmount) {
+          message.warning(t('accountBalance.mixedTotalExceedVirtual'))
+          return
+        }
+        // 对公转账：银行转账金额不能大于虚拟账户充值金额
+        if (payMethod === 'corporate' && bankAmount > virtualAmount) {
+          message.warning(t('accountBalance.bankExceedVirtual'))
+          return
         }
       }
       if (contractFiles.length === 0) {

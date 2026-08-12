@@ -433,9 +433,15 @@ function nodeItem(node: string, approver: string, time: string, status: string, 
  * 審批記錄 → 審批詳情展示結構
  * 後端 FinApprovalVO.extra 與 approvalStore 寫入的 extra 同構，因此真實數據與降級數據共用本映射。
  */
-function toDetailData(record: FinApproval): ApprovalDetailData {
+function toDetailData(record: FinApproval, t?: (key: string) => string): ApprovalDetailData {
   const extra = (record.extra || {}) as Record<string, unknown>
   const brand = brandLabelMap[record.brand] || record.brand
+  /** 業務類型代碼 → 翻譯標籤 */
+  const bizTypeLabel = (code: string) => {
+    if (!t) return code
+    const map: Record<string, string> = { delivery: 'accountBalance.bizDelivery', store: 'accountBalance.bizStore' }
+    return map[code] ? t(map[code]) : code
+  }
   const base: ApprovalDetailData = {
     approvalType: record.approvalType as ApprovalDetailData['approvalType'],
     applicant: record.applicant,
@@ -459,7 +465,7 @@ function toDetailData(record: FinApproval): ApprovalDetailData {
     const payMethod = str(extra.payMethod) as ApprovalDetailData['payMethod']
     return {
       ...base,
-      businessType: str(extra.businessType),
+      businessType: bizTypeLabel(str(extra.businessType)),
       businessChannel: str(extra.businessChannelLabel),
       bdPerson: str(extra.bd) || '--',
       isActual: extra.isActual === true,
@@ -550,9 +556,9 @@ export default function ApprovalDetail() {
   /** 後端不可用時的降級詳情：本地審批記錄優先，其次靜態演示數據 */
   const fallbackDetail = useCallback((): ApprovalDetailData => {
     const local = getApprovalRecordByFlowNo(flowNo)
-    if (local) return toDetailData(local as unknown as FinApproval)
+    if (local) return toDetailData(local as unknown as FinApproval, t)
     return mockDetails[flowNo] || mockDetails[urlType] || mockDetails['CZ202601160000']
-  }, [flowNo, urlType])
+  }, [flowNo, urlType, t])
 
   const [data, setData] = useState<ApprovalDetailData>(fallbackDetail)
   const [submitting, setSubmitting] = useState(false)
@@ -573,7 +579,7 @@ export default function ApprovalDetail() {
       if (!flowNo) return
       try {
         const record = await fetchFinApprovalDetail(flowNo).catch(() => null)
-        if (!cancelled) setData(record ? toDetailData(record) : fallbackDetail())
+        if (!cancelled) setData(record ? toDetailData(record, t) : fallbackDetail())
       } catch {
         // 流程不存在等業務錯誤：保留降級展示
         if (!cancelled) setData(fallbackDetail())

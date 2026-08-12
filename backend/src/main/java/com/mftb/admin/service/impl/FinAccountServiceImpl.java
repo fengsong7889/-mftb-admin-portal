@@ -183,4 +183,21 @@ public class FinAccountServiceImpl implements FinAccountService {
     private static BigDecimal nonNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
+
+    @Override
+    public List<FinAccount> findAccountsByGroupCode(String groupCode) {
+        return accountMapper.selectList(
+                new LambdaQueryWrapper<FinAccount>()
+                        .eq(FinAccount::getGroupCode, groupCode));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void fixBalance(String groupId, String brand, FinAccount account) {
+        FinAccount existing = requireAccount(groupId, brand);
+        existing.setVirtualBalance(account.getVirtualBalance());
+        existing.setActualBalance(account.getActualBalance());
+        existing.setUpdatedBy("system-fix");
+        accountMapper.updateById(existing);
+    }
 }

@@ -273,7 +273,7 @@ public class StoreServiceImpl implements StoreService {
         wrapper.orderByAsc(BizStore::getId);
         List<BizStore> stores = storeMapper.selectList(wrapper);
         return stores.stream()
-                .map(s -> new OptionVO(String.valueOf(s.getId()), s.getStoreName() + "(" + s.getStoreCode() + ")"))
+                .map(s -> new OptionVO(s.getStoreCode(), s.getStoreName()))
                 .toList();
     }
 

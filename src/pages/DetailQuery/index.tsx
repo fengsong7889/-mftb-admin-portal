@@ -347,7 +347,7 @@ export default function DetailQuery() {
       title: t('common.colGroupName'),
       dataIndex: 'groupName',
       key: 'groupName',
-      width: 120,
+      width: 160,
     },
     {
       title: t('common.colBrand'),

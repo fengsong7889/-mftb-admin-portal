@@ -228,6 +228,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
      * 2. 若不同 algoType 模块前缀冲突，追加第3个字的首字母（如 WDG）
      * 3. 仍冲突则追加 algoType 数字（如 WD1）
      * 4. 序号取同前缀下最大序号 +1，格式 %05d
+     * 5. 若名称非中文导致无法提取字母前缀，则按 algoType 使用固定兜底前缀
      */
     private String generateCode(String algoName, Integer algoType) {
         String prefix = buildPrefix(algoName, algoType);
@@ -235,12 +236,25 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         return prefix + String.format("%05d", maxSeq + 1);
     }
 
+    /** algoType → 固定兜底前缀（当名称无法提取合法字母前缀时使用） */
+    private static final Map<Integer, String> TYPE_FALLBACK_PREFIX = Map.of(
+            1, "WD",   // 無敵星星
+            2, "XD",   // 新店廣告
+            3, "PH",   // 盤活復蘇
+            4, "LL",   // 流量廣告
+            5, "RQ"    // 人氣商家
+    );
+
     /** 根据算法名称构建编码前缀 */
     private String buildPrefix(String algoName, Integer algoType) {
         if (!StringUtils.hasText(algoName) || algoName.length() < 2) {
-            return "ALG";
+            return fallbackPrefix(algoType);
         }
         String two = PinyinUtil.getFirstLetter(algoName.substring(0, 2), "").toUpperCase();
+        // 校验：前缀必须为纯英文字母，非中文名称（数字/符号等）无法产生合法前缀
+        if (!two.matches("[A-Z]+")) {
+            return fallbackPrefix(algoType);
+        }
         // 检查是否与不同 algoType 模块冲突
         List<AdAlgorithm> existing = algorithmMapper.selectList(
                 new LambdaQueryWrapper<AdAlgorithm>()
@@ -267,6 +281,11 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         }
         // 仍冲突 → 追加 algoType 数字
         return two + algoType;
+    }
+
+    /** 按 algoType 取兜底前缀，未知类型默认 ALG */
+    private String fallbackPrefix(Integer algoType) {
+        return TYPE_FALLBACK_PREFIX.getOrDefault(algoType, "ALG");
     }
 
     /** 查询指定前缀下的最大序号 */

@@ -325,7 +325,7 @@ export default function BatchQuery() {
       title: t('common.colFlowNo'),
       dataIndex: 'flowNo',
       key: 'flowNo',
-      width: 100,
+      width: 150,
     },
     {
       title: t('common.colTradeTime'),

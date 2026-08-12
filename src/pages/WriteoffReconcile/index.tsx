@@ -349,7 +349,7 @@ export default function WriteoffReconcile() {
   const columns: TableColumnsType<ReconcileRecord> = [
     { title: t('writeoffReconcile.colStatDate'), dataIndex: 'date', key: 'date', width: 110, fixed: 'left' },
     { title: t('common.colGroupId'), dataIndex: 'groupId', key: 'groupId', width: 90, fixed: 'left' },
-    { title: t('common.colGroupName'), dataIndex: 'groupName', key: 'groupName', width: 110, fixed: 'left' },
+    { title: t('common.colGroupName'), dataIndex: 'groupName', key: 'groupName', width: 160, fixed: 'left' },
     {
       title: t('common.colBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: string) => <BrandTag value={v} />,

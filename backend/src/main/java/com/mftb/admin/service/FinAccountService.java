@@ -6,6 +6,7 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.FinAccount;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 推广金账户服务
@@ -35,4 +36,10 @@ public interface FinAccountService {
 
     /** 更新账户状态 */
     void updateStatus(String groupId, String brand, String status);
+
+    /** 诊断用：按集团编码查询所有账户原始记录 */
+    List<FinAccount> findAccountsByGroupCode(String groupCode);
+
+    /** 数据修复：直接设置账户余额（仅用于修正错误数据） */
+    void fixBalance(String groupId, String brand, FinAccount account);
 }

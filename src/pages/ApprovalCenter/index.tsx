@@ -203,7 +203,10 @@ export default function ApprovalCenter() {
       const records = (res.records ?? []) as ApprovalRecord[]
       const extraGifts = localGiftApprovals(query)
         .filter(g => !records.some(r => r.flowNo === g.flowNo))
-      setData([...extraGifts, ...records])
+      const merged = [...extraGifts, ...records]
+      // 合并后按申请时间倒序排列
+      merged.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
+      setData(merged)
       setTotal((res.total ?? 0) + extraGifts.length)
     } finally {
       setLoading(false)
@@ -334,8 +337,8 @@ export default function ApprovalCenter() {
   
 
   const columns: TableColumnsType<ApprovalRecord> = [
-    { title: t('common.colGroupId'), dataIndex: 'groupId', key: 'groupId', width: 80, fixed: 'left' },
-    { title: t('common.colGroupName'), dataIndex: 'groupName', key: 'groupName', width: 110 },
+    { title: t('common.colGroupId'), dataIndex: 'groupId', key: 'groupId', width: 100, fixed: 'left' },
+    { title: t('common.colGroupName'), dataIndex: 'groupName', key: 'groupName', width: 150 },
     {
       title: t('common.colBrand'),
       dataIndex: 'brand',
@@ -350,17 +353,17 @@ export default function ApprovalCenter() {
       title: t('approvalCenter.colApprovalType'),
       dataIndex: 'approvalType',
       key: 'approvalType',
-      width: 80,
+      width: 90,
       render: (v: string) => (approvalTypeMapKeys[v] ? t(approvalTypeMapKeys[v]) : v),
     },
-    { title: t('approvalCenter.colApplicant'), dataIndex: 'applicant', key: 'applicant', width: 100 },
+    { title: t('approvalCenter.colApplicant'), dataIndex: 'applicant', key: 'applicant', width: 130 },
     { title: t('approvalCenter.colApplyTime'), dataIndex: 'applyTime', key: 'applyTime', width: 160 },
     // 業務主管審批 - 藍色
     {
       title: t('approvalCenter.colBiz'),
       key: 'biz',
       children: [
-        { title: t('approvalCenter.colApprover'), dataIndex: 'bizApprover', key: 'bizApprover', width: 110 },
+        { title: t('approvalCenter.colApprover'), dataIndex: 'bizApprover', key: 'bizApprover', width: 130 },
         { title: t('approvalCenter.colApproveTime'), dataIndex: 'bizApproveTime', key: 'bizApproveTime', width: 160 },
         {
           title: t('approvalCenter.colApproveStatus'),
@@ -376,7 +379,7 @@ export default function ApprovalCenter() {
       title: t('approvalCenter.colOps'),
       key: 'ops',
       children: [
-        { title: t('approvalCenter.colApprover'), dataIndex: 'opsApprover', key: 'opsApprover', width: 110 },
+        { title: t('approvalCenter.colApprover'), dataIndex: 'opsApprover', key: 'opsApprover', width: 130 },
         { title: t('approvalCenter.colApproveTime'), dataIndex: 'opsApproveTime', key: 'opsApproveTime', width: 160 },
         {
           title: t('approvalCenter.colApproveStatus'),
@@ -392,7 +395,7 @@ export default function ApprovalCenter() {
       title: t('approvalCenter.colFin'),
       key: 'fin',
       children: [
-        { title: t('approvalCenter.colApprover'), dataIndex: 'finApprover', key: 'finApprover', width: 110 },
+        { title: t('approvalCenter.colApprover'), dataIndex: 'finApprover', key: 'finApprover', width: 130 },
         { title: t('approvalCenter.colApproveTime'), dataIndex: 'finApproveTime', key: 'finApproveTime', width: 160 },
         {
           title: t('approvalCenter.colApproveStatus'),
@@ -512,7 +515,7 @@ export default function ApprovalCenter() {
           }}
           size="middle"
           bordered
-          scroll={{ x: 2000 }}
+          scroll={{ x: 2400 }}
         />
       </div>
 
