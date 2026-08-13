@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Form, Input, Select, Tag, InputNumber, Upload, message, Modal } from 'antd'
+import { Button, Form, Input, Select, InputNumber, Upload, message, Modal } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -9,7 +9,6 @@ import type { StoreItem } from '../../api/store'
 import { fetchStoresByGroup } from '../../api/store'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 import { createGiftRecord } from '../../api/gift'
-import { getApprovalRecords } from '../../utils/approvalStore'
 import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import BrandTag from '../../components/BrandTag'
 
@@ -48,13 +47,6 @@ export default function GiftAdd() {
   // 监控广告类型选择，动态读取规则配置
   const selectedAdType = Form.useWatch('adType', form) as string | undefined
 
-  /** 当前广告类型的赠送上限（每日次数，0=不限） */
-  const giftLimit = useMemo(() => {
-    if (!selectedAdType) return 0
-    const key = `gift_limit_${selectedAdType}`
-    return getSystemRuleValue<number>(key) ?? 10
-  }, [selectedAdType])
-
   /** 当前广告类型是否需要审批 */
   const needApproval = useMemo(() => {
     if (!selectedAdType) return true
@@ -62,16 +54,12 @@ export default function GiftAdd() {
     return getSystemRuleValue<boolean>(key) ?? true
   }, [selectedAdType])
 
-  /** 今日已提交的赠送申请数（按广告类型） */
-  const todaySubmittedCount = useMemo(() => {
-    if (!selectedAdType) return 0
-    const today = new Date().toISOString().slice(0, 10)
-    return getApprovalRecords().filter(r =>
-      r.approvalType === 'gift' &&
-      r.extra?.adType === selectedAdType &&
-      r.applyTime?.startsWith(today)
-    ).length
-  }, [selectedAdType, submitting])
+  /** 当前广告类型的赠送限制天数（0=不限，默认365） */
+  const giftMaxDays = useMemo(() => {
+    if (!selectedAdType) return 365
+    const key = `gift_limit_${selectedAdType}`
+    return getSystemRuleValue<number>(key) || 365
+  }, [selectedAdType])
 
   // 從 URL 參數判斷是否為贈送模式
   const isGiftMode = searchParams.get('mode') === 'gift'
@@ -147,12 +135,7 @@ export default function GiftAdd() {
       const values = await form.validateFields()
       setSubmitting(true)
 
-      // 检查每日赠送上限（0=不限）
-      if (giftLimit > 0 && todaySubmittedCount >= giftLimit) {
-        message.error(t('dailyLimitReached', { limit: giftLimit, adType: adTypeOptions.find(o => o.value === values.adType)?.label || values.adType }))
-        setSubmitting(false)
-        return
-      }
+      // 校验逻辑已迁移至规则配置「限制天數」，由表單 max 校驗控制
 
       // 处理凭证文件（目前仅前端占位，实际上传需要文件上传服务）
       const certificateFiles = form.getFieldValue('certificate') || []
@@ -392,26 +375,9 @@ export default function GiftAdd() {
             <ClockCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
           </div>
           <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('giftConfig')}</span>
-          {selectedAdType && (
-            <>
-              {needApproval ? (
-                <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('approvalRequired')}</Tag>
-              ) : (
-                <Tag color="green" style={{ marginLeft: 4, fontSize: 11 }}>{t('noApprovalRequired')}</Tag>
-              )}
-              {giftLimit > 0 && (
-                <Tag color={todaySubmittedCount >= giftLimit ? 'red' : 'blue'} style={{ marginLeft: 4, fontSize: 11 }}>
-                  {t('dailyLimit')}: {todaySubmittedCount}/{giftLimit}
-                </Tag>
-              )}
-            </>
-          )}
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <span style={{ fontSize: 12, color: '#8C6D1F' }}>
-            {selectedAdType
-              ? (needApproval ? t('approvalTip') : t('noApprovalTip'))
-              : t('selectAdTypeFirst')
-            }
+            {t('approvalTip')}
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
@@ -435,7 +401,7 @@ export default function GiftAdd() {
             <InputNumber
               placeholder={t('inputGiftDays')}
               min={1}
-              max={365}
+              max={giftMaxDays}
               style={{ width: '100%' }}
               addonAfter={t('dayUnit')}
             />

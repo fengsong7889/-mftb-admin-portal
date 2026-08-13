@@ -35,8 +35,10 @@ export const mockData: WaterfallStrategy[] = (() => {
   const data: WaterfallStrategy[] = []
   for (let i = 0; i < 24; i++) {
     const id = i + 1
+    const dateStr = `2026081${Math.min(2 + Math.floor(i / 5), 9)}`
     data.push({
       id,
+      strategyCode: `PB${dateStr}${String(i).padStart(3, '0')}`,
       strategyName: PROMOTION_NAMES[i % PROMOTION_NAMES.length],
       brand: appPool[i % appPool.length],
       status: pseudoRandom(id * 100 + 5) > 0.2 ? 1 : 2,
@@ -87,7 +89,7 @@ export default function PromotionSlotConfig() {
     try {
       if (mockMode) {
         let result = [...mockData]
-        if (v.id) result = result.filter(item => String(item.id).includes(String(v.id)))
+        if (v.strategyCode) result = result.filter(item => (item.strategyCode ?? '').includes(String(v.strategyCode)))
         if (v.strategyName) result = result.filter(item => item.strategyName.includes(String(v.strategyName)))
         if (v.brand) result = result.filter(item => item.brand === v.brand)
         if (v.status) result = result.filter(item => item.status === v.status)
@@ -98,6 +100,7 @@ export default function PromotionSlotConfig() {
           () => fetchWaterfallList({
             page: p, size: s,
             id: v.id ? Number(v.id) : undefined,
+            strategyCode: v.strategyCode || undefined,
             strategyName: v.strategyName || undefined,
             brand: v.brand || undefined,
             status: v.status,
@@ -192,7 +195,7 @@ export default function PromotionSlotConfig() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'id', title: t('promotionSlotConfig.colConfigId') },
+    { key: 'strategyCode', title: t('promotionSlotConfig.colConfigId') },
     { key: 'strategyName', title: t('promotionSlotConfig.colWaterfallName') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'status', title: t('common.colStatus') },
@@ -207,12 +210,12 @@ export default function PromotionSlotConfig() {
   const columns: ColumnsType<WaterfallStrategy> = [
     {
       title: t('promotionSlotConfig.colConfigId'),
-      dataIndex: 'id',
-      key: 'id',
-      width: 100,
+      dataIndex: 'strategyCode',
+      key: 'strategyCode',
+      width: 160,
       align: 'center',
-      render: (v: number) => (
-        <Tag color="blue">{String(v).padStart(6, '0')}</Tag>
+      render: (v: string) => (
+        <Tag color="blue">{v || '-'}</Tag>
       ),
     },
     {
@@ -291,7 +294,7 @@ export default function PromotionSlotConfig() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
-          <Form.Item label={t('promotionSlotConfig.colConfigId')} name="id">
+          <Form.Item label={t('promotionSlotConfig.colConfigId')} name="strategyCode">
             <Input placeholder={t('promotionSlotConfig.placeholderConfigId')} allowClear />
           </Form.Item>
           <Form.Item label={t('promotionSlotConfig.colWaterfallName')} name="strategyName">

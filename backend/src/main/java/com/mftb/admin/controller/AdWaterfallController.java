@@ -39,11 +39,12 @@ public class AdWaterfallController {
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String strategyCode,
             @RequestParam(required = false) String strategyName,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Long algoId) {
-        return Result.success(waterfallService.page(page, size, id, strategyName, brand, status, algoId));
+        return Result.success(waterfallService.page(page, size, id, strategyCode, strategyName, brand, status, algoId));
     }
 
     /** 策略详情（含坑位明细 + 自然流量兜底算法，APP 按配置ID引用） */

@@ -261,19 +261,19 @@ SELECT 'PH00001', '盤活復蘇-團購版', 3, 'flashBee', 4, 4, 10,
 WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'PH00001' AND deleted = 0) t);
 
 -- ============================================================
--- 六、初始数据（幂等: 仅当不存在时插入）
--- 预置 1 条无敌星星算法示例, 便于端到端验证（后续可通过「算法库」菜单维护）
+-- 六、初始数据（已废弃，示例数据已迁移至 35_delete_wd00001_algo.sql 清理）
 -- ============================================================
-INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, slot_count, params, status, remark, updated_by)
-SELECT 'WD00001', '無敵星星-首頁黃金展位', 1, 'flashBee', 1, 1, 5,
-       JSON_OBJECT(
-           'recallDimension', 1,
-           'rankingStage', 2,
-           'bidMode', 2,
-           'timeSlot', 1,
-           'continuousPurchase', true,
-           'purchaseLimitDays', 12
-       ),
-       1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'WD00001' AND deleted = 0) t);
+-- [DELETED] 原無敵星星-首頁黃金展位示例数据已于 2026-08-13 删除
+-- INSERT INTO biz_ad_algorithm (algo_code, algo_name, algo_type, brand, channel, placement_interface, slot_count, params, status, remark, updated_by)
+-- SELECT 'WD00001', '無敵星星-首頁黃金展位', 1, 'flashBee', 1, 1, 5,
+--        JSON_OBJECT(
+--            'recallDimension', 1,
+--            'rankingStage', 2,
+--            'bidMode', 2,
+--            'timeSlot', 1,
+--            'continuousPurchase', true,
+--            'purchaseLimitDays', 12
+--        ),
+--        1, '系統預置示例算法', '系統'
+-- WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'WD00001' AND deleted = 0) t);
 

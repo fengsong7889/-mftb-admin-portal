@@ -45,12 +45,13 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
     private final BizSeqService bizSeqService;
 
     @Override
-    public PageResult<AdWaterfallVO> page(long page, long size, Long id, String strategyName,
-                                          String brand, Integer status, Long algoId) {
+    public PageResult<AdWaterfallVO> page(long page, long size, Long id, String strategyCode,
+                                          String strategyName, String brand, Integer status, Long algoId) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdWaterfall> wrapper = new LambdaQueryWrapper<>();
         if (id != null) wrapper.eq(AdWaterfall::getId, id);
+        if (StringUtils.hasText(strategyCode)) wrapper.like(AdWaterfall::getStrategyCode, strategyCode);
         if (StringUtils.hasText(strategyName)) wrapper.like(AdWaterfall::getStrategyName, strategyName);
         if (StringUtils.hasText(brand)) wrapper.eq(AdWaterfall::getBrand, brand);
         if (status != null) wrapper.eq(AdWaterfall::getStatus, status);

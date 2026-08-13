@@ -190,6 +190,7 @@ export default function RuleConfig() {
                         if (menu === '欠款對賬') return { label: '欠款', color: '#EB2F96' }
                         if (menu === '商戶集團管理') return { label: '門店', color: '#FA8C16' }
                         if (menu === '瀑布流配置') return { label: '策略', color: '#2F54EB' }
+                        if (menu === '銷售定價') return { label: '定價', color: '#E8720C' }
                         if (menu === '推廣贈送') return { label: '贈送', color: '#F5222D' }
                         if (menu === '員工管理' || menu === '組織管理' || menu === '職位管理') return { label: '人事', color: '#FAAD14' }
                         if (key.startsWith('ad_order_')) return { label: '訂單', color: '#1890FF' }

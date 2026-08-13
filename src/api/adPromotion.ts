@@ -153,6 +153,8 @@ export interface AdRegionPrice {
 /** 計價配置（與後端 AdPricingStarVO 對齊） */
 export interface AdPricingStar {
   id?: number
+  /** 定價編號（按編號生成規則 config_pricing_star 生成，如 DJWD20260812000） */
+  pricingNo?: string
   algoId: number
   algoName?: string
   brand?: AdBrand | string
@@ -461,6 +463,8 @@ export function cancelAdOrder(orderNo: string) {
 /** 盤活復蘇計價配置（與後端 AdPricingReviveVO 對齊） */
 export interface AdPricingRevive {
   id?: number
+  /** 定價編號（按編號生成規則 config_pricing_revive 生成，如 DJPH20260812000） */
+  pricingNo?: string
   algoId: number
   algoName?: string
   brand?: AdBrand | string
@@ -666,6 +670,8 @@ export interface AdHotSkinPrice {
 /** 人氣商家計價配置（與後端 AdPricingHotVO 對齊） */
 export interface AdPricingHot {
   id?: number
+  /** 定價編號（按編號生成規則 config_pricing_hot 生成，如 DJRQ20260812000） */
+  pricingNo?: string
   algoId: number
   algoName?: string
   brand?: AdBrand | string
@@ -818,6 +824,8 @@ export function placeAdHotOrder(data: AdHotOrderRequest) {
  */
 export interface WaterfallStrategy {
   id?: number
+  /** 策略编号（按编号生成规则 config_waterfall 生成，如 PB20260812000） */
+  strategyCode?: string
   strategyName: string
   brand?: AdBrand | string
   /** 自然流量兜底算法ID（未配置坑位讀取該算法數據） */
@@ -863,8 +871,10 @@ export interface WaterfallStrategyRequest {
 export interface WaterfallQuery {
   page?: number
   size?: number
-  /** 配置ID */
+  /** 配置ID（数据库主键） */
   id?: number
+  /** 策略编号（如 PB20260812000） */
+  strategyCode?: string
   strategyName?: string
   brand?: string
   status?: number

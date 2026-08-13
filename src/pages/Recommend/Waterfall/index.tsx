@@ -77,6 +77,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
 const toPricingRow = (vo: AdPricingStar, algoType: AlgorithmType): WaterfallSlotConfig => ({
   id: -(vo.id ?? 0),
   adId: `${algoType === AlgorithmType.HOT_REVIVE_AD ? 'RV' : algoType === AlgorithmType.POPULAR_MERCHANT_KA ? 'HT' : 'PR'}${String(vo.id ?? 0).padStart(6, '0')}`,
+  pricingNo: vo.pricingNo,
   promotionName: vo.algoName || '-',
   app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
   channel: (vo.channel ?? RecommendChannel.DELIVERY) as RecommendChannel,
@@ -249,9 +250,9 @@ export default function Waterfall() {
       allowed.includes(item.bizChannel ?? '')
     )
     
-    // 配置ID搜索
+    // 配置ID搜索（按定價編號 pricingNo 模糊匹配）
     if (values.adId) {
-      result = result.filter(item => item.adId?.includes(String(values.adId)))
+      result = result.filter(item => item.pricingNo?.includes(String(values.adId)))
     }
     
     // 瀑布流名称搜索
@@ -394,7 +395,7 @@ export default function Waterfall() {
 
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
-    { key: 'adId', title: t('waterfall.colConfigId') },
+    { key: 'pricingNo', title: t('waterfall.colConfigId') },
     { key: 'promotionName', title: t('waterfall.colAlgorithmName') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'bizChannel', title: t('waterfall.colBizChannel') },
@@ -412,10 +413,10 @@ export default function Waterfall() {
   const columns: ColumnsType<WaterfallSlotConfig> = [
     { 
       title: t('waterfall.colConfigId'),
-      dataIndex: 'adId',
-      key: 'adId',
-      width: 120,
-      render: (text: string) => <Tag color="blue">{text}</Tag>,
+      dataIndex: 'pricingNo',
+      key: 'pricingNo',
+      width: 180,
+      render: (text: string) => <Tag color="blue">{text || '-'}</Tag>,
     },
     { 
       title: t('waterfall.colAlgorithmName'),
