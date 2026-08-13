@@ -671,6 +671,20 @@ const filterMenusByPermission = (
     .filter((item): item is MenuItem => item !== null)
 }
 
+/** 遞歸查找目標 key 的所有祖先 key（從根到父，不含自身） */
+const findAncestorKeys = (items: MenuItem[], targetKey: string, path: string[] = []): string[] => {
+  for (const item of items) {
+    if (!item) continue
+    if (item.key === targetKey) return path
+    const children = (item as MenuItem & { children?: MenuItem[] }).children
+    if (children?.length) {
+      const found = findAncestorKeys(children, targetKey, [...path, String(item.key)])
+      if (found.length > 0) return found
+    }
+  }
+  return []
+}
+
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -680,6 +694,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const [pwdValue, setPwdValue] = useState('')
   const [_pendingKey, setPendingKey] = useState<string>('')
   const [menuTree, setMenuTree] = useState<MenuVO[] | null>(null)
+  const [openKeys, setOpenKeys] = useState<string[]>([])
 
   /** 加载后端菜单树（名称/层级/排序与数据库实时同步）；加载失败时降级使用内置菜单 */
   useEffect(() => {
@@ -706,6 +721,17 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
       ? (new URLSearchParams(location.search).get('from') === 'ad-sales' ? 'ad-sales' : 'promotion-sales-config')
     : (pathToKey[location.pathname] || 'home')
+
+  /** 路由變化時自動展開對應的父級菜單（刷新/直接跳轉均生效） */
+  useEffect(() => {
+    const ancestors = findAncestorKeys(visibleMenuItems, selectedKey)
+    if (ancestors.length > 0) {
+      setOpenKeys((prev) => {
+        const merged = new Set([...prev, ...ancestors])
+        return [...merged]
+      })
+    }
+  }, [selectedKey, visibleMenuItems])
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (noPageKeys.has(key)) {
@@ -767,7 +793,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         items={visibleMenuItems}
         onClick={handleMenuClick}
         selectedKeys={[selectedKey]}
-        defaultOpenKeys={[]}
+        openKeys={collapsed ? [] : openKeys}
+        onOpenChange={setOpenKeys}
         className="sidebar-menu"
       />
       <Modal
