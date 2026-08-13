@@ -3,6 +3,7 @@ import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, mess
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -261,7 +262,7 @@ export default function RoleManagement() {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 170,
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     {
       title: t('roleManagement.colUpdatedBy'),
@@ -275,7 +276,7 @@ export default function RoleManagement() {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     {
       title: t('common.colAction'),

@@ -26,7 +26,6 @@ const DELIVERY_CARD_TYPES: AlgorithmType[] = [
   AlgorithmType.HOT_REVIVE_AD,
   AlgorithmType.NEW_STORE_AD,
   AlgorithmType.TRAFFIC_AD,
-  AlgorithmType.ORGANIC_TRAFFIC,
   AlgorithmType.POPULAR_MERCHANT_KA,
 ]
 const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [

@@ -14,11 +14,11 @@ import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.service.RoleService;
+import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.JwtUtil;
 import com.mftb.admin.util.NetworkUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -46,10 +46,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleService roleService;
     private final DepartmentService departmentService;
     private final LoginLogService loginLogService;
-
-    /** 空闲超时时间（毫秒），与 JwtAuthenticationFilter 保持一致 */
-    @Value("${session.idle-timeout:3600000}")
-    private long idleTimeout;
+    private final SysConfigService sysConfigService;
 
     /** 登录失败频率限制: 同一账号 15 分钟内最多 5 次失败 */
     private static final int MAX_LOGIN_ATTEMPTS = 5;
@@ -155,10 +152,10 @@ public class AuthServiceImpl implements AuthService {
             data.put("loginLocation", "");
             return SessionCheckResult.fail(401, "您的账号已在其他设备登录", data);
         }
-        // 空闲超时
+        // 空闲超时（从 DB 动态读取管理员配置的值）
         if (user.getLastActiveAt() != null) {
             long idleMs = java.time.Duration.between(user.getLastActiveAt(), LocalDateTime.now()).toMillis();
-            if (idleMs > idleTimeout) {
+            if (idleMs > sysConfigService.getSessionIdleTimeoutMs()) {
                 return SessionCheckResult.fail(ResultCode.SESSION_IDLE_TIMEOUT.getCode(), "您已长时间未操作，会话已过期", null);
             }
         }

@@ -10,7 +10,7 @@ import {
   CloseOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { useSystemRules } from '../../hooks/useSystemRules'
+import { useSystemRules, syncIdleTimeoutToBackend } from '../../hooks/useSystemRules'
 import type { RuleItem, RuleGroup } from '../../constants/ruleConfig'
 
 /** 廣告類型子分組顯示名稱與配色 */
@@ -40,7 +40,18 @@ export default function RuleConfig() {
     setEditingGroups(prev => ({ ...prev, [groupKey]: false }))
     delete snapshotRef.current[groupKey]
     message.success('規則配置已保存')
-  }, [saveAll])
+
+    // 系統安全規則保存時，同步空閒超時到後端 DB
+    if (groupKey === 'system_security') {
+      const group = groups.find(g => g.key === 'system_security')
+      const timeoutRule = group?.rules.find(r => r.key === 'session_idle_timeout_minutes')
+      if (timeoutRule && typeof timeoutRule.value === 'number') {
+        syncIdleTimeoutToBackend(timeoutRule.value).catch(() => {
+          message.warning('本地已保存，但同步後端失敗，請檢查網絡後重試')
+        })
+      }
+    }
+  }, [saveAll, groups])
 
   const handleCancel = useCallback((groupKey: string) => {
     try {

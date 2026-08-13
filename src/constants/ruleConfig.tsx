@@ -284,6 +284,9 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'algo_guess', label: '猜你喜歡算法ID', type: 'table', value: 'SFXH', defaultValue: 'SFXH', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'SFXH20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '算法庫' },
       { key: 'algo_organic', label: '自然流量算法ID', type: 'table', value: 'SFZR', defaultValue: 'SFZR', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'SFZR20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '算法庫' },
       { key: 'algo_brand', label: '品牌商家算法ID', type: 'table', value: 'SFPP', defaultValue: 'SFPP', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'SFPP20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_gold', label: '點金廣告算法ID', type: 'table', value: 'SFJD', defaultValue: 'SFJD', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'SFJD20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_signboard', label: '金字招牌算法ID', type: 'table', value: 'SFJZ', defaultValue: 'SFJZ', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'SFJZ20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '算法庫' },
+      { key: 'algo_promo', label: '商品促銷算法ID', type: 'table', value: 'SFSP', defaultValue: 'SFSP', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'SFSP20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '算法庫' },
       /* ── 瀑布流配置 ── */
       { key: 'config_waterfall', label: '瀑布流策略', type: 'table', value: 'PB', defaultValue: 'PB', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'PB20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '瀑布流配置' },
       /* ── 廣告銷售 ── */

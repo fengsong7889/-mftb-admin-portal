@@ -23,7 +23,6 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.TRAFFIC_AD,
     AlgorithmType.GUESS_YOU_LIKE,
     AlgorithmType.ORGANIC_TRAFFIC,
-    AlgorithmType.SEARCH_ALGORITHM,
     AlgorithmType.GOLDEN_SIGNBOARD,
     AlgorithmType.PRODUCT_PROMO,
   ],
@@ -88,7 +87,6 @@ export default function Algorithm() {
     [AlgorithmType.TRAFFIC_AD]: t('algorithm.typeTraffic'),
     [AlgorithmType.GUESS_YOU_LIKE]: t('algorithm.typeGuessYouLike'),
     [AlgorithmType.ORGANIC_TRAFFIC]: t('algorithm.typeOrganicTraffic'),
-    [AlgorithmType.SEARCH_ALGORITHM]: t('algorithm.typeSearchAlgorithm'),
     [AlgorithmType.BRAND_MERCHANT]: t('algorithm.typeBrandMerchant'),
     [AlgorithmType.GOLD_AD]: t('algorithm.typeGoldAd'),
     [AlgorithmType.GOLDEN_SIGNBOARD]: t('algorithm.typeGoldenSignboard'),
@@ -106,7 +104,6 @@ export default function Algorithm() {
     { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
     { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: t('algorithm.descGuessYouLike') },
     { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
-    { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: t('algorithm.descSearchAlgorithm') },
     { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
     { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: t('algorithm.descProductPromo') },
   ]

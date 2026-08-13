@@ -85,6 +85,7 @@ import {
   MergeCellsOutlined,
   ExpandAltOutlined,
   ShrinkOutlined,
+  BranchesOutlined,
 } from '@ant-design/icons'
 
 /** 菜单可用图标注册表：图标名称 → 组件（数据库 icon 字段存储名称字符串） */
@@ -170,6 +171,7 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'MergeCellsOutlined': MergeCellsOutlined,
   'ExpandAltOutlined': ExpandAltOutlined,
   'ShrinkOutlined': ShrinkOutlined,
+  'BranchesOutlined': BranchesOutlined,
 }
 
 /** 全部可用图标名称（用于图标选择器） */

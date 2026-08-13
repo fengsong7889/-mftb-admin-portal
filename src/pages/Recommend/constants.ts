@@ -48,7 +48,6 @@ export enum AlgorithmType {
   TRAFFIC_AD = 15,        // 流量广告（後端未定義，前端預留）
   GUESS_YOU_LIKE = 6,     // 猜你喜欢
   ORGANIC_TRAFFIC = 7,    // 自然流量
-  SEARCH_ALGORITHM = 9,   // 搜索算法
   POPULAR_MERCHANT_KA = 5, // 人气商家
   BRAND_MERCHANT = 11,       // 品牌商家(KA)
   GOLD_AD = 12,              // 点金广告
@@ -64,7 +63,6 @@ export const ALGORITHM_TYPE_OPTIONS = [
   { labelKey: 'recommend.algoTrafficAd', value: AlgorithmType.TRAFFIC_AD },
   { labelKey: 'recommend.algoGuessYouLike', value: AlgorithmType.GUESS_YOU_LIKE },
   { labelKey: 'recommend.algoOrganicTraffic', value: AlgorithmType.ORGANIC_TRAFFIC },
-  { labelKey: 'recommend.algoSearchAlgorithm', value: AlgorithmType.SEARCH_ALGORITHM },
   { labelKey: 'recommend.algoPopularMerchant', value: AlgorithmType.POPULAR_MERCHANT_KA },
   { labelKey: 'recommend.algoBrandMerchant', value: AlgorithmType.BRAND_MERCHANT },
   { labelKey: 'recommend.algoGoldAd', value: AlgorithmType.GOLD_AD },
@@ -81,7 +79,6 @@ export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.TRAFFIC_AD]: 'cyan',
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
-  [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
   [AlgorithmType.POPULAR_MERCHANT_KA]: 'geekblue',
   [AlgorithmType.BRAND_MERCHANT]: 'orange',
   [AlgorithmType.GOLD_AD]: 'yellow',

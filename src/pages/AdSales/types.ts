@@ -120,13 +120,6 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     enabled: false,
   },
   {
-    type: AlgorithmType.ORGANIC_TRAFFIC,
-    name: '自然流量',
-    icon: '🌿',
-    description: '自然流量曝光，提升店鋪基礎流量',
-    enabled: false,
-  },
-  {
     type: AlgorithmType.EXCLUSIVE_MERCHANT,
     name: '獨家商家',
     icon: '👑',
@@ -202,7 +195,6 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
     [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
     [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
     [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
-    [AlgorithmType.SEARCH_ALGORITHM]: '搜索算法',
     [AlgorithmType.POPULAR_MERCHANT_KA]: '人氣商家',
     [AlgorithmType.BRAND_MERCHANT]: '品牌商家(KA)',
     [AlgorithmType.GOLD_AD]: '點金廣告',

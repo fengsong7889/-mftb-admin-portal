@@ -193,7 +193,7 @@ export default function PopularSkinPricing() {
   // 購買多天折扣配置（梯度）
   const [gradientEnabled, setGradientEnabled] = useState(false)
   const [gradients, setGradients] = useState<DayDiscountGradient[]>([])
-  // 預售天數（銷售策略，與無敵星星/盤活復蘇保持一致）：限制商家最多可購買未來幾天內的皮膚推廣
+  // 上線天數（銷售策略，與無敵星星/盤活復蘇保持一致）：限制商家最多可購買未來幾天內的皮膚推廣
   const [presaleDays, setPresaleDays] = useState<number>(7)
   // 退費比例配置：人氣商家默認不允許退款（與訂單側業務規則一致），開啟後可配置退費比例梯度
   const [refundEnabled, setRefundEnabled] = useState(false)
@@ -255,7 +255,7 @@ export default function PopularSkinPricing() {
           app: appValue ?? APP_OPTIONS[0]?.value,
           channel: data.channel ?? channelOptions[0]?.value,
         })
-        // 回填預售天數
+        // 回填上線天數
         if (data.presaleDays) setPresaleDays(data.presaleDays)
         // 回填退款開關
         setRefundEnabled(data.refundEnabled === 1)
@@ -796,7 +796,7 @@ export default function PopularSkinPricing() {
           </Form.Item>
         </div>
 
-        {/* 銷售策略：預售天數（與無敵星星/盤活復蘇定價保持一致，限制廣告銷售可購買的天數範圍） */}
+        {/* 銷售策略：上線天數（與無敵星星/盤活復蘇定價保持一致，限制廣告銷售可購買的天數範圍） */}
         <div style={cardShellStyle}>
           {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', t('recommend:popularSkin.salesStrategyCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>

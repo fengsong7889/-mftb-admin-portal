@@ -9,7 +9,6 @@ import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import MenuPermissionGuard from './components/MenuPermissionGuard'
-import { useIdleTimeout } from './hooks/useIdleTimeout'
 import './App.css'
 
 /* 懒加载所有页面组件，避免启动时一次性加载所有模块 */
@@ -89,6 +88,10 @@ const MapPlanning = lazy(() => import('./pages/MapPlanning'))
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
+// 審批流程配置
+const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
+const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
+const WorkflowDetail = lazy(() => import('./pages/WorkflowConfig/WorkflowDetail'))
 
 const { Content } = Layout
 
@@ -106,9 +109,6 @@ function PageLoading() {
 function AuthenticatedLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
-
-  // 空闲超时自动登出
-  useIdleTimeout()
 
   return (
     <Layout className="app-layout">
@@ -200,6 +200,10 @@ function AuthenticatedLayout() {
               <Route path="/menu-config" element={<MenuConfig />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
               <Route path="/rule-config" element={<RuleConfig />} />
+              {/* 審批流程配置 */}
+              <Route path="/workflow-config" element={<WorkflowConfig />} />
+              <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />
+              <Route path="/workflow-config/:id" element={<WorkflowEditor />} />
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* PRD需求查看 */}

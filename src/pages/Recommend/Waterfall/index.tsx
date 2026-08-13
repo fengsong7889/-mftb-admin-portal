@@ -30,13 +30,8 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.INVINCIBLE_STAR,
     AlgorithmType.HOT_REVIVE_AD,
     AlgorithmType.POPULAR_MERCHANT_KA,
-    AlgorithmType.EXCLUSIVE_MERCHANT,
     AlgorithmType.TRAFFIC_AD,
-    AlgorithmType.GUESS_YOU_LIKE,
-    AlgorithmType.ORGANIC_TRAFFIC,
-    AlgorithmType.SEARCH_ALGORITHM,
     AlgorithmType.GOLDEN_SIGNBOARD,
-    AlgorithmType.PRODUCT_PROMO,
   ],
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
@@ -66,7 +61,6 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.TRAFFIC_AD]: 'cyan',
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
-  [AlgorithmType.SEARCH_ALGORITHM]: 'magenta',
   [AlgorithmType.BRAND_MERCHANT]: 'orange',
   [AlgorithmType.GOLD_AD]: 'gold',
   [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
@@ -120,13 +114,8 @@ export default function Waterfall() {
     { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: t('algorithm.descInvincibleStar') },
     { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: t('algorithm.descHotRevive') },
     { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: t('waterfall.descPopularMerchant') },
-    { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: t('algorithm.descExclusiveMerchant') },
     { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
-    { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: t('algorithm.descGuessYouLike') },
-    { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
-    { type: AlgorithmType.SEARCH_ALGORITHM, icon: '🔍', description: t('algorithm.descSearchAlgorithm') },
     { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
-    { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: t('algorithm.descProductPromo') },
   ]
 
   /** 算法类型标签映射（复用 algorithm 命名空间，依赖 t，定义在组件内以便响应语言切换） */
@@ -139,7 +128,6 @@ export default function Waterfall() {
     [AlgorithmType.TRAFFIC_AD]: t('algorithm.typeTraffic'),
     [AlgorithmType.GUESS_YOU_LIKE]: t('algorithm.typeGuessYouLike'),
     [AlgorithmType.ORGANIC_TRAFFIC]: t('algorithm.typeOrganicTraffic'),
-    [AlgorithmType.SEARCH_ALGORITHM]: t('algorithm.typeSearchAlgorithm'),
     [AlgorithmType.BRAND_MERCHANT]: t('algorithm.typeBrandMerchant'),
     [AlgorithmType.GOLD_AD]: t('algorithm.typeGoldAd'),
     [AlgorithmType.GOLDEN_SIGNBOARD]: t('algorithm.typeGoldenSignboard'),

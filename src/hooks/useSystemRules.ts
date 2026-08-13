@@ -2,7 +2,7 @@
  * 通用系統規則 Hook
  *
  * 提供規則的讀取、更新、重置、持久化能力。
- * 存儲後端：localStorage（後續可替換為後端 API）。
+ * 存儲後端：localStorage（主要）+ 後端 DB（系統安全規則同步）。
  */
 import { useState, useCallback, useMemo } from 'react'
 import {
@@ -11,6 +11,7 @@ import {
   type RuleGroup,
   type RuleItem,
 } from '../constants/ruleConfig'
+import { updateSystemConfig } from '../api/systemConfig'
 
 /* ==================== 工具函數 ==================== */
 
@@ -133,6 +134,18 @@ export function useSystemRules() {
   }, [groups])
 
   return { groups, updateRule, refresh, resetAll, saveAll, getRuleValue, valueMap }
+}
+
+/* ==================== 後端同步（系統安全規則） ==================== */
+
+/**
+ * 將空閒超時配置同步到後端 DB（分鐘 → 毫秒轉換）
+ * 供 RuleConfig 頁面保存「系統安全規則」時調用
+ * @returns Promise，成功時 resolve，失敗時 reject（調用方決定是否提示用戶）
+ */
+export async function syncIdleTimeoutToBackend(minutes: number): Promise<void> {
+  const ms = String(minutes * 60 * 1000)
+  await updateSystemConfig('session_idle_timeout_ms', ms)
 }
 
 /* ==================== 同步讀取（供非組件場景使用） ==================== */

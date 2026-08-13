@@ -3,6 +3,7 @@ import { Button, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Tree, TreeS
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import type { DataNode } from 'antd/es/tree'
 import type { MenuPermission } from '../types'
 import { menuPermissionTree, getMenuActions } from '../types'
@@ -335,7 +336,7 @@ export default function FunctionPermission() {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
@@ -350,7 +351,7 @@ export default function FunctionPermission() {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]

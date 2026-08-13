@@ -51,6 +51,7 @@ import {
   SolutionOutlined,
   ScheduleOutlined,
   MenuOutlined,
+  BranchesOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -165,6 +166,7 @@ const keyToPath: Record<string, string> = {
   'menu-config': '/menu-config',
   'translation-manage': '/translation-manage',
   'rule-config': '/rule-config',
+  'workflow-config': '/workflow-config',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -540,6 +542,11 @@ const menuItems: MenuItem[] = [
         icon: <SwapOutlined />,
         label: '規則配置',
       },
+      {
+        key: 'workflow-config',
+        icon: <BranchesOutlined />,
+        label: '流程配置',
+      },
     ],
   },
 
@@ -616,6 +623,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'menu-config': <MenuOutlined />,
   'translation-manage': <GlobalOutlined />,
   'rule-config': <SwapOutlined />,
+  'workflow-config': <ApartmentOutlined />,
 }
 
 /** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */
@@ -717,6 +725,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
     // 充值頁面：高亮「賬戶餘額」
     : location.pathname === '/recharge-add' ? 'account-balance'
+    // 審批流程編輯頁：高亮「審批流程」
+    : location.pathname.startsWith('/workflow-config/') ? 'workflow-config'
     // 訂單列表 / 訂單詳情：按來源高亮（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）
     : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
       ? (new URLSearchParams(location.search).get('from') === 'ad-sales' ? 'ad-sales' : 'promotion-sales-config')

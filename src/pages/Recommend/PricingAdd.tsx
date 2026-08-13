@@ -33,7 +33,6 @@ const ALGORITHM_OPTIONS = [
   { labelKey: 'recommend.algoTrafficAd', value: AlgorithmType.TRAFFIC_AD },
   { labelKey: 'recommend.algoGuessYouLike', value: AlgorithmType.GUESS_YOU_LIKE },
   { labelKey: 'recommend.algoOrganicTraffic', value: AlgorithmType.ORGANIC_TRAFFIC },
-  { labelKey: 'recommend.algoSearchAlgorithm', value: AlgorithmType.SEARCH_ALGORITHM },
 ]
 
 // 商圈枚举
@@ -87,7 +86,7 @@ const mockData: PricingRecord[] = [
   },
   { id: 6, app: AppType.SHANFENG, channel: RecommendChannel.DELIVERY, slotIndex: 3, algorithmType: AlgorithmType.EXCLUSIVE_MERCHANT, region: '澳門', dailyPrice: 2200, minDays: 7, discountTiers: '30天8折', status: ServiceStatus.DISABLED },
   { id: 7, app: AppType.MFOOD, channel: RecommendChannel.HOME, slotIndex: 3, algorithmType: AlgorithmType.ORGANIC_TRAFFIC, region: '珠海', dailyPrice: 800, minDays: 1, discountTiers: '无折扣', status: ServiceStatus.ENABLED },
-  { id: 8, app: AppType.SHANFENG, channel: RecommendChannel.SUPERMARKET, slotIndex: 1, algorithmType: AlgorithmType.SEARCH_ALGORITHM, region: '澳門', dailyPrice: 1600, minDays: 3, discountTiers: '7天9折', status: ServiceStatus.ENABLED },
+  { id: 8, app: AppType.SHANFENG, channel: RecommendChannel.SUPERMARKET, slotIndex: 1, algorithmType: AlgorithmType.GUESS_YOU_LIKE, region: '澳門', dailyPrice: 1600, minDays: 3, discountTiers: '7天9折', status: ServiceStatus.ENABLED },
   { id: 9, app: AppType.MFOOD, channel: RecommendChannel.DELIVERY, slotIndex: 2, algorithmType: AlgorithmType.INVINCIBLE_STAR, region: '氹仔', dailyPrice: 2000, minDays: 7, discountTiers: '15天85折 / 30天75折', status: ServiceStatus.ENABLED },
   { id: 10, app: AppType.SHANFENG, channel: RecommendChannel.GROUP_BUY, slotIndex: 2, algorithmType: AlgorithmType.TRAFFIC_AD, region: '澳門', dailyPrice: 1400, minDays: 5, discountTiers: '30天8折', status: ServiceStatus.ENABLED },
   { id: 11, app: AppType.MFOOD, channel: RecommendChannel.HOME, slotIndex: 4, algorithmType: AlgorithmType.GUESS_YOU_LIKE, region: '珠海', dailyPrice: 2600, minDays: 7, discountTiers: '7天9折 / 30天8折', status: ServiceStatus.ENABLED },
@@ -99,7 +98,7 @@ const mockData: PricingRecord[] = [
     ]
   },
   { id: 14, app: AppType.SHANFENG, channel: RecommendChannel.HOME, slotIndex: 5, algorithmType: AlgorithmType.EXCLUSIVE_MERCHANT, region: '澳門', dailyPrice: 3000, minDays: 7, discountTiers: '15天8折 / 30天7折', status: ServiceStatus.ENABLED },
-  { id: 15, app: AppType.MFOOD, channel: RecommendChannel.DELIVERY, slotIndex: 4, algorithmType: AlgorithmType.SEARCH_ALGORITHM, region: '珠海', dailyPrice: 1700, minDays: 3, discountTiers: '7天9折', status: ServiceStatus.ENABLED },
+  { id: 15, app: AppType.MFOOD, channel: RecommendChannel.DELIVERY, slotIndex: 4, algorithmType: AlgorithmType.GUESS_YOU_LIKE, region: '珠海', dailyPrice: 1700, minDays: 3, discountTiers: '7天9折', status: ServiceStatus.ENABLED },
 ]
 
 export default function PricingAdd() {

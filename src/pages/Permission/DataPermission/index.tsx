@@ -3,6 +3,7 @@ import { Button, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, TreeSelect,
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import type { DataTargetType } from '../types'
 import { DATA_TARGET_TYPE } from '../types'
 import { DEPT_STATUS } from '../../../api/department'
@@ -348,7 +349,7 @@ export default function DataPermission() {
       dataIndex: 'latestUpdatedAt',
       key: 'latestUpdatedAt',
       width: 170,
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
@@ -364,7 +365,7 @@ export default function DataPermission() {
       dataIndex: 'latestUpdatedAt',
       key: 'latestUpdatedAt',
       width: 170,
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-TW', { hour12: false }) : '-'),
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
@@ -546,7 +547,7 @@ export default function DataPermission() {
             </div>
             <div className="data-auth-field">
               <span className="data-auth-label">{t('dataPermission.colUpdatedAt')}</span>
-              <span>{detailGroup.latestUpdatedAt ? new Date(detailGroup.latestUpdatedAt).toLocaleString('zh-TW', { hour12: false }) : '-'}</span>
+              <span>{detailGroup.latestUpdatedAt ? dayjs(detailGroup.latestUpdatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
             </div>
           </>
         )}

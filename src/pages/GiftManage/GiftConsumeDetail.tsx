@@ -280,7 +280,8 @@ export default function GiftConsumeDetail() {
       title: t('colChangeDate'),
       dataIndex: 'changeDate',
       key: 'changeDate',
-      width: 120,
+      width: 170,
+      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     {
       title: t('colAlgorithmInfo'),
@@ -515,7 +516,7 @@ export default function GiftConsumeDetail() {
           showQuickJumper: true,
           showTotal: (total) => t('common:total', { count: total }),
         }}
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1550 }}
       />
     </div>
   )

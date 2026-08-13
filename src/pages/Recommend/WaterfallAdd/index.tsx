@@ -57,7 +57,6 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.TRAFFIC_AD]: '📊',
   [AlgorithmType.GUESS_YOU_LIKE]: '💡',
   [AlgorithmType.ORGANIC_TRAFFIC]: '🌿',
-  [AlgorithmType.SEARCH_ALGORITHM]: '🔍',
 }
 
 // 可選算法列表（從後端算法庫動態加載，不再使用本地 Mock）

@@ -30,12 +30,12 @@ const SEED_GIFTS: GiftRecordItem[] = [
 ]
 
 const SEED_CONSUMES: GiftConsumeItem[] = [
-  { id: 1, giftRecordId: 1, giftId: '2401-001', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 1, storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', adType: 'new_store', tradeType: 'ad_purchase', balanceChange: -5, changeDate: '2025-01-20', algorithmId: 'ALG001', algorithmName: '新店首推算法', orderNo: 'ORD20250120001', remainingDays: 85, remark: '購買廣告扣減', createdAt: '2025-01-20 10:00:00' },
-  { id: 2, giftRecordId: 1, giftId: '2401-001', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 1, storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', adType: 'new_store', tradeType: 'ad_purchase', balanceChange: -7, changeDate: '2025-02-05', algorithmId: 'ALG002', algorithmName: '精準推薦算法', orderNo: 'ORD20250205001', remainingDays: 78, remark: '購買廣告扣減', createdAt: '2025-02-05 14:30:00' },
-  { id: 3, giftRecordId: 2, giftId: '2401-002', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 2, storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', adType: 'revival', tradeType: 'ad_purchase', balanceChange: -10, changeDate: '2025-02-20', algorithmId: 'ALG003', algorithmName: '盤活復蘇算法', orderNo: 'ORD20250220001', remainingDays: 50, remark: '購買廣告扣減', createdAt: '2025-02-20 11:00:00' },
-  { id: 4, giftRecordId: 2, giftId: '2401-002', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 2, storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', adType: 'revival', tradeType: 'manual_deduct', balanceChange: -20, changeDate: '2025-03-10', algorithmId: 'ALG003', algorithmName: '盤活復蘇算法', orderNo: 'ORD20250310001', remainingDays: 30, remark: '運營手動扣除', createdAt: '2025-03-10 15:00:00' },
-  { id: 5, giftRecordId: 4, giftId: '2401-004', groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeId: 4, storeCode: 'MD00004', storeName: '珠海百貨·香洲店', brand: 'mFood', adType: 'gold', tradeType: 'ad_purchase', balanceChange: -45, changeDate: '2025-04-20', algorithmId: 'ALG004', algorithmName: '金牌商家算法', orderNo: 'ORD20250420001', remainingDays: 0, remark: '購買廣告扣減', createdAt: '2025-04-20 09:00:00' },
-  { id: 6, giftRecordId: 5, giftId: '2401-005', groupId: 3, groupCode: 'JT000003', groupName: '氹仔美食廣場集團', storeId: 5, storeCode: 'MD00005', storeName: '美食廣場·官也街店', brand: 'mFood', adType: 'ka', tradeType: 'ad_purchase', balanceChange: -5, changeDate: '2025-06-01', algorithmId: 'ALG005', algorithmName: '人氣商家算法', orderNo: 'ORD20250601001', remainingDays: 25, remark: '購買廣告扣減', createdAt: '2025-06-01 10:00:00' },
+  { id: 1, giftRecordId: 1, giftId: '2401-001', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 1, storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', adType: 'new_store', tradeType: 'ad_purchase', balanceChange: -5, changeDate: '2025-01-20 10:30:00', algorithmId: 'ALG001', algorithmName: '新店首推算法', orderNo: 'ORD20250120001', remainingDays: 85, remark: '購買廣告扣減', createdAt: '2025-01-20 10:00:00' },
+  { id: 2, giftRecordId: 1, giftId: '2401-001', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 1, storeCode: 'MD00001', storeName: '豪華軒·新馬路店', brand: 'flashBee', adType: 'new_store', tradeType: 'ad_purchase', balanceChange: -7, changeDate: '2025-02-05 14:20:00', algorithmId: 'ALG002', algorithmName: '精準推薦算法', orderNo: 'ORD20250205001', remainingDays: 78, remark: '購買廣告扣減', createdAt: '2025-02-05 14:30:00' },
+  { id: 3, giftRecordId: 2, giftId: '2401-002', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 2, storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', adType: 'revival', tradeType: 'ad_purchase', balanceChange: -10, changeDate: '2025-02-20 11:15:00', algorithmId: 'ALG003', algorithmName: '盤活復蘇算法', orderNo: 'ORD20250220001', remainingDays: 50, remark: '購買廣告扣減', createdAt: '2025-02-20 11:00:00' },
+  { id: 4, giftRecordId: 2, giftId: '2401-002', groupId: 1, groupCode: 'JT000001', groupName: '澳門豪華餐飲集團', storeId: 2, storeCode: 'MD00002', storeName: '豪華軒·氹仔店', brand: 'mFood', adType: 'revival', tradeType: 'manual_deduct', balanceChange: -20, changeDate: '2025-03-10 15:45:00', algorithmId: 'ALG003', algorithmName: '盤活復蘇算法', orderNo: 'ORD20250310001', remainingDays: 30, remark: '運營手動扣除', createdAt: '2025-03-10 15:00:00' },
+  { id: 5, giftRecordId: 4, giftId: '2401-004', groupId: 2, groupCode: 'JT000002', groupName: '珠海百貨連鎖集團', storeId: 4, storeCode: 'MD00004', storeName: '珠海百貨·香洲店', brand: 'mFood', adType: 'gold', tradeType: 'ad_purchase', balanceChange: -45, changeDate: '2025-04-20 09:30:00', algorithmId: 'ALG004', algorithmName: '金牌商家算法', orderNo: 'ORD20250420001', remainingDays: 0, remark: '購買廣告扣減', createdAt: '2025-04-20 09:00:00' },
+  { id: 6, giftRecordId: 5, giftId: '2401-005', groupId: 3, groupCode: 'JT000003', groupName: '氹仔美食廣場集團', storeId: 5, storeCode: 'MD00005', storeName: '美食廣場·官也街店', brand: 'mFood', adType: 'ka', tradeType: 'ad_purchase', balanceChange: -5, changeDate: '2025-06-01 10:20:00', algorithmId: 'ALG005', algorithmName: '人氣商家算法', orderNo: 'ORD20250601001', remainingDays: 25, remark: '購買廣告扣減', createdAt: '2025-06-01 10:00:00' },
 ]
 
 function initMockData() {
@@ -69,7 +69,7 @@ function now(): string {
 }
 
 function today(): string {
-  return now().slice(0, 10)
+  return now()
 }
 
 function currentOperator(): string {
@@ -84,7 +84,7 @@ function currentOperator(): string {
 function inDateRange(value: string | undefined, from?: string, to?: string): boolean {
   if (!from && !to) return true
   if (!value) return false
-  const day = value.slice(0, 10)
+  const day = value.replace(/\//g, '-').slice(0, 10)
   if (from && day < from) return false
   if (to && day > to) return false
   return true

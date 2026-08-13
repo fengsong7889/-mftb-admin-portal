@@ -11,11 +11,11 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysLoginLogMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.LoginLogService;
+import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.NetworkUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,10 +39,7 @@ public class LoginLogServiceImpl implements LoginLogService {
 
     private final SysLoginLogMapper loginLogMapper;
     private final SysUserMapper sysUserMapper;
-
-    /** 空闲超时时间（毫秒），与 JwtAuthenticationFilter 保持一致 */
-    @Value("${session.idle-timeout:3600000}")
-    private Long sessionIdleTimeout;
+    private final SysConfigService sysConfigService;
 
     @Override
     @Transactional
@@ -88,8 +85,8 @@ public class LoginLogServiceImpl implements LoginLogService {
     @Transactional
     @Scheduled(fixedRate = 60000) // 每 60 秒执行一次，由定时任务驱动而非每次请求触发
     public void markTimeoutSessions() {
-        // 使用空闲超时阈值标记离线会话
-        LocalDateTime threshold = LocalDateTime.now().minus(Duration.ofMillis(sessionIdleTimeout));
+        // 使用空闲超时阈值标记离线会话（从 DB 动态读取管理员配置的值）
+        LocalDateTime threshold = LocalDateTime.now().minus(Duration.ofMillis(sysConfigService.getSessionIdleTimeoutMs()));
 
         // 查找所有在线记录（logoutTime 为 NULL）
         List<SysLoginLog> onlineSessions = loginLogMapper.selectList(
@@ -126,8 +123,8 @@ public class LoginLogServiceImpl implements LoginLogService {
 
             // 用户确实已不活跃，标记为超时退出
             LocalDateTime actualTimeout = user.getLastActiveAt() != null
-                    ? user.getLastActiveAt().plus(Duration.ofMillis(sessionIdleTimeout))
-                    : session.getLoginTime().plus(Duration.ofMillis(sessionIdleTimeout));
+                    ? user.getLastActiveAt().plus(Duration.ofMillis(sysConfigService.getSessionIdleTimeoutMs()))
+                    : session.getLoginTime().plus(Duration.ofMillis(sysConfigService.getSessionIdleTimeoutMs()));
             session.setLogoutTime(actualTimeout);
             session.setLogoutReason("timeout");
             loginLogMapper.updateById(session);
