@@ -13,15 +13,18 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RechargeApplyDTO;
 import com.mftb.admin.dto.StoreAmountDTO;
 import com.mftb.admin.dto.TransferApplyDTO;
+import com.mftb.admin.entity.BizGiftRecord;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinApproval;
 import com.mftb.admin.entity.FinDebtBill;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.FinApprovalMapper;
 import com.mftb.admin.mapper.FinDebtBillMapper;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinApprovalService;
 import com.mftb.admin.service.FinWriteChainService;
+import com.mftb.admin.service.WorkflowConfigService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.FinExtras;
 import com.mftb.admin.util.JsonUtils;
@@ -63,10 +66,12 @@ public class FinApprovalServiceImpl implements FinApprovalService {
 
     private final FinApprovalMapper approvalMapper;
     private final FinDebtBillMapper debtBillMapper;
+    private final BizGiftRecordMapper giftRecordMapper;
     private final FinAccountService accountService;
     private final FinWriteChainService writeChainService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
+    private final WorkflowConfigService workflowConfigService;
 
     /* ==================== 查询 ==================== */
 
@@ -168,7 +173,48 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         extra.put("bd", StringUtils.hasText(request.getBd()) ? request.getBd() : FinExtras.DASH);
         extra.put("remark", request.getRemark() == null ? "" : request.getRemark());
 
+        if (!workflowConfigService.isApprovalEnabled("recharge")) {
+            return createApprovalDirect("recharge", request.getGroupId(), request.getGroupName(), request.getBrand(), extra);
+        }
         return createApproval("recharge", request.getGroupId(), request.getGroupName(), request.getBrand(), extra);
+    }
+
+    /** 审批停用时直接执行：创建已通过的审批记录并写入业务数据 */
+    private String createApprovalDirect(String approvalType, String groupCode, String groupName,
+                                        String brand, Map<String, Object> extra) {
+        SysUser current = operatorResolver.currentUser();
+        String flowRuleKey = BizSeqService.flowRuleKey(approvalType);
+        if (flowRuleKey == null) {
+            throw new BusinessException("未知的审批类型: " + approvalType);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        String approver = operatorResolver.operatorSignature(current);
+
+        FinApproval approval = new FinApproval();
+        approval.setFlowNo(bizSeqService.next(flowRuleKey));
+        approval.setApprovalType(approvalType);
+        approval.setGroupCode(groupCode);
+        approval.setGroupName(groupName);
+        approval.setBrand(brand);
+        approval.setApplicant(operatorResolver.operatorSignature(current));
+        approval.setApplyTime(now);
+        // 所有节点直接设为已通过
+        approval.setBizApprover(approver);
+        approval.setBizApproveTime(now);
+        approval.setBizApproveStatus(FLOW_APPROVED);
+        approval.setOpsApprover(approver);
+        approval.setOpsApproveTime(now);
+        approval.setOpsApproveStatus(FLOW_APPROVED);
+        approval.setFinApprover(approver);
+        approval.setFinApproveTime(now);
+        approval.setFinApproveStatus(FLOW_APPROVED);
+        approval.setFlowStatus(FLOW_APPROVED);
+        approval.setExtra(JsonUtils.toJson(extra));
+        approval.setUpdatedBy(operatorResolver.currentOperatorName());
+        approvalMapper.insert(approval);
+        // 直接执行业务写入
+        writeChainService.writeApprovedRecords(approval, now);
+        return approval.getFlowNo();
     }
 
     @Override
@@ -197,6 +243,10 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         extra.put("transferAmount", amount);
         extra.put("remark", request.getRemark() == null ? "" : request.getRemark());
 
+        if (!workflowConfigService.isApprovalEnabled("transfer")) {
+            return createApprovalDirect("transfer", request.getFromGroupId(), request.getFromGroupName(),
+                    request.getBrand(), extra);
+        }
         return createApproval("transfer", request.getFromGroupId(), request.getFromGroupName(),
                 request.getBrand(), extra);
     }
@@ -231,6 +281,9 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         extra.put("batchSettlement", nullToEmpty(request.getBatchSettlement()));
         extra.put("remark", request.getRemark() == null ? "" : request.getRemark());
 
+        if (!workflowConfigService.isApprovalEnabled("deduct")) {
+            return createApprovalDirect("deduct", request.getGroupId(), request.getGroupName(), request.getBrand(), extra);
+        }
         return createApproval("deduct", request.getGroupId(), request.getGroupName(), request.getBrand(), extra);
     }
 
@@ -277,6 +330,11 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         extra.put("repayStores", storeRows(request.getRepayStores()));
         extra.put("remark", request.getRemark() == null ? "" : request.getRemark());
 
+        if (!workflowConfigService.isApprovalEnabled("merge")) {
+            // 审批停用：不冻结账户，直接执行合并业务
+            return createApprovalDirect("merge", request.getSourceGroupId(), request.getSourceGroupName(),
+                    request.getBrand(), extra);
+        }
         String flowNo = createApproval("merge", request.getSourceGroupId(), request.getSourceGroupName(),
                 request.getBrand(), extra);
         // 合并申请提交即冻结双方账户，避免审批期间余额变动
@@ -344,8 +402,13 @@ public class FinApprovalServiceImpl implements FinApprovalService {
             approval.setFinApproveStatus(FLOW_APPROVED);
             approval.setFlowStatus(FLOW_APPROVED);
             saveNode(approval);
-            // 全部节点通过 → 同事务写入批次/明细/欠款单/账户余额
-            writeChainService.writeApprovedRecords(approval, now);
+            if ("gift".equals(approval.getApprovalType())) {
+                // 赠送审批通过：更新赠送记录审批状态为已审批
+                activateGiftRecord(approval.getFlowNo());
+            } else {
+                // 财务审批通过 → 同事务写入批次/明细/欠款单/账户余额
+                writeChainService.writeApprovedRecords(approval, now);
+            }
             return ApproveResultVO.of(NODE_FIN, true, null);
         }
         throw new BusinessException("该流程没有待审批节点");
@@ -390,6 +453,10 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         saveNode(approval);
         // 合并流程驳回后解除双方账户合并冻结
         releaseMergeFreeze(approval);
+        // 赠送流程驳回后更新赠送记录审批状态为驳回
+        if ("gift".equals(approval.getApprovalType())) {
+            rejectGiftRecord(approval.getFlowNo());
+        }
         return nodeName;
     }
 
@@ -410,6 +477,32 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         Map<String, Object> extra = JsonUtils.parseMap(approval.getExtra());
         restoreAccount(approval.getGroupCode(), approval.getBrand());
         restoreAccount(FinExtras.text(extra, "targetGroupId"), approval.getBrand());
+    }
+
+    /** 赠送审批通过后：将赠送记录审批状态更新为已审批(2) */
+    private void activateGiftRecord(String flowNo) {
+        BizGiftRecord record = giftRecordMapper.selectOne(
+                new LambdaQueryWrapper<BizGiftRecord>()
+                        .eq(BizGiftRecord::getApprovalNo, flowNo)
+                        .eq(BizGiftRecord::getApprovalStatus, 1));
+        if (record != null) {
+            record.setApprovalStatus(2); // 已审批
+            record.setUpdatedBy(operatorResolver.currentOperatorName());
+            giftRecordMapper.updateById(record);
+        }
+    }
+
+    /** 赠送审批驳回后：将赠送记录审批状态更新为驳回(3) */
+    private void rejectGiftRecord(String flowNo) {
+        BizGiftRecord record = giftRecordMapper.selectOne(
+                new LambdaQueryWrapper<BizGiftRecord>()
+                        .eq(BizGiftRecord::getApprovalNo, flowNo)
+                        .eq(BizGiftRecord::getApprovalStatus, 1));
+        if (record != null) {
+            record.setApprovalStatus(3); // 驳回
+            record.setUpdatedBy(operatorResolver.currentOperatorName());
+            giftRecordMapper.updateById(record);
+        }
     }
 
     /** 合并冻结账户恢复正常状态 */

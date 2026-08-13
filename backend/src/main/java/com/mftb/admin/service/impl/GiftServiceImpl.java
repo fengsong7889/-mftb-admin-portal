@@ -12,11 +12,14 @@ import com.mftb.admin.entity.BizGiftConsume;
 import com.mftb.admin.entity.BizGiftRecord;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
+import com.mftb.admin.entity.FinApproval;
 import com.mftb.admin.mapper.BizGiftConsumeMapper;
 import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.mapper.FinApprovalMapper;
 import com.mftb.admin.service.GiftService;
+import com.mftb.admin.service.WorkflowConfigService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -48,8 +51,10 @@ public class GiftServiceImpl implements GiftService {
     private final BizGiftConsumeMapper giftConsumeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final BizStoreMapper storeMapper;
+    private final FinApprovalMapper finApprovalMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+    private final WorkflowConfigService workflowConfigService;
 
     @Override
     public PageResult<GiftRecordVO> listRecords(long page, long size, Long groupId, Long storeId, String brand, String adType) {
@@ -116,11 +121,42 @@ public class GiftServiceImpl implements GiftService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public GiftRecordVO createRecord(GiftRecordRequest request) {
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());
         if (group == null) throw new BusinessException("集团不存在");
         BizStore store = storeMapper.selectById(request.getStoreId());
         if (store == null) throw new BusinessException("门店不存在");
+
+        boolean needApproval = workflowConfigService.isApprovalEnabled("gift");
+        String approvalNo = null;
+
+        if (needApproval) {
+            // 审批启用：创建审批流程记录，赠送记录关联审批编号
+            String flowNo = bizSeqService.next(BizSeqService.flowRuleKey("gift"));
+            Map<String, Object> extra = new LinkedHashMap<>();
+            extra.put("adType", request.getAdType());
+            extra.put("giftDays", request.getGiftDays());
+            extra.put("validDays", request.getValidDays());
+            extra.put("reason", request.getReason());
+
+            FinApproval approval = new FinApproval();
+            approval.setFlowNo(flowNo);
+            approval.setApprovalType("gift");
+            approval.setGroupCode(String.valueOf(request.getGroupId()));
+            approval.setGroupName(group.getGroupName());
+            approval.setBrand(request.getBrand());
+            approval.setApplicant(operatorResolver.operatorSignature(operatorResolver.currentUser()));
+            approval.setApplyTime(LocalDateTime.now());
+            approval.setBizApproveStatus("pending");
+            approval.setOpsApproveStatus("pending");
+            approval.setFinApproveStatus("pending");
+            approval.setFlowStatus("pending");
+            approval.setExtra(JsonUtils.toJson(extra));
+            approval.setUpdatedBy(operatorResolver.currentOperatorName());
+            finApprovalMapper.insert(approval);
+            approvalNo = flowNo;
+        }
 
         BizGiftRecord record = new BizGiftRecord();
         // 赠送ID按广告类型取对应编号规则（如 XDZS/RQZS/PHZS + 年月日 + 4位序号）
@@ -144,10 +180,11 @@ public class GiftServiceImpl implements GiftService {
         record.setStatus(1); // 可用
         record.setReason(request.getReason());
         record.setCredentials(JsonUtils.toJson(request.getCredentials()));
-        record.setApprovalNo(request.getApprovalNo());
+        record.setApprovalNo(approvalNo);
         record.setApplicant(operatorResolver.currentOperatorName());
         record.setApplyTime(LocalDateTime.now());
-        record.setApprovalStatus(1); // 未审批
+        // 审批启用=未审批(1)，审批停用=已审批(2)直接生效
+        record.setApprovalStatus(needApproval ? 1 : 2);
         record.setUpdatedBy(operatorResolver.currentOperatorName());
         record.setDeleted(0);
         giftRecordMapper.insert(record);

@@ -4422,5 +4422,28 @@
     "selectPlaceholder": "請選擇",
     "weightedRandomDesc": "按權重隨機分配，權重越大被選中概率越高",
     "consistencyCheckInterval": "校驗間隔"
+  },
+  "workflowConfig": {
+    "pageTitle": "流程配置",
+    "pageDesc": "配置各業務流程的審批開關，停用審批後對應操作將直接執行",
+    "colFlowName": "流程名稱",
+    "colFlowType": "流程類型",
+    "colApprovalEnabled": "審批開關",
+    "colDescription": "說明",
+    "colUpdatedAt": "最後更新時間",
+    "enabled": "啟用",
+    "disabled": "停用",
+    "enableTip": "啟用後該流程將進入審批環節",
+    "disableTip": "停用後該流程將跳過審批直接執行操作",
+    "confirmEnable": "確認啟用",
+    "confirmDisable": "確認停用",
+    "enableConfirmContent": "確定要啟用「{{name}}」的審批流程嗎？啟用後對應操作將進入審批環節。",
+    "disableConfirmContent": "確定要停用「{{name}}」的審批流程嗎？停用後對應操作將直接執行，無需審批。",
+    "updateSuccess": "流程配置已更新",
+    "flowRecharge": "推廣金充值",
+    "flowDeduct": "推廣金扣款",
+    "flowTransfer": "推廣金轉賬",
+    "flowMerge": "推廣金合併",
+    "flowGift": "贈送廣告天數"
   }
 }
