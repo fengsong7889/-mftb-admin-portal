@@ -94,6 +94,11 @@ export function useSystemRules() {
     localStorage.removeItem(SYSTEM_RULE_STORAGE_KEY)
   }, [])
 
+  /** 从 localStorage 重建（用于取消编辑后恢复） */
+  const refresh = useCallback(() => {
+    setGroups(buildGroups())
+  }, [])
+
   /** 持久化當前所有規則到 localStorage */
   const saveAll = useCallback(() => {
     const values: Record<string, unknown> = {}
@@ -127,7 +132,7 @@ export function useSystemRules() {
     return map
   }, [groups])
 
-  return { groups, updateRule, resetAll, saveAll, getRuleValue, valueMap }
+  return { groups, updateRule, refresh, resetAll, saveAll, getRuleValue, valueMap }
 }
 
 /* ==================== 同步讀取（供非組件場景使用） ==================== */

@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Switch, InputNumber, Select, Input, Tag } from 'antd'
+import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal } from 'antd'
 import {
   SettingOutlined,
   DownOutlined,
   UpOutlined,
-  LockOutlined,
+  EditOutlined,
+  SaveOutlined,
+  CloseOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import { useSystemRules } from '../../hooks/useSystemRules'
 import type { RuleItem, RuleGroup } from '../../constants/ruleConfig'
@@ -19,7 +22,54 @@ const SUB_GROUP_META: Record<string, { label: string; color: string }> = {
 
 export default function RuleConfig() {
   const { t } = useTranslation()
-  const { groups } = useSystemRules()
+  const { groups, updateRule, refresh, saveAll, resetAll } = useSystemRules()
+
+  /* 每个分組獨立编辑模式 */
+  const [editingGroups, setEditingGroups] = useState<Record<string, boolean>>({})
+  const snapshotRef = useRef<Record<string, string>>({})
+
+  const isEditing = (key: string) => !!editingGroups[key]
+
+  const handleEdit = useCallback((groupKey: string) => {
+    snapshotRef.current[groupKey] = JSON.stringify(groups)
+    setEditingGroups(prev => ({ ...prev, [groupKey]: true }))
+  }, [groups])
+
+  const handleSave = useCallback((groupKey: string) => {
+    saveAll()
+    setEditingGroups(prev => ({ ...prev, [groupKey]: false }))
+    delete snapshotRef.current[groupKey]
+    message.success('規則配置已保存')
+  }, [saveAll])
+
+  const handleCancel = useCallback((groupKey: string) => {
+    try {
+      const snap = JSON.parse(snapshotRef.current[groupKey] || '{}') as RuleGroup[]
+      const saved: Record<string, unknown> = {}
+      snap.forEach(g => g.rules.forEach(r => { saved[r.key] = r.value }))
+      localStorage.setItem('system_rule_config', JSON.stringify(saved))
+    } catch { /* ignore */ }
+    refresh()
+    setEditingGroups(prev => ({ ...prev, [groupKey]: false }))
+    delete snapshotRef.current[groupKey]
+  }, [refresh])
+
+  const handleReset = useCallback((groupKey: string) => {
+    const group = groups.find(g => g.key === groupKey)
+    Modal.confirm({
+      title: '確認重置',
+      content: `「${group?.title || groupKey}」的所有規則將恢復為默認值，此操作不可撤銷。`,
+      okText: '確認重置',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => {
+        // 将该组规则恢复为默认值并保存
+        group?.rules.forEach(r => updateRule(r.key, r.defaultValue))
+        saveAll()
+        message.success(`「${group?.title}」已恢復默認規則`)
+      },
+    })
+  }, [groups, updateRule, saveAll])
 
   /* 每個分組獨立折疊 + 髢標記（全部默認折疊） */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
@@ -34,8 +84,8 @@ export default function RuleConfig() {
   const toggleMenu = (menu: string) =>
     setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }))
 
-  /* 控件渲染（只讀模式，全部禁用） */
-  const renderControl = (rule: RuleItem) => {
+  /* 控件渲染（按分组编辑状态控制） */
+  const renderControl = (rule: RuleItem, groupEditing: boolean) => {
     switch (rule.type) {
       case 'switch':
         return (
@@ -43,7 +93,8 @@ export default function RuleConfig() {
             checked={rule.value as boolean}
             checkedChildren="開"
             unCheckedChildren="關"
-            disabled
+            disabled={!groupEditing}
+            onChange={(checked) => groupEditing && updateRule(rule.key, checked)}
           />
         )
       case 'number':
@@ -54,7 +105,8 @@ export default function RuleConfig() {
               min={rule.min}
               max={rule.max}
               style={{ width: 120 }}
-              disabled
+              disabled={!groupEditing}
+              onChange={(v) => groupEditing && updateRule(rule.key, v ?? 0)}
             />
             {rule.unit && <span style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.unit}</span>}
           </div>
@@ -65,7 +117,8 @@ export default function RuleConfig() {
             value={rule.value as string | number}
             options={rule.options}
             style={{ width: 160 }}
-            disabled
+            disabled={!groupEditing}
+            onChange={(v) => groupEditing && updateRule(rule.key, v)}
           />
         )
       case 'text':
@@ -73,7 +126,8 @@ export default function RuleConfig() {
           <Input
             value={rule.value as string}
             style={{ width: 200 }}
-            disabled
+            disabled={!groupEditing}
+            onChange={(e) => groupEditing && updateRule(rule.key, e.target.value)}
           />
         )
       default:
@@ -122,6 +176,7 @@ export default function RuleConfig() {
       {/* ── 分組卡片 ── */}
       {groups.map(group => {
         const isCollapsed = collapsed[group.key] ?? false
+        const groupEditing = isEditing(group.key)
 
         return (
           <div key={group.key} style={{
@@ -157,7 +212,6 @@ export default function RuleConfig() {
               <Tag color={group.color} style={{ marginLeft: 8, fontSize: 11 }}>
                 {group.rules.length} 項
               </Tag>
-              <Tag icon={<LockOutlined />} style={{ marginLeft: 4, fontSize: 11, color: '#8C8C8C', borderColor: '#d9d9d9', background: '#FAFAFA' }}>已鎖定</Tag>
               <div style={{ flex: 1 }} />
               <span style={{ fontSize: 12, color: '#8C8C8C', marginRight: 4 }}>
                 {group.description}
@@ -171,6 +225,42 @@ export default function RuleConfig() {
             {/* 分組內容（折疊時隱藏） */}
             {!isCollapsed && (
               <>
+                {/* 分組獨立操作欄（展開後可見） */}
+                <div style={{
+                  padding: '10px 24px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', background: groupEditing ? '#FFF7E6' : '#FAFAFA',
+                  borderBottom: '1px solid #f0f0f0', transition: 'background 0.2s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Tag icon={<EditOutlined />} style={{ fontSize: 11, margin: 0, color: groupEditing ? '#E8720C' : '#8C8C8C', borderColor: groupEditing ? '#E8720C40' : '#d9d9d9', background: groupEditing ? '#FFF7E6' : '#fff' }}>
+                      {groupEditing ? '可編輯' : '已鎖定'}
+                    </Tag>
+                    {groupEditing && <span style={{ fontSize: 12, color: '#E8720C' }}>修改後點擊保存生效</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {!groupEditing ? (
+                      <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(group.key)}
+                        style={{ borderRadius: 4, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 26 }}>
+                        编辑
+                      </Button>
+                    ) : (
+                      <>
+                        <Button size="small" danger icon={<ReloadOutlined />} onClick={() => handleReset(group.key)}
+                          style={{ borderRadius: 4, fontSize: 12, height: 26 }}>
+                          重置
+                        </Button>
+                        <Button size="small" icon={<CloseOutlined />} onClick={() => handleCancel(group.key)}
+                          style={{ borderRadius: 4, fontSize: 12, height: 26 }}>
+                          取消
+                        </Button>
+                        <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleSave(group.key)}
+                          style={{ borderRadius: 4, fontSize: 12, height: 26, backgroundColor: '#E8720C', borderColor: '#E8720C' }}>
+                          保存
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
                 {/* 規則列表（支持 subGroup 子分組） */}
                 <div style={{ padding: '8px 24px 0' }}>
                   {(() => {
@@ -338,7 +428,7 @@ export default function RuleConfig() {
                             <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                           </div>
                           <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                            {renderControl(rule)}
+                            {renderControl(rule, groupEditing)}
                           </div>
                         </div>
                       ))
@@ -369,7 +459,7 @@ export default function RuleConfig() {
                               <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                             </div>
                             <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                              {renderControl(rule)}
+                              {renderControl(rule, groupEditing)}
                             </div>
                           </div>
                         ))}
@@ -411,7 +501,7 @@ export default function RuleConfig() {
                                     <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
                                   </div>
                                   <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                                    {renderControl(rule)}
+                                    {renderControl(rule, groupEditing)}
                                   </div>
                                 </div>
                               ))}
