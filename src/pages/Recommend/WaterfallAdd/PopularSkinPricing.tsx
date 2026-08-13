@@ -324,7 +324,7 @@ export default function PopularSkinPricing() {
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
-    }, 2200)
+    }, 5000)
     return () => clearInterval(timer)
   }, [previewSkin])
 
@@ -334,7 +334,7 @@ export default function PopularSkinPricing() {
     if (!previewSkin || previewSkin.dishLayouts.length <= 1) return
     const timer = setInterval(() => {
       setPreviewLayoutIndex(i => (i + 1) % previewSkin.dishLayouts.length)
-    }, 3000)
+    }, 5000)
     return () => clearInterval(timer)
   }, [previewSkin])
 

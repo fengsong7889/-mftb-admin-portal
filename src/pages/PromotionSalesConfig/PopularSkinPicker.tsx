@@ -242,7 +242,7 @@ export default function PopularSkinPicker() {
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
-    }, 2200)
+    }, 5000)
     return () => clearInterval(timer)
   }, [selectedSkin])
 
@@ -345,7 +345,7 @@ export default function PopularSkinPicker() {
   /** 菜品佈局① 大圖拼列（縮小版，同定價預覽：左 1 張大圖疊價格 + 右 2 張小圖） */
   const renderDishGridMini = () => (
     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 6, marginTop: 8 }}>
-      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: PREVIEW_DISHES[0].bg, height: 92 }}>
+      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: PREVIEW_DISHES[0].bg, height: 104 }}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 54, lineHeight: 1 }}>
           {PREVIEW_DISHES[0].emoji}
         </div>
@@ -360,7 +360,7 @@ export default function PopularSkinPicker() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {PREVIEW_DISHES.slice(1, 3).map(dish => (
           <div key={dish.name} style={{
-            borderRadius: 8, background: dish.bg, height: 43,
+            borderRadius: 8, background: dish.bg, height: 49,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, lineHeight: 1,
           }}>{dish.emoji}</div>
         ))}
