@@ -56,11 +56,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
         log.error("系统异常", e);
-        // TODO: 临时暴露异常信息用于诊断，修复后恢复为 "系统繁忙, 请稍后重试"
-        String detail = e.getClass().getSimpleName() + ": " + e.getMessage();
-        if (e.getCause() != null) {
-            detail += " | cause: " + e.getCause().getMessage();
-        }
-        return Result.error(ResultCode.ERROR.getCode(), detail);
+        return Result.error(ResultCode.ERROR.getCode(), "系统繁忙, 请稍后重试");
     }
 }
