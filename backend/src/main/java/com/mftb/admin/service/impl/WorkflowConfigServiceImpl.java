@@ -40,25 +40,25 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
     @Override
     public List<WorkflowConfigVO> listAll() {
         List<WorkflowConfig> configs = workflowConfigMapper.selectList(
-                new LambdaQueryWrapper<WorkflowConfig>().orderByAsc(WorkflowConfig::getId));
+                new LambdaQueryWrapper<WorkflowConfig>()
+                        .select(WorkflowConfig::getId, WorkflowConfig::getFlowType, WorkflowConfig::getFlowName,
+                                WorkflowConfig::getApprovalEnabled, WorkflowConfig::getDescription,
+                                WorkflowConfig::getUpdatedBy, WorkflowConfig::getCreatedAt, WorkflowConfig::getUpdatedAt)
+                        .orderByAsc(WorkflowConfig::getId));
         return configs.stream().map(WorkflowConfigVO::from).toList();
     }
 
     @Override
     public void updateApprovalEnabled(String flowType, boolean approvalEnabled) {
-        WorkflowConfig config = workflowConfigMapper.selectOne(
-                new LambdaQueryWrapper<WorkflowConfig>()
-                        .eq(WorkflowConfig::getFlowType, flowType));
-        if (config == null) {
-            throw new BusinessException("流程类型不存在: " + flowType);
-        }
-
         int value = approvalEnabled ? 1 : 0;
-        workflowConfigMapper.update(null,
+        int rows = workflowConfigMapper.update(null,
                 new LambdaUpdateWrapper<WorkflowConfig>()
                         .eq(WorkflowConfig::getFlowType, flowType)
                         .set(WorkflowConfig::getApprovalEnabled, value)
                         .set(WorkflowConfig::getUpdatedBy, operatorResolver.currentOperatorName()));
+        if (rows == 0) {
+            throw new BusinessException("流程类型不存在: " + flowType);
+        }
 
         // 立即刷新缓存
         approvalCache.put(flowType, approvalEnabled);
@@ -81,7 +81,9 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
             return;
         }
         try {
-            List<WorkflowConfig> configs = workflowConfigMapper.selectList(null);
+            List<WorkflowConfig> configs = workflowConfigMapper.selectList(
+                    new LambdaQueryWrapper<WorkflowConfig>()
+                            .select(WorkflowConfig::getFlowType, WorkflowConfig::getApprovalEnabled));
             Map<String, Boolean> newCache = new HashMap<>();
             for (WorkflowConfig config : configs) {
                 newCache.put(config.getFlowType(),
@@ -96,10 +98,12 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
 
     @Override
     public void updateNodesConfig(String flowType, String nodesConfig, String routingRules) {
-        WorkflowConfig config = workflowConfigMapper.selectOne(
+        // 先检查记录是否存在（仅查 flowType 列，避免新列未迁移时 SELECT 报错）
+        Long count = workflowConfigMapper.selectCount(
                 new LambdaQueryWrapper<WorkflowConfig>()
+                        .select(WorkflowConfig::getFlowType)
                         .eq(WorkflowConfig::getFlowType, flowType));
-        if (config == null) {
+        if (count == null || count == 0) {
             throw new BusinessException("流程类型不存在: " + flowType);
         }
         workflowConfigMapper.update(null,

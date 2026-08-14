@@ -1,6 +1,7 @@
 package com.mftb.admin.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
@@ -77,6 +78,7 @@ public class FinApproval {
     private String extra;
 
     /** 实际审批节点实例JSON（动态解析后的节点+审批人数据） */
+    @TableField(insertStrategy = FieldStrategy.NOT_NULL, updateStrategy = FieldStrategy.NOT_NULL)
     private String approvalNodes;
 
     /** 最后更新人 */

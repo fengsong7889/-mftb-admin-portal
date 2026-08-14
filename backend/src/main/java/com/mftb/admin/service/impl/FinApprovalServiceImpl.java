@@ -388,9 +388,16 @@ public class FinApprovalServiceImpl implements FinApprovalService {
      * 如果流程配置中没有 nodesConfig/routingRules，返回 null（降级为旧的固定三级审批）
      */
     private List<ApprovalNodeInstance> resolveDynamicNodes(String approvalType, String brand, SysUser initiator) {
-        WorkflowConfig config = workflowConfigMapper.selectOne(
-                new LambdaQueryWrapper<WorkflowConfig>()
-                        .eq(WorkflowConfig::getFlowType, approvalType));
+        WorkflowConfig config;
+        try {
+            config = workflowConfigMapper.selectOne(
+                    new LambdaQueryWrapper<WorkflowConfig>()
+                            .eq(WorkflowConfig::getFlowType, approvalType));
+        } catch (Exception e) {
+            // 数据库尚未迁移新列时降级为旧逻辑（避免阻塞业务提交）
+            log.warn("读取流程动态配置失败（可能未执行迁移脚本），降级为固定三级审批: {}", e.getMessage());
+            return null;
+        }
         if (config == null || config.getNodesConfig() == null || config.getRoutingRules() == null) {
             return null; // 无动态配置，降级为旧逻辑
         }
