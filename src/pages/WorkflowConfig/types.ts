@@ -1,7 +1,7 @@
 /**
  * 審批流程配置 — 類型定義
  *
- * 支持可配置的審批節點、條件分支路由、靈活審批人分配。
+ * 支持可配置的審批節點、流程級路由規則、按品牌區分的審批人分配。
  */
 
 /** 條件分支運算符 */
@@ -26,26 +26,68 @@ export type ApprovalRule = 'any' | 'all'
 /** 駁回策略 */
 export type RejectBehavior = 'restart' | 'previous'
 
-/** 審批節點 */
+/* ==================== 審批人配置（支持按品牌區分） ==================== */
+
+/** 單組審批人配置 */
+export interface ApproverSetting {
+  approverType: ApproverType
+  approverIds: string[]
+  approvalRule: ApprovalRule
+}
+
+/** 審批人配置 — 支持按品牌區分 */
+export interface ApproverConfig {
+  /** 是否按品牌區分審批人 */
+  byBrand: boolean
+  /** 默認審批人配置（byBrand=false 時使用） */
+  default: ApproverSetting
+  /** 按品牌的審批人配置（byBrand=true 時使用），key 為品牌值 '1'=閃蜂 / '2'=mFood */
+  brands: Record<string, ApproverSetting>
+}
+
+/* ==================== 審批節點 ==================== */
+
+/** 審批節點（不含條件，條件由路由規則控制） */
 export interface WorkflowNode {
   id: string
   /** 節點名稱，如 '業務主管審批' */
   name: string
   /** 順序（從 1 開始） */
   sortOrder: number
-  /** 審批人分配類型 */
-  approverType: ApproverType
-  /** 具體人員 ID 或角色編碼 */
-  approverIds: string[]
-  /** 審批規則：單人通過 / 會簽 */
-  approvalRule: ApprovalRule
-  /** 條件配置，空數組 = 始終激活 */
-  condition: NodeCondition[]
+  /** 審批人配置（支持按品牌區分） */
+  approverConfig: ApproverConfig
   /** 抄送人員 ID 列表 */
   ccUserIds: string[]
   /** 節點級超時（小時），null = 不超時 */
   timeoutHours: number | null
+
+  /* ---- 以下字段為舊版兼容，數據遷移後移除 ---- */
+  /** @deprecated 使用 approverConfig.default.approverType */
+  approverType?: ApproverType
+  /** @deprecated 使用 approverConfig.default.approverIds */
+  approverIds?: string[]
+  /** @deprecated 使用 approverConfig.default.approvalRule */
+  approvalRule?: ApprovalRule
+  /** @deprecated 條件已提升到流程級路由規則 */
+  condition?: NodeCondition[]
 }
+
+/* ==================== 路由規則（流程級條件） ==================== */
+
+/** 路由規則 — 根據條件決定激活哪些節點 */
+export interface RoutingRule {
+  id: string
+  /** 規則名稱，如 '美食外賣流程' */
+  name: string
+  /** 條件列表（AND 關係），空數組 = 默認規則（始終匹配） */
+  conditions: NodeCondition[]
+  /** 滿足條件時激活的節點 ID 列表 */
+  activatedNodeIds: string[]
+  /** 優先級（數字越小越優先） */
+  priority: number
+}
+
+/* ==================== 流程定義 ==================== */
 
 /** 審批流程定義 */
 export interface WorkflowDefinition {
@@ -62,6 +104,8 @@ export interface WorkflowDefinition {
   enabled: boolean
   /** 審批節點列表 */
   nodes: WorkflowNode[]
+  /** 路由規則（流程級條件，決定哪些節點被激活） */
+  routingRules: RoutingRule[]
   /** 駁回策略 */
   rejectBehavior: RejectBehavior
   /** 全局超時提醒（小時） */
@@ -80,8 +124,8 @@ export interface WorkflowDefinition {
 export const APPROVER_TYPE_LABELS: Record<ApproverType, string> = {
   person: '指定人員',
   role: '指定角色',
-  department_leader: '部門主管',
-  initiator_leader: '發起人主管',
+  department_leader: '部門負責人',
+  initiator_leader: '直屬領導',
 }
 
 /** 審批規則標籤 */
@@ -181,5 +225,34 @@ export const APPROVAL_TYPE_OPTIONS = [
   { label: '贈送', value: 'gift' },
 ]
 
+/** 品牌選項（用於審批人按品牌配置） */
+export const BRAND_CONFIG_OPTIONS = [
+  { label: '閃蜂', value: '1' },
+  { label: 'mFood', value: '2' },
+]
+
 /** localStorage 存儲 key */
 export const WORKFLOW_STORAGE_KEY = 'mftb_workflow_config'
+
+/* ==================== 工具函數 ==================== */
+
+/** 從節點獲取指定品牌的審批人設置 */
+export function getApproverSettingForBrand(node: WorkflowNode, brand?: string): ApproverSetting {
+  if (node.approverConfig.byBrand && brand && node.approverConfig.brands[brand]) {
+    return node.approverConfig.brands[brand]
+  }
+  return node.approverConfig.default
+}
+
+/** 創建默認審批人配置 */
+export function createDefaultApproverConfig(
+  approverType: ApproverType = 'role',
+  approverIds: string[] = [],
+  approvalRule: ApprovalRule = 'any',
+): ApproverConfig {
+  return {
+    byBrand: false,
+    default: { approverType, approverIds, approvalRule },
+    brands: {},
+  }
+}

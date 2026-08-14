@@ -295,7 +295,7 @@ export default function DebtReconcile() {
     { title: t('debtReconcile.colLoanDate'), dataIndex: 'loanDate', key: 'loanDate', width: 110 },
     { title: t('debtReconcile.colBillNo'), dataIndex: 'billNo', key: 'billNo', width: 160 },
     { title: t('common.colBatchNo'), dataIndex: 'batchNo', key: 'batchNo', width: 160 },
-    { title: t('common.colFlowNo'), dataIndex: 'flowNo', key: 'flowNo', width: 160 },
+    { title: t('common.colFlowNo'), dataIndex: 'flowNo', key: 'flowNo', width: 160, render: (val: string) => val === 'DIRECT-EXEC' ? <Tag color="default">未經審批</Tag> : val },
     {
       title: t('debtReconcile.colDebtTotal'), dataIndex: 'debtTotal', key: 'debtTotal', width: 120, align: 'right',
       render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{fmtAmt(v)}</span>,

@@ -76,6 +76,9 @@ public class FinApproval {
     /** 申请表单扩展数据 JSON（结算方式/扣款门店/对方集团/偿还门店等） */
     private String extra;
 
+    /** 实际审批节点实例JSON（动态解析后的节点+审批人数据） */
+    private String approvalNodes;
+
     /** 最后更新人 */
     private String updatedBy;
 

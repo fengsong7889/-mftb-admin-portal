@@ -146,29 +146,33 @@ export default function Dashboard() {
       title: t('recommendDashboard.colAdRevenue'), 
       dataIndex: 'revenue', 
       key: 'revenue',
+      align: 'right' as const,
       render: (v: number) => (
         <span style={{ color: '#3f8600', fontWeight: 600, fontSize: 16 }}>
           MOP {v.toLocaleString()}
         </span>
       ),
     },
-    { title: t('recommendDashboard.colRunningAdsCount'), dataIndex: 'ads', key: 'ads', width: 120 },
+    { title: t('recommendDashboard.colRunningAdsCount'), dataIndex: 'ads', key: 'ads', width: 120, align: 'right' as const },
     { 
       title: t('recommendDashboard.colTotalImpressions'), 
       dataIndex: 'impressions', 
       key: 'impressions',
+      align: 'right' as const,
       render: (v: number) => v.toLocaleString(),
     },
     { 
       title: t('recommendDashboard.colTotalClicks'), 
       dataIndex: 'clicks', 
       key: 'clicks',
+      align: 'right' as const,
       render: (v: number) => v.toLocaleString(),
     },
     { 
       title: t('recommendDashboard.colAvgCtr'), 
       dataIndex: 'avgCtr', 
       key: 'avgCtr',
+      align: 'right' as const,
       render: (v: number) => `${v}%`,
     },
   ]

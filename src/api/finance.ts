@@ -100,6 +100,26 @@ export interface FinApproval {
   flowStatus: string
   rejectReason: string
   extra?: Record<string, unknown>
+  /** 动态审批节点实例列表 */
+  approvalNodes?: ApprovalNodeInstance[]
+}
+
+/** 审批人实例 */
+export interface ApproverInstance {
+  userId: number
+  name: string
+  /** pending | approved | rejected | skipped */
+  status: string
+  time: string | null
+}
+
+/** 审批节点实例 */
+export interface ApprovalNodeInstance {
+  nodeId: string
+  nodeName: string
+  /** any | all */
+  approvalRule: string
+  approvers: ApproverInstance[]
 }
 
 /** 審批中心查詢參數 */

@@ -326,6 +326,7 @@ export default function BatchQuery() {
       dataIndex: 'flowNo',
       key: 'flowNo',
       width: 150,
+      render: (val: string) => val === 'DIRECT-EXEC' ? <Tag color="default">未經審批</Tag> : val,
     },
     {
       title: t('common.colTradeTime'),

@@ -46,4 +46,30 @@ public class WorkflowConfigController {
         workflowConfigService.updateApprovalEnabled(flowType, value);
         return Result.success();
     }
+
+    /** 保存流程节点配置和路由规则 */
+    @PutMapping("/{flowType}/config")
+    @RequirePermission(menu = "workflow-config", action = "edit")
+    public Result<Void> updateConfig(
+            @PathVariable String flowType,
+            @RequestBody Map<String, String> body) {
+        String nodesConfig = body.get("nodesConfig");
+        String routingRules = body.get("routingRules");
+        workflowConfigService.updateNodesConfig(flowType, nodesConfig, routingRules);
+        return Result.success();
+    }
+
+    /** 读取流程节点配置和路由规则 */
+    @GetMapping("/{flowType}/config")
+    @RequirePermission(menu = "workflow-config")
+    public Result<WorkflowConfigVO> getConfig(@PathVariable String flowType) {
+        List<WorkflowConfigVO> all = workflowConfigService.listAll();
+        WorkflowConfigVO config = all.stream()
+                .filter(c -> flowType.equals(c.getFlowType()))
+                .findFirst().orElse(null);
+        if (config == null) {
+            return Result.error(404, "流程类型不存在: " + flowType);
+        }
+        return Result.success(config);
+    }
 }

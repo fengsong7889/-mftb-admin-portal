@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.ApproveResultVO;
+import com.mftb.admin.dto.ApprovalNodeInstance;
+import com.mftb.admin.dto.ApproverInstance;
 import com.mftb.admin.dto.DeductApplyDTO;
 import com.mftb.admin.dto.FinApprovalQuery;
 import com.mftb.admin.dto.FinApprovalVO;
@@ -18,9 +20,12 @@ import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinApproval;
 import com.mftb.admin.entity.FinDebtBill;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.entity.WorkflowConfig;
 import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.FinApprovalMapper;
 import com.mftb.admin.mapper.FinDebtBillMapper;
+import com.mftb.admin.mapper.WorkflowConfigMapper;
+import com.mftb.admin.service.ApproverResolverService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinApprovalService;
 import com.mftb.admin.service.FinWriteChainService;
@@ -36,6 +41,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +60,9 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private static final String FLOW_REJECTED = "rejected";
     private static final String FLOW_CANCELLED = "cancelled";
 
+    /** 审批停用时直接执行的标记（前端据此显示「未经审批」标识） */
+    public static final String DIRECT_EXEC_MARKER = "DIRECT-EXEC";
+
     /** 审批节点名称（与前端审批中心/审批详情展示一致） */
     private static final String NODE_BIZ = "業務主管審批";
     private static final String NODE_OPS = "運營主管審批";
@@ -67,11 +76,13 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private final FinApprovalMapper approvalMapper;
     private final FinDebtBillMapper debtBillMapper;
     private final BizGiftRecordMapper giftRecordMapper;
+    private final WorkflowConfigMapper workflowConfigMapper;
     private final FinAccountService accountService;
     private final FinWriteChainService writeChainService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final WorkflowConfigService workflowConfigService;
+    private final ApproverResolverService approverResolverService;
 
     /* ==================== 查询 ==================== */
 
@@ -179,42 +190,27 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         return createApproval("recharge", request.getGroupId(), request.getGroupName(), request.getBrand(), extra);
     }
 
-    /** 审批停用时直接执行：创建已通过的审批记录并写入业务数据 */
+    /** 审批停用时直接执行：不创建审批记录，直接写入业务数据，返回 DIRECT-EXEC 标记 */
     private String createApprovalDirect(String approvalType, String groupCode, String groupName,
                                         String brand, Map<String, Object> extra) {
-        SysUser current = operatorResolver.currentUser();
         String flowRuleKey = BizSeqService.flowRuleKey(approvalType);
         if (flowRuleKey == null) {
             throw new BusinessException("未知的审批类型: " + approvalType);
         }
         LocalDateTime now = LocalDateTime.now();
-        String approver = operatorResolver.operatorSignature(current);
 
+        // 构造内存中的审批对象（不入库），仅用于传递业务参数给 writeChainService
         FinApproval approval = new FinApproval();
-        approval.setFlowNo(bizSeqService.next(flowRuleKey));
+        approval.setFlowNo(DIRECT_EXEC_MARKER);
         approval.setApprovalType(approvalType);
         approval.setGroupCode(groupCode);
         approval.setGroupName(groupName);
         approval.setBrand(brand);
-        approval.setApplicant(operatorResolver.operatorSignature(current));
-        approval.setApplyTime(now);
-        // 所有节点直接设为已通过
-        approval.setBizApprover(approver);
-        approval.setBizApproveTime(now);
-        approval.setBizApproveStatus(FLOW_APPROVED);
-        approval.setOpsApprover(approver);
-        approval.setOpsApproveTime(now);
-        approval.setOpsApproveStatus(FLOW_APPROVED);
-        approval.setFinApprover(approver);
-        approval.setFinApproveTime(now);
-        approval.setFinApproveStatus(FLOW_APPROVED);
-        approval.setFlowStatus(FLOW_APPROVED);
         approval.setExtra(JsonUtils.toJson(extra));
-        approval.setUpdatedBy(operatorResolver.currentOperatorName());
-        approvalMapper.insert(approval);
-        // 直接执行业务写入
+
+        // 直接执行业务写入（批次/明细/欠款单/余额变动）
         writeChainService.writeApprovedRecords(approval, now);
-        return approval.getFlowNo();
+        return DIRECT_EXEC_MARKER;
     }
 
     @Override
@@ -365,8 +361,125 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         approval.setFlowStatus(FLOW_PENDING);
         approval.setExtra(JsonUtils.toJson(extra));
         approval.setUpdatedBy(operatorResolver.currentOperatorName());
+
+        // ── 动态节点解析：读取流程配置中的节点和路由规则 ──
+        List<ApprovalNodeInstance> dynamicNodes = resolveDynamicNodes(approvalType, brand, current);
+        if (dynamicNodes != null && !dynamicNodes.isEmpty()) {
+            approval.setApprovalNodes(JsonUtils.toJson(dynamicNodes));
+            // 向下兼容：将第一个节点映射到 biz 列，第二个到 ops，第三个到 fin
+            for (int i = 0; i < dynamicNodes.size() && i < 3; i++) {
+                ApprovalNodeInstance node = dynamicNodes.get(i);
+                String approverNames = node.getApprovers().stream()
+                        .map(ApproverInstance::getName).reduce((a, b) -> a + "," + b).orElse("");
+                switch (i) {
+                    case 0 -> { approval.setBizApprover(approverNames); }
+                    case 1 -> { approval.setOpsApprover(approverNames); }
+                    case 2 -> { approval.setFinApprover(approverNames); }
+                }
+            }
+        }
+
         approvalMapper.insert(approval);
         return approval.getFlowNo();
+    }
+
+    /**
+     * 动态节点解析：读取流程配置 → 匹配路由规则 → 解析每个激活节点的审批人
+     * 如果流程配置中没有 nodesConfig/routingRules，返回 null（降级为旧的固定三级审批）
+     */
+    private List<ApprovalNodeInstance> resolveDynamicNodes(String approvalType, String brand, SysUser initiator) {
+        WorkflowConfig config = workflowConfigMapper.selectOne(
+                new LambdaQueryWrapper<WorkflowConfig>()
+                        .eq(WorkflowConfig::getFlowType, approvalType));
+        if (config == null || config.getNodesConfig() == null || config.getRoutingRules() == null) {
+            return null; // 无动态配置，降级为旧逻辑
+        }
+
+        // 解析节点配置和路由规则
+        List<Map<String, Object>> nodesConfig = JsonUtils.parseMapList(config.getNodesConfig());
+        List<Map<String, Object>> routingRules = JsonUtils.parseMapList(config.getRoutingRules());
+        if (nodesConfig.isEmpty() || routingRules.isEmpty()) {
+            return null;
+        }
+
+        // 匹配路由规则（按优先级排序，取第一条匹配的）
+        Map<String, Object> matchedRule = routingRules.stream()
+                .sorted((a, b) -> {
+                    int pa = a.get("priority") instanceof Number ? ((Number) a.get("priority")).intValue() : 999;
+                    int pb = b.get("priority") instanceof Number ? ((Number) b.get("priority")).intValue() : 999;
+                    return Integer.compare(pa, pb);
+                })
+                .findFirst().orElse(null);
+
+        if (matchedRule == null) {
+            return null;
+        }
+
+        // 获取激活的节点 ID 列表
+        @SuppressWarnings("unchecked")
+        List<String> activatedNodeIds = (List<String>) matchedRule.get("activatedNodeIds");
+        if (activatedNodeIds == null || activatedNodeIds.isEmpty()) {
+            return null;
+        }
+
+        // 对每个激活节点解析审批人
+        Long initiatorDeptId = initiator != null ? initiator.getDepartmentId() : null;
+        List<ApprovalNodeInstance> result = new ArrayList<>();
+        for (String nodeId : activatedNodeIds) {
+            Map<String, Object> nodeConfig = nodesConfig.stream()
+                    .filter(n -> nodeId.equals(n.get("id")))
+                    .findFirst().orElse(null);
+            if (nodeConfig == null) continue;
+
+            ApprovalNodeInstance instance = new ApprovalNodeInstance();
+            instance.setNodeId(nodeId);
+            instance.setNodeName((String) nodeConfig.get("name"));
+
+            // 解析 approverConfig（支持按品牌区分）
+            @SuppressWarnings("unchecked")
+            Map<String, Object> approverConfig = (Map<String, Object>) nodeConfig.get("approverConfig");
+            if (approverConfig == null) continue;
+
+            boolean byBrand = Boolean.TRUE.equals(approverConfig.get("byBrand"));
+            Map<String, Object> setting;
+            if (byBrand && brand != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> brands = (Map<String, Object>) approverConfig.get("brands");
+                setting = brands != null ? (Map<String, Object>) brands.get(brand) : null;
+                if (setting == null) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> defaultSetting = (Map<String, Object>) approverConfig.get("default");
+                    setting = defaultSetting;
+                }
+            } else {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> defaultSetting = (Map<String, Object>) approverConfig.get("default");
+                setting = defaultSetting;
+            }
+            if (setting == null) continue;
+
+            String approverType = (String) setting.get("approverType");
+            @SuppressWarnings("unchecked")
+            List<String> approverIds = (List<String>) setting.get("approverIds");
+            String approvalRule = (String) setting.get("approvalRule");
+
+            instance.setApprovalRule(approvalRule != null ? approvalRule : "any");
+
+            // 调用解析服务
+            List<ApproverInstance> approvers = approverResolverService.resolve(approverType, approverIds, initiatorDeptId);
+
+            // 空校验：非 initiator_leader 类型时，解析为空则阻止提交
+            if (approvers.isEmpty() && !"initiator_leader".equals(approverType)) {
+                String brandLabel = byBrand ? "（品牌 " + brand + "）" : "";
+                throw new BusinessException(
+                        String.format("「%s」节点%s未找到审批人，请先完善配置", instance.getNodeName(), brandLabel));
+            }
+
+            instance.setApprovers(approvers);
+            result.add(instance);
+        }
+
+        return result.isEmpty() ? null : result;
     }
 
     /* ==================== 审批流转 ==================== */

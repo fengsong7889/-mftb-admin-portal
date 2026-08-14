@@ -21,6 +21,7 @@ import type { DeductApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
+import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -236,6 +237,7 @@ export default function DeductAdd() {
         return
       }
       // ====== 二次確認彈窗 ======
+      const approvalEnabled = isWorkflowEnabled('deduct')
       const consumeStoreId = form.getFieldValue('consumeStore')
       const consumeStoreOpt = storeOptions.find(s => s.value === consumeStoreId)
       const consumeTypeVal = form.getFieldValue('consumeType')
@@ -276,6 +278,16 @@ export default function DeductAdd() {
               <span className="confirm-info-value">{selectedBatch}</span>
             </div>}
             </div>
+            {!approvalEnabled && (
+              <div style={{
+                marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #FFF1F0, #FFFAF0)',
+                border: '1.5px solid #FF7A45',
+                fontSize: 13, color: '#CF1322', lineHeight: 1.6, fontWeight: 500,
+              }}>
+                ⚡ 當前扣款審批流程已停用，確認後將直接執行扣款，無需審批。
+              </div>
+            )}
           </div>
         ),
         onOk: async () => {
@@ -727,10 +739,13 @@ export default function DeductAdd() {
               {t('accountBalance.submitSuccessTitle')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && (
+              {submittedFlowNo && !isDirectExec(submittedFlowNo) && (
                 <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              {t('accountBalance.submitSuccessDesc')}
+              {isDirectExec(submittedFlowNo)
+                ? '✅ 已直接執行扣款（未經審批）'
+                : t('accountBalance.submitSuccessDesc')
+              }
             </p>
             <Button
               type="primary"

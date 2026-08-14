@@ -23,6 +23,7 @@ import type { FinAccount, MergeApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
+import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 import BrandTag from '../../components/BrandTag'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -253,6 +254,7 @@ export default function MergeAdd() {
       }
       if (certificateFiles.length === 0) { message.warning(t('accountBalance.uploadCertificate')); return }
       // ====== 二次確認彈窗 ======
+      const approvalEnabled = isWorkflowEnabled('merge')
       const sourceName = sourceAccount?.groupName || ''
       const targetName = targetAccount?.groupName || ''
       Modal.confirm({
@@ -285,6 +287,16 @@ export default function MergeAdd() {
               <span className="confirm-info-value danger">MOP {sourceDebtAmount.toLocaleString()}</span>
             </div>}
             </div>
+            {!approvalEnabled && (
+              <div style={{
+                marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #FFF1F0, #FFFAF0)',
+                border: '1.5px solid #FF7A45',
+                fontSize: 13, color: '#CF1322', lineHeight: 1.6, fontWeight: 500,
+              }}>
+                ⚡ 當前合併審批流程已停用，確認後將直接執行合併，無需審批。
+              </div>
+            )}
           </div>
         ),
         onOk: async () => {
@@ -696,10 +708,13 @@ export default function MergeAdd() {
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>{t('accountBalance.submitSuccessTitle')}</h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && (
+              {submittedFlowNo && !isDirectExec(submittedFlowNo) && (
                 <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              {t('accountBalance.submitSuccessDesc')}
+              {isDirectExec(submittedFlowNo)
+                ? '✅ 已直接執行合併（未經審批）'
+                : t('accountBalance.submitSuccessDesc')
+              }
             </p>
             <Button type="primary" size="large" onClick={() => navigate('/account-balance')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}>

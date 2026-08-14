@@ -299,31 +299,31 @@ export default function BatchDetail() {
   /** 交易明細列 */
   const flowColumns: TableColumnsType<FlowRow> = [
     { title: t('common.colIndex'), dataIndex: 'key', key: 'key', width: 60, align: 'center' },
-    { title: t('common.colTradeType'), dataIndex: 'tradeType', key: 'tradeType', width: 90, align: 'center' },
-    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId', width: 110, align: 'center', render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
-    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', width: 140, align: 'center', render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
-    { title: t('common.colChannel'), dataIndex: 'channel', key: 'channel', width: 90, align: 'center' },
-    { title: t('common.colChangeType'), dataIndex: 'changeType', key: 'changeType', width: 150, align: 'center' },
-    { title: t('common.colTradeTime'), dataIndex: 'tradeTime', key: 'tradeTime', width: 170, align: 'center' },
-    { title: t('common.colVirtualChange'), dataIndex: 'virtualChange', key: 'virtualChange', width: 140, align: 'center', render: renderChange },
-    { title: t('common.colActualChange'), dataIndex: 'actualChange', key: 'actualChange', width: 140, align: 'center', render: renderChange },
-    { title: t('batchDetail.colRelated'), dataIndex: 'relatedId', key: 'relatedId', width: 190, align: 'center', render: (v: string) => <span style={{ color: '#8C8C8C' }}>{v}</span> },
+    { title: t('common.colTradeType'), dataIndex: 'tradeType', key: 'tradeType', width: 90 },
+    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId', width: 110, render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
+    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', width: 140, render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
+    { title: t('common.colChannel'), dataIndex: 'channel', key: 'channel', width: 90 },
+    { title: t('common.colChangeType'), dataIndex: 'changeType', key: 'changeType', width: 150 },
+    { title: t('common.colTradeTime'), dataIndex: 'tradeTime', key: 'tradeTime', width: 170 },
+    { title: t('common.colVirtualChange'), dataIndex: 'virtualChange', key: 'virtualChange', width: 140, align: 'right' as const, render: renderChange },
+    { title: t('common.colActualChange'), dataIndex: 'actualChange', key: 'actualChange', width: 140, align: 'right' as const, render: renderChange },
+    { title: t('batchDetail.colRelated'), dataIndex: 'relatedId', key: 'relatedId', width: 190, render: (v: string) => <span style={{ color: '#8C8C8C' }}>{v}</span> },
   ]
 
   /** 營業額扣款門店列（充值） */
   const deductStoreColumns: TableColumnsType<DeductStoreRow> = [
-    { title: t('batchDetail.colDeductStoreId'), dataIndex: 'storeId', key: 'storeId', align: 'center' },
-    { title: t('batchDetail.colDeductStoreName'), dataIndex: 'storeName', key: 'storeName', align: 'center' },
-    { title: t('batchDetail.colDeductAmount'), dataIndex: 'amount', key: 'amount', align: 'center', render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
-    { title: t('batchDetail.colDeductedAmount'), dataIndex: 'deducted', key: 'deducted', align: 'center', render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 600 }}>{v.toLocaleString()}</span> },
+    { title: t('batchDetail.colDeductStoreId'), dataIndex: 'storeId', key: 'storeId' },
+    { title: t('batchDetail.colDeductStoreName'), dataIndex: 'storeName', key: 'storeName' },
+    { title: t('batchDetail.colDeductAmount'), dataIndex: 'amount', key: 'amount', align: 'right' as const, render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
+    { title: t('batchDetail.colDeductedAmount'), dataIndex: 'deducted', key: 'deducted', align: 'right' as const, render: (v: number) => <span style={{ color: '#1976D2', fontWeight: 600 }}>{v.toLocaleString()}</span> },
   ]
 
   /** 欠款償還門店列（合併） */
   const repayStoreColumns: TableColumnsType<RepayStoreRow> = [
-    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId', align: 'center' },
-    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', align: 'center' },
-    { title: t('common.colBd'), dataIndex: 'bd', key: 'bd', align: 'center' },
-    { title: t('batchDetail.colRepayAmount'), dataIndex: 'amount', key: 'amount', align: 'center', render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
+    { title: t('common.colStoreId'), dataIndex: 'storeId', key: 'storeId' },
+    { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName' },
+    { title: t('common.colBd'), dataIndex: 'bd', key: 'bd' },
+    { title: t('batchDetail.colRepayAmount'), dataIndex: 'amount', key: 'amount', align: 'right' as const, render: (v: number) => <span style={{ color: '#E8720C', fontWeight: 600 }}>{v.toLocaleString()}</span> },
   ]
 
   /** 四列信息網格（全局統一：標籤在上、值在下） */
@@ -349,7 +349,7 @@ export default function BatchDetail() {
       <>
         <div style={gridStyle}>
           <InfoItem label={t('batchDetail.rechargeBatchNo')} value={record.batchNo} />
-          <InfoItem label={t('common.colFlowNo')} value={record.flowNo} />
+          <InfoItem label={t('common.colFlowNo')} value={record.flowNo === 'DIRECT-EXEC' ? '未經審批' : record.flowNo} />
           <InfoItem label={t('common.colGroupId')} value={record.groupId} />
           <InfoItem label={t('common.colGroupName')} value={record.groupName} />
           <InfoItem label={t('common.colBrand')} value={<BrandTag value={record.brand} />} />
@@ -415,7 +415,7 @@ export default function BatchDetail() {
     return (
       <div style={gridStyle}>
         <InfoItem label={t('batchDetail.transferBatchNo')} value={record.batchNo} />
-        <InfoItem label={t('common.colFlowNo')} value={record.flowNo} />
+        <InfoItem label={t('common.colFlowNo')} value={record.flowNo === 'DIRECT-EXEC' ? '未經審批' : record.flowNo} />
         <InfoItem label={t('common.colGroupId')} value={record.groupId} />
         <InfoItem label={t('common.colGroupName')} value={record.groupName} />
         <InfoItem label={t('common.colBrand')} value={<BrandTag value={record.brand} />} />
@@ -441,7 +441,7 @@ export default function BatchDetail() {
       <>
         <div style={gridStyle}>
           <InfoItem label={t('batchDetail.mergeBatchNo')} value={record.batchNo} />
-          <InfoItem label={t('common.colFlowNo')} value={record.flowNo} />
+          <InfoItem label={t('common.colFlowNo')} value={record.flowNo === 'DIRECT-EXEC' ? '未經審批' : record.flowNo} />
           <InfoItem label={t('common.colGroupId')} value={record.groupId} />
           <InfoItem
             label={t('common.colGroupName')}

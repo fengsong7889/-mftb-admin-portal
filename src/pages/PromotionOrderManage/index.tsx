@@ -546,12 +546,14 @@ export default function PromotionOrderManage() {
       dataIndex: 'originalPrice',
       key: 'originalPrice',
       width: 120,
+      align: 'right' as const,
       render: (price: number) => `$${price}`,
     },
     {
       title: t('promotionOrderManage.colDiscount'),
       key: 'discount',
       width: 120,
+      align: 'right' as const,
       render: (_, record) => {
         const disc = record.discountAmount ?? (record.originalPrice - record.actualPrice)
         return disc > 0 ? <span style={{ color: '#fa8c16' }}>-${disc}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
@@ -586,6 +588,7 @@ export default function PromotionOrderManage() {
       dataIndex: 'actualPrice',
       key: 'actualPrice',
       width: 120,
+      align: 'right' as const,
       render: (price: number) => (
         <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${price}</span>
       ),

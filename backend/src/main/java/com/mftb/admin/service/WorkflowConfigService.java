@@ -32,4 +32,13 @@ public interface WorkflowConfigService {
      * @return true=需要审批, false=直接执行
      */
     boolean isApprovalEnabled(String flowType);
+
+    /**
+     * 保存流程节点配置和路由规则
+     *
+     * @param flowType     流程类型标识
+     * @param nodesConfig  节点配置JSON
+     * @param routingRules 路由规则JSON
+     */
+    void updateNodesConfig(String flowType, String nodesConfig, String routingRules);
 }

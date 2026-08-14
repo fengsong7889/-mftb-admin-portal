@@ -25,10 +25,10 @@ import {
   rejectFinApproval,
   cancelFinApproval,
 } from '../../api/finance'
-import type { FinApproval } from '../../api/finance'
+import type { FinApproval, ApprovalNodeInstance } from '../../api/finance'
 import { useTranslation } from 'react-i18next'
 
-/** 审批历史记录 */
+/** 審批历史记录 */
 interface ApprovalTimelineItem {
   node: string
   time: string
@@ -36,6 +36,10 @@ interface ApprovalTimelineItem {
   status: 'approved' | 'rejected' | 'submitted' | 'pending'
   comment: string
   rejectReason?: string
+  /** 多人审批时的审批人列表 */
+  approvers?: { name: string; status: string; time: string | null }[]
+  /** 审批规则: any / all */
+  approvalRule?: string
 }
 
 /** 审批详情数据 */
@@ -453,12 +457,28 @@ function toDetailData(record: FinApproval, t?: (key: string) => string): Approva
     groupName: record.groupName,
     notes: str(extra.remark),
     hasRevoke: record.flowStatus === 'pending',
-    timeline: [
-      nodeItem('finance', record.finApprover, record.finApproveTime, record.finApproveStatus, record.rejectReason),
-      nodeItem('operation', record.opsApprover, record.opsApproveTime, record.opsApproveStatus, record.rejectReason),
-      nodeItem('business', record.bizApprover, record.bizApproveTime, record.bizApproveStatus, record.rejectReason),
-      { node: 'created', time: record.applyTime, approver: record.applicant, status: 'submitted', comment: '' },
-    ],
+    timeline: record.approvalNodes?.length
+      ? [
+          ...record.approvalNodes.map(n => ({
+            node: n.nodeName,
+            time: n.approvers?.find(a => a.status === 'approved' || a.status === 'rejected')?.time || '--',
+            approver: n.approvers?.map(a => a.name).join(', ') || '--',
+            status: (n.approvers?.some(a => a.status === 'rejected') ? 'rejected'
+              : n.approvers?.every(a => a.status === 'approved' || a.status === 'skipped') ? 'approved'
+              : 'pending') as ApprovalTimelineItem['status'],
+            comment: '',
+            rejectReason: n.approvers?.find(a => a.status === 'rejected')?.status === 'rejected' ? record.rejectReason : undefined,
+            approvers: n.approvers?.map(a => ({ name: a.name, status: a.status, time: a.time })),
+            approvalRule: n.approvalRule,
+          })),
+          { node: 'created', time: record.applyTime, approver: record.applicant, status: 'submitted' as const, comment: '' },
+        ]
+      : [
+          nodeItem('finance', record.finApprover, record.finApproveTime, record.finApproveStatus, record.rejectReason),
+          nodeItem('operation', record.opsApprover, record.opsApproveTime, record.opsApproveStatus, record.rejectReason),
+          nodeItem('business', record.bizApprover, record.bizApproveTime, record.bizApproveStatus, record.rejectReason),
+          { node: 'created', time: record.applyTime, approver: record.applicant, status: 'submitted' as const, comment: '' },
+        ],
   }
 
   if (record.approvalType === 'recharge') {
@@ -1159,7 +1179,7 @@ export default function ApprovalDetail() {
                         render: (val: string) => <Tag color="blue">{val}</Tag>,
                       },
                       {
-                        title: t('approvalDetail.repayAmount'), dataIndex: 'amount', width: 160, align: 'center' as const,
+                        title: t('approvalDetail.repayAmount'), dataIndex: 'amount', width: 160, align: 'right' as const,
                         render: (val: number) => (
                           <span style={{
                             padding: '2px 10px', borderRadius: 4,
@@ -1287,12 +1307,29 @@ export default function ApprovalDetail() {
                     <span className="approval-timeline-node">{timelineNodeMapKeys[item.node] ? t(timelineNodeMapKeys[item.node]) : item.node}</span>
                     <span className="approval-timeline-time">{item.time}</span>
                   </div>
-                  <div className="approval-timeline-info">
-                    {item.status === 'submitted' ? t('approvalCenter.colApplicant') : t('approvalCenter.colApprover')}：{item.approver}
-                  </div>
-                  <div className="approval-timeline-status">
-                    {renderStatusTag(item.status)}
-                  </div>
+                  {item.approvers?.length ? (
+                    <div style={{ fontSize: 12, color: '#666', lineHeight: 2, marginTop: 4 }}>
+                      {item.approvers.map((a, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>{a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}</span>
+                          {renderStatusTag(a.status === 'skipped' ? 'pending' : a.status)}
+                          <span style={{ color: '#999', fontSize: 11 }}>{a.time || '--'}</span>
+                        </div>
+                      ))}
+                      {item.approvalRule === 'all' && (
+                        <Tag color="orange" style={{ fontSize: 11, marginTop: 2 }}>{t('approvalCenter.countersign')}</Tag>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="approval-timeline-info">
+                        {item.status === 'submitted' ? t('approvalCenter.colApplicant') : t('approvalCenter.colApprover')}：{item.approver}
+                      </div>
+                      <div className="approval-timeline-status">
+                        {renderStatusTag(item.status)}
+                      </div>
+                    </>
+                  )}
                   {item.comment && (
                     <div className="approval-timeline-comment">
                       <span className="approval-timeline-comment-label">{t('approvalDetail.commentTitle')}：</span>

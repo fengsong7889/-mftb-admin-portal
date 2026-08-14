@@ -172,10 +172,10 @@ export default function HintReport() {
     { title: t('hintReport.colBrand'), dataIndex: 'brand', key: 'brand', width: 80 },
     { title: t('hintReport.colTerminal'), dataIndex: 'terminal', key: 'terminal', width: 120 },
     { title: t('hintReport.colRegion'), dataIndex: 'region', key: 'region', width: 80 },
-    { title: t('hintReport.colShowCount'), dataIndex: 'showCount', key: 'showCount', width: 100, sorter: true },
-    { title: t('hintReport.colClickCount'), dataIndex: 'clickCount', key: 'clickCount', width: 100, sorter: true },
-    { title: t('hintReport.colClickRate'), dataIndex: 'clickRate', key: 'clickRate', width: 100, sorter: true },
-    { title: t('hintReport.colJumpCount'), dataIndex: 'jumpCount', key: 'jumpCount', width: 100, sorter: true },
+    { title: t('hintReport.colShowCount'), dataIndex: 'showCount', key: 'showCount', width: 100, align: 'right' as const, sorter: true },
+    { title: t('hintReport.colClickCount'), dataIndex: 'clickCount', key: 'clickCount', width: 100, align: 'right' as const, sorter: true },
+    { title: t('hintReport.colClickRate'), dataIndex: 'clickRate', key: 'clickRate', width: 100, align: 'right' as const, sorter: true },
+    { title: t('hintReport.colJumpCount'), dataIndex: 'jumpCount', key: 'jumpCount', width: 100, align: 'right' as const, sorter: true },
   ]
 
   const terminalOptions = [

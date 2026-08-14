@@ -189,6 +189,7 @@ export default function GroupList() {
       dataIndex: 'storeCount',
       key: 'storeCount',
       width: 100,
+      align: 'center' as const,
       render: (count: number) => (
         <span style={{ color: count > 0 ? '#1890ff' : '#8c8c8c' }}>
           {count} {t('storeUnit')}

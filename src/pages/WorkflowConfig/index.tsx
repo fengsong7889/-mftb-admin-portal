@@ -81,12 +81,14 @@ export default function WorkflowConfig() {
     const action = wf.enabled ? '停用' : '啟用'
     Modal.confirm({
       title: `確認${action}`,
-      content: `確定${action}「${wf.name}」流程？`,
+      content: wf.enabled
+        ? `確定${action}「${wf.name}」流程？${action}後對應操作將直接執行，無需審批。`
+        : `確定${action}「${wf.name}」流程？${action}後對應操作將進入審批環節。`,
       okText: '確認',
       cancelText: '取消',
       okButtonProps: { danger: wf.enabled },
-      onOk: () => {
-        toggleEnabled(id)
+      onOk: async () => {
+        await toggleEnabled(id)
         message.success(`「${wf.name}」已${action}`)
       },
     })

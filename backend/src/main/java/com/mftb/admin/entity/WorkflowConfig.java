@@ -30,6 +30,12 @@ public class WorkflowConfig {
     /** 流程说明 */
     private String description;
 
+    /** 审批节点配置JSON（前端编排的 WorkflowNode[]） */
+    private String nodesConfig;
+
+    /** 路由规则JSON（前端编排的 RoutingRule[]） */
+    private String routingRules;
+
     /** 最后更新人 */
     private String updatedBy;
 

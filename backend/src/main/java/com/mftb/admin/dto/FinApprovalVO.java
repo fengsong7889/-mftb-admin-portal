@@ -5,6 +5,7 @@ import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -51,6 +52,9 @@ public class FinApprovalVO {
     /** 申请表单扩展数据（结算方式/扣款门店/对方集团/偿还门店等） */
     private Map<String, Object> extra;
 
+    /** 动态审批节点实例列表 */
+    private List<ApprovalNodeInstance> approvalNodes;
+
     public static FinApprovalVO from(FinApproval approval) {
         FinApprovalVO vo = new FinApprovalVO();
         vo.setId(approval.getId());
@@ -73,6 +77,7 @@ public class FinApprovalVO {
         vo.setFlowStatus(approval.getFlowStatus());
         vo.setRejectReason(approval.getRejectReason());
         vo.setExtra(JsonUtils.parseMap(approval.getExtra()));
+        vo.setApprovalNodes(JsonUtils.parseList(approval.getApprovalNodes(), ApprovalNodeInstance.class));
         return vo;
     }
 

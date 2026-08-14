@@ -19,6 +19,7 @@ import BrandTag from '../../components/BrandTag'
 import { fetchFinAccounts, submitTransferApply } from '../../api/finance'
 import type { FinAccount, TransferApplyPayload } from '../../api/finance'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
+import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
 function useCountUp(target: number, duration = 1200) {
@@ -157,6 +158,7 @@ export default function TransferAdd() {
         return
       }
       // ====== 二次確認彈窗 ======
+      const approvalEnabled = isWorkflowEnabled('transfer')
       Modal.confirm({
         title: t('accountBalance.confirmSubmitTitle'),
         icon: (
@@ -183,6 +185,16 @@ export default function TransferAdd() {
               <span className="confirm-info-value highlight">MOP {transferAmount.toLocaleString()}</span>
             </div>
             </div>
+            {!approvalEnabled && (
+              <div style={{
+                marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #FFF1F0, #FFFAF0)',
+                border: '1.5px solid #FF7A45',
+                fontSize: 13, color: '#CF1322', lineHeight: 1.6, fontWeight: 500,
+              }}>
+                ⚡ 當前轉賬審批流程已停用，確認後將直接執行轉賬，無需審批。
+              </div>
+            )}
           </div>
         ),
         onOk: async () => {
@@ -515,10 +527,13 @@ export default function TransferAdd() {
               {t('accountBalance.submitSuccessTitle')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && (
+              {submittedFlowNo && !isDirectExec(submittedFlowNo) && (
                 <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              {t('accountBalance.submitSuccessDesc')}
+              {isDirectExec(submittedFlowNo)
+                ? '✅ 已直接執行轉賬（未經審批）'
+                : t('accountBalance.submitSuccessDesc')
+              }
             </p>
             <Button
               type="primary"

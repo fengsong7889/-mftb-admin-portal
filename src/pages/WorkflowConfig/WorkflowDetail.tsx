@@ -7,7 +7,7 @@ import {
   TeamOutlined,
   ApartmentOutlined,
   CrownOutlined,
-  ThunderboltOutlined,
+  NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
 import {
@@ -15,11 +15,10 @@ import {
   APPROVER_TYPE_LABELS,
   APPROVAL_RULE_LABELS,
   REJECT_BEHAVIOR_LABELS,
-  CONDITION_OPERATOR_LABELS,
-  CONDITION_FIELD_OPTIONS,
-  getConditionFieldOptions,
+  BRAND_CONFIG_OPTIONS,
+  getApproverSettingForBrand,
 } from './types'
-import type { WorkflowNode, WorkflowDefinition, ApproverType } from './types'
+import type { WorkflowNode, WorkflowDefinition, ApproverType, ApproverConfig, ApproverSetting } from './types'
 import { getApproverOptions } from './options'
 
 /** 流程類型標籤映射（複用 APPROVAL_TYPE_OPTIONS） */
@@ -36,24 +35,40 @@ function approverIcon(type: ApproverType) {
   return map[type]
 }
 
-/** 審批人展示文本 */
-function approverText(node: WorkflowNode) {
-  if (node.approverType === 'initiator_leader') return APPROVER_TYPE_LABELS[node.approverType]
-  const options = getApproverOptions(node.approverType)
-  const names = node.approverIds.map(v => options.find(o => o.value === v)?.label || v).join('、')
-  return `${APPROVER_TYPE_LABELS[node.approverType]}：${names || '未選擇'}`
+/** 從 approverConfig 獲取展示文本 */
+function approverConfigText(cfg: ApproverConfig | undefined): string {
+  if (!cfg) return '未配置'
+  if (!cfg.byBrand) {
+    const s = cfg.default
+    const typeLabel = APPROVER_TYPE_LABELS[s.approverType]
+    if (s.approverType === 'initiator_leader') return typeLabel
+    const options = getApproverOptions(s.approverType)
+    const names = s.approverIds.map(v => options.find(o => o.value === v)?.label || v).join('、')
+    return `${typeLabel}：${names || '未選擇'}`
+  }
+  const parts: string[] = []
+  for (const brand of BRAND_CONFIG_OPTIONS) {
+    const s = cfg.brands[brand.value]
+    if (s) {
+      const typeLabel = APPROVER_TYPE_LABELS[s.approverType]
+      const names = s.approverType === 'initiator_leader' ? '' :
+        '：' + s.approverIds.map(v => getApproverOptions(s.approverType).find(o => o.value === v)?.label || v).join('、')
+      parts.push(`${brand.label}: ${typeLabel}${names}`)
+    }
+  }
+  return parts.join('；') || '未配置'
 }
 
-/** 條件文本 */
-function conditionText(node: WorkflowNode, workflowType?: string) {
-  if (!node.condition || node.condition.length === 0) return ''
-  const fieldOptions = getConditionFieldOptions(workflowType)
-  return node.condition.map(c => {
-    const fieldLabel = fieldOptions.find(f => f.value === c.field)?.label || c.field
-    const opLabel = CONDITION_OPERATOR_LABELS[c.operator] || c.operator
-    const v = Array.isArray(c.value) ? c.value.join('、') : c.value
-    return `${fieldLabel} ${opLabel} ${v}`
-  }).join(' 且 ')
+/** 從 approverConfig 獲取規則文本 */
+function approvalRuleText(cfg: ApproverConfig | undefined): string {
+  if (!cfg) return ''
+  if (!cfg.byBrand) return APPROVAL_RULE_LABELS[cfg.default.approvalRule]
+  const parts: string[] = []
+  for (const brand of BRAND_CONFIG_OPTIONS) {
+    const s = cfg.brands[brand.value]
+    if (s) parts.push(`${brand.label}: ${APPROVAL_RULE_LABELS[s.approvalRule]}`)
+  }
+  return parts.join('；') || APPROVAL_RULE_LABELS[cfg.default?.approvalRule || 'any']
 }
 
 export default function WorkflowDetail() {
@@ -64,7 +79,6 @@ export default function WorkflowDetail() {
 
   const [activeTab, setActiveTab] = useState('config')
   const [viewNode, setViewNode] = useState<WorkflowNode | null>(null)
-
   if (!workflow) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: '80px 0' }}>
@@ -157,12 +171,8 @@ export default function WorkflowDetail() {
                   {node.sortOrder}
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{node.name}</span>
-                {(node.condition?.length ?? 0) > 0 ? (
-                  <Tag color="orange" icon={<ThunderboltOutlined />} style={{ margin: 0, fontSize: 11 }}>
-                    {conditionText(node, workflow.approvalType)}
-                  </Tag>
-                ) : (
-                  <Tag style={{ margin: 0, fontSize: 11 }}>無條件</Tag>
+                {node.approverConfig?.byBrand && (
+                  <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>按品牌區分</Tag>
                 )}
               </div>
               <div style={{
@@ -172,18 +182,17 @@ export default function WorkflowDetail() {
               }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ color: '#8C8C8C' }}>審批人：</span>
-                  {approverIcon(node.approverType)}
                   <span
                     style={{ color: '#1890FF', cursor: 'pointer', textDecoration: 'underline dotted' }}
                     onClick={() => setViewNode(node)}
                     title="點擊查看審批人明細"
                   >
-                    {approverText(node)}
+                    {approverConfigText(node.approverConfig)}
                   </span>
                 </div>
                 <div>
                   <span style={{ color: '#8C8C8C' }}>規則：</span>
-                  {APPROVAL_RULE_LABELS[node.approvalRule]}
+                  {approvalRuleText(node.approverConfig)}
                 </div>
                 {node.ccUserIds.length > 0 && (
                   <div>
@@ -202,6 +211,54 @@ export default function WorkflowDetail() {
           )
         })}
       </div>
+
+      {/* 路由規則區域 */}
+      {workflow.routingRules && workflow.routingRules.length > 0 && (
+        <div style={{
+          border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+          padding: '20px 24px', marginTop: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#FFF0F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <NodeIndexOutlined style={{ fontSize: 14, color: '#EB2F96' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>路由規則</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {workflow.routingRules.sort((a, b) => a.priority - b.priority).map((rule, idx) => {
+              const isDefault = rule.conditions.length === 0
+              return (
+                <div key={rule.id} style={{
+                  padding: '10px 16px', border: '1px solid #e8eaed', borderRadius: 6,
+                  borderLeft: `4px solid ${isDefault ? '#52C41A' : '#722ED1'}`,
+                  display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
+                }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: '50%', background: '#722ED1',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {idx + 1}
+                  </div>
+                  <span style={{ fontWeight: 600 }}>{rule.name}</span>
+                  {isDefault && <Tag color="green" style={{ margin: 0, fontSize: 11 }}>默認</Tag>}
+                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                    激活 {rule.activatedNodeIds.length}/{workflow.nodes.length} 個節點
+                  </span>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {rule.activatedNodeIds.map(nid => {
+                      const n = workflow.nodes.find(nd => nd.id === nid)
+                      return n ? <Tag key={nid} style={{ fontSize: 11, margin: 0 }}>#{n.sortOrder} {n.name}</Tag> : null
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -228,20 +285,9 @@ export default function WorkflowDetail() {
           const color = nodeColors[idx % nodeColors.length]
           return (
             <div key={node.id}>
-              {/* 連線（帶條件標籤） */}
+              {/* 連線 */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0' }}>
                 <div style={{ width: 2, height: 28, background: '#D9D9D9' }} />
-                {(node.condition?.length ?? 0) > 0 && (
-                  <div style={{
-                    display: 'inline-block', padding: '2px 10px', margin: '4px 0',
-                    background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 4,
-                    fontSize: 11, color: '#D46B08', maxWidth: 420, whiteSpace: 'nowrap',
-                    overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    <ThunderboltOutlined style={{ marginRight: 4 }} />
-                    條件：{conditionText(node, workflow.approvalType)}
-                  </div>
-                )}
                 <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid #D9D9D9' }} />
               </div>
 
@@ -265,15 +311,14 @@ export default function WorkflowDetail() {
                   </div>
                   <div style={{ fontSize: 12, color: '#595959', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {approverIcon(node.approverType)}
                       <span style={{ color: '#1890FF', cursor: 'pointer', textDecoration: 'underline dotted' }}
                         onClick={() => setViewNode(node)}>
-                        {approverText(node)}
+                        {approverConfigText(node.approverConfig)}
                       </span>
                     </span>
                     <span>
                       <span style={{ color: '#8C8C8C' }}>規則：</span>
-                      {node.approvalRule === 'all' ? '會簽' : '單人通過'}
+                      {approvalRuleText(node.approverConfig)}
                     </span>
                     {node.timeoutHours && <span>超時 {node.timeoutHours}h</span>}
                   </div>
@@ -359,51 +404,87 @@ export default function WorkflowDetail() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {viewNode && approverIcon(viewNode.approverType)}
+            <TeamOutlined style={{ color: '#E8720C' }} />
             <span>審批人明細：{viewNode?.name}</span>
           </div>
         }
         open={viewNode != null}
         onCancel={() => setViewNode(null)}
         footer={null}
-        width={520}
+        width={560}
       >
-        {viewNode && (
-          <Descriptions column={1} size="middle" labelStyle={{ color: '#8C8C8C', width: 110 }}>
-            <Descriptions.Item label="審批人類型">
-              {APPROVER_TYPE_LABELS[viewNode.approverType]}
-            </Descriptions.Item>
-            <Descriptions.Item label="審批人">
-              {viewNode.approverType === 'initiator_leader' ? (
-                <span style={{ color: '#52C41A' }}>自動取發起人的直屬主管</span>
-              ) : (
-                viewNode.approverIds.map(v => {
-                  const opt = getApproverOptions(viewNode.approverType).find(o => o.value === v)
-                  return <Tag key={v} style={{ marginBottom: 4 }}>{opt?.label || v}</Tag>
-                })
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="審批規則">
-              {APPROVAL_RULE_LABELS[viewNode.approvalRule]}
-            </Descriptions.Item>
-            <Descriptions.Item label="抄送人員">
-              {viewNode.ccUserIds.length > 0
-                ? viewNode.ccUserIds.map(v => {
-                    const opt = getApproverOptions('person').find(o => o.value === v)
-                    return <Tag key={v} style={{ marginBottom: 4 }}>{opt?.label || v}</Tag>
-                  })
-                : '無'}
-            </Descriptions.Item>
-            <Descriptions.Item label="節點超時">
-              {viewNode.timeoutHours ? `${viewNode.timeoutHours} 小時` : '不限'}
-            </Descriptions.Item>
-            <Descriptions.Item label="激活條件">
-              {(viewNode.condition?.length ?? 0) > 0 ? (
-                <Tag color="orange" icon={<ThunderboltOutlined />}>{conditionText(viewNode, workflow.approvalType)}</Tag>
-              ) : '無條件，始終參與審批'}
-            </Descriptions.Item>
-          </Descriptions>
-        )}
+        {viewNode && (() => {
+          const cfg = viewNode.approverConfig
+          if (!cfg.byBrand) {
+            const s = cfg.default
+            return (
+              <Descriptions column={1} size="middle" labelStyle={{ color: '#8C8C8C', width: 110 }}>
+                <Descriptions.Item label="審批人類型">{APPROVER_TYPE_LABELS[s.approverType]}</Descriptions.Item>
+                <Descriptions.Item label="審批人">
+                  {s.approverType === 'initiator_leader' ? (
+                    <span style={{ color: '#52C41A' }}>自動取發起人的直屬主管</span>
+                  ) : (
+                    s.approverIds.map(v => {
+                      const opt = getApproverOptions(s.approverType).find(o => o.value === v)
+                      return <Tag key={v} style={{ marginBottom: 4 }}>{opt?.label || v}</Tag>
+                    })
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="審批規則">{APPROVAL_RULE_LABELS[s.approvalRule]}</Descriptions.Item>
+                <Descriptions.Item label="抄送人員">
+                  {viewNode.ccUserIds.length > 0
+                    ? viewNode.ccUserIds.map(v => {
+                        const opt = getApproverOptions('person').find(o => o.value === v)
+                        return <Tag key={v} style={{ marginBottom: 4 }}>{opt?.label || v}</Tag>
+                      })
+                    : '無'}
+                </Descriptions.Item>
+                <Descriptions.Item label="節點超時">{viewNode.timeoutHours ? `${viewNode.timeoutHours} 小時` : '不限'}</Descriptions.Item>
+              </Descriptions>
+            )
+          }
+          // 按品牌區分展示
+          return (
+            <div>
+              {BRAND_CONFIG_OPTIONS.map(brand => {
+                const s = cfg.brands[brand.value]
+                if (!s) return null
+                return (
+                  <div key={brand.value} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#262626' }}>
+                      <Tag color="purple">{brand.label}</Tag>
+                    </div>
+                    <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C', width: 110 }}>
+                      <Descriptions.Item label="審批人類型">{APPROVER_TYPE_LABELS[s.approverType]}</Descriptions.Item>
+                      <Descriptions.Item label="審批人">
+                        {s.approverType === 'initiator_leader' ? (
+                          <span style={{ color: '#52C41A' }}>自動取發起人的直屬主管</span>
+                        ) : (
+                          s.approverIds.map(v => {
+                            const opt = getApproverOptions(s.approverType).find(o => o.value === v)
+                            return <Tag key={v} style={{ marginBottom: 4 }}>{opt?.label || v}</Tag>
+                          })
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="審批規則">{APPROVAL_RULE_LABELS[s.approvalRule]}</Descriptions.Item>
+                    </Descriptions>
+                  </div>
+                )
+              })}
+              <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C', width: 110 }}>
+                <Descriptions.Item label="抄送人員">
+                  {viewNode.ccUserIds.length > 0
+                    ? viewNode.ccUserIds.map(v => {
+                        const opt = getApproverOptions('person').find(o => o.value === v)
+                        return <Tag key={v} style={{ marginBottom: 4 }}>{opt?.label || v}</Tag>
+                      })
+                    : '無'}
+                </Descriptions.Item>
+                <Descriptions.Item label="節點超時">{viewNode.timeoutHours ? `${viewNode.timeoutHours} 小時` : '不限'}</Descriptions.Item>
+              </Descriptions>
+            </div>
+          )
+        })()}
       </Modal>
     </div>
   )

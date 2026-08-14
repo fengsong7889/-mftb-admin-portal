@@ -180,6 +180,16 @@ export default function GiftAdd() {
                 <span className="confirm-info-value">{values.validDays} {t('dayUnit')}</span>
               </div>
             </div>
+            {!needApproval && (
+              <div style={{
+                marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #FFF1F0, #FFFAF0)',
+                border: '1.5px solid #FF7A45',
+                fontSize: 13, color: '#CF1322', lineHeight: 1.6, fontWeight: 500,
+              }}>
+                ⚡ 當前贈送審批流程已停用，確認後將直接贈送到賬，無需審批。
+              </div>
+            )}
           </div>
         ),
         onOk: async () => {

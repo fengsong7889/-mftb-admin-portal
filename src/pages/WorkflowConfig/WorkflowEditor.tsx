@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Form, Input, Select, Radio, InputNumber, Button, Tag, message, Modal, Popconfirm } from 'antd'
+import { Form, Input, Select, Radio, InputNumber, Button, Tag, message, Popconfirm, Checkbox } from 'antd'
 import {
   ArrowLeftOutlined,
   SaveOutlined,
@@ -11,10 +11,10 @@ import {
   ApartmentOutlined,
   CrownOutlined,
   ExclamationCircleOutlined,
-  ThunderboltOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
   SettingOutlined,
+  NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
 import {
@@ -22,14 +22,14 @@ import {
   APPROVER_TYPE_LABELS,
   APPROVAL_RULE_LABELS,
   REJECT_BEHAVIOR_LABELS,
-  CONDITION_OPERATOR_LABELS,
-  CONDITION_FIELD_OPTIONS,
-  getConditionFieldOptions,
+  BRAND_CONFIG_OPTIONS,
+  getApproverSettingForBrand,
+  createDefaultApproverConfig,
 } from './types'
-import type { WorkflowNode, WorkflowDefinition, ApproverType, NodeCondition } from './types'
+import type { WorkflowNode, WorkflowDefinition, ApproverConfig, RoutingRule } from './types'
 import { getApproverOptions } from './options'
 import ApproverConfigModal from './ApproverConfigModal'
-import ConditionConfigModal from './ConditionConfigModal'
+import RoutingRuleConfigModal from './RoutingRuleConfigModal'
 
 export default function WorkflowEditor() {
   const navigate = useNavigate()
@@ -54,9 +54,9 @@ export default function WorkflowEditor() {
   const [approverModalOpen, setApproverModalOpen] = useState(false)
   const [editingApproverNode, setEditingApproverNode] = useState<WorkflowNode | null>(null)
 
-  /* 條件配置彈窗 */
-  const [conditionModalOpen, setConditionModalOpen] = useState(false)
-  const [editingConditionNode, setEditingConditionNode] = useState<WorkflowNode | null>(null)
+  /* 路由規則 */
+  const [routingRules, setRoutingRules] = useState<RoutingRule[]>(existing?.routingRules || [])
+  const [routingRuleModalOpen, setRoutingRuleModalOpen] = useState(false)
 
   /* 節點顏色 */
   const nodeColors = ['#1890FF', '#52C41A', '#E8720C', '#722ED1', '#13C2C2', '#EB2F96', '#FA8C16', '#2F54EB']
@@ -73,31 +73,26 @@ export default function WorkflowEditor() {
     setApproverModalOpen(true)
   }, [])
 
-  /* 打開條件配置 */
-  const handleEditCondition = useCallback((node: WorkflowNode) => {
-    setEditingConditionNode(node)
-    setConditionModalOpen(true)
-  }, [])
-
   /* 審批人配置確認 */
   const handleApproverOk = useCallback((values: {
     name: string
-    approverType: ApproverType
-    approverIds: string[]
-    approvalRule: WorkflowNode['approvalRule']
+    approverConfig: ApproverConfig
     ccUserIds: string[]
   }) => {
     if (editingApproverNode) {
-      /* 編輯已有節點的審批人信息 */
-      setNodes(prev => prev.map(n => n.id === editingApproverNode.id ? { ...n, ...values } : n))
+      /* 編輯已有節點 */
+      setNodes(prev => prev.map(n => n.id === editingApproverNode.id
+        ? { ...n, name: values.name, approverConfig: values.approverConfig, ccUserIds: values.ccUserIds }
+        : n))
     } else {
-      /* 新增節點：追加到末尾 */
+      /* 新增節點 */
       const newId = `nd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       const newNode: WorkflowNode = {
-        ...values,
         id: newId,
+        name: values.name,
         sortOrder: nodes.length + 1,
-        condition: [],
+        approverConfig: values.approverConfig,
+        ccUserIds: values.ccUserIds,
         timeoutHours: null,
       }
       setNodes(prev => [...prev, newNode])
@@ -106,14 +101,11 @@ export default function WorkflowEditor() {
     setEditingApproverNode(null)
   }, [editingApproverNode, nodes.length])
 
-  /* 條件配置確認 */
-  const handleConditionOk = useCallback((conditions: NodeCondition[]) => {
-    if (editingConditionNode) {
-      setNodes(prev => prev.map(n => n.id === editingConditionNode.id ? { ...n, condition: conditions } : n))
-    }
-    setConditionModalOpen(false)
-    setEditingConditionNode(null)
-  }, [editingConditionNode])
+  /* 路由規則確認 */
+  const handleRoutingRulesOk = useCallback((rules: RoutingRule[]) => {
+    setRoutingRules(rules)
+    setRoutingRuleModalOpen(false)
+  }, [])
 
   /* 節點上移/下移 */
   const handleMoveNode = useCallback((index: number, direction: -1 | 1) => {
@@ -133,38 +125,45 @@ export default function WorkflowEditor() {
     message.success(`「${nodeName}」已刪除`)
   }, [])
 
-  /* 條件文本 */
-  const getConditionText = useCallback((node: WorkflowNode) => {
-    if (!node.condition || node.condition.length === 0) return ''
-    const fieldOptions = getConditionFieldOptions(approvalType)
-    return node.condition.map(c => {
-      const fieldLabel = fieldOptions.find(f => f.value === c.field)?.label || c.field
-      const opLabel = CONDITION_OPERATOR_LABELS[c.operator] || c.operator
-      const v = Array.isArray(c.value) ? c.value.join('、') : c.value
-      return `${fieldLabel} ${opLabel} ${v}`
-    }).join(' 且 ')
-  }, [approvalType])
-
-  /* 審批人圖標 */
-  const getApproverIcon = useCallback((type: ApproverType) => {
-    const map: Record<ApproverType, React.ReactNode> = {
-      person: <UserOutlined style={{ fontSize: 12 }} />,
-      role: <TeamOutlined style={{ fontSize: 12 }} />,
-      department_leader: <ApartmentOutlined style={{ fontSize: 12 }} />,
-      initiator_leader: <CrownOutlined style={{ fontSize: 12 }} />,
+  /* 審批人展示文本（基於 approverConfig） */
+  const getApproverText = useCallback((node: WorkflowNode) => {
+    const cfg = node.approverConfig
+    if (!cfg) return '未配置'
+    if (!cfg.byBrand) {
+      const s = cfg.default
+      const typeLabel = APPROVER_TYPE_LABELS[s.approverType]
+      if (s.approverType === 'initiator_leader') return typeLabel
+      const options = getApproverOptions(s.approverType)
+      const names = s.approverIds.map(v => options.find(o => o.value === v)?.label || v).join('、')
+      return `${typeLabel}：${names || '未選擇'}`
     }
-    return map[type]
+    // 按品牌時簡要展示
+    const parts: string[] = []
+    for (const brand of BRAND_CONFIG_OPTIONS) {
+      const s = cfg.brands[brand.value]
+      if (s) {
+        const typeLabel = APPROVER_TYPE_LABELS[s.approverType]
+        parts.push(`${brand.label}: ${typeLabel}`)
+      }
+    }
+    if (cfg.default) {
+      const typeLabel = APPROVER_TYPE_LABELS[cfg.default.approverType]
+      parts.unshift(`默認: ${typeLabel}`)
+    }
+    return parts.join('；') || '未配置'
   }, [])
 
-  /* 審批人展示文本 */
-  const getApproverText = useCallback((node: WorkflowNode) => {
-    const typeLabel = APPROVER_TYPE_LABELS[node.approverType]
-    if (node.approverType === 'initiator_leader') return typeLabel
-    const options = getApproverOptions(node.approverType)
-    const names = node.approverIds
-      .map(v => options.find(o => o.value === v)?.label || v)
-      .join('、')
-    return `${typeLabel}：${names || '未選擇'}`
+  /* 審批規則展示 */
+  const getApprovalRuleText = useCallback((node: WorkflowNode) => {
+    const cfg = node.approverConfig
+    if (!cfg) return ''
+    if (!cfg.byBrand) return APPROVAL_RULE_LABELS[cfg.default.approvalRule]
+    const parts: string[] = []
+    for (const brand of BRAND_CONFIG_OPTIONS) {
+      const s = cfg.brands[brand.value]
+      if (s) parts.push(`${brand.label}: ${APPROVAL_RULE_LABELS[s.approvalRule]}`)
+    }
+    return parts.join('；') || APPROVAL_RULE_LABELS[cfg.default?.approvalRule || 'any']
   }, [])
 
   /* 保存 */
@@ -182,8 +181,23 @@ export default function WorkflowEditor() {
       return
     }
     for (const n of nodes) {
-      if (n.approverIds.length === 0 && n.approverType !== 'initiator_leader') {
+      const cfg = n.approverConfig
+      if (!cfg) {
         message.warning(`節點「${n.name}」未配置審批人`)
+        return
+      }
+      if (!cfg.byBrand && cfg.default.approverIds.length === 0 && cfg.default.approverType !== 'initiator_leader') {
+        message.warning(`節點「${n.name}」未配置審批人`)
+        return
+      }
+    }
+    if (routingRules.length === 0) {
+      message.warning('請至少添加一條路由規則')
+      return
+    }
+    for (const r of routingRules) {
+      if (r.activatedNodeIds.length === 0) {
+        message.warning(`路由規則「${r.name}」未激活任何節點`)
         return
       }
     }
@@ -195,6 +209,7 @@ export default function WorkflowEditor() {
       rejectBehavior,
       timeoutHours,
       nodes,
+      routingRules,
       updatedAt: new Date().toISOString(),
     }
 
@@ -289,6 +304,70 @@ export default function WorkflowEditor() {
         </Form>
       </div>
 
+      {/* ── B2. 路由規則區 ── */}
+      <div style={{
+        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#FFF0F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <NodeIndexOutlined style={{ fontSize: 14, color: '#EB2F96' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>路由規則</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400, marginLeft: 4 }}>
+            根據條件決定每次提交激活哪些審批節點
+          </span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          <Button type="primary" size="small" icon={<SettingOutlined />} onClick={() => setRoutingRuleModalOpen(true)}
+            style={{ borderRadius: 6, backgroundColor: '#722ED1', borderColor: '#722ED1' }}>
+            設置規則
+          </Button>
+        </div>
+
+        {routingRules.length === 0 ? (
+          <div style={{
+            padding: '24px 0', textAlign: 'center', color: '#BFBFBF',
+            border: '2px dashed #F0F0F0', borderRadius: 8,
+          }}>
+            <ExclamationCircleOutlined style={{ fontSize: 24, marginBottom: 8 }} />
+            <div>尚未配置路由規則，請點擊「設置規則」</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {routingRules.sort((a, b) => a.priority - b.priority).map((rule, idx) => {
+              const isDefault = rule.conditions.length === 0
+              return (
+                <div key={rule.id} style={{
+                  padding: '10px 16px', border: '1px solid #e8eaed', borderRadius: 6,
+                  borderLeft: `4px solid ${isDefault ? '#52C41A' : '#722ED1'}`,
+                  display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
+                }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: '50%', background: '#722ED1',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {idx + 1}
+                  </div>
+                  <span style={{ fontWeight: 600 }}>{rule.name}</span>
+                  {isDefault && <Tag color="green" style={{ margin: 0, fontSize: 11 }}>默認</Tag>}
+                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                    激活 {rule.activatedNodeIds.length}/{nodes.length} 個節點
+                  </span>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {rule.activatedNodeIds.map(nid => {
+                      const n = nodes.find(nd => nd.id === nid)
+                      return n ? <Tag key={nid} style={{ fontSize: 11, margin: 0 }}>#{n.sortOrder} {n.name}</Tag> : null
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {/* ── C. 審批節點列表 ── */}
       <div style={{
         border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
@@ -341,24 +420,14 @@ export default function WorkflowEditor() {
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>
                   {node.name}
                 </span>
-                {(node.condition?.length ?? 0) > 0 ? (
-                  <Tag color="orange" icon={<ThunderboltOutlined />} style={{ margin: 0, fontSize: 11 }}>
-                    {getConditionText(node)}
-                  </Tag>
-                ) : (
-                  <Tag style={{ margin: 0, fontSize: 11 }}>無條件</Tag>
+                {node.approverConfig?.byBrand && (
+                  <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>按品牌區分</Tag>
                 )}
                 <div style={{ flex: 1 }} />
-                {/* 配置入口：審批人與條件分離 */}
                 <Button size="small" type="link" icon={<SettingOutlined />}
                   onClick={() => handleEditApprover(node)}
                   style={{ color: '#E8720C', fontSize: 12 }}>
                   審批人設置
-                </Button>
-                <Button size="small" type="link" icon={<ThunderboltOutlined />}
-                  onClick={() => handleEditCondition(node)}
-                  style={{ color: '#FA8C16', fontSize: 12 }}>
-                  條件設置
                 </Button>
                 {/* 排序調整 */}
                 <Button size="small" type="text" icon={<ArrowUpOutlined />}
@@ -387,7 +456,6 @@ export default function WorkflowEditor() {
               }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ color: '#8C8C8C' }}>審批人：</span>
-                  {getApproverIcon(node.approverType)}
                   <span
                     style={{ color: '#1890FF', cursor: 'pointer', textDecoration: 'underline dotted' }}
                     onClick={() => handleEditApprover(node)}
@@ -398,7 +466,7 @@ export default function WorkflowEditor() {
                 </div>
                 <div>
                   <span style={{ color: '#8C8C8C' }}>規則：</span>
-                  {APPROVAL_RULE_LABELS[node.approvalRule]}
+                  {getApprovalRuleText(node)}
                 </div>
                 {node.ccUserIds.length > 0 && (
                   <div>
@@ -410,12 +478,6 @@ export default function WorkflowEditor() {
                   <div>
                     <span style={{ color: '#8C8C8C' }}>超時：</span>
                     {node.timeoutHours} 小時
-                  </div>
-                )}
-                {(node.condition?.length ?? 0) > 0 && (
-                  <div>
-                    <span style={{ color: '#8C8C8C' }}>條件：</span>
-                    <span style={{ color: '#FA8C16' }}>{getConditionText(node)}</span>
                   </div>
                 )}
               </div>
@@ -440,14 +502,14 @@ export default function WorkflowEditor() {
         onCancel={() => { setApproverModalOpen(false); setEditingApproverNode(null) }}
       />
 
-      {/* ── 條件配置彈窗 ── */}
-      <ConditionConfigModal
-        open={conditionModalOpen}
-        nodeName={editingConditionNode?.name || ''}
-        conditions={editingConditionNode?.condition ?? []}
+      {/* ── 路由規則配置彈窗 ── */}
+      <RoutingRuleConfigModal
+        open={routingRuleModalOpen}
+        rules={routingRules}
+        nodes={nodes}
         workflowType={approvalType}
-        onOk={handleConditionOk}
-        onCancel={() => { setConditionModalOpen(false); setEditingConditionNode(null) }}
+        onOk={handleRoutingRulesOk}
+        onCancel={() => setRoutingRuleModalOpen(false)}
       />
     </div>
   )

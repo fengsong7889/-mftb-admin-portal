@@ -379,14 +379,12 @@ export default function DetailQuery() {
       dataIndex: 'channel',
       key: 'channel',
       width: 90,
-      align: 'center',
     },
     {
       title: t('common.colTradeType'),
       dataIndex: 'tradeType',
       key: 'tradeType',
       width: 90,
-      align: 'center',
       render: (val: string) => (
         <Tag color={tradeTypeColor[val] || 'default'}>{val}</Tag>
       ),
@@ -396,7 +394,6 @@ export default function DetailQuery() {
       dataIndex: 'changeType',
       key: 'changeType',
       width: 140,
-      align: 'center',
     },
     {
       title: t('common.colTradeTime'),
@@ -434,7 +431,8 @@ export default function DetailQuery() {
       key: 'flowNo',
       width: 150,
       render: (val: string) =>
-        val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
+        val === 'DIRECT-EXEC' ? <Tag color="default">未經審批</Tag>
+        : val === '--' ? <span style={{ color: '#999' }}>--</span> : val,
     },
     {
       title: t('common.colBd'),

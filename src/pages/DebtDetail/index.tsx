@@ -416,7 +416,7 @@ export default function DebtDetail() {
         <div style={gridStyle}>
           <InfoItem label={t('debtReconcile.colBillNo')} value={bill.billNo} valueStyle={{ fontWeight: 600 }} />
           <InfoItem label={t('common.colBatchNo')} value={bill.batchNo} />
-          <InfoItem label={t('common.colFlowNo')} value={bill.flowNo} />
+          <InfoItem label={t('common.colFlowNo')} value={bill.flowNo === 'DIRECT-EXEC' ? '未經審批' : bill.flowNo} />
           <InfoItem label={t('debtReconcile.colSource')} value={<Tag color={sourceTag.color} style={{ margin: 0 }}>{t(sourceTag.labelKey)}</Tag>} />
           <InfoItem label={t('common.colGroupId')} value={bill.groupId} />
           <InfoItem label={t('common.colGroupName')} value={bill.groupName} />

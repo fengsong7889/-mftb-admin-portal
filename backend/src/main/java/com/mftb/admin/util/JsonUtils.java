@@ -92,4 +92,17 @@ public final class JsonUtils {
             return "[]";
         }
     }
+
+    /** 泛型解析 JSON 数组为 List<T>，解析失败返回空列表 */
+    public static <T> List<T> parseList(String json, Class<T> elementClass) {
+        if (json == null || json.isBlank()) {
+            return new ArrayList<>();
+        }
+        try {
+            return MAPPER.readValue(json,
+                MAPPER.getTypeFactory().constructCollectionType(List.class, elementClass));
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
 }

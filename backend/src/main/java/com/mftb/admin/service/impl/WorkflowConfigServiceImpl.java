@@ -93,4 +93,21 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
             log.warn("加载流程配置缓存失败: {}", e.getMessage());
         }
     }
+
+    @Override
+    public void updateNodesConfig(String flowType, String nodesConfig, String routingRules) {
+        WorkflowConfig config = workflowConfigMapper.selectOne(
+                new LambdaQueryWrapper<WorkflowConfig>()
+                        .eq(WorkflowConfig::getFlowType, flowType));
+        if (config == null) {
+            throw new BusinessException("流程类型不存在: " + flowType);
+        }
+        workflowConfigMapper.update(null,
+                new LambdaUpdateWrapper<WorkflowConfig>()
+                        .eq(WorkflowConfig::getFlowType, flowType)
+                        .set(WorkflowConfig::getNodesConfig, nodesConfig)
+                        .set(WorkflowConfig::getRoutingRules, routingRules)
+                        .set(WorkflowConfig::getUpdatedBy, operatorResolver.currentOperatorName()));
+        log.info("流程配置已更新: {} 节点配置和路由规则", flowType);
+    }
 }

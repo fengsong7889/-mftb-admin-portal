@@ -22,6 +22,7 @@ import type { RechargeApplyPayload } from '../../api/finance'
 import { fetchStoreBdOptions, fetchStoresByGroupCode } from '../../api/store'
 import type { OptionItem } from '../../api/types'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
+import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /** 集團选项 */
 const groupOptions = [
@@ -255,6 +256,7 @@ export default function RechargeAdd() {
         return
       }
       // ====== 二次確認彈窗 ======
+      const approvalEnabled = isWorkflowEnabled('recharge')
       const group = groupOptions.find(g => g.value === groupIdParam)
       const payMethodLabel = payMethod === 'corporate' ? t('accountBalance.settlementCorporate') : payMethod === 'mixed' ? t('accountBalance.settlementMixed') : t('accountBalance.settlementRevenue')
       Modal.confirm({
@@ -295,6 +297,16 @@ export default function RechargeAdd() {
               <span className="confirm-info-value">MOP {revenueAmount.toLocaleString()}</span>
             </div>}
             </div>
+            {!approvalEnabled && (
+              <div style={{
+                marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #FFF1F0, #FFFAF0)',
+                border: '1.5px solid #FF7A45',
+                fontSize: 13, color: '#CF1322', lineHeight: 1.6, fontWeight: 500,
+              }}>
+                ⚡ 當前充值審批流程已停用，確認後將直接充值到賬，無需審批。
+              </div>
+            )}
           </div>
         ),
         onOk: async () => {
@@ -846,10 +858,13 @@ export default function RechargeAdd() {
               {t('accountBalance.submitSuccessTitle')}
             </h3>
             <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && (
+              {submittedFlowNo && !isDirectExec(submittedFlowNo) && (
                 <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
               )}
-              {t('accountBalance.submitSuccessDesc')}
+              {isDirectExec(submittedFlowNo)
+                ? '✅ 已直接充值到賬（未經審批）'
+                : t('accountBalance.submitSuccessDesc')
+              }
             </p>
             <Button
               type="primary"

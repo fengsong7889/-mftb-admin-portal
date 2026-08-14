@@ -23,6 +23,12 @@ public class WorkflowConfigVO {
     /** 流程说明 */
     private String description;
 
+    /** 审批节点配置JSON */
+    private String nodesConfig;
+
+    /** 路由规则JSON */
+    private String routingRules;
+
     /** 最后更新人 */
     private String updatedBy;
 
@@ -35,6 +41,8 @@ public class WorkflowConfigVO {
         vo.setFlowName(config.getFlowName());
         vo.setApprovalEnabled(config.getApprovalEnabled() != null && config.getApprovalEnabled() == 1);
         vo.setDescription(config.getDescription());
+        vo.setNodesConfig(config.getNodesConfig());
+        vo.setRoutingRules(config.getRoutingRules());
         vo.setUpdatedBy(config.getUpdatedBy());
         vo.setUpdatedAt(config.getUpdatedAt() != null ? config.getUpdatedAt().toString() : null);
         return vo;
