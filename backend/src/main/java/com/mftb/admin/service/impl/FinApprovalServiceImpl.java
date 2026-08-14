@@ -35,6 +35,7 @@ import com.mftb.admin.util.FinExtras;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -50,6 +51,7 @@ import java.util.Set;
 /**
  * 财务审批流程服务实现（审批流转口径移植 approvalStore.approveCurrentNode / rejectCurrentNode）
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FinApprovalServiceImpl implements FinApprovalService {
