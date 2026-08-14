@@ -75,15 +75,19 @@ export default function NewStoreDayPicker() {
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [lastSubmitDays, setLastSubmitDays] = useState(0)
 
+  // 品牌变更时重新加载算法列表
   useEffect(() => {
-    fetchAdAlgorithms({ algoType: 2, status: 1, size: 100 }).then(res => {
-      // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
+    if (!searchBrand) {
+      setAlgorithmOptions([])
+      return
+    }
+    fetchAdAlgorithms({ algoType: 2, brand: searchBrand, status: 1, size: 100 }).then(res => {
       const records = (res.records || []).filter(a => a.updatedBy !== '系統')
       setAlgorithmOptions(
         records.map(a => ({ label: a.algoName, value: a.id!, brand: a.brand }))
       )
     }).catch(() => {})
-  }, [])
+  }, [searchBrand])
 
   const giftInfo = useMemo(() => {
     if (!inventory) return null
@@ -97,18 +101,29 @@ export default function NewStoreDayPicker() {
 
   const queriedStoreName = inventory?.storeName || queriedStoreCode
 
+  // 品牌变更处理：清空已选算法、门店、BD
+  const handleBrandChange = (value: string | null) => {
+    setSearchBrand(value)
+    setSearchAlgorithm(null)
+    setSearchStoreCode(null)
+    setSearchBD(null)
+    setAlgorithmOptions([])
+    setStoreOptions([])
+    setBdOptions([])
+    setFetchedStores([])
+  }
+
+  // 算法变更处理（品牌已由用户预先选择）
   const handleAlgorithmChange = (value: number | null) => {
     setSearchAlgorithm(value)
-    const algo = algorithmOptions.find(a => a.value === value)
-    setSearchBrand(algo?.brand || null)
     // 切换算法时清空门店和BD
     setSearchStoreCode(null)
     setSearchBD(null)
     setStoreOptions([])
     setBdOptions([])
     setFetchedStores([])
-    if (algo?.brand) {
-      fetchStores({ brand: algo.brand, size: 200 }).then(res => {
+    if (searchBrand) {
+      fetchStores({ brand: searchBrand, size: 200 }).then(res => {
         const records = res.records || []
         setStoreOptions(
           records.map(s => ({ label: `${s.storeName}（${s.storeCode}）`, value: s.storeCode }))
@@ -299,13 +314,13 @@ export default function NewStoreDayPicker() {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-          <Form.Item label={t('algoNameLabel')}>
-            <Select placeholder={t('dpAlgoPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={algorithmOptions} />
-          </Form.Item>
           <Form.Item label={t('brandLabel')}>
-            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
-              options={[{ label: t('flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} disabled />
+            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
+              options={[{ label: t('flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} />
+          </Form.Item>
+          <Form.Item label={t('algoNameLabel')}>
+            <Select placeholder={searchBrand ? t('dpAlgoPlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+              options={algorithmOptions} disabled={!searchBrand} />
           </Form.Item>
           <Form.Item label={t('storeNameLabel')}>
             <Select placeholder={t('storeSearchHint')} value={searchStoreCode} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />

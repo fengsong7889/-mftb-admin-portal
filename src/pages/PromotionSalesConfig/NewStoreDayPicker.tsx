@@ -70,6 +70,7 @@ const BD_OPTIONS = [
 
 /** 後端品牌名 → UI 品牌值 映射 */
 const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
+const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
 
 /** 门店赠送天数记录（来源：贈送管理菜單的贈送數據） */
 interface GiftDaysRecord {
@@ -102,9 +103,15 @@ export default function NewStoreDayPicker() {
   const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
   const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
 
-  // 加载算法库已启用的新店广告算法
+  // 加载算法库已启用的新店广告算法（按品牌过滤）
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.NEW_STORE_AD, status: 1 })
+    if (!searchBrand) {
+      setAlgorithmOptions([])
+      setAlgorithmBrandOverrides({})
+      return
+    }
+    const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.NEW_STORE_AD, brand: backendBrand, status: 1 })
       .then(res => {
         if (!res) return
         const brandOverrides: Record<string, string> = {}
@@ -117,7 +124,7 @@ export default function NewStoreDayPicker() {
         setAlgorithmOptions(options)
         setAlgorithmBrandOverrides(brandOverrides)
       }).catch(() => {})
-  }, [])
+  }, [searchBrand])
 
   // 各门店已额外消耗的赠送天数（本地提交订单后累加）
   const [extraUsedDays, setExtraUsedDays] = useState<Record<string, number>>({})
@@ -145,10 +152,16 @@ export default function NewStoreDayPicker() {
 
   const queriedStore = MOCK_STORES.find(s => s.id === queriedStoreId)
 
-  // 算法名称变更处理：自动带出品牌
+  // 品牌变更处理：清空已选算法
+  const handleBrandChange = (value: string | null) => {
+    setSearchBrand(value)
+    setSearchAlgorithm(null)
+    setAlgorithmOptions([])
+  }
+
+  // 算法名称变更处理（品牌已由用户预先选择）
   const handleAlgorithmChange = (value: string | null) => {
     setSearchAlgorithm(value)
-    setSearchBrand(value ? (algorithmBrandOverrides[value] ?? null) : null)
   }
 
   // 门店名称变更处理：自动带出BD
@@ -175,6 +188,7 @@ export default function NewStoreDayPicker() {
     setSearchStoreName(null); setSearchBD(null)
     setQueriedStoreId(null); setSelectedDates([])
     setHasSearched(false)
+    setAlgorithmOptions([])
   }
 
   // 可选日期范围：今天 → 赠送有效期止
@@ -295,13 +309,13 @@ export default function NewStoreDayPicker() {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-          <Form.Item label={t('algoNameLabel')}>
-            <Select placeholder={t('dpAlgoPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={algorithmOptions} />
-          </Form.Item>
           <Form.Item label={t('brandLabel')}>
-            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
-              options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
+            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
+              options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
+          </Form.Item>
+          <Form.Item label={t('algoNameLabel')}>
+            <Select placeholder={searchBrand ? t('dpAlgoPlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+              options={algorithmOptions} disabled={!searchBrand} />
           </Form.Item>
           <Form.Item label={t('storeNameLabel')}>
             <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />

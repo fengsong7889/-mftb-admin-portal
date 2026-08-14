@@ -6,14 +6,12 @@ import com.mftb.admin.dto.AdHotInventoryVO;
 import com.mftb.admin.dto.AdHotOrderRequest;
 import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingHotVO;
-import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemHot;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdOrderItemHotMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
@@ -23,7 +21,6 @@ import com.mftb.admin.service.AdSalesHotService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.GiftService;
-import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -57,7 +54,6 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     /** 赠送管理中人气商家的广告类型标识（biz_gift_record.ad_type） */
     public static final String GIFT_AD_TYPE = "ka";
 
-    private final AdAlgorithmMapper algorithmMapper;
     private final AdOrderMapper orderMapper;
     private final AdOrderItemHotMapper itemMapper;
     private final BizMerchantGroupMapper groupMapper;
@@ -73,7 +69,6 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
 
     @Override
     public AdHotInventoryVO inventory(Long algoId, String storeCode, String groupCode) {
-        requireActiveAlgorithm(algoId);
         AdPricingHotVO pricing = requireActivePricing(algoId);
         if (pricing.getSkins().isEmpty()) {
             throw new BusinessException("該算法未配置皮膚計價");
@@ -118,12 +113,13 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdOrderVO placeOrder(AdHotOrderRequest request) {
-        AdAlgorithm algorithm = requireActiveAlgorithm(request.getAlgoId());
         AdPricingHotVO pricing = requireActivePricing(request.getAlgoId());
         if (pricing.getSkins().isEmpty()) {
             throw new BusinessException("該算法未配置皮膚計價");
         }
-        String brand = algorithm.getBrand();
+        // 解耦算法库：品牌/频道/名称均从定价记录获取
+        String brand = pricing.getBrand();
+        Integer channel = pricing.getChannel();
         // 屏蔽商家拦截
         requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
 
@@ -219,12 +215,12 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
-        order.setAlgoType(algorithm.getAlgoType());
-        order.setAlgoId(algorithm.getId());
-        order.setAlgoName(algorithm.getAlgoName());
-        order.setAlgoCode(algorithm.getAlgoCode());
+        order.setAlgoType(5); // 人氣商家固定类型
+        order.setAlgoId(pricing.getAlgoId());
+        order.setAlgoName(pricing.getAlgoName());
+        order.setAlgoCode(null); // 解耦算法库后不再使用
         order.setBrand(brand);
-        order.setChannel(algorithm.getChannel());
+        order.setChannel(channel);
         order.setGroupCode(request.getGroupCode());
         order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
@@ -285,12 +281,12 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         // 8. 扣减赠送天数余额并写消费流水（与订单同事务）
         if (giftDays > 0 && store != null) {
             giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
-                    algorithm.getAlgoCode(), algorithm.getAlgoName());
+                    pricing.getPricingNo(), pricing.getAlgoName());
         }
 
         // 9. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=广告类型）
-        String changeType = AdAlgoTypeNames.of(algorithm.getAlgoType());
-        String finChannel = algorithm.getChannel() != null && algorithm.getChannel() == 4 ? "團購" : "外賣";
+        String changeType = "人氣商家";
+        String finChannel = channel != null && channel == 4 ? "團購" : "外賣";
         if (actualTotal.signum() > 0) {
             String firstDetailId = finWriteChainService.writeAdConsume(
                     request.getGroupCode(), order.getGroupName(), brand,
@@ -304,17 +300,6 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     }
 
     /* ==================== 内部方法 ==================== */
-
-    private AdAlgorithm requireActiveAlgorithm(Long algoId) {
-        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
-        if (algorithm == null) {
-            throw new BusinessException("算法不存在");
-        }
-        if (algorithm.getStatus() == null || algorithm.getStatus() != 1) {
-            throw new BusinessException("算法已停用，無法購買");
-        }
-        return algorithm;
-    }
 
     private AdPricingHotVO requireActivePricing(Long algoId) {
         AdPricingHotVO pricing = pricingService.activeByAlgo(algoId);

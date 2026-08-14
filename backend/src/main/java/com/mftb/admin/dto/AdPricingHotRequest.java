@@ -14,9 +14,11 @@ import java.util.Map;
 @Data
 public class AdPricingHotRequest {
 
-    /** 关联算法ID */
-    @NotNull(message = "关联算法不能为空")
+    /** 关联算法ID（解耦后不再必填） */
     private Long algoId;
+
+    /** 人气名称（用户自定义命名，不再关联算法库） */
+    private String algoName;
 
     /** 所属品牌: flashBee / mFood */
     private String brand;
@@ -64,5 +66,7 @@ public class AdPricingHotRequest {
         private String borderType;
         /** 边框颜色(HEX, borderType=color时生效) */
         private String borderColor;
+        /** 菜品展示布局: grid=大图拼列 carousel=阶梯轮播（单选） */
+        private String dishLayout;
     }
 }

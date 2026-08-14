@@ -6,10 +6,8 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdPricingHotRequest;
 import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.dto.PageResult;
-import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdPricingHot;
 import com.mftb.admin.entity.AdPricingHotSkin;
-import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdPricingHotMapper;
 import com.mftb.admin.mapper.AdPricingHotSkinMapper;
 import com.mftb.admin.service.AdPricingHotService;
@@ -38,7 +36,6 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
 
     private final AdPricingHotMapper pricingMapper;
     private final AdPricingHotSkinMapper skinMapper;
-    private final AdAlgorithmMapper algorithmMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -78,12 +75,10 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdPricingHotVO create(AdPricingHotRequest request) {
-        AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
-
         AdPricingHot entity = new AdPricingHot();
         // 定价编号：按编号生成规则 config_pricing_hot（DJRQ + YYYYMMDD + 3位）
         entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_HOT));
-        applyRequest(entity, request, algorithm);
+        applyRequest(entity, request);
         if (entity.getStatus() == null) {
             entity.setStatus(1);
         }
@@ -99,8 +94,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
     @Transactional(rollbackFor = Exception.class)
     public AdPricingHotVO update(Long id, AdPricingHotRequest request) {
         AdPricingHot entity = require(id);
-        AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
-        applyRequest(entity, request, algorithm);
+        applyRequest(entity, request);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         pricingMapper.updateById(entity);
 
@@ -140,19 +134,14 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
         return entity;
     }
 
-    private AdAlgorithm requireAlgorithm(Long algoId) {
-        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
-        if (algorithm == null) {
-            throw new BusinessException("关联算法不存在");
+    private void applyRequest(AdPricingHot entity, AdPricingHotRequest request) {
+        // 解耦算法库：人气名称、品牌、频道均从请求直接获取
+        if (request.getAlgoId() != null) {
+            entity.setAlgoId(request.getAlgoId());
         }
-        return algorithm;
-    }
-
-    private void applyRequest(AdPricingHot entity, AdPricingHotRequest request, AdAlgorithm algorithm) {
-        entity.setAlgoId(algorithm.getId());
-        entity.setAlgoName(algorithm.getAlgoName());
-        entity.setBrand(StringUtils.hasText(request.getBrand()) ? request.getBrand() : algorithm.getBrand());
-        entity.setChannel(request.getChannel() != null ? request.getChannel() : algorithm.getChannel());
+        entity.setAlgoName(StringUtils.hasText(request.getAlgoName()) ? request.getAlgoName() : entity.getAlgoName());
+        entity.setBrand(request.getBrand());
+        entity.setChannel(request.getChannel());
         entity.setPresaleDays(request.getPresaleDays() == null || request.getPresaleDays() < 1
                 ? DEFAULT_PRESALE_DAYS : request.getPresaleDays());
         entity.setRefundEnabled(request.getRefundEnabled() == null ? 1 : request.getRefundEnabled());
@@ -185,6 +174,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             entity.setPrice(skin.getPrice() == null ? BigDecimal.ZERO : skin.getPrice());
             entity.setBorderType(StringUtils.hasText(skin.getBorderType()) ? skin.getBorderType() : "color");
             entity.setBorderColor(skin.getBorderColor());
+            entity.setDishLayout(StringUtils.hasText(skin.getDishLayout()) ? skin.getDishLayout() : "grid");
             entity.setDeleted(0);
             skinMapper.insert(entity);
         }
@@ -203,6 +193,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             item.setPrice(skin.getPrice());
             item.setBorderType(skin.getBorderType());
             item.setBorderColor(skin.getBorderColor());
+            item.setDishLayout(skin.getDishLayout());
             vo.getSkins().add(item);
         }
         return vo;

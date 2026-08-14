@@ -18,6 +18,8 @@ import { fetchAdAlgorithms } from '../../api/adPromotion'
 
 /** 後端品牌名 → UI 品牌值 映射 */
 const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
+/** UI 品牌值 → 後端品牌名 映射 */
+const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
 
 /**
  * 人氣商家 - 購買廣告（皮膚售賣，店鋪推廣版）
@@ -200,9 +202,16 @@ export default function PopularSkinPicker() {
   const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
   const [algorithmNameMap, setAlgorithmNameMap] = useState<Record<string, string>>({})
 
-  // 加载算法库已启用的人气商家算法
+  // 加载算法库已启用的人气商家算法（按品牌过滤）
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1, hasPricing: true })
+    if (!searchBrand) {
+      setAlgorithmOptions([])
+      setAlgorithmBrandOverrides({})
+      setAlgorithmNameMap({})
+      return
+    }
+    const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, brand: backendBrand, status: 1, hasPricing: true })
       .then(res => {
         if (!res) return
         // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
@@ -220,7 +229,7 @@ export default function PopularSkinPicker() {
         setAlgorithmBrandOverrides(brandOverrides)
         setAlgorithmNameMap(nameMap)
       }).catch(() => {})
-  }, [])
+  }, [searchBrand])
 
   // 選購狀態
   const [selectedSkinId, setSelectedSkinId] = useState<number | null>(null)
@@ -262,10 +271,17 @@ export default function PopularSkinPicker() {
     return { original, sale, saved: original - sale }
   }, [selectedSkin, buyDays, currentTier])
 
-  // 算法變更：自動帶出品牌
+  // 品牌變更：清空已選算法
+  const handleBrandChange = (value: string | undefined) => {
+    setSearchBrand(value ?? null)
+    setSearchAlgorithm(null)
+    setAlgorithmOptions([])
+    setAlgorithmBrandOverrides({})
+    setAlgorithmNameMap({})
+  }
+
   const handleAlgorithmChange = (value: string | null) => {
     setSearchAlgorithm(value)
-    setSearchBrand(value ? (algorithmBrandOverrides[value] ?? null) : null)
   }
 
   const handleSearch = () => {
@@ -275,6 +291,7 @@ export default function PopularSkinPicker() {
   }
   const handleReset = () => {
     setSearchAlgorithm(null); setSearchBrand(null)
+    setAlgorithmOptions([]); setAlgorithmBrandOverrides({}); setAlgorithmNameMap({})
     setHasSearched(false); setSelectedSkinId(null)
   }
 
@@ -526,13 +543,29 @@ export default function PopularSkinPicker() {
       {/* 查詢區域 - 店鋪推廣入口無需選擇門店 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
-          <Form.Item label={t('algoNameLabel')}>
-            <Select placeholder={t('algoSearchPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={algorithmOptions} />
-          </Form.Item>
           <Form.Item label={t('brandLabel')}>
-            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
-              options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
+            <Select
+              placeholder={t('brandAutoHint')}
+              value={searchBrand}
+              onChange={handleBrandChange}
+              allowClear
+              options={[
+                { label: t('flashBee'), value: 'shanfeng' },
+                { label: 'mFood', value: 'mfood' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label={t('algoNameLabel')}>
+            <Select
+              placeholder={searchBrand ? t('algoSearchPlaceholder') : t('selectBrandFirst')}
+              value={searchAlgorithm}
+              onChange={handleAlgorithmChange}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={algorithmOptions}
+              disabled={!searchBrand}
+            />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

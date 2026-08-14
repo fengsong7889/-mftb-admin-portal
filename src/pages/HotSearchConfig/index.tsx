@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button, Space, Input, InputNumber, Select, Table, Tag, Modal, Form, DatePicker,
@@ -14,6 +14,8 @@ import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { fetchAdAlgorithms } from '../../api/adPromotion'
+import { fetchStores } from '../../api/store'
 
 const { RangePicker } = DatePicker
 
@@ -126,6 +128,53 @@ export default function HotSearchConfig() {
   const [autoRankBusiness, setAutoRankBusiness] = useState<string[]>([])
   const [autoRankDays, setAutoRankDays] = useState<number>(30)
   const [autoRankTop, setAutoRankTop] = useState<number>(10)
+
+  // 搜索区域：品牌 → 算法 → 门店 级联状态
+  const [searchBrand, setSearchBrand] = useState<string | null>(null)
+  const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
+  const [searchStore, setSearchStore] = useState<string | null>(null)
+  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
+
+  // 品牌变更 → 重新加载算法列表，清空算法和门店
+  const handleSearchBrandChange = (value: string | undefined) => {
+    setSearchBrand(value ?? null)
+    setSearchAlgorithm(null)
+    setSearchStore(null)
+    setAlgorithmOptions([])
+    setStoreOptions([])
+  }
+
+  // 算法变更 → 重新加载门店列表，清空门店
+  const handleSearchAlgorithmChange = (value: string | null) => {
+    setSearchAlgorithm(value)
+    setSearchStore(null)
+    setStoreOptions([])
+    if (searchBrand && value) {
+      fetchStores({ brand: searchBrand, size: 200 }).then(res => {
+        const records = res.records || []
+        setStoreOptions(
+          records.map(s => ({ label: `${s.storeName}（${s.storeCode}）`, value: s.storeCode }))
+        )
+      }).catch(() => {})
+    }
+  }
+
+  // 品牌变更时自动加载算法列表（按品牌过滤）
+  useEffect(() => {
+    if (!searchBrand) {
+      setAlgorithmOptions([])
+      return
+    }
+    fetchAdAlgorithms({ page: 1, size: 200, brand: searchBrand, status: 1 })
+      .then(res => {
+        if (!res) return
+        const records = res.records.filter(a => a.updatedBy !== '系統')
+        setAlgorithmOptions(
+          records.map(a => ({ label: a.algoName, value: String(a.id) }))
+        )
+      }).catch(() => {})
+  }, [searchBrand])
 
   /** 搜索入口（合并原 searchPage + searchChannel） */
   const searchEntryOptions = [
@@ -552,6 +601,39 @@ export default function HotSearchConfig() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
+          <Form.Item label={t('hotSearchConfig.searchBrand')}>
+            <Select
+              placeholder={t('common.all')}
+              allowClear
+              value={searchBrand}
+              onChange={handleSearchBrandChange}
+              options={brandOptions}
+            />
+          </Form.Item>
+          <Form.Item label={t('hotSearchConfig.searchAlgorithm')}>
+            <Select
+              placeholder={searchBrand ? t('adSales.algoSearchPlaceholder') : t('adSales.selectBrandFirst')}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              value={searchAlgorithm}
+              onChange={handleSearchAlgorithmChange}
+              options={algorithmOptions}
+              disabled={!searchBrand}
+            />
+          </Form.Item>
+          <Form.Item label={t('hotSearchConfig.searchStore')}>
+            <Select
+              placeholder={searchAlgorithm ? t('common.placeholderSelect') : t('algorithm.selectAlgorithmFirst')}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              value={searchStore}
+              onChange={v => setSearchStore(v ?? null)}
+              options={storeOptions}
+              disabled={!searchAlgorithm}
+            />
+          </Form.Item>
           <Form.Item label={t('hotSearchConfig.searchWord')}>
             <Input placeholder={t('hotSearchConfig.searchWordPlaceholder')} allowClear />
           </Form.Item>
@@ -564,9 +646,6 @@ export default function HotSearchConfig() {
           <Form.Item label={t('hotSearchConfig.searchEntry')}>
             <Select placeholder={t('common.all')} allowClear options={searchEntryOptions} />
           </Form.Item>
-          <Form.Item label={t('hotSearchConfig.searchBrand')}>
-            <Select placeholder={t('common.all')} allowClear options={brandOptions} />
-          </Form.Item>
           <Form.Item label={t('hotSearchConfig.searchRegion')}>
             <Select placeholder={t('common.all')} allowClear options={regionOptions} />
           </Form.Item>
@@ -576,7 +655,10 @@ export default function HotSearchConfig() {
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
-              <Button icon={<ReloadOutlined />}>{t('common.reset')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => {
+                setSearchBrand(null); setSearchAlgorithm(null); setSearchStore(null)
+                setAlgorithmOptions([]); setStoreOptions([])
+              }}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>

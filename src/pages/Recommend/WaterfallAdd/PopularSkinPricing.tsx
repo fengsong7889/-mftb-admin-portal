@@ -7,14 +7,13 @@
  * 皮膚組成元素（參考 APP 實際展示樣式）：
  *  - 卡片邊框：支持 無邊框 / 選擇配色 / 上傳邊框圖 三種方式，小圖/大圖模式通用
  *  - 大圖模式左側豎版主圖：必須上傳（小圖模式無需上傳圖片）
- *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播，可多選（配置該皮膚支持的佈局）；
- *    風格不售賣給商家，商家僅選擇大圖模式圖片與邊框風格，具體展示哪種佈局、
- *    在瀑布流第幾個位置展示由系統配置瀑布流策略時決定
+ *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播，單選；
+ *    商家自己選擇一種菜品佈局風格購買
  *  - 售價按天計算（MOP/天）
  *  - 內置預覽：運營人員可查看所配置皮膚在小圖/大圖模式下的展示效果
  */
 import { useMemo, useState, useEffect } from 'react'
-import { Button, Checkbox, ColorPicker, Form, Input, InputNumber, Select, Space, Switch, Table, Upload, message, Modal } from 'antd'
+import { Button, Radio, ColorPicker, Form, Input, InputNumber, Select, Space, Switch, Table, Upload, message, Modal } from 'antd'
 import type { UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -39,7 +38,6 @@ import {
   AppType,
 } from '../constants'
 import {
-  fetchAdAlgorithms,
   fetchAdHotPricingDetail,
   createAdHotPricing,
   updateAdHotPricing,
@@ -100,8 +98,8 @@ interface SkinItem {
   name: string
   /** 售價 MOP/天 */
   price?: number
-  /** 菜品展示佈局（大圖模式，可多選）：配置該皮膚支持的佈局，具體展示由系統瀑布流策略決定 */
-  dishLayouts: DishLayout[]
+  /** 菜品展示佈局（單選）：大圖拼列 / 階梯輪播，商家自選一種 */
+  dishLayout: DishLayout
   /** 邊框方式：無 / 配色 / 上傳邊框圖 */
   borderType: 'none' | 'color' | 'image'
   /** 邊框顏色（borderType=color 時生效） */
@@ -119,7 +117,7 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   id: skinIdSeed++,
   name: '',
   price: undefined,
-  dishLayouts: ['grid', 'carousel'],
+  dishLayout: 'grid',
   borderType: 'image',
   borderColor: '#FF4D4F',
   borderImage: null,
@@ -154,17 +152,17 @@ const MOCK_DETAIL_IMAGE = svgDataUrl(
 const buildMockSkins = (): SkinItem[] => [
   createSkin({
     name: '紅運當頭', price: 28, borderType: 'color', borderColor: '#FF4D4F',
-    dishLayouts: ['grid'],
+    dishLayout: 'grid',
     bigImage: buildMockBigImage('#FF4D4F', '#FFA39E', '紅運當頭'),
   }),
   createSkin({
     name: '橙意滿滿', price: 18, borderType: 'color', borderColor: '#E8720C',
-    dishLayouts: ['grid', 'carousel'],
+    dishLayout: 'carousel',
     bigImage: buildMockBigImage('#E8720C', '#FFB347', '橙意滿滿'),
   }),
   createSkin({
     name: '簡約無框', price: 8, borderType: 'none',
-    dishLayouts: ['carousel'],
+    dishLayout: 'carousel',
     bigImage: buildMockBigImage('#595959', '#8C8C8C', '簡約無框'),
   }),
 ]
@@ -186,8 +184,6 @@ export default function PopularSkinPricing() {
   const [previewSkin, setPreviewSkin] = useState<SkinItem | null>(null)
   // 階梯輪播餐品指針：current 為當前張，prev 為正在向左滑出的上一張
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
-  // 大圖模式預覽風格指針：皮膚支持多種佈局時每 3 秒自動輪換，模擬系統隨機分配效果
-  const [previewLayoutIndex, setPreviewLayoutIndex] = useState(0)
   // 狀態（底部 Switch：啟用/停用）
   const [status, setStatus] = useState<ServiceStatus>(ServiceStatus.ENABLED)
   // 購買多天折扣配置（梯度）
@@ -200,8 +196,7 @@ export default function PopularSkinPricing() {
   const [cancelFeeRules, setCancelFeeRules] = useState<CancelFeeRule[]>([{ id: 1, maxDays: 3, feePercent: 50 }])
   // 詳情圖（基礎信息卡片，與無敵星星/盤活復蘇保持一致）
   const [detailFileList, setDetailFileList] = useState<UploadFile[]>([])
-  // 算法選項（從後端算法庫動態加載人氣商家算法，含品牌信息以便自動帶出）
-  const [algorithmOptions, setAlgorithmOptions] = useState<{ id: number; name: string; app: AppType }[]>([])
+  // 人氣名稱（用戶自定義命名，不再關聯算法庫）
 
   // APP/頻道/邊框/菜品佈局選項（多語言，使用 labelKey 統一管理）
   const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
@@ -226,22 +221,6 @@ export default function PopularSkinPricing() {
         { label: t('recommend:channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
       ]
 
-  // 從後端加載人氣商家算法列表（含品牌信息）
-  useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1 })
-      .then(res => {
-        if (res.records?.length) {
-          // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
-          setAlgorithmOptions(res.records.filter(a => a.updatedBy !== '系統').map(a => ({
-            id: a.id!,
-            name: a.algoName,
-            app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
-          })))
-        }
-      })
-      .catch(() => { /* 後端不可用，算法列表為空 */ })
-  }, [])
-
   // 編輯/詳情模式：從後端加載計價配置並回填
   useEffect(() => {
     if (!urlId) return
@@ -251,7 +230,7 @@ export default function PopularSkinPricing() {
         // 回填基礎信息
         const appValue = brandToAppType(data.brand)
         form.setFieldsValue({
-          algorithmId: data.algoId,
+          popularName: data.algoName || '',
           app: appValue ?? APP_OPTIONS[0]?.value,
           channel: data.channel ?? channelOptions[0]?.value,
         })
@@ -292,6 +271,7 @@ export default function PopularSkinPricing() {
           setSkins(data.skins.map((s: AdHotSkinPrice) => createSkin({
             name: s.skinName,
             price: s.price,
+            dishLayout: (s as any).dishLayout || 'grid',
             borderType: (s.borderType === 'none' || s.borderType === 'color' || s.borderType === 'image') ? s.borderType : 'color',
             borderColor: s.borderColor || '#FF4D4F',
           })))
@@ -320,20 +300,10 @@ export default function PopularSkinPricing() {
 
   // 階梯輪播：當前張向左滑出、下一張從後方呈現上來，關閉彈窗/所選佈局不含輪播時自動停止
   useEffect(() => {
-    if (!previewSkin || !previewSkin.dishLayouts.includes('carousel')) return
+    if (!previewSkin || previewSkin.dishLayout !== 'carousel') return
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [previewSkin])
-
-  // 大圖模式風格自動輪換預覽：支持多種佈局時每 3 秒切換一種，點擊風格標籤可手動定位
-  useEffect(() => {
-    setPreviewLayoutIndex(0)
-    if (!previewSkin || previewSkin.dishLayouts.length <= 1) return
-    const timer = setInterval(() => {
-      setPreviewLayoutIndex(i => (i + 1) % previewSkin.dishLayouts.length)
     }, 5000)
     return () => clearInterval(timer)
   }, [previewSkin])
@@ -415,7 +385,7 @@ export default function PopularSkinPricing() {
           message.error(t('recommend:popularSkin.enterSkinName'))
           return
         }
-        if (skin.dishLayouts.length === 0) {
+        if (!skin.dishLayout) {
           message.error(t('recommend:popularSkin.selectOneDishLayout'))
           return
         }
@@ -445,7 +415,7 @@ export default function PopularSkinPricing() {
       setLoading(true)
       // 構建請求 payload
       const payload = {
-        algoId: values.algorithmId,
+        algoName: values.popularName,
         brand: appTypeToBrand(values.app),
         channel: values.channel,
         presaleDays,
@@ -463,6 +433,7 @@ export default function PopularSkinPricing() {
           price: s.price!,
           borderType: s.borderType,
           borderColor: s.borderType === 'color' ? s.borderColor : undefined,
+          dishLayout: s.dishLayout,
         })),
       }
       try {
@@ -755,23 +726,16 @@ export default function PopularSkinPricing() {
         <div style={cardShellStyle}>
           {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend:popularSkin.basicInfoTitle'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label={t('adSales:algoNameLabel')} name="algorithmId" rules={[{ required: true, message: t('recommend:popularSkin.selectAlgorithm') }]}>
-              <Select
-                placeholder={t('recommend:popularSkin.selectAlgorithm')}
-                showSearch
-                optionFilterProp="label"
+            <Form.Item label={t('recommend:popularSkin.popularNameLabel')} name="popularName" rules={[{ required: true, message: t('recommend:popularSkin.popularNamePlaceholder') }]}>
+              <Input
+                placeholder={t('recommend:popularSkin.popularNamePlaceholder')}
+                maxLength={30}
+                showCount
                 disabled={isEditMode || isDetailMode}
-                options={algorithmOptions.map(alg => ({ label: alg.name, value: alg.id }))}
-                onChange={(value) => {
-                  const selectedAlg = algorithmOptions.find(alg => alg.id === value)
-                  if (selectedAlg) {
-                    form.setFieldsValue({ app: selectedAlg.app })
-                  }
-                }}
               />
             </Form.Item>
             <Form.Item label={t('recommend:popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend:popularSkin.selectApp') }]}>
-              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={tAppOptions} disabled />
+              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
             </Form.Item>
             <Form.Item label={t('recommend:popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend:popularSkin.selectChannel') }]}>
               <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={channelOptions} disabled={isEditMode || isDetailMode} />
@@ -895,10 +859,13 @@ export default function PopularSkinPricing() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px' }}>
                 <div>
                   <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.dishLayoutLabel')}</div>
-                  <Checkbox.Group
-                    value={skin.dishLayouts}
-                    disabled
+                  <Radio.Group
+                    value={skin.dishLayout}
+                    disabled={isDetailMode}
+                    onChange={e => updateSkin(skin.id, { dishLayout: e.target.value })}
                     options={tDishLayoutOptions}
+                    optionType="button"
+                    buttonStyle="solid"
                   />
                   <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4, lineHeight: '16px' }}>
                     {t('recommend:popularSkin.dishLayoutHint')}
@@ -1230,23 +1197,10 @@ export default function PopularSkinPricing() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend:popularSkin.bigMode')}</span>
-                  {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位 */}
-                  {previewSkin.dishLayouts.length > 1 && previewSkin.dishLayouts.map((layout, idx) => {
-                    const isActive = idx === Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)
-                    return (
-                      <span
-                        key={layout}
-                        onClick={() => setPreviewLayoutIndex(idx)}
-                        style={{
-                          fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
-                          color: isActive ? '#E8720C' : '#8C8C8C',
-                          background: isActive ? '#FFF7E6' : '#F0F0F0',
-                          border: `1px solid ${isActive ? '#E8720C' : 'transparent'}`,
-                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                        }}
-                      >{tDishLayoutOptions.find(o => o.value === layout)?.label}</span>
-                    )
-                  })}
+                  <span style={{
+                    fontSize: 11, borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
+                    color: '#E8720C', background: '#FFF7E6', border: '1px solid #E8720C',
+                  }}>{tDishLayoutOptions.find(o => o.value === previewSkin.dishLayout)?.label}</span>
                 </div>
                 {/* 瀑布流上下文：上方鄰卡（模糊淡化） */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1289,15 +1243,11 @@ export default function PopularSkinPricing() {
                           )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {previewInfoBlock()}
-                          {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
-                          {previewSkin.dishLayouts.length === 0 && (
+                          {/* 菜品展示區：渲染商家選擇的佈局風格 */}
+                          {!previewSkin.dishLayout && (
                             <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>{t('recommend:popularSkin.noDishLayout')}</div>
                           )}
-                          {(() => {
-                            const layout = previewSkin.dishLayouts[Math.min(previewLayoutIndex, previewSkin.dishLayouts.length - 1)]
-                            if (!layout) return null
-                            return layout === 'grid' ? renderDishGrid() : renderDishCarousel()
-                          })()}
+                          {previewSkin.dishLayout === 'grid' ? renderDishGrid() : previewSkin.dishLayout === 'carousel' ? renderDishCarousel() : null}
                         </div>
                       </div>
                     </div>

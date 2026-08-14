@@ -17,15 +17,15 @@ import type { Dayjs } from 'dayjs'
 import { fetchGiftAvailableDays } from '../../api/gift'
 import { usePaymentRule } from '../../hooks/usePaymentRule'
 import {
-  fetchAdAlgorithms,
+  fetchAdHotPricingList,
   fetchAdHotInventory,
   placeAdHotOrder,
   type AdHotInventoryVO,
   type AdHotInventoryCell,
+  type AdPricingHot,
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
-import { AlgorithmType } from '../Recommend/constants'
 
 /** 人氣商家廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_POPULAR = 'popular_merchant'
@@ -220,16 +220,7 @@ function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
 /** 月份選擇器每頁展示數（超出用上下頁按鈕切換） */
 const MONTHS_PER_PAGE = 6
 
-/** 人氣商家算法選項（Mock 兜底，後端不可用時使用） */
-const FALLBACK_ALGORITHM_OPTIONS = [
-  { label: '人氣商家-首頁版', value: '1', brand: 'shanfeng' },
-  { label: '人氣商家-外賣版', value: '2', brand: 'mfood' },
-]
-/** 算法退款配置兜底（對應銷售定價中的退款開關） */
-const FALLBACK_REFUND_CONFIG: Record<string, boolean> = {
-  '1': false,
-  '2': true,
-}
+/** 人氣商家定價選項（從銷售定價配置加載，value=算法ID） */
 /** 皮膚配色兜底（後端庫存僅含名稱+價格，視覺配色以此兜底） */
 const SKIN_COLOR_PALETTE = [
   { borderColor: '#FF4D4F', tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)' },
@@ -285,10 +276,8 @@ export default function PopularSkinPicker() {
   const [previewLayoutIndex, setPreviewLayoutIndex] = useState(0)
 
   // ===== 真實接口接線 =====
-  // 算法下拉（人氣商家加載真實算法庫數據，value=算法ID）
-  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
-  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
-  const [algorithmRefundConfig, setAlgorithmRefundConfig] = useState<Record<string, boolean>>(FALLBACK_REFUND_CONFIG)
+  // 人氣名稱下拉（從銷售定價配置加載，value=algoId）
+  const [pricingOptions, setPricingOptions] = useState<Array<{ label: string; value: string }>>([])
   // 門店下拉（真實門店，value=storeCode）
   const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
   const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
@@ -415,29 +404,23 @@ export default function PopularSkinPicker() {
     }).catch(() => {})
   }, [])
 
-  // 真實算法下拉：人氣商家加載真實算法庫數據
+  // 人氣名稱下拉：從銷售定價配置加載（按品牌過濾，僅顯示啟用且有皮膚的定價）
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: 1, hasPricing: true })
+    if (!searchBrand) {
+      setPricingOptions([])
+      return
+    }
+    const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
+    const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
+    fetchAdHotPricingList({ page: 1, size: 200, brand: backendBrand, status: 1 })
       .then(res => {
         if (!res) return
-        // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
-        const records = res.records.filter(a => a.updatedBy !== '系統')
-        const brandOverrides: Record<string, string> = {}
-        const refundConfig: Record<string, boolean> = {}
-        const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
-        const options = records.map(a => {
-          const value = String(a.id)
-          const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
-          if (uiBrand) brandOverrides[value] = uiBrand
-          return { label: a.algoName, value }
-        })
-        if (options.length > 0) {
-          setAlgorithmOptions(options)
-          setAlgorithmBrandOverrides(brandOverrides)
-          setAlgorithmRefundConfig(refundConfig)
-        }
+        const options = (res.records ?? [])
+          .filter(p => p.skins && p.skins.length > 0)
+          .map(p => ({ label: p.algoName || p.pricingNo || '-', value: String(p.algoId) }))
+        setPricingOptions(options)
       }).catch(() => {})
-  }, [])
+  }, [searchBrand])
 
   // 贈送天數餘額：選擇門店後加載
   useEffect(() => {
@@ -508,9 +491,15 @@ export default function PopularSkinPicker() {
   }, [customDates])
 
   // 算法變更：自動帶出品牌
+  // 品牌变更处理：清空已选算法
+  const handleBrandChange = (value: string | null) => {
+    setSearchBrand(value)
+    setSearchAlgorithm(null)
+    setPricingOptions([])
+  }
+
   const handleAlgorithmChange = (value: string | null) => {
     setSearchAlgorithm(value)
-    setSearchBrand(value && algorithmBrandOverrides[value] ? algorithmBrandOverrides[value] : null)
   }
   // 門店變更：自動帶出BD
   const handleStoreChange = (value: string | null) => {
@@ -549,6 +538,7 @@ export default function PopularSkinPicker() {
     setSearchStoreName(null); setSearchBD(null)
     setHasSearched(false); setSelectedSkinId(null)
     setInventoryData(null); setCustomDates([])
+    setPricingOptions([])
   }
 
   // 自選日期：點擊日曆單日選中/取消
@@ -880,13 +870,13 @@ export default function PopularSkinPicker() {
       {/* 查詢區域 - 與其它購買界面保持一致 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-          <Form.Item label={t('algoNameLabel')}>
-            <Select placeholder={t('algoSearchPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={algorithmOptions} />
-          </Form.Item>
           <Form.Item label={t('brandLabel')}>
-            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={v => setSearchBrand(v)} allowClear
-              options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
+            <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
+              options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
+          </Form.Item>
+          <Form.Item label={t('recommend:popularSkin.popularNameLabel')}>
+            <Select placeholder={searchBrand ? t('recommend:popularSkin.popularNamePlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+              options={pricingOptions} disabled={!searchBrand} />
           </Form.Item>
           <Form.Item label={t('storeNameLabel')}>
             <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />

@@ -71,5 +71,7 @@ public class AdPricingHotVO {
         private String borderType;
         /** 边框颜色(HEX, borderType=color时生效) */
         private String borderColor;
+        /** 菜品展示布局: grid=大图拼列 carousel=阶梯轮播 */
+        private String dishLayout;
     }
 }

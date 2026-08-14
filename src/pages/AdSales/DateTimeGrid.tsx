@@ -323,10 +323,17 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [currentAlgorithmRefundEnabled, setCurrentAlgorithmRefundEnabled] = useState<boolean | null>(null)
 
   // 真实算法下拉（無敵星星加载真实算法库数据，value=算法ID）
-  // 规则6：选择门店后过滤掉对该商家屏蔽的算法（无法选择）
+  // 品牌变更时重新加载算法列表；选择门店后过滤掉对该商家屏蔽的算法
   useEffect(() => {
     if (inventoryItem.algorithmType !== AlgorithmType.INVINCIBLE_STAR) return
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
+    if (!searchBrand) {
+      setAlgorithmOptions([])
+      setAlgorithmMetaMap({})
+      setAlgorithmBrandOverrides({})
+      return
+    }
+    const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, brand: backendBrand, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
     .then(res => {
       if (!res) return
       const meta: Record<string, { apiId: number }> = {}
@@ -338,7 +345,6 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         if (uiBrand) brandOverrides[value] = uiBrand
         return { label: a.algoName, value }
       })
-      // 只保留数据库中的真实算法，不再混入虚拟演示选项
       setAlgorithmOptions(options)
       setAlgorithmMetaMap(meta)
       setAlgorithmBrandOverrides(brandOverrides)
@@ -349,7 +355,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchStoreName])
+  }, [searchBrand, searchStoreName])
 
   // ===== 真实接口接线 =====
   // 算法下拉（無敵星星加载真实算法库数据，value=算法ID）
@@ -487,22 +493,26 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const getAlgorithmBrand = (value: string | null) =>
     value ? (algorithmBrandOverrides[value] ?? ALGORITHM_BRAND_MAP[value]) : undefined
 
-  // 算法名称变更处理：自动带出品牌，并检查购物车冲突
+  // 品牌变更处理：清空已选算法，按品牌重新加载算法列表
+  const handleBrandChange = (value: string | null) => {
+    setSearchBrand(value)
+    setSearchAlgorithm(null)
+    setAlgorithmOptions([])
+    applyAlgorithmMeta(null)
+  }
+
+  // 算法名称变更处理：检查购物车冲突（品牌已由用户预先选择）
   const handleAlgorithmChange = (value: string | null) => {
     // 更新退款配置状态（真实算法异步从定价配置加载）
     applyAlgorithmMeta(value)
     if (hasCartItems && value !== searchAlgorithm) {
       setPendingAction(() => {
         setSearchAlgorithm(value)
-        // 自动带出品牌
-        setSearchBrand(getAlgorithmBrand(value) ?? null)
       })
       setIsConflictModalVisible(true)
       return
     }
     setSearchAlgorithm(value)
-    // 自动带出品牌
-    setSearchBrand(getAlgorithmBrand(value) ?? null)
   }
 
   // 门店名称变更处理：自动带出BD，并检查购物车冲突
@@ -586,6 +596,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     setSearchBD(null)
     setHasSearched(false)
     setInventoryData(null)
+    setAlgorithmOptions([])
     setBdOptions(BD_OPTIONS)
   }
   
@@ -806,28 +817,28 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
           <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+            <Form.Item label={t('brandLabel')}>
+              <Select
+                placeholder={t('brandAutoHint')}
+                value={searchBrand}
+                onChange={handleBrandChange}
+                allowClear
+                options={[
+                  { label: t('flashBee'), value: 'shanfeng' },
+                  { label: 'mFood', value: 'mfood' },
+                ]}
+              />
+            </Form.Item>
             <Form.Item label={t('algoNameLabel')}>
               <Select
-                placeholder={t('algoSearchPlaceholder')}
+                placeholder={searchBrand ? t('algoSearchPlaceholder') : t('selectBrandFirst')}
                 value={searchAlgorithm}
                 onChange={handleAlgorithmChange}
                 allowClear
                 showSearch
                 optionFilterProp="label"
                 options={algorithmOptions}
-              />
-            </Form.Item>
-            <Form.Item label={t('brandLabel')}>
-              <Select
-                placeholder={t('brandAutoHint')}
-                value={searchBrand}
-                onChange={(v) => setSearchBrand(v)}
-                allowClear
-                disabled
-                options={[
-                  { label: t('flashBee'), value: 'shanfeng' },
-                  { label: 'mFood', value: 'mfood' },
-                ]}
+                disabled={!searchBrand}
               />
             </Form.Item>
             <Form.Item label={t('storeNameLabel')}>

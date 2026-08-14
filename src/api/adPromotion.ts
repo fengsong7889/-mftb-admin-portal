@@ -665,6 +665,8 @@ export interface AdHotSkinPrice {
   borderType?: string
   /** 邊框顏色(HEX, borderType=color 時生效) */
   borderColor?: string
+  /** 菜品展示佈局: grid=大圖拼列 carousel=階梯輪播（單選） */
+  dishLayout?: string
 }
 
 /** 人氣商家計價配置（與後端 AdPricingHotVO 對齊） */
@@ -700,7 +702,8 @@ export interface AdPricingHot {
 
 /** 人氣商家計價配置新增/編輯請求 */
 export interface AdPricingHotRequest {
-  algoId: number
+  algoId?: number
+  algoName?: string
   brand?: string
   channel?: number
   presaleDays: number

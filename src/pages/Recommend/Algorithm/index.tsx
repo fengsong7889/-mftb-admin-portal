@@ -16,7 +16,6 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.INVINCIBLE_STAR,
     AlgorithmType.HOT_REVIVE_AD,
     AlgorithmType.NEW_STORE_AD,
-    AlgorithmType.POPULAR_MERCHANT_KA,
     AlgorithmType.BRAND_MERCHANT,
     AlgorithmType.GOLD_AD,
     AlgorithmType.EXCLUSIVE_MERCHANT,
@@ -97,7 +96,6 @@ export default function Algorithm() {
     { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: t('algorithm.descInvincibleStar') },
     { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: t('algorithm.descHotRevive') },
     { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: t('algorithm.descNewStore') },
-    { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: t('algorithm.descPopularMerchant') },
     { type: AlgorithmType.BRAND_MERCHANT, icon: '💎', description: t('algorithm.descBrandMerchant') },
     { type: AlgorithmType.GOLD_AD, icon: '💰', description: t('algorithm.descGoldAd') },
     { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: t('algorithm.descExclusiveMerchant') },
@@ -352,7 +350,7 @@ export default function Algorithm() {
                       ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type)),
                       card => card.type,
                     ).map(card => {
-                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.ORGANIC_TRAFFIC || card.type === AlgorithmType.GUESS_YOU_LIKE
+                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.ORGANIC_TRAFFIC || card.type === AlgorithmType.GUESS_YOU_LIKE
                         return renderAlgoCard(card, enabled, 'delivery', deliveryCardOrder.getDragProps(card.type))
                       })}
                   </div>

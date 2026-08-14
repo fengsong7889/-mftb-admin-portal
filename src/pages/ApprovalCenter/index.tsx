@@ -82,14 +82,9 @@ function pickValue(v?: string) {
   return !v || v === 'all' ? undefined : v
 }
 
-/** 定位審批中流程的當前待審節點（動態節點優先，舊字段降級） */
+/** 定位審批中流程的當前待審節點（固定三級：業務 → 運營 → 財務） */
 function resolveCurrentNode(r: ApprovalRecord): string {
   if (r.flowStatus !== 'pending') return ''
-  if (r.approvalNodes?.length) {
-    const pendingNode = r.approvalNodes.find(n =>
-      n.approvers?.some(a => a.status === 'pending'))
-    return pendingNode?.nodeId || ''
-  }
   if (r.bizApproveStatus === 'pending') return 'business'
   if (r.opsApproveStatus === 'pending') return 'operation'
   return 'finance'
@@ -106,14 +101,8 @@ function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boole
   if (query.currentNode && resolveCurrentNode(r) !== query.currentNode) return false
   if (query.applicant && !r.applicant.includes(query.applicant)) return false
   if (query.approver) {
-    if (r.approvalNodes?.length) {
-      const hit = r.approvalNodes.some(n =>
-        n.approvers?.some(a => a.name?.includes(query.approver!)))
-      if (!hit) return false
-    } else {
-      const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver!))
-      if (!hit) return false
-    }
+    const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver!))
+    if (!hit) return false
   }
   if (query.applyFrom && r.applyTime.slice(0, 10) < query.applyFrom) return false
   if (query.applyTo && r.applyTime.slice(0, 10) > query.applyTo) return false
@@ -257,13 +246,6 @@ export default function ApprovalCenter() {
   const canApprove = useCallback((record: ApprovalRecord) => {
     if (!hasPermission('approval-center:edit')) return false
     if (record.flowStatus !== 'pending') return false
-    if (record.approvalNodes?.length) {
-      const pendingNode = record.approvalNodes.find(n =>
-        n.approvers?.some(a => a.status === 'pending'))
-      if (!pendingNode) return false
-      return pendingNode.approvers.some(a =>
-        a.status === 'pending' && isCurrentUser(a.name))
-    }
     const node = resolveCurrentNode(record)
     const approver = node === 'business' ? record.bizApprover : node === 'operation' ? record.opsApprover : record.finApprover
     return isCurrentUser(approver)
@@ -376,69 +358,79 @@ export default function ApprovalCenter() {
     },
     { title: t('approvalCenter.colApplicant'), dataIndex: 'applicant', key: 'applicant', width: 130 },
     { title: t('approvalCenter.colApplyTime'), dataIndex: 'applyTime', key: 'applyTime', width: 160 },
-    // 动态审批节点列（根据 approvalNodes 数据生成）
-    ...(() => {
-      const nodeMap = new Map<string, { name: string; rule: string }>()
-      data.forEach(r => {
-        r.approvalNodes?.forEach(n => {
-          if (!nodeMap.has(n.nodeId)) {
-            nodeMap.set(n.nodeId, { name: n.nodeName, rule: n.approvalRule })
-          }
-        })
-      })
-      return Array.from(nodeMap.entries()).map(([nodeId, { name, rule }]) => ({
-        title: name,
-        key: `node_${nodeId}`,
-        children: [
-          {
-            title: t('approvalCenter.colApprover'),
-            key: `${nodeId}_approver`,
-            width: 130,
-            render: (_: unknown, r: ApprovalRecord) => {
-              const node = r.approvalNodes?.find(n => n.nodeId === nodeId)
-              if (!node) return <span style={{ color: '#999' }}>--</span>
-              return (
-                <div>{node.approvers?.map((a, i) => (
-                  <div key={i} style={{ whiteSpace: 'nowrap' }}>
-                    {a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}
-                  </div>
-                ))}</div>
-              )
-            },
-          },
-          {
-            title: t('approvalCenter.colApproveTime'),
-            key: `${nodeId}_time`,
-            width: 160,
-            render: (_: unknown, r: ApprovalRecord) => {
-              const node = r.approvalNodes?.find(n => n.nodeId === nodeId)
-              if (!node) return <span style={{ color: '#999' }}>--</span>
-              return (
-                <div>{node.approvers?.map((a, i) => (
-                  <div key={i} style={{ whiteSpace: 'nowrap' }}>
-                    {a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.time || '--'}</s> : (a.time || '--')}
-                  </div>
-                ))}</div>
-              )
-            },
-          },
-          {
-            title: t('approvalCenter.colApproveStatus'),
-            key: `${nodeId}_status`,
-            width: 90,
-            render: (_: unknown, r: ApprovalRecord) => {
-              const node = r.approvalNodes?.find(n => n.nodeId === nodeId)
-              if (!node) return <span style={{ color: '#999' }}>--</span>
-              return (
-                <div>{node.approvers?.map((a, i) => (
-                  <div key={i}>{renderApprovalStatus(a.status)}</div>
-                ))}</div>
-              )
-            },
-          },
-        ],
-      }))
-    })(),
+    // 固定三級審批列（業務主管 → 運營主管 → 財務主管），無論流程配置如何調整均按位置映射
+    {
+      title: t('approvalCenter.colBiz'),
+      key: 'biz',
+      children: [
+        {
+          title: t('approvalCenter.colApprover'),
+          key: 'biz_approver',
+          width: 130,
+          render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.bizApprover || '--'}</span>,
+        },
+        {
+          title: t('approvalCenter.colApproveTime'),
+          key: 'biz_time',
+          width: 160,
+          render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.bizApproveTime || '--'}</span>,
+        },
+        {
+          title: t('approvalCenter.colApproveStatus'),
+          key: 'biz_status',
+          width: 90,
+          render: (_: unknown, r: ApprovalRecord) => renderApprovalStatus(r.bizApproveStatus),
+        },
+      ],
+    },
+    {
+      title: t('approvalCenter.colOps'),
+      key: 'ops',
+      children: [
+        {
+          title: t('approvalCenter.colApprover'),
+          key: 'ops_approver',
+          width: 130,
+          render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.opsApprover || '--'}</span>,
+        },
+        {
+          title: t('approvalCenter.colApproveTime'),
+          key: 'ops_time',
+          width: 160,
+          render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.opsApproveTime || '--'}</span>,
+        },
+        {
+          title: t('approvalCenter.colApproveStatus'),
+          key: 'ops_status',
+          width: 90,
+          render: (_: unknown, r: ApprovalRecord) => renderApprovalStatus(r.opsApproveStatus),
+        },
+      ],
+    },
+    {
+      title: t('approvalCenter.colFin'),
+      key: 'fin',
+      children: [
+        {
+          title: t('approvalCenter.colApprover'),
+          key: 'fin_approver',
+          width: 130,
+          render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.finApprover || '--'}</span>,
+        },
+        {
+          title: t('approvalCenter.colApproveTime'),
+          key: 'fin_time',
+          width: 160,
+          render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.finApproveTime || '--'}</span>,
+        },
+        {
+          title: t('approvalCenter.colApproveStatus'),
+          key: 'fin_status',
+          width: 90,
+          render: (_: unknown, r: ApprovalRecord) => renderApprovalStatus(r.finApproveStatus),
+        },
+      ],
+    },
     {
       title: t('approvalCenter.colFlowStatus'),
       dataIndex: 'flowStatus',
@@ -548,11 +540,7 @@ export default function ApprovalCenter() {
           }}
           size="middle"
           bordered
-          scroll={{ x: 1200 + Math.max(0, (() => {
-            const nodeIds = new Set<string>()
-            data.forEach(r => r.approvalNodes?.forEach(n => nodeIds.add(n.nodeId)))
-            return nodeIds.size
-          })()) * 380 }}
+          scroll={{ x: 2340 }}
         />
       </div>
 
@@ -579,7 +567,7 @@ export default function ApprovalCenter() {
 
             <h4 style={{ marginTop: 20, marginBottom: 12, fontSize: 14, color: '#333', borderBottom: '1px solid #f0f0f0', paddingBottom: 8 }}>{t('approvalCenter.flowSection')}</h4>
             {detailRecord.approvalNodes?.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(detailRecord.approvalNodes.length, 3)}, 1fr)`, gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${detailRecord.approvalNodes.length}, 1fr)`, gap: '16px' }}>
                 {detailRecord.approvalNodes.map((node, idx) => (
                   <div key={node.nodeId || idx} style={{ padding: 12, background: '#f6f6f6', borderRadius: 8 }}>
                     <div style={{ fontWeight: 600, color: '#333', marginBottom: 8 }}>

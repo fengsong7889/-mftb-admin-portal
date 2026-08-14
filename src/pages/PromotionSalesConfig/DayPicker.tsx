@@ -200,13 +200,18 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     }).catch(() => {})
   }, [])
 
-  // 真实算法下拉：规则6 选择门店后过滤掉对该商家屏蔽的算法
+  // 真实算法下拉：按品牌过滤，选择门店后进一步过滤
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.HOT_REVIVE_AD, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
+    if (!searchBrand) {
+      setAlgorithmOptions([])
+      setAlgorithmBrandOverrides({})
+      return
+    }
+    const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.HOT_REVIVE_AD, brand: backendBrand, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
       .then(res => {
         if (!res) return
         const brandOverrides: Record<string, string> = {}
-        // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
         const records = res.records.filter(a => a.updatedBy !== '系統')
         const options = records.map(a => {
           const value = String(a.id)
@@ -222,7 +227,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
         }
       }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchStoreName])
+  }, [searchBrand, searchStoreName])
 
   // 贈送天數餘額：按門店查詢真實餘額，切換門店時刷新並清零已選抵扣天數
   useEffect(() => {
@@ -237,10 +242,17 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   }, [searchStoreName, storeMap, hasSearched])
 
   // 算法名称变更处理：自动带出品牌，并检查购物车冲突
+  // 品牌变更处理：清空已选算法
+  const handleBrandChange = (value: string | null) => {
+    setSearchBrand(value)
+    setSearchAlgorithm(null)
+    setAlgorithmOptions([])
+  }
+
+  // 算法名称变更处理（品牌已由用户预先选择）
   const handleAlgorithmChange = (value: string | null) => {
     const apply = () => {
       setSearchAlgorithm(value)
-      setSearchBrand(value && algorithmBrandOverrides[value] ? algorithmBrandOverrides[value] : null)
     }
     if (hasCartItems && value !== searchAlgorithm) {
       setPendingAction(apply)
@@ -326,6 +338,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
     setInventoryData(null)
     setCartItems([])
     setSelectedDates([])
+    setAlgorithmOptions([])
   }
 
   // 倒计时：每秒更新当前时间
@@ -672,13 +685,13 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
           <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
-            <Form.Item label={t('algoNameLabel')}>
-              <Select placeholder={t('dpAlgoPlaceholder')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-                options={algorithmOptions} />
-            </Form.Item>
             <Form.Item label={t('brandLabel')}>
-              <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={(v) => setSearchBrand(v)} allowClear
-                options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} disabled />
+              <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
+                options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
+            </Form.Item>
+            <Form.Item label={t('algoNameLabel')}>
+              <Select placeholder={searchBrand ? t('dpAlgoPlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+                options={algorithmOptions} disabled={!searchBrand} />
             </Form.Item>
             <Form.Item label={t('storeNameLabel')}>
               <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
