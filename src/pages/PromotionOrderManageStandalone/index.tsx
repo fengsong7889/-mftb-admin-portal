@@ -395,7 +395,7 @@ export default function PromotionOrderManage() {
     { key: 'orderNo', title: t('promotionOrderManage.colOrderNo') },
     { key: 'groupInfo', title: t('promotionOrderManage.colGroupInfo') },
     { key: 'storeInfo', title: t('promotionOrderManage.colStoreInfo') },
-    { key: 'algorithmInfo', title: t('promotionOrderManage.colAlgorithmInfo') },
+    { key: 'algorithmInfo', title: orderType === '人氣商家' ? '配置ID/人氣名稱' : t('promotionOrderManage.colAlgorithmInfo') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'channel', title: t('common.colChannel') },
     { key: 'region', title: t('promotionOrderManage.colRegion') },
@@ -462,7 +462,7 @@ export default function PromotionOrderManage() {
       ),
     },
     {
-      title: t('promotionOrderManage.colAlgorithmInfo'),
+      title: orderType === '人氣商家' ? '配置ID/人氣名稱' : t('promotionOrderManage.colAlgorithmInfo'),
       key: 'algorithmInfo',
       width: 180,
       render: (_, record) => (
@@ -983,7 +983,7 @@ export default function PromotionOrderManage() {
                 style={{ width: '100%' }}
               />
             </Form.Item>
-            <Form.Item label={t('promotionOrderManage.colAlgoName')}>
+            <Form.Item label={orderType === '人氣商家' ? '人氣名稱' : t('promotionOrderManage.colAlgoName')}>
               <Select
                 showSearch
                 allowClear

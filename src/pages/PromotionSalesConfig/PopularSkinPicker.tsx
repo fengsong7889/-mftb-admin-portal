@@ -555,7 +555,7 @@ export default function PopularSkinPicker() {
               ]}
             />
           </Form.Item>
-          <Form.Item label={t('algoNameLabel')}>
+          <Form.Item label={'人氣名稱'}>
             <Select
               placeholder={searchBrand ? t('algoSearchPlaceholder') : t('selectBrandFirst')}
               value={searchAlgorithm}

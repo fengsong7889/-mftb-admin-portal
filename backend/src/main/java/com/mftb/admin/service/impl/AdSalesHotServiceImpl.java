@@ -52,7 +52,7 @@ import java.util.Set;
 public class AdSalesHotServiceImpl implements AdSalesHotService {
 
     /** 赠送管理中人气商家的广告类型标识（biz_gift_record.ad_type） */
-    public static final String GIFT_AD_TYPE = "ka";
+    public static final String GIFT_AD_TYPE = "popular_merchant";
 
     private final AdOrderMapper orderMapper;
     private final AdOrderItemHotMapper itemMapper;
@@ -84,6 +84,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         AdHotInventoryVO vo = new AdHotInventoryVO();
         vo.setAlgoId(algoId);
         vo.setPresaleDays(pricing.getPresaleDays());
+        vo.setGiftCashValue(pricing.getGiftCashValue());
         vo.setDiscountTiers(pricing.getDiscountTiers());
         vo.setRefundEnabled(pricing.getRefundEnabled());
         for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
@@ -94,6 +95,8 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
                 cell.setPrice(skin.getPrice());
                 cell.setBorderType(skin.getBorderType());
                 cell.setBorderColor(skin.getBorderColor());
+                cell.setTier(skin.getTier());
+                cell.setDishLayout(skin.getDishLayout());
                 boolean bought = StringUtils.hasText(groupCode)
                         && purchased.contains(cellKey(date, skin.getSkinName()));
                 cell.setStatus(bought ? "purchased" : "available");
@@ -216,9 +219,9 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
         order.setAlgoType(5); // 人氣商家固定类型
-        order.setAlgoId(pricing.getAlgoId());
+        order.setAlgoId(pricing.getId()); // 解耦後存定價配置ID，用於已購格子查詢
         order.setAlgoName(pricing.getAlgoName());
-        order.setAlgoCode(null); // 解耦算法库后不再使用
+        order.setAlgoCode(pricing.getPricingNo()); // 存定价编号，用于订单列表展示"配置ID"
         order.setBrand(brand);
         order.setChannel(channel);
         order.setGroupCode(request.getGroupCode());
@@ -301,10 +304,13 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
 
     /* ==================== 内部方法 ==================== */
 
-    private AdPricingHotVO requireActivePricing(Long algoId) {
-        AdPricingHotVO pricing = pricingService.activeByAlgo(algoId);
+    private AdPricingHotVO requireActivePricing(Long pricingId) {
+        AdPricingHotVO pricing = pricingService.detail(pricingId);
         if (pricing == null) {
-            throw new BusinessException("該算法未配置銷售定價");
+            throw new BusinessException("該定價配置不存在");
+        }
+        if (pricing.getStatus() == null || pricing.getStatus() != 1) {
+            throw new BusinessException("該定價配置未啟用");
         }
         return pricing;
     }

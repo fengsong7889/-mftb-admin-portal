@@ -122,8 +122,10 @@ interface SaleSkin {
   borderColor?: string
   /** 皮膚主色漸變（大圖模式左側主圖示意） */
   tagBg: string
-  /** 該皮膚支持的菜品展示佈局（平台配置，由系統瀑布流策略自動分配，商家不可選擇） */
-  dishLayouts: DishLayout[]
+  /** 菜品展示佈局（定價配置單選：grid=大圖拼列 / carousel=階梯輪播） */
+  dishLayout: DishLayout
+  /** 皮膚段位（經典/精選/旗艦/至尊） */
+  tier: 'classic' | 'premium' | 'flagship' | 'ultimate'
   /** 賣點描述 */
   desc: string
   /** 已售套數（氛圍數據） */
@@ -134,55 +136,112 @@ interface SaleSkin {
 const POSTER_SLOGANS = ['人氣商家', '人氣爆棚', '人氣之選', '人氣王牌', '人氣好店', '人氣首選']
 const posterSlogan = (skinId: number) => POSTER_SLOGANS[skinId % POSTER_SLOGANS.length]
 
+/** 皮膚段位配置（同定價頁，購買頁卡片展示用）—— 等級越高視覺越華麗 */
+const SKIN_TIER_CONFIG: Record<string, {
+  labelKey: string; color: string; bg: string;
+  /** 卡片段位標籤的完整樣式 */
+  badge: CSSProperties;
+  /** 標籤前缀圖標（至尊帶星） */
+  icon?: string;
+}> = {
+  classic: {
+    labelKey: 'recommend.popularSkin.skinTierClassic', color: '#8C8C8C', bg: '#F5F5F5',
+    badge: {
+      fontSize: 9, fontWeight: 500, color: '#8C8C8C', background: '#F5F5F5',
+      borderRadius: 3, padding: '1px 6px', whiteSpace: 'nowrap',
+      border: '1px solid #E8E8E8',
+    },
+  },
+  premium: {
+    labelKey: 'recommend.popularSkin.skinTierPremium', color: '#1890FF', bg: '#E6F7FF',
+    badge: {
+      fontSize: 9, fontWeight: 600, color: '#1890FF',
+      background: 'linear-gradient(135deg, #E6F7FF, #BAE7FF)',
+      borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap',
+      border: '1px solid #91D5FF',
+      boxShadow: '0 1px 2px rgba(24,144,255,0.12)',
+    },
+  },
+  flagship: {
+    labelKey: 'recommend.popularSkin.skinTierFlagship', color: '#E8720C', bg: '#FFF7E6',
+    badge: {
+      fontSize: 9, fontWeight: 700, color: '#fff',
+      background: 'linear-gradient(135deg, #E8720C, #F5A623)',
+      borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap',
+      border: '1px solid rgba(255,255,255,0.3)',
+      boxShadow: '0 2px 6px rgba(232,114,12,0.3)',
+      textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+    },
+  },
+  ultimate: {
+    labelKey: 'recommend.popularSkin.skinTierUltimate', color: '#722ED1', bg: '#F9F0FF',
+    icon: '✦',
+    badge: {
+      fontSize: 9, fontWeight: 700, color: '#fff',
+      background: 'linear-gradient(135deg, #722ED1, #B24BF3, #722ED1)',
+      backgroundSize: '200% 200%',
+      borderRadius: 4, padding: '1px 8px', whiteSpace: 'nowrap',
+      border: '1px solid rgba(255,255,255,0.35)',
+      boxShadow: '0 2px 8px rgba(114,46,209,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+      textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      animation: 'tierShimmer 2.5s ease-in-out infinite',
+    },
+  },
+}
+const getSaleTierConfig = (tier: string) => SKIN_TIER_CONFIG[tier] ?? SKIN_TIER_CONFIG.classic
+
+/** 段位排序權重：經典 → 精選 → 旗艦 → 至尊 */
+const TIER_ORDER: Record<string, number> = { classic: 0, premium: 1, flagship: 2, ultimate: 3 }
+
 /** Mock：銷售定價已上架的皮膚套件 */
 const SALE_SKINS: SaleSkin[] = [
   {
     id: 1, name: '紅運當頭', pricePerDay: 28, borderType: 'color', borderColor: '#FF4D4F',
-    tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', desc: '喜慶紅框，節慶檔期首選', sold: 386, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #FF4D4F, #FF7A45)', desc: '喜慶紅框，節慶檔期首選', sold: 386, dishLayout: 'grid', tier: 'classic',
   },
   {
     id: 2, name: '橙意滿滿', pricePerDay: 18, borderType: 'color', borderColor: '#E8720C',
-    tagBg: 'linear-gradient(135deg, #E8720C, #F59432)', desc: '品牌橙框，醒目聚焦高轉化', sold: 512, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #E8720C, #F59432)', desc: '品牌橙框，醒目聚焦高轉化', sold: 512, dishLayout: 'grid', tier: 'classic',
   },
   {
     id: 3, name: '紫氣東來', pricePerDay: 22, borderType: 'color', borderColor: '#722ED1',
-    tagBg: 'linear-gradient(135deg, #722ED1, #9254DE)', desc: '高級紫框，品質商家氛圍感', sold: 208, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #722ED1, #9254DE)', desc: '高級紫框，品質商家氛圍感', sold: 208, dishLayout: 'carousel', tier: 'premium',
   },
   {
     id: 4, name: '簡約無框', pricePerDay: 8, borderType: 'none',
-    tagBg: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', desc: '無邊框輕量款，入門首選', sold: 655, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #8C8C8C, #BFBFBF)', desc: '無邊框輕量款，入門首選', sold: 655, dishLayout: 'grid', tier: 'classic',
   },
   {
     id: 5, name: '金碧輝煌', pricePerDay: 32, borderType: 'color', borderColor: '#FAAD14',
-    tagBg: 'linear-gradient(135deg, #FAAD14, #FFC53D)', desc: '土豪金框，旺鋪氣場拉滿', sold: 173, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #FAAD14, #FFC53D)', desc: '土豪金框，旺鋪氣場拉滿', sold: 173, dishLayout: 'grid', tier: 'premium',
   },
   {
     id: 6, name: '碧海藍天', pricePerDay: 20, borderType: 'color', borderColor: '#1890FF',
-    tagBg: 'linear-gradient(135deg, #1890FF, #40A9FF)', desc: '清爽藍框，飲品甜品百搭', sold: 294, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #1890FF, #40A9FF)', desc: '清爽藍框，飲品甜品百搭', sold: 294, dishLayout: 'carousel', tier: 'premium',
   },
   {
     id: 7, name: '翠綠生機', pricePerDay: 20, borderType: 'color', borderColor: '#52C41A',
-    tagBg: 'linear-gradient(135deg, #52C41A, #73D13D)', desc: '健康綠框，輕食沙拉首選', sold: 231, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #52C41A, #73D13D)', desc: '健康綠框，輕食沙拉首選', sold: 231, dishLayout: 'grid', tier: 'classic',
   },
   {
     id: 8, name: '青峰翡翠', pricePerDay: 24, borderType: 'color', borderColor: '#13C2C2',
-    tagBg: 'linear-gradient(135deg, #13C2C2, #36CFC9)', desc: '青碧色框，清新耳目一新', sold: 156, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #13C2C2, #36CFC9)', desc: '青碧色框，清新耳目一新', sold: 156, dishLayout: 'grid', tier: 'premium',
   },
   {
     id: 9, name: '粉黛甜心', pricePerDay: 26, borderType: 'color', borderColor: '#EB2F96',
-    tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #EB2F96, #F759AB)', desc: '少女粉框，甜品烘焙拉滿好感', sold: 342, dishLayout: 'carousel', tier: 'flagship',
   },
   {
     id: 10, name: '暗夜黑金', pricePerDay: 30, borderType: 'color', borderColor: '#8B6D3B',
-    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #1A1A2E, #3D2E1A, #8B6D3B)', desc: '暗夜黑底+暗金邊框，西餐日料高級質感', sold: 128, dishLayout: 'grid', tier: 'flagship',
   },
   {
     id: 11, name: '橘光暮色', pricePerDay: 25, borderType: 'color', borderColor: '#FA541C',
-    tagBg: 'linear-gradient(135deg, #FA541C, #FF7A45)', desc: '暮色橘框，宵夜燒烤氛圍感', sold: 267, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #FA541C, #FF7A45)', desc: '暮色橘框，宵夜燒烤氛圍感', sold: 267, dishLayout: 'grid', tier: 'flagship',
   },
   {
     id: 12, name: '極光幻彩', pricePerDay: 36, borderType: 'color', borderColor: '#2F54EB',
-    tagBg: 'linear-gradient(135deg, #2F54EB, #722ED1)', desc: '幻彩漸變框，旗艦頂級曝光款', sold: 95, dishLayouts: ['grid', 'carousel'],
+    tagBg: 'linear-gradient(135deg, #2F54EB, #722ED1)', desc: '幻彩漸變框，旗艦頂級曝光款', sold: 95, dishLayout: 'carousel', tier: 'ultimate',
   },
 ]
 
@@ -235,8 +294,9 @@ const SKIN_COLOR_PALETTE = [
 
 export default function PopularSkinPicker() {
   const { t } = useTranslation('adSales')
+  const { t: tr } = useTranslation() // 默認 translation 命名空間，用於 recommend.popularSkin.* 鍵
   const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
-  const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: t('layoutGrid'), carousel: t('layoutCarousel') }
+  
   const navigate = useNavigate()
 
   // 查詢條件（算法名稱 / 所屬品牌 / 門店名稱 / 歸屬BD，與其它購買界面保持一致）
@@ -266,14 +326,16 @@ export default function PopularSkinPicker() {
   const [giftDaysUsed, setGiftDaysUsed] = useState(0)
   // 支付成功彈窗展示的贈送天數抵扣
   const [paidGiftDays, setPaidGiftDays] = useState(0)
+  // 支付成功彈窗展示的推廣金花費
+  const [paidPromoAmount, setPaidPromoAmount] = useState(0)
+  // 支付成功彈窗時的支付模式（用於區分展示）
+  const [paidPaymentMode, setPaidPaymentMode] = useState<'promo' | 'gift' | 'mixed'>('promo')
   // 支付規則：根據規則配置決定推廣金與贈送天數是否可混合使用
   const { mixedPayment } = usePaymentRule(GIFT_AD_TYPE_POPULAR)
   // 非混合支付時的選擇模式：'promo' = 推廣金支付, 'gift' = 贈送天數抵扣
   const [paymentMode, setPaymentMode] = useState<'promo' | 'gift'>('promo')
-  // 階梯輪播餐品指針（同定價預覽）：current 為當前張，prev 為正在向左滑出的上一張
+  // 階梯輪播餐品指針（定價配置 carousel 時使用）
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
-  // 大圖模式預覽風格指針：皮膚支持多種佈局時每 3 秒自動輪換，模擬系統隨機分配效果
-  const [previewLayoutIndex, setPreviewLayoutIndex] = useState(0)
 
   // ===== 真實接口接線 =====
   // 人氣名稱下拉（從銷售定價配置加載，value=algoId）
@@ -288,35 +350,40 @@ export default function PopularSkinPicker() {
 
   const selectedStore = searchStoreName ? storeMap[searchStoreName] : undefined
 
-  // 皮膚列表：優先從庫存 API 返回的 cells 提取真實皮膚（名稱+價格+邊框配置+銷量），後端不可用時兜底 Mock
+  // 皮膚列表：優先從庫存 API 返回的 cells 提取真實皮膚（名稱+價格+邊框配置+段位+菜品佈局+銷量），後端不可用時兜底 Mock
   const effectiveSkins: SaleSkin[] = useMemo(() => {
+    let skins: SaleSkin[]
     if (inventoryData?.cells && inventoryData.cells.length > 0) {
       // 從庫存 cells 中提取去重的皮膚列表（保持定價配置順序）
       const seen = new Set<string>()
-      const skins: SaleSkin[] = []
+      const list: SaleSkin[] = []
       inventoryData.cells.forEach(cell => {
         if (seen.has(cell.skinName)) return
         seen.add(cell.skinName)
-        const idx = skins.length
+        const idx = list.length
         const palette = SKIN_COLOR_PALETTE[idx % SKIN_COLOR_PALETTE.length]
         // 邊框配置以定價配置為準：配色邊框用真實顏色；無邊框/上傳邊框圖無顏色數據時以色板兜底
         const useRealColor = cell.borderType === 'color' && !!cell.borderColor
-        skins.push({
+        list.push({
           id: idx + 1,
           name: cell.skinName,
           pricePerDay: cell.price,
           borderType: cell.borderType === 'none' ? 'none' : 'color',
           borderColor: useRealColor ? cell.borderColor : palette.borderColor,
           tagBg: palette.tagBg,
-          // 定價頁大圖模式佈局默認全選（大圖拼列 + 階梯輪播），購買頁預覽支持 tab 切換展示
-          dishLayouts: ['grid', 'carousel'],
+          // 菜品展示佈局：讀取定價配置的單選值（grid/carousel）
+          dishLayout: cell.dishLayout === 'carousel' ? 'carousel' : 'grid',
+          tier: (cell.tier === 'classic' || cell.tier === 'premium' || cell.tier === 'flagship' || cell.tier === 'ultimate') ? cell.tier : 'classic',
           desc: cell.skinName,
           sold: inventoryData.skinSoldCounts?.[cell.skinName] ?? 0,
         })
       })
-      return skins
+      skins = list
+    } else {
+      skins = SALE_SKINS
     }
-    return SALE_SKINS
+    // 按段位排序：經典 → 精選 → 旗艦 → 至尊
+    return skins.sort((a, b) => (TIER_ORDER[a.tier] ?? 0) - (TIER_ORDER[b.tier] ?? 0))
   }, [inventoryData])
 
   const selectedSkin = effectiveSkins.find(s => s.id === selectedSkinId) || null
@@ -330,6 +397,8 @@ export default function PopularSkinPicker() {
   }, [inventoryData])
   // 退款開關（來自定價配置）
   const currentAlgorithmRefundEnabled = inventoryData ? inventoryData.refundEnabled === 1 : null
+  // 贈送天數每日現金價值（來自定價配置，0 或未配置時視為未啟用）
+  const giftCashValue = inventoryData?.giftCashValue ?? 0
 
   // 皮膚真實價格映射（來自庫存 API）
   const skinPriceMap = useMemo(() => {
@@ -342,6 +411,17 @@ export default function PopularSkinPicker() {
   const effectiveSkinPricePerDay = selectedSkin
     ? (skinPriceMap[selectedSkin.name] ?? selectedSkin.pricePerDay)
     : 0
+
+  // 切換到贈送天數支付模式時，若已選皮膚日單價 > 現金價值，自動取消選擇
+  useEffect(() => {
+    if (!mixedPayment && paymentMode === 'gift' && giftCashValue > 0 && selectedSkin) {
+      const price = skinPriceMap[selectedSkin.name] ?? selectedSkin.pricePerDay
+      if (price > giftCashValue) {
+        setSelectedSkinId(null)
+        message.warning(t('skinAutoDeselected', { value: giftCashValue }))
+      }
+    }
+  }, [paymentMode, mixedPayment, giftCashValue, selectedSkin, skinPriceMap])
 
   // 自選日期可選範圍：最早次日生效，最晚 sellableDays 天內
   const customMinDate = dayjs().add(1, 'day').startOf('day')
@@ -363,23 +443,13 @@ export default function PopularSkinPicker() {
     ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（${t('selfSelectDays', { count: customDates.length })}）`
     : t('notSelected')
 
-  // 階梯輪播預覽：所選皮膚支持階梯輪播佈局時逐張輪播，切換皮膚時重置
+  // 階梯輪播預覽：所選皮膚配置為 carousel 時逐張輪播，切換皮膚時重置
   useEffect(() => {
-    if (!selectedSkin || !selectedSkin.dishLayouts.includes('carousel')) return
+    if (!selectedSkin || selectedSkin.dishLayout !== 'carousel') return
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [selectedSkin])
-
-  // 大圖模式風格自動輪換預覽：支持多種佈局時每 3 秒切換一種，點擊風格標籤可手動定位
-  useEffect(() => {
-    setPreviewLayoutIndex(0)
-    if (!selectedSkin || selectedSkin.dishLayouts.length <= 1) return
-    const timer = setInterval(() => {
-      setPreviewLayoutIndex(i => (i + 1) % selectedSkin.dishLayouts.length)
-    }, 5000)
+    }, 3000)
     return () => clearInterval(timer)
   }, [selectedSkin])
 
@@ -417,7 +487,7 @@ export default function PopularSkinPicker() {
         if (!res) return
         const options = (res.records ?? [])
           .filter(p => p.skins && p.skins.length > 0)
-          .map(p => ({ label: p.algoName || p.pricingNo || '-', value: String(p.algoId) }))
+          .map(p => ({ label: p.algoName || p.pricingNo || '-', value: String(p.id) }))
         setPricingOptions(options)
       }).catch(() => {})
   }, [searchBrand])
@@ -442,18 +512,24 @@ export default function PopularSkinPicker() {
     return { original, sale, saved: original - sale }
   }, [selectedSkin, effectiveSkinPricePerDay, effectiveDays, currentTier])
 
-  // 贈送天數抵扣計算
+  // 贈送天數抵扣計算（基於現金價值）
   const maxGiftDaysUsable = Math.min(giftDaysBalance, effectiveDays)
   // 非混合支付選擇贈送天數抵扣時自動全部抵扣（無需用戶操作）；混合支付時才允許用戶手動選擇抵扣天數
   const effectiveGiftDays = !mixedPayment && paymentMode === 'gift'
     ? maxGiftDaysUsable
     : Math.min(giftDaysUsed, maxGiftDaysUsable)
+  // 每日折後單價（用於計算現金價值抵扣上限）
+  const dailySalePrice = effectiveDays > 0 ? Math.round(basePriceSummary.sale / effectiveDays) : 0
+  // 每日贈送抵扣額：有現金價值配置時取 min(日單價, 現金價值)；未配置時回退全額抵扣
+  const dailyGiftCover = giftCashValue > 0 ? Math.min(dailySalePrice, giftCashValue) : dailySalePrice
   const giftDeduction = useMemo(() => {
     // 非混合支付且選擇推廣金模式時，不使用贈送天數抵扣
     if (!mixedPayment && paymentMode === 'promo') return 0
     if (effectiveGiftDays <= 0 || effectiveDays === 0) return 0
-    return Math.min(basePriceSummary.sale, Math.round(basePriceSummary.sale / effectiveDays * effectiveGiftDays))
-  }, [effectiveGiftDays, effectiveDays, basePriceSummary.sale, mixedPayment, paymentMode])
+    return effectiveGiftDays * dailyGiftCover
+  }, [effectiveGiftDays, effectiveDays, dailyGiftCover, mixedPayment, paymentMode])
+  // 每日需補差價（混合支付時，皮膚日單價超過現金價值的部分）
+  const dailySupplement = giftCashValue > 0 ? Math.max(0, dailySalePrice - giftCashValue) : 0
 
   // 最終費用計算（含贈送天數抵扣）
   const priceSummary = useMemo(() => {
@@ -595,6 +671,11 @@ export default function PopularSkinPicker() {
         message.error('贈送天數餘額不足，無法抵扣')
         return
       }
+      // 皮膚日單價不得超過現金價值
+      if (giftCashValue > 0 && effectiveSkinPricePerDay > giftCashValue) {
+        message.error(t('skinExceedCashValue', { value: giftCashValue }))
+        return
+      }
     } else if (mixedPayment) {
       // 混合支付：抵扣後應付金額不得超過推廣金餘額
       if (priceSummary.payable > merchantBalance) {
@@ -621,6 +702,8 @@ export default function PopularSkinPicker() {
       })
       setIsPaymentModalVisible(false)
       setPaidGiftDays(effectiveGiftDays)
+      setPaidPromoAmount(priceSummary.payable)
+      setPaidPaymentMode(mixedPayment ? 'mixed' : paymentMode)
       setMerchantBalance(prev => prev - priceSummary.payable)
       setIsSuccessModalVisible(true)
     } catch (err) {
@@ -708,23 +791,20 @@ export default function PopularSkinPicker() {
     </div>
   )
 
-  /** 菜品佈局② 階梯輪播（縮小版，同定價預覽）：頂層向左滑出的同時，後方卡片沿階梯位彈性頂上來 */
+  /** 菜品佈局② 階梯輪播（縮小版，定價配置 carousel 時使用）：頂層向左滑出的同時，後方卡片沿階梯位彈性頂上來 */
   const renderDishCarouselMini = () => {
     const n = PREVIEW_DISHES.length
-    // 堆疊深度位：0=前方主卡，1/2=後方階梯卡
     const depthStyles: CSSProperties[] = [
       { top: 0, bottom: 0, left: 0, right: '28%', zIndex: 3, opacity: 1, transform: 'translateX(0) rotate(0deg)', boxShadow: '3px 0 10px rgba(0,0,0,0.12)' },
       { top: 6, bottom: 6, left: 22, right: 0, zIndex: 2, opacity: 0.75, transform: 'translateX(0) rotate(0deg)', boxShadow: 'none' },
       { top: 12, bottom: 12, left: 44, right: -4, zIndex: 1, opacity: 0.5, transform: 'translateX(0) rotate(0deg)', boxShadow: 'none' },
     ]
-    // 離場位：沿主卡位置向左滑出淡出（容器 overflow hidden 裁剪）
     const exitStyle: CSSProperties = { top: 0, bottom: 0, left: 0, right: '28%', zIndex: 4, opacity: 0, transform: 'translateX(-118%) rotate(-5deg)' }
     return (
       <div style={{ position: 'relative', height: 104, marginTop: 8, overflow: 'hidden' }}>
         {PREVIEW_DISHES.map((dish, i) => {
           const depth = (i - dishState.current + n) % n
           const prevDepth = dishState.prev !== null ? (i - dishState.prev + n) % n : depth
-          // 剛離場：帶過渡向左滑出；歸隊：直接停到隊尾階梯位淡入，不做跨屏橫穿
           const isExiting = depth > 2 && prevDepth === 0
           const reJoining = depth <= 2 && prevDepth > 2
           const style = depth <= 2 ? depthStyles[depth] : isExiting ? exitStyle : { ...depthStyles[2], opacity: 0, zIndex: 0 }
@@ -736,7 +816,6 @@ export default function PopularSkinPicker() {
               animation: reJoining ? 'dishBackIn 0.5s ease' : undefined,
               ...style,
             }}>
-              {/* 餐品铺滿整卡，後方卡同步縮小，頂上來時平滑放大 */}
               <div style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 72, lineHeight: 1,
@@ -744,7 +823,6 @@ export default function PopularSkinPicker() {
                 filter: isFront ? 'none' : 'saturate(0.85)',
                 transition: reJoining ? 'none' : 'transform 0.65s cubic-bezier(0.34, 1.25, 0.5, 1), filter 0.4s ease',
               }}>{dish.emoji}</div>
-              {/* 折扣膠囊 + 名稱條：僅前方主卡展示，頂上來後延遲淡入 */}
               <div style={{ opacity: isFront ? 1 : 0, transition: 'opacity 0.3s ease 0.25s' }}>
                 <div style={{ position: 'absolute', left: 5, bottom: 22, display: 'flex', alignItems: 'stretch', borderRadius: 10, overflow: 'hidden' }}>
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#E8302D', background: '#fff', padding: '2px 5px' }}>🏷️ {dish.discount}</span>
@@ -762,7 +840,6 @@ export default function PopularSkinPicker() {
             </div>
           )
         })}
-        {/* 輪播指示點 */}
         <div style={{ position: 'absolute', right: 3, bottom: 3, zIndex: 5, display: 'flex', gap: 3 }}>
           {PREVIEW_DISHES.map((_, i) => (
             <span key={i} style={{
@@ -774,6 +851,7 @@ export default function PopularSkinPicker() {
       </div>
     )
   }
+
 
   /** 大圖模式預覽（同定價預覽：左側豎版主圖 + 右側信息/標籤 + 按皮膚配置的菜品佈局） */
   const renderSkinBigPreview = (skin: SaleSkin) => (
@@ -811,12 +889,8 @@ export default function PopularSkinPicker() {
         <div style={{ flex: 1, minWidth: 0 }}>
           {previewInfoRows(13)}
           {previewTagsRow()}
-          {/* 菜品展示區：僅渲染當前輪換到的風格（實際展示哪種由系統隨機分配，不同風格間自動切換） */}
-          {(() => {
-            const layout = skin.dishLayouts[Math.min(previewLayoutIndex, skin.dishLayouts.length - 1)]
-            if (!layout) return null
-            return layout === 'grid' ? renderDishGridMini() : renderDishCarouselMini()
-          })()}
+          {/* 菜品展示區：根據定價配置的 dishLayout 渲染對應樣式 */}
+          {skin.dishLayout === 'carousel' ? renderDishCarouselMini() : renderDishGridMini()}
         </div>
       </div>
     </div>
@@ -874,8 +948,8 @@ export default function PopularSkinPicker() {
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
           </Form.Item>
-          <Form.Item label={t('recommend:popularSkin.popularNameLabel')}>
-            <Select placeholder={searchBrand ? t('recommend:popularSkin.popularNamePlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
+          <Form.Item label={tr('recommend.popularSkin.popularNameLabel')}>
+            <Select placeholder={searchBrand ? tr('recommend.popularSkin.popularNamePlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
               options={pricingOptions} disabled={!searchBrand} />
           </Form.Item>
           <Form.Item label={t('storeNameLabel')}>
@@ -927,37 +1001,54 @@ export default function PopularSkinPicker() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 {effectiveSkins.map(skin => {
                   const isSelected = selectedSkinId === skin.id
+                  // 贈送天數支付模式：皮膚日單價 > 現金價值時置灰不可選
+                  const skinRealPrice = skinPriceMap[skin.name] ?? skin.pricePerDay
+                  const isGiftOnlyMode = !mixedPayment && paymentMode === 'gift'
+                  const isDisabled = isGiftOnlyMode && giftCashValue > 0 && skinRealPrice > giftCashValue
                   return (
                     <div
                       key={skin.id}
-                      title={skin.desc}
-                      onClick={() => setSelectedSkinId(skin.id)}
+                      title={isDisabled ? t('skinExceedCashValue', { value: giftCashValue }) : skin.desc}
+                      onClick={() => { if (!isDisabled) setSelectedSkinId(skin.id) }}
                       style={{
-                        position: 'relative', borderRadius: 10, padding: 12, cursor: 'pointer',
+                        position: 'relative', borderRadius: 10, padding: 12,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
                         border: isSelected ? '2px solid #E8720C' : '1px solid #f0f0f0',
-                        background: isSelected ? '#FFF7E6' : '#FAFAFA',
+                        background: isDisabled ? '#F5F5F5' : isSelected ? '#FFF7E6' : '#FAFAFA',
                         boxShadow: isSelected ? '0 4px 12px rgba(232,114,12,0.18)' : 'none',
                         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        opacity: isDisabled ? 0.55 : 1,
                       }}
-                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.transform = 'translateY(-2px)' }}
+                      onMouseEnter={e => { if (!isSelected && !isDisabled) e.currentTarget.style.transform = 'translateY(-2px)' }}
                       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
                     >
                       {isSelected && (
                         <CheckCircleFilled style={{ position: 'absolute', top: 8, right: 8, fontSize: 16, color: '#E8720C', zIndex: 1 }} />
                       )}
-                      {/* 皮膚色块示意：邊框色 + 套件名稱（定價已取消標籤配置，不再展示人氣標籤） */}
+                      {/* 置灰原因標籤 */}
+                      {isDisabled && (
+                        <div style={{
+                          position: 'absolute', top: 6, right: 6, fontSize: 9, color: '#FF4D4F',
+                          background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 3, padding: '0 4px',
+                          whiteSpace: 'nowrap', zIndex: 1,
+                        }}>{t('exceedCashValueTag')}</div>
+                      )}
+                      {/* 皮膚色块示意：邊框色 + 套件名稱 */}
                       <div style={{
                         height: 56, borderRadius: 8, background: '#fff',
                         border: skin.borderType === 'color' ? `2px solid ${skin.borderColor}` : '1px dashed #d9d9d9',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 8px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px',
                       }}>
                         <span style={{
                           fontSize: 13, fontWeight: 600, color: '#262626',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>{skin.name}</span>
                       </div>
-                      {/* 銷量（訂單數據：售出一個訂單記一次）+ 價格 */}
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+                      {/* 段位標籤（左下角）+ 銷量 + 價格 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        {(() => { const tc = getSaleTierConfig(skin.tier); return (
+                          <span style={tc.badge}>{tc.icon ? `${tc.icon} ` : ''}{tr(tc.labelKey)}</span>
+                        )})()}
                         <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>{t('soldCount', { count: skin.sold })}</span>
                         <div style={{ flex: 1 }} />
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#FF4D4F' }}>${skinPriceMap[skin.name] ?? skin.pricePerDay}</span>
@@ -1181,26 +1272,7 @@ export default function PopularSkinPicker() {
                 <div>
                   <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('smallMode')}</div>
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '12px 0 6px' }}>
-                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('bigMode')}</span>
-                    {/* 支持的風格列表：高亮當前預覽中的風格，每 3 秒自動輪換，點擊可手動定位（同定價頁預覽 tab） */}
-                    {selectedSkin.dishLayouts.length > 1 && selectedSkin.dishLayouts.map((l, idx) => {
-                      const isActive = idx === Math.min(previewLayoutIndex, selectedSkin.dishLayouts.length - 1)
-                      return (
-                        <span
-                          key={l}
-                          onClick={() => setPreviewLayoutIndex(idx)}
-                          style={{
-                            fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
-                            color: isActive ? '#E8720C' : '#8C8C8C',
-                            background: isActive ? '#FFF7E6' : '#F0F0F0',
-                            border: `1px solid ${isActive ? '#E8720C' : 'transparent'}`,
-                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                          }}
-                        >{DISH_LAYOUT_LABEL[l]}</span>
-                      )
-                    })}
-                  </div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px' }}>{t('bigMode')}</div>
                   {renderWaterfallCompare(renderSkinBigPreview(selectedSkin))}
                   {/* 風格分配說明：消除商家對固定展示風格的誤解 */}
                   <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
@@ -1256,8 +1328,9 @@ export default function PopularSkinPicker() {
                   <span>{t('orderDiscount')}：</span>
                   <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
                 </div>
-                {/* 混合支付：抵扣天數（borderTop 之後，同實付總額樣式） */}
+                {/* 混合支付：抵扣天數 + 現金價值抵扣明細 + 補差價 */}
                 {mixedPayment && (
+                  <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                     <span style={{ fontWeight: 600 }}>抵扣天數：</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1277,13 +1350,42 @@ export default function PopularSkinPicker() {
                       )}
                     </span>
                   </div>
+                  {/* 現金價值抵扣明細（有配置時展示） */}
+                  {giftCashValue > 0 && effectiveGiftDays > 0 && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, fontSize: 12, color: '#595959' }}>
+                        <span>每日抵扣（{t('giftCashValueShort')}）：</span>
+                        <span style={{ fontWeight: 600, color: '#E8720C' }}>${dailyGiftCover}/天</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                        <span>{t('giftDaysDeductLabel')}：</span>
+                        <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
+                      </div>
+                      {dailySupplement > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#FF4D4F' }}>
+                          <span>{t('supplementHint')}：</span>
+                          <span style={{ fontWeight: 600 }}>${dailySupplement}/天 × {effectiveGiftDays}天 = ${dailySupplement * effectiveGiftDays}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  </>
                 )}
                 {/* 赠送天数抵扣（borderTop 之後，同實付總額樣式） */}
                 {paymentMode === 'gift' && !mixedPayment && (
+                  <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                     <span style={{ fontWeight: 600 }}>抵扣天數：</span>
                     <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
                   </div>
+                  {/* 現金價值抵扣明細（有配置時展示） */}
+                  {giftCashValue > 0 && effectiveGiftDays > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, color: '#fa8c16' }}>
+                      <span>{t('giftDaysDeductLabel')}：</span>
+                      <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
+                    </div>
+                  )}
+                  </>
                 )}
                 {/* 實付總額（推廣金 / 混合支付顯示） */}
                 {(mixedPayment || paymentMode === 'promo') && (
@@ -1313,7 +1415,7 @@ export default function PopularSkinPicker() {
       <Modal
         title={t('confirmOrder')} open={isPaymentModalVisible}
         onOk={handleConfirmPayment} onCancel={() => setIsPaymentModalVisible(false)}
-        okText={t('confirmPay')} cancelText={t('common:cancel')}
+        okText={t('confirmPay')} cancelText={tr('common.cancel')}
         confirmLoading={paying}
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
         width={600}
@@ -1410,6 +1512,13 @@ export default function PopularSkinPicker() {
                     <span style={{ fontWeight: 600 }}>抵扣天數：</span>
                     <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
                   </div>
+                  {/* 現金價值抵扣明細 */}
+                  {giftCashValue > 0 && effectiveGiftDays > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, color: '#fa8c16' }}>
+                      <span>{t('giftDaysDeductLabel')}：</span>
+                      <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1455,6 +1564,25 @@ export default function PopularSkinPicker() {
                     <span style={{ fontWeight: 600 }}>抵扣天數：</span>
                     <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
                   </div>
+                  {/* 現金價值抵扣明細 + 補差價 */}
+                  {giftCashValue > 0 && effectiveGiftDays > 0 && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, fontSize: 12, color: '#595959' }}>
+                        <span>每日抵扣（{t('giftCashValueShort')}）：</span>
+                        <span style={{ fontWeight: 600, color: '#E8720C' }}>${dailyGiftCover}/天</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                        <span>{t('giftDaysDeductLabel')}：</span>
+                        <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
+                      </div>
+                      {dailySupplement > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#FF4D4F' }}>
+                          <span>{t('supplementHint')}：</span>
+                          <span style={{ fontWeight: 600 }}>${dailySupplement}/天 × {effectiveGiftDays}天 = ${dailySupplement * effectiveGiftDays}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                     <span style={{ fontWeight: 600 }}>{t('totalPayable')}：</span>
                     <span style={{ fontWeight: 700 }}>${priceSummary.payable}</span>
@@ -1479,16 +1607,33 @@ export default function PopularSkinPicker() {
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
           <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('skinPurchaseSuccess')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8 }}>
-            {paidGiftDays > 0 && (
+            {/* 混合支付：同時展示推廣金花費和贈送天數 */}
+            {paidPaymentMode === 'mixed' && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 32 }}>
+                <div>
+                  <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
+                  <p style={{ fontSize: 30, fontWeight: 700, color: '#E8720C', margin: 0, lineHeight: 1.2 }}>${paidPromoAmount}</p>
+                </div>
+                {paidGiftDays > 0 && (
+                  <div>
+                    <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
+                    <p style={{ fontSize: 30, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitSuffix')}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* 僅推廣金支付 */}
+            {paidPaymentMode === 'promo' && (
+              <>
+                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
+                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidPromoAmount}</p>
+              </>
+            )}
+            {/* 僅贈送天數抵扣 */}
+            {paidPaymentMode === 'gift' && (
               <>
                 <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
                 <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitSuffix')}</p>
-              </>
-            )}
-            {paidGiftDays === 0 && (
-              <>
-                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${priceSummary.sale}</p>
               </>
             )}
           </div>

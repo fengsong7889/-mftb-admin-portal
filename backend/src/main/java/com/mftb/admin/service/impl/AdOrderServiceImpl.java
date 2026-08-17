@@ -15,6 +15,7 @@ import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdAlgorithm;
+import com.mftb.admin.entity.AdPricingHot;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
@@ -24,6 +25,7 @@ import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
+import com.mftb.admin.mapper.AdPricingHotMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
@@ -69,6 +71,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderItemNewStoreMapper newStoreItemMapper;
     private final AdOrderItemHotMapper hotItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
+    private final AdPricingHotMapper hotPricingMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
@@ -666,6 +669,20 @@ public class AdOrderServiceImpl implements AdOrderService {
             records.forEach(r -> {
                 if (!StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null) {
                     r.setAlgoCode(codeMap.get(r.getAlgoId()));
+                }
+            });
+        }
+        // 人气商家订单(algoType=5): algoId指向定价配置表，从biz_ad_pricing_hot回填pricingNo
+        List<Long> hotMissingIds = records.stream()
+                .filter(r -> !StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null && r.getAlgoType() != null && r.getAlgoType() == 5)
+                .map(AdOrderVO::getAlgoId).distinct().toList();
+        if (!hotMissingIds.isEmpty()) {
+            Map<Long, String> hotCodeMap = hotPricingMapper.selectBatchIds(hotMissingIds)
+                    .stream().filter(a -> StringUtils.hasText(a.getPricingNo()))
+                    .collect(Collectors.toMap(AdPricingHot::getId, AdPricingHot::getPricingNo, (a, b) -> a));
+            records.forEach(r -> {
+                if (!StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null && r.getAlgoType() != null && r.getAlgoType() == 5) {
+                    r.setAlgoCode(hotCodeMap.get(r.getAlgoId()));
                 }
             });
         }

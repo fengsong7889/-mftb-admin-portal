@@ -21,6 +21,9 @@ public class AdHotInventoryVO {
     /** 预售天数 */
     private Integer presaleDays;
 
+    /** 赠送天数每日现金价值（MOP），从定价配置穿透 */
+    private Integer giftCashValue;
+
     /** 多格梯度折扣 JSON 字符串（前端展示折扣规则） */
     private String discountTiers;
 
@@ -44,8 +47,12 @@ public class AdHotInventoryVO {
         private BigDecimal price;
         /** 边框方式: none=无边框 color=选择配色 image=上传边框图 */
         private String borderType;
-        /** 边框颜色(HEX, borderType=color时生效) */
+        /** 边框颜色(HEX, borderType= color时生效) */
         private String borderColor;
+        /** 皮肤段位: classic=经典 premium=精选 flagship=旗舰 ultimate=至尊 */
+        private String tier;
+        /** 菜品展示布局: grid=大图拼列 carousel=阶梯轮播（来自定价配置，单选） */
+        private String dishLayout;
         /** 格子状态: available=可购买 purchased=本商家已购买（不能重复购买） */
         private String status;
     }

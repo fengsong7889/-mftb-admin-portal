@@ -38,6 +38,9 @@ public class AdPricingHotSkin {
     /** 菜品展示布局: grid=大图拼列 carousel=阶梯轮播（单选） */
     private String dishLayout;
 
+    /** 皮肤段位: classic=经典 premium=精选 flagship=旗舰 ultimate=至尊 */
+    private String tier;
+
     /** 逻辑删除 */
     @TableLogic
     private Integer deleted;

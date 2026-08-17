@@ -50,14 +50,14 @@ import {
 
 /** 邊框方式 */
 const BORDER_TYPE_OPTIONS = [
-  { value: 'none', labelKey: 'recommend:popularSkin.borderNoneLabel' },
-  { value: 'color', labelKey: 'recommend:popularSkin.borderColorLabel' },
-  { value: 'image', labelKey: 'recommend:popularSkin.borderImageLabel' },
+  { value: 'none', labelKey: 'recommend.popularSkin.borderNoneLabel' },
+  { value: 'color', labelKey: 'recommend.popularSkin.borderColorLabel' },
+  { value: 'image', labelKey: 'recommend.popularSkin.borderImageLabel' },
 ]
 
 /** 邊框配色預設色板 */
 const COLOR_PRESETS = [
-  { labelKey: 'recommend:popularSkin.recommendedColors', colors: ['#FF4D4F', '#E8720C', '#FAAD14', '#52C41A', '#1890FF', '#722ED1', '#EB2F96', '#13C2C2'] },
+  { labelKey: 'recommend.popularSkin.recommendedColors', colors: ['#FF4D4F', '#E8720C', '#FAAD14', '#52C41A', '#1890FF', '#722ED1', '#EB2F96', '#13C2C2'] },
 ]
 
 /** 可上傳圖片的字段 */
@@ -65,9 +65,24 @@ type SkinImageField = 'borderImage' | 'bigImage'
 
 /** 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播 */
 type DishLayout = 'grid' | 'carousel'
+
+/** 皮膚段位（等級越高視覺效果越好、價格越貴） */
+type SkinTier = 'classic' | 'premium' | 'flagship' | 'ultimate'
+const SKIN_TIER_OPTIONS: { value: SkinTier; labelKey: string; descKey: string; color: string; bg: string; badge: React.CSSProperties; icon?: string }[] = [
+  { value: 'classic',   labelKey: 'recommend.popularSkin.skinTierClassic',   descKey: 'recommend.popularSkin.skinTierClassicDesc',   color: '#8C8C8C', bg: '#F5F5F5',
+    badge: { fontSize: 12, fontWeight: 500, color: '#8C8C8C', background: '#F5F5F5', borderRadius: 4, padding: '1px 10px', border: '1px solid #E8E8E8' } },
+  { value: 'premium',   labelKey: 'recommend.popularSkin.skinTierPremium',   descKey: 'recommend.popularSkin.skinTierPremiumDesc',   color: '#1890FF', bg: '#E6F7FF',
+    badge: { fontSize: 12, fontWeight: 600, color: '#1890FF', background: 'linear-gradient(135deg, #E6F7FF, #BAE7FF)', borderRadius: 4, padding: '1px 10px', border: '1px solid #91D5FF', boxShadow: '0 1px 3px rgba(24,144,255,0.15)' } },
+  { value: 'flagship',  labelKey: 'recommend.popularSkin.skinTierFlagship',  descKey: 'recommend.popularSkin.skinTierFlagshipDesc',  color: '#E8720C', bg: '#FFF7E6',
+    badge: { fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #E8720C, #F5A623)', borderRadius: 4, padding: '1px 10px', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 2px 6px rgba(232,114,12,0.3)', textShadow: '0 1px 2px rgba(0,0,0,0.15)' } },
+  { value: 'ultimate',  labelKey: 'recommend.popularSkin.skinTierUltimate',  descKey: 'recommend.popularSkin.skinTierUltimateDesc',  color: '#722ED1', bg: '#F9F0FF', icon: '✦',
+    badge: { fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #722ED1, #B24BF3, #722ED1)', backgroundSize: '200% 200%', borderRadius: 4, padding: '1px 10px', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 2px 8px rgba(114,46,209,0.4), inset 0 1px 0 rgba(255,255,255,0.2)', textShadow: '0 1px 3px rgba(0,0,0,0.2)', animation: 'tierShimmer 2.5s ease-in-out infinite' } },
+]
+/** 按段位 value 取配置 */
+const getTierConfig = (tier: SkinTier) => SKIN_TIER_OPTIONS.find(o => o.value === tier) ?? SKIN_TIER_OPTIONS[0]
 const DISH_LAYOUT_OPTIONS = [
-  { value: 'grid', labelKey: 'recommend:popularSkin.dishLayoutGridLabel' },
-  { value: 'carousel', labelKey: 'recommend:popularSkin.dishLayoutCarouselLabel' },
+  { value: 'grid', labelKey: 'recommend.popularSkin.dishLayoutGridLabel' },
+  { value: 'carousel', labelKey: 'recommend.popularSkin.dishLayoutCarouselLabel' },
 ]
 
 /** 預覽用 Mock 餐品（麥當勞示意，bg 為餐品底圖漸變，铺滿整張卡片） */
@@ -96,6 +111,8 @@ interface SkinItem {
   id: number
   /** 皮膚名稱 */
   name: string
+  /** 皮膚段位（經典/精選/旗艦/至尊） */
+  tier: SkinTier
   /** 售價 MOP/天 */
   price?: number
   /** 菜品展示佈局（單選）：大圖拼列 / 階梯輪播，商家自選一種 */
@@ -116,6 +133,7 @@ let skinIdSeed = Date.now()
 const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   id: skinIdSeed++,
   name: '',
+  tier: 'classic',
   price: undefined,
   dishLayout: 'grid',
   borderType: 'image',
@@ -191,6 +209,8 @@ export default function PopularSkinPricing() {
   const [gradients, setGradients] = useState<DayDiscountGradient[]>([])
   // 上線天數（銷售策略，與無敵星星/盤活復蘇保持一致）：限制商家最多可購買未來幾天內的皮膚推廣
   const [presaleDays, setPresaleDays] = useState<number>(7)
+  // 贈送天數每日現金價值（MOP）：人氣商家專屬，定義每個贈送天等價多少金額
+  const [giftCashValue, setGiftCashValue] = useState<number>(10)
   // 退費比例配置：人氣商家默認不允許退款（與訂單側業務規則一致），開啟後可配置退費比例梯度
   const [refundEnabled, setRefundEnabled] = useState(false)
   const [cancelFeeRules, setCancelFeeRules] = useState<CancelFeeRule[]>([{ id: 1, maxDays: 3, feePercent: 50 }])
@@ -215,10 +235,10 @@ export default function PopularSkinPricing() {
 
   // 業務頻道選項（按模塊過濾，與銷售定價通用表單保持一致）
   const channelOptions = urlModule === 'groupBuy'
-    ? [{ label: t('recommend:channelGroupBuyName'), value: RecommendChannel.GROUP_BUY }]
+    ? [{ label: t('channelGroupBuyName'), value: RecommendChannel.GROUP_BUY }]
     : [
-        { label: t('recommend:channelDeliveryName'), value: RecommendChannel.DELIVERY },
-        { label: t('recommend:channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
+        { label: t('channelDeliveryName'), value: RecommendChannel.DELIVERY },
+        { label: t('channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
       ]
 
   // 編輯/詳情模式：從後端加載計價配置並回填
@@ -236,6 +256,8 @@ export default function PopularSkinPricing() {
         })
         // 回填上線天數
         if (data.presaleDays) setPresaleDays(data.presaleDays)
+        // 回填贈送天數每日現金價值
+        if (data.giftCashValue != null) setGiftCashValue(data.giftCashValue)
         // 回填退款開關
         setRefundEnabled(data.refundEnabled === 1)
         // 回填狀態
@@ -270,8 +292,9 @@ export default function PopularSkinPricing() {
         if (data.skins?.length) {
           setSkins(data.skins.map((s: AdHotSkinPrice) => createSkin({
             name: s.skinName,
+            tier: (s.tier === 'classic' || s.tier === 'premium' || s.tier === 'flagship' || s.tier === 'ultimate') ? s.tier : 'classic',
             price: s.price,
-            dishLayout: (s as any).dishLayout || 'grid',
+            dishLayout: (s.dishLayout as DishLayout) || 'grid',
             borderType: (s.borderType === 'none' || s.borderType === 'color' || s.borderType === 'image') ? s.borderType : 'color',
             borderColor: s.borderColor || '#FF4D4F',
           })))
@@ -304,7 +327,7 @@ export default function PopularSkinPricing() {
     setDishState({ current: 0, prev: null })
     const timer = setInterval(() => {
       setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
-    }, 5000)
+    }, 3000)
     return () => clearInterval(timer)
   }, [previewSkin])
 
@@ -316,17 +339,17 @@ export default function PopularSkinPricing() {
   // 上傳皮膚圖片（本地預覽，不真正上傳）
   const handleUploadImage = (file: File, targetId: number, field: SkinImageField) => {
     if (!file.type.startsWith('image/')) {
-      message.error(t('recommend:popularSkin.uploadImageOnly'))
+      message.error(t('recommend.popularSkin.uploadImageOnly'))
       return false
     }
     if (file.size > 5 * 1024 * 1024) {
-      message.error(t('recommend:popularSkin.imageTooLarge'))
+      message.error(t('recommend.popularSkin.imageTooLarge'))
       return false
     }
     const reader = new FileReader()
     reader.onload = () => {
       updateSkin(targetId, { [field]: reader.result as string })
-      message.success(t('recommend:popularSkin.uploadSuccess'))
+      message.success(t('recommend.popularSkin.uploadSuccess'))
     }
     reader.readAsDataURL(file)
     return false
@@ -355,12 +378,12 @@ export default function PopularSkinPricing() {
   // 刪除皮膚
   const handleRemoveSkin = (id: number) => {
     if (skins.length <= 1) {
-      message.warning(t('recommend:popularSkin.keepOneSkin'))
+      message.warning(t('recommend.popularSkin.keepOneSkin'))
       return
     }
     Modal.confirm({
-      title: t('recommend:popularSkin.confirmDeleteSkinTitle'),
-      content: t('recommend:popularSkin.confirmDeleteSkinContent'),
+      title: t('recommend.popularSkin.confirmDeleteSkinTitle'),
+      content: t('recommend.popularSkin.confirmDeleteSkinContent'),
       okText: t('common:delete'),
       okButtonProps: { danger: true },
       cancelText: t('common:cancel'),
@@ -380,25 +403,25 @@ export default function PopularSkinPricing() {
       const values = await form.validateFields()
       for (let i = 0; i < skins.length; i++) {
         const skin = skins[i]
-        const label = skin.name.trim() || t('recommend:popularSkin.skinNameFallback', { index: i + 1 })
+        const label = skin.name.trim() || t('recommend.popularSkin.skinNameFallback', { index: i + 1 })
         if (!skin.name.trim()) {
-          message.error(t('recommend:popularSkin.enterSkinName'))
+          message.error(t('recommend.popularSkin.enterSkinName'))
           return
         }
         if (!skin.dishLayout) {
-          message.error(t('recommend:popularSkin.selectOneDishLayout'))
+          message.error(t('recommend.popularSkin.selectOneDishLayout'))
           return
         }
         if (skin.borderType === 'image' && !skin.borderImage) {
-          message.error(t('recommend:popularSkin.uploadBorderImage'))
+          message.error(t('recommend.popularSkin.uploadBorderImage'))
           return
         }
         if (!skin.bigImage) {
-          message.error(t('recommend:popularSkin.uploadBigImage'))
+          message.error(t('recommend.popularSkin.uploadBigImage'))
           return
         }
         if (skin.price === undefined || skin.price <= 0) {
-          message.error(t('recommend:popularSkin.setPrice'))
+          message.error(t('recommend.popularSkin.setPrice'))
           return
         }
       }
@@ -407,7 +430,7 @@ export default function PopularSkinPricing() {
         for (let i = 0; i < gradients.length; i++) {
           const g = gradients[i]
           if (!g.days || !g.discount) {
-            message.error(t('recommend:popularSkin.completeDaysDiscount', { index: i + 1 }))
+            message.error(t('recommend.popularSkin.completeDaysDiscount', { index: i + 1 }))
             return
           }
         }
@@ -419,6 +442,7 @@ export default function PopularSkinPricing() {
         brand: appTypeToBrand(values.app),
         channel: values.channel,
         presaleDays,
+        giftCashValue,
         refundEnabled: refundEnabled ? 1 : 2,
         discountTiers: gradientEnabled && gradients.length
           ? gradients.filter(g => g.days && g.discount).map(g => ({ minDays: g.days!, discount: g.discount! }))
@@ -430,6 +454,7 @@ export default function PopularSkinPricing() {
         status,
         skins: skins.map(s => ({
           skinName: s.name,
+          tier: s.tier,
           price: s.price!,
           borderType: s.borderType,
           borderColor: s.borderType === 'color' ? s.borderColor : undefined,
@@ -439,15 +464,16 @@ export default function PopularSkinPricing() {
       try {
         if (isEditMode) {
           await updateAdHotPricing(Number(urlId), payload)
-          message.success(t('recommend:popularSkin.editSuccess'))
+          message.success(t('recommend.popularSkin.editSuccess'))
         } else {
           await createAdHotPricing(payload)
-          message.success(t('recommend:popularSkin.addSuccess'))
+          message.success(t('recommend.popularSkin.addSuccess'))
         }
         navigate(`/promotion-waterfall?type=${AlgorithmType.POPULAR_MERCHANT_KA}`)
-      } catch {
-        // 後端不可用或業務錯誤，提示用戶
-        message.error(isEditMode ? t('recommend:popularSkin.editFail') : t('recommend:popularSkin.addFail'))
+      } catch (err) {
+        // 後端不可用或業務錯誤，展示實際錯誤信息便於排查
+        const fallback = isEditMode ? t('recommend.popularSkin.editFail') : t('recommend.popularSkin.addFail')
+        message.error(err instanceof Error ? err.message || fallback : fallback)
       }
     } catch {
       /* 表單校驗失敗，antd 自動提示 */
@@ -505,7 +531,7 @@ export default function PopularSkinPricing() {
           ? <img src={skin[field] as string} alt={emptyText} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           : isDetailMode
             // 詳情模式無圖時展示只讀占位，不出現上傳按鈕
-            ? <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('recommend:popularSkin.noImage')}</span>
+            ? <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('recommend.popularSkin.noImage')}</span>
             : (
               <>
                 <PlusOutlined style={{ fontSize: 14, color: '#8C8C8C' }} />
@@ -527,7 +553,7 @@ export default function PopularSkinPricing() {
   /** 上傳邊框圖時，以覆蓋層方式套在卡片外圍 */
   const previewBorderOverlay = (skin: SkinItem) => (
     skin.borderType === 'image' && skin.borderImage ? (
-      <img src={skin.borderImage} alt={t('recommend:popularSkin.borderImageLabel')}
+      <img src={skin.borderImage} alt={t('recommend.popularSkin.borderImageLabel')}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', borderRadius: 12 }} />
     ) : null
   )
@@ -713,9 +739,9 @@ export default function PopularSkinPricing() {
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {isDetailMode ? t('recommend:popularSkin.skinPricingDetail') : isEditMode ? t('recommend:popularSkin.skinPricingEdit') : t('recommend:popularSkin.skinPricingAdd')}
+                {isDetailMode ? t('recommend.popularSkin.skinPricingDetail') : isEditMode ? t('recommend.popularSkin.skinPricingEdit') : t('recommend.popularSkin.skinPricingAdd')}
               </h2>
-              <span style={{ fontSize: 14, color: '#595959' }}>🏆 {t('recommend:popularSkin.skinPopularMerchant')}</span>
+              <span style={{ fontSize: 14, color: '#595959' }}>🏆 {t('recommend.popularSkin.skinPopularMerchant')}</span>
             </div>
           </div>
         </div>
@@ -724,25 +750,25 @@ export default function PopularSkinPricing() {
       <Form form={form} layout="vertical" disabled={isDetailMode}>
         {/* 基礎信息 */}
         <div style={cardShellStyle}>
-          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend:popularSkin.basicInfoTitle'))}
+          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend.popularSkin.basicInfoTitle'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label={t('recommend:popularSkin.popularNameLabel')} name="popularName" rules={[{ required: true, message: t('recommend:popularSkin.popularNamePlaceholder') }]}>
+            <Form.Item label={t('recommend.popularSkin.popularNameLabel')} name="popularName" rules={[{ required: true, message: t('recommend.popularSkin.popularNamePlaceholder') }]}>
               <Input
-                placeholder={t('recommend:popularSkin.popularNamePlaceholder')}
+                placeholder={t('recommend.popularSkin.popularNamePlaceholder')}
                 maxLength={30}
                 showCount
                 disabled={isEditMode || isDetailMode}
               />
             </Form.Item>
-            <Form.Item label={t('recommend:popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend:popularSkin.selectApp') }]}>
-              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
+            <Form.Item label={t('recommend.popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend.popularSkin.selectApp') }]}>
+              <Select placeholder={t('recommend.popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
             </Form.Item>
-            <Form.Item label={t('recommend:popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend:popularSkin.selectChannel') }]}>
-              <Select placeholder={t('recommend:popularSkin.pleaseSelect')} options={channelOptions} disabled={isEditMode || isDetailMode} />
+            <Form.Item label={t('recommend.popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend.popularSkin.selectChannel') }]}>
+              <Select placeholder={t('recommend.popularSkin.pleaseSelect')} options={channelOptions} disabled={isEditMode || isDetailMode} />
             </Form.Item>
           </div>
           {/* 詳情圖：置於第二行，與算法名稱左對齊（與無敵星星/盤活復蘇保持一致） */}
-          <Form.Item label={t('recommend:popularSkin.detailImageLabel')} style={{ marginBottom: 0, marginTop: 16 }}>
+          <Form.Item label={t('recommend.popularSkin.detailImageLabel')} style={{ marginBottom: 0, marginTop: 16 }}>
             <Upload
               disabled={isDetailMode}
               listType="picture-card"
@@ -753,7 +779,7 @@ export default function PopularSkinPricing() {
               {detailFileList.length < 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <PlusOutlined style={{ fontSize: 20 }} />
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:popularSkin.uploadDetailImage')}</span>
+                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
                 </div>
               )}
             </Upload>
@@ -762,9 +788,9 @@ export default function PopularSkinPricing() {
 
         {/* 銷售策略：上線天數（與無敵星星/盤活復蘇定價保持一致，限制廣告銷售可購買的天數範圍） */}
         <div style={cardShellStyle}>
-          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', t('recommend:popularSkin.salesStrategyCard'))}
+          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', t('recommend.popularSkin.salesStrategyCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend:popularSkin.presaleDaysLabel')}</span>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.popularSkin.presaleDaysLabel')}</span>
             <InputNumber
               min={1}
               max={90}
@@ -772,11 +798,28 @@ export default function PopularSkinPricing() {
               value={presaleDays}
               disabled={isDetailMode}
               onChange={(value) => setPresaleDays(value || 7)}
-              addonAfter={t('recommend:popularSkin.dayAddon')}
+              addonAfter={t('recommend.popularSkin.dayAddon')}
               style={{ width: 160 }}
             />
             <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
-              {t('recommend:popularSkin.presaleDaysHint', { days: presaleDays })}
+              {t('recommend.popularSkin.presaleDaysHint', { days: presaleDays })}
+            </span>
+          </div>
+          {/* 贈送天數每日現金價值 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: 16 }}>
+            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.popularSkin.giftCashValueLabel')}</span>
+            <InputNumber
+              min={0}
+              max={9999}
+              precision={0}
+              value={giftCashValue}
+              disabled={isDetailMode}
+              onChange={(value) => setGiftCashValue(value || 0)}
+              addonAfter={`${t('recommend.popularSkin.mopUnit')}/${t('recommend.popularSkin.dayUnit')}`}
+              style={{ width: 160 }}
+            />
+            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
+              {t('recommend.popularSkin.giftCashValueHint', { value: giftCashValue })}
             </span>
           </div>
         </div>
@@ -784,9 +827,9 @@ export default function PopularSkinPricing() {
         {/* 皮膚列表 */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <SkinOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', t('recommend:popularSkin.skinListCard'),
+            <SkinOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', t('recommend.popularSkin.skinListCard'),
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
-              {t('recommend:popularSkin.skinListHint')}
+              {t('recommend.popularSkin.skinListHint')}
             </span>,
             !isDetailMode && (
               <Button
@@ -796,7 +839,7 @@ export default function PopularSkinPricing() {
                 onClick={handleAddSkin}
                 style={{ borderRadius: 6 }}
               >
-                {t('recommend:popularSkin.addSkin')}
+                {t('recommend.popularSkin.addSkin')}
               </Button>
             ),
           )}
@@ -806,7 +849,7 @@ export default function PopularSkinPricing() {
               border: '1px solid #f0f0f0', borderRadius: 8,
               padding: '16px 20px', marginBottom: 12, background: '#FAFAFA',
             }}>
-              {/* 塊頭：序號徽章 + 固定標題（自增序號 + 皮膚套件） + 預覽/刪除 */}
+              {/* 塊頭：序號徽章 + 固定標題 + 段位彩色標籤 + 預覽/刪除 */}
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{
                   width: 24, height: 24, borderRadius: 8, flexShrink: 0,
@@ -816,23 +859,27 @@ export default function PopularSkinPricing() {
                   boxShadow: '0 2px 4px rgba(232,114,12,0.25)', marginRight: 8,
                 }}>{index + 1}</div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>
-                  {t('recommend:popularSkin.skinKit')}
+                  {t('recommend.popularSkin.skinKit')}
                 </span>
+                {/* 段位彩色標籤 */}
+                {(() => { const tc = getTierConfig(skin.tier); return (
+                  <span style={{ marginLeft: 8, transition: 'all 0.25s', ...tc.badge }}>{tc.icon ? `${tc.icon} ` : ''}{t(tc.labelKey)}</span>
+                )})()}
                 <div style={{ flex: 1 }} />
                 <Button type="link" size="small" icon={<EyeOutlined />}
-                  onClick={() => setPreviewSkin(skin)}>{t('recommend:popularSkin.skinPreview')}</Button>
+                  onClick={() => setPreviewSkin(skin)}>{t('recommend.popularSkin.skinPreview')}</Button>
                 {!isDetailMode && (
                   <Button type="link" danger size="small" icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveSkin(skin.id)}>{t('recommend:popularSkin.skinDelete')}</Button>
+                    onClick={() => handleRemoveSkin(skin.id)}>{t('recommend.popularSkin.skinDelete')}</Button>
                 )}
               </div>
 
-              {/* 第一行：名稱 / 售價 */}
+              {/* 第一行：名稱 / 售價 / 段位 */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px', marginBottom: 14 }}>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.skinNameLabel')}</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend.popularSkin.skinNameLabel')}</div>
                   <Input
-                    placeholder={t('recommend:popularSkin.skinNamePh')}
+                    placeholder={t('recommend.popularSkin.skinNamePh')}
                     value={skin.name}
                     maxLength={20}
                     allowClear
@@ -841,24 +888,46 @@ export default function PopularSkinPricing() {
                   />
                 </div>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.skinPriceLabel')}</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend.popularSkin.skinPriceLabel')}</div>
                   <InputNumber
                     style={{ width: '100%' }}
                     min={1}
                     precision={0}
-                    placeholder={t('recommend:popularSkin.skinPricePh')}
+                    placeholder={t('recommend.popularSkin.skinPricePh')}
                     value={skin.price}
                     disabled={isDetailMode}
                     onChange={v => updateSkin(skin.id, { price: v ?? undefined })}
-                    addonAfter={t('recommend:popularSkin.mopDayUnit')}
+                    addonAfter={t('recommend.popularSkin.mopDayUnit')}
                   />
+                </div>
+                <div>
+                  <div style={fieldLabelStyle}>{t('recommend.popularSkin.skinTierLabel')}</div>
+                  <Radio.Group
+                    value={skin.tier}
+                    disabled={isDetailMode}
+                    onChange={e => updateSkin(skin.id, { tier: e.target.value })}
+                    optionType="button"
+                    buttonStyle="solid"
+                    size="small"
+                  >
+                    {SKIN_TIER_OPTIONS.map(opt => {
+                      const tc = getTierConfig(opt.value)
+                      return (
+                        <Radio.Button key={opt.value} value={opt.value}
+                          style={skin.tier === opt.value ? { background: tc.bg, borderColor: tc.color, color: tc.color, fontWeight: 600 } : {}}
+                        >
+                          {t(opt.labelKey)}
+                        </Radio.Button>
+                      )
+                    })}
+                  </Radio.Group>
                 </div>
               </div>
 
               {/* 第二行：菜品展示佈局 / 邊框 / 大圖主圖 */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px' }}>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.dishLayoutLabel')}</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend.popularSkin.dishLayoutLabel')}</div>
                   <Radio.Group
                     value={skin.dishLayout}
                     disabled={isDetailMode}
@@ -868,12 +937,12 @@ export default function PopularSkinPricing() {
                     buttonStyle="solid"
                   />
                   <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4, lineHeight: '16px' }}>
-                    {t('recommend:popularSkin.dishLayoutHint')}
+                    {t('recommend.popularSkin.dishLayoutHint')}
                   </div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ ...fieldLabelStyle, marginBottom: 0 }}>{requiredMark}{t('recommend:popularSkin.borderConfigLabel')}</span>
+                    <span style={{ ...fieldLabelStyle, marginBottom: 0 }}>{requiredMark}{t('recommend.popularSkin.borderConfigLabel')}</span>
                     <Select
                       style={{ width: 110, flexShrink: 0 }}
                       value={skin.borderType}
@@ -891,14 +960,14 @@ export default function PopularSkinPricing() {
                       onChange={c => updateSkin(skin.id, { borderColor: c.toHexString() })}
                     />
                   )}
-                  {skin.borderType === 'image' && renderUploadBox(skin, 'borderImage', 88, 88, t('recommend:popularSkin.uploadBorderText'))}
+                  {skin.borderType === 'image' && renderUploadBox(skin, 'borderImage', 88, 88, t('recommend.popularSkin.uploadBorderText'))}
                 </div>
                 <div>
-                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend:popularSkin.bigImageLabel')}</div>
+                  <div style={fieldLabelStyle}>{requiredMark}{t('recommend.popularSkin.bigImageLabel')}</div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    {renderUploadBox(skin, 'bigImage', 88, 88, t('recommend:popularSkin.uploadImageText'))}
+                    {renderUploadBox(skin, 'bigImage', 88, 88, t('recommend.popularSkin.uploadImageText'))}
                     <div style={{ fontSize: 11, color: '#8C8C8C', lineHeight: '18px', paddingTop: 2 }}>
-                      {t('recommend:popularSkin.bigImageHint')}
+                      {t('recommend.popularSkin.bigImageHint')}
                     </div>
                   </div>
                 </div>
@@ -910,7 +979,7 @@ export default function PopularSkinPricing() {
         {/* 購買多天折扣配置（梯度），參考盤活復蘇 */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <PercentageOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#F9F0FF', t('recommend:popularSkin.gradientDiscountTitle'),
+            <PercentageOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#F9F0FF', t('recommend.popularSkin.gradientDiscountTitle'),
             <>
               <Switch
                 size="small"
@@ -923,7 +992,7 @@ export default function PopularSkinPricing() {
                   }
                 }}
               />
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:popularSkin.gradientDiscountHint')}</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.gradientDiscountHint')}</span>
             </>,
             gradientEnabled && !isDetailMode && (
               <Button
@@ -933,14 +1002,14 @@ export default function PopularSkinPricing() {
                 onClick={handleAddGradient}
                 style={{ borderRadius: 6 }}
               >
-                {t('recommend:popularSkin.addGradient')}
+                {t('recommend.popularSkin.addGradient')}
               </Button>
             ),
           )}
           {gradientEnabled ? (
             gradients.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
-                {t('recommend:popularSkin.noGradientConfig')}
+                {t('recommend.popularSkin.noGradientConfig')}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -949,33 +1018,33 @@ export default function PopularSkinPricing() {
                     <span style={{
                       fontSize: 12, fontWeight: 600, color: '#722ED1', background: '#F9F0FF',
                       border: '1px solid #D3ADF7', borderRadius: 4, padding: '1px 8px', flexShrink: 0,
-                    }}>{t('recommend:popularSkin.gradientN', { index: index + 1 })}</span>
-                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.purchaseDaysGe')}</span>
+                    }}>{t('recommend.popularSkin.gradientN', { index: index + 1 })}</span>
+                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.purchaseDaysGe')}</span>
                     <InputNumber
                       min={1}
                       max={9999}
                       precision={0}
-                      placeholder={t('recommend:daysPlaceholder')}
+                      placeholder={t('recommend.daysPlaceholder')}
                       style={{ width: 110 }}
                       value={gradient.days || undefined}
                       disabled={isDetailMode}
                       onChange={value => handleUpdateGradient(index, 'days', value)}
                     />
-                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.correspondingDiscount')}</span>
+                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.correspondingDiscount')}</span>
                     <InputNumber
                       min={0.01}
                       max={10}
                       precision={2}
-                      placeholder={t('recommend:discountPlaceholder')}
+                      placeholder={t('recommend.discountPlaceholder')}
                       style={{ width: 120 }}
-                      addonAfter={t('recommend:zheUnit')}
+                      addonAfter={t('recommend.zheUnit')}
                       value={gradient.discount || undefined}
                       disabled={isDetailMode}
                       onChange={value => handleUpdateGradient(index, 'discount', value)}
                     />
                     <span style={{ fontSize: 12, color: '#8c8c8c' }}>
                       {(gradient.days ?? 0) > 0 && (gradient.discount ?? 0) > 0
-                        ? t('recommend:popularSkin.gradientExample', { days: gradient.days, discount: gradient.discount })
+                        ? t('recommend.popularSkin.gradientExample', { days: gradient.days, discount: gradient.discount })
                         : ''}
                     </span>
                     {!isDetailMode && (
@@ -986,24 +1055,24 @@ export default function PopularSkinPricing() {
                         icon={<DeleteOutlined />}
                         style={{ marginLeft: 'auto' }}
                         onClick={() => handleRemoveGradient(index)}
-                      >{t('recommend:popularSkin.skinDelete')}</Button>
+                      >{t('recommend.popularSkin.skinDelete')}</Button>
                     )}
                   </div>
                 ))}
               </div>
             )
           ) : (
-            <div style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend:popularSkin.gradientDisabledHint')}</div>
+            <div style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.popularSkin.gradientDisabledHint')}</div>
           )}
         </div>
 
         {/* 訂單退款，退費比例配置（與無敵星星/盤活復蘇定價保持一致） */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#fff1f0', t('recommend:popularSkin.refundConfigTitle'),
-            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>{t('recommend:popularSkin.refundConfigHint')}</span>,
+            <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#fff1f0', t('recommend.popularSkin.refundConfigTitle'),
+            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>{t('recommend.popularSkin.refundConfigHint')}</span>,
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend:popularSkin.allowRefund') : t('recommend:popularSkin.notAllowRefund')}</span>
+              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend.popularSkin.allowRefund') : t('recommend.popularSkin.notAllowRefund')}</span>
               <Switch
                 size="small"
                 checked={refundEnabled}
@@ -1022,12 +1091,12 @@ export default function PopularSkinPricing() {
               size="small"
               columns={[
                 {
-                  title: t('recommend:popularSkin.adPromotionCol'),
+                  title: t('recommend.popularSkin.adPromotionCol'),
                   dataIndex: 'maxDays',
                   width: 220,
                   render: (_, record: CancelFeeRule) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:popularSkin.remainingDaysLe')}</span>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.popularSkin.remainingDaysLe')}</span>
                       <InputNumber
                         disabled={isDetailMode}
                         min={0}
@@ -1036,15 +1105,15 @@ export default function PopularSkinPricing() {
                         onChange={(val) => {
                           setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, maxDays: val ?? 0 } : r))
                         }}
-                        addonAfter={record.maxDays === 999 ? '' : t('recommend:popularSkin.dayAddon')}
-                        placeholder={record.maxDays === 999 ? t('recommend:popularSkin.unlimitedPh') : ''}
+                        addonAfter={record.maxDays === 999 ? '' : t('recommend.popularSkin.dayAddon')}
+                        placeholder={record.maxDays === 999 ? t('recommend.popularSkin.unlimitedPh') : ''}
                         style={{ flex: 1 }}
                       />
                     </div>
                   ),
                 },
                 {
-                  title: t('recommend:popularSkin.ratioConfigCol'),
+                  title: t('recommend.popularSkin.ratioConfigCol'),
                   dataIndex: 'feePercent',
                   width: 160,
                   render: (_, record: CancelFeeRule) => (
@@ -1062,7 +1131,7 @@ export default function PopularSkinPricing() {
                   ),
                 },
                 {
-                  title: t('recommend:popularSkin.opCol'),
+                  title: t('recommend.popularSkin.opCol'),
                   width: 120,
                   align: 'center',
                   render: (_: unknown, record: CancelFeeRule) => {
@@ -1079,7 +1148,7 @@ export default function PopularSkinPricing() {
                               setCancelFeeRules(prev => [...prev, { id: nextId, maxDays: 0, feePercent: 50 }])
                             }}
                           >
-                            {t('recommend:popularSkin.addTier')}
+                            {t('recommend.popularSkin.addTier')}
                           </Button>
                         )}
                         <Button
@@ -1088,13 +1157,13 @@ export default function PopularSkinPricing() {
                           danger
                           onClick={() => {
                             if (cancelFeeRules.length <= 1) {
-                              message.warning(t('recommend:atLeastOneRule'))
+                              message.warning(t('recommend.atLeastOneRule'))
                               return
                             }
                             setCancelFeeRules(prev => prev.filter(r => r.id !== record.id))
                           }}
                         >
-                          {t('recommend:popularSkin.skinDelete')}
+                          {t('recommend.popularSkin.skinDelete')}
                         </Button>
                       </Space>
                     )
@@ -1108,24 +1177,24 @@ export default function PopularSkinPricing() {
               background: '#fafafa', borderRadius: 8,
               border: '1px dashed #d9d9d9',
             }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend:popularSkin.notAllowRefundHint')}</span>
+              <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
             </div>
           )}
         </div>
 
         {/* 狀態設置 */}
         <div style={cardShellStyle}>
-          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, '#f6ffed', t('recommend:popularSkin.statusSettingCard'))}
+          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, '#f6ffed', t('recommend.popularSkin.statusSettingCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:popularSkin.statusLabelColon')}</span>
+            <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
             <Switch
               checked={status === ServiceStatus.ENABLED}
               disabled={isDetailMode}
               onChange={checked => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
-              checkedChildren={t('recommend:popularSkin.statusEnabledText')}
-              unCheckedChildren={t('recommend:popularSkin.statusDisabledText')}
+              checkedChildren={t('recommend.popularSkin.statusEnabledText')}
+              unCheckedChildren={t('recommend.popularSkin.statusDisabledText')}
             />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:popularSkin.disableSkinHint')}</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.disableSkinHint')}</span>
           </div>
         </div>
       </Form>
@@ -1134,8 +1203,8 @@ export default function PopularSkinPricing() {
       <Modal
         open={!!previewSkin}
         title={previewSkin?.name.trim()
-          ? t('recommend:popularSkin.skinPreviewModalTitleNamed', { name: previewSkin.name })
-          : t('recommend:popularSkin.skinPreviewModalTitle')}
+          ? t('recommend.popularSkin.skinPreviewModalTitleNamed', { name: previewSkin.name })
+          : t('recommend.popularSkin.skinPreviewModalTitle')}
         footer={null}
         width={620}
         onCancel={() => setPreviewSkin(null)}
@@ -1145,7 +1214,7 @@ export default function PopularSkinPricing() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* 小圖模式 */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('recommend:popularSkin.smallMode')}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('recommend.popularSkin.smallMode')}</div>
                 {/* 瀑布流上下文：上方鄰卡（模糊淡化） */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
@@ -1167,7 +1236,7 @@ export default function PopularSkinPricing() {
                       background: 'linear-gradient(135deg, #E8720C, #F59432)',
                       borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
                       boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-                    }}>{t('recommend:popularSkin.yourStoreBadge')}</span>
+                    }}>{t('recommend.popularSkin.yourStoreBadge')}</span>
                     <div style={previewCardStyle(previewSkin)}>
                       {previewBorderOverlay(previewSkin)}
                       <div style={{ display: 'flex', gap: 10 }}>
@@ -1196,7 +1265,7 @@ export default function PopularSkinPricing() {
               {/* 大圖模式：左側豎版主圖 + 右側店鋪信息/優惠券/品牌說/商品列 */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend:popularSkin.bigMode')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend.popularSkin.bigMode')}</span>
                   <span style={{
                     fontSize: 11, borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
                     color: '#E8720C', background: '#FFF7E6', border: '1px solid #E8720C',
@@ -1223,14 +1292,14 @@ export default function PopularSkinPricing() {
                       background: 'linear-gradient(135deg, #E8720C, #F59432)',
                       borderRadius: 8, padding: '1px 8px', lineHeight: '16px',
                       boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
-                    }}>{t('recommend:popularSkin.yourStoreBadge')}</span>
+                    }}>{t('recommend.popularSkin.yourStoreBadge')}</span>
                     <div style={previewCardStyle(previewSkin)}>
                       {previewBorderOverlay(previewSkin)}
                       <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
                         {previewSkin.bigImage
                           ? (
                             <div style={{ width: 130, flexShrink: 0, alignSelf: 'stretch' }}>
-                              <img src={previewSkin.bigImage} alt={t('recommend:popularSkin.bigImageAlt')} style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                              <img src={previewSkin.bigImage} alt={t('recommend.popularSkin.bigImageAlt')} style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', display: 'block' }} />
                             </div>
                           )
                           : (
@@ -1239,13 +1308,13 @@ export default function PopularSkinPricing() {
                               border: '1px dashed #d9d9d9', background: '#fafafa',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: 11, color: '#8C8C8C', textAlign: 'center', padding: 8,
-                            }}>{t('recommend:popularSkin.noBigImage')}</div>
+                            }}>{t('recommend.popularSkin.noBigImage')}</div>
                           )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {previewInfoBlock()}
                           {/* 菜品展示區：渲染商家選擇的佈局風格 */}
                           {!previewSkin.dishLayout && (
-                            <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>{t('recommend:popularSkin.noDishLayout')}</div>
+                            <div style={{ fontSize: 12, color: '#BFBFBF', marginTop: 10 }}>{t('recommend.popularSkin.noDishLayout')}</div>
                           )}
                           {previewSkin.dishLayout === 'grid' ? renderDishGrid() : previewSkin.dishLayout === 'carousel' ? renderDishCarousel() : null}
                         </div>
@@ -1267,12 +1336,12 @@ export default function PopularSkinPricing() {
                 </div>
                 {/* 風格分配說明 */}
                 <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
-                  {t('recommend:popularSkin.layoutAssignHint')}
+                  {t('recommend.popularSkin.layoutAssignHint')}
                 </div>
               </div>
             </div>
             <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 12 }}>
-              {t('recommend:popularSkin.previewDataHint')}
+              {t('recommend.popularSkin.previewDataHint')}
             </div>
           </div>
         )}

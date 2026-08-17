@@ -22,6 +22,8 @@ public class AdPricingHotVO {
     private String brand;
     private Integer channel;
     private Integer presaleDays;
+    /** 赠送天数每日现金价值（MOP） */
+    private Integer giftCashValue;
     private Integer refundEnabled;
     /** 多格梯度折扣 JSON 字符串 */
     private String discountTiers;
@@ -48,6 +50,7 @@ public class AdPricingHotVO {
         vo.setBrand(entity.getBrand());
         vo.setChannel(entity.getChannel());
         vo.setPresaleDays(entity.getPresaleDays());
+        vo.setGiftCashValue(entity.getGiftCashValue());
         vo.setRefundEnabled(entity.getRefundEnabled());
         vo.setDiscountTiers(entity.getDiscountTiers());
         vo.setCancelFeeTiers(entity.getCancelFeeTiers());
@@ -73,5 +76,7 @@ public class AdPricingHotVO {
         private String borderColor;
         /** 菜品展示布局: grid=大图拼列 carousel=阶梯轮播 */
         private String dishLayout;
+        /** 皮肤段位: classic=经典 premium=精选 flagship=旗舰 ultimate=至尊 */
+        private String tier;
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, Tabs } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -97,6 +97,9 @@ export default function Waterfall() {
   const [searchForm] = Form.useForm()
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | null>(urlType) // null = 卡片选择页
   const [bizTypeTab, setBizTypeTab] = useState<string>('delivery') // 外賣到家 / 團購到店
+  // 使用 ref 同步追踪最新状态，避免异步回调中闭包值过期导致过滤失效
+  const selectedTypeRef = useRef<AlgorithmType | null>(urlType)
+  const bizTypeTabRef = useRef<string>('delivery')
   const [dataList, setDataList] = useState<WaterfallSlotConfig[]>([])
   const [filteredData, setFilteredData] = useState<WaterfallSlotConfig[]>([])
   const [modalVisible, setModalVisible] = useState(false)
@@ -166,7 +169,7 @@ export default function Waterfall() {
   const tAlgorithmTypeOptions = useMemo(() => ALGORITHM_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const tRegionOptions = useMemo(() => REGION_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
-  /** 加載定價列表（無敵星星 + 盤活復蘇 + 人氣商家並行拉取後合併）+ 算法列表 */
+  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家并行拉取后合并）+ 算法列表 */
   useEffect(() => {
     let mounted = true
     Promise.all([
@@ -185,9 +188,12 @@ export default function Waterfall() {
         setDataList(list)
         // 缓存全量算法列表供新增/编辑弹窗筛选
         setAllAlgorithms(algoRes.records ?? [])
-        if (urlType != null) {
-          const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
-          setFilteredData(list.filter(item => item.algorithmType === urlType && allowed.includes(item.bizChannel ?? '')))
+        // 使用 ref 获取最新状态，避免闭包值过期
+        const currentType = selectedTypeRef.current
+        const currentTab = bizTypeTabRef.current
+        const allowed = TAB_BIZ_CHANNELS[currentTab] || BIZ_CHANNEL_POOL
+        if (currentType != null) {
+          setFilteredData(list.filter(item => item.algorithmType === currentType && allowed.includes(item.bizChannel ?? '')))
         } else {
           setFilteredData(list)
         }
@@ -207,7 +213,8 @@ export default function Waterfall() {
   // 点击卡片进入列表
   const handleSelectType = (type: AlgorithmType) => {
     setSelectedAlgorithmType(type)
-    const allowed = TAB_BIZ_CHANNELS[bizTypeTab] || BIZ_CHANNEL_POOL
+    selectedTypeRef.current = type
+    const allowed = TAB_BIZ_CHANNELS[bizTypeTabRef.current] || BIZ_CHANNEL_POOL
     setFilteredData(dataList.filter(item => item.algorithmType === type && allowed.includes(item.bizChannel ?? '')))
     searchForm.resetFields()
   }
@@ -215,6 +222,7 @@ export default function Waterfall() {
   // 返回卡片选择页
   const handleBackToCards = () => {
     setSelectedAlgorithmType(null)
+    selectedTypeRef.current = null
     setFilteredData(dataList)
     searchForm.resetFields()
   }
@@ -384,14 +392,14 @@ export default function Waterfall() {
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'pricingNo', title: t('waterfall.colConfigId') },
-    { key: 'promotionName', title: t('waterfall.colAlgorithmName') },
+    { key: 'promotionName', title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'bizChannel', title: t('waterfall.colBizChannel') },
     { key: 'status', title: t('common.colStatus') },
     { key: 'updatedBy', title: t('waterfall.colLastUpdater') },
     { key: 'updatedAt', title: t('waterfall.colLastUpdateTime') },
     { key: 'action', title: t('common.colAction') },
-  ], [t])
+  ], [t, selectedAlgorithmType])
 
   const { configComponent, applyConfig } = useColumnConfig('waterfall', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -407,7 +415,7 @@ export default function Waterfall() {
       render: (text: string) => <Tag color="blue">{text || '-'}</Tag>,
     },
     { 
-      title: t('waterfall.colAlgorithmName'),
+      title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName'),
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 200,
@@ -537,7 +545,19 @@ export default function Waterfall() {
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <Tabs
             activeKey={bizTypeTab}
-            onChange={(key) => setBizTypeTab(key)}
+            onChange={(key) => {
+              setBizTypeTab(key)
+              bizTypeTabRef.current = key
+              // 切换 tab 时同步重新过滤，避免显示不匹配的业务频道数据
+              const allowed = TAB_BIZ_CHANNELS[key] || BIZ_CHANNEL_POOL
+              const currentType = selectedTypeRef.current
+              if (currentType != null) {
+                setFilteredData(dataList.filter(item => item.algorithmType === currentType && allowed.includes(item.bizChannel ?? '')))
+              } else {
+                setFilteredData(dataList)
+              }
+              searchForm.resetFields()
+            }}
             items={['delivery', 'groupBuy'].map(tabKey => ({
               key: tabKey,
               label: tabKey === 'delivery' ? t('waterfall.bizDelivery') : t('waterfall.bizGroupBuy'),
@@ -631,7 +651,7 @@ export default function Waterfall() {
           <Form.Item label={t('waterfall.colConfigId')} name="adId">
             <Input placeholder={t('waterfall.placeholderConfigId')} allowClear />
           </Form.Item>
-          <Form.Item label={t('waterfall.colAlgorithmName')} name="promotionName">
+          <Form.Item label={selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName')} name="promotionName">
             <Select 
               placeholder={t('waterfall.placeholderSearch')} 
               allowClear
@@ -946,7 +966,7 @@ export default function Waterfall() {
               <Descriptions.Item label={t('waterfall.placementPage')}>
                 {CHANNEL_LABEL[viewingRecord.channel]}
               </Descriptions.Item>
-              <Descriptions.Item label={t('waterfall.colAlgorithmName')} span={2}>
+              <Descriptions.Item label={viewingRecord.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName')} span={2}>
                 <strong>{viewingRecord.algorithmName}</strong>
               </Descriptions.Item>
               <Descriptions.Item label={t('waterfall.adType')}>

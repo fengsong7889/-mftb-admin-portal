@@ -667,6 +667,8 @@ export interface AdHotSkinPrice {
   borderColor?: string
   /** 菜品展示佈局: grid=大圖拼列 carousel=階梯輪播（單選） */
   dishLayout?: string
+  /** 皮膚段位: classic=經典 premium=精選 flagship=旗艦 ultimate=至尊 */
+  tier?: string
 }
 
 /** 人氣商家計價配置（與後端 AdPricingHotVO 對齊） */
@@ -680,6 +682,8 @@ export interface AdPricingHot {
   channel?: number
   /** 預售天數（今天起 N 天可售），默認 30 */
   presaleDays: number
+  /** 贈送天數每日現金價值（MOP），用於人氣商家贈送天數抵扣計算 */
+  giftCashValue?: number
   /** 退款開關: 1=允許退款 2=不允許 */
   refundEnabled?: number
   /** 多格梯度折扣 JSON 字符串，如 [{"minDays":3,"discount":95}] */
@@ -707,6 +711,8 @@ export interface AdPricingHotRequest {
   brand?: string
   channel?: number
   presaleDays: number
+  /** 贈送天數每日現金價值（MOP） */
+  giftCashValue?: number
   refundEnabled?: number
   /** 多格梯度折扣: [{"minDays":3,"discount":95}] */
   discountTiers?: Record<string, unknown>[]
@@ -776,8 +782,12 @@ export interface AdHotInventoryCell {
   price: number
   /** 邊框方式: none=無邊框 color=選擇配色 image=上傳邊框圖 */
   borderType?: string
-  /** 邊框顏色(HEX, borderType=color 時生效) */
+  /** 邊框顏色(HEX, borderType= color 時生效) */
   borderColor?: string
+  /** 皮膚段位: classic=經典 premium=精選 flagship=旗艦 ultimate=至尊 */
+  tier?: string
+  /** 菜品展示佈局: grid=大圖拼列 carousel=階梯輪播 */
+  dishLayout?: string
   /** 格子狀態: available=可購買 purchased=本商家已購買 */
   status: 'available' | 'purchased'
 }
@@ -786,6 +796,8 @@ export interface AdHotInventoryCell {
 export interface AdHotInventoryVO {
   algoId: number
   presaleDays: number
+  /** 贈送天數每日現金價值（MOP），從定價配置穿透 */
+  giftCashValue?: number
   /** 多格梯度折扣 JSON 字符串 */
   discountTiers?: string
   /** 退款開關: 1=允許退款 2=不允許 */

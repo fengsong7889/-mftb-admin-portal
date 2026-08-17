@@ -144,6 +144,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
         entity.setChannel(request.getChannel());
         entity.setPresaleDays(request.getPresaleDays() == null || request.getPresaleDays() < 1
                 ? DEFAULT_PRESALE_DAYS : request.getPresaleDays());
+        entity.setGiftCashValue(request.getGiftCashValue());
         entity.setRefundEnabled(request.getRefundEnabled() == null ? 1 : request.getRefundEnabled());
         entity.setDiscountTiers(request.getDiscountTiers() == null ? null : JsonUtils.toJson(request.getDiscountTiers()));
         entity.setCancelFeeTiers(request.getCancelFeeTiers() == null ? null : JsonUtils.toJson(request.getCancelFeeTiers()));
@@ -175,6 +176,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             entity.setBorderType(StringUtils.hasText(skin.getBorderType()) ? skin.getBorderType() : "color");
             entity.setBorderColor(skin.getBorderColor());
             entity.setDishLayout(StringUtils.hasText(skin.getDishLayout()) ? skin.getDishLayout() : "grid");
+            entity.setTier(StringUtils.hasText(skin.getTier()) ? skin.getTier() : "classic");
             entity.setDeleted(0);
             skinMapper.insert(entity);
         }
@@ -194,6 +196,7 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             item.setBorderType(skin.getBorderType());
             item.setBorderColor(skin.getBorderColor());
             item.setDishLayout(skin.getDishLayout());
+            item.setTier(skin.getTier());
             vo.getSkins().add(item);
         }
         return vo;

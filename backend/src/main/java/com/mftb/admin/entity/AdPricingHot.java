@@ -37,6 +37,10 @@ public class AdPricingHot {
     /** 预售天数（今天起 N 天可售，超出为待开售），默认 30 */
     private Integer presaleDays;
 
+    /** 赠送天数每日现金价值（MOP），用于人气商家赠送天数抵扣计算 */
+    @TableField(insertStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NOT_NULL)
+    private Integer giftCashValue;
+
     /** 退款开关: 1=允许退款 2=不允许 */
     private Integer refundEnabled;
 

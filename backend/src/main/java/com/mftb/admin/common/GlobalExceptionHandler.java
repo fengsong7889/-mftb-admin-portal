@@ -52,10 +52,18 @@ public class GlobalExceptionHandler {
         return Result.error(ResultCode.PARAM_ERROR.getCode(), "数据已存在（可能为并发写入或历史残留），请刷新后重试");
     }
 
-    /** 其它未捕获异常 */
+    /** 其它未捕获异常（含 SQL 异常） */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
-        log.error("系统异常", e);
+        // 优先输出异常根因类名，便于快速定位是 SQL/空指针/类型转换等哪类问题
+        String exType = e.getClass().getSimpleName();
+        String exMsg = e.getMessage();
+        // 如果是 SQL 相关异常（类名含 Sql/SQL/MySQL），输出详细 SQL 信息
+        if (exType != null && exType.toLowerCase().contains("sql")) {
+            log.error("SQL异常 [{}]: {}", exType, exMsg);
+            return Result.error(ResultCode.ERROR.getCode(), "数据库异常: " + exMsg);
+        }
+        log.error("系统异常 [{}]: {}", exType, exMsg, e);
         return Result.error(ResultCode.ERROR.getCode(), "系统繁忙, 请稍后重试");
     }
 }

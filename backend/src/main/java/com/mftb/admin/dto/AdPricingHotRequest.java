@@ -30,6 +30,9 @@ public class AdPricingHotRequest {
     @NotNull(message = "预售天数不能为空")
     private Integer presaleDays;
 
+    /** 赠送天数每日现金价值（MOP） */
+    private Integer giftCashValue;
+
     /** 退款开关: 1=允许退款 2=不允许 */
     private Integer refundEnabled;
 
@@ -68,5 +71,7 @@ public class AdPricingHotRequest {
         private String borderColor;
         /** 菜品展示布局: grid=大图拼列 carousel=阶梯轮播（单选） */
         private String dishLayout;
+        /** 皮肤段位: classic=经典 premium=精选 flagship=旗舰 ultimate=至尊 */
+        private String tier;
     }
 }

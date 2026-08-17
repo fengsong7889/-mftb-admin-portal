@@ -971,7 +971,8 @@ export default function OrderDetail() {
   // 實付推廣金（贈送抵扣後）
   const actualPaid = Math.max(0, finalPrice - giftAmount)
   const totalSaved = totalOriginal - actualPaid
-  const payMode: 'promo' | 'gift' | 'mixed' = giftDays > 0 ? (actualPaid > 0 ? 'mixed' : 'gift') : 'promo'
+  // 支付方式检测：直接使用后端存储的 actualAmount 判断，避免 slot 价格反推精度误差
+  const payMode: 'promo' | 'gift' | 'mixed' = giftDays > 0 ? (order.actualPrice > 0 ? 'mixed' : 'gift') : 'promo'
 
   // 已退款：以「實付推廣金額」(actualPaid) 為基準計算退款，保證與費用明細一致，一目了然
   const refundAmountByPaid = Math.round(actualPaid * (1 - (refundInfo?.feePercent ?? 0) / 100))
@@ -1307,10 +1308,10 @@ export default function OrderDetail() {
           </Descriptions.Item>
           <Descriptions.Item label={t('common.colBrand')}>{appLabel(order.app)}</Descriptions.Item>
           <Descriptions.Item label={t('common.colChannel')}>{channelLabel(order.channel)}</Descriptions.Item>
-          <Descriptions.Item label={t('orderDetail.colAlgorithmId')}>
+          <Descriptions.Item label={isPopular ? '配置ID' : t('orderDetail.colAlgorithmId')}>
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>{order.algorithmId}</span>
           </Descriptions.Item>
-          <Descriptions.Item label={t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
+          <Descriptions.Item label={isPopular ? '人氣名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
           {order.skinName && (
             <Descriptions.Item label={t('orderDetail.skinKit')}>
               <Tag color="geekblue">{order.skinName}</Tag>
@@ -1661,19 +1662,34 @@ export default function OrderDetail() {
             {/* 分隔线 */}
             <div style={{ height: 1, background: '#FFE0B2', margin: '4px 0' }} />
 
-            {/* 混合支付：贈送天數抵扣（獨立一欄） */}
+            {/* 混合支付：贈送天數抵扣 + 抵扣現金（獨立展示） */}
             {payMode === 'mixed' && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.giftDeductLabel')}</span>
-                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('orderDetail.giftDeductTip', { days: giftDays })}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* 使用赠送天数抵扣 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.giftDeductDaysLabel')}</span>
+                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('orderDetail.giftDeductTip', { days: giftDays })}</span>
+                  </div>
+                  <div style={{
+                    padding: '4px 16px', background: '#FFF7E6', border: '1px solid #FFD591',
+                    borderRadius: 8,
+                  }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
+                  </div>
                 </div>
-                <div style={{
-                  padding: '4px 16px', background: '#FFF7E6', border: '1px solid #FFD591',
-                  borderRadius: 8,
-                }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
-                </div>
+                {/* 赠送天数抵扣现金（仅人气商家定价配置了现金价值） */}
+                {isPopular && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.giftDeductCashLabel')}</span>
+                  </div>
+                  <div style={{
+                    padding: '4px 16px', background: '#FFF7E6', border: '1px solid #FFD591',
+                    borderRadius: 8,
+                  }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>MOP {giftAmount}</span>
+                  </div>
+                </div>}
               </div>
             )}
 
@@ -1729,7 +1745,7 @@ export default function OrderDetail() {
                   <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: '#E8720C' }}>{finalPrice}</strong>
                     {giftDays > 0 && (
                       <> → {t('orderDetail.giftDeductShort', { days: giftDays })}
-                        {payMode === 'mixed' ? (
+                        {payMode === 'mixed' && isPopular ? (
                           <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong> + <strong style={{ color: '#FF4D4F' }}>MOP {actualPaid}</strong></>
                         ) : (
                           <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>
@@ -1740,7 +1756,7 @@ export default function OrderDetail() {
                 )}
                 {!order.gradientDiscount && giftDays > 0 && (
                   <> → {t('orderDetail.giftDeductShort', { days: giftDays })}
-                    {payMode === 'mixed' ? (
+                    {payMode === 'mixed' && isPopular ? (
                       <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong> + <strong style={{ color: '#FF4D4F' }}>MOP {actualPaid}</strong></>
                     ) : (
                       <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>

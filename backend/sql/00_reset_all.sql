@@ -802,7 +802,7 @@ CREATE TABLE `biz_ad_order_item_new_store` (
 CREATE TABLE `biz_ad_pricing_hot` (
 
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `algo_id` bigint NOT NULL COMMENT '关联算法ID (biz_ad_algorithm.id)',
+  `algo_id` bigint DEFAULT NULL COMMENT '关联算法ID（已解耦，可为空）',
   `algo_name` varchar(128) DEFAULT NULL COMMENT '算法名称快照',
   `brand` varchar(64) DEFAULT NULL COMMENT '所属品牌',
   `channel` tinyint DEFAULT NULL COMMENT '业务频道',
@@ -829,6 +829,10 @@ CREATE TABLE `biz_ad_pricing_hot_skin` (
   `pricing_id` bigint NOT NULL COMMENT '计价主表ID (biz_ad_pricing_hot.id)',
   `skin_name` varchar(64) NOT NULL COMMENT '皮肤名称',
   `price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '皮肤日单价(MOP)',
+  `border_type` varchar(16) DEFAULT 'color' COMMENT '边框方式: none=无边框 color=选择配色 image=上传边框图',
+  `border_color` varchar(32) DEFAULT NULL COMMENT '边框颜色(HEX, border_type=color时生效)',
+  `dish_layout` varchar(20) DEFAULT 'grid' COMMENT '菜品展示布局: grid=大图拼列(1大2小) carousel=阶梯轮播',
+  `tier` varchar(20) DEFAULT 'classic' COMMENT '皮肤段位: classic=经典 premium=精选 flagship=旗舰 ultimate=至尊',
   `deleted` tinyint DEFAULT '0' COMMENT '逻辑删除',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

@@ -109,7 +109,7 @@ export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = 
             border: '1px solid #ff4d4f',
             animation: 'refundWarnPulse 1.8s ease-in-out infinite',
           }}>
-            ⚠️ {t('noRefund')}
+            {t('noRefund')}
           </span>
         </Tooltip>
       )}
