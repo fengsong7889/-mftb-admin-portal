@@ -10,6 +10,7 @@ import {
   DollarOutlined,
   SafetyCertificateOutlined,
   OrderedListOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -227,6 +228,18 @@ const SYSTEM_SECURITY_RULES: RuleItem[] = [
   },
 ]
 
+/** 算法配置規則（控制算法參數模塊的顯示/隱藏） */
+const ALGORITHM_CONFIG_RULES: RuleItem[] = [
+  {
+    key: 'organic_traffic_show_dimension_weight',
+    label: '自然流量 — 維度權重與計算配置',
+    description: '關閉後，自然流量算法參數頁面將隱藏維度權重統計卡與維度權重配置區，僅展示商業維度、店鋪維度、平台維度三個維度的評分項配置',
+    type: 'switch',
+    value: true,
+    defaultValue: true,
+  },
+]
+
 /* ==================== 分組配置 ==================== */
 
 /** 默認規則分組（含默認值） */
@@ -262,6 +275,14 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
     color: '#722ED1',
     description: '會話安全與空閒超時相關規則（僅管理員可配置）',
     rules: SYSTEM_SECURITY_RULES,
+  },
+  {
+    key: 'algorithm_config',
+    title: '算法配置規則',
+    icon: <ThunderboltOutlined />,
+    color: '#FA8C16',
+    description: '控制算法參數頁面中高級配置模塊的顯示與隱藏',
+    rules: ALGORITHM_CONFIG_RULES,
   },
   {
     key: 'id_generation',

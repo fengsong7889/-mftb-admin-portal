@@ -55,15 +55,28 @@ public class GlobalExceptionHandler {
     /** 其它未捕获异常（含 SQL 异常） */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
-        // 优先输出异常根因类名，便于快速定位是 SQL/空指针/类型转换等哪类问题
-        String exType = e.getClass().getSimpleName();
-        String exMsg = e.getMessage();
-        // 如果是 SQL 相关异常（类名含 Sql/SQL/MySQL），输出详细 SQL 信息
-        if (exType != null && exType.toLowerCase().contains("sql")) {
-            log.error("SQL异常 [{}]: {}", exType, exMsg);
+        // 沿 cause 链向下查找，定位真正的异常根因（MyBatis 常将 SQLException 包裹为 MyBatisSystemException）
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String exType = root.getClass().getSimpleName();
+        String exMsg = root.getMessage();
+        // 根因或外层异常类名含 Sql/SQL/MySQL → 视为数据库异常
+        boolean isSql = containsSqlKeyword(e.getClass().getSimpleName())
+                || containsSqlKeyword(exType);
+        if (isSql) {
+            log.error("SQL异常 [{}]: {}", e.getClass().getSimpleName(), exMsg);
             return Result.error(ResultCode.ERROR.getCode(), "数据库异常: " + exMsg);
         }
-        log.error("系统异常 [{}]: {}", exType, exMsg, e);
+        log.error("系统异常 [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         return Result.error(ResultCode.ERROR.getCode(), "系统繁忙, 请稍后重试");
+    }
+
+    /** 判断类名是否包含 SQL 关键字 */
+    private boolean containsSqlKeyword(String name) {
+        if (name == null) return false;
+        String lower = name.toLowerCase();
+        return lower.contains("sql") || lower.contains("mysql");
     }
 }

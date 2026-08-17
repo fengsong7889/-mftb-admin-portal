@@ -397,11 +397,11 @@ export default function EmployeeManagement() {
   }
 
   const columns: TableColumnsType<EmployeeItem> = [
-    { title: t('employee.colEmpId'), dataIndex: 'empId', key: 'empId', width: 110 },
-    { title: t('employee.colName'), dataIndex: 'name', key: 'name', width: 120 },
-    { title: t('employee.colDepartment'), dataIndex: 'department', key: 'department', width: 120, render: (v: string) => v || '-' },
-    { title: t('employee.colPositionZh'), dataIndex: 'position', key: 'position', width: 130, render: (v: string) => v || '-' },
-    { title: t('employee.colPositionEn'), dataIndex: 'positionEn', key: 'positionEn', width: 150, render: (v: string) => v || '-' },
+    { title: t('employee.colEmpId'), dataIndex: 'empId', key: 'empId', width: 100 },
+    { title: t('employee.colName'), dataIndex: 'name', key: 'name', width: 100 },
+    { title: t('employee.colDepartment'), dataIndex: 'department', key: 'department', width: 140, render: (v: string) => v || '-' },
+    { title: t('employee.colPositionZh'), dataIndex: 'position', key: 'position', width: 140, render: (v: string) => v || '-' },
+    { title: t('employee.colPositionEn'), dataIndex: 'positionEn', key: 'positionEn', width: 170, render: (v: string) => v || '-' },
     {
       title: t('employee.colSequence'),
       dataIndex: 'sequence',
@@ -411,8 +411,8 @@ export default function EmployeeManagement() {
         v ? <Tag color={POSITION_SEQUENCE_TAG_COLOR[v] || 'default'}>{SEQ_LABEL[v] || v}</Tag> : '-'
       ),
     },
-    { title: t('employee.colJobLevel'), dataIndex: 'jobLevel', key: 'jobLevel', width: 90, render: (v: string) => v || '-' },
-    { title: t('employee.colRank'), dataIndex: 'rank', key: 'rank', width: 80, render: (v: string) => v || '-' },
+    { title: t('employee.colJobLevel'), dataIndex: 'jobLevel', key: 'jobLevel', width: 80, render: (v: string) => v || '-' },
+    { title: t('employee.colRank'), dataIndex: 'rank', key: 'rank', width: 70, render: (v: string) => v || '-' },
     {
       title: t('employee.colRoleAuth'),
       dataIndex: 'functionRoleIds',
@@ -448,20 +448,20 @@ export default function EmployeeManagement() {
       title: t('employee.colUpdatedBy'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
-      width: 110,
+      width: 120,
       render: (v: string) => v || '-',
     },
     {
       title: t('employee.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 170,
+      width: 165,
       render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 240,
+      width: 200,
       render: (_, record) => {
         const isBuiltinAdmin = record.username === BUILTIN_ADMIN
         return (

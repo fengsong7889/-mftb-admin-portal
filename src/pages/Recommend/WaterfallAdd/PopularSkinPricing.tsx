@@ -235,10 +235,10 @@ export default function PopularSkinPricing() {
 
   // 業務頻道選項（按模塊過濾，與銷售定價通用表單保持一致）
   const channelOptions = urlModule === 'groupBuy'
-    ? [{ label: t('channelGroupBuyName'), value: RecommendChannel.GROUP_BUY }]
+    ? [{ label: t('recommend.channelGroupBuyName'), value: RecommendChannel.GROUP_BUY }]
     : [
-        { label: t('channelDeliveryName'), value: RecommendChannel.DELIVERY },
-        { label: t('channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
+        { label: t('recommend.channelDeliveryName'), value: RecommendChannel.DELIVERY },
+        { label: t('recommend.channelSupermarketName'), value: RecommendChannel.SUPERMARKET },
       ]
 
   // 編輯/詳情模式：從後端加載計價配置並回填

@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Popover, Spin } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin } from 'antd'
+import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
+import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import {
   ScoreDimension, ScoreMode, TierDirection, CalcCycle,
   SCORE_DIMENSION_ICON, SCORE_DIMENSION_COLOR,
@@ -12,12 +12,12 @@ import {
   DEFAULT_ORGANIC_SCORE_RULES,
   RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
   TIER_DIRECTION_LABEL, CALC_CYCLE_LABEL,
-  type OrganicScoreRule, type RangeScores, type ScoreTier,
+  type OrganicScoreRule, type RangeScores, type ScoreTier, type ScoreConditionItem,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
   createOrganicRule, updateOrganicRule, toggleOrganicRuleStatus,
-  updateOrganicRuleScore, deleteOrganicRule,
+  deleteOrganicRule,
   type OrganicRuleVO,
 } from '@/api/organicScore'
 
@@ -51,11 +51,6 @@ const DIMENSION_ORDER: ScoreDimension[] = [
   ScoreDimension.PLATFORM,
 ]
 
-/** 評分項表格每頁條數 */
-const RULE_PAGE_SIZE = 10
-
-/** 評分項表格高度（固定高度，避免頁面隨評分項增多無限變長） */
-const RULE_TABLE_HEIGHT = 400
 
 /** 新增/編輯評分項的表單值 */
 interface RuleFormValues {
@@ -63,12 +58,16 @@ interface RuleFormValues {
   description: string
   mode: ScoreMode
   score: number
+  /** 前提條件描述 */
+  prerequisites?: string
   /** 統計天數（可選，僅部分規則需要） */
   statDays?: number
   /** 配送範圍分層分數（僅配送範圍規則使用） */
   rangeScores?: RangeScores
   /** 梯度檔位（僅 mode=TIERED 時使用） */
   tiers?: ScoreTier[]
+  /** 條件計分子項（僅 mode=CONDITIONAL 時使用） */
+  conditionItems?: ScoreConditionItem[]
   /** 計算周期（僅 mode=TIERED 時使用） */
   calcCycle?: CalcCycle
   status: ServiceStatus
@@ -95,8 +94,10 @@ interface Props {
 function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   let tiers: ScoreTier[] | undefined
   let rangeScores: RangeScores | undefined
+  let conditionItems: ScoreConditionItem[] | undefined
   try { tiers = vo.tiers ? JSON.parse(vo.tiers) : undefined } catch { tiers = undefined }
   try { rangeScores = vo.rangeScores ? JSON.parse(vo.rangeScores) : undefined } catch { rangeScores = undefined }
+  try { conditionItems = vo.conditionItems ? JSON.parse(vo.conditionItems) : undefined } catch { conditionItems = undefined }
   return {
     id: vo.ruleCode,
     dimension: vo.dimension as ScoreDimension,
@@ -104,9 +105,11 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     description: vo.description,
     mode: vo.mode as ScoreMode,
     score: vo.score,
+    prerequisites: vo.prerequisites || undefined,
     statDays: vo.statDays ?? undefined,
     rangeScores,
     tiers,
+    conditionItems,
     calcCycle: vo.calcCycle as CalcCycle | undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
@@ -168,6 +171,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     [ScoreMode.RULE_DEDUCTION]: t('organicTrafficScore.modeRuleDeduction'),
     [ScoreMode.AMOUNT_MULTIPLIER]: t('organicTrafficScore.modeAmountMultiplier'),
     [ScoreMode.TIERED]: '梯度計分',
+    [ScoreMode.CONDITIONAL]: '條件計分',
   }
   /** 配送範圍分層標籤（依賴 t） */
   const RANGE_LABEL: Record<keyof RangeScores, string> = {
@@ -183,6 +187,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     { label: MODE_LABEL[ScoreMode.RULE_DEDUCTION], value: ScoreMode.RULE_DEDUCTION },
     { label: MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
     { label: MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
+    { label: MODE_LABEL[ScoreMode.CONDITIONAL], value: ScoreMode.CONDITIONAL },
   ]
   const [dimensionWeight, setDimensionWeight] = useState<Record<ScoreDimension, number>>(DEFAULT_DIMENSION_WEIGHT)
   const [savingWeights, setSavingWeights] = useState(false)
@@ -191,6 +196,57 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [activeDimension, setActiveDimension] = useState<ScoreDimension>(ScoreDimension.COMMERCIAL)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<ServiceStatus | undefined>(undefined)
+  /** 展開的規則 ID 集合（可展開列表模式） */
+  const [expandedRules, setExpandedRules] = useState<Record<string, boolean>>({})
+  /** 權重配置是否收起 */
+  const [weightConfigCollapsed, setWeightConfigCollapsed] = useState(false)
+  /** 內聯編輯中的規則 ID 集合 */
+  const [inlineEditing, setInlineEditing] = useState<Record<string, boolean>>({})
+  /** 內聯編輯臨時表單值 */
+  const [inlineForm, setInlineForm] = useState<Record<string, Partial<OrganicScoreRule>>>({})
+
+  /** 進入內聯編輯模式 */
+  const handleInlineEdit = (rule: OrganicScoreRule) => {
+    setInlineEditing(prev => ({ ...prev, [rule.id]: true }))
+    setInlineForm(prev => ({ ...prev, [rule.id]: { ...rule } }))
+    // 自動展開詳情區
+    if (!expandedRules[rule.id]) {
+      setExpandedRules(prev => ({ ...prev, [rule.id]: true }))
+    }
+  }
+  /** 取消內聯編輯 */
+  const handleInlineCancel = (ruleId: string) => {
+    setInlineEditing(prev => { const n = { ...prev }; delete n[ruleId]; return n })
+    setInlineForm(prev => { const n = { ...prev }; delete n[ruleId]; return n })
+  }
+  /** 保存內聯編輯 */
+  const handleInlineSave = async (ruleId: string) => {
+    const values = inlineForm[ruleId]
+    if (!values) return
+    const payload = {
+      dimension: values.dimension!,
+      name: values.name!,
+      description: values.description!,
+      mode: values.mode!,
+      score: values.score,
+      prerequisites: values.prerequisites,
+      statDays: values.statDays,
+      rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
+      tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
+      conditionItems: values.conditionItems ? JSON.stringify(values.conditionItems) : undefined,
+      calcCycle: values.calcCycle,
+      status: values.status!,
+    }
+    try {
+      const vo = await updateOrganicRule(ruleId as unknown as number, payload)
+      setRules(prev => prev.map(r => r.id === ruleId ? voToRule(vo) : r))
+      message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
+    } catch {
+      setRules(prev => prev.map(r => r.id === ruleId ? { ...r, ...values } as OrganicScoreRule : r))
+      message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
+    }
+    handleInlineCancel(ruleId)
+  }
 
   // 排名規則說明彈窗
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
@@ -204,6 +260,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const ruleFormMode = Form.useWatch('mode', ruleForm)
   /** 梯度檔位本地狀態（彈窗內編輯） */
   const [tierRows, setTierRows] = useState<ScoreTier[]>([])
+  /** 條件計分子項本地狀態（彈窗內編輯） */
+  const [conditionRows, setConditionRows] = useState<ScoreConditionItem[]>([])
 
   /** 權重總和（用於校驗提示） */
   const weightTotal = useMemo(
@@ -272,13 +330,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       description: '',
       mode: ScoreMode.RULE_BONUS,
       score: 50,
+      prerequisites: undefined,
       statDays: undefined,
       rangeScores: undefined,
       tiers: undefined,
+      conditionItems: undefined,
       calcCycle: CalcCycle.NIGHTLY,
       status: ServiceStatus.ENABLED,
     })
     setTierRows([])
+    setConditionRows([])
     setModalOpen(true)
   }
 
@@ -291,13 +352,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       description: record.description,
       mode: record.mode,
       score: record.score,
+      prerequisites: record.prerequisites,
       statDays: record.statDays,
       rangeScores: record.rangeScores,
       tiers: record.tiers,
+      conditionItems: record.conditionItems,
       calcCycle: record.calcCycle,
       status: record.status,
     })
     setTierRows(record.tiers || [])
+    setConditionRows(record.conditionItems || [])
     setModalOpen(true)
   }
 
@@ -312,15 +376,25 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       }
       values.tiers = [...tierRows]
     }
+    // 條件計分模式時，將 conditionRows 寫入 conditionItems
+    if (values.mode === ScoreMode.CONDITIONAL) {
+      if (conditionRows.length === 0) {
+        message.warning('請至少配置一組條件分值')
+        return
+      }
+      values.conditionItems = [...conditionRows]
+    }
     const payload = {
       dimension: editingRule ? editingRule.dimension : modalDimension,
       name: values.name,
       description: values.description,
       mode: values.mode,
       score: values.score,
+      prerequisites: values.prerequisites,
       statDays: values.statDays,
       rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
       tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
+      conditionItems: values.conditionItems ? JSON.stringify(values.conditionItems) : undefined,
       calcCycle: values.calcCycle,
       status: values.status,
     }
@@ -392,143 +466,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     })
   }
 
-  /** 分值調整（表格內聯編輯） */
-  const handleScoreChange = async (id: string, score: number | null) => {
-    if (score === null) return
-    setRules(prev => prev.map(r => r.id === id ? { ...r, score } : r))
-    try {
-      await updateOrganicRuleScore(id as unknown as number, score)
-    } catch { /* 後端不可用時僅更新本地 */ }
-  }
 
-  const buildColumns = (): ColumnsType<OrganicScoreRule> => [
-    { title: t('organicTrafficScore.colRuleId'), dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <Tag color="blue">{v}</Tag> },
-    {
-      title: t('organicTrafficScore.colRuleName'), dataIndex: 'name', key: 'name', width: 200,
-      render: (v: string, record) => (
-        <Space size={4}>
-          <span style={{ fontWeight: 500, color: '#262626' }}>{v}</span>
-          {!record.builtin && <Tag color="orange">{t('organicTrafficScore.custom')}</Tag>}
-        </Space>
-      ),
-    },
-    { title: t('organicTrafficScore.colScoringDesc'), dataIndex: 'description', key: 'description', render: (v: string) => <span style={{ color: '#8C8C8C', fontSize: 12 }}>{v}</span> },
-    {
-      title: t('organicTrafficScore.colScoringMode'), dataIndex: 'mode', key: 'mode', width: 110,
-      render: (v: ScoreMode) => <Tag color={SCORE_MODE_COLOR[v]}>{MODE_LABEL[v]}</Tag>,
-    },
-    {
-      title: t('organicTrafficScore.colScore'), dataIndex: 'score', key: 'score', width: 130,
-      render: (v: number, record) => {
-        // 梯度計分規則：顯示「梯度配置 (N档)」+ hover 彈出詳細檔位表
-        if (record.mode === ScoreMode.TIERED && record.tiers?.length) {
-          return (
-            <Popover
-              title={<span style={{ fontSize: 13, fontWeight: 600 }}>{record.name} · 梯度配置</span>}
-              content={
-                <div style={{ minWidth: 260 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {record.tiers.map((tier: ScoreTier, idx: number) => (
-                      <div key={idx} style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '4px 8px', borderRadius: 4,
-                        background: tier.score >= 0 ? '#f6ffed' : '#fff2f0',
-                      }}>
-                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-                          {tier.statDays ? `統計 ${tier.statDays} 天，` : ''}
-                        </span>
-                        <span style={{ fontSize: 12, color: '#595959' }}>
-                          訂單 {TIER_DIRECTION_LABEL[tier.direction]} {tier.threshold} 單
-                        </span>
-                        <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 13, color: tier.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
-                          {tier.score >= 0 ? '+' : ''}{tier.score} 分
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              }
-              trigger="hover"
-            >
-              <Button type="link" size="small" style={{ padding: '0 4px', fontSize: 12 }}>
-                梯度配置 ({record.tiers.length}档)
-              </Button>
-            </Popover>
-          )
-        }
-        if (record.rangeScores) {
-          return (
-            <Popover
-              title={<span style={{ fontSize: 13, fontWeight: 600 }}>{record.name} · {t('organicTrafficScore.tieredScore')}</span>}
-              content={
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 20px', minWidth: 160 }}>
-                  {RANGE_SCORE_KEYS.map(key => (
-                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <span style={{ color: '#8C8C8C', fontSize: 12 }}>{RANGE_LABEL[key]}</span>
-                      <span style={{ fontWeight: 600, color: '#262626' }}>{record.rangeScores![key]} {t('organicTrafficScore.scoreUnit')}</span>
-                    </div>
-                  ))}
-                </div>
-              }
-              trigger="hover"
-            >
-              <Button type="link" size="small" style={{ padding: '0 4px', fontSize: 12 }}>
-                {t('organicTrafficScore.viewTiered')}
-              </Button>
-            </Popover>
-          )
-        }
-        return (
-          <InputNumber
-            value={v}
-            min={-100}
-            max={100}
-            size="small"
-            style={{ width: 84 }}
-            disabled={readOnly}
-            onChange={val => handleScoreChange(record.id, val)}
-          />
-        )
-      },
-    },
-    {
-      title: t('organicTrafficScore.colStatus'), dataIndex: 'status', key: 'status', width: 90,
-      render: (v: ServiceStatus) => (
-        <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
-          {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
-        </Tag>
-      ),
-    },
-    {
-      title: t('organicTrafficScore.colAction'), key: 'action', width: 170,
-      render: (_, record) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-          <Button type="link" size="small" disabled={readOnly} onClick={() => handleOpenEdit(record)}>{t('common.edit')}</Button>
-          <Button
-            type="link"
-            size="small"
-            disabled={readOnly}
-            danger={record.status === ServiceStatus.ENABLED}
-            style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
-          </Button>
-          {!record.builtin && (
-            <Button type="link" size="small" danger disabled={readOnly} onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
-          )}
-        </Space>
-      ),
-    },
-  ]
-
-  /** 渲染一組評分項：篩選工具條 + 分頁表格 */
+  /** 渲染一組評分項：븩選工具條 + 可展開列表（參考規則配置菜單佈局） */
   const renderRulePanel = (dimension: ScoreDimension) => {
     const total = getRules(dimension)
     const data = getFilteredRules(dimension)
     const enabledCount = total.filter(r => r.status === ServiceStatus.ENABLED).length
     return (
       <>
+        {/* 篩選工具條 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <Input
             allowClear
@@ -563,136 +509,314 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             </Button>
           )}
         </div>
-        <Table
-          rowKey="id"
-          size="small"
-          columns={buildColumns()}
-          dataSource={data}
-          scroll={{ x: 1100, y: RULE_TABLE_HEIGHT }}
-          pagination={{
-            pageSize: RULE_PAGE_SIZE,
-            showSizeChanger: true,
-            size: 'small',
-            showTotal: (total) => t('common.total', { count: total }),
-          }}
-        />
+
+        {/* 可展開規則列表（參考規則配置菜單風格） */}
+        <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+          {data.length === 0 && (
+            <div style={{ padding: 40, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>暫無評分項配置</div>
+          )}
+          {data.map((rule, idx) => {
+            const isExpanded = !!expandedRules[rule.id]
+            const { color: dimColor } = SCORE_DIMENSION_COLOR[dimension]
+            return (
+              <div key={rule.id} style={{
+                borderTop: idx > 0 ? '1px solid #f5f5f5' : 'none',
+                transition: 'background 0.2s',
+              }}>
+                {/* ── 主行（點擊展開/折疀） ── */}
+                <div
+                  onClick={() => setExpandedRules(prev => ({ ...prev, [rule.id]: !prev[rule.id] }))}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '14px 20px', cursor: 'pointer', userSelect: 'none',
+                    background: isExpanded ? '#FAFAFA' : '#fff',
+                  }}
+                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#FAFAFA' }}
+                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#fff' }}
+                >
+                  {/* 展開/折疀箭頭 */}
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 20, height: 20, borderRadius: 4, marginRight: 10, flexShrink: 0,
+                    background: isExpanded ? dimColor : '#E8E8E8',
+                    transition: 'all 0.2s',
+                  }}>
+                    {isExpanded
+                      ? <UpOutlined style={{ fontSize: 10, color: '#fff' }} />
+                      : <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
+                    }
+                  </span>
+                  {/* 規則名稱 */}
+                  <span style={{ fontWeight: 500, color: '#262626', fontSize: 14 }}>{rule.name}</span>
+                  {/* 右側：狀態 + 操作 */}
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    <Tag color={rule.status === ServiceStatus.ENABLED ? 'success' : 'default'} style={{ margin: 0 }}>
+                      {rule.status === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
+                    </Tag>
+                    {!readOnly && (
+                      <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+                        <Button
+                          type="link" size="small"
+                          danger={rule.status === ServiceStatus.ENABLED}
+                          style={rule.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
+                          onClick={e => { e.stopPropagation(); handleToggleStatus(rule) }}
+                        >
+                          {rule.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
+                        </Button>
+                        {!rule.builtin && (
+                          <Button type="link" size="small" danger onClick={e => { e.stopPropagation(); handleDelete(rule) }}>{t('common.delete')}</Button>
+                        )}
+                      </Space>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 展開詳情區 ── */}
+                {isExpanded && (() => {
+                  const isEditingInline = !!inlineEditing[rule.id]
+                  const form = inlineForm[rule.id] || rule
+                  return (
+                  <div style={{
+                    padding: '16px 20px 16px 50px',
+                    background: isEditingInline ? '#FFFBE6' : '#FAFAFA',
+                    borderTop: '1px solid ' + (isEditingInline ? '#FFE58F' : '#f0f0f0'),
+                  }}>
+                    {/* ── 元信息行：規則ID + 計分方式 + 分值 + 操作按鈕 ── */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                      <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>{rule.id}</Tag>
+                      <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>{MODE_LABEL[rule.mode]}</Tag>
+                      {rule.mode === ScoreMode.RULE_BONUS && (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>+{rule.score} 分</span>
+                      )}
+                      {rule.mode === ScoreMode.RULE_DEDUCTION && (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#FF4D4F' }}>{rule.score} 分</span>
+                      )}
+                      {rule.mode === ScoreMode.DECAY && (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#722ED1' }}>{rule.score} 分</span>
+                      )}
+                      {rule.mode === ScoreMode.AMOUNT_MULTIPLIER && (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>×{rule.score}</span>
+                      )}
+                      {rule.statDays && (
+                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>統計 {rule.statDays} 天</span>
+                      )}
+                      {!readOnly && (
+                        <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                          {!isEditingInline ? (
+                            <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
+                              style={{ borderRadius: 4, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
+                              編輯
+                            </Button>
+                          ) : (
+                            <Space size={6}>
+                              <Button size="small" onClick={() => handleInlineCancel(rule.id)}
+                                style={{ borderRadius: 4, fontSize: 12, height: 28 }}>取消</Button>
+                              <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleInlineSave(rule.id)}
+                                style={{ borderRadius: 4, fontSize: 12, height: 28, backgroundColor: '#E8720C', borderColor: '#E8720C' }}>保存</Button>
+                            </Space>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── 內容區：顯示模式 vs 編輯模式 ── */}
+                    {!isEditingInline ? (
+                      /* 顯示模式 */
+                      <>
+                        <div style={{ fontSize: 13, color: '#595959', marginBottom: 8, lineHeight: 1.6 }}>
+                          {rule.description}
+                        </div>
+                        {rule.prerequisites && (
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
+                            border: '1px solid #d3adf7', marginBottom: 10,
+                          }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>前提條件</span>
+                            <span style={{ fontSize: 13, color: '#595959' }}>{rule.prerequisites}</span>
+                          </div>
+                        )}
+                        {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {rule.conditionItems.map((item: ScoreConditionItem, i: number) => (
+                                <div key={i} style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  padding: '8px 12px', borderRadius: 6,
+                                  background: item.score >= 0 ? '#f6ffed' : '#fff2f0',
+                                  border: `1px solid ${item.score >= 0 ? '#b7eb8f' : '#ffccc7'}`,
+                                }}>
+                                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 24 }}>#{i + 1}</span>
+                                  <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>{item.condition}</span>
+                                  <span style={{ fontWeight: 600, fontSize: 14, color: item.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
+                                    {item.score >= 0 ? '+' : ''}{item.score} 分
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {rule.mode === ScoreMode.TIERED && rule.tiers?.length && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {rule.tiers.map((tier: ScoreTier, i: number) => (
+                                <div key={i} style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  padding: '8px 12px', borderRadius: 6,
+                                  background: tier.score >= 0 ? '#f6ffed' : '#fff2f0',
+                                }}>
+                                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 24 }}>#{i + 1}</span>
+                                  {tier.statDays && <span style={{ fontSize: 12, color: '#8C8C8C' }}>統計 {tier.statDays} 天</span>}
+                                  <span style={{ fontSize: 13, color: '#595959' }}>訂單 {TIER_DIRECTION_LABEL[tier.direction]} {tier.threshold} 單</span>
+                                  <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 14, color: tier.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
+                                    {tier.score >= 0 ? '+' : ''}{tier.score} 分
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {rule.rangeScores && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>配送範圍分值</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                              {RANGE_SCORE_KEYS.map(key => (
+                                <div key={key} style={{
+                                  padding: '8px 12px', borderRadius: 6, background: '#fff',
+                                  border: '1px solid #f0f0f0', textAlign: 'center',
+                                }}>
+                                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{RANGE_LABEL[key]}</div>
+                                  <div style={{ fontSize: 16, fontWeight: 600, color: '#262626' }}>{rule.rangeScores![key]} 分</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {!rule.rangeScores && [ScoreMode.RULE_BONUS, ScoreMode.RULE_DEDUCTION, ScoreMode.DECAY].includes(rule.mode) && (
+                          <div style={{ marginTop: 8, fontSize: 13 }}>
+                            <span style={{ color: '#8C8C8C' }}>分值：</span>
+                            <span style={{ fontWeight: 600, fontSize: 16, color: rule.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
+                              {rule.score >= 0 ? '+' : ''}{rule.score} 分
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      /* 編輯模式 */
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>規則名稱</div>
+                            <Input size="small" value={form.name} maxLength={30} showCount
+                              onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], name: e.target.value } }) as any)} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
+                            <Input size="small" value={form.prerequisites || ''} maxLength={60} showCount allowClear
+                              placeholder="填寫規則生效的前提條件"
+                              onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: e.target.value || undefined } }) as any)} />
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>評分說明</div>
+                          <Input.TextArea size="small" value={form.description} rows={2} maxLength={120} showCount
+                            onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], description: e.target.value } }) as any)} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
+                            <Select size="small" value={form.mode} style={{ width: '100%' }}
+                              options={MODE_OPTIONS}
+                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], mode: val } }) as any)} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>分值</div>
+                            <InputNumber size="small" value={form.score} min={-100} max={100} style={{ width: '100%' }}
+                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>狀態</div>
+                          <Switch checked={form.status === ServiceStatus.ENABLED}
+                            checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
+                            onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], status: checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED } }) as any)} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  )
+                })()}
+              </div>
+            )
+          })}
+        </div>
       </>
     )
   }
 
-  /** 維度面板頭：維度說明 + 權重標籤 */
-  const renderDimensionHeader = (dimension: ScoreDimension) => {
-    const { color, bg } = SCORE_DIMENSION_COLOR[dimension]
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
-        padding: '10px 14px', background: bg, borderRadius: 8,
-        borderLeft: `4px solid ${color}`,
-      }}>
-        <span style={{ fontSize: 15 }}>{SCORE_DIMENSION_ICON[dimension]}</span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#262626', whiteSpace: 'nowrap' }}>
-          {DIM_LABEL[dimension]}
-        </span>
-        <Tag color={color} style={{ background: '#fff', color, border: `1px solid ${color}44`, margin: 0 }}>
-          {t('organicTrafficScore.weightLabel')} {dimensionWeight[dimension]}%
-        </Tag>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{DIM_DESC[dimension]}</span>
-      </div>
-    )
-  }
+
+  /** 是否顯示維度權重與計算配置區（由規則配置菜單控制） */
+  const showDimensionWeight = useMemo(
+    () => getSystemRuleValue<boolean>('organic_traffic_show_dimension_weight') !== false,
+    [],
+  )
 
   return (
     <Spin spinning={loading}>
-    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
-        </div>
+    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <SettingOutlined style={{ fontSize: 16, color: '#fa8c16' }} />
         <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.pageTitle')}</span>
-        <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('organicTrafficScore.scoringDimension')}</Tag>
         <Button size="small" icon={<QuestionCircleOutlined />} onClick={() => setRuleModalOpen(true)}>
           {t('organicTrafficScore.rankingRuleDesc')}
         </Button>
-        <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('organicTrafficScore.rankingSummary')}</span>
       </div>
-      {/* 3 個維度權重統計卡（帶計數動畫與 hover 動效） */}
-      <div key={weightTotal} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-        {DIMENSION_ORDER.map(dimension => {
-          const { color, bg } = SCORE_DIMENSION_COLOR[dimension]
-          return (
-            <div
-              key={dimension}
-              style={{
-                padding: 16, borderRadius: 12, background: bg,
-                border: `1px solid ${color}22`, textAlign: 'center',
-                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default',
-                position: 'relative', overflow: 'hidden',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            >
-              <div style={{ fontSize: 20, marginBottom: 6 }}>{SCORE_DIMENSION_ICON[dimension]}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color }}>
-                <AnimatedNumber value={dimensionWeight[dimension]} suffix="%" />
-              </div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
-                {DIM_LABEL[dimension]} · {t('organicTrafficScore.enabledCount', { count: enabledCountMap[dimension] })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* 維度權重配置：單行 3 列緊湊佈局（已移除得分重算定時器） */}
-      <div style={{
-        padding: '14px 20px', background: '#fff', border: '1px solid #f0f0f0',
-        borderRadius: 8, marginBottom: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.dimensionWeightConfig')}</span>
-          <span style={{ fontSize: 12, color: weightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
-            {`${t('organicTrafficScore.currentTotal', { total: weightTotal })}${weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}）`}`}
-          </span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          {DIMENSION_ORDER.map(dimension => (
-            <div key={dimension}>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{DIM_LABEL[dimension]}</div>
-              <InputNumber
-                value={dimensionWeight[dimension]}
-                min={0}
-                max={DIMENSION_WEIGHT_TOTAL}
-                addonAfter="%"
-                style={{ width: '100%' }}
-                disabled={readOnly}
-                onChange={val => setDimensionWeight(prev => ({ ...prev, [dimension]: val ?? 0 }))}
-              />
-            </div>
-          ))}
-        </div>
-        {!readOnly && (
-          <div style={{ textAlign: 'right', marginTop: 12 }}>
-            <Button
-              type="primary"
-              size="small"
-              icon={<SaveOutlined />}
-              disabled={weightTotal !== DIMENSION_WEIGHT_TOTAL}
-              loading={savingWeights}
-              onClick={handleSaveWeights}
-            >
-              {t('organicTrafficScore.saveWeight')}
-            </Button>
+      {/* 維度權重配置（可收起） */}
+      {showDimensionWeight && (
+        <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, marginBottom: 12 }}>
+          <div
+            onClick={() => setWeightConfigCollapsed(!weightConfigCollapsed)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
+              cursor: 'pointer', userSelect: 'none', background: '#FAFAFA', borderRadius: weightConfigCollapsed ? 8 : '8px 8px 0 0',
+            }}
+          >
+            {weightConfigCollapsed
+              ? <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
+              : <UpOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />}
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.dimensionWeightConfig')}</span>
+            <span style={{ fontSize: 12, color: weightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
+              {t('organicTrafficScore.currentTotal', { total: weightTotal })}{weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}）`}
+            </span>
+            {DIMENSION_ORDER.map(d => (
+              <Tag key={d} color={SCORE_DIMENSION_COLOR[d].color} style={{ margin: 0, fontSize: 11 }}>
+                {DIM_LABEL[d]} {dimensionWeight[d]}%
+              </Tag>
+            ))}
           </div>
-        )}
-      </div>
+          {!weightConfigCollapsed && (
+            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              {DIMENSION_ORDER.map(dimension => (
+                <div key={dimension} style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{DIM_LABEL[dimension]}</div>
+                  <InputNumber value={dimensionWeight[dimension]} min={0} max={DIMENSION_WEIGHT_TOTAL}
+                    addonAfter="%" style={{ width: '100%' }} disabled={readOnly}
+                    onChange={val => setDimensionWeight(prev => ({ ...prev, [dimension]: val ?? 0 }))} />
+                </div>
+              ))}
+              {!readOnly && (
+                <Button type="primary" size="small" icon={<SaveOutlined />}
+                  disabled={weightTotal !== DIMENSION_WEIGHT_TOTAL} loading={savingWeights}
+                  onClick={handleSaveWeights} style={{ marginTop: 18 }}>
+                  {t('organicTrafficScore.saveWeight')}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 各維度評分項配置：Tabs 切換，頁面高度固定不隨評分項增多而拉長 */}
       <div style={{
@@ -712,12 +836,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                 </span>
               </span>
             ),
-            children: (
-              <>
-                {renderDimensionHeader(dimension)}
-                {renderRulePanel(dimension)}
-              </>
-            ),
+            children: renderRulePanel(dimension),
           }))}
         />
       </div>
@@ -762,13 +881,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           <Form.Item label={t('organicTrafficScore.ruleName')} name="name" rules={[{ required: true, message: t('organicTrafficScore.ruleNameRequired') }]}>
             <Input placeholder={t('organicTrafficScore.namePlaceholder')} maxLength={30} showCount />
           </Form.Item>
+          <Form.Item
+            label="前提條件"
+            name="prerequisites"
+            extra="填寫此規則生效的前提條件，如「商家報名免運費活動」「參與滿額立減活動」"
+          >
+            <Input placeholder="例如：商家報名免運費活動" maxLength={60} showCount allowClear />
+          </Form.Item>
 
           <Form.Item label={t('organicTrafficScore.scoringMode')} name="mode" rules={[{ required: true, message: t('organicTrafficScore.scoringModeRequired') }]}>
             <Select options={MODE_OPTIONS} placeholder={t('organicTrafficScore.selectScoringMode')}
               disabled={editingRule?.mode === ScoreMode.TIERED}
             />
           </Form.Item>
-          {!isDeliveryRange(editingRule?.id) && ruleFormMode !== ScoreMode.TIERED && (
+          {!isDeliveryRange(editingRule?.id) && ruleFormMode !== ScoreMode.TIERED && ruleFormMode !== ScoreMode.CONDITIONAL && (
             <Form.Item
               label={t('organicTrafficScore.score')}
               name="score"
@@ -868,7 +994,70 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                 block
                 onClick={() => setTierRows(prev => [...prev, { threshold: 0, direction: TierDirection.LESS_THAN, score: 0, statDays: 30 }])}
               >
-                新增檔位
+              新增檔位
+              </Button>
+            </div>
+          )}
+          {/* 條件計分配置：多組「條件描述 → 分值」 */}
+          {ruleFormMode === ScoreMode.CONDITIONAL && (
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f0f5ff', border: '1px solid #adc6ff', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>條件計分配置</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>每組定義一個條件描述及對應分值，可新增多組以覆蓋不同場景</div>
+              {conditionRows.length === 0 && (
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置條件，請點擊下方「新增條件」</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {conditionRows.map((item, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 12px', background: '#fff', borderRadius: 6,
+                    border: '1px solid #f0f0f0',
+                  }}>
+                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                    <Input
+                      value={item.condition}
+                      placeholder="條件描述，如：報名免運費活動"
+                      style={{ flex: 1 }}
+                      size="small"
+                      onChange={e => {
+                        const next = [...conditionRows]
+                        next[idx] = { ...next[idx], condition: e.target.value }
+                        setConditionRows(next)
+                      }}
+                    />
+                    <InputNumber
+                      value={item.score}
+                      min={-100}
+                      max={100}
+                      size="small"
+                      style={{ width: 80 }}
+                      placeholder="分值"
+                      onChange={val => {
+                        const next = [...conditionRows]
+                        next[idx] = { ...next[idx], score: val ?? 0 }
+                        setConditionRows(next)
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: '#595959' }}>分</span>
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      style={{ marginLeft: 'auto' }}
+                      onClick={() => setConditionRows(prev => prev.filter((_, i) => i !== idx))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                block
+                onClick={() => setConditionRows(prev => [...prev, { condition: '', score: 10 }])}
+              >
+                新增條件
               </Button>
             </div>
           )}

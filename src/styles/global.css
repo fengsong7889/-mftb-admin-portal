@@ -138,3 +138,8 @@ body {
   padding: 0 !important;
   text-align: left;
 }
+
+/* 全局表格表头文字禁止换行 */
+.ant-table-thead > tr > th {
+  white-space: nowrap;
+}

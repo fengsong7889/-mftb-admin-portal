@@ -17,9 +17,11 @@ export interface OrganicRuleVO {
   description: string
   mode: number
   score: number
+  prerequisites?: string
   statDays?: number
   rangeScores?: string
   tiers?: string
+  conditionItems?: string
   calcCycle?: string
   status: number
   builtin: number
@@ -41,9 +43,11 @@ export interface OrganicRulePayload {
   description: string
   mode: number
   score?: number
+  prerequisites?: string
   statDays?: number
   rangeScores?: string
   tiers?: string
+  conditionItems?: string
   calcCycle?: string
   status: number
 }

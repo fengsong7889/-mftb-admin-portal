@@ -28,6 +28,8 @@ export enum ScoreMode {
   AMOUNT_MULTIPLIER = 4,
   /** 梯度計分：按閾值分檔，不同區間對應不同分值 */
   TIERED = 5,
+  /** 條件計分：多組「條件描述 → 分值」，每組獨立計分 */
+  CONDITIONAL = 6,
 }
 
 /** 梯度比較方向 */
@@ -78,6 +80,7 @@ export const SCORE_MODE_LABEL: Record<ScoreMode, string> = {
   [ScoreMode.RULE_DEDUCTION]: '規則減分',
   [ScoreMode.AMOUNT_MULTIPLIER]: '金額倍率',
   [ScoreMode.TIERED]: '梯度計分',
+  [ScoreMode.CONDITIONAL]: '條件計分',
 }
 
 export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
@@ -86,6 +89,7 @@ export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
   [ScoreMode.RULE_DEDUCTION]: 'red',
   [ScoreMode.AMOUNT_MULTIPLIER]: 'gold',
   [ScoreMode.TIERED]: 'cyan',
+  [ScoreMode.CONDITIONAL]: 'geekblue',
 }
 
 export const SCORE_MODE_OPTIONS = [
@@ -94,6 +98,7 @@ export const SCORE_MODE_OPTIONS = [
   { label: SCORE_MODE_LABEL[ScoreMode.RULE_DEDUCTION], value: ScoreMode.RULE_DEDUCTION },
   { label: SCORE_MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
   { label: SCORE_MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
+  { label: SCORE_MODE_LABEL[ScoreMode.CONDITIONAL], value: ScoreMode.CONDITIONAL },
 ]
 
 export const TIER_DIRECTION_LABEL: Record<TierDirection, string> = {
@@ -139,6 +144,14 @@ export interface ScoreTier {
   statDays?: number
 }
 
+/** 條件計分子項（一組條件描述 → 分值） */
+export interface ScoreConditionItem {
+  /** 條件描述（如「報名免運費活動」） */
+  condition: string
+  /** 該條件對應分值（正=加分，負=扣分） */
+  score: number
+}
+
 /** 單條評分規則 */
 export interface OrganicScoreRule {
   id: string
@@ -148,12 +161,16 @@ export interface OrganicScoreRule {
   mode: ScoreMode
   /** 分值上限（扣分項為負值） */
   score: number
+  /** 前提條件描述（如「商家報名免運費活動」） */
+  prerequisites?: string
   /** 統計天數（僅部分規則需要，如店鋪銷量、好評/差評等） */
   statDays?: number
   /** 配送範圍分層分數（僅配送範圍規則使用） */
   rangeScores?: RangeScores
   /** 梯度檔位（僅 mode=TIERED 時使用） */
   tiers?: ScoreTier[]
+  /** 條件計分子項（僅 mode=CONDITIONAL 時使用） */
+  conditionItems?: ScoreConditionItem[]
   /** 計算周期（僅 mode=TIERED 時使用） */
   calcCycle?: CalcCycle
   status: ServiceStatus
@@ -176,8 +193,8 @@ const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 /** 默認評分規則（可在界面上新增/停用/調整分值） */
 export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   // ===== 商業維度（商家營銷投入與付費推廣） =====
-  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動固定加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
-  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費固定加分', mode: ScoreMode.RULE_BONUS, score: 20, status: ENABLED, builtin: true },
+  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動固定加分', mode: ScoreMode.RULE_BONUS, score: 30, prerequisites: '商家報名滿額立減活動', status: ENABLED, builtin: true },
+  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費固定加分', mode: ScoreMode.RULE_BONUS, score: 20, prerequisites: '商家報名免運費活動', status: ENABLED, builtin: true },
   { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '浮動計分：得分 = 領券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減活動固定加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
   { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '浮動計分：得分 = 贈券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
@@ -186,6 +203,11 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'COM_08', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減-按平均折扣', description: '浮動計分：得分 = 商家出資金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_09', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 80, status: ENABLED, builtin: true },
   { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-金字招牌', description: '購買金字招牌廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
+  { id: 'COM_11', dimension: ScoreDimension.COMMERCIAL, name: '訂單加分', description: '根據商家參與活動類型與訂單量綜合條件加分', mode: ScoreMode.CONDITIONAL, score: 0, prerequisites: '商家需有有效訂單', conditionItems: [
+    { condition: '報名免運費活動且當月訂單≥50單', score: 30 },
+    { condition: '報名滿額立減活動且當月訂單≥100單', score: 50 },
+    { condition: '同時參與兩項活動且當月訂單≥200單', score: 80 },
+  ], status: ENABLED, builtin: true },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
   { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
