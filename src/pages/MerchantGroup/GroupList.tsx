@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Button, Space, Form, DatePicker, Table, message, Modal } from 'antd'
+import dayjs from 'dayjs'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined,
@@ -215,14 +216,14 @@ export default function GroupList() {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
-      render: (val: string) => val || '-',
+      render: (val: number) => val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
       title: t('colCreatedAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
-      render: (val: string) => val || '-',
+      render: (val: number) => val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
       title: t('common:action'),
