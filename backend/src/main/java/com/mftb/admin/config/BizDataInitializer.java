@@ -33,10 +33,33 @@ public class BizDataInitializer implements CommandLineRunner {
         migrateLegacyGroupCodes();
         migrateLegacyStoreCodes();
         migrateLegacyBizChannels();
+        cleanupDuplicateSeedStores();
         seedMerchantGroups();
         seedStores();
         seedWordLibrary();
         seedWorkflowConfig();
+    }
+
+    /** 清理重复种子门店: 同名门店保留 id 最小的一条，删除其余重复记录 (幂等: 无重复时不执行) */
+    private void cleanupDuplicateSeedStores() {
+        String[] seedNames = {"澳門總店", "氹仔分店", "新馬路店", "黑沙環店", "官也街老店", "珠海旗艦店"};
+        int totalDeleted = 0;
+        for (String name : seedNames) {
+            // 找出该名称下 id 最小的记录
+            List<Long> ids = jdbcTemplate.queryForList(
+                    "SELECT id FROM biz_store WHERE store_name = ? AND deleted = 0 ORDER BY id",
+                    Long.class, name);
+            if (ids.size() <= 1) continue;
+            // 保留第一条，删除其余
+            List<Long> toDelete = ids.subList(1, ids.size());
+            int deleted = jdbcTemplate.update(
+                    "UPDATE biz_store SET deleted = 1 WHERE id IN (" +
+                            String.join(",", toDelete.stream().map(String::valueOf).toList()) + ")");
+            totalDeleted += deleted;
+        }
+        if (totalDeleted > 0) {
+            log.info("已清理 {} 条重复种子门店数据", totalDeleted);
+        }
     }
 
     /** 存量集团ID迁移: 非 JT+6位数字 格式的编号按 id 顺序重编为 JT 序列 */
@@ -256,15 +279,15 @@ public class BizDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** 门店种子数据 (按 store_code 幂等) */
+    /** 门店种子数据 (按 store_code 幂等; 编码必须为 MD+6位数字, 避免被 migrateLegacyStoreCodes 误迁移) */
     private void seedStores() {
         String[][] stores = {
-                {"JT000001", "MD00001", "澳門總店", "mFood", "1,2", "store_s1001"},
-                {"JT000002", "MD00002", "氹仔分店", "flashBee", "1", "store_s1002"},
-                {"JT000003", "MD00003", "新馬路店", "mFood", "2", "store_s1003"},
-                {"JT000004", "MD00004", "黑沙環店", "flashBee", "1", "store_s1004"},
-                {"JT000005", "MD00005", "官也街老店", "mFood", "1,2", "store_s1005"},
-                {"JT000006", "MD00006", "珠海旗艦店", "flashBee,mFood", "1,2,3", "store_s1006"},
+                {"JT000001", "MD000001", "澳門總店", "mFood", "1,2", "store_s1001"},
+                {"JT000002", "MD000002", "氹仔分店", "flashBee", "1", "store_s1002"},
+                {"JT000003", "MD000003", "新馬路店", "mFood", "2", "store_s1003"},
+                {"JT000004", "MD000004", "黑沙環店", "flashBee", "1", "store_s1004"},
+                {"JT000005", "MD000005", "官也街老店", "mFood", "1,2", "store_s1005"},
+                {"JT000006", "MD000006", "珠海旗艦店", "flashBee,mFood", "1,2,3", "store_s1006"},
         };
         int inserted = 0;
         for (String[] s : stores) {
