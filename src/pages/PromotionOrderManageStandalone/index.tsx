@@ -19,7 +19,6 @@ enum OrderStatus {
   REFUNDED = 6,
 }
 
-import { BRAND_SHANFENG_LABEL } from '../../constants/brand'
 import { AlgorithmType } from '../Recommend/constants'
 import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup } from '../../api/adPromotion'
 
@@ -1135,7 +1134,7 @@ export default function PromotionOrderManage() {
           rowKey="id"
           rowSelection={{
             type: 'checkbox',
-            onChange: (selectedRowKeys, selectedRows) => {
+            onChange: (_selectedRowKeys, _selectedRows) => {
             },
           }}
           scroll={{ x: 2800 }}

@@ -11,7 +11,7 @@ import BrandTag from '../../components/BrandTag'
 import { getBatchRecordByKey } from '../../utils/approvalStore'
 import type { BatchStoreRecord } from '../../utils/approvalStore'
 import { fetchFinBatchDetail, fetchFinDetails } from '../../api/finance'
-import type { FinBatch, FinDetail } from '../../api/finance'
+import type { FinDetail } from '../../api/finance'
 
 /** 批次類型標題映射（i18n key，僅充值/轉賬/合併生成批次，扣款不生成批次） */
 const TYPE_TITLE_MAP_KEYS: Record<string, string> = {

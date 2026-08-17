@@ -94,7 +94,7 @@ export default function DataPermission() {
   const [editingTargetId, setEditingTargetId] = useState<number | null>(null) // null=新增, number=编辑某target
   const [targetId, setTargetId] = useState<number>()
   const [groupCodes, setGroupCodes] = useState<string[]>([])
-  const [existingAuthIds, setExistingAuthIds] = useState<number[]>([]) // 编辑时已有记录的ID
+  const [_existingAuthIds, setExistingAuthIds] = useState<number[]>([]) // 编辑时已有记录的ID
   const [submitting, setSubmitting] = useState(false)
 
   // 授权详情弹窗（显示某target下所有商家集团）
@@ -333,7 +333,7 @@ export default function DataPermission() {
   )
 
   /** 状态列 */
-  const renderStatus = (status: number) => (
+  const _renderStatus = (status: number) => (
     <Tag color={status === 1 ? 'green' : 'default'}>
       {status === 1 ? t('dataPermission.statusEnabled') : t('dataPermission.statusDisabled')}
     </Tag>

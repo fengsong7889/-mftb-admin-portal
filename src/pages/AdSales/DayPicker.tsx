@@ -145,7 +145,7 @@ export default function DayPicker({ inventoryItem }: DayPickerProps) {
   // ===== 真实接口接线 =====
   // 算法下拉（盘活复苏加载真实算法库数据，value=算法ID）
   const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
-  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
   // 门店下拉（真实门店，value=storeCode）
   const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
   const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})

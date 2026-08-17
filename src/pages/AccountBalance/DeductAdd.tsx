@@ -20,7 +20,6 @@ import { fetchFinAccounts, fetchFinBatches, submitDeductApply } from '../../api/
 import type { DeductApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
-import { mockSubmitApproval } from '../../api/mock/financeMock'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -50,7 +49,7 @@ function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; su
 }
 
 /** 扣款方式選項（labelKey 為 i18n key） */
-const deductMethodOptions = [
+const _deductMethodOptions = [
   { labelKey: 'accountBalance.deductMethodConsume', value: 'consume' },
   { labelKey: 'accountBalance.deductMethodBatch', value: 'batch' },
   { labelKey: 'accountBalance.deductMethodAccount', value: 'account' },

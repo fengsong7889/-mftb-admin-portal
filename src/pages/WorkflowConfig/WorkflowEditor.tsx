@@ -1,15 +1,13 @@
 import { useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Form, Input, Select, Radio, InputNumber, Button, Tag, message, Popconfirm, Checkbox } from 'antd'
+import { Form, Input, Select, Radio, InputNumber, Button, Tag, message, Popconfirm } from 'antd'
 import {
   ArrowLeftOutlined,
   SaveOutlined,
   PlusOutlined,
   DeleteOutlined,
-  UserOutlined,
   TeamOutlined,
   ApartmentOutlined,
-  CrownOutlined,
   ExclamationCircleOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -23,8 +21,6 @@ import {
   APPROVAL_RULE_LABELS,
   REJECT_BEHAVIOR_LABELS,
   BRAND_CONFIG_OPTIONS,
-  getApproverSettingForBrand,
-  createDefaultApproverConfig,
 } from './types'
 import type { WorkflowNode, WorkflowDefinition, ApproverConfig, RoutingRule } from './types'
 import { getApproverOptions } from './options'

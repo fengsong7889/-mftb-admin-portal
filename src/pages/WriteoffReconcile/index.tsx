@@ -235,7 +235,7 @@ const emptySummary: FinReconcileSummary = {
  * 後端不可用時的降級查詢：演示日報本地篩選分頁 + 彙總
  * 期初取各集團區間首日期初、期末取各集團區間末日期末，保證勾稽成立
  */
-function mockFetchReconcile(query: FinReconcileQuery): FinReconcileResult {
+function _mockFetchReconcile(query: FinReconcileQuery): FinReconcileResult {
   const filtered = mockData.filter(r => {
     if (query.groupId && !r.groupId.includes(query.groupId)) return false
     if (query.groupName && !r.groupName.includes(query.groupName)) return false

@@ -64,7 +64,7 @@ interface AlgorithmOption {
 }
 
 /** 算法库不可用时的降级选项（当前仅无敌星星接入数据库） */
-const MOCK_ALGORITHM_OPTIONS: AlgorithmOption[] = [
+const _MOCK_ALGORITHM_OPTIONS: AlgorithmOption[] = [
   { label: 'algoInvincibleStar', value: 1, type: 1, brand: 'flashBee' },
 ]
 

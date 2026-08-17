@@ -3,10 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Tag, Tabs, Modal, Descriptions, Empty } from 'antd'
 import {
   ArrowLeftOutlined,
-  UserOutlined,
   TeamOutlined,
   ApartmentOutlined,
-  CrownOutlined,
   NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
@@ -16,24 +14,12 @@ import {
   APPROVAL_RULE_LABELS,
   REJECT_BEHAVIOR_LABELS,
   BRAND_CONFIG_OPTIONS,
-  getApproverSettingForBrand,
 } from './types'
-import type { WorkflowNode, WorkflowDefinition, ApproverType, ApproverConfig, ApproverSetting } from './types'
+import type { WorkflowNode, WorkflowDefinition, ApproverConfig } from './types'
 import { getApproverOptions } from './options'
 
 /** 流程類型標籤映射（複用 APPROVAL_TYPE_OPTIONS） */
 const typeLabelMap = Object.fromEntries(APPROVAL_TYPE_OPTIONS.map(o => [o.value, o.label]))
-
-/** 審批人圖標 */
-function approverIcon(type: ApproverType) {
-  const map: Record<ApproverType, React.ReactNode> = {
-    person: <UserOutlined />,
-    role: <TeamOutlined />,
-    department_leader: <ApartmentOutlined />,
-    initiator_leader: <CrownOutlined />,
-  }
-  return map[type]
-}
 
 /** 從 approverConfig 獲取展示文本 */
 function approverConfigText(cfg: ApproverConfig | undefined): string {

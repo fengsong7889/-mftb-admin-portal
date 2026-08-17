@@ -7,19 +7,14 @@ import {
   ReloadOutlined,
   PlusOutlined,
   ExportOutlined,
-  EditOutlined,
-  SaveOutlined,
-  CloseOutlined,
   ExpandAltOutlined,
   ShrinkOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
-  EyeOutlined,
-  EyeInvisibleOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchMenuTree, createMenu, updateMenu, updateMenuStatus, deleteMenu } from '../../api/menu'
+import { fetchMenuTree, createMenu, updateMenu, updateMenuStatus } from '../../api/menu'
 import type { MenuVO, MenuPayload } from '../../api/menu'
 import { renderMenuIcon, getMenuIconOptions } from '../../components/MenuIcon'
 

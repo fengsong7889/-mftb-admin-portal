@@ -100,7 +100,7 @@ const STORE_OPTIONS = MOCK_STORES.map(s => ({
 }))
 
 /** 算法 → 品牌映射（选择算法后自动带出品牌） */
-const ALGORITHM_BRAND_MAP: Record<string, string> = {
+const _ALGORITHM_BRAND_MAP: Record<string, string> = {
   invincible_star: 'shanfeng',
   new_store_ad: 'mfood',
   hot_revive: 'shanfeng',
@@ -361,7 +361,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   // 算法下拉（無敵星星加载真实算法库数据，value=算法ID）
   const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
   const [algorithmMetaMap, setAlgorithmMetaMap] = useState<Record<string, { apiId: number }>>({})
-  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
   // 门店下拉（真实门店，value=storeCode）
   const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string; name?: string }>>(STORE_OPTIONS)
   const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
@@ -489,9 +489,9 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     }
   }
 
-  // 取算法对应的品牌（真实算法优先，其次 mock 映射）
-  const getAlgorithmBrand = (value: string | null) =>
-    value ? (algorithmBrandOverrides[value] ?? ALGORITHM_BRAND_MAP[value]) : undefined
+  // 取算法对应的品牌（真实算法优先，其次 mock 映射）——目前未使用，保留供后续扩展
+  // const getAlgorithmBrand = (value: string | null) =>
+  //   value ? (algorithmBrandOverrides[value] ?? ALGORITHM_BRAND_MAP[value]) : undefined
 
   // 品牌变更处理：清空已选算法，按品牌重新加载算法列表
   const handleBrandChange = (value: string | null) => {

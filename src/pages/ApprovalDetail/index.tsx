@@ -25,7 +25,7 @@ import {
   rejectFinApproval,
   cancelFinApproval,
 } from '../../api/finance'
-import type { FinApproval, ApprovalNodeInstance } from '../../api/finance'
+import type { FinApproval } from '../../api/finance'
 import { useTranslation } from 'react-i18next'
 
 /** 審批历史记录 */

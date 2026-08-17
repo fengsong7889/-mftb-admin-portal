@@ -40,7 +40,7 @@ export default function PositionManagement() {
   const isNonZh = !i18n.language?.startsWith('zh')
 
   /** 獲取職位顯示名稱：非繁中時取英文名，無則回退中文名 */
-  const getPositionDisplayName = (pos: PositionItem) =>
+  const _getPositionDisplayName = (pos: PositionItem) =>
     isNonZh ? (pos.nameEn || pos.name) : pos.name
   const [dataSource, setDataSource] = useState<PositionItem[]>([])
 

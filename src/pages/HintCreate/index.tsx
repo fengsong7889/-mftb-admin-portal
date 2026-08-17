@@ -109,7 +109,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
   }, [open, form])
 
   const handleSubmit = () => {
-    form.validateFields().then((values) => {
+    form.validateFields().then((_values) => {
       message.success(t('hintCreate.submitSuccess'))
       onSuccess?.()
       onCancel()

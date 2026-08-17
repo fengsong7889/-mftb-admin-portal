@@ -199,7 +199,7 @@ export default function PopularSkinPicker() {
   const [hasSearched, setHasSearched] = useState(false)
   // 真实算法下拉（從算法庫 API 動態加載）
   const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
-  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
   const [algorithmNameMap, setAlgorithmNameMap] = useState<Record<string, string>>({})
 
   // 加载算法库已启用的人气商家算法（按品牌过滤）

@@ -143,7 +143,7 @@ function genUniqueKey(prefix: string, existingKeys: string[]): string {
 
 
 /** 初始语言列表：默认展示语言代码库的所有语言 */
-const INITIAL_LANGUAGES: Language[] = Object.keys(LANG_INFO).map(code => ({
+const _INITIAL_LANGUAGES: Language[] = Object.keys(LANG_INFO).map(code => ({
   code,
   name: LANG_INFO[code].native,
   flag: LANG_INFO[code].flag,
@@ -311,7 +311,7 @@ function voToLang(vo: LanguageVO): Language {
 }
 
 /** 合并语言列表与语言代码库（默认展示所有语言） */
-function mergeLangsWithLibrary(list: Language[]): Language[] {
+function _mergeLangsWithLibrary(list: Language[]): Language[] {
   const merged = [...list]
   Object.keys(LANG_INFO).forEach(code => {
     if (!merged.some(l => l.code === code)) {

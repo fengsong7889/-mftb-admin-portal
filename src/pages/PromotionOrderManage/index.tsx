@@ -819,7 +819,7 @@ export default function PromotionOrderManage() {
           rowKey="id"
           rowSelection={{
             type: 'checkbox',
-            onChange: (selectedRowKeys, selectedRows) => {
+            onChange: (_selectedRowKeys, _selectedRows) => {
             },
           }}
           scroll={{ x: 2200 }}

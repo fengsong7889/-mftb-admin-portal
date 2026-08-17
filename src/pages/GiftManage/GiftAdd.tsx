@@ -234,13 +234,13 @@ export default function GiftAdd() {
             setCountdown(5)
             // 等待確認彈窗完全關閉後再顯示成功彈窗
             setTimeout(() => setSuccessVisible(true), 350)
-          } catch (err: unknown) {
+          } catch {
             message.error(t('submitFailed'))
           }
         },
       })
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'errorFields' in err) return
+    } catch (_err: unknown) {
+      if (_err && typeof _err === 'object' && 'errorFields' in _err) return
       message.error(t('submitFailed'))
     } finally {
       setSubmitting(false)

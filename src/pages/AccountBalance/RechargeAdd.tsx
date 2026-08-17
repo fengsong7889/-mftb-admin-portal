@@ -21,7 +21,6 @@ import { submitRechargeApply } from '../../api/finance'
 import type { RechargeApplyPayload } from '../../api/finance'
 import { fetchStoreBdOptions, fetchStoresByGroupCode } from '../../api/store'
 import type { OptionItem } from '../../api/types'
-import { mockSubmitApproval } from '../../api/mock/financeMock'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /** 集團选项 */

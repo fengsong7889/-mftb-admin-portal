@@ -21,8 +21,6 @@ import {
   fetchAdHotInventory,
   placeAdHotOrder,
   type AdHotInventoryVO,
-  type AdHotInventoryCell,
-  type AdPricingHot,
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
@@ -436,12 +434,13 @@ export default function PopularSkinPicker() {
   // 生效購買天數：取已選日期數
   const effectiveDays = customDates.length
   // 投放時段文案（結算欄 / 支付彈窗）：首末日期區間
-  const periodText = customDates.length > 0
-    ? `${dayjs(customDates[0]).format('MM-DD')} ~ ${dayjs(customDates[customDates.length - 1]).format('MM-DD')}（${t('selfSelectDays', { count: customDates.length })}）`
-    : t('notSelected')
-  const periodTextFull = customDates.length > 0
-    ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（${t('selfSelectDays', { count: customDates.length })}）`
-    : t('notSelected')
+  // periodText / periodTextFull 目前未使用，保留供后续扩展
+  // const periodText = customDates.length > 0
+  //   ? `${dayjs(customDates[0]).format('MM-DD')} ~ ${dayjs(customDates[customDates.length - 1]).format('MM-DD')}（${t('selfSelectDays', { count: customDates.length })}）`
+  //   : t('notSelected')
+  // const periodTextFull = customDates.length > 0
+  //   ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（${t('selfSelectDays', { count: customDates.length })}）`
+  //   : t('notSelected')
 
   // 階梯輪播預覽：所選皮膚配置為 carousel 時逐張輪播，切換皮膚時重置
   useEffect(() => {

@@ -9,7 +9,6 @@ import {
   DEFAULT_RULE_GROUPS,
   SYSTEM_RULE_STORAGE_KEY,
   type RuleGroup,
-  type RuleItem,
 } from '../constants/ruleConfig'
 import { updateSystemConfig } from '../api/systemConfig'
 

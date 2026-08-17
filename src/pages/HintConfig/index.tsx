@@ -39,13 +39,6 @@ interface HintRecord {
   crowd?: string
 }
 
-const channelMap: Record<string, string> = { home: '大首頁', takeaway: '外賣頻道', groupBuy: '團購頻道', supermarket: '超市頻道' }
-const terminalMap: Record<string, string> = { app: 'APP', wechatMini: '微信小程序', mpayMini: 'Mpay小應用', wechatH5: '微信H5' }
-const regionMap: Record<string, string> = { macau: '澳門', taipa: '氹仔', costa: '高仕德', venetian: '威尼斯', macauUni: '澳門大學' }
-const hintSourceMap: Record<string, string> = { operation: '運營推廣', hotSearch: '熱搜推廣' }
-const timeSlotMap: Record<string, string> = { allDay: '全天', breakfast: '早餐', lunch: '午餐', afternoonTea: '下午茶', dinner: '晚餐', midnightSnack: '宵夜' }
-const crowdMap: Record<string, string> = { all: '全部', newUser: '新用戶', oldUser: '老用戶', vip: 'VIP用戶' }
-
 const mockData: HintRecord[] = [
   { key: '1', hintId: 'DW20261221', brand: 'mFood', hintSource: 'operation', searchChannel: 'home', region: ['macau'], terminal: ['app', 'wechatMini'], effectStartDate: '2026-02-28', effectEndDate: '2027-02-28', lastUpdater: '古月(001)', lastUpdateTime: '2026-02-28 18:20:21', status: 'active', hintWord: '今日特惠外賣', jumpType: 'appPage', jumpTarget: 'checkInCenter', timeSlot: 'lunch', crowd: 'all' },
   { key: '2', hintId: 'DW20261222', brand: 'flashBee', hintSource: 'hotSearch', searchChannel: 'takeaway', region: ['macau', 'taipa'], terminal: ['app', 'mpayMini'], effectStartDate: '2026-02-28', effectEndDate: '2027-02-28', lastUpdater: '加侖(002)', lastUpdateTime: '2026-02-28 18:20:21', status: 'active', hotSearchRank: 5, timeSlot: 'allDay', crowd: 'all' },

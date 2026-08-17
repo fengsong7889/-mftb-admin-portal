@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
 import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal } from 'antd'
 import {
   SettingOutlined,
@@ -21,8 +20,7 @@ const SUB_GROUP_META: Record<string, { label: string; color: string }> = {
 }
 
 export default function RuleConfig() {
-  const { t } = useTranslation()
-  const { groups, updateRule, refresh, saveAll, resetAll } = useSystemRules()
+  const { groups, updateRule, refresh, saveAll } = useSystemRules()
 
   /* 每个分組獨立编辑模式 */
   const [editingGroups, setEditingGroups] = useState<Record<string, boolean>>({})

@@ -7,7 +7,7 @@
 import { useState, useCallback } from 'react'
 import { DEFAULT_WORKFLOWS } from '../constants/defaultWorkflows'
 import { WORKFLOW_STORAGE_KEY, createDefaultApproverConfig } from '../pages/WorkflowConfig/types'
-import type { WorkflowDefinition, WorkflowNode, RoutingRule } from '../pages/WorkflowConfig/types'
+import type { WorkflowDefinition, WorkflowNode } from '../pages/WorkflowConfig/types'
 import { updateApprovalEnabled } from '../api/workflowConfig'
 
 /* ==================== 工具函數 ==================== */

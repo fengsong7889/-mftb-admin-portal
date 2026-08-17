@@ -35,7 +35,6 @@ import {
   RecommendChannel,
   ServiceStatus,
   APP_OPTIONS,
-  AppType,
 } from '../constants'
 import {
   fetchAdHotPricingDetail,
@@ -403,7 +402,7 @@ export default function PopularSkinPricing() {
       const values = await form.validateFields()
       for (let i = 0; i < skins.length; i++) {
         const skin = skins[i]
-        const label = skin.name.trim() || t('recommend.popularSkin.skinNameFallback', { index: i + 1 })
+        const _label = skin.name.trim() || t('recommend.popularSkin.skinNameFallback', { index: i + 1 })
         if (!skin.name.trim()) {
           message.error(t('recommend.popularSkin.enterSkinName'))
           return

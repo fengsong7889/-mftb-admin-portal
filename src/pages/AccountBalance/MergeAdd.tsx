@@ -22,7 +22,6 @@ import { fetchFinAccounts, fetchFinDebts, submitMergeApply } from '../../api/fin
 import type { FinAccount, MergeApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
-import { mockSubmitApproval } from '../../api/mock/financeMock'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 import BrandTag from '../../components/BrandTag'
 

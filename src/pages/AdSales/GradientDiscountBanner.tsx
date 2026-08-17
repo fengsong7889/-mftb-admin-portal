@@ -22,7 +22,7 @@ interface GradientDiscountBannerProps {
 /** 折扣展示文案：90 → 9折，95 → 95折 — 由组件内部使用 t() 生成 */
 // formatDiscount moved inside component to access t()
 
-export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel = '', currentCount, refundDisabled = false }: GradientDiscountBannerProps) {
+export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel: _scopeLabel = '', currentCount, refundDisabled = false }: GradientDiscountBannerProps) {
   const { t } = useTranslation('adSales')
 
   /** 折扣展示文案：90 → 9折，95 → 95折 */

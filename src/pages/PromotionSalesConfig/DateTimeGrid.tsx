@@ -238,7 +238,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
   const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
   // 真实算法下拉（從算法庫 API 動態加載，value=算法ID）
   const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
-  const [algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
 
   // 加载算法库已启用的算法（按品牌过滤）
   useEffect(() => {

@@ -15,7 +15,7 @@ import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { getBatchRecords } from '../../utils/approvalStore'
 import { fetchFinBatches } from '../../api/finance'
-import type { FinBatch, FinBatchQuery } from '../../api/finance'
+import type { FinBatchQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -122,7 +122,7 @@ function pickValue(v?: string) {
 }
 
 /** 後端不可用時的降級查詢：localStorage 批次記錄 + 演示數據本地篩選分頁 */
-function mockFetchBatches(query: FinBatchQuery) {
+function _mockFetchBatches(query: FinBatchQuery) {
   const stored: BatchRecord[] = getBatchRecords().map(r => ({
     key: r.key,
     index: 0,

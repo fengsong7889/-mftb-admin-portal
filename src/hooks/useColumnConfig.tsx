@@ -10,7 +10,7 @@ function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[
       const parsed = JSON.parse(saved) as ColumnConfig[]
       if (Array.isArray(parsed) && parsed.length > 0) {
         // 以保存的顺序为基准，补齐新增列、移除已删除列
-        const defaultKeys = new Set(defaults.map(c => c.key))
+        const _defaultKeys = new Set(defaults.map(c => c.key))
         const result: ColumnConfig[] = []
         let hasStaleKeys = false
         // 先按保存顺序排列

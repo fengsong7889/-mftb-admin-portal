@@ -11,7 +11,7 @@ import {
   APPROVAL_RULE_LABELS,
   createDefaultApproverConfig,
 } from './types'
-import type { WorkflowNode, ApproverType, ApprovalRule, ApproverConfig, ApproverSetting } from './types'
+import type { WorkflowNode, ApproverType, ApprovalRule, ApproverConfig } from './types'
 import { getApproverOptions } from './options'
 
 interface Props {
@@ -42,14 +42,6 @@ const BRAND_TABS: { key: BrandTabKey; label: string }[] = [
   { key: '1', label: '閃蜂' },
   { key: '2', label: 'mFood' },
 ]
-
-/** 取得某品牌的配置（不存在時返回空默認） */
-function getBrandSetting(config: ApproverConfig | undefined, brand: string, fallbackType: ApproverType): ApproverSetting {
-  if (config?.byBrand && config.brands[brand]) {
-    return { ...config.brands[brand], approverType: fallbackType }
-  }
-  return { approverType: fallbackType, approverIds: [], approvalRule: 'any' }
-}
 
 /** 審批人配置彈窗 */
 export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, onCancel }: Props) {

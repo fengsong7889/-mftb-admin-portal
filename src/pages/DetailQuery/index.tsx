@@ -15,7 +15,7 @@ import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { BIZ_CHANNEL_LABEL_MAP } from '../../constants/bizChannel'
 import { getDetailRecords } from '../../utils/approvalStore'
 import { fetchFinDetails } from '../../api/finance'
-import type { FinDetail, FinDetailQuery } from '../../api/finance'
+import type { FinDetailQuery } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -113,7 +113,7 @@ function pickValue(v?: string) {
 }
 
 /** 後端不可用時的降級查詢：localStorage 明細記錄 + 演示數據本地篩選分頁 */
-function mockFetchDetails(query: FinDetailQuery) {
+function _mockFetchDetails(query: FinDetailQuery) {
   const stored = getDetailRecords().map(r => ({
     detailId: r.detailId,
     groupId: r.groupId,

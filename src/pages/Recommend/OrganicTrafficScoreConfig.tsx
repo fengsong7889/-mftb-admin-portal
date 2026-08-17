@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin } from 'antd'
-import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons'
+import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
@@ -11,7 +11,7 @@ import {
   DEFAULT_DIMENSION_WEIGHT, DIMENSION_WEIGHT_TOTAL,
   DEFAULT_ORGANIC_SCORE_RULES,
   RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
-  TIER_DIRECTION_LABEL, CALC_CYCLE_LABEL,
+  TIER_DIRECTION_LABEL,
   type OrganicScoreRule, type RangeScores, type ScoreTier, type ScoreConditionItem,
 } from './organicTrafficConfig'
 import {
@@ -21,28 +21,6 @@ import {
   type OrganicRuleVO,
 } from '@/api/organicScore'
 
-/** 數值計數動畫（1200ms，遵循數據指標統計卡標準） */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>()
-  useEffect(() => {
-    const start = performance.now()
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(2, -10 * progress)
-      setValue(Math.round(target * eased))
-      if (progress < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [target, duration])
-  return value
-}
-
-function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string }) {
-  const animated = useCountUp(value)
-  return <>{animated.toLocaleString()}{suffix}</>
-}
 
 /** 維度順序（界面展示順序） */
 const DIMENSION_ORDER: ScoreDimension[] = [
@@ -157,12 +135,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     [ScoreDimension.COMMERCIAL]: t('organicTrafficScore.dimCommercial'),
     [ScoreDimension.STORE]: t('organicTrafficScore.dimStore'),
     [ScoreDimension.PLATFORM]: t('organicTrafficScore.dimPlatform'),
-  }
-  /** 維度說明（依賴 t） */
-  const DIM_DESC: Record<ScoreDimension, string> = {
-    [ScoreDimension.COMMERCIAL]: t('organicTrafficScore.descCommercial'),
-    [ScoreDimension.STORE]: t('organicTrafficScore.descStore'),
-    [ScoreDimension.PLATFORM]: t('organicTrafficScore.descPlatform'),
   }
   /** 計分方式標籤（依賴 t） */
   const MODE_LABEL: Record<ScoreMode, string> = {
@@ -312,14 +284,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     setStatusFilter(undefined)
   }
 
-  /** 各維度啟用項數量（統計卡） */
-  const enabledCountMap = useMemo(() => {
-    const map = {} as Record<ScoreDimension, number>
-    DIMENSION_ORDER.forEach(d => {
-      map[d] = rules.filter(r => r.dimension === d && r.status === ServiceStatus.ENABLED).length
-    })
-    return map
-  }, [rules])
 
   /** 打開新增彈窗 */
   const handleOpenAdd = (dimension: ScoreDimension) => {
@@ -343,27 +307,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     setModalOpen(true)
   }
 
-  /** 打開編輯彈窗 */
-  const handleOpenEdit = (record: OrganicScoreRule) => {
-    setEditingRule(record)
-    setModalDimension(record.dimension)
-    ruleForm.setFieldsValue({
-      name: record.name,
-      description: record.description,
-      mode: record.mode,
-      score: record.score,
-      prerequisites: record.prerequisites,
-      statDays: record.statDays,
-      rangeScores: record.rangeScores,
-      tiers: record.tiers,
-      conditionItems: record.conditionItems,
-      calcCycle: record.calcCycle,
-      status: record.status,
-    })
-    setTierRows(record.tiers || [])
-    setConditionRows(record.conditionItems || [])
-    setModalOpen(true)
-  }
 
   /** 保存評分項（新增或編輯） */
   const handleSaveRule = async () => {
@@ -563,9 +506,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         >
                           {rule.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
                         </Button>
-                        {!rule.builtin && (
-                          <Button type="link" size="small" danger onClick={e => { e.stopPropagation(); handleDelete(rule) }}>{t('common.delete')}</Button>
-                        )}
+                        <Button type="link" size="small" danger onClick={e => { e.stopPropagation(); handleDelete(rule) }}>{t('common.delete')}</Button>
                       </Space>
                     )}
                   </div>

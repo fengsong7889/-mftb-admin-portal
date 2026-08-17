@@ -11,7 +11,6 @@ import {
   RecommendChannel, 
   AlgorithmType,
   ServiceStatus,
-  Region,
   APP_OPTIONS,
   SERVICE_STATUS_OPTIONS,
   ALGORITHM_TYPE_OPTIONS,
@@ -45,7 +44,7 @@ const TAB_BIZ_CHANNELS: Record<string, string[]> = {
   groupBuy: ['groupBuy'],
 }
 
-const CHANNEL_TO_BIZ: Record<number, string> = {
+const _CHANNEL_TO_BIZ: Record<number, string> = {
   [RecommendChannel.DELIVERY]: 'food',
   [RecommendChannel.SUPERMARKET]: 'supermarket',
   [RecommendChannel.GROUP_BUY]: 'groupBuy',
@@ -314,7 +313,7 @@ export default function Waterfall() {
   // 新增/编辑
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields()
+      const _values = await form.validateFields()
       message.success(editingRecord ? t('waterfall.editSuccess') : t('waterfall.addSuccess'))
       setModalVisible(false)
       form.resetFields()

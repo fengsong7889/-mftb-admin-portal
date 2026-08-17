@@ -94,7 +94,7 @@ export default function RechargeModal({ open, onClose, record }: RechargeModalPr
   /** 确认提交 */
   const handleConfirm = async () => {
     try {
-      const values = await form.validateFields()
+      await form.validateFields()
       if (!directAmount) {
         message.warning(t('accountBalance.fillVisualAmount'))
         return

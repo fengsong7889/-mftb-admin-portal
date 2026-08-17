@@ -67,7 +67,7 @@ export default function NewStoreDayPicker() {
   const [bdOptions, setBdOptions] = useState<{ label: string; value: string }[]>([])
   const [inventory, setInventory] = useState<AdNewStoreInventoryVO | null>(null)
   const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [_submitting, setSubmitting] = useState(false)
 
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [currentMonth, setCurrentMonth] = useState<Dayjs>(dayjs())

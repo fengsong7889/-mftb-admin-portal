@@ -3,7 +3,6 @@ import { Modal, Select, Input, Switch, Divider, message } from 'antd'
 import { ThunderboltOutlined } from '@ant-design/icons'
 import {
   AMOUNT_OPERATOR_OPTIONS,
-  CONDITION_OPERATOR_LABELS,
   CONDITION_BRAND_OPTIONS,
   CONDITION_CHANNEL_OPTIONS,
   CONDITION_AD_TYPE_OPTIONS,
@@ -36,7 +35,6 @@ export default function ConditionConfigModal({ open, nodeName, conditions, workf
 
   /* ── 數字類條件（金額 / 贈送天數） ── */
   const numericField = gift ? 'giftDays' : 'amount'
-  const numericOpLabel = gift ? '贈送天數' : '' // 動態取
 
   const [numericEnabled, setNumericEnabled] = useState(false)
   const [numericOp, setNumericOp] = useState<ConditionOperator>('eq')

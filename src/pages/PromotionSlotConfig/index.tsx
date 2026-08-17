@@ -51,7 +51,7 @@ export const mockData: WaterfallStrategy[] = (() => {
 })()
 
 /** 算法名称筛选选项（后端不可用时降级） */
-const MOCK_ALGO_OPTIONS = [
+const _MOCK_ALGO_OPTIONS = [
   { label: '無敵星星-首頁黃金展位', value: 1 },
 ]
 

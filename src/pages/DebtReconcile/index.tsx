@@ -131,7 +131,7 @@ const emptyBrandStats: FinDebtBrandStats = {
  * 後端不可用時的降級查詢：本地欠款單（審批寫入 + 演示數據）篩選分頁
  * 品牌待還統計口徑與後端一致：僅累計未結清賬單的剩餘待還
  */
-function mockFetchDebts(query: FinDebtQuery): FinDebtPageResult {
+function _mockFetchDebts(query: FinDebtQuery): FinDebtPageResult {
   const filtered = getAllDebtBills().filter(b => {
     if (query.groupId && !b.groupId.includes(query.groupId)) return false
     if (query.groupName && !b.groupName.includes(query.groupName)) return false

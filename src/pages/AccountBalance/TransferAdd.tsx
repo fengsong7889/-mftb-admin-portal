@@ -18,7 +18,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import { fetchFinAccounts, submitTransferApply } from '../../api/finance'
 import type { FinAccount, TransferApplyPayload } from '../../api/finance'
-import { mockSubmitApproval } from '../../api/mock/financeMock'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */

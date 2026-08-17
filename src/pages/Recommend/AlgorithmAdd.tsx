@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, HolderOutlined, EyeOutlined, PictureOutlined } from '@ant-design/icons'
-import { AlgorithmType, APP_OPTIONS, ALGORITHM_TYPE_OPTIONS } from './constants'
+import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
+import { AlgorithmType, APP_OPTIONS } from './constants'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
@@ -101,8 +101,6 @@ export default function AlgorithmAdd() {
     { value: 'grid', labelKey: 'recommend.layoutGrid', icon: '🖼️', color: '#52C41A', descKey: 'recommend.layoutGridDesc' },
     { value: 'carousel', labelKey: 'recommend.layoutCarousel', icon: '🎠', color: '#722ED1', descKey: 'recommend.layoutCarouselDesc' },
   ]
-  const POPULAR_LAYOUT_LABEL_KEY: Record<PopularLayoutType, string> = { small: 'recommend.layoutSmallLabel', grid: 'recommend.layoutGridLabel', carousel: 'recommend.layoutCarouselLabel' }
-  const POPULAR_LAYOUT_COLOR: Record<PopularLayoutType, string> = { small: '#1890FF', grid: '#52C41A', carousel: '#722ED1' }
   /** 人氣商家 - 展示樣式配置 */
   type LayoutMode = 'manual' | 'auto'
   interface ManualRule { id: number; position: number; layout: PopularLayoutType }
@@ -121,32 +119,6 @@ export default function AlgorithmAdd() {
   ])
   /** 可用的大圖樣式（排除小圖） */
   const bigLayoutOptions = POPULAR_LAYOUT_OPTIONS.filter(o => o.value !== 'small')
-  /** 根據配置生成最終展示序列（用於提交） */
-  const layoutSequence = useMemo(() => {
-    if (layoutMode === 'manual') {
-      const maxPos = manualRules.length > 0 ? Math.max(...manualRules.map(r => r.position)) : 0
-      if (maxPos === 0) return ['small']
-      const seq: PopularLayoutType[] = []
-      for (let i = 1; i <= maxPos; i++) {
-        const rule = manualRules.find(r => r.position === i)
-        seq.push(rule ? rule.layout : 'small')
-      }
-      return seq
-    } else {
-      // auto 模式：有序閉環循環
-      if (autoLayouts.length === 0) return ['small']
-      const cycleLen = autoLayouts.reduce((sum, item) => sum + item.interval, 0)
-      const seq: PopularLayoutType[] = []
-      let pos = 1
-      for (const item of autoLayouts) {
-        seq.push(item.type)
-        for (let j = 1; j < item.interval; j++) { seq.push('small'); pos++ }
-        pos++
-      }
-      return seq
-    }
-  }, [layoutMode, manualRules, autoLayouts])
-
   // 新店广告 - 波浪计算配置（周期/间隔为默认值，后续如需调整仅改以下常量）
   /** 新店週期默認天數 */
   const NEW_STORE_CYCLE_DAYS = 60
@@ -508,7 +480,7 @@ export default function AlgorithmAdd() {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {manualRules.map((rule, idx) => (
+                      {manualRules.map((rule) => (
                         <div key={rule.id} style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           background: '#fff', borderRadius: 6, padding: '8px 12px', border: '1px solid #f0f0f0',

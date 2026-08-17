@@ -26,7 +26,6 @@ import {
   Region,
   ServiceStatus,
   APP_OPTIONS,
-  REGION_OPTIONS,
   REGION_LABEL_KEY,
   REGION_TREE_DATA,
   AREA_TO_REGIONS,
@@ -34,7 +33,7 @@ import {
 } from '../constants'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
-import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, appTypeToBrand, brandToAppType, type AdPricingStar, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
+import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
 import { fetchStores } from '../../../api/store'
 
 /** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
@@ -252,7 +251,7 @@ function WaterfallAddGeneral() {
   }, [])
   
   // 盘活复苏 - 按天定价配置
-  const [_dailyPrice, setDailyPrice] = useState<number | undefined>(undefined)
+  const [_dailyPrice, _setDailyPrice] = useState<number | undefined>(undefined)
   
   // 显示广告位的条件（已移除廣告位選擇）
   
@@ -788,7 +787,7 @@ function WaterfallAddGeneral() {
         return
       }
 
-      const submitData = {
+      const _submitData = {
         app: selectedApp,
         channel: selectedChannel,
         algorithmType: selectedAlgorithmType,
