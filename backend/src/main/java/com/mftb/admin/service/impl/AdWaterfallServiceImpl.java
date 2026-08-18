@@ -46,7 +46,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
 
     @Override
     public PageResult<AdWaterfallVO> page(long page, long size, Long id, String strategyCode,
-                                          String strategyName, String brand, Integer status, Long algoId) {
+                                          String strategyName, String brand, Integer status, String algoId) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdWaterfall> wrapper = new LambdaQueryWrapper<>();
@@ -89,7 +89,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdWaterfallVO create(AdWaterfallRequest request) {
-        Map<Long, AdAlgorithm> algorithms = validateSlots(request);
+        Map<String, AdAlgorithm> algorithms = validateSlots(request);
 
         AdWaterfall entity = new AdWaterfall();
         entity.setStrategyCode(bizSeqService.next(BizSeqService.RULE_WATERFALL));
@@ -109,7 +109,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
     @Transactional(rollbackFor = Exception.class)
     public AdWaterfallVO update(Long id, AdWaterfallRequest request) {
         AdWaterfall entity = require(id);
-        Map<Long, AdAlgorithm> algorithms = validateSlots(request);
+        Map<String, AdAlgorithm> algorithms = validateSlots(request);
         applyRequest(entity, request, algorithms);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         waterfallMapper.updateById(entity);
@@ -151,12 +151,13 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
         return entity;
     }
 
-    /** 校验坑位配置：坑位序号不重复、算法存在；返回涉及算法映射 */
-    private Map<Long, AdAlgorithm> validateSlots(AdWaterfallRequest request) {
+    /** 校验坑位配置：坑位序号不重复、算法存在；返回涉及算法映射（按 algoCode 索引）。
+     *  同时包含 naturalAlgoId（如有），避免后续重复查询。 */
+    private Map<String, AdAlgorithm> validateSlots(AdWaterfallRequest request) {
         List<AdWaterfallRequest.SlotItem> slots = request.getSlots() == null
                 ? Collections.emptyList() : request.getSlots();
 
-        Set<Long> algoIds = new HashSet<>();
+        Set<String> algoCodes = new HashSet<>();
         Set<Integer> positions = new HashSet<>();
         for (AdWaterfallRequest.SlotItem slot : slots) {
             if (slot.getSlotPosition() == null || slot.getSlotPosition() < 1) {
@@ -165,30 +166,39 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
             if (!positions.add(slot.getSlotPosition())) {
                 throw new BusinessException(slot.getSlotPosition() + "号位配置重复，一个坑位只能展示一种算法");
             }
-            algoIds.add(slot.getAlgoId());
+            algoCodes.add(slot.getAlgoId());
         }
+        // 将自然流量兜底算法也纳入查询范围，避免 applyRequest 中重复查库
         if (request.getNaturalAlgoId() != null) {
-            algoIds.add(request.getNaturalAlgoId());
+            algoCodes.add(request.getNaturalAlgoId());
         }
-        if (algoIds.isEmpty()) {
+        if (algoCodes.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<Long, AdAlgorithm> algorithms = algorithmMapper.selectBatchIds(algoIds).stream()
-                .collect(Collectors.toMap(AdAlgorithm::getId, Function.identity()));
-        for (Long algoId : algoIds) {
-            if (!algorithms.containsKey(algoId)) {
-                throw new BusinessException("算法不存在: " + algoId);
+        Map<String, AdAlgorithm> algorithms = algorithmMapper.selectList(
+                new LambdaQueryWrapper<AdAlgorithm>().in(AdAlgorithm::getAlgoCode, algoCodes)
+        ).stream().collect(Collectors.toMap(AdAlgorithm::getAlgoCode, Function.identity()));
+        // 仅校验坑位引用的算法必须存在（naturalAlgoId 可选，不在坑位中不强制校验）
+        Set<String> slotAlgoCodes = slots.stream().map(AdWaterfallRequest.SlotItem::getAlgoId).collect(Collectors.toSet());
+        for (String algoCode : slotAlgoCodes) {
+            if (!algorithms.containsKey(algoCode)) {
+                throw new BusinessException("算法不存在: " + algoCode);
             }
         }
         return algorithms;
     }
 
-    private void applyRequest(AdWaterfall entity, AdWaterfallRequest request, Map<Long, AdAlgorithm> algorithms) {
+    private void applyRequest(AdWaterfall entity, AdWaterfallRequest request, Map<String, AdAlgorithm> algorithms) {
         entity.setStrategyName(request.getStrategyName());
         entity.setBrand(request.getBrand());
         entity.setNaturalAlgoId(request.getNaturalAlgoId());
-        entity.setNaturalAlgoName(request.getNaturalAlgoId() == null ? null
-                : algorithms.get(request.getNaturalAlgoId()).getAlgoName());
+        // naturalAlgoId 现为算法编码，直接从已查询的 algorithms 映射中取名称（无需额外查库）
+        if (request.getNaturalAlgoId() != null) {
+            AdAlgorithm naturalAlgo = algorithms.get(request.getNaturalAlgoId());
+            entity.setNaturalAlgoName(naturalAlgo != null ? naturalAlgo.getAlgoName() : null);
+        } else {
+            entity.setNaturalAlgoName(null);
+        }
         entity.setFilterDislike(request.getFilterDislike() == null ? 2 : request.getFilterDislike());
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
@@ -196,7 +206,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
         entity.setRemark(request.getRemark());
     }
 
-    private void saveSlots(Long waterfallId, AdWaterfallRequest request, Map<Long, AdAlgorithm> algorithms) {
+    private void saveSlots(Long waterfallId, AdWaterfallRequest request, Map<String, AdAlgorithm> algorithms) {
         List<AdWaterfallRequest.SlotItem> slots = request.getSlots();
         if (slots == null || slots.isEmpty()) {
             return;
@@ -206,7 +216,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
             AdWaterfallSlot entity = new AdWaterfallSlot();
             entity.setWaterfallId(waterfallId);
             entity.setSlotPosition(slot.getSlotPosition());
-            entity.setAlgoId(algorithm.getId());
+            entity.setAlgoId(algorithm.getAlgoCode());
             entity.setAlgoName(algorithm.getAlgoName());
             entity.setAlgoType(algorithm.getAlgoType());
             entity.setStatus(slot.getStatus() == null ? 1 : slot.getStatus());

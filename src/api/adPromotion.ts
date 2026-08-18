@@ -137,6 +137,18 @@ export function deleteAdAlgorithm(id: number) {
   return request.delete<unknown, void>(`/ad/algorithms/${id}`, SILENT)
 }
 
+/** 瀑布流引用信息 */
+export interface WaterfallReference {
+  strategyCode: string
+  strategyName: string
+  slotPosition: number
+}
+
+/** 查詢引用該算法的瀑布流配置列表 */
+export function fetchAlgorithmWaterfallReferences(algoId: number) {
+  return request.get<unknown, WaterfallReference[]>(`/ad/algorithms/${algoId}/waterfall-references`, SILENT)
+}
+
 /* ==================== 銷售定價（無敵星星計價） ==================== */
 
 /** 商圈日單價條目 */
@@ -843,8 +855,8 @@ export interface WaterfallStrategy {
   strategyCode?: string
   strategyName: string
   brand?: AdBrand | string
-  /** 自然流量兜底算法ID（未配置坑位讀取該算法數據） */
-  naturalAlgoId?: number | null
+  /** 自然流量兜底算法编码（未配置坑位讀取該算法數據） */
+  naturalAlgoId?: string | null
   naturalAlgoName?: string
   /** 過濾用戶不喜歡: 1=開啟 2=關閉 */
   filterDislike?: number
@@ -863,7 +875,7 @@ export interface WaterfallSlotItem {
   id?: number
   /** 坑位序號（從1開始） */
   slotPosition: number
-  algoId: number
+  algoId: string
   algoName?: string
   /** 算法類型快照: 1=無敵星星 2=新店廣告 3=盤活復蘇 ... */
   algoType?: number
@@ -875,11 +887,11 @@ export interface WaterfallSlotItem {
 export interface WaterfallStrategyRequest {
   strategyName: string
   brand?: string
-  naturalAlgoId?: number | null
+  naturalAlgoId?: string | null
   filterDislike?: number
   status?: number
   remark?: string
-  slots?: { slotPosition: number; algoId: number; status?: number }[]
+  slots?: { slotPosition: number; algoId: string; status?: number }[]
 }
 
 /** 瀑布流策略查詢參數 */

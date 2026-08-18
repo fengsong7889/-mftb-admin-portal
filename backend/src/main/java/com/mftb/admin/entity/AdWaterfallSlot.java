@@ -26,8 +26,8 @@ public class AdWaterfallSlot {
     /** 坑位序号（从1开始） */
     private Integer slotPosition;
 
-    /** 算法ID（biz_ad_algorithm.id） */
-    private Long algoId;
+    /** 算法编码（biz_ad_algorithm.algo_code） */
+    private String algoId;
 
     /** 算法名称快照 */
     private String algoName;

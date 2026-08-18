@@ -11,9 +11,13 @@ import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdAlgorithm;
+import com.mftb.admin.entity.AdWaterfall;
+import com.mftb.admin.entity.AdWaterfallSlot;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
+import com.mftb.admin.mapper.AdWaterfallMapper;
+import com.mftb.admin.mapper.AdWaterfallSlotMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
@@ -25,10 +29,14 @@ import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * 推广算法库服务实现
@@ -38,6 +46,8 @@ import java.util.Map;
 public class AdAlgorithmServiceImpl implements AdAlgorithmService {
 
     private final AdAlgorithmMapper algorithmMapper;
+    private final AdWaterfallSlotMapper waterfallSlotMapper;
+    private final AdWaterfallMapper waterfallMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
     private final AdPricingHotService hotPricingService;
@@ -184,6 +194,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
         if (status == null || (status != 1 && status != 2)) {
             throw new BusinessException("非法的服务状态: " + status);
@@ -192,12 +203,75 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         entity.setStatus(status);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         algorithmMapper.updateById(entity);
+        // 停用时级联删除引用该算法的瀑布流坑位
+        if (status == 2) {
+            cascadeDeleteSlots(entity.getAlgoCode());
+        }
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        require(id);
+        AdAlgorithm entity = require(id);
+        // 删除时级联删除引用该算法的瀑布流坑位
+        cascadeDeleteSlots(entity.getAlgoCode());
         algorithmMapper.deleteById(id);
+    }
+
+    /** 级联删除引用指定算法编码的瀑布流坑位记录 */
+    private void cascadeDeleteSlots(String algoCode) {
+        if (algoCode == null) return;
+        waterfallSlotMapper.delete(new LambdaQueryWrapper<AdWaterfallSlot>()
+                .eq(AdWaterfallSlot::getAlgoId, algoCode));
+    }
+
+    @Override
+    public List<Map<String, Object>> findWaterfallReferences(Long algoId) {
+        AdAlgorithm algo = algorithmMapper.selectById(algoId);
+        if (algo == null || algo.getAlgoCode() == null) {
+            return List.of();
+        }
+        String algoCode = algo.getAlgoCode();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        // 1. 查询坑位引用（biz_ad_waterfall_slot）
+        List<AdWaterfallSlot> slots = waterfallSlotMapper.selectList(
+                new LambdaQueryWrapper<AdWaterfallSlot>()
+                        .eq(AdWaterfallSlot::getAlgoId, algoCode));
+        if (!slots.isEmpty()) {
+            List<Long> waterfallIds = slots.stream()
+                    .map(AdWaterfallSlot::getWaterfallId)
+                    .distinct()
+                    .toList();
+            Map<Long, AdWaterfall> waterfallMap = waterfallMapper.selectBatchIds(waterfallIds).stream()
+                    .collect(java.util.stream.Collectors.toMap(AdWaterfall::getId, Function.identity()));
+            for (AdWaterfallSlot slot : slots) {
+                AdWaterfall w = waterfallMap.get(slot.getWaterfallId());
+                if (w != null) {
+                    Map<String, Object> ref = new HashMap<>();
+                    ref.put("strategyCode", w.getStrategyCode());
+                    ref.put("strategyName", w.getStrategyName());
+                    ref.put("slotPosition", slot.getSlotPosition());
+                    ref.put("refType", "slot");
+                    result.add(ref);
+                }
+            }
+        }
+
+        // 2. 查询自然流量兜底引用（biz_ad_waterfall.natural_algo_id）
+        List<AdWaterfall> naturalRefs = waterfallMapper.selectList(
+                new LambdaQueryWrapper<AdWaterfall>()
+                        .eq(AdWaterfall::getNaturalAlgoId, algoCode));
+        for (AdWaterfall w : naturalRefs) {
+            Map<String, Object> ref = new HashMap<>();
+            ref.put("strategyCode", w.getStrategyCode());
+            ref.put("strategyName", w.getStrategyName());
+            ref.put("slotPosition", null);
+            ref.put("refType", "natural");
+            result.add(ref);
+        }
+
+        return result;
     }
 
     private AdAlgorithm require(Long id) {

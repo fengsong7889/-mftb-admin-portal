@@ -64,6 +64,7 @@ const PromotionWaterfall = lazy(() => import('./pages/Recommend/Waterfall'))
 const PromotionWaterfallAdd = lazy(() => import('./pages/Recommend/WaterfallAdd'))
 const PromotionSlotConfig = lazy(() => import('./pages/PromotionSlotConfig'))
 const PromotionSlotConfigAdd = lazy(() => import('./pages/PromotionSlotConfigAdd'))
+const PromotionSlotConfigSlots = lazy(() => import('./pages/PromotionSlotConfigSlots'))
 const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
 const AdSales = lazy(() => import('./pages/AdSales'))
 const PromotionWordLibrary = lazy(() => import('./pages/PromotionWordLibrary'))
@@ -176,6 +177,7 @@ function AuthenticatedLayout() {
               <Route path="/promotion-algorithm-flow" element={<PromotionAlgorithmFlow />} />
               <Route path="/promotion-slot-config" element={<PromotionSlotConfig />} />
               <Route path="/promotion-slot-config-add" element={<PromotionSlotConfigAdd />} />
+              <Route path="/promotion-slot-config-slots" element={<PromotionSlotConfigSlots />} />
               <Route path="/promotion-waterfall" element={<PromotionWaterfall />} />
               <Route path="/promotion-waterfall1" element={<PromotionWaterfall />} />
               <Route path="/promotion-waterfall-add" element={<PromotionWaterfallAdd />} />

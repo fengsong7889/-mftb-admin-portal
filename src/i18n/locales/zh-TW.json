@@ -2466,6 +2466,7 @@
     "naturalFallbackPopover": "瀑布流中未配置廣告算法的坑位，統一讀取該算法計算出來的數據。用戶不斷下滑時會刷到幾百、幾千個未配置坑位，由自然流量兜底，無需逐坑位人工配置。自然流量坑位不出現在左側手機預覽和下方坑位列表中。",
     "naturalFallbackHint": "下方列表未覆蓋的坑位，統一展示該算法的數據",
     "selectFallbackAlgo": "請選擇兜底算法",
+    "fallbackAlgoRequired": "請選擇自然流量兜底算法",
     "colPosition": "展示位置",
     "colAlgoId": "算法ID",
     "colAlgoName": "算法名稱",
@@ -2483,6 +2484,10 @@
     "moveSuccess": "已將「{{name}}」移動至 {{pos}}號位",
     "editPosConfig": "編輯{{pos}}號位配置",
     "addPosConfig": "新增坑位配置",
+    "addEditPosConfig": "新增/編輯坑位配置",
+    "addEditBtn": "新增/編輯",
+    "algoSelectSection": "算法選擇",
+    "posConfigSection": "展示位配置",
     "selectAlgo": "請選擇算法名稱",
     "selectAlgoPlaceholder": "請選擇算法（來自算法庫已啟用算法）",
     "selectAlgoFirst": "請先選擇算法名稱",
@@ -2493,7 +2498,14 @@
     "clearAll": "清空全部",
     "noPosSelected": "暫未選擇位置，請在上方網格中點擊選擇",
     "algoTypeFallback": "類型{{type}}",
-    "saveSuccessMsg": "保存成功"
+    "saveSuccessMsg": "保存成功",
+    "saveFailed": "保存失敗，請檢查網絡連接或聯繫管理員",
+    "unsavedChanges": "您有未保存的坑位變更，請點擊右側「保存」按鈕完成保存",
+    "saveNow": "立即保存",
+    "discardConfirmTitle": "放棄未保存的變更？",
+    "discardConfirmContent": "當前有未保存的坑位配置變更，離開後這些變更將丟失。",
+    "discardConfirmOk": "放棄變更",
+    "discardConfirmCancel": "繼續編輯"
   },
   "promotionWordLibrary": {
     "colWord": "詞條",
@@ -2531,7 +2543,7 @@
     "typeHotRevive": "盤活復蘇",
     "typeExclusiveMerchant": "獨家商家",
     "typePopularMerchant": "人氣商家",
-    "typeTraffic": "流量廣告",
+    "typeTraffic": "投流廣告",
     "typeGuessYouLike": "猜你喜歡",
     "typeOrganicTraffic": "自然流量",
     "typeSearchAlgorithm": "搜索算法",
@@ -2570,7 +2582,10 @@
     "confirmDeleteContent": "確定要刪除算法「{{name}}」嗎？",
     "toggleSuccess": "已{{action}}「{{name}}」",
     "toggleFailed": "{{action}}失敗",
-    "deleteFailed": "刪除失敗"
+    "deleteFailed": "刪除失敗",
+    "waterfallRefWarning": "⚠️ 該算法已被以下瀑布流配置引用：",
+    "waterfallRefImpact": "停用/刪除後將同步清除瀑布流中的引用，確定繼續？",
+    "affectedSlots": "坑位 {{positions}}"
   },
   "recommendDashboard": {
     "pageTitle": "數據看板",

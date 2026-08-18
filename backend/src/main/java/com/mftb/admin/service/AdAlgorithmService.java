@@ -4,6 +4,9 @@ import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmVO;
 import com.mftb.admin.dto.PageResult;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 推广算法库服务
  */
@@ -27,4 +30,7 @@ public interface AdAlgorithmService {
 
     /** 删除（逻辑删除） */
     void delete(Long id);
+
+    /** 查询引用该算法的瀑布流配置列表 */
+    List<Map<String, Object>> findWaterfallReferences(Long algoId);
 }

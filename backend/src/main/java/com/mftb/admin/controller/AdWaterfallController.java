@@ -43,7 +43,7 @@ public class AdWaterfallController {
             @RequestParam(required = false) String strategyName,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) Long algoId) {
+            @RequestParam(required = false) String algoId) {
         return Result.success(waterfallService.page(page, size, id, strategyCode, strategyName, brand, status, algoId));
     }
 

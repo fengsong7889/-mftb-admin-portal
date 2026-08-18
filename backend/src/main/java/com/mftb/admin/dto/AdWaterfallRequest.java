@@ -21,8 +21,8 @@ public class AdWaterfallRequest {
     /** 所属品牌: flashBee / mFood */
     private String brand;
 
-    /** 自然流量兜底算法ID（未配置坑位统一读取该算法数据） */
-    private Long naturalAlgoId;
+    /** 自然流量兜底算法编码（未配置坑位统一读取该算法数据） */
+    private String naturalAlgoId;
 
     /** 过滤用户不喜欢: 1=开启 2=关闭 */
     private Integer filterDislike;
@@ -43,9 +43,9 @@ public class AdWaterfallRequest {
         /** 坑位序号（从1开始，同一策略内唯一） */
         @NotNull(message = "坑位序号不能为空")
         private Integer slotPosition;
-        /** 算法ID（biz_ad_algorithm.id） */
-        @NotNull(message = "坑位算法不能为空")
-        private Long algoId;
+        /** 算法编码（biz_ad_algorithm.algo_code） */
+        @NotBlank(message = "算法编码不能为空")
+        private String algoId;
         /** 坑位状态: 1=启用 2=停用 */
         private Integer status;
     }

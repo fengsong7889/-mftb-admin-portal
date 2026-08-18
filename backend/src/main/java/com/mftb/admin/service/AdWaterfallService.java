@@ -9,9 +9,9 @@ import com.mftb.admin.dto.PageResult;
  */
 public interface AdWaterfallService {
 
-    /** 分页查询（algoId 非空时过滤包含该算法的策略） */
+    /** 分页查询（algoId 非空时过滤包含该算法编码的策略） */
     PageResult<AdWaterfallVO> page(long page, long size, Long id, String strategyCode,
-                                   String strategyName, String brand, Integer status, Long algoId);
+                                   String strategyName, String brand, Integer status, String algoId);
 
     /** 策略详情（含坑位明细 + 自然流量兜底算法），APP 按配置ID引用 */
     AdWaterfallVO detail(Long id);

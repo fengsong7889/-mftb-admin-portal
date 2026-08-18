@@ -2465,6 +2465,7 @@
     "naturalFallbackPopover": "Slots without configured ad algorithms will uniformly read data from this algorithm. As users keep scrolling, hundreds or thousands of unconfigured slots will be filled by organic traffic, no need to configure each slot manually. Organic traffic slots do not appear in the left phone preview or the slot list below.",
     "naturalFallbackHint": "Slots not covered in the list below will uniformly display this algorithm's data",
     "selectFallbackAlgo": "Select fallback algorithm",
+        "fallbackAlgoRequired": "Please select a natural traffic fallback algorithm",
     "colPosition": "Display Position",
     "colAlgoId": "Algorithm ID",
     "colAlgoName": "Algorithm Name",
@@ -2482,6 +2483,10 @@
     "moveSuccess": "Moved \"{{name}}\" to slot {{pos}}",
     "editPosConfig": "Edit Slot {{pos}} Config",
     "addPosConfig": "Add Slot Config",
+    "addEditPosConfig": "Add/Edit Slot Config",
+    "addEditBtn": "Add/Edit",
+    "algoSelectSection": "Algorithm Selection",
+    "posConfigSection": "Slot Position Config",
     "selectAlgo": "Please select algorithm name",
     "selectAlgoPlaceholder": "Select algorithm (from enabled algorithms in library)",
     "selectAlgoFirst": "Please select an algorithm first",
@@ -2492,7 +2497,14 @@
     "clearAll": "Clear All",
     "noPosSelected": "No position selected, click to select in the grid above",
     "algoTypeFallback": "Type {{type}}",
-    "saveSuccessMsg": "Saved successfully"
+    "saveSuccessMsg": "Saved successfully",
+    "saveFailed": "Save failed. Please check your connection or contact admin",
+        "unsavedChanges": "You have unsaved slot changes. Click the Save button on the right to save them.",
+        "saveNow": "Save Now",
+        "discardConfirmTitle": "Discard unsaved changes?",
+        "discardConfirmContent": "You have unsaved slot configuration changes. They will be lost if you leave.",
+        "discardConfirmOk": "Discard Changes",
+        "discardConfirmCancel": "Keep Editing"
   },
   "promotionWordLibrary": {
     "colWord": "Word",
@@ -2530,7 +2542,7 @@
     "typeHotRevive": "Revival Ad",
     "typeExclusiveMerchant": "Exclusive Merchant",
     "typePopularMerchant": "Popular Merchant",
-    "typeTraffic": "Traffic Ad",
+    "typeTraffic": "Traffic Flow Ad",
     "typeGuessYouLike": "Guess You Like",
     "typeOrganicTraffic": "Organic Traffic",
     "typeSearchAlgorithm": "Search Algorithm",
@@ -2569,7 +2581,10 @@
     "confirmDeleteContent": "Are you sure to delete algorithm \"{{name}}\"?",
     "toggleSuccess": "\"{{name}}\" has been {{action}}",
     "toggleFailed": "Failed to {{action}}",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "waterfallRefWarning": "⚠️ This algorithm is referenced by the following waterfall configs:",
+    "waterfallRefImpact": "Disabling/deleting will also remove references in waterfall configs. Continue?",
+    "affectedSlots": "slots {{positions}}"
   },
   "recommendDashboard": {
     "pageTitle": "Dashboard",

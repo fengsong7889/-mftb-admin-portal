@@ -1027,6 +1027,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/promotion-algorithm-flow': 'promotion-algorithm',
   '/promotion-slot-config': 'promotion-slot-config',
   '/promotion-slot-config-add': 'promotion-slot-config',
+  '/promotion-slot-config-slots': 'promotion-slot-config',
   '/promotion-waterfall': 'promotion-waterfall',
   '/promotion-waterfall1': 'promotion-waterfall',
   '/promotion-waterfall-add': 'promotion-waterfall',

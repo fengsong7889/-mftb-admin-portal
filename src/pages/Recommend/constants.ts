@@ -74,16 +74,16 @@ export const ALGORITHM_TYPE_OPTIONS = [
 export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.INVINCIBLE_STAR]: 'gold',
   [AlgorithmType.NEW_STORE_AD]: 'green',
-  [AlgorithmType.HOT_REVIVE_AD]: 'volcano',
+  [AlgorithmType.HOT_REVIVE_AD]: 'magenta',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: 'purple',
-  [AlgorithmType.TRAFFIC_AD]: 'cyan',
+  [AlgorithmType.TRAFFIC_AD]: 'yellow',
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
-  [AlgorithmType.POPULAR_MERCHANT_KA]: 'geekblue',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: 'red',
   [AlgorithmType.BRAND_MERCHANT]: 'orange',
-  [AlgorithmType.GOLD_AD]: 'yellow',
-  [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
-  [AlgorithmType.PRODUCT_PROMO]: 'red',
+  [AlgorithmType.GOLD_AD]: 'cyan',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: 'geekblue',
+  [AlgorithmType.PRODUCT_PROMO]: 'volcano',
 } as Record<AlgorithmType, string>
 
 /** 区域（全系统唯一商圈枚举：定价/门店/购买/订单等所有商圈相关数据均引用此处） */

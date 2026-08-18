@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -9,52 +9,10 @@ import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
   fetchWaterfallList, updateWaterfallStatus, deleteWaterfall,
-  fetchAdAlgorithms, withAdFallback,
+  fetchAdAlgorithms,
 } from '../../api/adPromotion'
+import { isBackendUnavailable } from '../../api/request'
 import type { WaterfallStrategy } from '../../api/adPromotion'
-
-/** 伪随机数生成器（本地演示数据用） */
-const pseudoRandom = (seed: number) => {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
-
-/** 推广名称虚拟数据 */
-const PROMOTION_NAMES = [
-  '无敌星星国庆推广', '新店广告中秋特惠', '盘活广告双十一狂欢',
-  '独家商家周年庆', '流量广告圣诞特卖', '猜你喜欢新年推荐',
-  '自然流量春季大促', '搜索算法开学季', '无敌星星情人节专场',
-  '新店广告夏季清凉', '盘活广告秋季美食', '独家商家冬季暖锅',
-  '流量广告周末特惠', '猜你喜欢月末冲刺', '自然流量节日庆典',
-  '搜索算法品牌周',
-]
-
-/** Mock数据 - 后端不可用时降级展示 */
-// eslint-disable-next-line react-refresh/only-export-components
-export const mockData: WaterfallStrategy[] = (() => {
-  const appPool = ['flashBee', 'mFood']
-  const data: WaterfallStrategy[] = []
-  for (let i = 0; i < 24; i++) {
-    const id = i + 1
-    const dateStr = `2026081${Math.min(2 + Math.floor(i / 5), 9)}`
-    data.push({
-      id,
-      strategyCode: `PB${dateStr}${String(i).padStart(3, '0')}`,
-      strategyName: PROMOTION_NAMES[i % PROMOTION_NAMES.length],
-      brand: appPool[i % appPool.length],
-      status: pseudoRandom(id * 100 + 5) > 0.2 ? 1 : 2,
-      updatedBy: 'admin',
-      updatedAt: `2024-01-${String(20 + Math.floor(id / 3)).padStart(2, '0')} 10:00:00`,
-      slots: [],
-    })
-  }
-  return data
-})()
-
-/** 算法名称筛选选项（后端不可用时降级） */
-const _MOCK_ALGO_OPTIONS = [
-  { label: '無敵星星-首頁黃金展位', value: 1 },
-]
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()
@@ -67,8 +25,6 @@ export default function PromotionSlotConfig() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
-  /** 后端不可用降级标记: true 时查询走本地 Mock 过滤 */
-  const [mockMode, setMockMode] = useState(false)
   /** 算法名称筛选选项（来自算法库） */
   const [algoOptions, setAlgoOptions] = useState<{ label: string; value: number }[]>([])
 
@@ -83,59 +39,69 @@ export default function PromotionSlotConfig() {
       .catch(() => { /* 保留降级选项 */ })
   }, [])
 
-  /** 加载列表: 后端可用走服务端分页, 不可用降级本地 Mock 过滤 */
+  /** 加载列表: 始终优先尝试后端 API，失败时降级本地 Mock */
+  const loadingRef = useRef(false)
   const load = useCallback(async (p: number, s: number, values?: Record<string, unknown>) => {
+    if (loadingRef.current) {
+      console.log('[WaterfallList] load 被跳过（上一次仍在进行）')
+      return
+    }
+    loadingRef.current = true
     const v = values ?? searchForm.getFieldsValue()
+    console.log('[WaterfallList] load 开始, page=', p, 'pageSize=', s, new Error().stack?.split('\n').slice(1, 4).join(' | '))
     setLoading(true)
     try {
-      if (mockMode) {
-        let result = [...mockData]
-        if (v.strategyCode) result = result.filter(item => (item.strategyCode ?? '').includes(String(v.strategyCode)))
-        if (v.strategyName) result = result.filter(item => item.strategyName.includes(String(v.strategyName)))
-        if (v.brand) result = result.filter(item => item.brand === v.brand)
-        if (v.status) result = result.filter(item => item.status === v.status)
-        if (v.updatedBy) result = result.filter(item => (item.updatedBy ?? '').includes(String(v.updatedBy)))
-        if (Array.isArray(v.updatedAtRange) && v.updatedAtRange.length === 2) {
-          const [start, end] = v.updatedAtRange as [dayjs.Dayjs, dayjs.Dayjs]
-          result = result.filter(item => {
-            if (!item.updatedAt) return false
-            const ts = dayjs(item.updatedAt)
-            return !ts.isBefore(start.startOf('day')) && !ts.isAfter(end.endOf('day'))
-          })
+      try {
+        const res = await fetchWaterfallList({
+          page: p, size: s,
+          id: v.id ? Number(v.id) : undefined,
+          strategyCode: v.strategyCode || undefined,
+          strategyName: v.strategyName || undefined,
+          brand: v.brand || undefined,
+          status: v.status,
+          algoId: v.algoId,
+          updatedBy: v.updatedBy || undefined,
+          updatedAtStart: Array.isArray(v.updatedAtRange) && v.updatedAtRange[0] ? (v.updatedAtRange[0] as dayjs.Dayjs).startOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
+          updatedAtEnd: Array.isArray(v.updatedAtRange) && v.updatedAtRange[1] ? (v.updatedAtRange[1] as dayjs.Dayjs).endOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
+        })
+        console.log('[WaterfallList] API 成功, records=', res?.records?.length ?? 'null/undefined', 'total=', res?.total)
+        setData(res?.records ?? [])
+        setTotal(res?.total ?? 0)
+      } catch (apiErr) {
+        if (isBackendUnavailable(apiErr)) {
+          console.warn('[WaterfallList] 后端不可用，顯示空白列表')
+        } else {
+          const status = (apiErr as { response?: { status?: number } })?.response?.status
+          const msg = (apiErr as Error)?.message || '未知错误'
+          console.error('[WaterfallList] API 业务错误:', status, msg)
+          if (status === 403) {
+            message.error('沒有權限訪問瀑布流配置，請聯繫管理員授權')
+          } else {
+            message.error(`加載列表失敗: ${msg}`)
+          }
         }
-        setData(result)
-        setTotal(result.length)
-      } else {
-        const res = await withAdFallback(
-          () => fetchWaterfallList({
-            page: p, size: s,
-            id: v.id ? Number(v.id) : undefined,
-            strategyCode: v.strategyCode || undefined,
-            strategyName: v.strategyName || undefined,
-            brand: v.brand || undefined,
-            status: v.status,
-            algoId: v.algoId,
-            updatedBy: v.updatedBy || undefined,
-            updatedAtStart: Array.isArray(v.updatedAtRange) && v.updatedAtRange[0] ? (v.updatedAtRange[0] as dayjs.Dayjs).startOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
-            updatedAtEnd: Array.isArray(v.updatedAtRange) && v.updatedAtRange[1] ? (v.updatedAtRange[1] as dayjs.Dayjs).endOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
-          }),
-          async () => {
-            setMockMode(true)
-            return { records: mockData, total: mockData.length }
-          },
-        )
-        setData(res.records)
-        setTotal(res.total)
+        setData([])
+        setTotal(0)
       }
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
-  }, [mockMode, searchForm])
+  }, [searchForm])
 
-  // 初始化查询
+  // 初始化查询（仅挂载时执行一次）
   useEffect(() => {
     load(1, pageSize)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 稳定的分页 onChange 引用（避免每次渲染创建新函数导致 Table 重复触发）
+  const loadRef = useRef(load)
+  loadRef.current = load
+  const handlePaginationChange = useCallback((p: number, s: number) => {
+    setPage(p)
+    setPageSize(s)
+    loadRef.current(p, s)
   }, [])
 
   // 编辑
@@ -158,13 +124,6 @@ export default function PromotionSlotConfig() {
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       onOk: async () => {
-        if (mockMode) {
-          setData(prev => prev.map(item =>
-            item.id === record.id ? { ...item, status: newStatus } : item
-          ))
-          message.success(t('promotionSlotConfig.toggleSuccess', { action: actionText, name: record.strategyName }))
-          return
-        }
         await updateWaterfallStatus(record.id as number, newStatus)
         message.success(t('promotionSlotConfig.toggleSuccess', { action: actionText, name: record.strategyName }))
         load(page, pageSize)
@@ -181,11 +140,6 @@ export default function PromotionSlotConfig() {
       cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
-        if (mockMode) {
-          setData(prev => prev.filter(item => item.id !== record.id))
-          message.success(t('common.deleteSuccess'))
-          return
-        }
         await deleteWaterfall(record.id as number)
         message.success(t('common.deleteSuccess'))
         load(page, pageSize)
@@ -273,7 +227,7 @@ export default function PromotionSlotConfig() {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
-      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
+      render: (v: string | number) => <span style={{ whiteSpace: 'nowrap' }}>{v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>,
     },
     {
       title: t('common.colAction'),
@@ -404,11 +358,7 @@ export default function PromotionSlotConfig() {
             pageSizeOptions: ['10', '20', '50'],
             showQuickJumper: true,
             showTotal: (total) => t('common.total', { count: total }),
-            onChange: (p, s) => {
-              setPage(p)
-              setPageSize(s)
-              load(p, s)
-            },
+            onChange: handlePaginationChange,
           }}
           size="small"
           rowKey="id"

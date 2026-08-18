@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '../constants'
-import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
+import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, fetchAlgorithmWaterfallReferences, brandToAppType, type AdAlgorithm, type WaterfallReference } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '../../../hooks/useCardOrder'
 import BrandTag from '../../../components/BrandTag'
@@ -24,7 +24,6 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.GUESS_YOU_LIKE,
     AlgorithmType.ORGANIC_TRAFFIC,
     AlgorithmType.GOLDEN_SIGNBOARD,
-    AlgorithmType.PRODUCT_PROMO,
   ],
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
@@ -108,7 +107,6 @@ export default function Algorithm() {
     { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: t('algorithm.descGuessYouLike') },
     { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
     { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
-    { type: AlgorithmType.PRODUCT_PROMO, icon: '🎯', description: t('algorithm.descProductPromo') },
   ]
 
   /** 根据业务类型过滤数据 */
@@ -173,33 +171,120 @@ export default function Algorithm() {
   }
 
   // 启用/停用算法
-  const handleToggleStatus = (record: AlgorithmRecord) => {
+  const handleToggleStatus = async (record: AlgorithmRecord) => {
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
     const actionText = newStatus === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')
-    Modal.confirm({
-      title: t('algorithm.confirmToggleTitle', { action: actionText }),
-      content: t('algorithm.confirmToggleContent', { action: actionText, name: record.name }),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-      onOk: async () => {
-        try {
-          await updateAdAlgorithmStatus(record.id, newStatus)
-        } catch (err) {
-          message.error((err as Error).message || t('algorithm.toggleFailed', { action: actionText }))
-          return
-        }
-        setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
-        setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
-        message.success(t('algorithm.toggleSuccess', { action: actionText, name: record.name }))
-      },
-    })
+
+    // 停用时先检查瀑布流引用
+    let references: WaterfallReference[] = []
+    if (newStatus === ServiceStatus.DISABLED) {
+      try {
+        references = await fetchAlgorithmWaterfallReferences(record.id)
+      } catch {
+        // 查询失败继续执行，不阻止操作
+      }
+    }
+
+    const showConfirm = (refs: WaterfallReference[]) => {
+      const hasRefs = refs.length > 0
+      // 按策略分组显示
+      const groupedRefs = refs.reduce((acc, ref) => {
+        const key = `${ref.strategyCode}|${ref.strategyName}`
+        if (!acc[key]) acc[key] = { strategyCode: ref.strategyCode, strategyName: ref.strategyName, positions: [] }
+        acc[key].positions.push(ref.slotPosition)
+        return acc
+      }, {} as Record<string, { strategyCode: string; strategyName: string; positions: number[] }>)
+      const groupedList = Object.values(groupedRefs)
+
+      Modal.confirm({
+        title: t('algorithm.confirmToggleTitle', { action: actionText }),
+        content: (
+          <div>
+            <p>{t('algorithm.confirmToggleContent', { action: actionText, name: record.name })}</p>
+            {hasRefs && (
+              <>
+                <p style={{ color: '#FA8C16', fontWeight: 500, marginTop: 12 }}>
+                  {t('algorithm.waterfallRefWarning')}
+                </p>
+                <div style={{ maxHeight: 200, overflowY: 'auto', background: '#FFF7E6', borderRadius: 6, padding: '8px 12px', marginTop: 8 }}>
+                  {groupedList.map((g, i) => (
+                    <div key={i} style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
+                      <code style={{ background: '#f5f5f5', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
+                      {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.join(', ') })}）
+                    </div>
+                  ))}
+                </div>
+                <p style={{ color: '#FF4D4F', fontSize: 12, marginTop: 8 }}>
+                  {t('algorithm.waterfallRefImpact')}
+                </p>
+              </>
+            )}
+          </div>
+        ),
+        okText: t('common.confirm'),
+        cancelText: t('common.cancel'),
+        onOk: async () => {
+          try {
+            await updateAdAlgorithmStatus(record.id, newStatus)
+          } catch (err) {
+            message.error((err as Error).message || t('algorithm.toggleFailed', { action: actionText }))
+            return
+          }
+          setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+          setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+          message.success(t('algorithm.toggleSuccess', { action: actionText, name: record.name }))
+        },
+      })
+    }
+
+    showConfirm(references)
   }
 
   // 删除算法
-  const handleDelete = (record: AlgorithmRecord) => {
+  const handleDelete = async (record: AlgorithmRecord) => {
+    // 先检查瀑布流引用
+    let references: WaterfallReference[] = []
+    try {
+      references = await fetchAlgorithmWaterfallReferences(record.id)
+    } catch {
+      // 查询失败继续执行，不阻止操作
+    }
+
+    // 按策略分组显示
+    const groupedRefs = references.reduce((acc, ref) => {
+      const key = `${ref.strategyCode}|${ref.strategyName}`
+      if (!acc[key]) acc[key] = { strategyCode: ref.strategyCode, strategyName: ref.strategyName, positions: [] }
+      acc[key].positions.push(ref.slotPosition)
+      return acc
+    }, {} as Record<string, { strategyCode: string; strategyName: string; positions: number[] }>)
+    const groupedList = Object.values(groupedRefs)
+    const hasRefs = references.length > 0
+
     Modal.confirm({
       title: t('common.confirmDelete'),
-      content: t('algorithm.confirmDeleteContent', { name: record.name }),
+      content: (
+        <div>
+          <p>{t('algorithm.confirmDeleteContent', { name: record.name })}</p>
+          {hasRefs && (
+            <>
+              <p style={{ color: '#FA8C16', fontWeight: 500, marginTop: 12 }}>
+                {t('algorithm.waterfallRefWarning')}
+              </p>
+              <div style={{ maxHeight: 200, overflowY: 'auto', background: '#FFF7E6', borderRadius: 6, padding: '8px 12px', marginTop: 8 }}>
+                {groupedList.map((g, i) => (
+                  <div key={i} style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
+                    <code style={{ background: '#f5f5f5', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
+                    {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.join(', ') })}）
+                  </div>
+                ))}
+              </div>
+              <p style={{ color: '#FF4D4F', fontSize: 12, marginTop: 8 }}>
+                {t('algorithm.waterfallRefImpact')}
+              </p>
+            </>
+          )}
+        </div>
+      ),
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       okButtonProps: { danger: true },

@@ -19,8 +19,8 @@ public class AdWaterfallVO {
     private String strategyCode;
     private String strategyName;
     private String brand;
-    /** 自然流量兜底算法ID（未配置坑位读取该算法数据） */
-    private Long naturalAlgoId;
+    /** 自然流量兜底算法编码（未配置坑位读取该算法数据） */
+    private String naturalAlgoId;
     private String naturalAlgoName;
     /** 过滤用户不喜欢: 1=开启 2=关闭 */
     private Integer filterDislike;
@@ -55,7 +55,7 @@ public class AdWaterfallVO {
     public static class SlotItem {
         private Long id;
         private Integer slotPosition;
-        private Long algoId;
+        private String algoId;
         private String algoName;
         private Integer algoType;
         private Integer status;

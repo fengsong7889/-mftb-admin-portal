@@ -1,16 +1,16 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Select, Space, message, Table, Tag, Badge, Switch, Popover, Modal } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined, AppstoreOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined, AppstoreOutlined, ThunderboltOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import BrandTag from '../components/BrandTag'
 import {
   fetchAdAlgorithms, fetchWaterfallDetail, createWaterfall, updateWaterfall,
-  withAdFallback,
 } from '../api/adPromotion'
+import { isBackendUnavailable } from '../api/request'
 import type { WaterfallStrategyRequest } from '../api/adPromotion'
-import { mockData } from './PromotionSlotConfig/index'
+import { SLOT_DRAFT_KEY, SLOT_RESULT_KEY } from './PromotionSlotConfigSlots'
 
 /** 品牌选项（与后端 brand 枚举对齐） */
 const APP_OPTIONS = [
@@ -35,33 +35,24 @@ const ALGO_TYPE_LABEL: Record<number, string> = {
 
 /** 算法类型颜色 */
 const ALGO_TYPE_COLOR: Record<number, string> = {
-  1: 'magenta',
-  2: 'blue',
-  3: 'green',
-  4: 'orange',
-  5: 'cyan',
-  6: 'purple',
-  7: 'gold',
-  10: 'red',
+  1: 'gold',
+  2: 'green',
+  3: 'magenta',
+  4: 'purple',
+  5: 'red',
+  6: 'blue',
+  7: 'lime',
+  11: 'orange',
+  12: 'cyan',
+  13: 'geekblue',
+  14: 'volcano',
+  15: 'yellow',
 }
-
-/** 坑位算法分配配色（高飽和度，不同算法類型顏色明顯區分） */
-const SLOT_TYPE_STYLE: Record<number, { bg: string; border: string; text: string }> = {
-  1: { bg: '#FFF1B8', border: '#D4A017', text: '#8B6914' },  // 无敌星星 - 黄金色
-  2: { bg: '#D9F7BE', border: '#52C41A', text: '#237804' },  // 新店广告 - 绿色
-  3: { bg: '#FFD8BF', border: '#FF6B2B', text: '#CB3B00' },  // 盘活复苏 - 橘色
-  4: { bg: '#EFDBFF', border: '#9254DE', text: '#531DAB' },  // 独家商家 - 紫色
-  5: { bg: '#B5F5EC', border: '#13C2C2', text: '#086E6E' },  // 流量广告 - 青色
-  6: { bg: '#BAE7FF', border: '#1890FF', text: '#096DD9' },  // 猜你喜欢 - 蓝色
-  7: { bg: '#E8FFB3', border: '#73D13D', text: '#389E0D' },  // 自然流量 - 青绿
-  10: { bg: '#FFA39E', border: '#FF4D4F', text: '#A8071A' }, // 人气商家 - 红色
-}
-const DEFAULT_SLOT_STYLE = { bg: '#F0F0F0', border: '#BFBFBF', text: '#595959' }
 
 /** 坑位算法配置 */
 interface SlotAlgorithm {
   position: number
-  algorithmId: number
+  algorithmId: string
   algorithmName: string
   algorithmType: number
   brand?: string
@@ -71,28 +62,15 @@ interface SlotAlgorithm {
 /** 可选算法条目 */
 interface AlgorithmOption {
   label: string
-  value: number
+  value: string
   type: number
   brand?: string
 }
 
-/** 弹窗内待确认的坑位分配 */
-interface PendingSlot {
-  position: number
-  algorithmId: number
-  algorithmName: string
-  algorithmType: number
-  brand?: string
-}
-
-/** 算法库不可用时的降级选项（当前仅无敌星星接入数据库） */
-const _MOCK_ALGORITHM_OPTIONS: AlgorithmOption[] = [
-  { label: 'algoInvincibleStar', value: 1, type: 1, brand: 'flashBee' },
-]
-
 export default function PromotionSlotConfigAdd() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const editIdParam = searchParams.get('id') || ''
   const modeParam = searchParams.get('mode') || ''
@@ -103,24 +81,13 @@ export default function PromotionSlotConfigAdd() {
   const [slotAlgorithms, setSlotAlgorithms] = useState<SlotAlgorithm[]>([])
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false)
-  const [addForm] = Form.useForm()
-  const [selectedAlgoType, setSelectedAlgoType] = useState<number | null>(null)
-  /** 弹窗内待确认的坑位分配（支持多算法，按算法類型着不同顏色） */
-  const [pendingSlots, setPendingSlots] = useState<PendingSlot[]>([])
-  /** 弹窗当前选中的算法（点击坑位即分配给该算法） */
-  const [currentAlgo, setCurrentAlgo] = useState<AlgorithmOption | null>(null)
-  const selectedPositions = useMemo(() => pendingSlots.map(p => p.position).sort((a, b) => a - b), [pendingSlots])
-  /** 编辑中的坑位序号（新增弹窗复用于编辑场景），null 表示新增 */
-  const [editingPosition, setEditingPosition] = useState<number | null>(null)
-  const [totalPositions, setTotalPositions] = useState<number>(100)
   /** 算法库选项（来自「算法库」已启用算法） */
   const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmOption[]>([])
   const [saving, setSaving] = useState(false)
-  /** 弹窗中当前选中算法的品牌 */
-  const [selectedAlgoBrand, setSelectedAlgoBrand] = useState<string | undefined>(undefined)
-  /** 自然流量兜底算法ID（未配置坑位統一讀取該算法數據） */
-  const [naturalAlgoId, setNaturalAlgoId] = useState<number | undefined>(undefined)
+  /** 自然流量兜底算法编码（未配置坑位統一讀取該算法數據） */
+  const [naturalAlgoId, setNaturalAlgoId] = useState<string | undefined>(undefined)
+  /** 是否有未保存的坑位變更（從坑位頁返回後或修改坑位後為 true） */
+  const [hasUnsavedSlotChanges, setHasUnsavedSlotChanges] = useState(false)
 
   /** 自然流量兜底算法選項：只展示算法庫中「自然流量」類型（algoType=7）的算法 */
   const naturalAlgoOptions = useMemo(
@@ -138,7 +105,7 @@ export default function PromotionSlotConfigAdd() {
         if (res.records.length > 0) {
           setAlgorithmOptions(res.records.map(a => ({
             label: a.algoName,
-            value: a.id as number,
+            value: a.algoCode as string,
             type: a.algoType,
             brand: a.brand as string | undefined,
           })))
@@ -147,117 +114,92 @@ export default function PromotionSlotConfigAdd() {
       .catch(() => { /* 保留降级选项 */ })
   }, [])
 
-  /** 编辑/详情模式加载数据，后端不可用时降级 Mock */
+  /** 编辑/详情模式加载数据，后端完全不可用时降级 Mock，后端返回业务错误时提示用户 */
+  const slotResultConsumedRef = useRef(false)
   useEffect(() => {
     if (!editIdParam) return
     const id = Number(editIdParam)
-    withAdFallback(
-      () => fetchWaterfallDetail(id),
-      async () => {
-        // 降级: 使用列表 Mock 基础信息，坑位为空
-        const record = mockData.find(item => item.id === id)
-        return record ?? { id, strategyName: '', slots: [] }
-      },
-    ).then(detail => {
-      form.setFieldsValue({
-        promotionName: detail.strategyName,
-        app: detail.brand,
+
+    // 同步检查 sessionStorage（坑位配置页返回的结果优先于 API 数据）
+    const resultRaw = sessionStorage.getItem(SLOT_RESULT_KEY)
+    if (resultRaw) {
+      sessionStorage.removeItem(SLOT_RESULT_KEY)
+      sessionStorage.removeItem(SLOT_DRAFT_KEY)
+      slotResultConsumedRef.current = true
+      try {
+        const parsed = JSON.parse(resultRaw) as SlotAlgorithm[]
+        console.log('[WaterfallAdd] 编辑模式读取坑位配置页结果:', parsed.length, '条')
+        setSlotAlgorithms(parsed)
+        setHasUnsavedSlotChanges(true)
+      } catch { /* 忽略脏数据 */ }
+    }
+
+    fetchWaterfallDetail(id)
+      .then(detail => {
+        loadDetailIntoForm(detail, id)
       })
-      setNaturalAlgoId(detail.naturalAlgoId ?? undefined)
-      setFilterDislike(detail.filterDislike === 1)
-      setSlotAlgorithms((detail.slots ?? []).map(s => ({
-        position: s.slotPosition,
-        algorithmId: s.algoId,
-        algorithmName: s.algoName ?? '',
-        algorithmType: s.algoType ?? 1,
-        brand: undefined,
-        status: (s.status === 2 ? 2 : 1) as 1 | 2,
-      })))
-    }).catch(() => message.error(t('promotionSlotConfig:loadFailed')))
+      .catch(err => {
+        if (isBackendUnavailable(err)) {
+          console.warn('[WaterfallDetail] 后端不可用，顯示空白表單')
+          loadDetailIntoForm({ strategyName: '', slots: [] }, id)
+        } else {
+          const status = err?.response?.status
+          const msg = err?.message || '未知错误'
+          console.error('[WaterfallDetail] 加载失败:', status, msg)
+          if (status === 403) {
+            message.error('沒有權限訪問該配置，請聯繫管理員授權')
+          } else if (status === 404) {
+            message.error('該配置記錄不存在，可能尚未保存至數據庫')
+          } else {
+            message.error(`加載配置失敗: ${msg}`)
+          }
+        }
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editIdParam])
+  }, [editIdParam, location.key])
 
-  // 新增坑位配置
-  const handleAddSlot = () => {
-    addForm.resetFields()
-    setSelectedAlgoType(null)
-    setSelectedAlgoBrand(undefined)
-    setCurrentAlgo(null)
-    setPendingSlots([])
-    setEditingPosition(null)
-    setIsAddModalVisible(true)
-  }
-
-  // 切换位置选择（编辑场景单选，新增场景多选；分配给当前选中算法）
-  const togglePosition = (pos: number) => {
-    if (!currentAlgo) {
-      message.warning(t('promotionSlotConfig:selectAlgoFirst'))
-      return
-    }
-    const assign = { algorithmId: currentAlgo.value, algorithmName: currentAlgo.label, algorithmType: currentAlgo.type, brand: currentAlgo.brand }
-    if (editingPosition !== null) {
-      setPendingSlots([{ position: pos, ...assign }])
-      return
-    }
-    setPendingSlots(prev => {
-      const existing = prev.find(p => p.position === pos)
-      if (existing) {
-        // 同算法再次点击取消；不同算法点击改派
-        if (existing.algorithmId === currentAlgo.value) return prev.filter(p => p.position !== pos)
-        return prev.map(p => (p.position === pos ? { position: pos, ...assign } : p))
-      }
-      return [...prev, { position: pos, ...assign }].sort((a, b) => a.position - b.position)
+  /** 将后端详情数据填入表单与坑位列表 */
+  const loadDetailIntoForm = (detail: { strategyName?: string; brand?: string; naturalAlgoId?: string | null; filterDislike?: number; slots?: { slotPosition: number; algoId: string; algoName?: string; algoType?: number; status?: number }[] }, id: number | string) => {
+    form.setFieldsValue({
+      promotionName: detail.strategyName,
+      app: detail.brand,
     })
-  }
-
-  // 移除位置
-  const removePosition = (pos: number) => {
-    setPendingSlots(prev => prev.filter(p => p.position !== pos))
-  }
-
-  // 清空所有选择
-  const clearAllPositions = () => {
-    setPendingSlots([])
-  }
-
-  const handleConfirmAddSlot = async () => {
-    if (pendingSlots.length === 0) {
-      message.warning(t('promotionSlotConfig:selectAtLeastOnePos'))
+    setNaturalAlgoId(detail.naturalAlgoId ?? undefined)
+    setFilterDislike(detail.filterDislike === 1)
+    // 如果 sessionStorage 已经提供了坑位数据，不再用 API 数据覆盖
+    if (slotResultConsumedRef.current) {
+      console.log('[WaterfallAdd] sessionStorage 已提供坑位数据，跳过 API 坑位数据')
       return
     }
-
-    if (editingPosition !== null) {
-      // 编辑场景: 替换原坑位的算法（位置可移动，单选）
-      const target = pendingSlots[0]
-      setSlotAlgorithms(prev => prev
-        .map(item => item.position === editingPosition
-          ? {
-              ...item,
-              position: target.position,
-              algorithmId: target.algorithmId,
-              algorithmName: target.algorithmName,
-              algorithmType: target.algorithmType,
-              brand: target.brand,
-            }
-          : item)
-        .sort((a, b) => a.position - b.position))
-      message.success(t('promotionSlotConfig:updateSlotSuccess', { pos: target.position, name: target.algorithmName }))
-    } else {
-      // 新增场景: 多个算法的坑位配置一次性保存
-      const newSlots: SlotAlgorithm[] = pendingSlots.map(p => ({
-        position: p.position,
-        algorithmId: p.algorithmId,
-        algorithmName: p.algorithmName,
-        algorithmType: p.algorithmType,
-        brand: p.brand,
-        status: 1 as const,
-      }))
-      setSlotAlgorithms(prev => [...prev, ...newSlots].sort((a, b) => a.position - b.position))
-      const algoNames = [...new Set(newSlots.map(s => s.algorithmName))].join('、')
-      message.success(t('promotionSlotConfig:addSlotSuccess', { name: algoNames, positions: selectedPositions.map(p => t('promotionSlotConfig:posNum', { pos: p })).join('、') }))
-    }
-    setIsAddModalVisible(false)
+    const slots: SlotAlgorithm[] = (detail.slots ?? []).map(s => ({
+      position: s.slotPosition,
+      algorithmId: s.algoId,
+      algorithmName: s.algoName ?? '',
+      algorithmType: s.algoType ?? 1,
+      brand: undefined,
+      status: (s.status === 2 ? 2 : 1) as 1 | 2,
+    }))
+    setSlotAlgorithms(slots)
   }
+
+  // 进入坑位配置独立页面：当前配置写入草稿后跳转
+  const handleGoSlots = () => {
+    sessionStorage.setItem(SLOT_DRAFT_KEY, JSON.stringify(slotAlgorithms))
+    navigate('/promotion-slot-config-slots')
+  }
+
+  // 新增模式：应用坑位配置页返回的配置结果
+  useEffect(() => {
+    if (editIdParam) return
+    const raw = sessionStorage.getItem(SLOT_RESULT_KEY)
+    if (!raw) return
+    sessionStorage.removeItem(SLOT_RESULT_KEY)
+    sessionStorage.removeItem(SLOT_DRAFT_KEY)
+    try {
+      setSlotAlgorithms(JSON.parse(raw) as SlotAlgorithm[])
+      setHasUnsavedSlotChanges(true)
+    } catch { /* 忽略脏数据 */ }
+  }, [editIdParam])
 
   // 删除坑位配置（删除后该坑位回归自然流量）
   const handleDeleteSlot = (record: SlotAlgorithm) => {
@@ -269,22 +211,10 @@ export default function PromotionSlotConfigAdd() {
       okButtonProps: { danger: true },
       onOk: () => {
         setSlotAlgorithms(prev => prev.filter(item => item.position !== record.position))
+        setHasUnsavedSlotChanges(true)
         message.success(t('promotionSlotConfig:deleteSlotSuccess', { pos: record.position }))
       },
     })
-  }
-
-  // 编辑坑位配置
-  const handleEditSlot = (record: SlotAlgorithm) => {
-    addForm.resetFields()
-    addForm.setFieldsValue({ algorithmId: record.algorithmId })
-    setSelectedAlgoType(record.algorithmType)
-    setSelectedAlgoBrand(record.brand)
-    const algo = algorithmOptions.find(a => a.value === record.algorithmId)
-    setCurrentAlgo(algo ?? { label: record.algorithmName, value: record.algorithmId, type: record.algorithmType, brand: record.brand })
-    setPendingSlots([{ position: record.position, algorithmId: record.algorithmId, algorithmName: record.algorithmName, algorithmType: record.algorithmType, brand: record.brand }])
-    setEditingPosition(record.position)
-    setIsAddModalVisible(true)
   }
 
   // 切换启用/停用状态
@@ -302,6 +232,7 @@ export default function PromotionSlotConfigAdd() {
             item.position === record.position ? { ...item, status: newStatus } : item
           )
         )
+        setHasUnsavedSlotChanges(true)
         message.success(t('promotionSlotConfig:toggleSuccess', { action: actionText, name: record.algorithmName }))
       },
     })
@@ -325,6 +256,7 @@ export default function PromotionSlotConfigAdd() {
     // 重新编号 position
     const reordered = newList.map((item, i) => ({ ...item, position: i + 1 }))
     setSlotAlgorithms(reordered)
+    setHasUnsavedSlotChanges(true)
     setDragIndex(null)
     setDragOverIndex(null)
     message.success(t('promotionSlotConfig:moveSuccess', { name: moved.algorithmName, pos: index + 1 }))
@@ -344,6 +276,7 @@ export default function PromotionSlotConfigAdd() {
     const [moved] = newList.splice(index, 1)
     newList.splice(target, 0, moved)
     setSlotAlgorithms(newList.map((item, i) => ({ ...item, position: i + 1 })))
+    setHasUnsavedSlotChanges(true)
   }
 
   // 手机模型标题
@@ -354,11 +287,28 @@ export default function PromotionSlotConfigAdd() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, slotAlgorithms])
 
-  const handleBack = () => navigate('/promotion-slot-config')
+  const handleBack = () => {
+    if (hasUnsavedSlotChanges) {
+      Modal.confirm({
+        title: t('promotionSlotConfig:discardConfirmTitle'),
+        content: t('promotionSlotConfig:discardConfirmContent'),
+        okText: t('promotionSlotConfig:discardConfirmOk'),
+        cancelText: t('promotionSlotConfig:discardConfirmCancel'),
+        okButtonProps: { danger: true },
+        onOk: () => navigate('/promotion-slot-config'),
+      })
+    } else {
+      navigate('/promotion-slot-config')
+    }
+  }
 
   const handleSave = async () => {
     try {
       const values = await form.validateFields()
+      if (!naturalAlgoId) {
+        message.warning(t('promotionSlotConfig:fallbackAlgoRequired'))
+        return
+      }
       setSaving(true)
       const request: WaterfallStrategyRequest = {
         strategyName: values.promotionName,
@@ -372,15 +322,25 @@ export default function PromotionSlotConfigAdd() {
           status: item.status,
         })),
       }
+      console.log('[WaterfallAdd] handleSave 开始, isEditMode=', isEditMode, 'editId=', editIdParam)
+      console.log('[WaterfallAdd] request payload:', JSON.stringify(request))
+      console.log('[WaterfallAdd] slotAlgorithms count:', slotAlgorithms.length)
       if (isEditMode) {
-        await updateWaterfall(Number(editIdParam), request)
+        const res = await updateWaterfall(Number(editIdParam), request)
+        console.log('[WaterfallAdd] update 成功, response:', res)
       } else {
-        await createWaterfall(request)
+        const res = await createWaterfall(request)
+        console.log('[WaterfallAdd] create 成功, response:', res)
       }
       message.success(t('promotionSlotConfig:saveSuccessMsg'))
+      setHasUnsavedSlotChanges(false)
       navigate('/promotion-slot-config')
     } catch (error) {
-      console.error('保存失败:', error)
+      const errStatus = (error as { response?: { status?: number } })?.response?.status
+      const errMsg = (error as Error)?.message || '未知错误'
+      const errData = (error as { response?: { data?: unknown } })?.response?.data
+      console.error('[WaterfallAdd] 保存失败, status=', errStatus, 'msg=', errMsg, 'data=', errData, error)
+      message.error(t('promotionSlotConfig:saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -417,11 +377,11 @@ export default function PromotionSlotConfigAdd() {
       title: t('promotionSlotConfig:colAlgoId'),
       dataIndex: 'algorithmId',
       key: 'algorithmId',
-      width: 100,
+      width: 200,
       align: 'center',
-      render: (id: number) => (
+      render: (code: string) => (
         <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
-          {String(id).padStart(6, '0')}
+          {code}
         </code>
       ),
     },
@@ -447,7 +407,10 @@ export default function PromotionSlotConfigAdd() {
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (v: string) => v ? <BrandTag value={v} /> : '-',
+      render: (_: unknown, record: SlotAlgorithm) => {
+        const brand = record.brand ?? algorithmOptions.find(a => a.value === record.algorithmId)?.brand
+        return brand ? <BrandTag value={brand} /> : '-'
+      },
     },
     {
       title: t('promotionSlotConfig:colStatus'),
@@ -464,7 +427,7 @@ export default function PromotionSlotConfigAdd() {
     ...(!isDetailMode ? [{
       title: t('common:colAction'),
       key: 'action',
-      width: 260,
+      width: 200,
       align: 'center' as const,
       render: (_: unknown, record: SlotAlgorithm) => {
         const index = slotAlgorithms.findIndex(s => s.position === record.position)
@@ -494,9 +457,6 @@ export default function PromotionSlotConfigAdd() {
             onClick={() => handleToggleStatus(record)}
           >
             {record.status === 1 ? t('promotionSlotConfig:disabled') : t('promotionSlotConfig:enabled')}
-          </Button>
-          <Button type="link" size="small" onClick={() => handleEditSlot(record)}>
-            {t('common:edit')}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
             {t('common:delete')}
@@ -675,8 +635,8 @@ export default function PromotionSlotConfigAdd() {
               undefined,
               !isDetailMode ? (
                 <Space size={16}>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={handleAddSlot} size="small">
-                    新增
+                  <Button type="primary" icon={<PlusOutlined />} onClick={handleGoSlots} size="small">
+                    {t('promotionSlotConfig:addEditBtn')}
                   </Button>
                   <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('promotionSlotConfig:filterDislike')}</span>
@@ -721,7 +681,10 @@ export default function PromotionSlotConfigAdd() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#391085' }}>{t('promotionSlotConfig:naturalFallback')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#391085' }}>
+                    <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>
+                    {t('promotionSlotConfig:naturalFallback')}
+                  </span>
                   <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>{t('promotionSlotConfig:unconfiguredSlotEffective')}</Tag>
                   <Popover
                     content={
@@ -752,6 +715,31 @@ export default function PromotionSlotConfigAdd() {
               />
             </div>
 
+            {/* 未保存变更提示横幅 */}
+            {hasUnsavedSlotChanges && !isDetailMode && (
+              <div style={{
+                background: 'linear-gradient(135deg, #FFF7E6 0%, #FFE7BA 100%)',
+                border: '1px solid #FFD591',
+                borderRadius: 8,
+                padding: '10px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                  <ExclamationCircleOutlined style={{ color: '#FA8C16', fontSize: 16, flexShrink: 0 }} />
+                  <span style={{ color: '#D46B08', fontSize: 13, fontWeight: 500 }}>
+                    {t('promotionSlotConfig:unsavedChanges')}
+                  </span>
+                </div>
+                <Button type="primary" size="small" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+                  {t('promotionSlotConfig:saveNow')}
+                </Button>
+              </div>
+            )}
+
             <Table<SlotAlgorithm>
               columns={columns}
               dataSource={slotAlgorithms}
@@ -768,204 +756,6 @@ export default function PromotionSlotConfigAdd() {
           </div>
         </div>
       </div>
-
-      {/* 新增坑位弹窗 */}
-      <Modal
-        title={editingPosition !== null ? t('promotionSlotConfig:editPosConfig', { pos: editingPosition }) : t('promotionSlotConfig:addPosConfig')}
-        open={isAddModalVisible}
-        onOk={handleConfirmAddSlot}
-        onCancel={() => setIsAddModalVisible(false)}
-        okText={t('common:confirm')}
-        cancelText={t('common:cancel')}
-        okButtonProps={{ style: { background: '#E8720C', borderColor: '#E8720C' } }}
-        width={1160}
-      >
-        <Form form={addForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item
-            label={t('promotionSlotConfig:colAlgoName')}
-            name="algorithmId"
-            rules={[{ required: true, message: t('promotionSlotConfig:selectAlgo') }]}
-          >
-            <Select
-              placeholder={t('promotionSlotConfig:selectAlgoPlaceholder')}
-              showSearch
-              optionFilterProp="label"
-              options={algorithmOptions.map(a => ({ label: a.label, value: a.value }))}
-              onChange={(value) => {
-                const algo = algorithmOptions.find(a => a.value === value) ?? null
-                setSelectedAlgoType(algo ? algo.type : null)
-                setSelectedAlgoBrand(algo ? algo.brand : undefined)
-                setCurrentAlgo(algo)
-              }}
-            />
-          </Form.Item>
-          <Form.Item label={t('promotionSlotConfig:colAlgoType')}>
-            <Input
-              value={selectedAlgoType !== null ? tAlgoTypeLabel(selectedAlgoType) : ''}
-              disabled
-              placeholder={t('promotionSlotConfig:selectAlgoFirst')}
-              style={{ color: selectedAlgoType !== null ? '#333' : '#bfbfbf' }}
-            />
-          </Form.Item>
-          <Form.Item label={t('common:brand')}>
-            {selectedAlgoBrand ? (
-              <BrandTag value={selectedAlgoBrand} />
-            ) : (
-              <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectAlgoFirst')}</span>
-            )}
-          </Form.Item>
-          <Form.Item label={
-            <span>
-              {t('promotionSlotConfig:displayPosition')}
-              <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400, marginLeft: 8 }}>
-                {t('promotionSlotConfig:selectedPosCount', { count: selectedPositions.length })}
-              </span>
-              <Select
-                value={totalPositions}
-                onChange={(val) => setTotalPositions(val)}
-                size="small"
-                style={{ width: 90, marginLeft: 12, fontSize: 12 }}
-                options={[
-                  { label: t('promotionSlotConfig:topN', { count: 100 }), value: 100 },
-                  { label: t('promotionSlotConfig:topN', { count: 200 }), value: 200 },
-                  { label: t('promotionSlotConfig:topN', { count: 300 }), value: 300 },
-                  { label: t('promotionSlotConfig:topN', { count: 500 }), value: 500 },
-                ]}
-              />
-            </span>
-          } required>
-            <div style={{ 
-              maxHeight: 450, 
-              overflowY: 'auto', 
-              padding: '12px', 
-              background: '#fafafa', 
-              border: '1px solid #e8e8e8', 
-              borderRadius: 6 
-            }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 8 }}>
-                {Array.from({ length: totalPositions }, (_, i) => i + 1).map(pos => {
-                  const existingSlot = slotAlgorithms.find(s => s.position === pos)
-                  // 编辑场景下当前坑位允许重新选择
-                  const isOccupied = !!existingSlot && pos !== editingPosition
-                  const pending = pendingSlots.find(p => p.position === pos)
-                  const slotStyle = pending ? (SLOT_TYPE_STYLE[pending.algorithmType] ?? DEFAULT_SLOT_STYLE) : null
-                  return (
-                    <div
-                      key={pos}
-                      onClick={() => !isOccupied && togglePosition(pos)}
-                      style={{
-                        position: 'relative',
-                        height: 44,
-                        borderRadius: 6,
-                        border: pending ? `2px solid ${slotStyle!.border}` : isOccupied ? '1px solid #e8e8e8' : '1px solid #d9d9d9',
-                        background: pending ? slotStyle!.bg : isOccupied ? '#f5f5f5' : '#fff',
-                        cursor: isOccupied ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s',
-                        opacity: isOccupied ? 0.5 : 1,
-                        overflow: 'hidden',
-                      }}
-                      title={pending ? `${pos}：${pending.algorithmName}（${tAlgoTypeLabel(pending.algorithmType)}）` : undefined}
-                    >
-                      {pending ? (
-                        <>
-                          {/* 左上角位置编号 */}
-                          <span style={{
-                            position: 'absolute', top: 2, left: 4, zIndex: 1,
-                            fontSize: 10, fontWeight: 700, lineHeight: 1, color: slotStyle!.text,
-                          }}>{pos}</span>
-                          {/* 算法名称跑马灯（从右到左滑动） */}
-                          <div className="slot-marquee-wrap">
-                            <span className="slot-marquee-text" style={{ fontSize: 11, fontWeight: 600, color: slotStyle!.text }}>
-                              {pending.algorithmName}（{tAlgoTypeLabel(pending.algorithmType)}）
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <div style={{
-                          height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 12, color: isOccupied ? '#bfbfbf' : '#333',
-                        }}>
-                          {t('promotionSlotConfig:posNum', { pos })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* 已选位置统计展示区 */}
-            <div style={{ 
-              marginTop: 12, 
-              padding: '12px 16px', 
-              background: selectedPositions.length > 0 ? '#fff7e6' : '#fafafa', 
-              border: selectedPositions.length > 0 ? '1px solid #ffd591' : '1px solid #e8e8e8', 
-              borderRadius: 6 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>
-                  {t('promotionSlotConfig:slotStats', { count: selectedPositions.length })}
-                </span>
-                {selectedPositions.length > 0 && editingPosition === null && (
-                  <Button 
-                    size="small" 
-                    onClick={clearAllPositions} 
-                    style={{ fontSize: 12, padding: '0 8px', height: 22 }}
-                  >
-                    {t('promotionSlotConfig:clearAll')}
-                  </Button>
-                )}
-              </div>
-              {pendingSlots.length > 0 ? (
-                <div style={{ 
-                  maxHeight: 140, 
-                  overflowY: 'auto', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  gap: 6 
-                }}>
-                  {Object.values(
-                    pendingSlots.reduce<Record<number, PendingSlot[]>>((acc, cur) => {
-                      (acc[cur.algorithmId] = acc[cur.algorithmId] || []).push(cur)
-                      return acc
-                    }, {}),
-                  ).map(group => {
-                    const gStyle = SLOT_TYPE_STYLE[group[0].algorithmType] ?? DEFAULT_SLOT_STYLE
-                    return (
-                      <div key={group[0].algorithmId} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-                        padding: '4px 10px', borderRadius: 6,
-                        background: gStyle.bg, border: `1px solid ${gStyle.border}`,
-                      }}>
-                        <Tag color={ALGO_TYPE_COLOR[group[0].algorithmType] ?? 'default'} style={{ margin: 0, flexShrink: 0 }}>
-                          {tAlgoTypeLabel(group[0].algorithmType)}
-                        </Tag>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: gStyle.text, flexShrink: 0 }}>{group[0].algorithmName}</span>
-                        <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', marginLeft: 'auto' }}>
-                          {[...group].sort((a, b) => a.position - b.position).map(p => (
-                            <Tag
-                              key={p.position}
-                              closable={editingPosition === null}
-                              onClose={() => removePosition(p.position)}
-                              style={{ margin: 0, fontSize: 11, background: '#fff', borderColor: gStyle.border, color: gStyle.text }}
-                            >
-                              {t('promotionSlotConfig:posNum', { pos: p.position })}
-                            </Tag>
-                          ))}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '12px 0', color: '#bfbfbf', fontSize: 13 }}>
-                  {t('promotionSlotConfig:noPosSelected')}
-                </div>
-              )}
-            </div>
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* 底部操作按钮（详情模式下隐藏） */}
       {!isDetailMode && (

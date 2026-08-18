@@ -29,8 +29,8 @@ public class AdWaterfall {
     /** 所属品牌: flashBee / mFood */
     private String brand;
 
-    /** 自然流量兜底算法ID（未配置坑位读取该算法数据） */
-    private Long naturalAlgoId;
+    /** 自然流量兜底算法编码（未配置坑位读取该算法数据） */
+    private String naturalAlgoId;
 
     /** 自然流量算法名称快照 */
     private String naturalAlgoName;
