@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Button, Space, Table, Tag, Select, Form, Input, message, Modal } from 'antd'
+import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -93,6 +94,15 @@ export default function PromotionSlotConfig() {
         if (v.strategyName) result = result.filter(item => item.strategyName.includes(String(v.strategyName)))
         if (v.brand) result = result.filter(item => item.brand === v.brand)
         if (v.status) result = result.filter(item => item.status === v.status)
+        if (v.updatedBy) result = result.filter(item => (item.updatedBy ?? '').includes(String(v.updatedBy)))
+        if (Array.isArray(v.updatedAtRange) && v.updatedAtRange.length === 2) {
+          const [start, end] = v.updatedAtRange as [dayjs.Dayjs, dayjs.Dayjs]
+          result = result.filter(item => {
+            if (!item.updatedAt) return false
+            const ts = dayjs(item.updatedAt)
+            return !ts.isBefore(start.startOf('day')) && !ts.isAfter(end.endOf('day'))
+          })
+        }
         setData(result)
         setTotal(result.length)
       } else {
@@ -105,6 +115,9 @@ export default function PromotionSlotConfig() {
             brand: v.brand || undefined,
             status: v.status,
             algoId: v.algoId,
+            updatedBy: v.updatedBy || undefined,
+            updatedAtStart: Array.isArray(v.updatedAtRange) && v.updatedAtRange[0] ? (v.updatedAtRange[0] as dayjs.Dayjs).startOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
+            updatedAtEnd: Array.isArray(v.updatedAtRange) && v.updatedAtRange[1] ? (v.updatedAtRange[1] as dayjs.Dayjs).endOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
           }),
           async () => {
             setMockMode(true)
@@ -199,6 +212,8 @@ export default function PromotionSlotConfig() {
     { key: 'strategyName', title: t('promotionSlotConfig.colWaterfallName') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'status', title: t('common.colStatus') },
+    { key: 'updatedBy', title: t('promotionSlotConfig.colLastUpdater') },
+    { key: 'updatedAt', title: t('promotionSlotConfig.colLastUpdateTime') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
@@ -245,6 +260,20 @@ export default function PromotionSlotConfig() {
           {statusLabel(v)}
         </Tag>
       ),
+    },
+    {
+      title: t('promotionSlotConfig.colLastUpdater'),
+      dataIndex: 'updatedBy',
+      key: 'updatedBy',
+      width: 120,
+      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
+    },
+    {
+      title: t('promotionSlotConfig.colLastUpdateTime'),
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 170,
+      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
     },
     {
       title: t('common.colAction'),
@@ -331,6 +360,12 @@ export default function PromotionSlotConfig() {
                 { label: t('common.disable'), value: 2 },
               ]}
             />
+          </Form.Item>
+          <Form.Item label={t('promotionSlotConfig.colLastUpdater')} name="updatedBy">
+            <Input placeholder={t('promotionSlotConfig.placeholderUpdater')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('promotionSlotConfig.colLastUpdateTime')} name="updatedAtRange">
+            <DatePicker.RangePicker style={{ width: '100%' }} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

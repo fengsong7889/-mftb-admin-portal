@@ -895,6 +895,12 @@ export interface WaterfallQuery {
   status?: number
   /** 按算法過濾（包含該算法的策略） */
   algoId?: number
+  /** 最後更新人（模糊匹配） */
+  updatedBy?: string
+  /** 最後更新時間起（YYYY-MM-DD HH:mm:ss） */
+  updatedAtStart?: string
+  /** 最後更新時間止（YYYY-MM-DD HH:mm:ss） */
+  updatedAtEnd?: string
 }
 
 /** 策略分頁查詢 */

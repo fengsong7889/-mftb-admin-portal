@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '../constants'
 import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, brandToAppType, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -41,6 +42,8 @@ export interface AlgorithmRecord {
   brand?: AppType  // 所属品牌
   status: ServiceStatus
   slotCount: number
+  updatedBy?: string
+  updatedAt?: string
 }
 
 /** 後端算法 VO → 前端列表記錄 */
@@ -54,6 +57,8 @@ const toAlgorithmRecord = (vo: AdAlgorithm): AlgorithmRecord => ({
   brand: brandToAppType(vo.brand),
   status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
   slotCount: vo.slotCount ?? 0,
+  updatedBy: vo.updatedBy,
+  updatedAt: vo.updatedAt ? dayjs(vo.updatedAt).format('YYYY-MM-DD HH:mm:ss') : undefined,
 })
 
 export default function Algorithm() {
@@ -231,6 +236,8 @@ export default function Algorithm() {
     { key: 'name', title: t('algorithm.colAlgorithmName') },
     { key: 'brand', title: t('common.colBrand') },
     { key: 'status', title: t('common.colStatus') },
+    { key: 'updatedBy', title: t('algorithm.colLastUpdater') },
+    { key: 'updatedAt', title: t('algorithm.colLastUpdateTime') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
@@ -252,6 +259,14 @@ export default function Algorithm() {
           {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
         </Tag>
       ),
+    },
+    {
+      title: t('algorithm.colLastUpdater'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
+      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
+    },
+    {
+      title: t('algorithm.colLastUpdateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
     },
     {
       title: t('common.colAction'), key: 'action', width: 280,

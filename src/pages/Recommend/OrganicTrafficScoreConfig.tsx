@@ -489,6 +489,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                       : <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
                     }
                   </span>
+                  {/* 規則ID */}
+                  <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>{rule.id}</Tag>
+                  <span style={{ width: 14, flexShrink: 0 }} />
                   {/* 規則名稱 */}
                   <span style={{ fontWeight: 500, color: '#262626', fontSize: 14 }}>{rule.name}</span>
                   {/* 右側：狀態 + 操作 */}
@@ -522,41 +525,35 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     background: isEditingInline ? '#FFFBE6' : '#FAFAFA',
                     borderTop: '1px solid ' + (isEditingInline ? '#FFE58F' : '#f0f0f0'),
                   }}>
-                    {/* ── 元信息行：規則ID + 計分方式 + 分值 + 操作按鈕 ── */}
+                    {/* ── 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                      <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>{rule.id}</Tag>
-                      <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>{MODE_LABEL[rule.mode]}</Tag>
-                      {rule.mode === ScoreMode.RULE_BONUS && (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>+{rule.score} 分</span>
-                      )}
-                      {rule.mode === ScoreMode.RULE_DEDUCTION && (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#FF4D4F' }}>{rule.score} 分</span>
-                      )}
-                      {rule.mode === ScoreMode.DECAY && (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#722ED1' }}>{rule.score} 分</span>
-                      )}
-                      {rule.mode === ScoreMode.AMOUNT_MULTIPLIER && (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>×{rule.score}</span>
-                      )}
-                      {rule.statDays && (
-                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>統計 {rule.statDays} 天</span>
-                      )}
-                      {!readOnly && (
-                        <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                          {!isEditingInline ? (
-                            <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
-                              style={{ borderRadius: 4, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
-                              編輯
-                            </Button>
-                          ) : (
-                            <Space size={6}>
-                              <Button size="small" onClick={() => handleInlineCancel(rule.id)}
-                                style={{ borderRadius: 4, fontSize: 12, height: 28 }}>取消</Button>
-                              <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleInlineSave(rule.id)}
-                                style={{ borderRadius: 4, fontSize: 12, height: 28, backgroundColor: '#E8720C', borderColor: '#E8720C' }}>保存</Button>
-                            </Space>
+                      {!isEditingInline && (
+                        <>
+                          <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>{MODE_LABEL[rule.mode]}</Tag>
+                          {rule.mode === ScoreMode.RULE_BONUS && (
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>+{rule.score} 分</span>
                           )}
-                        </div>
+                          {rule.mode === ScoreMode.RULE_DEDUCTION && (
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#FF4D4F' }}>{rule.score} 分</span>
+                          )}
+                          {rule.mode === ScoreMode.DECAY && (
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#722ED1' }}>{rule.score} 分</span>
+                          )}
+                          {rule.mode === ScoreMode.AMOUNT_MULTIPLIER && (
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>×{rule.score}</span>
+                          )}
+                          {rule.statDays && (
+                            <span style={{ fontSize: 12, color: '#8C8C8C' }}>統計 {rule.statDays} 天</span>
+                          )}
+                          {!readOnly && (
+                            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                              <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
+                                style={{ borderRadius: 4, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
+                                編輯
+                              </Button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -564,21 +561,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     {!isEditingInline ? (
                       /* 顯示模式 */
                       <>
-                        <div style={{ fontSize: 13, color: '#595959', marginBottom: 8, lineHeight: 1.6 }}>
-                          {rule.description}
-                        </div>
-                        {rule.prerequisites && (
-                          <div style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 6,
-                            padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
-                            border: '1px solid #d3adf7', marginBottom: 10,
-                          }}>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>前提條件</span>
-                            <span style={{ fontSize: 13, color: '#595959' }}>{rule.prerequisites}</span>
-                          </div>
-                        )}
                         {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && (
-                          <div style={{ marginTop: 8 }}>
+                          <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                               {rule.conditionItems.map((item: ScoreConditionItem, i: number) => (
@@ -599,7 +583,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           </div>
                         )}
                         {rule.mode === ScoreMode.TIERED && rule.tiers?.length && (
-                          <div style={{ marginTop: 8 }}>
+                          <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                               {rule.tiers.map((tier: ScoreTier, i: number) => (
@@ -620,7 +604,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           </div>
                         )}
                         {rule.rangeScores && (
-                          <div style={{ marginTop: 8 }}>
+                          <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>配送範圍分值</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                               {RANGE_SCORE_KEYS.map(key => (
@@ -635,14 +619,22 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {!rule.rangeScores && [ScoreMode.RULE_BONUS, ScoreMode.RULE_DEDUCTION, ScoreMode.DECAY].includes(rule.mode) && (
-                          <div style={{ marginTop: 8, fontSize: 13 }}>
-                            <span style={{ color: '#8C8C8C' }}>分值：</span>
-                            <span style={{ fontWeight: 600, fontSize: 16, color: rule.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
-                              {rule.score >= 0 ? '+' : ''}{rule.score} 分
-                            </span>
+                        {/* 備註（描述 + 前提條件）放最下面 */}
+                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #e8e8e8' }}>
+                          <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
+                            {rule.description}
                           </div>
-                        )}
+                          {rule.prerequisites && (
+                            <div style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
+                              border: '1px solid #d3adf7', marginTop: 8,
+                            }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>前提條件</span>
+                              <span style={{ fontSize: 13, color: '#595959' }}>{rule.prerequisites}</span>
+                            </div>
+                          )}
+                        </div>
                       </>
                     ) : (
                       /* 編輯模式 */
@@ -650,14 +642,27 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                           <div>
                             <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>規則名稱</div>
-                            <Input size="small" value={form.name} maxLength={30} showCount
+                            <Input value={form.name} maxLength={30} showCount
                               onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], name: e.target.value } }) as any)} />
                           </div>
                           <div>
                             <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
-                            <Input size="small" value={form.prerequisites || ''} maxLength={60} showCount allowClear
+                            <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
                               placeholder="填寫規則生效的前提條件"
                               onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: e.target.value || undefined } }) as any)} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
+                            <Select value={form.mode} style={{ width: '100%' }}
+                              options={MODE_OPTIONS}
+                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], mode: val } }) as any)} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>分值</div>
+                            <InputNumber value={form.score} min={-100} max={100} style={{ width: '100%' }}
+                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                           </div>
                         </div>
                         <div>
@@ -665,24 +670,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           <Input.TextArea size="small" value={form.description} rows={2} maxLength={120} showCount
                             onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], description: e.target.value } }) as any)} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                          <div>
-                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
-                            <Select size="small" value={form.mode} style={{ width: '100%' }}
-                              options={MODE_OPTIONS}
-                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], mode: val } }) as any)} />
+                        {/* 最後一排：狀態 + 取消/保存 */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px dashed #e8e8e8' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 12, color: '#595959' }}>狀態</span>
+                            <Switch checked={form.status === ServiceStatus.ENABLED}
+                              checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
+                              onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], status: checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED } }) as any)} />
                           </div>
-                          <div>
-                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>分值</div>
-                            <InputNumber size="small" value={form.score} min={-100} max={100} style={{ width: '100%' }}
-                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
-                          </div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>狀態</div>
-                          <Switch checked={form.status === ServiceStatus.ENABLED}
-                            checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
-                            onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], status: checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED } }) as any)} />
+                          <Space size={6}>
+                            <Button size="small" onClick={() => handleInlineCancel(rule.id)}
+                              style={{ borderRadius: 4, fontSize: 12, height: 28 }}>取消</Button>
+                            <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleInlineSave(rule.id)}
+                              style={{ borderRadius: 4, fontSize: 12, height: 28, backgroundColor: '#E8720C', borderColor: '#E8720C' }}>保存</Button>
+                          </Space>
                         </div>
                       </div>
                     )}
