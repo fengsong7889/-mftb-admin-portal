@@ -27,10 +27,14 @@ const ALGO_TYPE_LABEL: Record<number, string> = {
   2: 'recommend:algoNewStoreAd',
   3: 'recommend:algoHotReviveAd',
   4: 'recommend:algoExclusiveMerchant',
-  5: 'recommend:algoTrafficAd',
+  5: 'recommend:algoPopularMerchant',
   6: 'recommend:algoGuessYouLike',
   7: 'recommend:algoOrganicTraffic',
-  10: 'recommend:algoPopularMerchant',
+  11: 'recommend:algoBrandMerchant',
+  12: 'recommend:algoGoldAd',
+  13: 'recommend:algoGoldenSignboard',
+  14: 'recommend:algoProductPromo',
+  15: 'recommend:algoTrafficAd',
 }
 
 /** 算法类型颜色 */

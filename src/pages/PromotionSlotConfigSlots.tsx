@@ -34,10 +34,14 @@ const ALGO_TYPE_LABEL: Record<number, string> = {
   2: 'recommend:algoNewStoreAd',
   3: 'recommend:algoHotReviveAd',
   4: 'recommend:algoExclusiveMerchant',
-  5: 'recommend:algoTrafficAd',
+  5: 'recommend:algoPopularMerchant',
   6: 'recommend:algoGuessYouLike',
   7: 'recommend:algoOrganicTraffic',
-  10: 'recommend:algoPopularMerchant',
+  11: 'recommend:algoBrandMerchant',
+  12: 'recommend:algoGoldAd',
+  13: 'recommend:algoGoldenSignboard',
+  14: 'recommend:algoProductPromo',
+  15: 'recommend:algoTrafficAd',
 }
 
 /** 算法类型颜色 */
@@ -105,14 +109,14 @@ export default function PromotionSlotConfigSlots() {
   const slotGridRef = useRef<HTMLDivElement | null>(null)
   const [slotCellWidth, setSlotCellWidth] = useState(0)
 
-  /** 加载可选算法（排除自然流量，自然流量仅在瀑布流配置的兆底算法区域选择） */
+  /** 加载可选算法（排除自然流量和人气商家：自然流量仅在兆底算法区域选择；人气商家在销售定价菜单配置） */
   useEffect(() => {
     fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
       .then(res => {
         if (res.records.length > 0) {
           setAlgorithmOptions(
             res.records
-              .filter(a => a.algoType !== 7)  // 排除自然流量(ORGANIC_TRAFFIC=7)
+              .filter(a => a.algoType !== 7 && a.algoType !== 5)  // 排除自然流量(7)和人气商家(5)
               .map(a => ({
                 label: a.algoName,
                 value: a.algoCode as string,
