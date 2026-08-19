@@ -6,6 +6,8 @@ import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.dto.UserInfoVO;
+import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.util.JwtUtil;
@@ -20,6 +22,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * 认证接口
  */
@@ -31,6 +36,12 @@ public class AuthController {
     private final AuthService authService;
     private final LoginLogService loginLogService;
     private final JwtUtil jwtUtil;
+    private final SysUserMapper sysUserMapper;
+
+    /** 活跃时间更新节流间隔（毫秒），与 JwtAuthenticationFilter 保持一致 5 分钟 */
+    private static final long UPDATE_THROTTLE_MS = 5 * 60 * 1000L;
+    /** 每个用户上次更新 last_active_at 的时间戳（内存节流） */
+    private final ConcurrentHashMap<String, Long> checkLastUpdateMap = new ConcurrentHashMap<>();
 
     /** 登录 */
     @PostMapping("/login")
@@ -98,6 +109,29 @@ public class AuthController {
                     ? new Result<>(check.getCode(), check.getMessage(), check.getData())
                     : Result.error(check.getCode(), check.getMessage());
         }
+        // 会话正常 → 节流更新 last_active_at（前端轮询也代表用户在线）
+        throttleUpdateLastActive(username);
         return Result.success();
+    }
+
+    /**
+     * 节流更新用户最后活跃时间:
+     * 同一用户每 5 分钟最多更新一次数据库，与 JwtAuthenticationFilter 逻辑一致。
+     * 前端 /api/auth/check 轮询跳过了 Filter，需在此处补充更新。
+     */
+    private void throttleUpdateLastActive(String username) {
+        long now = System.currentTimeMillis();
+        Long lastUpdate = checkLastUpdateMap.get(username);
+        if (lastUpdate == null || now - lastUpdate > UPDATE_THROTTLE_MS) {
+            sysUserMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                            .eq(SysUser::getUsername, username)
+                            .set(SysUser::getLastActiveAt, LocalDateTime.now()));
+            checkLastUpdateMap.put(username, now);
+        }
+        if (checkLastUpdateMap.size() > 500) {
+            long threshold = now - UPDATE_THROTTLE_MS * 2;
+            checkLastUpdateMap.entrySet().removeIf(e -> e.getValue() < threshold);
+        }
     }
 }
