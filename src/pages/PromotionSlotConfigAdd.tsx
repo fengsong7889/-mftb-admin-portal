@@ -92,6 +92,19 @@ export default function PromotionSlotConfigAdd() {
   const [naturalAlgoId, setNaturalAlgoId] = useState<string | undefined>(undefined)
   /** 是否有未保存的坑位變更（從坑位頁返回後或修改坑位後為 true） */
   const [hasUnsavedSlotChanges, setHasUnsavedSlotChanges] = useState(false)
+  /** 手机状态栏实时时间 */
+  const [phoneTime, setPhoneTime] = useState(() => {
+    const now = new Date()
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+  })
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      setPhoneTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`)
+    }
+    const id = setInterval(tick, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   /** 自然流量兜底算法選項：只展示算法庫中「自然流量」類型（algoType=7）的算法 */
   const naturalAlgoOptions = useMemo(
@@ -536,96 +549,202 @@ export default function PromotionSlotConfigAdd() {
 
       {/* 下方：手机模型 + 算法列表 */}
       <div style={{ display: 'flex', gap: 24 }}>
-        {/* 左侧：手机模型 */}
-        <div style={{
-          width: 375, height: 720, flexShrink: 0,
-          background: 'linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%)',
-          borderRadius: 40, padding: '60px 20px 30px',
-          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255,255,255,0.1)',
-          border: '10px solid #1a1a1a', position: 'relative',
-        }}>
-          {/* 顶部状态栏 */}
+        {/* 左侧：手机模型（iPhone 风格高仿真预览） */}
+        <div style={{ width: 375, flexShrink: 0, position: 'relative' }}>
+          {/* 侧边按钮：音量 + */}
           <div style={{
-            position: 'absolute', top: 16, left: 0, right: 0,
-            padding: '0 24px', display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', fontSize: 12, color: '#333', fontWeight: 600,
-          }}>
-            <span>9:41</span>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 11 }}>📶</span>
-              <span style={{ fontSize: 11 }}>🔋</span>
-            </div>
-          </div>
-
-          {/* 屏幕内容区 */}
+            position: 'absolute', left: -3, top: 150,
+            width: 3, height: 32, borderRadius: '2px 0 0 2px',
+            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
+          }} />
+          {/* 侧边按钮：音量 - */}
           <div style={{
-            background: '#fff', borderRadius: 24, padding: '16px',
-            height: 'calc(100% - 20px)', overflow: 'hidden',
-            boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
-            display: 'flex', flexDirection: 'column',
-          }}>
-            {/* 标题栏 */}
-            <div style={{
-              textAlign: 'center', padding: '12px 0', marginBottom: 16,
-              borderBottom: '1px solid #f0f0f0', flexShrink: 0,
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 6 }}>
-                {phoneTitle}
-              </div>
-              <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: 1.5 }}>
-                {t('promotionSlotConfig:previewHint')}
-              </div>
-            </div>
+            position: 'absolute', left: -3, top: 195,
+            width: 3, height: 32, borderRadius: '2px 0 0 2px',
+            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
+          }} />
+          {/* 侧边按钮：静音开关 */}
+          <div style={{
+            position: 'absolute', left: -3, top: 112,
+            width: 3, height: 20, borderRadius: '2px 0 0 2px',
+            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
+          }} />
+          {/* 侧边按钮：电源 */}
+          <div style={{
+            position: 'absolute', right: -3, top: 160,
+            width: 3, height: 52, borderRadius: '0 2px 2px 0',
+            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
+          }} />
 
-            {/* 瀑布流位置列表（支持拖拽排序） */}
+          {/* 手机外壳（深空蓝钛金属配色） */}
+          <div style={{
+            width: 375, height: 720, borderRadius: 52, position: 'relative',
+            background: 'linear-gradient(160deg, #3E5C76 0%, #2C4A64 30%, #1B3A52 60%, #263F56 100%)',
+            boxShadow: [
+              '0 24px 64px rgba(20,40,65,0.40)',
+              '0 8px 24px rgba(0,0,0,0.22)',
+              'inset 0 1px 0 rgba(180,210,240,0.18)',
+              'inset 0 -1px 0 rgba(0,0,0,0.35)',
+              'inset 1px 0 0 rgba(180,210,240,0.08)',
+              'inset -1px 0 0 rgba(180,210,240,0.08)',
+            ].join(', '),
+          }}>
+            {/* 金属中框高光边 */}
             <div style={{
-              display: 'flex', flexDirection: 'column', gap: 10,
-              overflow: 'auto', flex: 1,
+              position: 'absolute', inset: 0, borderRadius: 52,
+              border: '1px solid rgba(180,210,240,0.12)',
+              pointerEvents: 'none', zIndex: 2,
+            }} />
+
+            {/* 天线带 */}
+            <div style={{
+              position: 'absolute', top: 90, left: -1, width: 2, height: 6,
+              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
+            }} />
+            <div style={{
+              position: 'absolute', top: 90, right: -1, width: 2, height: 6,
+              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
+            }} />
+            <div style={{
+              position: 'absolute', bottom: 130, left: -1, width: 2, height: 6,
+              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
+            }} />
+            <div style={{
+              position: 'absolute', bottom: 130, right: -1, width: 2, height: 6,
+              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
+            }} />
+
+            {/* 屏幕区域 */}
+            <div style={{
+              position: 'absolute', inset: 10, borderRadius: 42,
+              background: '#000', overflow: 'hidden',
             }}>
-              {slotAlgorithms.filter(item => item.status === 1).length === 0 && (
-                <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 13, padding: '24px 0' }}>
-                  {t('promotionSlotConfig:noConfiguredSlot')}
-                </div>
-              )}
-              {slotAlgorithms.filter(item => item.status === 1).map((item, index) => (
-                <div
-                  key={item.position}
-                  draggable={!isDetailMode}
-                  onDragStart={() => !isDetailMode && handleDragStart(index)}
-                  onDragOver={(e) => !isDetailMode && handleDragOver(e, index)}
-                  onDrop={() => !isDetailMode && handleDrop(index)}
-                  onDragEnd={handleDragEnd}
-                  style={{
-                    background: '#FAFAFA',
-                    borderRadius: 12,
-                    padding: '12px 16px',
-                    border: dragOverIndex === index ? '2px solid #1890ff' : '1px solid #F0F0F0',
-                    opacity: dragIndex === index ? 0.4 : 1,
-                    cursor: isDetailMode ? 'default' : 'grab',
-                    transition: 'border 0.2s, opacity 0.2s',
-                  }}
-                >
+              {/* 屏幕内容容器 */}
+              <div style={{
+                position: 'absolute', inset: 0, borderRadius: 42,
+                background: '#F5F5F5', overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                {/* 状态栏 */}
+                <div style={{
+                  height: 50, padding: '14px 28px 0', display: 'flex',
+                  justifyContent: 'space-between', alignItems: 'center',
+                  background: '#fff', flexShrink: 0, position: 'relative', zIndex: 5,
+                }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: '#000', letterSpacing: 0.5 }}>{phoneTime}</span>
+                  {/* 灵动岛 */}
                   <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {!isDetailMode && (
-                        <HolderOutlined style={{ color: '#bfbfbf', fontSize: 14, cursor: 'grab' }} />
-                      )}
-                      <Badge
-                        count={t('promotionSlotConfig:posNum', { pos: item.position })}
-                        style={{ backgroundColor: '#1890ff' }}
-                      />
-                    </div>
-                    <Tag color={ALGO_TYPE_COLOR[item.algorithmType] ?? 'default'}>
-                      {ALGO_TYPE_LABEL[item.algorithmType] ? t(ALGO_TYPE_LABEL[item.algorithmType]) : t('promotionSlotConfig:algoTypeFallback', { type: item.algorithmType })}
-                    </Tag>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
-                    {item.algorithmName}
+                    position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+                    width: 110, height: 30, background: '#000', borderRadius: 16, zIndex: 10,
+                  }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {/* 蜂窝信号图标 */}
+                    <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+                      <rect x="0" y="9" width="3" height="3" rx="0.5" fill="#000"/>
+                      <rect x="4.5" y="6" width="3" height="6" rx="0.5" fill="#000"/>
+                      <rect x="9" y="3" width="3" height="9" rx="0.5" fill="#000"/>
+                      <rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="#000"/>
+                    </svg>
+                    {/* WiFi 图标 */}
+                    <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                      <circle cx="8" cy="10" r="1.5" fill="#000"/>
+                      <path d="M4.5 8c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8" stroke="#000" strokeWidth="1.3" strokeLinecap="round"/>
+                      <path d="M1.8 5.5C3.5 3.5 5.6 2.5 8 2.5s4.5 1 6.2 3" stroke="#000" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                    {/* 电池图标 */}
+                    <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+                      <rect x="0.5" y="0.5" width="22" height="12" rx="2.5" stroke="#000" strokeOpacity="0.35"/>
+                      <rect x="2" y="2" width="19" height="9" rx="1.5" fill="#000"/>
+                      <path d="M24 4.5v4a2 2 0 0 0 0-4z" fill="#000" fillOpacity="0.4"/>
+                    </svg>
                   </div>
                 </div>
-              ))}
+
+                {/* APP 导航栏 */}
+                <div style={{
+                  background: '#fff', padding: '8px 16px 12px',
+                  borderBottom: '0.5px solid rgba(0,0,0,0.08)', flexShrink: 0,
+                  textAlign: 'center', position: 'relative',
+                }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: '#262626', letterSpacing: 0.3 }}>
+                    {phoneTitle}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 3, lineHeight: 1.4 }}>
+                    {t('promotionSlotConfig:previewHint')}
+                  </div>
+                </div>
+
+                {/* 瀑布流位置列表（支持拖拽排序） */}
+                <div style={{
+                  flex: 1, overflow: 'auto', padding: '12px 14px 28px',
+                  display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                  {slotAlgorithms.filter(item => item.status === 1).length === 0 && (
+                    <div style={{
+                      textAlign: 'center', color: '#bfbfbf', fontSize: 13,
+                      padding: '40px 16px', lineHeight: 1.8,
+                    }}>
+                      {t('promotionSlotConfig:noConfiguredSlot')}
+                    </div>
+                  )}
+                  {slotAlgorithms.filter(item => item.status === 1).map((item, index) => (
+                    <div
+                      key={item.position}
+                      draggable={!isDetailMode}
+                      onDragStart={() => !isDetailMode && handleDragStart(index)}
+                      onDragOver={(e) => !isDetailMode && handleDragOver(e, index)}
+                      onDrop={() => !isDetailMode && handleDrop(index)}
+                      onDragEnd={handleDragEnd}
+                      style={{
+                        background: '#FAFAFA',
+                        borderRadius: 12,
+                        padding: '12px 16px',
+                        border: dragOverIndex === index ? '2px solid #1890ff' : '1px solid #F0F0F0',
+                        opacity: dragIndex === index ? 0.4 : 1,
+                        cursor: isDetailMode ? 'default' : 'grab',
+                        transition: 'border 0.2s, opacity 0.2s',
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {!isDetailMode && (
+                            <HolderOutlined style={{ color: '#bfbfbf', fontSize: 14, cursor: 'grab' }} />
+                          )}
+                          <Badge
+                            count={t('promotionSlotConfig:posNum', { pos: item.position })}
+                            style={{ backgroundColor: '#1890ff' }}
+                          />
+                        </div>
+                        <Tag color={ALGO_TYPE_COLOR[item.algorithmType] ?? 'default'}>
+                          {ALGO_TYPE_LABEL[item.algorithmType] ? t(ALGO_TYPE_LABEL[item.algorithmType]) : t('promotionSlotConfig:algoTypeFallback', { type: item.algorithmType })}
+                        </Tag>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
+                        {item.algorithmName}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Home 指示条 */}
+                <div style={{
+                  height: 28, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', flexShrink: 0, background: '#F5F5F5',
+                }}>
+                  <div style={{
+                    width: 120, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.18)',
+                  }} />
+                </div>
+              </div>
+
+              {/* 屏幕玻璃光泽反射 */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: '40%', bottom: '55%',
+                background: 'linear-gradient(165deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 40%, transparent 100%)',
+                borderRadius: '42px 42px 60px 0', pointerEvents: 'none', zIndex: 20,
+              }} />
             </div>
           </div>
         </div>

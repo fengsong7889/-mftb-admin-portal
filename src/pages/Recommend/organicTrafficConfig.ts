@@ -193,14 +193,13 @@ const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 /** 默認評分規則（可在界面上新增/停用/調整分值） */
 export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   // ===== 商業維度（商家營銷投入與付費推廣） =====
-  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動固定加分', mode: ScoreMode.RULE_BONUS, score: 30, prerequisites: '商家報名滿額立減活動', status: ENABLED, builtin: true },
-  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費固定加分', mode: ScoreMode.RULE_BONUS, score: 20, prerequisites: '商家報名免運費活動', status: ENABLED, builtin: true },
-  { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '浮動計分：得分 = 領券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減活動固定加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
-  { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '浮動計分：得分 = 贈券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包-按金額', description: '浮動計分：得分 = 紅包金額 × 倍率，如紅包 10 元、倍率 2 則得 20 分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券-按金額', description: '浮動計分：得分 = 券金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_08', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減-按平均折扣', description: '浮動計分：得分 = 商家出資金額 × 倍率', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費加分', mode: ScoreMode.RULE_BONUS, score: 20, status: ENABLED, builtin: true },
+  { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '商家設置進店領券加分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減活動加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '商家設置收藏送券加分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包-按金額', description: '商家設置會員紅包加分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券-按金額', description: '商家設置閃蜂官方神券加分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_09', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 80, status: ENABLED, builtin: true },
   { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-金字招牌', description: '購買金字招牌廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
   { id: 'COM_11', dimension: ScoreDimension.COMMERCIAL, name: '訂單加分', description: '根據商家參與活動類型與訂單量綜合條件加分', mode: ScoreMode.CONDITIONAL, score: 0, prerequisites: '商家需有有效訂單', conditionItems: [
