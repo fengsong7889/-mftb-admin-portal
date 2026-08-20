@@ -1066,7 +1066,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                     </div>
                                     <span style={{
                                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                      height: 24, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                      height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
                                       color: isBonus ? '#52C41A' : '#FF4D4F',
                                       background: isBonus ? '#f6ffed' : '#fff2f0',
                                       border: `1px solid ${isBonus ? '#b7eb8f' : '#ffccc7'}`,
@@ -1124,7 +1124,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                     </div>
                                     <span style={{
                                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                      height: 24, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                      height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
                                       color: m.color, background: m.bg, border: `1px solid ${m.border}`,
                                     }}>
                                       {m.badge}
@@ -1206,8 +1206,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       <span style={{ fontSize: 13, color: '#595959' }}>
                                         訂單量 ≤ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
                                       </span>
-                                      <span style={{ fontWeight: 600, fontSize: 14, color: '#52C41A' }}>
-                                        固定加分：{tier.score} 分
+                                      <span style={{
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                        color: '#52C41A',
+                                        background: '#f6ffed',
+                                        border: '1px solid #b7eb8f',
+                                      }}>
+                                        固定加分
+                                      </span>
+                                      <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
+                                        {tier.score} 分
                                       </span>
                                     </div>
                                   )
@@ -1244,8 +1253,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       <span style={{ fontSize: 13, color: '#595959' }}>
                                         訂單量 ≥ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
                                       </span>
-                                      <span style={{ fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>
-                                        固定減分：{Math.abs(tier.score)} 分
+                                      <span style={{
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                        color: '#FF4D4F',
+                                        background: '#fff2f0',
+                                        border: '1px solid #ffccc7',
+                                      }}>
+                                        固定減分
+                                      </span>
+                                      <span style={{ fontSize: 15, fontWeight: 600, color: '#FF4D4F' }}>
+                                        {Math.abs(tier.score)} 分
                                       </span>
                                     </div>
                                   )
@@ -1282,7 +1300,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <div style={{ fontSize: 13, color: '#595959' }}>
                                     主營時段出餐 ≤ 歷史基線
                                   </div>
-                                  <span style={{ fontWeight: 600, fontSize: 14, color: '#52C41A' }}>固定加分 +{primaryScore} 分</span>
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                    color: '#52C41A',
+                                    background: '#f6ffed',
+                                    border: '1px solid #b7eb8f',
+                                  }}>
+                                    固定加分
+                                  </span>
+                                  <span style={{ fontWeight: 600, fontSize: 15, color: '#52C41A' }}>+{primaryScore} 分</span>
                                 </div>
                                 <div style={{
                                   display: 'flex', alignItems: 'center', gap: 12,
@@ -1291,7 +1318,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <div style={{ fontSize: 13, color: '#595959' }}>
                                     輔營時段出餐 ≤ 歷史基線
                                   </div>
-                                  <span style={{ fontWeight: 600, fontSize: 14, color: '#52C41A' }}>固定加分 +{secondaryScore} 分</span>
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                    color: '#52C41A',
+                                    background: '#f6ffed',
+                                    border: '1px solid #b7eb8f',
+                                  }}>
+                                    固定加分
+                                  </span>
+                                  <span style={{ fontWeight: 600, fontSize: 15, color: '#52C41A' }}>+{secondaryScore} 分</span>
                                 </div>
                               </div>
                             </div>
@@ -1314,7 +1350,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
                               }}>
                                 <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每拒絕一單</span>
-                                <span style={{ fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>固定扣分 {perOrder} 分</span>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                  color: '#FF4D4F',
+                                  background: '#fff2f0',
+                                  border: '1px solid #ffccc7',
+                                }}>
+                                  固定減分
+                                </span>
+                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
                               </div>
                               <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
                                 備注：統計天數含當天，商家當天拒絕接單即即時扣分
@@ -1339,7 +1384,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
                               }}>
                                 <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每超時一單</span>
-                                <span style={{ fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>固定扣分 {perOrder} 分</span>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                  color: '#FF4D4F',
+                                  background: '#fff2f0',
+                                  border: '1px solid #ffccc7',
+                                }}>
+                                  固定減分
+                                </span>
+                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
                               </div>
                               <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
                                 備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分
@@ -1364,7 +1418,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
                               }}>
                                 <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每取消一單</span>
-                                <span style={{ fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>固定扣分 {perOrder} 分</span>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                  color: '#FF4D4F',
+                                  background: '#fff2f0',
+                                  border: '1px solid #ffccc7',
+                                }}>
+                                  固定減分
+                                </span>
+                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
                               </div>
                               <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
                                 備注：統計天數含當天，商家當天取消訂單即即時扣分
@@ -1389,7 +1452,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
                               }}>
                                 <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每超時一單</span>
-                                <span style={{ fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>固定扣分 {perOrder} 分</span>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                  color: '#FF4D4F',
+                                  background: '#fff2f0',
+                                  border: '1px solid #ffccc7',
+                                }}>
+                                  固定減分
+                                </span>
+                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
                               </div>
                               <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
                                 備注：統計天數含當天，商家當天超時接單即即時扣分
