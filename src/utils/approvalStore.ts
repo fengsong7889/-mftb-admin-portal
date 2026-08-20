@@ -304,7 +304,7 @@ function writeApprovedRecords(record: ApprovalRecord, tradeTime: string): void {
 
 /**
  * 推廣贈送審批全部通過後寫入贈送記錄（此時剩餘天數才會新增）
- * 審批未通過/被駁回的申請不會寫入；後端不可用時由 gift API 自動降級寫入本地 Mock 贈送數據
+ * 審批未通過/被駁回的申請不會寫入；後端不可用時寫入失敗但不阻斷審批流轉
  */
 function writeGiftApprovedRecord(record: ApprovalRecord): void {
   const extra = (record.extra || {}) as Record<string, any>

@@ -1,12 +1,4 @@
 import request, { SILENT_HEADER, isBackendUnavailable } from './request'
-import {
-  mockFetchGiftRecords,
-  mockCreateGiftRecord,
-  mockFetchGiftRecordDetail,
-  mockFetchGiftRecordsByStore,
-  mockDeductGiftDays,
-  mockFetchGiftConsume,
-} from './mock/giftMock'
 
 /** 赠送记录 */
 export interface GiftRecordItem {
@@ -98,59 +90,44 @@ export interface GiftConsumePageResult {
   total: number
 }
 
-/** 静默请求头：后端不可用时降级到 Mock，不弹全局错误提示 */
+/** 静默请求头：后端不可用时不弹全局错误提示 */
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
-/** 推广赠送列表（后端不可用时自动降级到本地 Mock 数据） */
+/** 推广赠送列表 */
 export async function fetchGiftRecords(params: {
   page?: number; size?: number; groupId?: number; storeId?: number; brand?: string; adType?: string
 }) {
   try {
     return await request.get<unknown, GiftRecordPageResult>('/gifts', { params, ...SILENT })
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockFetchGiftRecords(params)
+    if (isBackendUnavailable(err)) return { records: [], total: 0 }
     throw err
   }
 }
 
 /** 新增赠送申请 */
 export async function createGiftRecord(data: GiftRecordPayload) {
-  try {
-    return await request.post<unknown, GiftRecordItem>('/gifts', data, SILENT)
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockCreateGiftRecord(data)
-    throw err
-  }
+  return request.post<unknown, GiftRecordItem>('/gifts', data)
 }
 
 /** 赠送明细详情 */
 export async function fetchGiftRecordDetail(id: number) {
-  try {
-    return await request.get<unknown, GiftRecordItem>(`/gifts/${id}`, SILENT)
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockFetchGiftRecordDetail(id)
-    throw err
-  }
+  return request.get<unknown, GiftRecordItem>(`/gifts/${id}`)
 }
 
-/** 指定门店+广告类型的逐笔赠送记录（赠送明细页；后端不可用时自动降级到本地 Mock 数据） */
+/** 指定门店+广告类型的逐笔赠送记录（赠送明细页） */
 export async function fetchGiftRecordsByStore(params: { storeId: number; adType: string }) {
   try {
     return await request.get<unknown, GiftRecordItem[]>('/gifts/records', { params, ...SILENT })
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockFetchGiftRecordsByStore(params)
+    if (isBackendUnavailable(err)) return []
     throw err
   }
 }
 
 /** 扣除赠送天数 */
 export async function deductGiftDays(id: number, data: GiftDeductPayload) {
-  try {
-    return await request.post<unknown, void>(`/gifts/${id}/deduct`, data, SILENT)
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockDeductGiftDays(id, data)
-    throw err
-  }
+  return request.post<unknown, void>(`/gifts/${id}/deduct`, data)
 }
 
 /** 可用赠送天数合计（广告销售下单前展示抵扣余额；后端不可用时返回 0，不降级 Mock） */
@@ -163,7 +140,7 @@ export async function fetchGiftAvailableDays(storeId: number, adType: string): P
   }
 }
 
-/** 消费明细列表（后端不可用时自动降级到本地 Mock 数据） */
+/** 消费明细列表 */
 export async function fetchGiftConsume(params: {
   page?: number; size?: number; groupId?: number; storeId?: number; brand?: string
   adType?: string; tradeType?: string; giftId?: string; orderNo?: string
@@ -172,7 +149,7 @@ export async function fetchGiftConsume(params: {
   try {
     return await request.get<unknown, GiftConsumePageResult>('/gifts/consume', { params, ...SILENT })
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockFetchGiftConsume(params)
+    if (isBackendUnavailable(err)) return { records: [], total: 0 }
     throw err
   }
 }
