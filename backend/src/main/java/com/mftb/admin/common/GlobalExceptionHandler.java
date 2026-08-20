@@ -2,6 +2,7 @@ package com.mftb.admin.common;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -43,6 +44,13 @@ public class GlobalExceptionHandler {
         FieldError fieldError = e.getBindingResult().getFieldError();
         String message = fieldError != null ? fieldError.getDefaultMessage() : "参数绑定失败";
         return Result.error(ResultCode.PARAM_ERROR.getCode(), message);
+    }
+
+    /** 请求体反序列化失败（如类型不匹配） */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<Void> handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
+        log.warn("请求体解析失败: {}", e.getMessage());
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), "请求参数格式错误，请检查数据类型后重试");
     }
 
     /** 唯一键冲突: 并发写入或历史残留时给出友好提示, 避免暴露 "系统繁忙" */

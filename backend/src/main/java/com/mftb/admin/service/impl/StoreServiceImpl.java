@@ -21,6 +21,8 @@ import com.mftb.admin.service.StoreService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -36,6 +38,7 @@ import java.util.stream.Collectors;
 /**
  * 门店服务实现
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StoreServiceImpl implements StoreService {
@@ -170,19 +173,34 @@ public class StoreServiceImpl implements StoreService {
     @Override
     public StoreVO create(StoreRequest request) {
         requireGroupExists(request.getGroupId());
-        BizStore store = new BizStore();
-        store.setGroupId(request.getGroupId());
-        store.setStoreCode(generateStoreCode());
-        store.setStoreName(request.getStoreName().trim());
-        store.setBrand(request.getBrand());
-        store.setBizChannel(request.getBizChannel());
-        store.setLoginAccount(request.getLoginAccount());
-        store.setRegion(request.getRegion());
-        store.setUpdatedBy(operatorResolver.currentOperatorName());
-        store.setDeleted(0);
-        storeMapper.insert(store);
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());
-        return StoreVO.from(store, group.getGroupCode(), group.getGroupName());
+
+        // 唯一键冲突时最多重试 3 次（序号表与实际表不一致时自动修复）
+        int maxRetries = 3;
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            BizStore store = new BizStore();
+            store.setGroupId(request.getGroupId());
+            store.setStoreCode(generateStoreCode());
+            store.setStoreName(request.getStoreName().trim());
+            store.setBrand(request.getBrand());
+            store.setBizChannel(request.getBizChannel());
+            store.setLoginAccount(request.getLoginAccount());
+            store.setRegion(request.getRegion());
+            store.setUpdatedBy(operatorResolver.currentOperatorName());
+            store.setDeleted(0);
+            try {
+                storeMapper.insert(store);
+                return StoreVO.from(store, group.getGroupCode(), group.getGroupName());
+            } catch (DuplicateKeyException e) {
+                if (attempt == maxRetries) {
+                    log.error("门店编码生成连续 {} 次冲突，store_code 序列可能严重偏移", maxRetries + 1);
+                    throw new BusinessException("门店编码生成失败，请联系管理员检查编号序列");
+                }
+                log.warn("门店编码冲突（第{}次），将重新生成: {}", attempt + 1, e.getMessage());
+            }
+        }
+        // unreachable
+        throw new BusinessException("门店创建失败");
     }
 
     @Override

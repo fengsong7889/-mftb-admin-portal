@@ -1188,7 +1188,13 @@ function WaterfallAddGeneral() {
                           } else {
                             next = onlySellTimeSlots.filter(k => k !== slot.key)
                           }
-                          setOnlySellTimeSlots(next)
+                          // 勾选全部 5 个时段时自动切换为「全部」模式
+                          const allSlotKeys = TIME_SLOTS.filter(s => s.key !== 'fullDay').map(s => s.key)
+                          if (allSlotKeys.every(k => next.includes(k))) {
+                            setOnlySellTimeSlots(['fullDay'])
+                          } else {
+                            setOnlySellTimeSlots(next)
+                          }
                         }}
                       >
                         {t(slot.labelKey)}
@@ -1307,9 +1313,14 @@ function WaterfallAddGeneral() {
                       </Form.Item>
                     </div>
                   ) : (
-                    // 無敵星星：按时段计价
+                    // 無敵星星：按时段计价（指定时段模式下只展示已勾选的时段）
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-                      {TIME_SLOTS.map(slot => (
+                      {TIME_SLOTS.filter(slot => {
+                        // 全部时段模式：展示所有时段
+                        if (onlySellTimeSlots.includes('fullDay')) return true
+                        // 指定时段模式：只展示已勾选的时段
+                        return onlySellTimeSlots.includes(slot.key)
+                      }).map(slot => (
                         <Form.Item
                           key={slot.key}
                           label={`${t(slot.labelKey)}${t('recommend.slotPriceSuffix')}`}
@@ -1376,7 +1387,12 @@ function WaterfallAddGeneral() {
                       )}
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                      {TIME_SLOTS.map(slot => {
+                      {TIME_SLOTS.filter(slot => {
+                        // 全部时段模式：展示所有时段折扣
+                        if (onlySellTimeSlots.includes('fullDay')) return true
+                        // 指定时段模式：只展示已勾选的时段折扣
+                        return onlySellTimeSlots.includes(slot.key)
+                      }).map(slot => {
                         const discountValue = config.discounts[slot.key]
                         return (
                         <Form.Item

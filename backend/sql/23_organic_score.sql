@@ -18,24 +18,33 @@ CREATE TABLE IF NOT EXISTS `biz_organic_score_dimension` (
 
 -- 2. 评分规则表
 CREATE TABLE IF NOT EXISTS `biz_organic_score_rule` (
-  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主鍵',
-  `rule_code`    VARCHAR(50)   NOT NULL COMMENT '規則編碼（COM_01 / STB_01 / PLT_01 等）',
-  `dimension`    INT           NOT NULL COMMENT '所屬維度: 1=商業 2=店鋪 4=平台',
-  `name`         VARCHAR(100)  NOT NULL COMMENT '規則名稱',
-  `description`  VARCHAR(500)  DEFAULT '' COMMENT '計分說明',
-  `mode`         INT           NOT NULL COMMENT '計分方式: 1=規則加分 2=衰減函數 3=規則減分 4=金額倍率 5=梯度計分',
-  `score`        INT           NOT NULL DEFAULT 0 COMMENT '分值（扣分為負值；金額倍率時填倍率）',
-  `stat_days`    INT           DEFAULT NULL COMMENT '統計天數（僅部分規則需要）',
-  `range_scores` JSON          DEFAULT NULL COMMENT '配送範圍分層分數 JSON: {"short":80,"medium":60,"long":40,"crossBridge":20}',
-  `tiers`        JSON          DEFAULT NULL COMMENT '梯度檔位 JSON: [{"threshold":50,"direction":"LESS_THAN","score":20}]',
-  `calc_cycle`   VARCHAR(20)   DEFAULT NULL COMMENT '計算周期: NIGHTLY=每晚統計 DAILY=按當天',
-  `status`       INT           NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用',
-  `builtin`      TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '是否系統內置: 1=是 0=否',
-  `sort_order`   INT           NOT NULL DEFAULT 0 COMMENT '排序號',
-  `updated_by`   VARCHAR(50)   DEFAULT NULL COMMENT '最後更新人',
-  `deleted`      INT           NOT NULL DEFAULT 0 COMMENT '邏輯刪除: 0=正常 1=已刪除',
-  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間',
-  `updated_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
+  `id`                BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主鍵',
+  `rule_code`         VARCHAR(50)   NOT NULL COMMENT '規則編碼（COM_01 / STB_01 / PLT_01 等）',
+  `dimension`         INT           NOT NULL COMMENT '所屬維度: 1=商業 2=店鋪 4=平台',
+  `name`              VARCHAR(100)  NOT NULL COMMENT '規則名稱',
+  `description`       VARCHAR(500)  DEFAULT '' COMMENT '計分說明',
+  `mode`              INT           NOT NULL COMMENT '計分方式: 1=規則加分 2=衰減函數 3=規則減分 4=金額倍率 5=梯度計分 6=條件計分',
+  `score`             INT           NOT NULL DEFAULT 0 COMMENT '分值（扣分為負值；金額倍率時填倍率）',
+  `prerequisites`     VARCHAR(500)  DEFAULT NULL COMMENT '前提條件',
+  `stat_days`         INT           DEFAULT NULL COMMENT '統計天數',
+  `stat_days_total`   INT           DEFAULT NULL COMMENT '歷史基線天數',
+  `stat_days_recent`  INT           DEFAULT NULL COMMENT '近期對比天數',
+  `range_scores`      JSON          DEFAULT NULL COMMENT '配送範圍分層分數 JSON',
+  `time_range_scores` JSON          DEFAULT NULL COMMENT '分時段配送範圍分數 JSON',
+  `tiers`             JSON          DEFAULT NULL COMMENT '梯度檔位 JSON',
+  `condition_items`   JSON          DEFAULT NULL COMMENT '條件計分項 JSON',
+  `calc_cycle`        VARCHAR(20)   DEFAULT NULL COMMENT '計算周期: NIGHTLY/DAILY/SCHEDULED',
+  `calc_interval_hours` DECIMAL(5,2) DEFAULT NULL COMMENT '定時監控間隔小時數',
+  `peak_time_ranges`  JSON          DEFAULT NULL COMMENT '高峰時段定義 JSON',
+  `deduction_per_order` INT         DEFAULT NULL COMMENT '每單固定扣分',
+  `decay_coefficient`   DECIMAL(10,4) DEFAULT NULL COMMENT '衰減係數',
+  `status`            INT           NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用',
+  `builtin`           TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '是否系統內置: 1=是 0=否',
+  `sort_order`        INT           NOT NULL DEFAULT 0 COMMENT '排序號',
+  `updated_by`        VARCHAR(50)   DEFAULT NULL COMMENT '最後更新人',
+  `deleted`           INT           NOT NULL DEFAULT 0 COMMENT '邏輯刪除: 0=正常 1=已刪除',
+  `created_at`        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間',
+  `updated_at`        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_rule_code` (`rule_code`),
   KEY `idx_dimension` (`dimension`),
@@ -51,42 +60,53 @@ INSERT IGNORE INTO `biz_organic_score_dimension` (`dimension`, `weight`, `sort_o
 (4, 25, 3, 'system');
 
 -- ============================================================
--- 初始化數據：29 條評分規則（含前端界面現有全部評分項）
+-- 初始化數據：評分規則（與前端 DEFAULT_ORGANIC_SCORE_RULES 同步）
 -- ============================================================
 
--- ===== 商業維度（10 條） =====
-INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `range_scores`, `tiers`, `calc_cycle`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
-('COM_01', 1, '滿額立減', '商家參與滿額立減活動固定加分', 1, 30, NULL, NULL, NULL, NULL, 1, 1, 1, 'system'),
-('COM_02', 1, '減免運費', '商家減免配送運費固定加分', 1, 20, NULL, NULL, NULL, NULL, 1, 1, 2, 'system'),
-('COM_03', 1, '進店領券', '浮動計分：得分 = 領券金額 × 倍率', 4, 2, NULL, NULL, NULL, NULL, 1, 1, 3, 'system'),
-('COM_04', 1, '新客立減', '商家參與新客立減活動固定加分', 1, 30, NULL, NULL, NULL, NULL, 1, 1, 4, 'system'),
-('COM_05', 1, '收藏送券', '浮動計分：得分 = 贈券金額 × 倍率', 4, 2, NULL, NULL, NULL, NULL, 1, 1, 5, 'system'),
-('COM_06', 1, '會員紅包-按金額', '浮動計分：得分 = 紅包金額 × 倍率，如紅包 10 元、倍率 2 則得 20 分', 4, 2, NULL, NULL, NULL, NULL, 1, 1, 6, 'system'),
-('COM_07', 1, '閃蜂官方神券-按金額', '浮動計分：得分 = 券金額 × 倍率', 4, 2, NULL, NULL, NULL, NULL, 1, 1, 7, 'system'),
-('COM_08', 1, '滿額立減-按平均折扣', '浮動計分：得分 = 商家出資金額 × 倍率', 4, 2, NULL, NULL, NULL, NULL, 1, 1, 8, 'system'),
-('COM_09', 1, '購買廣告-點金廣告', '購買點金廣告投放期內加分', 1, 80, NULL, NULL, NULL, NULL, 1, 1, 9, 'system'),
-('COM_10', 1, '購買廣告-金字招牌', '購買金字招牌廣告投放期內加分', 1, 100, NULL, NULL, NULL, NULL, 1, 1, 10, 'system');
+-- ===== 商業維度 =====
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `prerequisites`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('COM_01', 1, '滿額立減', '商家參與滿額立減活動加分', 1, 30, NULL, NULL, 1, 1, 1, 'system'),
+('COM_02', 1, '減免運費', '商家減免配送運費加分', 1, 20, NULL, NULL, 1, 1, 2, 'system'),
+('COM_03', 1, '進店領券', '商家設置進店領券加分', 4, 2, NULL, NULL, 1, 1, 3, 'system'),
+('COM_04', 1, '新客立減', '商家參與新客立減活動加分', 1, 30, NULL, NULL, 1, 1, 4, 'system'),
+('COM_05', 1, '收藏送券', '商家設置收藏送券加分', 4, 2, NULL, NULL, 1, 1, 5, 'system'),
+('COM_06', 1, '會員紅包-按金額', '商家設置會員紅包加分', 4, 2, NULL, NULL, 1, 1, 6, 'system'),
+('COM_07', 1, '閃蜂官方神券-按金額', '商家設置閃蜂官方神券加分', 4, 2, NULL, NULL, 1, 1, 7, 'system'),
+('COM_09', 1, '購買廣告-點金廣告', '購買點金廣告投放期內加分', 1, 80, NULL, NULL, 1, 1, 8, 'system'),
+('COM_10', 1, '購買廣告-金字招牌', '購買金字招牌廣告投放期內加分', 1, 100, NULL, NULL, 1, 1, 9, 'system');
 
--- ===== 店鋪維度（13 條） =====
-INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `range_scores`, `tiers`, `calc_cycle`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
-('STB_01', 2, '主營時段', '主營時段配置完整，當前處於主營時段內加分', 1, 60, NULL, NULL, NULL, NULL, 1, 1, 1, 'system'),
-('STB_04', 2, '店鋪標籤-金牌', '金牌店鋪身份標籤加分', 1, 60, NULL, NULL, NULL, NULL, 1, 1, 2, 'system'),
-('STO_01', 2, '營業狀態', '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', 1, 100, NULL, NULL, NULL, NULL, 1, 1, 3, 'system'),
-('STO_02A', 2, '好評得分', '統計天數內好評數量加分，好評越多得分越高', 1, 100, 30, NULL, NULL, NULL, 1, 1, 4, 'system'),
-('STO_02B', 2, '差評得分', '統計天數內差評數量扣分，差評越多扣分越多', 3, -100, 30, NULL, NULL, NULL, 1, 1, 5, 'system'),
-('STO_03', 2, '店鋪銷量扶持', '統計有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, NULL, NULL, '[{"threshold":50,"direction":"LESS_THAN","score":20,"statDays":30},{"threshold":100,"direction":"LESS_THAN","score":40,"statDays":30},{"threshold":200,"direction":"LESS_THAN","score":60,"statDays":30},{"threshold":500,"direction":"LESS_THAN","score":80,"statDays":30},{"threshold":500,"direction":"MORE_THAN","score":100,"statDays":30}]', NULL, 1, 1, 6, 'system'),
-('STO_03B', 2, '當天訂單超量扣分', '按當天計算，訂單超過閾值按梯度扣分，防止刷單', 5, 0, NULL, NULL, '[{"threshold":200,"direction":"MORE_THAN","score":-10},{"threshold":500,"direction":"MORE_THAN","score":-30},{"threshold":1000,"direction":"MORE_THAN","score":-60}]', 'DAILY', 1, 1, 7, 'system'),
-('STO_04', 2, '出餐速度', '平均出餐時長越短得分越高，店鋪自身效率指標', 2, 90, NULL, NULL, NULL, NULL, 1, 1, 8, 'system'),
-('STO_05', 2, '拒絕訂單', '商家拒絕訂單按次扣分', 3, -80, NULL, NULL, NULL, NULL, 1, 1, 9, 'system'),
-('STO_07', 2, '出餐超時', '超出承諾出餐時長的訂單按佔比扣分', 3, -70, NULL, NULL, NULL, NULL, 1, 1, 10, 'system'),
-('STO_08', 2, '取消訂單', '商家主動取消訂單按次扣分', 3, -80, NULL, NULL, NULL, NULL, 1, 1, 11, 'system'),
-('STO_09', 2, '超時接單', '超出接單時限未接單按次扣分', 3, -60, NULL, NULL, NULL, NULL, 1, 1, 12, 'system');
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `prerequisites`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('COM_11', 1, '訂單加分', '根據商家參與活動類型與訂單量綜合條件加分', 6, 0, '商家需有有效訂單', '[{"condition":"報名免運費活動且當月訂單≥50單","score":30},{"condition":"報名滿額立減活動且當月訂單≥100單","score":50},{"condition":"同時參與兩項活動且當月訂單≥200單","score":80}]', 1, 1, 10, 'system');
 
--- ===== 平台維度（6 條） =====
-INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `range_scores`, `tiers`, `calc_cycle`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
-('PLT_01', 4, '距離衰減', 'e^(-k×距離km)，距離越遠得分越低', 2, 100, NULL, NULL, NULL, NULL, 1, 1, 1, 'system'),
-('PLT_02A', 4, '配送範圍-早餐', '早餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 2, 'system'),
-('PLT_02B', 4, '配送範圍-午餐', '午餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 3, 'system'),
-('PLT_02C', 4, '配送範圍-下午茶', '下午茶時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 4, 'system'),
-('PLT_02D', 4, '配送範圍-晚餐', '晚餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 5, 'system'),
-('PLT_02E', 4, '配送範圍-夜宵', '夜宵時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', 1, 80, NULL, '{"short":80,"medium":60,"long":40,"crossBridge":20}', NULL, NULL, 1, 1, 6, 'system');
+-- ===== 店鋪維度 =====
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STB_01', 2, '主營時段加分', '主營時段配置完整，當前處於主營時段內加分', 1, 60, NULL, 1, 1, 1, 'system'),
+('STB_04', 2, '店鋪標籤-金牌', '金牌店鋪身份標籤加分', 1, 60, NULL, 1, 1, 2, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_01', 2, '營業狀態', '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', 6, 0, '[{"condition":"bonus","score":100},{"condition":"deduction","score":20},{"condition":"deduction","score":50},{"condition":"deduction","score":80}]', 1, 1, 3, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_02', 2, '評價得分', '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率', 6, 0, 30, '[{"condition":"fixed_bonus","score":50},{"condition":"fixed_bonus","score":20},{"condition":"fixed_bonus","score":0},{"condition":"fixed_deduction","score":20},{"condition":"fixed_deduction","score":50}]', 1, 1, 4, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `prerequisites`, `stat_days`, `tiers`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_03', 4, '商家扶持', '統計有效訂單數，按梯度加分：訂單越多得分越高', 5, 0, 'UNCONDITIONAL', 30, '[{"threshold":50,"direction":"LESS_THAN","score":20,"statDays":30}]', 1, 1, 5, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `calc_cycle`, `calc_interval_hours`, `tiers`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_03B', 4, '訂單過熱調控', '定時監控商家訂單過熱時按梯度降權，平衡流量分配給其他商家機會', 5, 0, 'SCHEDULED', 1.00, '[{"threshold":200,"direction":"MORE_THAN","score":-10},{"threshold":500,"direction":"MORE_THAN","score":-30},{"threshold":1000,"direction":"MORE_THAN","score":-60}]', 1, 1, 6, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days_total`, `stat_days_recent`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_04', 2, '出餐速度', '對比近期出餐時間與歷史基線，主營/輔營時段分別統計，達標加分鼓勵持續提速', 6, 0, 7, 1, '[{"condition":"primary_meet","score":30},{"condition":"secondary_meet","score":20}]', 1, 1, 7, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `deduction_per_order`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STO_05', 2, '拒絕接單', '統計天數內（含當天），每拒絕一單固定扣分，即時生效', 3, 0, 7, 80, 1, 1, 8, 'system'),
+('STO_07', 2, '出餐超時', '統計天數內（不含當天），每超時一單固定扣分，即時生效', 3, 0, 7, 70, 1, 1, 9, 'system'),
+('STO_08', 2, '取消訂單', '統計天數內（含當天），每取消一單固定扣分，即時生效', 3, 0, 7, 80, 1, 1, 10, 'system'),
+('STO_09', 2, '超時接單', '統計天數內（含當天），每超時一單固定扣分，即時生效', 3, 0, 7, 60, 1, 1, 11, 'system');
+
+-- ===== 平台維度 =====
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `decay_coefficient`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('PLT_01', 4, '距離衰減', '滿分按衰減係數×距離遞減，距離越遠得分越低', 2, 100, 5.0000, 1, 1, 1, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `time_range_scores`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('PLT_02A', 4, '配送範圍', '按時段配置配送範圍分層計分，後端根據當前時間自動匹配對應時段', 1, 0, '{"breakfast":{"short":80,"medium":60,"long":40,"crossBridge":20},"lunch":{"short":80,"medium":60,"long":40,"crossBridge":20},"afternoonTea":{"short":80,"medium":60,"long":40,"crossBridge":20},"dinner":{"short":80,"medium":60,"long":40,"crossBridge":20},"lateNight":{"short":80,"medium":60,"long":40,"crossBridge":20}}', 1, 1, 2, 'system');

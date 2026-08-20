@@ -24,7 +24,10 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
  * 无敌星星销售定价服务实现
@@ -157,7 +160,9 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
         entity.setBlockMerchant(request.getBlockMerchant() == null ? 2 : request.getBlockMerchant());
         entity.setBlockList(request.getBlockList() == null ? null : JsonUtils.toJson(request.getBlockList()));
         entity.setSellTimeSlots(request.getSellTimeSlots() == null ? null : JsonUtils.toJson(request.getSellTimeSlots()));
-        entity.setSlotDiscounts(request.getSlotDiscounts() == null ? null : JsonUtils.toJson(request.getSlotDiscounts()));
+        // 清理不在可售时段内的折扣字段，防止脏数据残留
+        entity.setSlotDiscounts(request.getSlotDiscounts() == null ? null
+                : JsonUtils.toJson(sanitizeSlotDiscounts(request.getSlotDiscounts(), request.getSellTimeSlots())));
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
         }
@@ -203,5 +208,36 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
             vo.getRegionPrices().add(item);
         }
         return vo;
+    }
+
+    /**
+     * 清理不在可售时段内的时段折扣字段:
+     * 当 sellTimeSlots 为指定模式（非 fullDay）时，移除未勾选时段对应的折扣值，
+     * 保证数据库中的 slotDiscounts 与 sellTimeSlots 保持一致。
+     */
+    private List<AdPricingStarRequest.RegionSlotDiscount> sanitizeSlotDiscounts(
+            List<AdPricingStarRequest.RegionSlotDiscount> discounts, List<String> sellTimeSlots) {
+        if (discounts == null || discounts.isEmpty()) return discounts;
+        // 全部时段模式或空：无需清理
+        if (sellTimeSlots == null || sellTimeSlots.isEmpty() || sellTimeSlots.contains("fullDay")) {
+            return discounts;
+        }
+        Set<String> allowed = new HashSet<>(sellTimeSlots);
+        // 时段字段名 → 清除方法映射
+        Map<String, BiConsumer<AdPricingStarRequest.RegionSlotDiscount, Object>> slotClearMap = Map.of(
+                "breakfast", (d, v) -> d.setBreakfast(null),
+                "lunch",     (d, v) -> d.setLunch(null),
+                "afternoon", (d, v) -> d.setAfternoon(null),
+                "dinner",    (d, v) -> d.setDinner(null),
+                "supper",    (d, v) -> d.setSupper(null)
+        );
+        for (AdPricingStarRequest.RegionSlotDiscount d : discounts) {
+            for (var entry : slotClearMap.entrySet()) {
+                if (!allowed.contains(entry.getKey())) {
+                    entry.getValue().accept(d, null);
+                }
+            }
+        }
+        return discounts;
     }
 }

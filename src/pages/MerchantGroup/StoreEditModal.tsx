@@ -103,7 +103,7 @@ export default function StoreEditModal({
       open={open}
       onOk={handleOk}
       onCancel={onClose}
-      okText={t('common:confirm')}
+      okText={t('common:save')}
       cancelText={t('common:cancel')}
       width={560}
       destroyOnClose

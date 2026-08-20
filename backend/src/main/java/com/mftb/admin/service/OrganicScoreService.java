@@ -21,15 +21,27 @@ public interface OrganicScoreService {
     /** 新增评分规则 */
     OrganicScoreRuleVO createRule(OrganicScoreRuleRequest request);
 
-    /** 编辑评分规则 */
+    /** 编辑评分规则（按数字ID） */
     OrganicScoreRuleVO updateRule(Long id, OrganicScoreRuleRequest request);
 
-    /** 切换规则状态（启用/停用） */
+    /** 编辑评分规则（按数字ID或规则编码） */
+    OrganicScoreRuleVO updateRuleByIdentifier(String identifier, OrganicScoreRuleRequest request);
+
+    /** 切换规则状态（启用/停用）（按数字ID） */
     void toggleRuleStatus(Long id);
 
-    /** 删除自定义评分规则 */
+    /** 切换规则状态（按数字ID或规则编码） */
+    void toggleRuleStatusByIdentifier(String identifier);
+
+    /** 删除自定义评分规则（按数字ID） */
     void deleteRule(Long id);
 
-    /** 更新规则分值（表格内联编辑） */
+    /** 删除自定义评分规则（按数字ID或规则编码） */
+    void deleteRuleByIdentifier(String identifier);
+
+    /** 更新规则分值（表格内联编辑）（按数字ID） */
     void updateRuleScore(Long id, Integer score);
+
+    /** 更新规则分值（按数字ID或规则编码） */
+    void updateRuleScoreByIdentifier(String identifier, Integer score);
 }

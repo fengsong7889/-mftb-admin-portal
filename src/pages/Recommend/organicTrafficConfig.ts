@@ -46,6 +46,8 @@ export enum CalcCycle {
   NIGHTLY = 'NIGHTLY',
   /** 按當天計算 */
   DAILY = 'DAILY',
+  /** 定時監控（按指定小時間隔校驗） */
+  SCHEDULED = 'SCHEDULED',
 }
 
 export const SCORE_DIMENSION_LABEL: Record<ScoreDimension, string> = {
@@ -109,6 +111,7 @@ export const TIER_DIRECTION_LABEL: Record<TierDirection, string> = {
 export const CALC_CYCLE_LABEL: Record<CalcCycle, string> = {
   [CalcCycle.NIGHTLY]: '每晚統計',
   [CalcCycle.DAILY]: '按當天計算',
+  [CalcCycle.SCHEDULED]: '定時監控',
 }
 
 /** 配送範圍分層分數（短程 / 中程 / 遠程 / 跨橋） */
@@ -132,6 +135,24 @@ export const RANGE_SCORE_LABELS: Record<keyof RangeScores, string> = {
 }
 export const DEFAULT_RANGE_SCORES: RangeScores = { short: 80, medium: 60, long: 40, crossBridge: 20 }
 
+/** 配送範圍分時段計分（合併 PLT_02A~E） */
+export interface TimeRangeScores {
+  breakfast?: RangeScores
+  lunch?: RangeScores
+  afternoonTea?: RangeScores
+  dinner?: RangeScores
+  lateNight?: RangeScores
+}
+
+export const TIME_PERIOD_KEYS: (keyof TimeRangeScores)[] = ['breakfast', 'lunch', 'afternoonTea', 'dinner', 'lateNight']
+export const TIME_PERIOD_LABELS: Record<keyof TimeRangeScores, string> = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  afternoonTea: '下午茶',
+  dinner: '晚餐',
+  lateNight: '宵夜',
+}
+
 /** 梯度檔位 */
 export interface ScoreTier {
   /** 閾值 */
@@ -152,6 +173,16 @@ export interface ScoreConditionItem {
   score: number
 }
 
+/** 高峰時段定義 */
+export interface PeakTimeRange {
+  /** 標籤（如「午高峰」） */
+  label: string
+  /** 開始時間（HH:mm 格式） */
+  start: string
+  /** 結束時間（HH:mm 格式） */
+  end: string
+}
+
 /** 單條評分規則 */
 export interface OrganicScoreRule {
   id: string
@@ -167,12 +198,28 @@ export interface OrganicScoreRule {
   statDays?: number
   /** 配送範圍分層分數（僅配送範圍規則使用） */
   rangeScores?: RangeScores
+  /** 配送範圍分時段計分（合併 PLT_02A~E） */
+  timeRangeScores?: TimeRangeScores
   /** 梯度檔位（僅 mode=TIERED 時使用） */
   tiers?: ScoreTier[]
   /** 條件計分子項（僅 mode=CONDITIONAL 時使用） */
   conditionItems?: ScoreConditionItem[]
   /** 計算周期（僅 mode=TIERED 時使用） */
   calcCycle?: CalcCycle
+  /** 定時監控間隔小時數（僅 calcCycle=SCHEDULED 時使用，支持小數如 0.5） */
+  calcIntervalHours?: number
+  /** 歷史基線天數（出餐速度等時間窗口對比規則使用） */
+  statDaysTotal?: number
+  /** 近期對比天數（出餐速度等時間窗口對比規則使用） */
+  statDaysRecent?: number
+  /** 高峰時段定義（出餐速度等規則使用） */
+  peakTimeRanges?: PeakTimeRange[]
+  /** 每單固定扣分（拒絕接單等按次計罰規則使用，正值存儲，顯示時加負號） */
+  deductionPerOrder?: number
+  /** 衰减系数（距離衰減規則使用，每公里扣除的分數） */
+  decayCoefficient?: number
+  /** 屏蔽商家列表（店鋪代碼，即使滿足條件也不扶持） */
+  blockedMerchants?: string[]
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
@@ -209,34 +256,45 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   ], status: ENABLED, builtin: true },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
-  { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
+  { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
   { id: 'STB_04', dimension: ScoreDimension.STORE, name: '店鋪標籤-金牌', description: '金牌店鋪身份標籤加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
-  { id: 'STO_01', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
-  { id: 'STO_02A', dimension: ScoreDimension.STORE, name: '好評得分', description: '統計天數內好評數量加分，好評越多得分越高', mode: ScoreMode.RULE_BONUS, score: 100, statDays: 30, status: ENABLED, builtin: true },
-  { id: 'STO_02B', dimension: ScoreDimension.STORE, name: '差評得分', description: '統計天數內差評數量扣分，差評越多扣分越多', mode: ScoreMode.RULE_DEDUCTION, score: -100, statDays: 30, status: ENABLED, builtin: true },
-  { id: 'STO_03', dimension: ScoreDimension.STORE, name: '店鋪銷量扶持', description: '統計有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, tiers: [
+  { id: 'STO_01', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
+      { condition: 'bonus', score: 100 },
+      { condition: 'deduction', score: 20 },
+      { condition: 'deduction', score: 50 },
+      { condition: 'deduction', score: 80 },
+    ] },
+  { id: 'STO_02', dimension: ScoreDimension.STORE, name: '評價得分', description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: [
+    { condition: 'fixed_bonus', score: 50 },
+    { condition: 'fixed_bonus', score: 20 },
+    { condition: 'fixed_bonus', score: 0 },
+    { condition: 'fixed_deduction', score: 20 },
+    { condition: 'fixed_deduction', score: 50 },
+  ] },
+  { id: 'STO_03', dimension: ScoreDimension.PLATFORM, name: '商家扶持', description: '統計有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, statDays: 30, prerequisites: 'UNCONDITIONAL', tiers: [
     { threshold: 50, direction: TierDirection.LESS_THAN, score: 20, statDays: 30 },
-    { threshold: 100, direction: TierDirection.LESS_THAN, score: 40, statDays: 30 },
-    { threshold: 200, direction: TierDirection.LESS_THAN, score: 60, statDays: 30 },
-    { threshold: 500, direction: TierDirection.LESS_THAN, score: 80, statDays: 30 },
-    { threshold: 500, direction: TierDirection.MORE_THAN, score: 100, statDays: 30 },
   ], status: ENABLED, builtin: true },
-  { id: 'STO_03B', dimension: ScoreDimension.STORE, name: '當天訂單超量扣分', description: '按當天計算，訂單超過閾值按梯度扣分，防止刷單', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.DAILY, tiers: [
+  { id: 'STO_03B', dimension: ScoreDimension.PLATFORM, name: '訂單過熱調控', description: '定時監控商家訂單過熱時按梯度降權，平衡流量分配給其他商家機會', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, tiers: [
     { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
     { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
     { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
   ], status: ENABLED, builtin: true },
-  { id: 'STO_04', dimension: ScoreDimension.STORE, name: '出餐速度', description: '平均出餐時長越短得分越高，店鋪自身效率指標', mode: ScoreMode.DECAY, score: 90, status: ENABLED, builtin: true },
-  { id: 'STO_05', dimension: ScoreDimension.STORE, name: '拒絕訂單', description: '商家拒絕訂單按次扣分', mode: ScoreMode.RULE_DEDUCTION, score: -80, status: ENABLED, builtin: true },
-  { id: 'STO_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '超出承諾出餐時長的訂單按佔比扣分', mode: ScoreMode.RULE_DEDUCTION, score: -70, status: ENABLED, builtin: true },
-  { id: 'STO_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '商家主動取消訂單按次扣分', mode: ScoreMode.RULE_DEDUCTION, score: -80, status: ENABLED, builtin: true },
-  { id: 'STO_09', dimension: ScoreDimension.STORE, name: '超時接單', description: '超出接單時限未接單按次扣分', mode: ScoreMode.RULE_DEDUCTION, score: -60, status: ENABLED, builtin: true },
+  { id: 'STO_04', dimension: ScoreDimension.STORE, name: '出餐速度', description: '對比近期出餐時間與歷史基線，主營/輔營時段分別統計，達標加分鼓勵持續提速', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, statDaysRecent: 1, conditionItems: [
+    { condition: 'primary_meet', score: 30 },
+    { condition: 'secondary_meet', score: 20 },
+  ], status: ENABLED, builtin: true },
+  { id: 'STO_05', dimension: ScoreDimension.STORE, name: '拒絕接單', description: '統計天數內（含當天），每拒絕一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
+  { id: 'STO_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },
+  { id: 'STO_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '統計天數內（含當天），每取消一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
+  { id: 'STO_09', dimension: ScoreDimension.STORE, name: '超時接單', description: '統計天數內（含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 60, status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
-  { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: 'e^(-k×距離km)，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, status: ENABLED, builtin: true },
-  { id: 'PLT_02A', dimension: ScoreDimension.PLATFORM, name: '配送範圍-早餐', description: '早餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', mode: ScoreMode.RULE_BONUS, score: 80, rangeScores: { ...DEFAULT_RANGE_SCORES }, status: ENABLED, builtin: true },
-  { id: 'PLT_02B', dimension: ScoreDimension.PLATFORM, name: '配送範圍-午餐', description: '午餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', mode: ScoreMode.RULE_BONUS, score: 80, rangeScores: { ...DEFAULT_RANGE_SCORES }, status: ENABLED, builtin: true },
-  { id: 'PLT_02C', dimension: ScoreDimension.PLATFORM, name: '配送範圍-下午茶', description: '下午茶時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', mode: ScoreMode.RULE_BONUS, score: 80, rangeScores: { ...DEFAULT_RANGE_SCORES }, status: ENABLED, builtin: true },
-  { id: 'PLT_02D', dimension: ScoreDimension.PLATFORM, name: '配送範圍-晚餐', description: '晚餐時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', mode: ScoreMode.RULE_BONUS, score: 80, rangeScores: { ...DEFAULT_RANGE_SCORES }, status: ENABLED, builtin: true },
-  { id: 'PLT_02E', dimension: ScoreDimension.PLATFORM, name: '配送範圍-夜宵', description: '夜宵時段配送範圍分層計分，按短程/中程/遠程/跨橋分別配置分數', mode: ScoreMode.RULE_BONUS, score: 80, rangeScores: { ...DEFAULT_RANGE_SCORES }, status: ENABLED, builtin: true },
+  { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },
+  { id: 'PLT_02A', dimension: ScoreDimension.PLATFORM, name: '配送範圍', description: '按時段配置配送範圍分層計分，後端根據當前時間自動匹配對應時段', mode: ScoreMode.RULE_BONUS, score: 0, timeRangeScores: {
+    breakfast: { ...DEFAULT_RANGE_SCORES },
+    lunch: { ...DEFAULT_RANGE_SCORES },
+    afternoonTea: { ...DEFAULT_RANGE_SCORES },
+    dinner: { ...DEFAULT_RANGE_SCORES },
+    lateNight: { ...DEFAULT_RANGE_SCORES },
+  }, status: ENABLED, builtin: true },
 ]

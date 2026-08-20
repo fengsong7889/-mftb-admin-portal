@@ -23,6 +23,8 @@ import java.util.Map;
 
 /**
  * 自然流量评分配置接口
+ * <p>
+ * 路径中的规则标识支持两种格式：数字ID（如 7）或规则编码（如 COM_07）
  */
 @RestController
 @RequestMapping("/api/organic-score")
@@ -53,35 +55,45 @@ public class OrganicScoreController {
         return Result.success("新增成功", organicScoreService.createRule(request));
     }
 
-    /** 编辑评分规则 */
-    @PutMapping("/rules/{id}")
+    /** 编辑评分规则（路径参数支持数字ID或规则编码） */
+    @PutMapping("/rules/{identifier}")
     @RequirePermission(menu = "promotion-algorithm", action = "edit")
-    public Result<OrganicScoreRuleVO> updateRule(@PathVariable Long id, @Valid @RequestBody OrganicScoreRuleRequest request) {
-        return Result.success("编辑成功", organicScoreService.updateRule(id, request));
+    public Result<OrganicScoreRuleVO> updateRule(@PathVariable String identifier, @Valid @RequestBody OrganicScoreRuleRequest request) {
+        return Result.success("编辑成功", organicScoreService.updateRuleByIdentifier(identifier, request));
     }
 
     /** 切换规则状态（启用/停用） */
-    @PutMapping("/rules/{id}/toggle")
+    @PutMapping("/rules/{identifier}/toggle")
     @RequirePermission(menu = "promotion-algorithm", action = "edit")
-    public Result<Void> toggleRuleStatus(@PathVariable Long id) {
-        organicScoreService.toggleRuleStatus(id);
+    public Result<Void> toggleRuleStatus(@PathVariable String identifier) {
+        organicScoreService.toggleRuleStatusByIdentifier(identifier);
         return Result.success();
     }
 
     /** 更新规则分值（表格内联编辑） */
-    @PutMapping("/rules/{id}/score")
+    @PutMapping("/rules/{identifier}/score")
     @RequirePermission(menu = "promotion-algorithm", action = "edit")
-    public Result<Void> updateRuleScore(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
-        Integer score = body.get("score");
-        organicScoreService.updateRuleScore(id, score);
+    public Result<Void> updateRuleScore(@PathVariable String identifier, @RequestBody Map<String, Object> body) {
+        Object raw = body.get("score");
+        Integer score = null;
+        if (raw instanceof Number num) {
+            score = num.intValue();
+        } else if (raw instanceof String str && !str.isBlank()) {
+            try {
+                score = Integer.parseInt(str.trim());
+            } catch (NumberFormatException ignored) {
+                // 非数字字符串，保持 null
+            }
+        }
+        organicScoreService.updateRuleScoreByIdentifier(identifier, score);
         return Result.success();
     }
 
     /** 删除自定义评分规则 */
-    @DeleteMapping("/rules/{id}")
+    @DeleteMapping("/rules/{identifier}")
     @RequirePermission(menu = "promotion-algorithm", action = "delete")
-    public Result<Void> deleteRule(@PathVariable Long id) {
-        organicScoreService.deleteRule(id);
+    public Result<Void> deleteRule(@PathVariable String identifier) {
+        organicScoreService.deleteRuleByIdentifier(identifier);
         return Result.success();
     }
 }

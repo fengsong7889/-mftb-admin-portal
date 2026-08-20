@@ -152,7 +152,7 @@ export async function fetchStoreUpdatedByOptions(keyword: string) {
 /** 新增门店 */
 export async function createStore(data: StorePayload) {
   try {
-    return await request.post<unknown, StoreItem>('/stores', data, SILENT)
+    return await request.post<unknown, StoreItem>('/stores', data)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockCreateStore(data)
     throw err
@@ -162,7 +162,7 @@ export async function createStore(data: StorePayload) {
 /** 编辑门店 */
 export async function updateStore(id: number, data: StorePayload) {
   try {
-    return await request.put<unknown, StoreItem>(`/stores/${id}`, data, SILENT)
+    return await request.put<unknown, StoreItem>(`/stores/${id}`, data)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockUpdateStore(id, data)
     throw err

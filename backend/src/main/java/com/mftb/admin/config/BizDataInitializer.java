@@ -38,6 +38,7 @@ public class BizDataInitializer implements CommandLineRunner {
         seedStores();
         seedWordLibrary();
         seedWorkflowConfig();
+        syncStoreCodeSequence();
     }
 
     /** 清理重复种子门店: 同名门店保留 id 最小的一条，删除其余重复记录 (幂等: 无重复时不执行) */
@@ -76,6 +77,35 @@ public class BizDataInitializer implements CommandLineRunner {
                     String.format("JT%06d", ++seq), id);
         }
         log.info("已将 {} 条存量集团ID迁移为 JT 自增序列", ids.size());
+    }
+
+    /**
+     * 同步门店编码序号: 保证 sys_biz_seq 中 MD 前缀的 current_value
+     * 严格大于 biz_store 表中已有的最大门店序号，避免新增门店时唯一键冲突。
+     * <p>
+     * 种子数据/迁移脚本直接写入 store_code 但不更新 sys_biz_seq，
+     * 此方法在每次启动时兜底同步，幂等执行。
+     */
+    private void syncStoreCodeSequence() {
+        if (!tableExists("sys_biz_seq") || !tableExists("biz_store")) {
+            return;
+        }
+        int maxExisting = maxCodeSeq("biz_store", "store_code", "MD");
+        if (maxExisting <= 0) {
+            return;
+        }
+        // sys_biz_seq.current_value 需设为 max + 1，
+        // 因为 BizSeqService.next() 在 seq_start=1 时: code = (current_value) - 1
+        int targetValue = maxExisting + 1;
+        // 先播种（行不存在时插入），再更新到目标值
+        jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq (prefix, date_key, current_value) VALUES ('MD', '00000000', 0)");
+        int updated = jdbcTemplate.update(
+                "UPDATE sys_biz_seq SET current_value = ? WHERE prefix = 'MD' AND date_key = '00000000' AND current_value < ?",
+                targetValue, targetValue);
+        if (updated > 0) {
+            log.info("已同步门店编码序号至 MD{}（max+1={})", String.format("%06d", maxExisting), targetValue);
+        }
     }
 
     /** 存量门店ID迁移: 非 MD+6位数字 格式的编号按 id 顺序重编为 MD 序列 */

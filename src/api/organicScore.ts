@@ -23,6 +23,13 @@ export interface OrganicRuleVO {
   tiers?: string
   conditionItems?: string
   calcCycle?: string
+  calcIntervalHours?: number
+  statDaysTotal?: number
+  statDaysRecent?: number
+  peakTimeRanges?: string
+  deductionPerOrder?: number
+  decayCoefficient?: number
+  timeRangeScores?: string
   status: number
   builtin: number
   sortOrder: number
@@ -49,6 +56,13 @@ export interface OrganicRulePayload {
   tiers?: string
   conditionItems?: string
   calcCycle?: string
+  calcIntervalHours?: number
+  statDaysTotal?: number
+  statDaysRecent?: number
+  peakTimeRanges?: string
+  deductionPerOrder?: number
+  decayCoefficient?: number
+  timeRangeScores?: string
   status: number
 }
 
