@@ -19,7 +19,7 @@ DELETE FROM `biz_organic_score_rule` WHERE `rule_code` IN (
   'PLT_02', 'PLT_03', 'PLT_04', 'PLT_05', 'PLT_06'
 );
 
--- 旧商业维度编码（COM_08=已废弃, COM_11=可能被用户覆盖需重建）
+-- 旧商业维度编码（COM_08=已废弃, COM_11=已永久删除）
 DELETE FROM `biz_organic_score_rule` WHERE `rule_code` IN ('COM_08', 'COM_11');
 
 -- 清理可能的临时编码残留

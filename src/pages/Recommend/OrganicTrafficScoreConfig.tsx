@@ -73,11 +73,11 @@ const isDeliveryRange = (id?: string) => id === 'PLT_02A'
 const needsStatDays = (mode?: ScoreMode, id?: string) => {
   if (mode === ScoreMode.TIERED) return true
   if (!id) return false
-  return ['STO_02', 'STO_03'].includes(id)
+  return ['STB_03', 'PLT_03'].includes(id)
 }
 
-/** STO_03 商家扶持 - 前提條件選項（可擴展） */
-const STO_03_PREREQ_OPTIONS = [
+/** PLT_03 商家扶持 - 前提條件選項（可擴展） */
+const PLT_03_PREREQ_OPTIONS = [
   { value: 'FREE_SHIPPING', label: '參與減免運費' },
   { value: 'MEMBER_COUPON', label: '參與會員紅包' },
 ]
@@ -119,30 +119,31 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     deductionPerOrder: vo.deductionPerOrder ?? undefined,
     decayCoefficient: vo.decayCoefficient ?? undefined,
     timeRangeScores: vo.timeRangeScores ? (() => { try { return JSON.parse(vo.timeRangeScores) as TimeRangeScores } catch { return undefined } })() : undefined,
+    blockedMerchants: vo.blockedMerchants ? (() => { try { return JSON.parse(vo.blockedMerchants) as string[] } catch { return undefined } })() : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
   }
 }
 
 /**
- * 前端合併 STO_02A/STO_02B → STO_02（評價得分 - 5 星配置）
+ * 前端合併 STO_02A/STO_02B → STB_03（評價得分 - 5 星配置）
  * 數據庫尚未遷移時，在加載後自動合併；同時處理舊 2 檔格式升級為 5 星。
  */
 function mergeReviewRules(rules: OrganicScoreRule[]): OrganicScoreRule[] {
   const good = rules.find(r => r.id === 'STO_02A')
   const bad = rules.find(r => r.id === 'STO_02B')
-  const existing = rules.find(r => r.id === 'STO_02')
+  const existing = rules.find(r => r.id === 'STB_03')
   const hasOldAB = !!(good || bad)
-  // 判斷現有 STO_02 是否為舊格式（只有 bonus/deduction 兩項）
+  // 判斷現有 STB_03 是否為舊格式（只有 bonus/deduction 兩項）
   const isOldFormat = existing && existing.conditionItems?.length === 2 &&
     existing.conditionItems.every(i => i.condition === 'bonus' || i.condition === 'deduction')
   if (!hasOldAB && !isOldFormat) return rules // 無舊數據且已是新格式
   // 刪除舊的 A/B
   let result = rules.filter(r => r.id !== 'STO_02A' && r.id !== 'STO_02B')
   // 使用默認 5 星配置
-  const defaultSTO02 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STO_02')
+  const defaultSTB03 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_03')
   const merged: OrganicScoreRule = {
-    id: 'STO_02',
+    id: 'STB_03',
     dimension: ScoreDimension.STORE,
     name: '評價得分',
     description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率',
@@ -151,7 +152,7 @@ function mergeReviewRules(rules: OrganicScoreRule[]): OrganicScoreRule[] {
     statDays: existing?.statDays || good?.statDays || bad?.statDays || 30,
     status: existing?.status || good?.status || ServiceStatus.ENABLED,
     builtin: true,
-    conditionItems: defaultSTO02?.conditionItems || [
+    conditionItems: defaultSTB03?.conditionItems || [
       { condition: 'fixed_bonus', score: 50 },
       { condition: 'fixed_bonus', score: 20 },
       { condition: 'fixed_bonus', score: 0 },
@@ -159,10 +160,10 @@ function mergeReviewRules(rules: OrganicScoreRule[]): OrganicScoreRule[] {
       { condition: 'fixed_deduction', score: 50 },
     ],
   }
-  // 移除舊 STO_02（如果有）
-  result = result.filter(r => r.id !== 'STO_02')
-  // 在原位置插入新 STO_02
-  const insertIdx = rules.findIndex(r => r.id === 'STO_02A' || r.id === 'STO_02')
+  // 移除舊 STB_03（如果有）
+  result = result.filter(r => r.id !== 'STB_03')
+  // 在原位置插入新 STB_03
+  const insertIdx = rules.findIndex(r => r.id === 'STO_02A' || r.id === 'STB_03')
   result.splice(insertIdx >= 0 ? insertIdx : result.length, 0, merged)
   return result
 }
@@ -182,20 +183,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     try {
       const config = await fetchOrganicScoreConfig()
       if (config.rules.length > 0) {
-        const loaded = config.rules.map(voToRule).filter(r => r.id !== 'COM_08' && r.id !== 'PLT_02B' && r.id !== 'PLT_02C' && r.id !== 'PLT_02D' && r.id !== 'PLT_02E')
-        // 前端保底：確保 STO_03/STO_03B 名稱與維度正確（SQLPub 複制延遲時生效）
+        const loaded = config.rules.map(voToRule).filter(r => r.id !== 'COM_08' && r.id !== 'COM_11' && r.id !== 'PLT_02B' && r.id !== 'PLT_02C' && r.id !== 'PLT_02D' && r.id !== 'PLT_02E')
+        // 前端保底：確保 PLT_03/PLT_04 名稱與維度正確（SQLPub 複制延遲時生效）
         loaded.forEach(r => {
-          if (r.id === 'STO_03') {
+          if (r.id === 'PLT_03') {
             r.name = '商家扶持'
             r.dimension = ScoreDimension.PLATFORM
           }
-          if (r.id === 'STO_03B') {
+          if (r.id === 'PLT_04') {
             r.name = '訂單過熱調控'
             r.dimension = ScoreDimension.PLATFORM
             r.calcCycle = CalcCycle.SCHEDULED
             if (!r.calcIntervalHours) r.calcIntervalHours = 1
           }
-          if (r.id === 'STO_04') {
+          if (r.id === 'STB_05') {
             r.name = '出餐速度'
             r.dimension = ScoreDimension.STORE
             if (!r.statDaysTotal) r.statDaysTotal = 7
@@ -207,22 +208,22 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               ]
             }
           }
-          if (r.id === 'STO_05') {
+          if (r.id === 'STB_06') {
             r.name = '拒絕接單'
             if (!r.statDays) r.statDays = 7
             if (!r.deductionPerOrder) r.deductionPerOrder = 80
           }
-          if (r.id === 'STO_07') {
+          if (r.id === 'STB_07') {
             r.name = '出餐超時'
             if (!r.statDays) r.statDays = 7
             if (!r.deductionPerOrder) r.deductionPerOrder = 70
           }
-          if (r.id === 'STO_08') {
+          if (r.id === 'STB_08') {
             r.name = '取消訂單'
             if (!r.statDays) r.statDays = 7
             if (!r.deductionPerOrder) r.deductionPerOrder = 80
           }
-          if (r.id === 'STO_09') {
+          if (r.id === 'STB_09') {
             r.name = '超時接單'
             if (!r.statDays) r.statDays = 7
             if (!r.deductionPerOrder) r.deductionPerOrder = 60
@@ -331,9 +332,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [inlineEditing, setInlineEditing] = useState<Record<string, boolean>>({})
   /** 內聯編輯臨時表單值 */
   const [inlineForm, setInlineForm] = useState<Record<string, Partial<OrganicScoreRule>>>({})
-  /** STO_03 屏蔽商家輸入框臨時值 */
+  /** PLT_03 屏蔽商家輸入框臨時值 */
   const [blockedMerchantInput, setBlockedMerchantInput] = useState('')
-  /** STO_03 門店選擇彈窗狀態 */
+  /** PLT_03 門店選擇彈窗狀態 */
   const [storeModalVisible, setStoreModalVisible] = useState(false)
   /** 門店彈窗是否為只讀模式 */
   const [storeModalReadOnly, setStoreModalReadOnly] = useState(false)
@@ -403,8 +404,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const handleInlineSave = async (ruleId: string) => {
     const values = inlineForm[ruleId]
     if (!values) return
-    // STO_03 梯度配置校驗：不允許空值
-    if (ruleId === 'STO_03') {
+    // PLT_03 梯度配置校驗：不允許空值
+    if (ruleId === 'PLT_03') {
       const tiers: ScoreTier[] = values.tiers || []
       if (tiers.length === 0) {
         message.warning('請至少配置一個梯度')
@@ -421,8 +422,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         }
       }
     }
-    // STO_03B 梯度配置校驗：不允許空值
-    if (ruleId === 'STO_03B') {
+    // PLT_04 梯度配置校驗：不允許空值
+    if (ruleId === 'PLT_04') {
       const tiers: ScoreTier[] = values.tiers || []
       if (tiers.length === 0) {
         message.warning('請至少配置一個梯度')
@@ -439,8 +440,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         }
       }
     }
-    // STO_04 出餐速度校驗：主營/輔營計分規則
-    if (ruleId === 'STO_04') {
+    // STB_05 出餐速度校驗：主營/輔營計分規則
+    if (ruleId === 'STB_05') {
       const items: ScoreConditionItem[] = (values as any).conditionItems || []
       const primaryItem = items.find(i => i.condition === 'primary_meet')
       const secondaryItem = items.find(i => i.condition === 'secondary_meet')
@@ -453,8 +454,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         return
       }
     }
-    // STO_05 拒絕接單校驗：統計天數 + 每單扣分
-    if (ruleId === 'STO_05') {
+    // STB_06 拒絕接單校驗：統計天數 + 每單扣分
+    if (ruleId === 'STB_06') {
       if (!values.statDays || values.statDays <= 0) {
         message.warning('請配置統計天數')
         return
@@ -464,8 +465,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         return
       }
     }
-    // STO_07 出餐超時校驗：統計天數 + 每單扣分
-    if (ruleId === 'STO_07') {
+    // STB_07 出餐超時校驗：統計天數 + 每單扣分
+    if (ruleId === 'STB_07') {
       if (!values.statDays || values.statDays <= 0) {
         message.warning('請配置統計天數')
         return
@@ -475,8 +476,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         return
       }
     }
-    // STO_08 取消訂單校驗：統計天數 + 每單扣分
-    if (ruleId === 'STO_08') {
+    // STB_08 取消訂單校驗：統計天數 + 每單扣分
+    if (ruleId === 'STB_08') {
       if (!values.statDays || values.statDays <= 0) {
         message.warning('請配置統計天數')
         return
@@ -486,8 +487,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         return
       }
     }
-    // STO_09 超時接單校驗：統計天數 + 每單扣分
-    if (ruleId === 'STO_09') {
+    // STB_09 超時接單校驗：統計天數 + 每單扣分
+    if (ruleId === 'STB_09') {
       if (!values.statDays || values.statDays <= 0) {
         message.warning('請配置統計天數')
         return
@@ -535,6 +536,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       deductionPerOrder: (values as any).deductionPerOrder,
       decayCoefficient: (values as any).decayCoefficient,
       timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
+      blockedMerchants: (values as any).blockedMerchants ? JSON.stringify((values as any).blockedMerchants) : undefined,
       status: values.status!,
     }
     try {
@@ -543,6 +545,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       const savedRule = voToRule(vo)
       if (values.prerequisites !== undefined) {
         savedRule.prerequisites = values.prerequisites
+      }
+      // 保留前端編輯過的屏蔽商家（API 可能未返回該字段）
+      if ((values as any).blockedMerchants !== undefined) {
+        savedRule.blockedMerchants = (values as any).blockedMerchants
       }
       setRules(prev => prev.map(r => r.id === ruleId ? savedRule : r))
       message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
@@ -937,44 +943,44 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                       {!isEditingInline && (
                         <>
-                          {rule.id !== 'STO_01' && rule.id !== 'STO_02' && rule.id !== 'STO_03' && rule.id !== 'STO_03B' && rule.id !== 'STO_04' && rule.id !== 'STO_05' && rule.id !== 'STO_07' && rule.id !== 'STO_08' && rule.id !== 'STO_09' && rule.id !== 'PLT_01' && (
+                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && (
                             <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
                               {(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A')
                                 ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
                                 : MODE_LABEL[rule.mode]}
                             </Tag>
                           )}
-                          {rule.id === 'STO_01' && (
+                          {rule.id === 'STB_02' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>四檔狀態計分</Tag>
                           )}
-                          {rule.id === 'STO_02' && (
+                          {rule.id === 'STB_03' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>雙檔評價計分</Tag>
                           )}
-                          {rule.id === 'STO_03' && (
+                          {rule.id === 'PLT_03' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>梯度扶持計分</Tag>
                           )}
-                          {rule.id === 'STO_03B' && (
+                          {rule.id === 'PLT_04' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>梯度降權計分</Tag>
                           )}
-                          {rule.id === 'STO_04' && (
+                          {rule.id === 'STB_05' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>時間窗口對比</Tag>
                           )}
-                          {rule.id === 'STO_05' && (
+                          {rule.id === 'STB_06' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
-                          {rule.id === 'STO_07' && (
+                          {rule.id === 'STB_07' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
-                          {rule.id === 'STO_08' && (
+                          {rule.id === 'STB_08' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
-                          {rule.id === 'STO_09' && (
+                          {rule.id === 'STB_09' && (
                             <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
                           {rule.id === 'PLT_01' && (
                             <Tag color="#1890FF" style={{ fontSize: 11, margin: 0 }}>距離衰減</Tag>
                           )}
-                          {rule.id !== 'STO_01' && rule.id !== 'STO_02' && rule.id !== 'STO_03' && rule.id !== 'STO_03B' && rule.id !== 'STO_04' && rule.id !== 'STO_05' && rule.id !== 'STO_07' && rule.id !== 'STO_08' && rule.id !== 'STO_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && ((rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
+                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && ((rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
                             rule.mode === ScoreMode.AMOUNT_MULTIPLIER
                               ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_01' ? '立減金額' : rule.id === 'COM_02' ? '運費金額' : rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
                               : <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>分值 +{rule.score} 分 <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>（直接加固定分）</span></span>
@@ -994,11 +1000,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               )}
                             </>
                           ))}
-                          {rule.statDays && (
-                            <span style={{ fontSize: 12, color: '#8C8C8C' }}>統計 {rule.statDays} 天</span>
-                          )}
+
                           {!readOnly && (
-                            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                            <div style={{ flexShrink: 0 }}>
                               <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
                                 style={{ borderRadius: 4, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
                                 編輯
@@ -1013,7 +1017,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     {!isEditingInline ? (
                       /* 顯示模式 */
                       <>
-                        {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STO_01' && rule.id !== 'STO_02' && rule.id !== 'STO_04' && (
+                        {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'STB_05' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1034,10 +1038,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {/* STO_01 營業狀態配置只讀顯示 */}
-                        {rule.id === 'STO_01' && (() => {
-                          const defaultSTO01 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STO_01')
-                          const items = rule.conditionItems?.length ? rule.conditionItems : (defaultSTO01?.conditionItems || [])
+                        {/* STB_02 營業狀態配置只讀顯示 */}
+                        {rule.id === 'STB_02' && (() => {
+                          const defaultSTB02 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_02')
+                          const items = rule.conditionItems?.length ? rule.conditionItems : (defaultSTB02?.conditionItems || [])
                           return (
                           <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -1082,10 +1086,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           </div>
                           )
                         })()}
-                        {/* STO_02 評價得分配置只讀顯示（5 星） */}
-                        {rule.id === 'STO_02' && (() => {
-                          const defaultSTO02 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STO_02')
-                          const items = rule.conditionItems?.length === 5 ? rule.conditionItems : (defaultSTO02?.conditionItems || [])
+                        {/* STB_03 評價得分配置只讀顯示（5 星） */}
+                        {rule.id === 'STB_03' && (() => {
+                          const defaultSTB03 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_03')
+                          const items = rule.conditionItems?.length === 5 ? rule.conditionItems : (defaultSTB03?.conditionItems || [])
                           const parseMode = (cond: string) => {
                             if (cond === 'fixed_bonus') return { badge: '固定加分', color: '#52C41A', bg: '#f6ffed', border: '#b7eb8f' }
                             if (cond === 'fixed_deduction') return { badge: '固定減分', color: '#FF4D4F', bg: '#fff2f0', border: '#ffccc7' }
@@ -1138,8 +1142,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           </div>
                           )
                         })()}
-                        {/* STO_03 商家扶持自定義只讀顯示 */}
-                        {rule.id === 'STO_03' && (() => {
+                        {/* PLT_03 商家扶持自定義只讀顯示 */}
+                        {rule.id === 'PLT_03' && (() => {
                           const tiers = rule.tiers || []
                           const days = rule.statDays || 30
                           const prereq = rule.prerequisites || 'UNCONDITIONAL'
@@ -1158,7 +1162,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                     <Tag color="green" style={{ fontSize: 12, margin: 0 }}>無條件</Tag>
                                   ) : (
                                     <span style={{ display: 'inline-flex', gap: 6 }}>
-                                      {STO_03_PREREQ_OPTIONS.filter(o => selectedConditions.includes(o.value)).map(o => (
+                                      {PLT_03_PREREQ_OPTIONS.filter(o => selectedConditions.includes(o.value)).map(o => (
                                         <Tag key={o.value} color="blue" style={{ fontSize: 12, margin: 0 }}>{o.label}</Tag>
                                       ))}
                                     </span>
@@ -1202,7 +1206,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       <span style={{ fontSize: 13, color: '#595959' }}>
                                         訂單量 ≤ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
                                       </span>
-                                      <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 14, color: '#52C41A' }}>
+                                      <span style={{ fontWeight: 600, fontSize: 14, color: '#52C41A' }}>
                                         固定加分：{tier.score} 分
                                       </span>
                                     </div>
@@ -1212,8 +1216,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_03B 訂單過熱調控自定義只讀顯示 */}
-                        {rule.id === 'STO_03B' && (() => {
+                        {/* PLT_04 訂單過熱調控自定義只讀顯示 */}
+                        {rule.id === 'PLT_04' && (() => {
                           const tiers = rule.tiers || []
                           const hours = rule.calcIntervalHours ?? 1
                           return (
@@ -1240,7 +1244,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       <span style={{ fontSize: 13, color: '#595959' }}>
                                         訂單量 ≥ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
                                       </span>
-                                      <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>
+                                      <span style={{ fontWeight: 600, fontSize: 14, color: '#FF4D4F' }}>
                                         固定減分：{Math.abs(tier.score)} 分
                                       </span>
                                     </div>
@@ -1250,8 +1254,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_04 出餐速度自定義只讀顯示 */}
-                        {rule.id === 'STO_04' && (() => {
+                        {/* STB_05 出餐速度自定義只讀顯示 */}
+                        {rule.id === 'STB_05' && (() => {
                           const totalDays = rule.statDaysTotal || 7
                           const recentDays = rule.statDaysRecent || 1
                           const items = rule.conditionItems || []
@@ -1272,7 +1276,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                                 <div style={{
-                                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+                                  display: 'flex', alignItems: 'center', gap: 12,
                                   padding: '10px 0', borderBottom: '1px dashed #E8E8E8',
                                 }}>
                                   <div style={{ fontSize: 13, color: '#595959' }}>
@@ -1281,7 +1285,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <span style={{ fontWeight: 600, fontSize: 14, color: '#52C41A' }}>固定加分 +{primaryScore} 分</span>
                                 </div>
                                 <div style={{
-                                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+                                  display: 'flex', alignItems: 'center', gap: 12,
                                   padding: '10px 0',
                                 }}>
                                   <div style={{ fontSize: 13, color: '#595959' }}>
@@ -1293,8 +1297,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_05 拒絕接單自定義只讀顯示 */}
-                        {rule.id === 'STO_05' && (() => {
+                        {/* STB_06 拒絕接單自定義只讀顯示 */}
+                        {rule.id === 'STB_06' && (() => {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 80
                           return (
@@ -1318,8 +1322,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_07 出餐超時自定義只讀顯示 */}
-                        {rule.id === 'STO_07' && (() => {
+                        {/* STB_07 出餐超時自定義只讀顯示 */}
+                        {rule.id === 'STB_07' && (() => {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 70
                           return (
@@ -1343,8 +1347,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_08 取消訂單自定義只讀顯示 */}
-                        {rule.id === 'STO_08' && (() => {
+                        {/* STB_08 取消訂單自定義只讀顯示 */}
+                        {rule.id === 'STB_08' && (() => {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 80
                           return (
@@ -1368,8 +1372,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_09 超時接單自定義只讀顯示 */}
-                        {rule.id === 'STO_09' && (() => {
+                        {/* STB_09 超時接單自定義只讀顯示 */}
+                        {rule.id === 'STB_09' && (() => {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 60
                           return (
@@ -1456,7 +1460,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {rule.mode === ScoreMode.TIERED && rule.tiers?.length && rule.id !== 'STO_03' && rule.id !== 'STO_03B' && (
+                        {rule.mode === ScoreMode.TIERED && rule.tiers?.length && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1498,7 +1502,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
                             {rule.description}
                           </div>
-                          {rule.prerequisites && rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STO_01' && rule.id !== 'STO_02' && rule.id !== 'STO_03' && rule.id !== 'STO_03B' && rule.id !== 'STO_04' && rule.id !== 'STO_05' && rule.id !== 'STO_07' && rule.id !== 'STO_08' && rule.id !== 'STO_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && (
+                          {rule.prerequisites && rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && (
                             <div style={{
                               display: 'inline-flex', alignItems: 'center', gap: 6,
                               padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
@@ -1513,13 +1517,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     ) : (
                       /* 編輯模式 */
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: (rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'STO_01' || rule.id === 'STO_02' || rule.id === 'STO_03' || rule.id === 'STO_03B' || rule.id === 'STO_04' || rule.id === 'STO_05' || rule.id === 'STO_07' || rule.id === 'STO_08' || rule.id === 'STO_09' || rule.id === 'PLT_01' || rule.id === 'PLT_02A') ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: (rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'STB_02' || rule.id === 'STB_03' || rule.id === 'PLT_03' || rule.id === 'PLT_04' || rule.id === 'STB_05' || rule.id === 'STB_06' || rule.id === 'STB_07' || rule.id === 'STB_08' || rule.id === 'STB_09' || rule.id === 'PLT_01' || rule.id === 'PLT_02A') ? '1fr' : '1fr 1fr', gap: 12 }}>
                           <div>
                             <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>規則名稱</div>
                             <Input value={form.name} maxLength={30} showCount
                               onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], name: e.target.value } }) as any)} />
                           </div>
-                          {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STO_01' && rule.id !== 'STO_02' && rule.id !== 'STO_03' && rule.id !== 'STO_03B' && rule.id !== 'STO_04' && rule.id !== 'STO_05' && rule.id !== 'STO_07' && rule.id !== 'STO_08' && rule.id !== 'STO_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A') && (
+                          {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
@@ -1527,8 +1531,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: e.target.value || undefined } }) as any)} />
                             </div>
                           )}
-                          {/* STO_03 自定義前提條件 */}
-                          {rule.id === 'STO_03' && (() => {
+                          {/* PLT_03 自定義前提條件 */}
+                          {rule.id === 'PLT_03' && (() => {
                             const prereqVal = (form as any).prerequisites || 'UNCONDITIONAL'
                             const isUnconditional = prereqVal === 'UNCONDITIONAL'
                             const selectedConds: string[] = isUnconditional ? [] : (() => { try { return JSON.parse(prereqVal) } catch { return [] } })()
@@ -1554,7 +1558,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                     }}
                                     style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
                                   >
-                                    {STO_03_PREREQ_OPTIONS.map(o => (
+                                    {PLT_03_PREREQ_OPTIONS.map(o => (
                                       <Checkbox key={o.value} value={o.value}>{o.label}</Checkbox>
                                     ))}
                                   </Checkbox.Group>
@@ -1562,8 +1566,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               </div>
                             )
                           })()}
-                          {/* STO_03 屏蔽商家（獨立區域） */}
-                          {rule.id === 'STO_03' && (() => {
+                          {/* PLT_03 屏蔽商家（獨立區域） */}
+                          {rule.id === 'PLT_03' && (() => {
                             const blocked: string[] = (form as any).blockedMerchants || []
                             return (
                               <div style={{ padding: 12, background: '#FFF2F0', borderRadius: 8, border: '1px solid #FFCCC7' }}>
@@ -1615,8 +1619,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               </div>
                             )
                           })()}
-                          {/* STO_03 統計天數 + 梯度配置 */}
-                          {rule.id === 'STO_03' && (
+                          {/* PLT_03 統計天數 + 梯度配置 */}
+                          {rule.id === 'PLT_03' && (
                             <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                                 <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -1696,8 +1700,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           )}
 
                         </div>
-                        {/* STO_01 營業狀態專屬配置 */}
-                        {rule.id === 'STO_01' && (
+                        {/* STB_02 營業狀態專屬配置 */}
+                        {rule.id === 'STB_02' && (
                           <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                               {[
@@ -1749,8 +1753,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {/* STO_02 評價得分專屬配置（5 星） */}
-                        {rule.id === 'STO_02' && (
+                        {/* STB_03 評價得分專屬配置（5 星） */}
+                        {rule.id === 'STB_03' && (
                           <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                               <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -1824,8 +1828,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {/* STO_03B 訂單過熱調控自定義編輯 */}
-                        {rule.id === 'STO_03B' && (
+                        {/* PLT_04 訂單過熱調控自定義編輯 */}
+                        {rule.id === 'PLT_04' && (
                           <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                               <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>監控方式</span>
@@ -1907,8 +1911,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {/* STO_04 出餐速度自定義編輯 */}
-                        {rule.id === 'STO_04' && (() => {
+                        {/* STB_05 出餐速度自定義編輯 */}
+                        {rule.id === 'STB_05' && (() => {
                           const items: ScoreConditionItem[] = (form as any).conditionItems || []
                           const primaryScore = items.find(i => i.condition === 'primary_meet')?.score ?? 0
                           const secondaryScore = items.find(i => i.condition === 'secondary_meet')?.score ?? 0
@@ -1959,8 +1963,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_05 拒絕接單自定義編輯 */}
-                        {rule.id === 'STO_05' && (() => {
+                        {/* STB_06 拒絕接單自定義編輯 */}
+                        {rule.id === 'STB_06' && (() => {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 80
                           return (
@@ -1990,8 +1994,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_07 出餐超時自定義編輯 */}
-                        {rule.id === 'STO_07' && (() => {
+                        {/* STB_07 出餐超時自定義編輯 */}
+                        {rule.id === 'STB_07' && (() => {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 70
                           return (
@@ -2021,8 +2025,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_08 取消訂單自定義編輯 */}
-                        {rule.id === 'STO_08' && (() => {
+                        {/* STB_08 取消訂單自定義編輯 */}
+                        {rule.id === 'STB_08' && (() => {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 80
                           return (
@@ -2052,8 +2056,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STO_09 超時接單自定義編輯 */}
-                        {rule.id === 'STO_09' && (() => {
+                        {/* STB_09 超時接單自定義編輯 */}
+                        {rule.id === 'STB_09' && (() => {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 60
                           return (
@@ -2170,8 +2174,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                           </div>
                         )}
-                        {/* 非 STO_01/STO_02/STO_03/STO_03B/STO_04/STO_05/STO_07/STO_08/STO_09/PLT_01/PLT_02A/STB_01/STB_04 顯示標準計分方式 */}
-                        {rule.id !== 'STO_01' && rule.id !== 'STO_02' && rule.id !== 'STO_03' && rule.id !== 'STO_03B' && rule.id !== 'STO_04' && rule.id !== 'STO_05' && rule.id !== 'STO_07' && rule.id !== 'STO_08' && rule.id !== 'STO_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && (
+                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04 顯示標準計分方式 */}
+                        {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
@@ -2771,7 +2775,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       </Modal>
     </div>
 
-    {/* STO_03 門店選擇彈窗（屏蔽商家） */}
+    {/* PLT_03 門店選擇彈窗（屏蔽商家） */}
     <Modal
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2789,7 +2793,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       } : {
         onOk: () => {
           const codes = tempBlockedStores.map(s => s.storeCode)
-          setInlineForm(prev => ({ ...prev, STO_03: { ...prev.STO_03, blockedMerchants: codes } }) as any)
+          setInlineForm(prev => ({ ...prev, PLT_03: { ...prev.PLT_03, blockedMerchants: codes } }) as any)
           setStoreModalVisible(false)
           message.success(`已選擇 ${codes.length} 家屏蔽商家`)
         },

@@ -249,44 +249,39 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券-按金額', description: '商家設置閃蜂官方神券加分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_09', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 80, status: ENABLED, builtin: true },
   { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-金字招牌', description: '購買金字招牌廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
-  { id: 'COM_11', dimension: ScoreDimension.COMMERCIAL, name: '訂單加分', description: '根據商家參與活動類型與訂單量綜合條件加分', mode: ScoreMode.CONDITIONAL, score: 0, prerequisites: '商家需有有效訂單', conditionItems: [
-    { condition: '報名免運費活動且當月訂單≥50單', score: 30 },
-    { condition: '報名滿額立減活動且當月訂單≥100單', score: 50 },
-    { condition: '同時參與兩項活動且當月訂單≥200單', score: 80 },
-  ], status: ENABLED, builtin: true },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
   { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
   { id: 'STB_04', dimension: ScoreDimension.STORE, name: '店鋪標籤-金牌', description: '金牌店鋪身份標籤加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
-  { id: 'STO_01', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
+  { id: 'STB_02', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
       { condition: 'bonus', score: 100 },
       { condition: 'deduction', score: 20 },
       { condition: 'deduction', score: 50 },
       { condition: 'deduction', score: 80 },
     ] },
-  { id: 'STO_02', dimension: ScoreDimension.STORE, name: '評價得分', description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: [
+  { id: 'STB_03', dimension: ScoreDimension.STORE, name: '評價得分', description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: [
     { condition: 'fixed_bonus', score: 50 },
     { condition: 'fixed_bonus', score: 20 },
     { condition: 'fixed_bonus', score: 0 },
     { condition: 'fixed_deduction', score: 20 },
     { condition: 'fixed_deduction', score: 50 },
   ] },
-  { id: 'STO_03', dimension: ScoreDimension.PLATFORM, name: '商家扶持', description: '統計有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, statDays: 30, prerequisites: 'UNCONDITIONAL', tiers: [
+  { id: 'PLT_03', dimension: ScoreDimension.PLATFORM, name: '商家扶持', description: '統計有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, statDays: 30, prerequisites: 'UNCONDITIONAL', tiers: [
     { threshold: 50, direction: TierDirection.LESS_THAN, score: 20, statDays: 30 },
   ], status: ENABLED, builtin: true },
-  { id: 'STO_03B', dimension: ScoreDimension.PLATFORM, name: '訂單過熱調控', description: '定時監控商家訂單過熱時按梯度降權，平衡流量分配給其他商家機會', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, tiers: [
+  { id: 'PLT_04', dimension: ScoreDimension.PLATFORM, name: '訂單過熱調控', description: '定時監控商家訂單過熱時按梯度降權，平衡流量分配給其他商家機會', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, tiers: [
     { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
     { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
     { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
   ], status: ENABLED, builtin: true },
-  { id: 'STO_04', dimension: ScoreDimension.STORE, name: '出餐速度', description: '對比近期出餐時間與歷史基線，主營/輔營時段分別統計，達標加分鼓勵持續提速', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, statDaysRecent: 1, conditionItems: [
+  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐速度', description: '對比近期出餐時間與歷史基線，主營/輔營時段分別統計，達標加分鼓勵持續提速', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, statDaysRecent: 1, conditionItems: [
     { condition: 'primary_meet', score: 30 },
     { condition: 'secondary_meet', score: 20 },
   ], status: ENABLED, builtin: true },
-  { id: 'STO_05', dimension: ScoreDimension.STORE, name: '拒絕接單', description: '統計天數內（含當天），每拒絕一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
-  { id: 'STO_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },
-  { id: 'STO_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '統計天數內（含當天），每取消一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
-  { id: 'STO_09', dimension: ScoreDimension.STORE, name: '超時接單', description: '統計天數內（含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 60, status: ENABLED, builtin: true },
+  { id: 'STB_06', dimension: ScoreDimension.STORE, name: '拒絕接單', description: '統計天數內（含當天），每拒絕一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
+  { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },
+  { id: 'STB_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '統計天數內（含當天），每取消一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
+  { id: 'STB_09', dimension: ScoreDimension.STORE, name: '超時接單', description: '統計天數內（含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 60, status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
   { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },

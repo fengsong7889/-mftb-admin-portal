@@ -29,6 +29,7 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
 
     private static final String INIT_SCRIPT = "23_organic_score.sql";
     private static final String MIGRATION_SCRIPT = "51_organic_score_code_normalization.sql";
+    private static final String RENAME_SCRIPT = "53_rename_sto_to_stb_plt.sql";
     private static final String CLEANUP_SCRIPT = "52_cleanup_tmp_organic_rules.sql";
 
     /** 需要幂等添加的列：列名 → DDL 定义 */
@@ -43,6 +44,7 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
         NEW_COLUMNS.put("peak_time_ranges",    "JSON DEFAULT NULL COMMENT '高峰時段定義 JSON'");
         NEW_COLUMNS.put("deduction_per_order", "INT DEFAULT NULL COMMENT '每單固定扣分'");
         NEW_COLUMNS.put("decay_coefficient",   "DECIMAL(10,4) DEFAULT NULL COMMENT '衰減係數'");
+        NEW_COLUMNS.put("blocked_merchants",   "JSON DEFAULT NULL COMMENT '屏蔽商家列表 JSON'");
     }
 
     private final JdbcTemplate jdbcTemplate;
@@ -56,21 +58,28 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
         try {
             executeSqlScript(MIGRATION_SCRIPT);
         } catch (Exception e) {
-            log.error("自然流量评分编码规范化迁移失败: {}", e.getMessage(), e);
+            log.error("自然流量评分编码规范化迁移失败：{}", e.getMessage(), e);
         }
-
-        // Step 3: 执行种子脚本（INSERT IGNORE 插入新格式数据）
+        
+        // Step 3: 执行重命名脚本（STO_ → STB_/PLT_ 前缀规范化）
+        try {
+            executeSqlScript(RENAME_SCRIPT);
+        } catch (Exception e) {
+            log.error("自然流量评分编码重命名失败：{}", e.getMessage(), e);
+        }
+        
+        // Step 4: 执行种子脚本（INSERT IGNORE 插入新格式数据）
         try {
             executeSqlScript(INIT_SCRIPT);
         } catch (Exception e) {
-            log.error("自然流量评分配置初始化失败: {}", e.getMessage(), e);
+            log.error("自然流量评分配置初始化失败：{}", e.getMessage(), e);
         }
-
-        // Step 4: 清理临时编码
+        
+        // Step 5: 清理临时编码
         try {
             executeSqlScript(CLEANUP_SCRIPT);
         } catch (Exception e) {
-            log.error("自然流量评分临时编码清理失败: {}", e.getMessage(), e);
+            log.error("自然流量评分临时编码清理失败：{}", e.getMessage(), e);
         }
     }
 
