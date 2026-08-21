@@ -200,12 +200,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             r.name = '出餐速度'
             r.dimension = ScoreDimension.STORE
             if (!r.statDaysTotal) r.statDaysTotal = 7
-            if (!r.statDaysRecent) r.statDaysRecent = 1
+            // 清除舊版 statDaysRecent 與主/輔營條件項
+            r.statDaysRecent = undefined
+            if (r.conditionItems?.some(i => i.condition === 'primary_meet' || i.condition === 'secondary_meet')) {
+              r.conditionItems = [{ condition: 'over_avg_deduction', score: 30 }]
+            }
             if (!r.conditionItems?.length) {
-              r.conditionItems = [
-                { condition: 'primary_meet', score: 30 },
-                { condition: 'secondary_meet', score: 20 },
-              ]
+              r.conditionItems = [{ condition: 'over_avg_deduction', score: 30 }]
             }
           }
           if (r.id === 'STB_06') {
@@ -440,17 +441,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         }
       }
     }
-    // STB_05 出餐速度校驗：主營/輔營計分規則
+    // STB_05 出餐速度校驗：統計天數 + 超均值扣分
     if (ruleId === 'STB_05') {
-      const items: ScoreConditionItem[] = (values as any).conditionItems || []
-      const primaryItem = items.find(i => i.condition === 'primary_meet')
-      const secondaryItem = items.find(i => i.condition === 'secondary_meet')
-      if (!primaryItem || primaryItem.score === undefined || primaryItem.score === null) {
-        message.warning('請配置主營時段達標加分')
+      if (!(values as any).statDaysTotal || (values as any).statDaysTotal <= 0) {
+        message.warning('請配置統計天數')
         return
       }
-      if (!secondaryItem || secondaryItem.score === undefined || secondaryItem.score === null) {
-        message.warning('請配置輔營時段達標加分')
+      const items: ScoreConditionItem[] = (values as any).conditionItems || []
+      const deductionItem = items.find(i => i.condition === 'over_avg_deduction')
+      if (!deductionItem || deductionItem.score === undefined || deductionItem.score === null || deductionItem.score <= 0) {
+        message.warning('請配置超均值扣分分值')
         return
       }
     }
@@ -1275,60 +1275,37 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {/* STB_05 出餐速度自定義只讀顯示 */}
                         {rule.id === 'STB_05' && (() => {
                           const totalDays = rule.statDaysTotal || 7
-                          const recentDays = rule.statDaysRecent || 1
                           const items = rule.conditionItems || []
-                          const primaryScore = items.find(i => i.condition === 'primary_meet')?.score ?? 0
-                          const secondaryScore = items.find(i => i.condition === 'secondary_meet')?.score ?? 0
+                          const deductionScore = items.find(i => i.condition === 'over_avg_deduction')?.score ?? 0
                           return (
                             <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>歷史基線：</span>
-                                  過去 <span style={{ fontWeight: 600, color: '#E8720C' }}>{totalDays}</span> 天
-                                </div>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>近期對比：</span>
-                                  最近 <span style={{ fontWeight: 600, color: '#E8720C' }}>{recentDays}</span> 天
+                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
+                                  過去 <span style={{ fontWeight: 600, color: '#E8720C' }}>{totalDays}</span> 天（不含當天）
                                 </div>
                               </div>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                <div style={{
-                                  display: 'flex', alignItems: 'center', gap: 12,
-                                  padding: '10px 0', borderBottom: '1px dashed #E8E8E8',
-                                }}>
-                                  <div style={{ fontSize: 13, color: '#595959' }}>
-                                    主營時段出餐 ≤ 歷史基線
-                                  </div>
-                                  <span style={{
-                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                    height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                    color: '#52C41A',
-                                    background: '#f6ffed',
-                                    border: '1px solid #b7eb8f',
-                                  }}>
-                                    固定加分
-                                  </span>
-                                  <span style={{ fontWeight: 600, fontSize: 15, color: '#52C41A' }}>+{primaryScore} 分</span>
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                padding: '10px 0',
+                              }}>
+                                <div style={{ fontSize: 13, color: '#595959' }}>
+                                  當日出餐時間 &gt; 過去 {totalDays} 天均值
                                 </div>
-                                <div style={{
-                                  display: 'flex', alignItems: 'center', gap: 12,
-                                  padding: '10px 0',
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                  color: '#FF4D4F',
+                                  background: '#fff2f0',
+                                  border: '1px solid #ffccc7',
                                 }}>
-                                  <div style={{ fontSize: 13, color: '#595959' }}>
-                                    輔營時段出餐 ≤ 歷史基線
-                                  </div>
-                                  <span style={{
-                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                    height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                    color: '#52C41A',
-                                    background: '#f6ffed',
-                                    border: '1px solid #b7eb8f',
-                                  }}>
-                                    固定加分
-                                  </span>
-                                  <span style={{ fontWeight: 600, fontSize: 15, color: '#52C41A' }}>+{secondaryScore} 分</span>
-                                </div>
+                                  固定扣分
+                                </span>
+                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>-{deductionScore} 分</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                                備注：統計天數不含當天，統計期間內平均出餐時間作為基線，當天成餐時間超過基線即扣分
                               </div>
                             </div>
                           )
@@ -1986,8 +1963,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {/* STB_05 出餐速度自定義編輯 */}
                         {rule.id === 'STB_05' && (() => {
                           const items: ScoreConditionItem[] = (form as any).conditionItems || []
-                          const primaryScore = items.find(i => i.condition === 'primary_meet')?.score ?? 0
-                          const secondaryScore = items.find(i => i.condition === 'secondary_meet')?.score ?? 0
+                          const deductionScore = items.find(i => i.condition === 'over_avg_deduction')?.score ?? 0
                           const updateCond = (cond: string, score: number) => {
                             const newItems = items.filter(i => i.condition !== cond)
                             newItems.push({ condition: cond, score })
@@ -1997,40 +1973,26 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>歷史基線</span>
+                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
                                   <InputNumber
                                     value={(form as any).statDaysTotal ?? 7}
                                     min={1} max={365} style={{ width: 110 }}
                                     addonAfter="天"
                                     onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDaysTotal: val ?? 7 } }) as any)}
                                   />
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>近期對比</span>
-                                  <InputNumber
-                                    value={(form as any).statDaysRecent ?? 1}
-                                    min={1} max={30} style={{ width: 110 }}
-                                    addonAfter="天"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDaysRecent: val ?? 1 } }) as any)}
-                                  />
+                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（不含當天）</span>
                                 </div>
                               </div>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                  <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>主營時段出餐 ≤ 基線</span>
-                                  <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
-                                  <InputNumber value={primaryScore} min={0} max={200} style={{ width: 130 }}
-                                    addonAfter="分" placeholder="輸入分數"
-                                    onChange={val => updateCond('primary_meet', val ?? 0)} />
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                  <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>輔營時段出餐 ≤ 基線</span>
-                                  <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
-                                  <InputNumber value={secondaryScore} min={0} max={200} style={{ width: 130 }}
-                                    addonAfter="分" placeholder="輸入分數"
-                                    onChange={val => updateCond('secondary_meet', val ?? 0)} />
-                                </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                                <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>當日出餐 &gt; 統計均值扣分</span>
+                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
+                                <InputNumber value={deductionScore} min={1} max={500} style={{ width: 130 }}
+                                  addonAfter="分" placeholder="輸入分數"
+                                  onChange={val => updateCond('over_avg_deduction', val ?? 0)} />
+                              </div>
+                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                                備注：統計天數不含當天，統計期間內平均出餐時間作為基線，當天成餐時間超過基線即扣分
                               </div>
                             </div>
                           )

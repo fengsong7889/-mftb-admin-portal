@@ -274,9 +274,8 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
     { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
     { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
   ], status: ENABLED, builtin: true },
-  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐速度', description: '對比近期出餐時間與歷史基線，主營/輔營時段分別統計，達標加分鼓勵持續提速', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, statDaysRecent: 1, conditionItems: [
-    { condition: 'primary_meet', score: 30 },
-    { condition: 'secondary_meet', score: 20 },
+  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐速度', description: '統計過去N天（不含當天）出餐均值，當天出餐時間超過均值即扣分', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, conditionItems: [
+    { condition: 'over_avg_deduction', score: 30 },
   ], status: ENABLED, builtin: true },
   { id: 'STB_06', dimension: ScoreDimension.STORE, name: '拒絕接單', description: '統計天數內（含當天），每拒絕一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
   { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },

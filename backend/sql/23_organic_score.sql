@@ -93,8 +93,8 @@ INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `
 INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `calc_cycle`, `calc_interval_hours`, `tiers`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
 ('PLT_04', 4, '訂單過熱調控', '定時監控商家訂單過熱時按梯度降權，平衡流量分配給其他商家機會', 5, 0, 'SCHEDULED', 1.00, '[{"threshold":200,"direction":"MORE_THAN","score":-10},{"threshold":500,"direction":"MORE_THAN","score":-30},{"threshold":1000,"direction":"MORE_THAN","score":-60}]', 1, 1, 6, 'system');
 
-INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days_total`, `stat_days_recent`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
-('STB_05', 2, '出餐速度', '對比近期出餐時間與歷史基線，主營/輔營時段分別統計，達標加分鼓勵持續提速', 6, 0, 7, 1, '[{"condition":"primary_meet","score":30},{"condition":"secondary_meet","score":20}]', 1, 1, 7, 'system');
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days_total`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STB_05', 2, '出餐速度', '統計過去N天（不含當天）出餐均值，當天出餐時間超過均值即扣分', 6, 0, 7, '[{"condition":"over_avg_deduction","score":30}]', 1, 1, 7, 'system');
 
 INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `stat_days`, `deduction_per_order`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
 ('STB_06', 2, '拒絕接單', '統計天數內（含當天），每拒絕一單固定扣分，即時生效', 3, 0, 7, 80, 1, 1, 8, 'system'),
