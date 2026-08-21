@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Modal, Form, Input, Select, message, TreeSelect } from 'antd'
+import { Modal, Form, Input, Select, message, TreeSelect, Checkbox } from 'antd'
 import { useTranslation } from 'react-i18next'
 import type { StoreItem, StorePayload } from '../../api/store'
 import { createStore, updateStore } from '../../api/store'
@@ -63,8 +63,8 @@ export default function StoreEditModal({
           loginAccount: editingRecord.loginAccount,
           region: editingRecord.region ?? undefined,
         })
-        // 品牌為單選，直接設置字符串值；業務頻道仍為多選
-        form.setFieldValue('brand', editingRecord.brand ? editingRecord.brand.trim() : undefined)
+        // 品牌改為多選（Checkbox），值為逗號分隔字符串
+        form.setFieldValue('brand', editingRecord.brand ? editingRecord.brand.split(',').map(s => s.trim()).filter(Boolean) : [])
         form.setFieldValue('bizChannel', editingRecord.bizChannel ? editingRecord.bizChannel.split(',').map(s => s.trim()).filter(Boolean) : [])
       } else {
         form.resetFields()
@@ -80,7 +80,7 @@ export default function StoreEditModal({
       const values = await form.validateFields()
       const payload = {
         ...values,
-        brand: values.brand,
+        brand: Array.isArray(values.brand) ? values.brand.join(',') : values.brand,
         bizChannel: Array.isArray(values.bizChannel) ? values.bizChannel.join(',') : values.bizChannel,
       }
       if (isEdit && editingRecord) {
@@ -141,19 +141,10 @@ export default function StoreEditModal({
           <Input placeholder={t('storeNamePlaceholder')} />
         </Form.Item>
         <Form.Item name="brand" label={t('common:brand')} rules={[{ required: true, message: t('brandRequired') }]}>
-          <Select
-            placeholder={t('brandPlaceholder')}
-            allowClear
-            options={BRAND_OPTIONS}
-          />
+          <Checkbox.Group options={BRAND_OPTIONS} />
         </Form.Item>
         <Form.Item name="bizChannel" label={t('bizChannelLabel')}>
-          <Select
-            placeholder={t('bizChannelPlaceholder')}
-            mode="multiple"
-            allowClear
-            options={BIZ_CHANNEL_OPTIONS}
-          />
+          <Checkbox.Group options={BIZ_CHANNEL_OPTIONS} />
         </Form.Item>
         {/* 所在區域=商圈：按澳門區域/氹仔區域树形分组展示，購買按商圈定價的廣告時跟隨門店 */}
         <Form.Item name="region" label={t('regionLabel')} tooltip={t('regionTooltip')}>

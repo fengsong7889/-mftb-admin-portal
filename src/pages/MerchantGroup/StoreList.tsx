@@ -239,8 +239,13 @@ export default function StoreList() {
       title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
-      width: 120,
-      render: (val: string) => val ? <BrandTag value={val} /> : '-',
+      width: 160,
+      render: (val: string) => {
+        if (!val) return '-'
+        const brands = val.split(',').map(s => s.trim()).filter(Boolean)
+        if (brands.length <= 1) return val ? <BrandTag value={val} /> : '-'
+        return <Space size={4} wrap>{brands.map(b => <BrandTag key={b} value={b} />)}</Space>
+      },
     },
     {
       title: t('colBizChannel'),

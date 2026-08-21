@@ -3240,6 +3240,7 @@
     "selectStore": "請選擇門店",
     "selectGroupFirst": "請先選擇集團",
     "brandAutoTip": "選擇門店後自動帶出，無需手動選擇",
+    "selectBrand": "請選擇所屬品牌",
     "giftConfig": "贈送配置",
     "approvalRequired": "需審批",
     "approvalTip": "📋 提交後將進入審批中心，審核通過後系統自動為商戶增加對應廣告天數。",

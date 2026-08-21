@@ -160,6 +160,11 @@ const keyToPath: Record<string, string> = {
   'promotion-report-overview': '/promotion-report-overview',
   'promotion-report-order': '/promotion-report-order',
   'promotion-report-compare': '/promotion-report-compare',
+  // 團購管理
+  'group-purchase-dashboard': '/group-purchase-dashboard',
+  'flash-sale-register': '/flash-sale-register',
+  'flash-sale-stats': '/flash-sale-stats',
+  'flash-sale-price': '/flash-sale-price',
   // 推广通(父菜单,无需映射)
   // 'promotion-tool': '/promotion-tool',
   // 系统配置
@@ -474,6 +479,33 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    key: 'group-purchase',
+    icon: <ShoppingFilled />,
+    label: '團購管理',
+    children: [
+      {
+        key: 'group-purchase-dashboard',
+        icon: <DashboardOutlined />,
+        label: '數據看板',
+      },
+      {
+        key: 'flash-sale-register',
+        icon: <FileTextOutlined />,
+        label: '秒殺商品登記',
+      },
+      {
+        key: 'flash-sale-stats',
+        icon: <BarChartOutlined />,
+        label: '秒殺商品統計',
+      },
+      {
+        key: 'flash-sale-price',
+        icon: <MoneyCollectOutlined />,
+        label: '澳覓秒殺價',
+      },
+    ],
+  },
+  {
     key: 'hr',
     icon: <TeamOutlined />,
     label: '集團人事',
@@ -615,6 +647,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'organization-management': <ApartmentOutlined />,
   'position-management': <IdcardOutlined />,
   'login-log': <ScheduleOutlined />,
+  // 團購管理
+  'group-purchase': <ShoppingFilled />,
+  'group-purchase-dashboard': <DashboardOutlined />,
+  'flash-sale-register': <FileTextOutlined />,
+  'flash-sale-stats': <BarChartOutlined />,
+  'flash-sale-price': <MoneyCollectOutlined />,
   'permission': <LockOutlined />,
   'role-management': <SolutionOutlined />,
   'function-permission': <AppstoreOutlined />,

@@ -85,6 +85,11 @@ const PromotionReportOrder = lazy(() => import('./pages/PromotionReport/OrderRep
 const PromotionReportCompare = lazy(() => import('./pages/PromotionReport/Compare'))
 // 地圖規劃
 const MapPlanning = lazy(() => import('./pages/MapPlanning'))
+// 團購管理
+const GroupPurchaseDashboard = lazy(() => import('./pages/GroupPurchase/Dashboard'))
+const FlashSaleRegister = lazy(() => import('./pages/GroupPurchase/FlashSaleRegister'))
+const FlashSaleStats = lazy(() => import('./pages/GroupPurchase/FlashSaleStats'))
+const FlashSalePrice = lazy(() => import('./pages/GroupPurchase/FlashSalePrice'))
 // 系統配置
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
@@ -196,6 +201,11 @@ function AuthenticatedLayout() {
               <Route path="/promotion-report-overview" element={<PromotionReportOverview />} />
               <Route path="/promotion-report-order" element={<PromotionReportOrder />} />
               <Route path="/promotion-report-compare" element={<PromotionReportCompare />} />
+              {/* 團購管理 */}
+              <Route path="/group-purchase-dashboard" element={<GroupPurchaseDashboard />} />
+              <Route path="/flash-sale-register" element={<FlashSaleRegister />} />
+              <Route path="/flash-sale-stats" element={<FlashSaleStats />} />
+              <Route path="/flash-sale-price" element={<FlashSalePrice />} />
               {/* 地圖規劃 */}
               <Route path="/map-planning" element={<MapPlanning />} />
               {/* 系統配置 */}

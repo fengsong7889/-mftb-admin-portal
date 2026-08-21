@@ -70,6 +70,12 @@ export const MENU_NAME_EN: Record<string, string> = {
   'organization-management': 'Organization',
   'position-management': 'Position',
   'login-log': 'Employee Activity',
+  // 團購管理
+  'group-purchase': 'Group Purchase',
+  'group-purchase-dashboard': 'Dashboard',
+  'flash-sale-register': 'Flash Sale Register',
+  'flash-sale-stats': 'Flash Sale Stats',
+  'flash-sale-price': 'Macau Flash Sale Price',
   // 權限管理
   'permission': 'Permission Management',
   'role-management': 'Role Management',

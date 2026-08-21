@@ -571,7 +571,7 @@ export default function Waterfall() {
                     card => card.type,
                   ).map(card => {
                       const cardOrder = tabKey === 'delivery' ? deliveryCardOrder : groupBuyCardOrder
-                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
+                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.GOLDEN_SIGNBOARD
                       return (
                         <div
                           key={card.type}

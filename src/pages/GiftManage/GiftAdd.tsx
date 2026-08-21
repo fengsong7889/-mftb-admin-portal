@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Form, Input, Select, InputNumber, Upload, message, Modal } from 'antd'
+import { Button, Form, Input, Select, InputNumber, Upload, message, Modal, Radio } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -10,6 +10,7 @@ import { fetchStoresByGroup } from '../../api/store'
 import { mockSubmitApproval } from '../../api/mock/financeMock'
 import { createGiftRecord } from '../../api/gift'
 import { getSystemRuleValue } from '../../hooks/useSystemRules'
+import { getBrandLabel } from '../../constants/brand'
 import BrandTag from '../../components/BrandTag'
 
 const { TextArea } = Input
@@ -38,6 +39,10 @@ export default function GiftAdd() {
   const [countdown, setCountdown] = useState(5)
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
+  /** 當前門店是否有多品牌需要用戶手動選擇 */
+  const [needsBrandSelection, setNeedsBrandSelection] = useState(false)
+  /** 門店支持的品牌列表（多品牌時供 Radio 單選） */
+  const [storeBrandOptions, setStoreBrandOptions] = useState<{ label: string; value: string }[]>([])
 
   // 集团/门店数据
   const [groups, setGroups] = useState<MerchantGroupItem[]>([])
@@ -108,10 +113,24 @@ export default function GiftAdd() {
     }
   }, [selectedGroupId, isGiftMode, form])
 
-  /** 選擇門店後自動帶出所屬品牌（無需用戶手動選擇） */
+  /** 選擇門店後自動帶出所屬品牌（多品牌時需用戶手動選擇） */
   const handleStoreChange = (storeId?: number) => {
     const store = stores.find(s => s.id === storeId)
-    form.setFieldsValue({ brand: store?.brand })
+    const brandStr = store?.brand || ''
+    const brands = brandStr.split(',').map(b => b.trim()).filter(Boolean)
+    if (brands.length > 1) {
+      // 門店同時屬於多個品牌，讓用戶單選
+      setNeedsBrandSelection(true)
+      setStoreBrandOptions(brands.map(b => ({
+        label: getBrandLabel(b) || b,
+        value: b,
+      })))
+      form.setFieldsValue({ brand: undefined })
+    } else {
+      setNeedsBrandSelection(false)
+      setStoreBrandOptions([])
+      form.setFieldsValue({ brand: brands[0] })
+    }
   }
 
   // 倒計時邏輯
@@ -368,12 +387,26 @@ export default function GiftAdd() {
           </Form.Item>
 
           <Form.Item
-            label={t('common:brand')}
-            name="brand"
-            tooltip={t('brandAutoTip')}
-            rules={[{ required: true, message: t('selectStoreFirst') }]}
+            noStyle
+            shouldUpdate={(prev, cur) => prev.storeId !== cur.storeId}
           >
-            <BrandDisplay placeholder={t('selectStoreFirst')} />
+            {() => (
+              <Form.Item
+                label={t('common:brand')}
+                name="brand"
+                rules={[{ required: true, message: needsBrandSelection ? t('selectBrand') : t('selectStoreFirst') }]}
+              >
+                {needsBrandSelection ? (
+                  <Radio.Group optionType="button" buttonStyle="solid">
+                    {storeBrandOptions.map(opt => (
+                      <Radio.Button key={opt.value} value={opt.value}>{opt.label}</Radio.Button>
+                    ))}
+                  </Radio.Group>
+                ) : (
+                  <BrandDisplay placeholder={t('selectStoreFirst')} />
+                )}
+              </Form.Item>
+            )}
           </Form.Item>
         </div>
       </div>

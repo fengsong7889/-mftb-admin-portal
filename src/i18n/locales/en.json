@@ -3239,6 +3239,7 @@
     "selectStore": "Please select a store",
     "selectGroupFirst": "Please select a group first",
     "brandAutoTip": "Auto-filled after selecting store, no manual selection needed",
+    "selectBrand": "Please select a brand",
     "giftConfig": "Gift Configuration",
     "approvalRequired": "Approval Required",
     "approvalTip": "📋 After submission, it will enter the approval center. The system will automatically add the corresponding ad days after approval.",

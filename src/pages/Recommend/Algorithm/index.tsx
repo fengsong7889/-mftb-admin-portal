@@ -23,7 +23,6 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.TRAFFIC_AD,
     AlgorithmType.GUESS_YOU_LIKE,
     AlgorithmType.ORGANIC_TRAFFIC,
-    AlgorithmType.GOLDEN_SIGNBOARD,
   ],
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
@@ -106,7 +105,6 @@ export default function Algorithm() {
     { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
     { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡', description: t('algorithm.descGuessYouLike') },
     { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
-    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
   ]
 
   /** 根据业务类型过滤数据 */

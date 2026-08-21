@@ -350,6 +350,12 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("organization-management", "Organization"),
                 Map.entry("position-management", "Position"),
                 Map.entry("login-log", "Employee Activity"),
+                // 團購管理
+                Map.entry("group-purchase", "Group Purchase"),
+                Map.entry("group-purchase-dashboard", "Dashboard"),
+                Map.entry("flash-sale-register", "Flash Sale Register"),
+                Map.entry("flash-sale-stats", "Flash Sale Stats"),
+                Map.entry("flash-sale-price", "Macau Flash Sale Price"),
                 Map.entry("permission", "Permission Management"),
                 Map.entry("role-management", "Role Management"),
                 Map.entry("function-permission", "Function Authorization"),
@@ -516,9 +522,10 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("promotion_tool",      new String[]{"推廣通",           null,  "4"});
         menus.put("search",              new String[]{"搜索管理",          null,  "5"});
         menus.put("finance",             new String[]{"財務管理",          null,  "6"});
-        menus.put("hr",                  new String[]{"集團人事",          null,  "7"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "8"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "9"});
+        menus.put("group-purchase",      new String[]{"團購管理",          null,  "7"});
+        menus.put("hr",                  new String[]{"集團人事",          null,  "8"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "9"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "10"});
         // ── 商戶集團管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
@@ -569,6 +576,11 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("debt-reconcile",      new String[]{"欠款對賬",         "merchant-reconcile", "2"});
         menus.put("approval",            new String[]{"審批管理",          "finance",            "3"});
         menus.put("approval-center",     new String[]{"審批中心",         "approval",           "1"});
+        // ── 團購管理 ──
+        menus.put("group-purchase-dashboard", new String[]{"數據看板",     "group-purchase",      "1"});
+        menus.put("flash-sale-register", new String[]{"秒殺商品登記",     "group-purchase",      "2"});
+        menus.put("flash-sale-stats",   new String[]{"秒殺商品統計",     "group-purchase",      "3"});
+        menus.put("flash-sale-price",   new String[]{"澳覓秒殺價",       "group-purchase",      "4"});
         // ── 集團人事 ──
         menus.put("employee-management", new String[]{"員工管理",         "hr",                 "1"});
         menus.put("organization-management", new String[]{"組織管理",     "hr",                 "2"});
@@ -642,6 +654,20 @@ public class DataInitializer implements CommandLineRunner {
         }
         if (created > 0) {
             log.info("已种子化 {} 个系统菜单到 sys_menu", created);
+            // 自动为 admin 角色授予新创建的菜单权限
+            Long adminRoleId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
+            if (adminRoleId != null) {
+                for (Map.Entry<String, String[]> entry : menus.entrySet()) {
+                    Long menuId = queryMenuIdByKey(entry.getKey());
+                    if (menuId != null) {
+                        jdbcTemplate.update(
+                                "INSERT IGNORE INTO sys_role_menu (role_id, menu_id) VALUES (?, ?)",
+                                adminRoleId, menuId);
+                    }
+                }
+                log.info("已为 admin 角色补充新菜单权限");
+            }
         }
         if (updated > 0) {
             log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
