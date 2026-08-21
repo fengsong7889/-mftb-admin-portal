@@ -94,6 +94,29 @@ export default function AlgorithmAdd() {
   const [selectedRegions, _setSelectedRegions] = useState<string[]>([])
   const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
+  /** 金字招牌 - 參數配置（支持多條招牌，每條含分類+名稱+滿足條件） */
+  interface SignboardItem {
+    id: number
+    category: 'ranking' | 'featured'
+    name: string
+    metric: string
+    scope: string
+    comparison: string
+    value: number | undefined
+  }
+  let signboardIdSeed = Date.now()
+  const createSignboardItem = (partial?: Partial<SignboardItem>): SignboardItem => ({
+    id: signboardIdSeed++,
+    category: 'ranking',
+    name: '',
+    metric: 'monthlyOrders',
+    scope: 'allMerchants',
+    comparison: 'percentage',
+    value: undefined,
+    ...partial,
+  })
+  const [signboardItems, setSignboardItems] = useState<SignboardItem[]>([createSignboardItem()])
+
   /** 人氣商家 - 展示佈局類型 */
   type PopularLayoutType = 'small' | 'grid' | 'carousel'
   const POPULAR_LAYOUT_OPTIONS: { value: PopularLayoutType; labelKey: string; icon: string; color: string; descKey: string }[] = [
@@ -281,8 +304,17 @@ export default function AlgorithmAdd() {
             layoutMode,
             manualRules: layoutMode === 'manual' ? manualRules.map(({ position, layout }) => ({ position, layout })) : [],
             autoLayouts: layoutMode === 'auto' ? autoLayouts.map(({ type, interval }) => ({ type, interval })) : [],
+          } : selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD ? {
+            signboardItems: signboardItems.map(({ category, name, metric, scope, comparison, value }) => ({
+              category,
+              signboardName: name,
+              qualificationMetric: metric,
+              qualificationScope: scope,
+              qualificationComparison: comparison,
+              qualificationValue: value,
+            })),
           } : {
-            // 非人氣商家：商家狀態計算 + 數據一致性校驗定時器
+            // 非人氣商家/金字招牌：商家狀態計算 + 數據一致性校驗定時器
             consistencyCheckInterval: values.consistencyCheckInterval,
             statusOpen: values.statusOpen ?? true,
             statusRest: values.statusRest ?? false,
@@ -397,7 +429,7 @@ export default function AlgorithmAdd() {
       {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
         /* 自然流量：4 個維度的商家評分規則配置 */
         <OrganicTrafficScoreConfig readOnly={isDetailMode} />
-      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE) ? (
+      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE || selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD) ? (
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -593,8 +625,148 @@ export default function AlgorithmAdd() {
             </>
           )}
 
+          {/* ===== 金字招牌：招牌列表（分類 + 名稱 + 滿足條件為一體，可新增多條） ===== */}
+          {selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
+            <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8720C' }} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>招牌列表</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>可新增多條招牌，每條配置獨立的分類、名稱和滿足條件</span>
+              </div>
+              {!isDetailMode && (
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setSignboardItems(prev => [...prev, createSignboardItem()])} style={{ borderRadius: 6 }}>
+                  新增招牌
+                </Button>
+              )}
+            </div>
+
+            {signboardItems.map((item, index) => (
+              <div key={item.id} style={{
+                border: '1px solid #f0f0f0', borderRadius: 8, padding: '16px 20px', marginBottom: 12,
+                background: '#FAFAFA', position: 'relative',
+              }}>
+                {/* 塊頭：序號 + 分類選擇 + 刪除按鈕 */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, gap: 12 }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 8, flexShrink: 0,
+                    background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                    color: '#fff', fontSize: 12, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(232,114,12,0.25)',
+                  }}>{index + 1}</div>
+
+                  {/* 招牌分類 */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                      { value: 'ranking' as const, label: '排名招牌', icon: '🏆' },
+                      { value: 'featured' as const, label: '特色招牌', icon: '⭐' },
+                    ].map(opt => (
+                      <div key={opt.value}
+                        onClick={() => !isDetailMode && setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, category: opt.value } : s))}
+                        style={{
+                          padding: '6px 14px', borderRadius: 6, cursor: isDetailMode ? 'default' : 'pointer',
+                          border: item.category === opt.value ? '2px solid #E8720C' : '1px solid #f0f0f0',
+                          background: item.category === opt.value ? '#FFF7E6' : '#fff',
+                          transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 4,
+                        }}>
+                        <span style={{ fontSize: 14 }}>{opt.icon}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: item.category === opt.value ? '#E8720C' : '#595959' }}>{opt.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ flex: 1 }} />
+                  {!isDetailMode && signboardItems.length > 1 && (
+                    <Button type="link" danger size="small" icon={<DeleteOutlined />}
+                      onClick={() => setSignboardItems(prev => prev.filter(s => s.id !== item.id))}>刪除</Button>
+                  )}
+                </div>
+
+                {/* 招牌名稱 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, color: '#595959', minWidth: 72, flexShrink: 0 }}><span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>招牌名稱</span>
+                  <Input
+                    placeholder="請輸入招牌名稱"
+                    maxLength={30}
+                    showCount
+                    value={item.name}
+                    disabled={isDetailMode}
+                    onChange={e => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, name: e.target.value } : s))}
+                    style={{ width: 300 }}
+                  />
+                </div>
+
+                {/* 滿足條件 */}
+                <div style={{
+                  border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+                  padding: '14px 16px',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12 }}>📋</span> 滿足條件
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {/* 條件一：指標 */}
+                    <Select
+                      value={item.metric}
+                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, metric: v } : s))}
+                      disabled={isDetailMode}
+                      style={{ width: 140 }}
+                      options={[
+                        { label: '月訂單量', value: 'monthlyOrders' },
+                        { label: '月復購率', value: 'monthlyRepurchase' },
+                        { label: '月好評率', value: 'monthlyRating' },
+                        { label: '月訪問量', value: 'monthlyVisits' },
+                        { label: '月客單價', value: 'monthlyAvgPrice' },
+                        { label: '門店收藏', value: 'storeFavorites' },
+                      ]}
+                    />
+                    <span style={{ fontSize: 13, color: '#595959' }}>超過</span>
+                    {/* 條件二：範圍 */}
+                    <Select
+                      value={item.scope}
+                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, scope: v } : s))}
+                      disabled={isDetailMode}
+                      style={{ width: 160 }}
+                      options={[
+                        { label: '全部商家', value: 'allMerchants' },
+                        { label: '商圈商家', value: 'districtMerchants' },
+                        { label: '全澳品類商家', value: 'macauCategoryMerchants' },
+                        { label: '商圈品類商家', value: 'districtCategoryMerchants' },
+                      ]}
+                    />
+                    <span style={{ fontSize: 13, color: '#595959' }}>的</span>
+                    {/* 條件三：比較方式 */}
+                    <Select
+                      value={item.comparison}
+                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, comparison: v } : s))}
+                      disabled={isDetailMode}
+                      style={{ width: 120 }}
+                      options={[
+                        { label: '百分比', value: 'percentage' },
+                        { label: '排名', value: 'ranking' },
+                      ]}
+                    />
+                    {/* 條件四：數值 */}
+                    <InputNumber
+                      value={item.value}
+                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, value: v ?? undefined } : s))}
+                      disabled={isDetailMode}
+                      min={1}
+                      max={item.comparison === 'percentage' ? 100 : 9999}
+                      placeholder="請輸入數值"
+                      addonAfter={item.comparison === 'percentage' ? '%' : '名'}
+                      style={{ width: 160 }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            </>
+          )}
+
           {/* ===== 其他算法：商家狀態計算 + 數據一致性校驗 ===== */}
-          {selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && (
+          {selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && (
             <>
           {/* 商家状态计算 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -1440,6 +1612,60 @@ export default function AlgorithmAdd() {
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:bigSmallStrategy')}</span>
+                      <Form.Item
+                        name="merchantExposureStrategy"
+                        style={{ flex: 1, marginBottom: 0 }}
+                        wrapperCol={{ span: 24 }}
+                      >
+                        <Select
+                          placeholder={t('recommend:selectPlaceholder')}
+                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          options={[
+                            { label: t('recommend:roundRobinCalc'), value: 'random' },
+                          ]}
+                          disabled={isDetailMode}
+                        />
+                      </Form.Item>
+                    </div>
+
+                      {/* 按轮询维度配置 */}
+                      {merchantExposureStrategy === 'random' && (
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                              {t('recommend:roundRobinStrategyDesc')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                  </div>
+            </div>
+          )}
+
+          {/* ===== 金字招牌：算法策略（輪詢計算） ===== */}
+          {selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
+              <div style={{
+                border: '1px solid #d6e4ff',
+                borderRadius: 8,
+                background: '#f0f5ff',
+                overflow: 'hidden',
+                marginBottom: 16,
+              }}>
+                    {/* 標題欄 */}
+                    <div style={{
+                      fontSize: 14, fontWeight: 600, color: '#1890ff',
+                      padding: '10px 20px',
+                      borderBottom: '1px solid #d6e4ff',
+                      background: '#e6f4ff',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <SettingOutlined />
+                      {t('recommend:algoStrategy')}
+                    </div>
+
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                       <Form.Item
                         name="merchantExposureStrategy"
                         style={{ flex: 1, marginBottom: 0 }}

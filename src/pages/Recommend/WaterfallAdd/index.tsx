@@ -33,6 +33,7 @@ import {
 } from '../constants'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
+import GoldenSignboardPricing from './GoldenSignboardPricing'
 import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
 import { fetchStores } from '../../../api/store'
 
@@ -143,6 +144,10 @@ export default function WaterfallAdd() {
   // 人氣商家：獨立的皮膚定價界面（賣皮膚模式，上傳皮膚樣式並配售價）
   if (typeParam && Number(typeParam) === AlgorithmType.POPULAR_MERCHANT_KA) {
     return <PopularSkinPricing />
+  }
+  // 金字招牌：基礎信息同人氣商家
+  if (typeParam && Number(typeParam) === AlgorithmType.GOLDEN_SIGNBOARD) {
+    return <GoldenSignboardPricing />
   }
   return <WaterfallAddGeneral />
 }
