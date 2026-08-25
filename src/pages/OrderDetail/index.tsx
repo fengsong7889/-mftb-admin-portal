@@ -160,6 +160,8 @@ interface OrderItem {
   terminalActor?: 'staff' | 'merchant' // 終態操作發起方：業務人員 / 商家
   /** 数据来源：api=后端真实数据 mock=演示数据 */
   source?: 'api' | 'mock'
+  /** 金字招牌：按标签分组的购买日期 */
+  labelDates?: { label: string; dates: string[] }[]
 }
 
 /* ---- 后端订单映射 ---- */
@@ -274,7 +276,7 @@ function toDetailOrder(
       region: item.region,
     }
   })
-  const regions = Array.from(new Set(vo.items.map(i => i.region)))
+  const regions = vo.regions && vo.regions.length > 0 ? vo.regions : Array.from(new Set(vo.items.map(i => i.region).filter(Boolean)))
   const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || fmt(vo.orderTime).slice(0, 10)
   // 生成推廣數據：推廣中/已推廣/已退款（推廣後退款）的訂單才有推廣數據
   const mappedStatus = mapAdStatus(vo.status)
@@ -319,10 +321,11 @@ function toDetailOrder(
     gradientDiscount: matchedTier ? { count: matchedTier.minSlots, discount: matchedTier.discount / 10 } : null,
     cancelFeeRules: pricing?.cancelFeeRules ?? [],
     refundAmount: vo.refundAmount ? vo.refundAmount : undefined,
-    refundEnabled: pricing?.refundEnabled ?? true,
+    refundEnabled: vo.refundEnabled !== undefined ? vo.refundEnabled === 1 : (pricing?.refundEnabled ?? true),
     promoStartDate: firstBizDate,
     purchaseDays: vo.purchaseDays,
     skinName: vo.skinNames?.[0] || vo.items.find(i => i.skinName)?.skinName || undefined,
+    labelDates: vo.labelDates?.map(ld => ({ label: ld.label, dates: ld.dates })),
     giftDays: vo.giftDays ?? 0,
     giftAmount: vo.giftAmount ?? 0,
     promoData,
@@ -1329,15 +1332,26 @@ export default function OrderDetail() {
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>{order.algorithmId}</span>
           </Descriptions.Item>
           <Descriptions.Item label={isPopular ? '人氣名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
-          {order.skinName && (
-            <Descriptions.Item label={isGoldenSignboard ? '購買標籤' : t('orderDetail.skinKit')}>
-              {isGoldenSignboard && SIGNBOARD_LABEL_CN[order.skinName] ? (
-                <Tag color={SIGNBOARD_LABEL_CN[order.skinName].color}>
-                  {SIGNBOARD_LABEL_CN[order.skinName].icon} {SIGNBOARD_LABEL_CN[order.skinName].label}
-                </Tag>
-              ) : (
-                <Tag color="geekblue">{order.skinName}</Tag>
-              )}
+          {isGoldenSignboard ? (
+            <Descriptions.Item label="購買標籤">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {order.labelDates?.map((ld, idx) => {
+                  const labelCfg = SIGNBOARD_LABEL_CN[ld.label]
+                  return (
+                    <Tag key={idx} color={labelCfg?.color || 'geekblue'}>
+                      {labelCfg ? `${labelCfg.icon} ${labelCfg.label}` : ld.label}
+                    </Tag>
+                  )
+                }) || (order.skinName && (
+                  <Tag color={SIGNBOARD_LABEL_CN[order.skinName]?.color || 'geekblue'}>
+                    {SIGNBOARD_LABEL_CN[order.skinName] ? `${SIGNBOARD_LABEL_CN[order.skinName].icon} ${SIGNBOARD_LABEL_CN[order.skinName].label}` : order.skinName}
+                  </Tag>
+                ))}
+              </div>
+            </Descriptions.Item>
+          ) : order.skinName && (
+            <Descriptions.Item label={t('orderDetail.skinKit')}>
+              <Tag color="geekblue">{order.skinName}</Tag>
             </Descriptions.Item>
           )}
         </Descriptions>
@@ -1564,22 +1578,26 @@ export default function OrderDetail() {
         {/* 金字招牌：標籤類型 + 購買日期與價格 */}
         {isGoldenSignboard && (() => {
           const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
-          const labelCfg = order.skinName ? SIGNBOARD_LABEL_CN[order.skinName] : null
           return (
             <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
               <div style={{
                 background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
+                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
               }}>
                 <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
                 <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
-                {labelCfg && (
+                {order.labelDates && order.labelDates.length > 0 && (
                   <>
                     <span style={{ width: 1, height: 14, background: '#E0E0E0' }} />
                     <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                    <Tag style={{ margin: 0, color: labelCfg.color, background: `${labelCfg.color}10`, borderColor: `${labelCfg.color}40` }}>
-                      {labelCfg.icon} {labelCfg.label}
-                    </Tag>
+                    {order.labelDates.map((ld, idx) => {
+                      const labelCfg = SIGNBOARD_LABEL_CN[ld.label]
+                      return (
+                        <Tag key={idx} style={{ margin: 0, color: labelCfg?.color || '#8C8C8C', background: `${labelCfg?.color || '#8C8C8C'}10`, borderColor: `${labelCfg?.color || '#8C8C8C'}40` }}>
+                          {labelCfg ? `${labelCfg.icon} ${labelCfg.label}` : ld.label}
+                        </Tag>
+                      )
+                    })}
                   </>
                 )}
               </div>
@@ -1888,8 +1906,20 @@ export default function OrderDetail() {
                       )}
                     </div>
                     {order.refundEnabled === false ? (
-                      <div style={{ fontSize: 12, color: '#cf1322' }}>
-                        {t('orderDetail.refundNotAllowedTip')}
+                      <div style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: '#cf1322',
+                        padding: '12px 16px',
+                        background: '#fff1f0',
+                        borderRadius: 6,
+                        border: '1px solid #ffa39e',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}>
+                        <ExclamationCircleOutlined style={{ fontSize: 16, color: '#cf1322' }} />
+                        <span>{t('orderDetail.refundNotAllowedTip')}</span>
                       </div>
                     ) : (
                       <>

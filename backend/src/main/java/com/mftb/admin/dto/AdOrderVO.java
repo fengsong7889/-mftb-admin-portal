@@ -36,7 +36,7 @@ public class AdOrderVO {
     private List<Integer> regions;
     /** 購買時段（明細去重聚合, 如 breakfast/lunch） */
     private List<String> mealSlots;
-    /** 按日期分組的購買時段（無敵星星：每個日期對應的時段列表） */
+    /** 按(商圈,日期)分組的購買時段（無敵星星） */
     private List<DateSlotGroup> dateSlots;
     /** 購買日期列表（盤活復蘇按天售賣，明細 biz_date 去重排序） */
     private List<String> purchaseDays;
@@ -53,6 +53,8 @@ public class AdOrderVO {
     private Integer giftDays;
     /** 赠送抵扣金额快照 */
     private BigDecimal giftAmount;
+    /** 退款开关快照: 1=允许退款 2=不允许 */
+    private Integer refundEnabled;
     private Integer status;
     private LocalDateTime orderTime;
     private LocalDateTime payTime;
@@ -60,14 +62,16 @@ public class AdOrderVO {
     private String remark;
     private LocalDateTime createdAt;
 
-    /** 按日期分組的時段 */
+    /** 按(商圈,日期)分組的時段 */
     @Data
     public static class DateSlotGroup {
+        private Integer region;
         private String date;
         private List<String> slots;
 
         public DateSlotGroup() {}
-        public DateSlotGroup(String date, List<String> slots) {
+        public DateSlotGroup(Integer region, String date, List<String> slots) {
+            this.region = region;
             this.date = date;
             this.slots = slots;
         }
@@ -111,6 +115,7 @@ public class AdOrderVO {
         vo.setRefundAmount(entity.getRefundAmount());
         vo.setGiftDays(entity.getGiftDays());
         vo.setGiftAmount(entity.getGiftAmount());
+        vo.setRefundEnabled(entity.getRefundEnabled());
         vo.setStatus(entity.getStatus());
         vo.setOrderTime(entity.getOrderTime());
         vo.setPayTime(entity.getPayTime());

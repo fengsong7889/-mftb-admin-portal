@@ -25,8 +25,8 @@ import com.mftb.admin.service.AdSalesStarService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.util.AdAlgoTypeNames;
+import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
-import com.mftb.admin.util.FinExtras;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -108,7 +108,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         vo.setDiscountTiers(pricing.getDiscountTiers());
         vo.setSlotDiscounts(pricing.getSlotDiscounts());
         for (AdPricingStarVO.RegionPriceItem regionPrice : pricing.getRegionPrices()) {
-            BigDecimal cellPrice = round2(regionPrice.getDailyPrice()
+            BigDecimal cellPrice = AdCalcUtils.round2(regionPrice.getDailyPrice()
                     .divide(BigDecimal.valueOf(MEAL_SLOTS.size()), RoundingMode.HALF_UP));
             int salesLimit = regionPrice.getDailySalesLimit() == null || regionPrice.getDailySalesLimit() < 1
                     ? 1 : regionPrice.getDailySalesLimit();
@@ -239,7 +239,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         Map<String, BigDecimal> cellPriceMap = new LinkedHashMap<>();
         Map<String, BigDecimal> cellDiscountedMap = new LinkedHashMap<>();
         for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
-            BigDecimal cellPrice = round2(regionDailyPrice.get(cell.getRegion())
+            BigDecimal cellPrice = AdCalcUtils.round2(regionDailyPrice.get(cell.getRegion())
                     .divide(cellUnitDivisor, RoundingMode.HALF_UP));
             String key = cellKey(cell.getBizDate(), cell.getRegion(), cell.getMealSlot());
             cellPriceMap.put(key, cellPrice);
@@ -248,14 +248,14 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             BigDecimal factor = slotDiscountFactor(
                     slotDiscountByRegion.get(cell.getRegion()), cell.getMealSlot(),
                     covered != null && covered.containsAll(MEAL_SLOTS));
-            BigDecimal discounted = round2(cellPrice.multiply(factor)
+            BigDecimal discounted = AdCalcUtils.round2(cellPrice.multiply(factor)
                     .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
             cellDiscountedMap.put(key, discounted);
             slotDiscountedTotal = slotDiscountedTotal.add(discounted);
         }
         // 时段个数梯度折扣匹配总格子数，对时段折扣后的价格再打折（折上折）
-        BigDecimal discountPercent = matchDiscountTier(pricing.getDiscountTiers(), request.getCells().size());
-        BigDecimal actualTotal = round2(slotDiscountedTotal.multiply(discountPercent)
+        BigDecimal discountPercent = AdCalcUtils.matchDiscountTier(pricing.getDiscountTiers(), "minSlots", request.getCells().size());
+        BigDecimal actualTotal = AdCalcUtils.round2(slotDiscountedTotal.multiply(discountPercent)
                 .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
@@ -303,6 +303,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         order.setDiscountAmount(discountAmount);
         order.setActualAmount(actualTotal);
         order.setRefundAmount(BigDecimal.ZERO);
+        order.setRefundEnabled(pricing.getRefundEnabled()); // 退款开关快照
         order.setStatus(1); // 初始状态=待推广，查询时动态计算真实状态
         order.setOrderTime(now);
         order.setPayTime(now);
@@ -315,7 +316,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             String key = cellKey(cell.getBizDate(), cell.getRegion(), cell.getMealSlot());
             BigDecimal originalPrice = cellPriceMap.get(key);
             // 明细实付 = 时段折扣后价格 x 梯度折扣（与总价同算法）
-            BigDecimal salePrice = round2(cellDiscountedMap.get(key).multiply(discountPercent)
+            BigDecimal salePrice = AdCalcUtils.round2(cellDiscountedMap.get(key).multiply(discountPercent)
                     .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
             AdOrderItemStar item = new AdOrderItemStar();
             item.setOrderId(order.getId());
@@ -590,7 +591,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             return BigDecimal.valueOf(100);
         }
         String key = fullDayCovered ? "fullDay" : slot;
-        BigDecimal factor = FinExtras.decimalOf(entry, key);
+        BigDecimal factor = AdCalcUtils.decimalOf(entry, key);
         if (factor == null || factor.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.valueOf(100);
         }
@@ -600,28 +601,5 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     /** 格子唯一键: 日期|商圈|餐段 */
     private static String cellKey(LocalDate date, Integer region, String slot) {
         return date + "|" + region + "|" + slot;
-    }
-
-    /**
-     * 匹配多时段梯度折扣: 按 minSlots 降序取第一个满足「格子数 >= minSlots」的梯度
-     *
-     * @return 折扣百分比（如 95 = 95折）, 无匹配返回 100
-     */
-    private static BigDecimal matchDiscountTier(String discountTiersJson, int cellCount) {
-        List<Map<String, Object>> tiers = JsonUtils.parseMapList(discountTiersJson);
-        tiers.sort((a, b) -> Integer.compare(FinExtras.intOf(b, "minSlots"), FinExtras.intOf(a, "minSlots")));
-        for (Map<String, Object> tier : tiers) {
-            if (cellCount >= FinExtras.intOf(tier, "minSlots")) {
-                BigDecimal discount = FinExtras.decimalOf(tier, "discount");
-                if (discount != null && discount.compareTo(BigDecimal.ZERO) > 0) {
-                    return discount;
-                }
-            }
-        }
-        return BigDecimal.valueOf(100);
-    }
-
-    private static BigDecimal round2(BigDecimal value) {
-        return value.setScale(2, RoundingMode.HALF_UP);
     }
 }

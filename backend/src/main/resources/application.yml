@@ -8,10 +8,10 @@ spring:
     name: mftb-admin
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 默認連接開發庫 fengsong_test；生產環境通過 DB_URL/DB_USERNAME/DB_PASSWORD 環境變量覆蓋
-    url: ${DB_URL:jdbc:mysql://mysql6.sqlpub.com:3311/fengsong_test?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:fengsong_mt}
-    password: ${DB_PASSWORD:re6NO4pZLL2pgqhp}
+    # 数据库连接信息必须通过环境变量 DB_URL/DB_USERNAME/DB_PASSWORD 注入，禁止在代码库中保留默认凭据
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai

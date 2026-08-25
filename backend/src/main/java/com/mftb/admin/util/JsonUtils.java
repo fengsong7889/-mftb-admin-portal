@@ -3,6 +3,7 @@ package com.mftb.admin.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.dto.MenuPermissionDTO;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -12,6 +13,7 @@ import java.util.Map;
 /**
  * JSON 工具: 处理 function_roles / permissions 字段的序列化与反序列化
  */
+@Slf4j
 public final class JsonUtils {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -28,6 +30,7 @@ public final class JsonUtils {
             return MAPPER.readValue(json, new TypeReference<List<Long>>() {
             });
         } catch (Exception e) {
+            log.warn("解析角色ID列表失败, 返回空列表: json={}, msg={}", json, e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -41,6 +44,7 @@ public final class JsonUtils {
             return MAPPER.readValue(json, new TypeReference<List<MenuPermissionDTO>>() {
             });
         } catch (Exception e) {
+            log.warn("解析菜单权限列表失败, 返回空列表: json={}, msg={}", json, e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -54,6 +58,7 @@ public final class JsonUtils {
             return MAPPER.readValue(json, new TypeReference<List<String>>() {
             });
         } catch (Exception e) {
+            log.warn("解析字符串列表失败, 返回空列表: json={}, msg={}", json, e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -67,6 +72,7 @@ public final class JsonUtils {
             return MAPPER.readValue(json, new TypeReference<LinkedHashMap<String, Object>>() {
             });
         } catch (Exception e) {
+            log.warn("解析 JSON Map 失败, 返回空 Map: json={}, msg={}", json, e.getMessage());
             return new LinkedHashMap<>();
         }
     }
@@ -80,6 +86,7 @@ public final class JsonUtils {
             return MAPPER.readValue(json, new TypeReference<List<Map<String, Object>>>() {
             });
         } catch (Exception e) {
+            log.warn("解析 JSON Map 列表失败, 返回空列表: json={}, msg={}", json, e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -89,6 +96,8 @@ public final class JsonUtils {
         try {
             return MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
+            log.warn("JSON 序列化失败, 返回空数组: type={}, msg={}",
+                    obj != null ? obj.getClass().getSimpleName() : "null", e.getMessage());
             return "[]";
         }
     }
@@ -102,6 +111,8 @@ public final class JsonUtils {
             return MAPPER.readValue(json,
                 MAPPER.getTypeFactory().constructCollectionType(List.class, elementClass));
         } catch (Exception e) {
+            log.warn("解析 JSON 列表失败, 返回空列表: elementClass={}, msg={}",
+                    elementClass.getSimpleName(), e.getMessage());
             return new ArrayList<>();
         }
     }

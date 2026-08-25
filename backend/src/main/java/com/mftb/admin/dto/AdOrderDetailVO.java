@@ -53,6 +53,7 @@ public class AdOrderDetailVO extends AdOrderVO {
         vo.setRefundAmount(order.getRefundAmount());
         vo.setGiftDays(order.getGiftDays());
         vo.setGiftAmount(order.getGiftAmount());
+        vo.setRefundEnabled(order.getRefundEnabled());
         vo.setStatus(order.getStatus());
         vo.setOrderTime(order.getOrderTime());
         vo.setPayTime(order.getPayTime());

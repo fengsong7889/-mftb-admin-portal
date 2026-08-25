@@ -74,8 +74,9 @@ public class GlobalExceptionHandler {
         boolean isSql = containsSqlKeyword(e.getClass().getSimpleName())
                 || containsSqlKeyword(exType);
         if (isSql) {
-            log.error("SQL异常 [{}]: {}", e.getClass().getSimpleName(), exMsg);
-            return Result.error(ResultCode.ERROR.getCode(), "数据库异常: " + exMsg);
+            // 异常详情仅记录在服务端日志，不返回给前端，避免暴露表结构/SQL 细节
+            log.error("SQL异常 [{}]: {}", e.getClass().getSimpleName(), exMsg, e);
+            return Result.error(ResultCode.ERROR.getCode(), "数据库操作异常, 请稍后重试");
         }
         log.error("系统异常 [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         return Result.error(ResultCode.ERROR.getCode(), "系统繁忙, 请稍后重试");

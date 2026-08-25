@@ -23,10 +23,12 @@ import com.mftb.admin.service.AdSalesSignboardService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.GiftService;
+import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -49,6 +51,7 @@ import java.util.Set;
  * 但同一商家(集团)已购买的「标签x日期」不能重复购买（退款释放后可再购）。
  * 每个标签独立计价，梯度折扣按该标签购买天数匹配，实付从推广金账户扣款。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
@@ -197,20 +200,20 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             String lk = entry.getKey();
             long days = entry.getValue();
             String tiersJson = labelDiscountTiersMap.get(lk);
-            labelDiscountPercent.put(lk, matchCellTier(tiersJson, (int) days));
+            labelDiscountPercent.put(lk, AdCalcUtils.matchDiscountTier(tiersJson, "minDays", (int) days));
         }
         // 逐格计价
         BigDecimal discountedTotal = BigDecimal.ZERO;
         for (AdSignboardOrderRequest.CellSelection cell : request.getCells()) {
             String pk = labelKey(cell.getLabelType(), cell.getScenario());
-            BigDecimal price = round2(labelPriceMap.get(pk));
+            BigDecimal price = AdCalcUtils.round2(labelPriceMap.get(pk));
             String key = cellKey(cell.getBizDate(), cell.getLabelType(), cell.getScenario());
             cellPriceMap.put(key, price);
             originalTotal = originalTotal.add(price);
             // 折后价 = 原价 × 折扣百分比 / 100
             BigDecimal dp = labelDiscountPercent.get(pk);
             discountedTotal = discountedTotal.add(
-                    round2(price.multiply(dp).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)));
+                    AdCalcUtils.round2(price.multiply(dp).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)));
         }
 
         // 5. 赠送天数抵扣
@@ -232,7 +235,7 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             if (giftDays > request.getCells().size()) {
                 throw new BusinessException("抵扣天數不能超過購買天數");
             }
-            giftDeduction = round2(discountedTotal
+            giftDeduction = AdCalcUtils.round2(discountedTotal
                     .multiply(BigDecimal.valueOf(giftDays))
                     .divide(BigDecimal.valueOf(request.getCells().size()), RoundingMode.HALF_UP));
             if (giftDeduction.compareTo(discountedTotal) > 0) {
@@ -284,6 +287,7 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         order.setRefundAmount(BigDecimal.ZERO);
         order.setGiftDays(giftDays);
         order.setGiftAmount(giftDeduction);
+        order.setRefundEnabled(pricing.getRefundEnabled()); // 退款开关快照
         order.setStatus(1); // 待推广
         order.setOrderTime(now);
         order.setPayTime(now);
@@ -301,14 +305,14 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             BigDecimal cellOrigPrice = cellPriceMap.get(key);
             String lk = labelKey(cell.getLabelType(), cell.getScenario());
             BigDecimal dp = labelDiscountPercent.get(lk);
-            BigDecimal cellDiscounted = round2(cellOrigPrice.multiply(dp)
+            BigDecimal cellDiscounted = AdCalcUtils.round2(cellOrigPrice.multiply(dp)
                     .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
             BigDecimal salePrice;
             if (i == cells.size() - 1) {
                 salePrice = actualTotal.subtract(allocated);
             } else {
                 salePrice = discountedTotal.signum() == 0 ? BigDecimal.ZERO
-                        : round2(cellDiscounted
+                        : AdCalcUtils.round2(cellDiscounted
                                 .multiply(actualTotal)
                                 .divide(discountedTotal, RoundingMode.HALF_UP));
                 allocated = allocated.add(salePrice);
@@ -397,42 +401,6 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         return labelType + ":" + (scenario != null ? scenario : "");
     }
 
-    /**
-     * 匹配梯度折扣: 按 minDays 降序取第一个满足「天数 >= minDays」的梯度
-     *
-     * @return 折扣百分比（如 95 = 95折）, 无匹配返回 100
-     */
-    private static BigDecimal matchCellTier(String discountTiersJson, int dayCount) {
-        List<Map<String, Object>> tiers = JsonUtils.parseMapList(discountTiersJson);
-        tiers.sort((a, b) -> Integer.compare(intOf(b, "minDays"), intOf(a, "minDays")));
-        for (Map<String, Object> tier : tiers) {
-            if (dayCount >= intOf(tier, "minDays")) {
-                BigDecimal discount = decimalOf(tier, "discount");
-                if (discount != null && discount.compareTo(BigDecimal.ZERO) > 0) {
-                    return discount;
-                }
-            }
-        }
-        return BigDecimal.valueOf(100);
-    }
-
-    private static int intOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value instanceof Number number ? number.intValue() : 0;
-    }
-
-    private static BigDecimal decimalOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number number) {
-            return new BigDecimal(number.toString());
-        }
-        return null;
-    }
-
-    private static BigDecimal round2(BigDecimal value) {
-        return value.setScale(2, RoundingMode.HALF_UP);
-    }
-
     /* ==================== 资格条件解析 ==================== */
 
     /** 场景资格条件（从算法配置解析） */
@@ -472,6 +440,7 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             }
         } catch (Exception e) {
             // 解析失败不影响主流程
+            log.warn("招牌算法场景条件解析失败: algoId={}, msg={}", algo != null ? algo.getId() : null, e.getMessage());
         }
         return result;
     }

@@ -40,6 +40,7 @@ import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.util.AdAlgoTypeNames;
+import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.FinExtras;
 import com.mftb.admin.util.JsonUtils;
@@ -204,37 +205,12 @@ public class AdOrderServiceImpl implements AdOrderService {
             return detail(orderNo);
         }
 
-        // 退款开关校验（按订单所属算法类型取对应计价配置）
-        Integer refundEnabled = null;
-        String cancelFeeTiersJson = null;
-        if (isRevive(order)) {
-            AdPricingReviveVO pricing = revivePricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) {
-                refundEnabled = pricing.getRefundEnabled();
-                cancelFeeTiersJson = pricing.getCancelFeeTiers();
-            }
-        } else if (isHot(order)) {
-            AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) {
-                refundEnabled = pricing.getRefundEnabled();
-                cancelFeeTiersJson = pricing.getCancelFeeTiers();
-            }
-        } else if (isSignboard(order)) {
-            AdPricingSignboardVO pricing = signboardPricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) {
-                refundEnabled = pricing.getRefundEnabled();
-                cancelFeeTiersJson = pricing.getCancelFeeTiers();
-            }
-        } else {
-            AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) {
-                refundEnabled = pricing.getRefundEnabled();
-                cancelFeeTiersJson = pricing.getCancelFeeTiers();
-            }
+        // 退款开关校验：优先使用订单快照，历史订单回退到计价配置；扣费梯度始终取最新计价配置
+        RefundConfig refundConfig = resolveRefundConfig(order);
+        if (refundConfig.refundEnabled() != null && refundConfig.refundEnabled() == 2) {
+            throw new BusinessException("該訂單不允許退款");
         }
-        if (refundEnabled != null && refundEnabled == 2) {
-            throw new BusinessException("該算法未開放退款");
-        }
+        String cancelFeeTiersJson = refundConfig.cancelFeeTiersJson();
 
         FinAccount account = accountService.find(order.getGroupCode(), order.getBrand());
         if (account == null) {
@@ -253,11 +229,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 throw new BusinessException("訂單沒有可退款的明細");
             }
             for (AdOrderItemRevive item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放库存（仅统计活跃明细）
                 reviveItemMapper.updateById(item);
@@ -272,11 +244,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 throw new BusinessException("訂單沒有可退款的明細");
             }
             for (AdOrderItemHot item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放格子（退款后可再购）
                 hotItemMapper.updateById(item);
@@ -291,11 +259,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 throw new BusinessException("訂單沒有可退款的明細");
             }
             for (AdOrderItemSignboard item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 signboardItemMapper.updateById(item);
@@ -310,11 +274,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 throw new BusinessException("訂單沒有可退款的明細");
             }
             for (AdOrderItemStar item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放格子（库存仅统计活跃明细）
                 itemMapper.updateById(item);
@@ -341,7 +301,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 refundTotal, changeType, order.getBdEmpId(),
                 changeType + "廣告退款 訂單" + order.getOrderNo(), order.getOrderNo(), now);
 
-        order.setRefundAmount(round2(safe(order.getRefundAmount()).add(refundTotal)));
+        order.setRefundAmount(AdCalcUtils.round2(safe(order.getRefundAmount()).add(refundTotal)));
         order.setStatus(4); // 已退款
         order.setUpdatedBy(operatorResolver.currentOperatorName());
         orderMapper.updateById(order);
@@ -382,21 +342,8 @@ public class AdOrderServiceImpl implements AdOrderService {
             return detail(orderNo);
         }
 
-        // 取消扣费梯度配置
-        String cancelFeeTiersJson = null;
-        if (isRevive(order)) {
-            AdPricingReviveVO pricing = revivePricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
-        } else if (isHot(order)) {
-            AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
-        } else if (isSignboard(order)) {
-            AdPricingSignboardVO pricing = signboardPricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
-        } else {
-            AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
-            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
-        }
+        // 取消扣费梯度配置（始终取最新计价配置）
+        String cancelFeeTiersJson = resolveRefundConfig(order).cancelFeeTiersJson();
 
         FinAccount account = accountService.find(order.getGroupCode(), order.getBrand());
         if (account == null) {
@@ -413,11 +360,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .in(AdOrderItemRevive::getDeliveryStatus, 1, 2));
             if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
             for (AdOrderItemRevive item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 reviveItemMapper.updateById(item);
@@ -430,11 +373,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .in(AdOrderItemHot::getDeliveryStatus, 1, 2));
             if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
             for (AdOrderItemHot item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 hotItemMapper.updateById(item);
@@ -447,11 +386,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .in(AdOrderItemSignboard::getDeliveryStatus, 1, 2));
             if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
             for (AdOrderItemSignboard item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 signboardItemMapper.updateById(item);
@@ -464,11 +399,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .in(AdOrderItemStar::getDeliveryStatus, 1, 2));
             if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
             for (AdOrderItemStar item : items) {
-                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
-                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
-                BigDecimal refundPrice = round2(item.getSalePrice()
-                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 itemMapper.updateById(item);
@@ -491,7 +422,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 refundTotal, changeType, order.getBdEmpId(),
                 changeType + "廣告取消 訂單" + order.getOrderNo(), order.getOrderNo(), now);
 
-        order.setRefundAmount(round2(safe(order.getRefundAmount()).add(refundTotal)));
+        order.setRefundAmount(AdCalcUtils.round2(safe(order.getRefundAmount()).add(refundTotal)));
         order.setStatus(5); // 已取消
         order.setUpdatedBy(operatorResolver.currentOperatorName());
         orderMapper.updateById(order);
@@ -718,18 +649,22 @@ public class AdOrderServiceImpl implements AdOrderService {
                 }
             }
             vo.setMealSlots(slots);
-            // 按日期分组时段：供列表页展示每个日期对应的购买时段
-            Map<String, List<String>> dateSlotMap = new LinkedHashMap<>();
+            // 按(商圈,日期)分组时段：供列表页展示每个商圈每个日期对应的购买时段
+            Map<String, List<String>> regionDateSlotMap = new LinkedHashMap<>();
             items.stream()
-                    .filter(i -> i.getBizDate() != null && i.getMealSlot() != null)
-                    .sorted(java.util.Comparator.comparing(AdOrderItemStar::getBizDate)
+                    .filter(i -> i.getBizDate() != null && i.getMealSlot() != null && i.getRegion() != null)
+                    .sorted(java.util.Comparator.comparing(AdOrderItemStar::getRegion)
+                            .thenComparing(AdOrderItemStar::getBizDate)
                             .thenComparing(i -> AdSalesStarServiceImpl.MEAL_SLOTS.indexOf(i.getMealSlot())))
                     .forEach(i -> {
-                        String date = i.getBizDate().toString();
-                        dateSlotMap.computeIfAbsent(date, k -> new ArrayList<>()).add(i.getMealSlot());
+                        String key = i.getRegion() + "|" + i.getBizDate().toString();
+                        regionDateSlotMap.computeIfAbsent(key, k -> new ArrayList<>()).add(i.getMealSlot());
                     });
             List<AdOrderVO.DateSlotGroup> dateSlots = new ArrayList<>();
-            dateSlotMap.forEach((date, slotList) -> dateSlots.add(new AdOrderVO.DateSlotGroup(date, slotList)));
+            regionDateSlotMap.forEach((key, slotList) -> {
+                String[] parts = key.split("\\|");
+                dateSlots.add(new AdOrderVO.DateSlotGroup(Integer.parseInt(parts[0]), parts[1], slotList));
+            });
             vo.setDateSlots(dateSlots);
         }
         // 新店廣告 + 金字招牌：從門店綁定區域回填商圈
@@ -835,6 +770,55 @@ public class AdOrderServiceImpl implements AdOrderService {
     }
 
     /**
+     * 解析退款配置: 退款开关优先用订单快照，无快照时回退到当前计价配置；
+     * 取消扣费梯度始终取当前计价配置（扣费规则可能更新）。
+     */
+    private RefundConfig resolveRefundConfig(AdOrder order) {
+        Integer refundEnabled = order.getRefundEnabled();
+        String cancelFeeTiersJson = null;
+        if (isRevive(order)) {
+            AdPricingReviveVO pricing = revivePricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
+        } else if (isHot(order)) {
+            AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
+        } else if (isSignboard(order)) {
+            AdPricingSignboardVO pricing = signboardPricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
+        } else {
+            AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
+        }
+        return new RefundConfig(refundEnabled, cancelFeeTiersJson);
+    }
+
+    /** 退款配置快照: refundEnabled 可能为 null（历史订单且无生效计价） */
+    private record RefundConfig(Integer refundEnabled, String cancelFeeTiersJson) {
+    }
+
+    /** 单格应退金额 = 实付分摊价 × (100 - 扣费比例) / 100，按剩余天数匹配扣费梯度 */
+    private static BigDecimal calcRefundPrice(BigDecimal salePrice, String cancelFeeTiersJson,
+                                              LocalDate today, LocalDate bizDate) {
+        long remainDays = ChronoUnit.DAYS.between(today, bizDate);
+        BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+        return AdCalcUtils.round2(salePrice
+                .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+    }
+
+    /**
      * 匹配取消扣费梯度: 按 remainDays 升序取第一个满足「实际剩余天数 <= 梯度天数」的扣费比例
      *
      * @return 扣费比例（0-100）, 无匹配返回 0（全额退）
@@ -855,9 +839,5 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private static BigDecimal safe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
-    }
-
-    private static BigDecimal round2(BigDecimal value) {
-        return value.setScale(2, RoundingMode.HALF_UP);
     }
 }

@@ -355,8 +355,9 @@ export const MEAL_SLOT_TIME_LABEL: Record<string, string> = {
   supper: '21:00-02:00',
 }
 
-/** 按日期分组的购买时段 */
+/** 按(商圈,日期)分组的购买时段 */
 export interface DateSlotGroup {
+  region: number
   date: string
   slots: string[]
 }
@@ -405,6 +406,8 @@ export interface AdOrder {
   giftDays?: number | null
   /** 贈送抵扣金額快照 */
   giftAmount?: number | null
+  /** 退款开关快照: 1=允许退款 2=不允许（下单时从计价配置快照） */
+  refundEnabled?: number | null
   /** 訂單狀態: 1=待推廣 2=推廣中 3=已推廣 4=已退款 5=已取消 */
   status: number
   /** 购买日期列表（盤活復蘇按天售賣，明细日期去重排序） */

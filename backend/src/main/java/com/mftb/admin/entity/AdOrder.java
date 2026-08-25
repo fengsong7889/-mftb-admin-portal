@@ -86,6 +86,9 @@ public class AdOrder {
     /** 赠送抵扣金额快照 */
     private BigDecimal giftAmount;
 
+    /** 退款开关快照: 1=允许退款 2=不允许（下单时从计价配置快照，防止配置变更后影响历史订单） */
+    private Integer refundEnabled;
+
     /** 订单状态: 1=待推广 2=推广中 3=已推广 4=已退款 5=已取消 */
     private Integer status;
 

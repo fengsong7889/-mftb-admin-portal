@@ -14,6 +14,7 @@ import com.mftb.admin.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 认证接口
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -74,6 +76,7 @@ public class AuthController {
             }
         } catch (Exception e) {
             // 日志记录失败不影响登出流程
+            log.warn("记录登出日志失败: {}", e.getMessage());
         }
         return Result.success();
     }

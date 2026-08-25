@@ -26,6 +26,7 @@ import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.GiftService;
 import com.mftb.admin.util.AdAlgoTypeNames;
+import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -175,13 +176,13 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         BigDecimal originalTotal = BigDecimal.ZERO;
         Map<String, BigDecimal> cellPriceMap = new LinkedHashMap<>();
         for (AdReviveOrderRequest.CellSelection cell : request.getCells()) {
-            BigDecimal dayPrice = round2(regionDailyPrice.get(cell.getRegion()));
+            BigDecimal dayPrice = AdCalcUtils.round2(regionDailyPrice.get(cell.getRegion()));
             String key = cellKey(cell.getBizDate(), cell.getRegion());
             cellPriceMap.put(key, dayPrice);
             originalTotal = originalTotal.add(dayPrice);
         }
-        BigDecimal discountPercent = matchDayTier(pricing.getDiscountTiers(), request.getCells().size());
-        BigDecimal discountedTotal = round2(originalTotal.multiply(discountPercent)
+        BigDecimal discountPercent = AdCalcUtils.matchDiscountTier(pricing.getDiscountTiers(), "minDays", request.getCells().size());
+        BigDecimal discountedTotal = AdCalcUtils.round2(originalTotal.multiply(discountPercent)
                 .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
 
         // 5. 赠送天数抵扣: 按折后日均价折算，封顶折后总额（赠送部分不走推广金，退款不返还）
@@ -203,7 +204,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
             if (giftDays > request.getCells().size()) {
                 throw new BusinessException("抵扣天數不能超過購買天數");
             }
-            giftDeduction = round2(discountedTotal
+            giftDeduction = AdCalcUtils.round2(discountedTotal
                     .multiply(BigDecimal.valueOf(giftDays))
                     .divide(BigDecimal.valueOf(request.getCells().size()), RoundingMode.HALF_UP));
             if (giftDeduction.compareTo(discountedTotal) > 0) {
@@ -256,6 +257,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         order.setRefundAmount(BigDecimal.ZERO);
         order.setGiftDays(giftDays);
         order.setGiftAmount(giftDeduction);
+        order.setRefundEnabled(pricing.getRefundEnabled()); // 退款开关快照
         order.setStatus(1); // 初始状态=待推广，查询时动态计算真实状态
         order.setOrderTime(now);
         order.setPayTime(now);
@@ -275,7 +277,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
                 salePrice = actualTotal.subtract(allocated);
             } else {
                 salePrice = discountedTotal.signum() == 0 ? BigDecimal.ZERO
-                        : round2(cellPriceMap.get(key).multiply(discountPercent)
+                        : AdCalcUtils.round2(cellPriceMap.get(key).multiply(discountPercent)
                                 .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)
                                 .multiply(actualTotal)
                                 .divide(discountedTotal, RoundingMode.HALF_UP));
@@ -512,41 +514,5 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
             }
         }
         return 1;
-    }
-
-    /**
-     * 匹配多天梯度折扣: 按 minDays 降序取第一个满足「天数 >= minDays」的梯度
-     *
-     * @return 折扣百分比（如 95 = 95折）, 无匹配返回 100
-     */
-    private static BigDecimal matchDayTier(String discountTiersJson, int dayCount) {
-        List<Map<String, Object>> tiers = JsonUtils.parseMapList(discountTiersJson);
-        tiers.sort((a, b) -> Integer.compare(intOf(b, "minDays"), intOf(a, "minDays")));
-        for (Map<String, Object> tier : tiers) {
-            if (dayCount >= intOf(tier, "minDays")) {
-                BigDecimal discount = decimalOf(tier, "discount");
-                if (discount != null && discount.compareTo(BigDecimal.ZERO) > 0) {
-                    return discount;
-                }
-            }
-        }
-        return BigDecimal.valueOf(100);
-    }
-
-    private static int intOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value instanceof Number number ? number.intValue() : 0;
-    }
-
-    private static BigDecimal decimalOf(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number number) {
-            return new BigDecimal(number.toString());
-        }
-        return null;
-    }
-
-    private static BigDecimal round2(BigDecimal value) {
-        return value.setScale(2, RoundingMode.HALF_UP);
     }
 }
