@@ -8,9 +8,10 @@ spring:
     name: mftb-admin
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://localhost:3306/fengsong?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    # 默認連接開發庫 fengsong_test；生產環境通過 DB_URL/DB_USERNAME/DB_PASSWORD 環境變量覆蓋
+    url: ${DB_URL:jdbc:mysql://mysql6.sqlpub.com:3311/fengsong_test?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:fengsong_mt}
+    password: ${DB_PASSWORD:re6NO4pZLL2pgqhp}
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai

@@ -3,6 +3,7 @@ package com.mftb.admin.dto;
 import com.mftb.admin.entity.AdOrderItemHot;
 import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
+import com.mftb.admin.entity.AdOrderItemSignboard;
 import com.mftb.admin.entity.AdOrderItemStar;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -70,6 +71,8 @@ public class AdOrderDetailVO extends AdOrderVO {
         private String mealSlot;
         /** 皮肤名称（人气商家明细） */
         private String skinName;
+        /** 场景（金字招牌：all_macau/district/null） */
+        private String scenario;
         private BigDecimal originalPrice;
         private BigDecimal salePrice;
         private BigDecimal refundPrice;
@@ -125,6 +128,22 @@ public class AdOrderDetailVO extends AdOrderVO {
             item.setRegion(null);
             item.setMealSlot(null);
             item.setSkinName(entity.getSkinName());
+            item.setOriginalPrice(entity.getOriginalPrice());
+            item.setSalePrice(entity.getSalePrice());
+            item.setRefundPrice(entity.getRefundPrice());
+            item.setDeliveryStatus(entity.getDeliveryStatus());
+            return item;
+        }
+
+        /** 金字招牌明细（标签 x 日期，无商圈/餐段维度） */
+        public static Item from(AdOrderItemSignboard entity) {
+            Item item = new Item();
+            item.setId(entity.getId());
+            item.setBizDate(entity.getBizDate());
+            item.setRegion(null);
+            item.setMealSlot(null);
+            item.setSkinName(entity.getLabelType()); // 复用 skinName 字段展示标签类型
+            item.setScenario(entity.getScenario());
             item.setOriginalPrice(entity.getOriginalPrice());
             item.setSalePrice(entity.getSalePrice());
             item.setRefundPrice(entity.getRefundPrice());

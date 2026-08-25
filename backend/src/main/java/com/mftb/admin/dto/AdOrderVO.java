@@ -42,6 +42,8 @@ public class AdOrderVO {
     private List<String> purchaseDays;
     /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
     private List<String> skinNames;
+    /** 按標籤分組的購買日期（金字招牌：每個標籤對應的日期列表） */
+    private List<LabelDateGroup> labelDates;
     private Integer itemCount;
     private BigDecimal originalAmount;
     private BigDecimal discountAmount;
@@ -68,6 +70,19 @@ public class AdOrderVO {
         public DateSlotGroup(String date, List<String> slots) {
             this.date = date;
             this.slots = slots;
+        }
+    }
+
+    /** 按標籤分組的日期（金字招牌） */
+    @Data
+    public static class LabelDateGroup {
+        private String label;
+        private List<String> dates;
+
+        public LabelDateGroup() {}
+        public LabelDateGroup(String label, List<String> dates) {
+            this.label = label;
+            this.dates = dates;
         }
     }
 

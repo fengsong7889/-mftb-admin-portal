@@ -131,7 +131,7 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     name: '金字招牌',
     icon: '🏅',
     description: '金字招牌商家，品質保證優先推薦',
-    enabled: false,
+    enabled: true,
   },
   {
     type: AlgorithmType.PRODUCT_PROMO,

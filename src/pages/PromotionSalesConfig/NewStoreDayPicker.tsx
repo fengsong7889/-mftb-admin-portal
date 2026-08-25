@@ -432,16 +432,16 @@ export default function NewStoreDayPicker() {
                 </Card>
 
                 {/* 日历网格 */}
-                <div style={{ border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f5f5f5', borderBottom: '1px solid #e8e8e8' }}>
+                <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAFAFA', borderBottom: '1px solid #f0f0f0' }}>
                     {WEEKDAY_LABELS.map((label, index) => (
-                      <div key={label} style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 600, fontSize: 13, color: index === 0 || index === 6 ? '#fa541c' : '#333', borderRight: index < 6 ? '1px solid #e8e8e8' : 'none' }}>
+                      <div key={label} style={{ padding: '8px 0', textAlign: 'center', fontWeight: 600, fontSize: 12, color: index === 0 || index === 6 ? '#FA8C16' : '#595959' }}>
                         {label}
                       </div>
                     ))}
                   </div>
                   {calendarGrid.map((week, weekIndex) => (
-                    <div key={weekIndex} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: weekIndex < calendarGrid.length - 1 ? '1px solid #e8e8e8' : 'none' }}>
+                    <div key={weekIndex} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                       {week.map((date, dayIndex) => {
                         const cellStyle = getCellStyle(date)
                         const dateStr = date?.format('YYYY-MM-DD') || ''
@@ -450,17 +450,17 @@ export default function NewStoreDayPicker() {
                         const selectable = date ? isDateSelectable(date) : false
                         return (
                           <div key={`${weekIndex}-${dayIndex}`} onClick={() => handleDateClick(date)}
-                            style={{ padding: '8px 6px', textAlign: 'center', minHeight: 52, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: dayIndex < 6 ? '1px solid #e8e8e8' : 'none', ...cellStyle, transition: 'all 0.2s' }}>
+                            style={{ minHeight: 56, margin: 2, borderRadius: 6, padding: '4px 2px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, ...cellStyle, transition: 'all 0.2s' }}>
                             {date ? (
                               <>
-                                <div style={{ fontSize: 14, fontWeight: isSelected ? 700 : (isToday ? 600 : 400), position: 'relative' }}>
+                                <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : isToday ? 600 : 400, position: 'relative', lineHeight: 1.2 }}>
                                   {date.date()}
-                                  {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
-                                </div>
+                                  {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
+                                </span>
                                 {selectable && (
                                   isSelected
-                                    ? <span style={{ fontSize: 9, color: '#E8720C', marginTop: 1, fontWeight: 600 }}>{t('selectedTag')}</span>
-                                    : <span style={{ fontSize: 9, color: '#52c41a', marginTop: 1 }}>{t('canPromote')}</span>
+                                    ? <span style={{ fontSize: 9, lineHeight: 1, color: '#E8720C', fontWeight: 600 }}>{t('selectedTag')}</span>
+                                    : <span style={{ fontSize: 9, lineHeight: 1, color: '#52c41a' }}>{t('canPromote')}</span>
                                 )}
                               </>
                             ) : null}

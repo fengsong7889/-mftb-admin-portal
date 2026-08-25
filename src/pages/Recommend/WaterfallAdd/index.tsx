@@ -34,7 +34,7 @@ import {
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
 import GoldenSignboardPricing from './GoldenSignboardPricing'
-import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
+import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, fetchAdPricingList, fetchAdRevivePricingList, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
 import { fetchStores } from '../../../api/store'
 
 /** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
@@ -287,8 +287,8 @@ function WaterfallAddGeneral() {
     }
     fetchAdAlgorithms(fetchParams as Parameters<typeof fetchAdAlgorithms>[0])
       .then(res => {
-        // 过滤系统预置算法（SQL seed），仅展示算法库菜单中用户创建的算法
-        const opts = (res.records ?? []).filter(a => a.updatedBy !== '系統').map(a => ({
+        // 过滤系统预置算法（SQL seed）及金字招牌（只需标签，不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
+        const opts = (res.records ?? []).filter(a => a.updatedBy !== '系統' && !a.algoCode?.startsWith('SFJZ')).map(a => ({
           id: a.id ?? 0,
           name: a.algoName,
           algoType: a.algoType,
@@ -700,6 +700,14 @@ function WaterfallAddGeneral() {
           message.error(t('recommend.selectAlgo'))
           return
         }
+        // 校驗：一個算法只能配置一個定價（新增時檢查）
+        if (!isEditMode) {
+          const existing = await fetchAdPricingList({ algoId, page: 1, size: 1 })
+          if (existing.total > 0) {
+            message.error('該算法已配置定價，一個算法只能配置一個定價')
+            return
+          }
+        }
         const payload: AdPricingStarRequest = {
           algoId,
           brand: appTypeToBrand(selectedApp),
@@ -758,6 +766,14 @@ function WaterfallAddGeneral() {
         if (!algoId) {
           message.error(t('recommend.selectAlgo'))
           return
+        }
+        // 校驗：一個算法只能配置一個定價（新增時檢查）
+        if (!isEditMode) {
+          const existing = await fetchAdRevivePricingList({ algoId, page: 1, size: 1 })
+          if (existing.total > 0) {
+            message.error('該算法已配置定價，一個算法只能配置一個定價')
+            return
+          }
         }
         const payload: AdPricingReviveRequest = {
           algoId,

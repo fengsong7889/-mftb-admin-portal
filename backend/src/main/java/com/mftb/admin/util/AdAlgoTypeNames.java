@@ -14,7 +14,7 @@ public final class AdAlgoTypeNames {
     private AdAlgoTypeNames() {
     }
 
-    /** 广告类型名称: 1=無敵星星 2=新店廣告 3=盤活復蘇 4=流量廣告 5=人氣商家 */
+    /** 广告类型名称: 1=無敵星星 2=新店廣告 3=盤活復蘇 4=流量廣告 5=人氣商家 13=金字招牌 */
     public static String of(Integer algoType) {
         if (algoType == null) {
             return FALLBACK;
@@ -25,6 +25,7 @@ public final class AdAlgoTypeNames {
             case 3 -> "盤活復蘇";
             case 4 -> "流量廣告";
             case 5 -> "人氣商家";
+            case 13 -> "金字招牌";
             default -> FALLBACK;
         };
     }

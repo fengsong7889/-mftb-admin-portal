@@ -15,11 +15,14 @@ DROP TABLE IF EXISTS `biz_ad_order`;
 DROP TABLE IF EXISTS `biz_ad_order_item_hot`;
 DROP TABLE IF EXISTS `biz_ad_order_item_new_store`;
 DROP TABLE IF EXISTS `biz_ad_order_item_revive`;
+DROP TABLE IF EXISTS `biz_ad_order_item_signboard`;
 DROP TABLE IF EXISTS `biz_ad_order_item_star`;
 DROP TABLE IF EXISTS `biz_ad_pricing_hot`;
 DROP TABLE IF EXISTS `biz_ad_pricing_hot_skin`;
 DROP TABLE IF EXISTS `biz_ad_pricing_revive`;
 DROP TABLE IF EXISTS `biz_ad_pricing_revive_region`;
+DROP TABLE IF EXISTS `biz_ad_pricing_signboard`;
+DROP TABLE IF EXISTS `biz_ad_pricing_signboard_label`;
 DROP TABLE IF EXISTS `biz_ad_pricing_star`;
 DROP TABLE IF EXISTS `biz_ad_pricing_star_region`;
 DROP TABLE IF EXISTS `biz_ad_waterfall`;
@@ -859,6 +862,26 @@ CREATE TABLE `biz_ad_order_item_hot` (
   KEY `idx_ad_item_hot_cell` (`biz_date`,`skin_name`),
   KEY `idx_ad_item_hot_status` (`delivery_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='人气商家订单明细表(皮肤x日期) ';
+
+CREATE TABLE `biz_ad_order_item_signboard` (
+
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `order_id` bigint NOT NULL COMMENT '订单主表ID (biz_ad_order.id)',
+  `order_no` varchar(64) NOT NULL COMMENT '订单编号快照',
+  `biz_date` date NOT NULL COMMENT '投放日期',
+  `label_type` varchar(32) NOT NULL COMMENT '标签类型(hot/popular/sales/rating/repurchase/favorites/customers)',
+  `original_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '格子原价(标签日单价)',
+  `sale_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '实付分摊价(折扣后)',
+  `refund_price` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '已退款金额(取消扣费梯度)',
+  `delivery_status` tinyint NOT NULL DEFAULT '1' COMMENT '投放状态: 1=待投放 2=已投放 3=已退款',
+  `deleted` tinyint DEFAULT '0' COMMENT '逻辑删除',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_ad_item_signboard_order` (`order_id`),
+  KEY `idx_ad_item_signboard_cell` (`biz_date`,`label_type`),
+  KEY `idx_ad_item_signboard_status` (`delivery_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='金字招牌订单明细表(标签x日期)';
 
 CREATE TABLE `biz_organic_score_dimension` (
 

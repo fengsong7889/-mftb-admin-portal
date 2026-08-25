@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Popover, TreeSelect } from 'antd'
 import BrandTag from '../../components/BrandTag'
-import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup } from '../../api/adPromotion'
+import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup, type LabelDateGroup } from '../../api/adPromotion'
 import dayjs from 'dayjs'
 const { RangePicker } = DatePicker
 import {
@@ -63,6 +63,8 @@ const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
   [RecommendType.TRAFFIC_AD]: '流量廣告',
+  [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
+  [RecommendType.GOLDEN_SIGNBOARD]: '金字招牌',
 }
 
 const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
@@ -70,6 +72,8 @@ const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
   [RecommendType.HOT_REVIVE_AD]: '🔥',
   [RecommendType.NEW_STORE_AD]: '🏪',
   [RecommendType.TRAFFIC_AD]: '📊',
+  [RecommendType.POPULAR_MERCHANT_KA]: '🏆',
+  [RecommendType.GOLDEN_SIGNBOARD]: '🏅',
 }
 
 const _RECOMMEND_TYPE_COLOR: Partial<Record<RecommendType, string>> = {
@@ -77,6 +81,17 @@ const _RECOMMEND_TYPE_COLOR: Partial<Record<RecommendType, string>> = {
   [RecommendType.HOT_REVIVE_AD]: 'green',
   [RecommendType.NEW_STORE_AD]: 'blue',
   [RecommendType.TRAFFIC_AD]: 'purple',
+}
+
+/** 金字招牌標籤類型 → 中文翻譯映射 */
+const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: string }> = {
+  hot: { label: '熱門', icon: '🔥', color: '#FF4D4F' },
+  popular: { label: '人氣', icon: '👑', color: '#FAAD14' },
+  sales: { label: '銷量', icon: '📈', color: '#1890FF' },
+  rating: { label: '好評', icon: '⭐', color: '#52C41A' },
+  repurchase: { label: '復購', icon: '🔄', color: '#722ED1' },
+  favorites: { label: '收藏', icon: '❤️', color: '#EB2F96' },
+  customers: { label: '顧客數', icon: '👥', color: '#13C2C2' },
 }
 
 // 订单接口定义
@@ -95,7 +110,8 @@ interface OrderItem {
   storeName: string           // 門店名稱
   mealSlots: string[]       // 無敵星星：購買時段
   dateSlots?: DateSlotGroup[] // 無敵星星：按日期分組的購買時段
-  purchaseDays?: string[]    // 盤活復蘇：購買日期列表
+  purchaseDays?: string[]    // 盤活復蘇/金字招牌：購買日期列表
+  labelDates?: LabelDateGroup[] // 金字招牌：按標籤分組的購買日期
   purchaseDate: string
   originalPrice: number
   discountPrice: number
@@ -137,7 +153,7 @@ function toOrderItem(vo: AdOrder): OrderItem {
   }))
   // 購買日期: 無敵星星和盤活復蘇均傳遞日期列表
   const hasNoMealSlots = (vo.mealSlots || []).length === 0
-  const isDayBasedType = vo.algoType === 3
+  const isDayBasedType = vo.algoType === 3 || vo.algoType === 13
   const isStarType = vo.algoType === 1
   const purchaseDays = (isDayBasedType && hasNoMealSlots) || isStarType
     ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
@@ -160,6 +176,7 @@ function toOrderItem(vo: AdOrder): OrderItem {
     mealSlots,
     dateSlots,
     purchaseDays,
+    labelDates: vo.labelDates,
     purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
@@ -445,10 +462,50 @@ export default function PromotionOrderManage() {
       },
     },
     {
-      title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : orderType === '盤活復蘇' ? t('promotionOrderManage.purchaseDaysTitle') : t('promotionOrderManage.purchaseContent'),
+      title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : orderType === '盤活復蘇' ? t('promotionOrderManage.purchaseDaysTitle') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
       width: 220,
       render: (_, record) => {
+        // 金字招牌：展示標籤 + 日期（類似無敵星星購買時段風格）
+        if (orderType === '金字招牌' || record.recommendType === RecommendType.GOLDEN_SIGNBOARD) {
+          if (record.labelDates && record.labelDates.length > 0) {
+            return (
+              <Space direction="vertical" size={2}>
+                {record.labelDates.map((lg, li) => {
+                  const cfg = SIGNBOARD_LABEL_CN[lg.label]
+                  const firstDate = lg.dates[0]
+                  const moreCount = lg.dates.length - 1
+                  const allDatesContent = (
+                    <Space direction="vertical" size={4}>
+                      {lg.dates.map((d, di) => (
+                        <Tag key={di} color="green" style={{ margin: 0 }}>{d}</Tag>
+                      ))}
+                    </Space>
+                  )
+                  return (
+                    <div key={li} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {cfg?.label || lg.label}</Tag>
+                      {firstDate && (
+                        <span style={{ fontSize: 12, color: '#595959' }}>{firstDate.slice(5)}</span>
+                      )}
+                      {moreCount > 0 && (
+                        <Popover
+                          content={allDatesContent}
+                          title={`${cfg?.label || lg.label} 全部日期`}
+                          trigger="click"
+                          placement="bottomLeft"
+                        >
+                          <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{moreCount}日期</span>
+                        </Popover>
+                      )}
+                    </div>
+                  )
+                })}
+              </Space>
+            )
+          }
+          return <span style={{ color: '#bfbfbf' }}>-</span>
+        }
         if (orderType === '盤活復蘇' || record.recommendType === RecommendType.HOT_REVIVE_AD) {
           // 盤活復蘇：只展示天數+日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {

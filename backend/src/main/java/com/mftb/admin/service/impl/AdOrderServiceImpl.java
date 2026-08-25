@@ -7,12 +7,14 @@ import com.mftb.admin.dto.AdOrderDetailVO;
 import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.dto.AdPricingReviveVO;
+import com.mftb.admin.dto.AdPricingSignboardVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemHot;
 import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
+import com.mftb.admin.entity.AdOrderItemSignboard;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdPricingHot;
@@ -23,6 +25,7 @@ import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdOrderItemHotMapper;
 import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
+import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.AdPricingHotMapper;
@@ -31,6 +34,7 @@ import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
+import com.mftb.admin.service.AdPricingSignboardService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.FinAccountService;
@@ -70,12 +74,14 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderItemReviveMapper reviveItemMapper;
     private final AdOrderItemNewStoreMapper newStoreItemMapper;
     private final AdOrderItemHotMapper hotItemMapper;
+    private final AdOrderItemSignboardMapper signboardItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingHotMapper hotPricingMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
     private final AdPricingHotService hotPricingService;
+    private final AdPricingSignboardService signboardPricingService;
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
@@ -146,6 +152,13 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .orderByAsc(AdOrderItemHot::getBizDate)
                             .orderByAsc(AdOrderItemHot::getSkinName));
             items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        } else if (isSignboard(order)) {
+            List<AdOrderItemSignboard> items = signboardItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemSignboard>()
+                            .eq(AdOrderItemSignboard::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemSignboard::getBizDate)
+                            .orderByAsc(AdOrderItemSignboard::getLabelType));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
         } else {
             List<AdOrderItemStar> items = itemMapper.selectList(
                     new LambdaQueryWrapper<AdOrderItemStar>()
@@ -206,6 +219,12 @@ public class AdOrderServiceImpl implements AdOrderService {
                 refundEnabled = pricing.getRefundEnabled();
                 cancelFeeTiersJson = pricing.getCancelFeeTiers();
             }
+        } else if (isSignboard(order)) {
+            AdPricingSignboardVO pricing = signboardPricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) {
+                refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
+            }
         } else {
             AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
             if (pricing != null) {
@@ -261,6 +280,25 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放格子（退款后可再购）
                 hotItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isSignboard(order)) {
+            List<AdOrderItemSignboard> items = signboardItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemSignboard>()
+                            .eq(AdOrderItemSignboard::getOrderId, order.getId())
+                            .in(AdOrderItemSignboard::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemSignboard item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                signboardItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else {
@@ -352,6 +390,9 @@ public class AdOrderServiceImpl implements AdOrderService {
         } else if (isHot(order)) {
             AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
             if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
+        } else if (isSignboard(order)) {
+            AdPricingSignboardVO pricing = signboardPricingService.activeByAlgo(order.getAlgoId());
+            if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
         } else {
             AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
             if (pricing != null) cancelFeeTiersJson = pricing.getCancelFeeTiers();
@@ -397,6 +438,23 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 hotItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isSignboard(order)) {
+            List<AdOrderItemSignboard> items = signboardItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemSignboard>()
+                            .eq(AdOrderItemSignboard::getOrderId, order.getId())
+                            .in(AdOrderItemSignboard::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
+            for (AdOrderItemSignboard item : items) {
+                long remainDays = ChronoUnit.DAYS.between(today, item.getBizDate());
+                BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
+                BigDecimal refundPrice = round2(item.getSalePrice()
+                        .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                signboardItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else {
@@ -480,6 +538,11 @@ public class AdOrderServiceImpl implements AdOrderService {
                     new LambdaQueryWrapper<AdOrderItemHot>()
                             .eq(AdOrderItemHot::getOrderId, vo.getId()));
             return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemHot::getBizDate).toList(), today, status);
+        } else if (isSignboardType(vo.getAlgoType())) {
+            List<AdOrderItemSignboard> items = signboardItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemSignboard>()
+                            .eq(AdOrderItemSignboard::getOrderId, vo.getId()));
+            return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemSignboard::getBizDate).toList(), today, status);
         }
         return status;
     }
@@ -557,13 +620,15 @@ public class AdOrderServiceImpl implements AdOrderService {
         }
         List<Long> starOrderIds = records.stream()
                 .filter(r -> !isReviveType(r.getAlgoType()) && !isNewStoreType(r.getAlgoType())
-                        && !isHotType(r.getAlgoType()))
+                        && !isHotType(r.getAlgoType()) && !isSignboardType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> reviveOrderIds = records.stream().filter(r -> isReviveType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> newStoreOrderIds = records.stream().filter(r -> isNewStoreType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> hotOrderIds = records.stream().filter(r -> isHotType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        List<Long> signboardOrderIds = records.stream().filter(r -> isSignboardType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         Map<Long, List<AdOrderItemStar>> byOrder = starOrderIds.isEmpty() ? Map.of()
                 : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
@@ -581,6 +646,10 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : hotItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemHot>()
                         .in(AdOrderItemHot::getOrderId, hotOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemHot::getOrderId));
+        Map<Long, List<AdOrderItemSignboard>> signboardByOrder = signboardOrderIds.isEmpty() ? Map.of()
+                : signboardItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemSignboard>()
+                        .in(AdOrderItemSignboard::getOrderId, signboardOrderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemSignboard::getOrderId));
         for (AdOrderVO vo : records) {
             if (isNewStoreType(vo.getAlgoType())) {
                 List<AdOrderItemNewStore> items = newStoreByOrder.getOrDefault(vo.getId(), List.of());
@@ -614,6 +683,31 @@ public class AdOrderServiceImpl implements AdOrderService {
                         .filter(java.util.Objects::nonNull).distinct().sorted().toList());
                 continue;
             }
+            if (isSignboardType(vo.getAlgoType())) {
+                List<AdOrderItemSignboard> items = signboardByOrder.getOrDefault(vo.getId(), List.of());
+                vo.setRegions(new ArrayList<>());   // 金字招牌无明细商圈，后续从门店回填
+                vo.setMealSlots(new ArrayList<>()); // 金字招牌无餐段
+                // 購買日期列表：明細去重排序
+                vo.setPurchaseDays(items.stream().map(AdOrderItemSignboard::getBizDate)
+                        .filter(java.util.Objects::nonNull).distinct().sorted()
+                        .map(Object::toString).toList());
+                // 標籤類型列表：明細去重排序
+                vo.setSkinNames(items.stream().map(AdOrderItemSignboard::getLabelType)
+                        .filter(java.util.Objects::nonNull).distinct().sorted().toList());
+                // 按標籤分組日期：供列表頁展示「標籤 + 日期」
+                Map<String, List<String>> labelDateMap = new LinkedHashMap<>();
+                items.stream()
+                        .filter(i -> i.getLabelType() != null && i.getBizDate() != null)
+                        .sorted(java.util.Comparator.comparing(AdOrderItemSignboard::getBizDate))
+                        .forEach(i -> labelDateMap.computeIfAbsent(i.getLabelType(), k -> new ArrayList<>())
+                                .add(i.getBizDate().toString()));
+                // 去重日期
+                List<AdOrderVO.LabelDateGroup> labelDates = new ArrayList<>();
+                labelDateMap.forEach((label, dates) -> labelDates.add(
+                        new AdOrderVO.LabelDateGroup(label, dates.stream().distinct().sorted().toList())));
+                vo.setLabelDates(labelDates);
+                continue;
+            }
             List<AdOrderItemStar> items = byOrder.getOrDefault(vo.getId(), List.of());
             vo.setRegions(items.stream().map(AdOrderItemStar::getRegion)
                     .filter(java.util.Objects::nonNull).distinct().sorted().toList());
@@ -638,9 +732,9 @@ public class AdOrderServiceImpl implements AdOrderService {
             dateSlotMap.forEach((date, slotList) -> dateSlots.add(new AdOrderVO.DateSlotGroup(date, slotList)));
             vo.setDateSlots(dateSlots);
         }
-        // 新店廣告：從門店綁定區域回填商圈
+        // 新店廣告 + 金字招牌：從門店綁定區域回填商圈
         List<String> newStoreCodes = records.stream()
-                .filter(r -> isNewStoreType(r.getAlgoType()) && StringUtils.hasText(r.getStoreCode()))
+                .filter(r -> (isNewStoreType(r.getAlgoType()) || isSignboardType(r.getAlgoType())) && StringUtils.hasText(r.getStoreCode()))
                 .map(AdOrderVO::getStoreCode).distinct().toList();
         if (!newStoreCodes.isEmpty()) {
             Map<String, Integer> storeRegionMap = storeMapper.selectList(
@@ -651,7 +745,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                     .filter(s -> s.getRegion() != null)
                     .collect(Collectors.toMap(BizStore::getStoreCode, BizStore::getRegion, (a, b) -> a));
             records.stream()
-                    .filter(r -> isNewStoreType(r.getAlgoType()) && StringUtils.hasText(r.getStoreCode()))
+                    .filter(r -> (isNewStoreType(r.getAlgoType()) || isSignboardType(r.getAlgoType())) && StringUtils.hasText(r.getStoreCode()))
                     .forEach(vo -> {
                         Integer region = storeRegionMap.get(vo.getStoreCode());
                         vo.setRegions(region != null ? List.of(region) : new ArrayList<>());
@@ -724,6 +818,15 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private static boolean isHotType(Integer algoType) {
         return algoType != null && algoType == 5;
+    }
+
+    /** 金字招牌订单（algo_type=13） */
+    private static boolean isSignboard(AdOrder order) {
+        return isSignboardType(order.getAlgoType());
+    }
+
+    private static boolean isSignboardType(Integer algoType) {
+        return algoType != null && algoType == 13;
     }
 
     /** 无敌星星订单（algo_type=1） */

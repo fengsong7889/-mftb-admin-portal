@@ -13,6 +13,7 @@ import {
   fetchAdOrderDetail,
   fetchAdPricingActive,
   fetchAdRevivePricingActive,
+  fetchAdSignboardPricingActive,
   refundAdOrder,
   cancelAdOrder,
   brandToAppType,
@@ -96,6 +97,7 @@ const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
   [RecommendType.NEW_STORE_AD]: '🏪',
   [RecommendType.TRAFFIC_AD]: '📊',
   [RecommendType.POPULAR_MERCHANT_KA]: '🏆',
+  [RecommendType.GOLDEN_SIGNBOARD]: '🌟',
 }
 
 /* ---- 接口 ---- */
@@ -726,6 +728,7 @@ export default function OrderDetail() {
       [RecommendType.NEW_STORE_AD]: t('promotionReport.recTypeNewStore'),
       [RecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
       [RecommendType.POPULAR_MERCHANT_KA]: t('promotionOrderManage.recTypePopular'),
+      [RecommendType.GOLDEN_SIGNBOARD]: t('recommend.algoGoldenSignboard'),
     }
     return map[v] || String(v)
   }
@@ -777,10 +780,12 @@ export default function OrderDetail() {
       discountTiers: { minSlots: number; discount: number }[]
     } | undefined
     try {
-      // 按算法類型取對應計價配置：盤活復蘇(3)用 revive 定價，其餘用星星定價
+      // 按算法類型取對應計價配置：盤活復蘇(3)用 revive 定價，金字招牌(13)用 signboard 定價，其餘用星星定價
       const p = detail.algoType === 3
         ? await fetchAdRevivePricingActive(detail.algoId).catch(() => null)
-        : await fetchAdPricingActive(detail.algoId).catch(() => null)
+        : detail.algoType === 13
+          ? await fetchAdSignboardPricingActive(detail.algoId).catch(() => null)
+          : await fetchAdPricingActive(detail.algoId).catch(() => null)
       if (p) {
         pricing = {
           cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers),
@@ -895,6 +900,18 @@ export default function OrderDetail() {
   const isNewStore = order.recommendType === RecommendType.NEW_STORE_AD
   const isPopular = order.recommendType === RecommendType.POPULAR_MERCHANT_KA
   const isRevive = order.recommendType === RecommendType.HOT_REVIVE_AD
+  const isGoldenSignboard = order.recommendType === RecommendType.GOLDEN_SIGNBOARD
+
+  /** 金字招牌標籤類型 → 中文翻譯映射 */
+  const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: string }> = {
+    hot: { label: '熱門', icon: '\uD83D\uDD25', color: '#FF4D4F' },
+    popular: { label: '人氣', icon: '\uD83D\uDC51', color: '#FAAD14' },
+    sales: { label: '銷量', icon: '\uD83D\uDCC8', color: '#1890FF' },
+    rating: { label: '好評', icon: '\u2B50', color: '#52C41A' },
+    repurchase: { label: '復購', icon: '\uD83D\uDD04', color: '#722ED1' },
+    favorites: { label: '收藏', icon: '\u2764\uFE0F', color: '#EB2F96' },
+    customers: { label: '顧客數', icon: '\uD83D\uDC65', color: '#13C2C2' },
+  }
 
   // 新店廣告已取消：保留「待推廣 / 推廣中」節點展示，但因未推廣即取消，兩節點以另色標記並打叉
   const isCancelledBeforePromo = isNewStore && order.status === OrderStatus.CANCELLED
@@ -1313,8 +1330,14 @@ export default function OrderDetail() {
           </Descriptions.Item>
           <Descriptions.Item label={isPopular ? '人氣名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
           {order.skinName && (
-            <Descriptions.Item label={t('orderDetail.skinKit')}>
-              <Tag color="geekblue">{order.skinName}</Tag>
+            <Descriptions.Item label={isGoldenSignboard ? '購買標籤' : t('orderDetail.skinKit')}>
+              {isGoldenSignboard && SIGNBOARD_LABEL_CN[order.skinName] ? (
+                <Tag color={SIGNBOARD_LABEL_CN[order.skinName].color}>
+                  {SIGNBOARD_LABEL_CN[order.skinName].icon} {SIGNBOARD_LABEL_CN[order.skinName].label}
+                </Tag>
+              ) : (
+                <Tag color="geekblue">{order.skinName}</Tag>
+              )}
             </Descriptions.Item>
           )}
         </Descriptions>
@@ -1325,7 +1348,7 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : t('orderDetail.slotTitleStar')} />
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : t('orderDetail.slotTitleStar')} />
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
@@ -1524,6 +1547,62 @@ export default function OrderDetail() {
                       <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>{day}</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>1</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                          <Tag color={statusLabel(dayStatus).color} style={{ margin: 0 }}>
+                            {statusLabel(dayStatus).label}
+                          </Tag>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
+
+        {/* 金字招牌：標籤類型 + 購買日期與價格 */}
+        {isGoldenSignboard && (() => {
+          const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
+          const labelCfg = order.skinName ? SIGNBOARD_LABEL_CN[order.skinName] : null
+          return (
+            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{
+                background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
+                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
+                <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
+                {labelCfg && (
+                  <>
+                    <span style={{ width: 1, height: 14, background: '#E0E0E0' }} />
+                    <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
+                    <Tag style={{ margin: 0, color: labelCfg.color, background: `${labelCfg.color}10`, borderColor: `${labelCfg.color}40` }}>
+                      {labelCfg.icon} {labelCfg.label}
+                    </Tag>
+                  </>
+                )}
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '35%' }} />
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '35%' }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ background: '#FAFAFA' }}>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.slotPrices.map((sp, i) => {
+                    const dayStatus = getDayStatus(sp.date)
+                    return (
+                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                        <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.date}</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                           <Tag color={statusLabel(dayStatus).color} style={{ margin: 0 }}>
                             {statusLabel(dayStatus).label}

@@ -6,6 +6,7 @@ import {
   ShopOutlined,
   SearchOutlined,
   ReloadOutlined,
+  ShoppingCartOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -18,6 +19,7 @@ import {
 } from './types'
 import { Region, AlgorithmType } from '../Recommend/constants'
 import GradientDiscountBanner from './GradientDiscountBanner'
+import NoRefundBadge from './NoRefundBadge'
 import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import {
   fetchAdAlgorithms,
@@ -912,91 +914,89 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         unitLabel={t('unitSlotBanner')}
         scopeLabel={t('scopeSingleDay')}
         currentCount={activeDate ? cartItems.filter(i => i.date === activeDateStr).length + selectedCells.filter(c => c.date === activeDateStr).length : 0}
-        refundDisabled={currentAlgorithmRefundEnabled === false}
       />
       <div style={{ display: 'flex', gap: 16 }}>
         {/* 左侧：日期×时段表格 */}
         <div style={{ flex: 1 }}>
         {/* 日期×时段表格 */}
         <Card 
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-            {/* 12306风格日期选择器 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-              <Button
-                size="small"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              >
-                ◀
-              </Button>
-              <div style={{ flex: 1, display: 'flex', gap: 4, padding: '4px 0' }}>
-                {dateList.map(date => {
-                  const dateStr = date.format('YYYY-MM-DD')
-                  const isSelected = selectedDates.some(d => d.format('YYYY-MM-DD') === dateStr)
-                  const isToday = dateStr === dayjs().format('YYYY-MM-DD')
-                  const isHovered = hoveredDate === dateStr
-                  const presale = isPresaleDate(date, sellableDays)
-                  return (
-                    <div
-                      key={dateStr}
-                      onClick={() => handleDateClick(date)}
-                      onMouseEnter={() => setHoveredDate(dateStr)}
-                      onMouseLeave={() => setHoveredDate(null)}
-                      style={{
-                        flex: 1,
-                        padding: '6px 4px',
-                        borderRadius: 6,
-                        border: presale
-                          ? '1px dashed #d9d9d9'
-                          : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                        background: presale
-                          ? '#fafafa'
-                          : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : isToday ? '#f6ffed' : '#fff',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        position: 'relative',
-                      }}
-                    >
-                      {selectedCells.some(c => c.date === dateStr) && (
-                        <div style={{
-                          position: 'absolute', top: 2, right: 2,
-                          width: 8, height: 8, borderRadius: '50%',
-                          background: '#ff4d4f',
-                          animation: 'dotPulse 1.5s ease-in-out infinite',
-                        }} />
-                      )}
-                      <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: presale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                        {date.format('MM-DD')}
+          title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>選擇購買日期/時段</span></Space>}
+          extra={currentAlgorithmRefundEnabled === false && <NoRefundBadge />}
+          bodyStyle={{ padding: '16px 20px' }}
+          style={{ flex: 1 }}
+        >
+          {/* 12306风格日期选择器 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Button
+              size="small"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              ◀
+            </Button>
+            <div style={{ flex: 1, display: 'flex', gap: 4, padding: '4px 0' }}>
+              {dateList.map(date => {
+                const dateStr = date.format('YYYY-MM-DD')
+                const isSelected = selectedDates.some(d => d.format('YYYY-MM-DD') === dateStr)
+                const isToday = dateStr === dayjs().format('YYYY-MM-DD')
+                const isHovered = hoveredDate === dateStr
+                const presale = isPresaleDate(date, sellableDays)
+                return (
+                  <div
+                    key={dateStr}
+                    onClick={() => handleDateClick(date)}
+                    onMouseEnter={() => setHoveredDate(dateStr)}
+                    onMouseLeave={() => setHoveredDate(null)}
+                    style={{
+                      flex: 1,
+                      padding: '6px 4px',
+                      borderRadius: 6,
+                      border: presale
+                        ? '1px dashed #d9d9d9'
+                        : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
+                      background: presale
+                        ? '#fafafa'
+                        : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : isToday ? '#f6ffed' : '#fff',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}
+                  >
+                    {selectedCells.some(c => c.date === dateStr) && (
+                      <div style={{
+                        position: 'absolute', top: 2, right: 2,
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: '#ff4d4f',
+                        animation: 'dotPulse 1.5s ease-in-out infinite',
+                      }} />
+                    )}
+                    <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: presale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
+                      {date.format('MM-DD')}
+                    </span>
+                    {presale ? (
+                      <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
+                        {isToday ? t('today') : WEEKDAY_LABELS[date.day()]}
                       </span>
-                      {presale ? (
-                        <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
-                      ) : (
-                        <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
-                          {isToday ? t('today') : WEEKDAY_LABELS[date.day()]}
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-              <Button
-                size="small"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              >
-                ▶
-              </Button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
+            <Button
+              size="small"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            >
+              ▶
+            </Button>
           </div>
-        }
-        style={{ flex: 1 }}
-      >
 
-        {/* 表格 - 仅展示 activeDate */}
+          {/* 表格 - 仅展示 activeDate */}
         {!activeDate ? (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
             <Empty description={t('selectDateHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
@@ -1592,7 +1592,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#595959' }}>享受折扣：</span>
                   {tier ? (
-                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{tier.minSlots}个时段{tier.discount > 10 ? tier.discount / 10 : tier.discount}折</span>
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>{tier.discount > 10 ? tier.discount / 10 : tier.discount}折</span>
                   ) : (
                     <span style={{ color: '#BFBFBF' }}>无折扣</span>
                   )}
@@ -1612,6 +1612,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
             type="primary"
             block 
             size="large"
+            icon={<ShoppingCartOutlined />}
             disabled={cartItems.length === 0}
             onClick={handlePayment}
             style={{ 
@@ -1642,7 +1643,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         okButtonProps={{ style: { background: '#ff4d4f', borderColor: '#ff4d4f' } }}
         width={600}
       >
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
           <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
@@ -1681,7 +1682,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#595959' }}>享受折扣：</span>
                   {s.tier ? (
-                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{s.tier.minSlots}个时段{s.tier.discount > 10 ? s.tier.discount / 10 : s.tier.discount}折</span>
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>{s.tier.discount > 10 ? s.tier.discount / 10 : s.tier.discount}折</span>
                   ) : (
                     <span style={{ color: '#BFBFBF' }}>无折扣</span>
                   )}

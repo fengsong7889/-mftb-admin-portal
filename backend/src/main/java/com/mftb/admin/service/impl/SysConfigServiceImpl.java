@@ -60,10 +60,19 @@ public class SysConfigServiceImpl implements SysConfigService {
                         .set(SysConfig::getConfigValue, configValue));
         if (rows == 0) {
             // key 不存在，插入新记录
-            SysConfig config = new SysConfig();
-            config.setConfigKey(configKey);
-            config.setConfigValue(configValue);
-            sysConfigMapper.insert(config);
+            try {
+                SysConfig config = new SysConfig();
+                config.setConfigKey(configKey);
+                config.setConfigValue(configValue);
+                sysConfigMapper.insert(config);
+            } catch (Exception e) {
+                // 并发写入时可能触发唯一键冲突，回退到更新
+                log.warn("插入配置 {} 失败（可能已存在），回退更新: {}", configKey, e.getMessage());
+                sysConfigMapper.update(null,
+                        new LambdaUpdateWrapper<SysConfig>()
+                                .eq(SysConfig::getConfigKey, configKey)
+                                .set(SysConfig::getConfigValue, configValue));
+            }
         }
         // 立即刷新缓存
         if (KEY_IDLE_TIMEOUT.equals(configKey)) {
@@ -95,7 +104,16 @@ public class SysConfigServiceImpl implements SysConfigService {
                 config.setConfigKey(KEY_IDLE_TIMEOUT);
                 config.setConfigValue(String.valueOf(DEFAULT_IDLE_TIMEOUT_MS));
                 config.setDescription("会话空闲超时时间（毫秒）");
-                sysConfigMapper.insert(config);
+                try {
+                    sysConfigMapper.insert(config);
+                } catch (Exception e) {
+                    // 并发初始化时可能已存在，忽略或回退更新
+                    log.warn("初始化空闲超时配置插入失败，回退更新: {}", e.getMessage());
+                    sysConfigMapper.update(null,
+                            new LambdaUpdateWrapper<SysConfig>()
+                                    .eq(SysConfig::getConfigKey, KEY_IDLE_TIMEOUT)
+                                    .set(SysConfig::getConfigValue, String.valueOf(DEFAULT_IDLE_TIMEOUT_MS)));
+                }
                 log.info("初始化空闲超时配置到 DB: {} ms", DEFAULT_IDLE_TIMEOUT_MS);
             }
             lastLoadTime = System.currentTimeMillis();

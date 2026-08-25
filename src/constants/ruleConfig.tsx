@@ -41,6 +41,8 @@ export interface RuleItem {
   options?: { label: string; value: string | number }[]
   /** 子分組（用於在分組內再按維度歸類，如廣告類型） */
   subGroup?: string
+  /** 互斥分組（同組內只能開啟一個 switch，開啟一個自動關閉其它） */
+  mutexGroup?: string
   /** 備註（用於 table 類型的補充說明） */
   remark?: string
   /** 日期格式（用於 table 類型的編號規則：'YYYYMMDD' | 'YYMM' | ''） */
@@ -68,24 +70,42 @@ export interface RuleGroup {
 
 /* ==================== 默認規則定義 ==================== */
 
-/** 廣告銷售規則 */
+/** 生成某廣告類型的 4 個互斥支付方式規則（同類型內互斥） */
+function paymentModeRules(subGroup: string): RuleItem[] {
+  const mutex = `payment_mode_${subGroup}`
+  return [
+    {
+      key: `payment_${subGroup}_promo_only`,
+      label: '僅支持推廣金支付',
+      description: '開啟後，訂單結算只展示推廣金模塊',
+      type: 'switch', value: false, defaultValue: false, mutexGroup: mutex, subGroup,
+    },
+    {
+      key: `payment_${subGroup}_gift_only`,
+      label: '僅支持贈送天數支付',
+      description: '開啟後，訂單結算只展示贈送天數模塊',
+      type: 'switch', value: false, defaultValue: false, mutexGroup: mutex, subGroup,
+    },
+    {
+      key: `payment_${subGroup}_mixed`,
+      label: '支持混合支付',
+      description: '開啟後，推廣金與贈送天數兩個模塊都展示',
+      type: 'switch', value: true, defaultValue: true, mutexGroup: mutex, subGroup,
+    },
+    {
+      key: `payment_${subGroup}_switchable`,
+      label: '支持切換推廣金和贈送天數支付',
+      description: '開啟後，用戶可自己切換選擇其中一種來支付',
+      type: 'switch', value: false, defaultValue: false, mutexGroup: mutex, subGroup,
+    },
+  ]
+}
+
+/** 廣告銷售規則（支付方式按廣告類型獨立配置） */
 const AD_SALES_RULES: RuleItem[] = [
-  {
-    key: 'revival_mixed_payment',
-    label: '盤活復蘇混合支付',
-    description: '推廣金與贈送天數是否可混合使用',
-    type: 'switch',
-    value: true,
-    defaultValue: true,
-  },
-  {
-    key: 'popular_merchant_mixed_payment',
-    label: '人氣商家混合支付',
-    description: '推廣金與贈送天數是否可混合使用',
-    type: 'switch',
-    value: true,
-    defaultValue: true,
-  },
+  ...paymentModeRules('revival'),
+  ...paymentModeRules('popular_merchant'),
+  ...paymentModeRules('golden_signboard'),
   {
     key: 'ad_click_cart_lock_seconds',
     label: '廣告點擊加購鎖定時長',

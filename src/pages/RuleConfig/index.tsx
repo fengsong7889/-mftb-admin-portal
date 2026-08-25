@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal } from 'antd'
+import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio } from 'antd'
 import {
   SettingOutlined,
   DownOutlined,
@@ -10,6 +10,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import { useSystemRules, syncIdleTimeoutToBackend } from '../../hooks/useSystemRules'
+import { PAYMENT_AD_TYPES, derivePaymentMode, syncPaymentModeToBackend } from '../../hooks/usePaymentRule'
 import type { RuleItem, RuleGroup } from '../../constants/ruleConfig'
 
 /** 廣告類型子分組顯示名稱與配色 */
@@ -17,6 +18,7 @@ const SUB_GROUP_META: Record<string, { label: string; color: string }> = {
   new_store: { label: '新店廣告', color: '#52C41A' },
   revival: { label: '盤活復蘇', color: '#E8720C' },
   popular_merchant: { label: '人氣商家', color: '#722ED1' },
+  golden_signboard: { label: '金字招牌', color: '#FA8C16' },
 }
 
 export default function RuleConfig() {
@@ -48,6 +50,22 @@ export default function RuleConfig() {
           message.warning('本地已保存，但同步後端失敗，請檢查網絡後重試')
         })
       }
+    }
+
+    // 廣告銷售規則保存時，同步各廣告類型支付方式到後端 DB
+    if (groupKey === 'ad_sales') {
+      const group = groups.find(g => g.key === 'ad_sales')
+      const getVal = (key: string) => group?.rules.find(r => r.key === key)?.value
+      PAYMENT_AD_TYPES.forEach(type => {
+        const mode = derivePaymentMode({
+          promoOnly: getVal(`payment_${type}_promo_only`),
+          giftOnly: getVal(`payment_${type}_gift_only`),
+          switchable: getVal(`payment_${type}_switchable`),
+        })
+        syncPaymentModeToBackend(type, mode).catch(() => {
+          message.warning('本地已保存，但同步後端失敗，請檢查網絡後重試')
+        })
+      })
     }
   }, [saveAll, groups])
 
@@ -142,6 +160,76 @@ export default function RuleConfig() {
       default:
         return null
     }
+  }
+
+  /* 將規則列表拆分為渲染單元：互斥組（同 mutexGroup 合併為一行）+ 單條規則 */
+  type RenderUnit = { type: 'single'; rule: RuleItem } | { type: 'mutex'; rules: RuleItem[] }
+  const toUnits = (rules: RuleItem[]): RenderUnit[] => {
+    const units: RenderUnit[] = []
+    const seen = new Set<string>()
+    rules.forEach(r => {
+      if (r.mutexGroup) {
+        if (!seen.has(r.mutexGroup)) {
+          seen.add(r.mutexGroup)
+          units.push({ type: 'mutex', rules: rules.filter(x => x.mutexGroup === r.mutexGroup) })
+        }
+      } else {
+        units.push({ type: 'single', rule: r })
+      }
+    })
+    return units
+  }
+
+  /* 單條規則行 */
+  const renderSingleRow = (rule: RuleItem, borderBottom: string, groupEditing: boolean, padLeft = 0) => (
+    <div key={rule.key} style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: `14px 0 14px ${padLeft}px`, borderBottom,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>{rule.label}</div>
+        <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
+      </div>
+      <div style={{ marginLeft: 16, flexShrink: 0 }}>{renderControl(rule, groupEditing)}</div>
+    </div>
+  )
+
+  /* 互斥組行：4 個選項並排（Radio.Group），一行展示 */
+  const renderMutexRow = (rules: RuleItem[], borderBottom: string, groupEditing: boolean, padLeft = 0) => {
+    const active = rules.find(r => r.value === true) || rules.find(r => r.defaultValue === true) || rules[0]
+    return (
+      <div key={rules[0].mutexGroup} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: `14px 0 14px ${padLeft}px`, borderBottom, gap: 16,
+      }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>支付方式</div>
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{active?.description || ''}</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+          <Radio.Group
+            value={active?.key}
+            disabled={!groupEditing}
+            onChange={e => updateRule(e.target.value, true)}
+            optionType="button"
+            buttonStyle="solid"
+            size="small"
+            options={rules.map(r => ({ label: r.label.replace(/^僅支持|^支持/, ''), value: r.key }))}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  /* 渲染一組規則（互斥組並排、單條逐行） */
+  const renderUnits = (rules: RuleItem[], groupEditing: boolean, padLeft = 0) => {
+    const units = toUnits(rules)
+    return units.map((u, i) => {
+      const border = i < units.length - 1 ? '1px solid #f5f5f5' : 'none'
+      return u.type === 'mutex'
+        ? renderMutexRow(u.rules, border, groupEditing, padLeft)
+        : renderSingleRow(u.rule, border, groupEditing, padLeft)
+    })
   }
 
   return (
@@ -423,24 +511,8 @@ export default function RuleConfig() {
                     }
                     const hasSubGroups = group.rules.some(r => r.subGroup)
                     if (!hasSubGroups) {
-                      /* 無子分組：平鋪渲染 */
-                      return group.rules.map((rule, idx) => (
-                        <div key={rule.key} style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '14px 0',
-                          borderBottom: idx < group.rules.length - 1 ? '1px solid #f5f5f5' : 'none',
-                        }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>
-                              {rule.label}
-                            </div>
-                            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
-                          </div>
-                          <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                            {renderControl(rule, groupEditing)}
-                          </div>
-                        </div>
-                      ))
+                      /* 無子分組：平鋪渲染（互斥組並排） */
+                      return renderUnits(group.rules, groupEditing)
                     }
                     /* 有子分組：按 subGroup 歸類並顯示子標題 */
                     const subGroups = new Map<string, RuleItem[]>()
@@ -456,22 +528,7 @@ export default function RuleConfig() {
                     return (
                       <>
                         {/* 無子分組的規則先渲染 */}
-                        {noSubRules.map(rule => (
-                          <div key={rule.key} style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '14px 0', borderBottom: '1px solid #f5f5f5',
-                          }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>
-                                {rule.label}
-                              </div>
-                              <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
-                            </div>
-                            <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                              {renderControl(rule, groupEditing)}
-                            </div>
-                          </div>
-                        ))}
+                        {renderUnits(noSubRules, groupEditing)}
                         {/* 按子分組渲染 */}
                         {Array.from(subGroups.entries()).map(([sgKey, sgRules], sgIdx) => {
                           const meta = SUB_GROUP_META[sgKey]
@@ -496,24 +553,8 @@ export default function RuleConfig() {
                                 </span>
                                 <div style={{ flex: 1, height: 1, background: '#f0f0f0' }} />
                               </div>
-                              {/* 子分組規則 */}
-                              {sgRules.map((rule, idx) => (
-                                <div key={rule.key} style={{
-                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                  padding: '12px 0 12px 14px',
-                                  borderBottom: idx < sgRules.length - 1 ? '1px solid #f5f5f5' : 'none',
-                                }}>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>
-                                      {rule.label}
-                                    </div>
-                                    <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
-                                  </div>
-                                  <div style={{ marginLeft: 16, flexShrink: 0 }}>
-                                    {renderControl(rule, groupEditing)}
-                                  </div>
-                                </div>
-                              ))}
+                              {/* 子分組規則（互斥組並排） */}
+                              {renderUnits(sgRules, groupEditing, 14)}
                             </div>
                           )
                         })}

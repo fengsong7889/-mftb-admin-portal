@@ -311,10 +311,7 @@ export default function PopularLayoutPreviewModal() {
                   </div>
                 </div>
               </WaterfallContext>
-              {/* 風格分配說明 */}
-              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
-                💡 大圖模式風格由系統隨機分配，在皮膚支持的風格間自動切換展示，商家無需選擇；在瀑布流第幾個位置以大圖模式展示，同樣由系統策略決定
-              </div>
+
             </div>
           </div>
           <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 12 }}>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover } from 'antd'
+import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import { AlgorithmType, APP_OPTIONS } from './constants'
@@ -94,28 +94,266 @@ export default function AlgorithmAdd() {
   const [selectedRegions, _setSelectedRegions] = useState<string[]>([])
   const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
 
-  /** 金字招牌 - 參數配置（支持多條招牌，每條含分類+名稱+滿足條件） */
-  interface SignboardItem {
+  /** 金字招牌 - 資格條件（同一場景/統計類標籤內多條件以且/或組合） */
+  interface QualificationCondition {
     id: number
-    category: 'ranking' | 'featured'
-    name: string
     metric: string
     scope: string
     comparison: string
     value: number | undefined
+    period?: number  // 顾客数专用：统计周期（天）
+    nextOperator: 'and' | 'or'  // 與下一個條件的關係
   }
-  let signboardIdSeed = Date.now()
-  const createSignboardItem = (partial?: Partial<SignboardItem>): SignboardItem => ({
-    id: signboardIdSeed++,
-    category: 'ranking',
-    name: '',
-    metric: 'monthlyOrders',
-    scope: 'allMerchants',
-    comparison: 'percentage',
-    value: undefined,
-    ...partial,
+  /** 金字招牌 - 對比場景：全澳對比 / 商圈對比 */
+  type SignboardScenario = 'allMacau' | 'district'
+  /** 場景配置（啟用開關 + 條件列表） */
+  interface ScenarioConfig { enabled: boolean; conditions: QualificationCondition[] }
+  let condIdSeed = Date.now() + 10000
+  /** 標籤類型選項 */
+  const SIGNBOARD_LABEL_OPTIONS = [
+    { value: 'hot', label: '熱門', icon: '🔥' },
+    { value: 'popular', label: '人氣', icon: '👑' },
+    { value: 'sales', label: '銷量', icon: '📈' },
+    { value: 'rating', label: '好評', icon: '⭐' },
+    { value: 'repurchase', label: '復購', icon: '🔄' },
+    { value: 'favorites', label: '收藏', icon: '❤️' },
+    { value: 'customers', label: '顧客數', icon: '👥' },
+  ] as const
+  /** 對比類標籤：按全澳/商圈兩個場景配置；統計類標籤：全量數據門檻，不劃分場景 */
+  const COMPARISON_LABELS = ['hot', 'popular', 'sales', 'rating', 'repurchase']
+  const AGGREGATE_LABELS = ['favorites', 'customers']
+  /** 場景定義（展示配色與說明） */
+  const SCENARIO_DEFS: Array<{ key: SignboardScenario; label: string; icon: string; color: string; bg: string; border: string; desc: string }> = [
+    { key: 'allMacau', label: '全澳對比', icon: '🌏', color: '#E8720C', bg: '#FFF7E6', border: '#FFD591', desc: '商家與全澳所有商家對比' },
+    { key: 'district', label: '商圈對比', icon: '🏙️', color: '#1890FF', bg: '#E6F7FF', border: '#91D5FF', desc: '商家與所在商圈內商家對比' },
+  ]
+  /** 標籤對應必選指標（新增條件時默認跟隨） */
+  const SIGNBOARD_REQUIRED_METRIC: Record<string, string> = {
+    sales: 'monthlyOrders',
+    rating: 'monthlyRating',
+    repurchase: 'monthlyRepurchase',
+    favorites: 'storeFavorites',
+    customers: 'monthlyCustomers',
+  }
+  const METRIC_OPTIONS = [
+    { label: '月訂單量', value: 'monthlyOrders' },
+    { label: '月復購率', value: 'monthlyRepurchase' },
+    { label: '月好評率', value: 'monthlyRating' },
+    { label: '月訪問量', value: 'monthlyVisits' },
+    { label: '門店收藏', value: 'storeFavorites' },
+    { label: '顧客數', value: 'monthlyCustomers' },
+  ]
+  const SCOPE_OPTIONS = [
+    { label: '全澳商家', value: 'allMerchants' },
+    { label: '商圈商家', value: 'districtMerchants' },
+    { label: '全澳-品類商家', value: 'macauCategoryMerchants' },
+    { label: '商圈-品類商家', value: 'districtCategoryMerchants' },
+  ]
+  /** 場景限定可選範圍：全澳場景僅全澳系、商圈場景僅商圈系 */
+  const SCOPE_OPTIONS_BY_SCENARIO: Record<SignboardScenario, typeof SCOPE_OPTIONS> = {
+    allMacau: SCOPE_OPTIONS.filter(o => o.value === 'allMerchants' || o.value === 'macauCategoryMerchants'),
+    district: SCOPE_OPTIONS.filter(o => o.value === 'districtMerchants' || o.value === 'districtCategoryMerchants'),
+  }
+  /** 場景默認範圍 */
+  const DEFAULT_SCOPE_BY_SCENARIO: Record<SignboardScenario, string> = { allMacau: 'allMerchants', district: 'districtMerchants' }
+  const createCondition = (metric = 'monthlyVisits', scope = 'allMerchants'): QualificationCondition => ({
+    id: condIdSeed++, metric, scope,
+    comparison: (metric === 'storeFavorites' || metric === 'monthlyCustomers') ? 'threshold' : 'percentage',
+    value: undefined, nextOperator: 'and',
   })
-  const [signboardItems, setSignboardItems] = useState<SignboardItem[]>([createSignboardItem()])
+  /** 對比類標籤：每個標籤兩個場景（全澳/商圈），各場景獨立啟用與配置 */
+  const [scenarioConfigs, setScenarioConfigs] = useState<Record<string, Record<SignboardScenario, ScenarioConfig>>>(() => {
+    const init: Record<string, Record<SignboardScenario, ScenarioConfig>> = {}
+    COMPARISON_LABELS.forEach(label => {
+      init[label] = { allMacau: { enabled: false, conditions: [] }, district: { enabled: false, conditions: [] } }
+    })
+    return init
+  })
+  /** 統計類標籤（收藏/顧客數）：全量數據門檻條件列表 */
+  const [aggregateConditions, setAggregateConditions] = useState<Record<string, QualificationCondition[]>>(() => ({
+    favorites: [createCondition('storeFavorites')],
+    customers: [createCondition('monthlyCustomers')],
+  }))
+  const [activeSignboardTab, setActiveSignboardTab] = useState<string>('hot')
+  /** 各標籤是否啟用（開關控制，關閉則定價頁不展示該標籤） */
+  const [signboardEnabledLabels, setSignboardEnabledLabels] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    SIGNBOARD_LABEL_OPTIONS.forEach(opt => { init[opt.value] = false })
+    return init
+  })
+  /** 切換指標時自動適配比較方式（收藏/顧客數→門檻，其它→百分比） */
+  const metricChangePatch = (metric: string): Partial<QualificationCondition> => ({
+    metric,
+    comparison: (metric === 'storeFavorites' || metric === 'monthlyCustomers') ? 'threshold' : 'percentage',
+  })
+  /** 場景：更新條件 */
+  const updateScenarioCondition = (label: string, scenario: SignboardScenario, condId: number, patch: Partial<QualificationCondition>) => {
+    setScenarioConfigs(prev => ({
+      ...prev,
+      [label]: {
+        ...prev[label],
+        [scenario]: { ...prev[label][scenario], conditions: prev[label][scenario].conditions.map(c => c.id === condId ? { ...c, ...patch } : c) },
+      },
+    }))
+    // 設置條件值時自動啟用場景和標籤
+    if (patch.value !== undefined && patch.value !== null) {
+      setScenarioConfigs(prev => ({
+        ...prev,
+        [label]: {
+          ...prev[label],
+          [scenario]: { ...prev[label][scenario], enabled: true },
+        },
+      }))
+      setSignboardEnabledLabels(prev => ({ ...prev, [label]: true }))
+    }
+  }
+  /** 場景：添加條件（指標跟隨標籤綁定，範圍跟隨場景默認） */
+  const addScenarioCondition = (label: string, scenario: SignboardScenario) => {
+    const metric = SIGNBOARD_REQUIRED_METRIC[label] || 'monthlyVisits'
+    setScenarioConfigs(prev => ({
+      ...prev,
+      [label]: {
+        ...prev[label],
+        [scenario]: { ...prev[label][scenario], conditions: [...prev[label][scenario].conditions, createCondition(metric, DEFAULT_SCOPE_BY_SCENARIO[scenario])] },
+      },
+    }))
+  }
+  /** 場景：刪除條件（每個場景至少保留一個條件） */
+  const removeScenarioCondition = (label: string, scenario: SignboardScenario, condId: number) => {
+    setScenarioConfigs(prev => {
+      const list = prev[label][scenario].conditions
+      if (list.length <= 1) return prev
+      return { ...prev, [label]: { ...prev[label], [scenario]: { ...prev[label][scenario], conditions: list.filter(c => c.id !== condId) } } }
+    })
+  }
+  /** 場景：啟用開關（首次啟用自動補條件；自動聯動標籤啟用/禁用） */
+  const toggleScenarioEnabled = (label: string, scenario: SignboardScenario, checked: boolean) => {
+    setScenarioConfigs(prev => {
+      const sc = prev[label][scenario]
+      const conditions = checked && sc.conditions.length === 0
+        ? [createCondition(SIGNBOARD_REQUIRED_METRIC[label] || 'monthlyVisits', DEFAULT_SCOPE_BY_SCENARIO[scenario])]
+        : sc.conditions
+      return { ...prev, [label]: { ...prev[label], [scenario]: { enabled: checked, conditions } } }
+    })
+    // 自動聯動：開啟場景時自動啟用標籤；關閉時若所有場景均關閉則停用標籤
+    if (checked) {
+      setSignboardEnabledLabels(prev => ({ ...prev, [label]: true }))
+    } else {
+      setScenarioConfigs(prev2 => {
+        const anyOn = SCENARIO_DEFS.some(d => d.key !== scenario && prev2[label][d.key].enabled)
+        if (!anyOn) setSignboardEnabledLabels(prev3 => ({ ...prev3, [label]: false }))
+        return prev2
+      })
+    }
+  }
+  /** 統計類標籤：更新條件 */
+  const updateAggregateCondition = (condId: number, patch: Partial<QualificationCondition>) => {
+    setAggregateConditions(prev => ({
+      ...prev,
+      [activeSignboardTab]: (prev[activeSignboardTab] || []).map(c => c.id === condId ? { ...c, ...patch } : c),
+    }))
+    // 設置條件值時自動啟用標籤（統計類無場景開關，需自動聯動）
+    if (patch.value !== undefined && patch.value !== null) {
+      setSignboardEnabledLabels(prev => ({ ...prev, [activeSignboardTab]: true }))
+    }
+  }
+  /** 統計類標籤：添加條件 */
+  const addAggregateCondition = () => {
+    const metric = SIGNBOARD_REQUIRED_METRIC[activeSignboardTab] || 'storeFavorites'
+    setAggregateConditions(prev => ({
+      ...prev,
+      [activeSignboardTab]: [...(prev[activeSignboardTab] || []), createCondition(metric)],
+    }))
+  }
+  /** 統計類標籤：刪除條件（至少保留一個） */
+  const removeAggregateCondition = (condId: number) => {
+    setAggregateConditions(prev => {
+      const list = prev[activeSignboardTab] || []
+      if (list.length <= 1) return prev
+      return { ...prev, [activeSignboardTab]: list.filter(c => c.id !== condId) }
+    })
+  }
+  /** 收藏人數格式化（1-9直接顯示，10-99取起始整十，100+用中文大數） */
+  const formatFavoritesCount = (n: number): string => {
+    if (n < 10) return `${n}`
+    if (n < 100) return `${Math.floor(n / 10) * 10}`
+    if (n < 1000) return '百'
+    if (n < 10000) return '千'
+    if (n < 100000) return '萬'
+    if (n < 1000000) return '十萬'
+    if (n < 10000000) return '百萬'
+    return '千萬'
+  }
+  /** 範圍 → 地區（解析後，用於預覽文案） */
+  const getRegion = (scope: string): string =>
+    scope === 'districtMerchants' || scope === 'districtCategoryMerchants' ? '高仕德' : '全澳'
+  /** 範圍 → 是否屬於商圈系 */
+  const isDistrictScope = (scope: string): boolean =>
+    scope === 'districtMerchants' || scope === 'districtCategoryMerchants'
+  /** 範圍 → 品類佔位符 */
+  const getCategoryPlaceholder = (scope: string): string =>
+    scope === 'macauCategoryMerchants' || scope === 'districtCategoryMerchants' ? '{品類}' : ''
+  /** 標籤 → 預覽展示文案 */
+  const getLabelPreviewText = (labelType: string): string => {
+    switch (labelType) {
+      case 'repurchase': return '回頭率超高'
+      default: return SIGNBOARD_LABEL_OPTIONS.find(o => o.value === labelType)?.label || ''
+    }
+  }
+  /** 標籤 → 是否帶「店鋪」後綴 */
+  const hasShopSuffix = (labelType: string): boolean =>
+    ['hot', 'popular', 'rating', 'repurchase'].includes(labelType)
+  /** 標籤 → 文案規則模板（展示文案組成結構） */
+  const getLabelRuleTemplate = (labelType: string): string => {
+    const labelText = getLabelPreviewText(labelType)
+    if (COMPARISON_LABELS.includes(labelType)) {
+      if (labelType === 'sales') return `全澳/商圈 + {品類} + ${labelText} + {排名/百分比}`
+      return `全澳/商圈 + {品類} + ${labelText} + 店鋪`
+    }
+    if (labelType === 'favorites') return `{人數} + 收藏 + 好店`
+    if (labelType === 'customers') return `近期 + {人數} + 下單`
+    return labelText
+  }
+  /** 生成單個獨立條件的預覽文案 */
+  const generatePreviewForCondition = (labelType: string, cond: QualificationCondition): string => {
+    const region = getRegion(cond.scope)
+    const category = getCategoryPlaceholder(cond.scope)
+    const labelText = getLabelPreviewText(labelType)
+    const suffix = hasShopSuffix(labelType) ? '店鋪' : ''
+    // 收藏：{人數}人收藏好店
+    if (labelType === 'favorites') {
+      if (cond.metric === 'storeFavorites' && cond.value) return `${formatFavoritesCount(cond.value)}人收藏好店`
+      return `${labelText}好店`
+    }
+    // 顧客數：近期{人數}人下單
+    if (labelType === 'customers') {
+      if (cond.metric === 'monthlyCustomers' && cond.value) return `近期${cond.value}人下單`
+      return `近期${labelText}`
+    }
+    // 銷量：全澳/商圈+{品類}+銷量+{排名/百分比}
+    if (labelType === 'sales' && cond.value) {
+      const rankText = cond.comparison === 'ranking' ? `第${cond.value}名` : `前${cond.value}%`
+      return `${region}${category}${labelText}·${rankText}`
+    }
+    // 熱門/人氣/好評/復購：全澳/商圈+{品類}+標籤+店鋪
+    return `${region}${category}${labelText}${suffix}`
+  }
+  /** 場景預覽文案：按場景首個條件生成（場景內 scope 同系） */
+  const generateScenarioPreview = (labelType: string, conditions: QualificationCondition[]): string => {
+    const first = conditions[0]
+    if (!first) return '—'
+    return generatePreviewForCondition(labelType, first)
+  }
+  /** 標籤是否「已配置」（啟用且任一場景/條件有有效數值） */
+  const isLabelConfigured = (labelType: string): boolean => {
+    if (!(signboardEnabledLabels[labelType] ?? false)) return false
+    const hasValue = (list: QualificationCondition[]) => list.some(c => c.value !== undefined && c.value !== null)
+    if (COMPARISON_LABELS.includes(labelType)) {
+      const sc = scenarioConfigs[labelType]
+      return !!sc && SCENARIO_DEFS.some(d => sc[d.key].enabled && hasValue(sc[d.key].conditions))
+    }
+    return hasValue(aggregateConditions[labelType] || [])
+  }
 
   /** 人氣商家 - 展示佈局類型 */
   type PopularLayoutType = 'small' | 'grid' | 'carousel'
@@ -220,6 +458,61 @@ export default function AlgorithmAdd() {
             if (p.statusRest !== undefined) form.setFieldsValue({ statusRest: p.statusRest })
             if (p.statusOverwhelmed !== undefined) form.setFieldsValue({ statusOverwhelmed: p.statusOverwhelmed })
             if (p.statusClosed !== undefined) form.setFieldsValue({ statusClosed: p.statusClosed })
+            // 金字招牌：回填招牌標籤條件配置（新結構 scenarios；舊結構 conditions 按範圍拆入場景）
+            if (Array.isArray(p.signboardItems) && p.signboardItems.length > 0) {
+              const restoredEnabled: Record<string, boolean> = {}
+              SIGNBOARD_LABEL_OPTIONS.forEach(opt => { restoredEnabled[opt.value] = false })
+              const restoredScenarios: Record<string, Record<SignboardScenario, ScenarioConfig>> = {}
+              COMPARISON_LABELS.forEach(label => {
+                restoredScenarios[label] = { allMacau: { enabled: false, conditions: [] }, district: { enabled: false, conditions: [] } }
+              })
+              const restoredAggregate: Record<string, QualificationCondition[]> = {}
+              const mapRawCond = (c: {
+                qualificationMetric?: string
+                qualificationScope?: string
+                qualificationComparison?: string
+                qualificationValue?: number
+                qualificationPeriod?: number
+                nextOperator?: string
+              }): QualificationCondition => ({
+                id: condIdSeed++,
+                metric: c.qualificationMetric || 'monthlyVisits',
+                scope: c.qualificationScope || 'allMerchants',
+                comparison: c.qualificationComparison || 'percentage',
+                value: c.qualificationValue,
+                period: c.qualificationPeriod,
+                nextOperator: (c.nextOperator === 'or' ? 'or' : 'and') as 'and' | 'or',
+              })
+              for (const item of p.signboardItems) {
+                if (!item.labelType) continue
+                if (COMPARISON_LABELS.includes(item.labelType)) {
+                  if (item.scenarios && typeof item.scenarios === 'object') {
+                    (['allMacau', 'district'] as SignboardScenario[]).forEach(skey => {
+                      const raw = item.scenarios[skey]
+                      if (raw && Array.isArray(raw.conditions)) {
+                        restoredScenarios[item.labelType][skey] = { enabled: raw.enabled === true, conditions: raw.conditions.map(mapRawCond) }
+                      }
+                    })
+                  } else if (Array.isArray(item.conditions)) {
+                    // 舊數據兼容：按條件範圍拆入全澳/商圈兩個場景
+                    const macauConds = item.conditions.filter((c: { qualificationScope?: string }) => !isDistrictScope(c.qualificationScope || ''))
+                    const districtConds = item.conditions.filter((c: { qualificationScope?: string }) => isDistrictScope(c.qualificationScope || ''))
+                    restoredScenarios[item.labelType].allMacau = { enabled: macauConds.length > 0, conditions: macauConds.map(mapRawCond) }
+                    restoredScenarios[item.labelType].district = { enabled: districtConds.length > 0, conditions: districtConds.map(mapRawCond) }
+                  }
+                } else if (Array.isArray(item.conditions)) {
+                  restoredAggregate[item.labelType] = item.conditions.map(mapRawCond)
+                }
+                // 啟用狀態（兼容舊數據：無 enabled 字段時以已配置條件為依據）
+                const fallbackEnabled = COMPARISON_LABELS.includes(item.labelType)
+                  ? (restoredScenarios[item.labelType].allMacau.enabled || restoredScenarios[item.labelType].district.enabled)
+                  : (restoredAggregate[item.labelType]?.length ?? 0) > 0
+                restoredEnabled[item.labelType] = item.enabled === true || (item.enabled === undefined && fallbackEnabled)
+              }
+              setSignboardEnabledLabels(restoredEnabled)
+              setScenarioConfigs(restoredScenarios)
+              setAggregateConditions(prev => ({ ...prev, ...restoredAggregate }))
+            }
           } catch { /* params 解析失敗保持默認值 */ }
         }
       })
@@ -305,14 +598,35 @@ export default function AlgorithmAdd() {
             manualRules: layoutMode === 'manual' ? manualRules.map(({ position, layout }) => ({ position, layout })) : [],
             autoLayouts: layoutMode === 'auto' ? autoLayouts.map(({ type, interval }) => ({ type, interval })) : [],
           } : selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD ? {
-            signboardItems: signboardItems.map(({ category, name, metric, scope, comparison, value }) => ({
-              category,
-              signboardName: name,
-              qualificationMetric: metric,
-              qualificationScope: scope,
-              qualificationComparison: comparison,
-              qualificationValue: value,
-            })),
+            signboardItems: SIGNBOARD_LABEL_OPTIONS.map(opt => {
+              const labelEnabled = signboardEnabledLabels[opt.value] ?? false
+              const condToPayload = ({ metric, scope, comparison, value, period, nextOperator }: QualificationCondition) => ({
+                qualificationMetric: metric,
+                qualificationScope: scope,
+                qualificationComparison: comparison,
+                qualificationValue: value,
+                qualificationPeriod: period,
+                nextOperator,
+              })
+              if (COMPARISON_LABELS.includes(opt.value)) {
+                // 對比類標籤：輸出全澳/商圈兩個場景（商家購買時按場景粒度選購）
+                const sc = scenarioConfigs[opt.value]
+                return {
+                  labelType: opt.value,
+                  enabled: labelEnabled && (sc.allMacau.enabled || sc.district.enabled),
+                  scenarios: {
+                    allMacau: { enabled: sc.allMacau.enabled, conditions: sc.allMacau.conditions.map(condToPayload) },
+                    district: { enabled: sc.district.enabled, conditions: sc.district.conditions.map(condToPayload) },
+                  },
+                }
+              }
+              // 統計類標籤：全量數據門檻條件
+              return {
+                labelType: opt.value,
+                enabled: labelEnabled,
+                conditions: (aggregateConditions[opt.value] || []).map(condToPayload),
+              }
+            }),
           } : {
             // 非人氣商家/金字招牌：商家狀態計算 + 數據一致性校驗定時器
             consistencyCheckInterval: values.consistencyCheckInterval,
@@ -625,143 +939,324 @@ export default function AlgorithmAdd() {
             </>
           )}
 
-          {/* ===== 金字招牌：招牌列表（分類 + 名稱 + 滿足條件為一體，可新增多條） ===== */}
+          {/* ===== 金字招牌：標籤配置（固定 7 個標籤 Tab + 各標籤獨立條件） ===== */}
           {selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
             <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8720C' }} />
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>招牌列表</span>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>可新增多條招牌，每條配置獨立的分類、名稱和滿足條件</span>
-              </div>
-              {!isDetailMode && (
-                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setSignboardItems(prev => [...prev, createSignboardItem()])} style={{ borderRadius: 6 }}>
-                  新增招牌
-                </Button>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8720C' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>招牌標籤配置</span>
+              <Popover
+                trigger="hover"
+                placement="right"
+                overlayStyle={{ maxWidth: 460 }}
+                title={<span style={{ fontSize: 13, fontWeight: 600 }}>📝 標籤配置說明</span>}
+                content={
+                  <div style={{ maxWidth: 420, fontSize: 12, lineHeight: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4, color: '#E8720C' }}>🔑 標籤分類與場景：</div>
+                    <div style={{ color: '#595959', marginBottom: 4 }}>
+                      對比類標籤（熱門/人氣/銷量/好評/復購）：每個標籤可同時配置「全澳對比」與「商圈對比」兩個場景<br />
+                      ・各場景獨立啟用，場景內支持多條件組合（且/或關係）<br />
+                      ・場景決定可選範圍：全澳場景限「全澳商家/全澳-品類商家」，商圈場景限「商圈商家/商圈-品類商家」<br />
+                      ・商家只能購買達到條件的場景標籤；兩個場景都滿足時由商家自行挑選其一購買<br />
+                      統計類標籤（收藏/顧客數）：統計全量數據門檻，不劃分場景
+                    </div>
+                    <div style={{ fontWeight: 600, marginBottom: 4, color: '#262626' }}>各標籤文案：</div>
+                    <div style={{ color: '#595959' }}>
+                      🔥 熱門 → 全澳/商圈 + {`{品類}`} + 熱門 + 店鋪<br />
+                      👑 人氣 → 全澳/商圈 + {`{品類}`} + 人氣 + 店鋪<br />
+                      📈 銷量 → 全澳/商圈 + {`{品類}`} + 銷量 + {`{排名/百分比}`}<br />
+                      ⭐ 好評 → 全澳/商圈 + {`{品類}`} + 好評 + 店鋪<br />
+                      🔄 復購 → 全澳/商圈 + {`{品類}`} + 回頭率超高 + 店鋪<br />
+                      ❤️ 收藏 → {`{人數}`} + 收藏 + 好店<br />
+                      👥 顧客數 → 近期 + {`{人數}`} + 下單
+                    </div>
+                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: '#262626' }}>收藏人數格式化：</div>
+                    <div style={{ color: '#595959' }}>
+                      1~9 → 直接顯示（如 5人）<br />
+                      10~99 → 取起始整十（如 15→10人、29→20人）<br />
+                      ≥100 → 中文大數（百/千/萬人，不用阿拉伯數字）
+                    </div>
+                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: '#262626' }}>💡 人數說明：</div>
+                    <div style={{ color: '#595959' }}>
+                      ❤️ 收藏 和 👥 顧客數 文案中展示的{`{人數}`}是店鋪實際數據，配置的資格條件僅為門檻值（如配置 ≥1000人，實際展示該店鋪真實的收藏/顧客人數）
+                    </div>
+                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: '#262626' }}>📊 數據來源：</div>
+                    <div style={{ color: '#595959' }}>
+                      📈 月訂單量、月訪問量、月復購率、月好評率 → 取上月統計<br />
+                      ❤️ 門店收藏 → 累積數據（實時累計）<br />
+                      👥 顧客數 → 基於昨天最新數據，每一天都會重新計算
+                    </div>
+                  </div>
+                }
+              >
+                <QuestionCircleOutlined style={{ fontSize: 13, color: '#1890FF', cursor: 'help' }} />
+              </Popover>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>點擊標籤直接配置，開啟場景即自動啟用</span>
             </div>
 
-            {signboardItems.map((item, index) => (
-              <div key={item.id} style={{
-                border: '1px solid #f0f0f0', borderRadius: 8, padding: '16px 20px', marginBottom: 12,
-                background: '#FAFAFA', position: 'relative',
-              }}>
-                {/* 塊頭：序號 + 分類選擇 + 刪除按鈕 */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, gap: 12 }}>
-                  <div style={{
-                    width: 24, height: 24, borderRadius: 8, flexShrink: 0,
-                    background: 'linear-gradient(135deg, #E8720C, #F59432)',
-                    color: '#fff', fontSize: 12, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(232,114,12,0.25)',
-                  }}>{index + 1}</div>
+            {/* 標籤 Tab 欄：對比類標籤（按場景配置） + 統計類標籤（全量門檻） */}
+            {(() => {
+              const renderTab = (opt: typeof SIGNBOARD_LABEL_OPTIONS[number]) => {
+                const isActive = activeSignboardTab === opt.value
+                const isEnabled = signboardEnabledLabels[opt.value] ?? false
+                const configured = isLabelConfigured(opt.value)
+                return (
+                  <div key={opt.value}
+                    onClick={() => !isDetailMode && setActiveSignboardTab(opt.value)}
+                    style={{
+                      padding: '6px 14px', borderRadius: 6, cursor: isDetailMode ? 'default' : 'pointer',
+                      border: '1px solid',
+                      borderColor: isActive ? '#E8720C' : '#f0f0f0',
+                      background: isActive ? '#FFF7E6' : '#fff',
+                      boxShadow: isActive ? '0 0 0 1px #E8720C' : 'none',
+                      transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
+                      opacity: isEnabled ? 1 : 0.5,
+                    }}>
+                    <span style={{ fontSize: 14 }}>{opt.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#E8720C' : '#595959' }}>{opt.label}</span>
+                    {configured && <span style={{ fontSize: 10, color: '#fff', background: '#52C41A', borderRadius: 3, padding: '0 4px', lineHeight: '16px', fontWeight: 600 }}>已配置</span>}
+                  </div>
+                )
+              }
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '30px', flexShrink: 0 }}>對比類標籤</span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                      {SIGNBOARD_LABEL_OPTIONS.filter(o => COMPARISON_LABELS.includes(o.value)).map(renderTab)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 8 }}>
+                    <span style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '30px', flexShrink: 0 }}>統計類標籤</span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                      {SIGNBOARD_LABEL_OPTIONS.filter(o => AGGREGATE_LABELS.includes(o.value)).map(renderTab)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
-                  {/* 招牌分類 */}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {[
-                      { value: 'ranking' as const, label: '排名招牌', icon: '🏆' },
-                      { value: 'featured' as const, label: '特色招牌', icon: '⭐' },
-                    ].map(opt => (
-                      <div key={opt.value}
-                        onClick={() => !isDetailMode && setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, category: opt.value } : s))}
-                        style={{
-                          padding: '6px 14px', borderRadius: 6, cursor: isDetailMode ? 'default' : 'pointer',
-                          border: item.category === opt.value ? '2px solid #E8720C' : '1px solid #f0f0f0',
-                          background: item.category === opt.value ? '#FFF7E6' : '#fff',
-                          transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 4,
-                        }}>
-                        <span style={{ fontSize: 14 }}>{opt.icon}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: item.category === opt.value ? '#E8720C' : '#595959' }}>{opt.label}</span>
+            {/* 當前標籤的條件編輯區：對比類→全澳/商圈雙場景；統計類→全量門檻 */}
+            {(() => {
+              const activeLabelCfg = SIGNBOARD_LABEL_OPTIONS.find(o => o.value === activeSignboardTab)
+              const isComparison = COMPARISON_LABELS.includes(activeSignboardTab)
+              /** 條件列表渲染：條件行 + 且/或切換 + 添加按鈕（場景/統計類共用） */
+              const renderConditionList = (opts: {
+                conditions: QualificationCondition[]
+                scenario?: SignboardScenario  // 對比類場景（限定範圍枚舉）；undefined = 統計類門檻樣式
+                onUpdate: (condId: number, patch: Partial<QualificationCondition>) => void
+                onRemove: (condId: number) => void
+                onAdd: () => void
+              }) => {
+                const scopeOptions = opts.scenario ? SCOPE_OPTIONS_BY_SCENARIO[opts.scenario] : undefined
+                return (
+                  <>
+                    {opts.conditions.map((cond, condIdx) => (
+                      <div key={cond.id}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 12, color: '#8c8c8c', minWidth: 46, flexShrink: 0 }}>條件{condIdx + 1}</span>
+                          {opts.scenario ? (
+                            <>
+                              {isDetailMode ? (
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{METRIC_OPTIONS.find(m => m.value === cond.metric)?.label || cond.metric}</span>
+                              ) : (
+                                <Select value={cond.metric} onChange={v => opts.onUpdate(cond.id, metricChangePatch(v))}
+                                  style={{ width: 120 }} options={METRIC_OPTIONS} />
+                              )}
+                              <span style={{ fontSize: 13, color: '#595959' }}>超過</span>
+                              {isDetailMode ? (
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#595959' }}>{SCOPE_OPTIONS.find(o => o.value === cond.scope)?.label || cond.scope}</span>
+                              ) : (
+                                <Select value={cond.scope} onChange={v => opts.onUpdate(cond.id, { scope: v })}
+                                  style={{ width: 150 }} options={scopeOptions} />
+                              )}
+                              {isDetailMode ? (
+                                <>
+                                  <span style={{ fontSize: 13, color: '#595959' }}>前</span>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#262626' }}>{cond.value ?? '-'}</span>
+                                  <span style={{ fontSize: 13, color: '#595959' }}>{cond.comparison === 'percentage' ? '%' : '名'}的商家</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Select value={cond.comparison} onChange={v => opts.onUpdate(cond.id, { comparison: v })}
+                                    style={{ width: 110 }}
+                                    options={[{ label: '百分比', value: 'percentage' }, { label: '排名', value: 'ranking' }]} />
+                                  <span style={{ fontSize: 13, color: '#595959' }}>前</span>
+                                  <InputNumber value={cond.value}
+                                    onChange={v => opts.onUpdate(cond.id, { value: v ?? undefined })}
+                                    min={1}
+                                    max={cond.comparison === 'percentage' ? 100 : 9999}
+                                    placeholder="數值"
+                                    addonAfter={cond.comparison === 'percentage' ? '%' : '名'}
+                                    style={{ width: 150 }} />
+                                  <span style={{ fontSize: 13, color: '#595959' }}>的商家</span>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {/* 統計類：固定指標 + 門檻樣式 */}
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{METRIC_OPTIONS.find(m => m.value === cond.metric)?.label || cond.metric}</span>
+                              {cond.metric === 'monthlyCustomers' && (
+                                <>
+                                  <span style={{ fontSize: 13, color: '#595959' }}>統計週期 近</span>
+                                  {isDetailMode ? (
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#262626' }}>{cond.period ?? '-'}</span>
+                                  ) : (
+                                    <InputNumber value={cond.period}
+                                      onChange={v => opts.onUpdate(cond.id, { period: v ?? undefined })}
+                                      min={1} placeholder="天數"
+                                      addonAfter="天" style={{ width: 130 }} />
+                                  )}
+                                  <span style={{ fontSize: 13, color: '#595959' }}>天，</span>
+                                </>
+                              )}
+                              <span style={{ fontSize: 13, color: '#595959' }}>人數 ≥</span>
+                              {isDetailMode ? (
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#262626' }}>{cond.value ?? '-'}</span>
+                              ) : (
+                                <InputNumber value={cond.value}
+                                  onChange={v => opts.onUpdate(cond.id, { value: v ?? undefined })}
+                                  min={1} placeholder="人數"
+                                  addonAfter="人" style={{ width: 150 }} />
+                              )}
+                              <span style={{ fontSize: 13, color: '#595959' }}>人</span>
+                            </>
+                          )}
+                          {!isDetailMode && (
+                            <Tooltip title={opts.conditions.length <= 1 ? '至少保留一個條件' : undefined}>
+                              <Button type="link" danger size="small" style={{ padding: '0 4px', fontSize: 12 }}
+                                disabled={opts.conditions.length <= 1}
+                                onClick={() => opts.onRemove(cond.id)}>刪除</Button>
+                            </Tooltip>
+                          )}
+                        </div>
+
+                        {condIdx < opts.conditions.length - 1 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 8px 46px' }}>
+                            <div style={{ width: 20, borderTop: '1px dashed #e8eaed' }} />
+                            <Tooltip title="點擊切換條件關係：且↔或">
+                              <div
+                                onClick={() => !isDetailMode && opts.onUpdate(cond.id, { nextOperator: cond.nextOperator === 'and' ? 'or' : 'and' })}
+                                style={{
+                                  padding: '2px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                                  cursor: isDetailMode ? 'default' : 'pointer',
+                                  transition: 'all 0.2s',
+                                  background: cond.nextOperator === 'or' ? '#E6F7FF' : '#F6FFED',
+                                  color: cond.nextOperator === 'or' ? '#1890FF' : '#52C41A',
+                                  border: cond.nextOperator === 'or' ? '1px solid #91D5FF' : '1px solid #B7EB8F',
+                                }}>
+                                {cond.nextOperator === 'or' ? '或' : '且'}
+                              </div>
+                            </Tooltip>
+                            <div style={{ flex: 1, borderTop: '1px dashed #e8eaed' }} />
+                          </div>
+                        )}
                       </div>
                     ))}
-                  </div>
+                    {!isDetailMode && (
+                      <Button type="dashed" icon={<PlusOutlined />} onClick={opts.onAdd}
+                        style={{ marginTop: 12, width: '100%', fontSize: 13, borderRadius: 6, color: '#E8720C', borderColor: '#E8720C' }}>
+                        添加條件
+                      </Button>
+                    )}
+                  </>
+                )
+              }
 
-                  <div style={{ flex: 1 }} />
-                  {!isDetailMode && signboardItems.length > 1 && (
-                    <Button type="link" danger size="small" icon={<DeleteOutlined />}
-                      onClick={() => setSignboardItems(prev => prev.filter(s => s.id !== item.id))}>刪除</Button>
-                  )}
-                </div>
-
-                {/* 招牌名稱 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 72, flexShrink: 0 }}><span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>招牌名稱</span>
-                  <Input
-                    placeholder="請輸入招牌名稱"
-                    maxLength={30}
-                    showCount
-                    value={item.name}
-                    disabled={isDetailMode}
-                    onChange={e => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, name: e.target.value } : s))}
-                    style={{ width: 300 }}
-                  />
-                </div>
-
-                {/* 滿足條件 */}
-                <div style={{
-                  border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
-                  padding: '14px 16px',
-                }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12 }}>📋</span> 滿足條件
+              /* ===== 對比類標籤：全澳對比 + 商圈對比 雙場景（扁平卡片） ===== */
+              if (isComparison) {
+                const sc = scenarioConfigs[activeSignboardTab]
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {SCENARIO_DEFS.map(def => {
+                      const scCfg = sc[def.key]
+                      const scopeOpts = SCOPE_OPTIONS_BY_SCENARIO[def.key]
+                      return (
+                        <div key={def.key} style={{
+                          border: '1px solid #e8eaed', borderLeft: `3px solid ${def.color}`,
+                          borderRadius: 8, background: '#fff', overflow: 'hidden',
+                        }}>
+                          {/* 場景標題行 */}
+                          <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 14 }}>{def.icon}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: def.color }}>{def.label}場景</span>
+                            <span style={{ fontSize: 11, color: '#8c8c8c' }}>{def.desc}；可選：{scopeOpts.map(o => o.label).join(' / ')}</span>
+                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 12, color: scCfg.enabled ? '#52C41A' : '#8C8C8C' }}>{scCfg.enabled ? '已啟用' : '未啟用'}</span>
+                              {!isDetailMode && (
+                                <Switch size="small" checked={scCfg.enabled}
+                                  onChange={checked => toggleScenarioEnabled(activeSignboardTab, def.key, checked)} />
+                              )}
+                            </div>
+                          </div>
+                          {/* 場景內容 */}
+                          {scCfg.enabled ? (
+                            <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0' }}>
+                              {renderConditionList({
+                                conditions: scCfg.conditions,
+                                scenario: def.key,
+                                onUpdate: (condId, patch) => updateScenarioCondition(activeSignboardTab, def.key, condId, patch),
+                                onRemove: condId => removeScenarioCondition(activeSignboardTab, def.key, condId),
+                                onAdd: () => addScenarioCondition(activeSignboardTab, def.key),
+                              })}
+                              {/* 文案規則 + 預覽文案 */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>文案規則：</span>
+                                <span style={{ fontSize: 11, color: '#595959', background: '#f5f5f5', padding: '1px 8px', borderRadius: 4, border: '1px solid #e8eaed', fontFamily: 'monospace' }}>
+                                  {getLabelRuleTemplate(activeSignboardTab)}
+                                </span>
+                                <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>預覽：</span>
+                                <span style={{
+                                  fontSize: 13, fontWeight: 600, color: def.color,
+                                  background: def.bg, padding: '2px 10px', borderRadius: 6,
+                                  border: `1px solid ${def.border}`,
+                                }}>
+                                  {generateScenarioPreview(activeSignboardTab, scCfg.conditions)}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', fontSize: 12, color: '#bfbfbf' }}>
+                              開啟後可配置「{def.label}」類資格條件
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    {/* 條件一：指標 */}
-                    <Select
-                      value={item.metric}
-                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, metric: v } : s))}
-                      disabled={isDetailMode}
-                      style={{ width: 140 }}
-                      options={[
-                        { label: '月訂單量', value: 'monthlyOrders' },
-                        { label: '月復購率', value: 'monthlyRepurchase' },
-                        { label: '月好評率', value: 'monthlyRating' },
-                        { label: '月訪問量', value: 'monthlyVisits' },
-                        { label: '月客單價', value: 'monthlyAvgPrice' },
-                        { label: '門店收藏', value: 'storeFavorites' },
-                      ]}
-                    />
-                    <span style={{ fontSize: 13, color: '#595959' }}>超過</span>
-                    {/* 條件二：範圍 */}
-                    <Select
-                      value={item.scope}
-                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, scope: v } : s))}
-                      disabled={isDetailMode}
-                      style={{ width: 160 }}
-                      options={[
-                        { label: '全部商家', value: 'allMerchants' },
-                        { label: '商圈商家', value: 'districtMerchants' },
-                        { label: '全澳品類商家', value: 'macauCategoryMerchants' },
-                        { label: '商圈品類商家', value: 'districtCategoryMerchants' },
-                      ]}
-                    />
-                    <span style={{ fontSize: 13, color: '#595959' }}>的</span>
-                    {/* 條件三：比較方式 */}
-                    <Select
-                      value={item.comparison}
-                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, comparison: v } : s))}
-                      disabled={isDetailMode}
-                      style={{ width: 120 }}
-                      options={[
-                        { label: '百分比', value: 'percentage' },
-                        { label: '排名', value: 'ranking' },
-                      ]}
-                    />
-                    {/* 條件四：數值 */}
-                    <InputNumber
-                      value={item.value}
-                      onChange={v => setSignboardItems(prev => prev.map(s => s.id === item.id ? { ...s, value: v ?? undefined } : s))}
-                      disabled={isDetailMode}
-                      min={1}
-                      max={item.comparison === 'percentage' ? 100 : 9999}
-                      placeholder="請輸入數值"
-                      addonAfter={item.comparison === 'percentage' ? '%' : '名'}
-                      style={{ width: 160 }}
-                    />
+                )
+              }
+
+              /* ===== 統計類標籤（收藏/顧客數）：全量數據門檻 ===== */
+              const conditions = aggregateConditions[activeSignboardTab] || []
+              return (
+                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 14 }}>{activeLabelCfg?.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{activeLabelCfg?.label}</span>
+                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>統計全量數據門檻，不區分全澳/商圈</span>
+                  </div>
+                  {renderConditionList({
+                    conditions,
+                    onUpdate: updateAggregateCondition,
+                    onRemove: removeAggregateCondition,
+                    onAdd: addAggregateCondition,
+                  })}
+                  {/* 文案規則 + 預覽文案 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>文案規則：</span>
+                    <span style={{ fontSize: 11, color: '#595959', background: '#f5f5f5', padding: '1px 8px', borderRadius: 4, border: '1px solid #e8eaed', fontFamily: 'monospace' }}>
+                      {getLabelRuleTemplate(activeSignboardTab)}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>預覽：</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C', background: '#FFF7E6', padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(232,114,12,0.15)' }}>
+                      {conditions[0] ? generatePreviewForCondition(activeSignboardTab, conditions[0]) : '—'}
+                    </span>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })()}
             </>
           )}
 
@@ -1612,60 +2107,6 @@ export default function AlgorithmAdd() {
                   <div style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:bigSmallStrategy')}</span>
-                      <Form.Item
-                        name="merchantExposureStrategy"
-                        style={{ flex: 1, marginBottom: 0 }}
-                        wrapperCol={{ span: 24 }}
-                      >
-                        <Select
-                          placeholder={t('recommend:selectPlaceholder')}
-                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
-                          options={[
-                            { label: t('recommend:roundRobinCalc'), value: 'random' },
-                          ]}
-                          disabled={isDetailMode}
-                        />
-                      </Form.Item>
-                    </div>
-
-                      {/* 按轮询维度配置 */}
-                      {merchantExposureStrategy === 'random' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
-                              {t('recommend:roundRobinStrategyDesc')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                  </div>
-            </div>
-          )}
-
-          {/* ===== 金字招牌：算法策略（輪詢計算） ===== */}
-          {selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
-              <div style={{
-                border: '1px solid #d6e4ff',
-                borderRadius: 8,
-                background: '#f0f5ff',
-                overflow: 'hidden',
-                marginBottom: 16,
-              }}>
-                    {/* 標題欄 */}
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: '#1890ff',
-                      padding: '10px 20px',
-                      borderBottom: '1px solid #d6e4ff',
-                      background: '#e6f4ff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <SettingOutlined />
-                      {t('recommend:algoStrategy')}
-                    </div>
-
-                  <div style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
                       <Form.Item
                         name="merchantExposureStrategy"
                         style={{ flex: 1, marginBottom: 0 }}

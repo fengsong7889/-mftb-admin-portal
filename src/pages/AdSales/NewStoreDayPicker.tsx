@@ -8,6 +8,7 @@ import {
   GiftOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  ShoppingCartOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -365,9 +366,9 @@ export default function NewStoreDayPicker() {
           >
             <div key={queriedStoreCode} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
               {[
-                { label: t('totalGiftDays'), value: <AnimatedNumber value={giftInfo.totalDays} suffix={t('dayUnitSuffix')} />, icon: <GiftOutlined />, color: '#1890ff', bg: '#E6F7FF' },
-                { label: t('usedDays'), value: <AnimatedNumber value={giftInfo.usedDays} suffix={t('dayUnitSuffix')} />, icon: <CheckCircleOutlined />, color: '#E8720C', bg: '#FFF7E6' },
-                { label: t('remainingDays'), value: <AnimatedNumber value={giftInfo.remainingDays} suffix={t('dayUnitSuffix')} />, icon: <CalendarOutlined />, color: '#52C41A', bg: '#F6FFED' },
+                { label: t('totalGiftDays'), value: <AnimatedNumber value={giftInfo.totalDays} suffix={t('dayUnitCount')} />, icon: <GiftOutlined />, color: '#1890ff', bg: '#E6F7FF' },
+                { label: t('usedDays'), value: <AnimatedNumber value={giftInfo.usedDays} suffix={t('dayUnitCount')} />, icon: <CheckCircleOutlined />, color: '#E8720C', bg: '#FFF7E6' },
+                { label: t('remainingDays'), value: <AnimatedNumber value={giftInfo.remainingDays} suffix={t('dayUnitCount')} />, icon: <CalendarOutlined />, color: '#52C41A', bg: '#F6FFED' },
                 { label: t('expireDate'), value: <span style={{ fontSize: 18 }}>{giftInfo.expireDate}</span>, icon: <ClockCircleOutlined />, color: '#722ED1', bg: '#F9F0FF' },
               ].map((stat, i) => (
                 <div key={i} style={{
@@ -438,16 +439,16 @@ export default function NewStoreDayPicker() {
                 </Card>
 
                 {/* 日历网格 */}
-                <div style={{ border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f5f5f5', borderBottom: '1px solid #e8e8e8' }}>
+                <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAFAFA', borderBottom: '1px solid #f0f0f0' }}>
                     {WEEKDAY_LABELS.map((label, index) => (
-                      <div key={label} style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 600, fontSize: 13, color: index === 0 || index === 6 ? '#fa541c' : '#333', borderRight: index < 6 ? '1px solid #e8e8e8' : 'none' }}>
+                      <div key={label} style={{ padding: '8px 0', textAlign: 'center', fontWeight: 600, fontSize: 12, color: index === 0 || index === 6 ? '#FA8C16' : '#595959' }}>
                         {label}
                       </div>
                     ))}
                   </div>
                   {calendarGrid.map((week, weekIndex) => (
-                    <div key={weekIndex} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: weekIndex < calendarGrid.length - 1 ? '1px solid #e8e8e8' : 'none' }}>
+                    <div key={weekIndex} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                       {week.map((date, dayIndex) => {
                         const cellStyle = getCellStyle(date)
                         const dateStr = date?.format('YYYY-MM-DD') || ''
@@ -456,17 +457,17 @@ export default function NewStoreDayPicker() {
                         const selectable = date ? isDateSelectable(date) : false
                         return (
                           <div key={`${weekIndex}-${dayIndex}`} onClick={() => handleDateClick(date)}
-                            style={{ padding: '8px 6px', textAlign: 'center', minHeight: 52, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: dayIndex < 6 ? '1px solid #e8e8e8' : 'none', ...cellStyle, transition: 'all 0.2s' }}>
+                            style={{ minHeight: 56, margin: 2, borderRadius: 6, padding: '4px 2px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, ...cellStyle, transition: 'all 0.2s' }}>
                             {date ? (
                               <>
-                                <div style={{ fontSize: 14, fontWeight: isSelected ? 700 : (isToday ? 600 : 400), position: 'relative' }}>
+                                <span style={{ fontSize: 14, fontWeight: isSelected ? 700 : isToday ? 600 : 400, position: 'relative', lineHeight: 1.2 }}>
                                   {date.date()}
-                                  {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
-                                </div>
+                                  {isToday && !isSelected && <span style={{ position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)', width: 4, height: 4, borderRadius: '50%', background: '#1890ff' }} />}
+                                </span>
                                 {selectable && (
                                   isSelected
-                                    ? <span style={{ fontSize: 9, color: '#E8720C', marginTop: 1, fontWeight: 600 }}>{t('selectedTag')}</span>
-                                    : <span style={{ fontSize: 9, color: '#52c41a', marginTop: 1 }}>{t('canPromote')}</span>
+                                    ? <span style={{ fontSize: 9, lineHeight: 1, color: '#E8720C', fontWeight: 600 }}>{t('selectedTag')}</span>
+                                    : <span style={{ fontSize: 9, lineHeight: 1, color: '#52c41a' }}>{t('canPromote')}</span>
                                 )}
                               </>
                             ) : null}
@@ -480,27 +481,41 @@ export default function NewStoreDayPicker() {
 
               {/* 右侧：已选天数 + 提交订单 */}
               <div style={{ width: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <Card size="small" title={<Space><CalendarOutlined /><span>{t('selectPromoDaysTitle')}</span></Space>}
+                <Card size="small" title={<Space><CalendarOutlined /><span>{t('currentSelection')}</span></Space>}
                   extra={selectedDates.length > 0 && <Button type="link" size="small" danger onClick={handleClearSelected}>{t('clearAction')}</Button>}>
                   {selectedDates.length > 0 ? (
-                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <div>
+                      {/* 按日期展示已选日期（参考无敌星星样式） */}
                       {datesByMonth.map(({ month, days }) => (
-                        <div key={month} style={{ background: '#fafafa', borderRadius: 6, padding: '10px 12px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('selectedMonth')}</span>
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>{month}</span>
+                        <div key={month} style={{ marginBottom: 12, border: '1px solid #d9f7be', borderRadius: 8, overflow: 'hidden', background: '#fcfff5' }}>
+                          <div style={{ 
+                            padding: '8px 12px', background: '#f6ffed', borderBottom: '1px solid #d9f7be',
+                          }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#389e0d' }}>📅 {month}</span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('selectedDatesLabel')}</span>
-                            <span style={{ fontSize: 13, fontWeight: 500 }}>{days.map(d => `${d}${t('dayUnitSuffix')}`).join('、')}</span>
+                          <div style={{ padding: '8px 12px' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {days.map(d => (
+                                <Tag key={d} color="orange" style={{ fontSize: 11, margin: 0 }}>{d}日</Tag>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       ))}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('totalDaysSelected')}</span>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#52c41a' }}>{t('dayCount', { count: selectedDates.length })}</span>
+                      
+                      {/* 天数合计横幅（新店广告无折扣） */}
+                      <div style={{ 
+                        padding: '10px 12px', borderRadius: 8, marginBottom: 12,
+                        background: 'linear-gradient(135deg, #fff7e6, #fff1cc)',
+                        border: '1px solid #ffe58f',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, color: '#595959' }}>{t('totalDaysSelected')}：</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#52c41a' }}>{t('dayCount', { count: selectedDates.length })}</span>
+                        </div>
                       </div>
-                    </Space>
+                    </div>
                   ) : (
                     <Empty description={t('selectPromoDateCalendar')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
                   )}
@@ -510,20 +525,20 @@ export default function NewStoreDayPicker() {
                 <Card size="small" title={t('orderSettlement')}>
                   <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('remainingGiftDays')}</span>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftInfo.remainingDays} {t('dayUnitSuffix')}</span>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftInfo.remainingDays} {t('dayUnitCount')}</span>
                   </div>
                   <div style={{ background: '#fafafa', borderRadius: 6, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ color: '#595959' }}>{t('useGiftDays')}</span>
-                      <span style={{ fontWeight: 600, color: '#E8720C' }}>{selectedDates.length} {t('dayUnitSuffix')}</span>
+                      <span style={{ fontWeight: 600, color: '#E8720C' }}>{selectedDates.length} {t('dayUnitCount')}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ color: '#595959' }}>{t('afterSubmitRemaining')}</span>
-                      <span style={{ fontWeight: 600, color: '#52c41a' }}>{giftInfo.remainingDays - selectedDates.length} {t('dayUnitSuffix')}</span>
+                      <span style={{ fontWeight: 600, color: '#52c41a' }}>{giftInfo.remainingDays - selectedDates.length} {t('dayUnitCount')}</span>
                     </div>
 
                   </div>
-                  <Button type="primary" block size="large" disabled={selectedDates.length === 0} onClick={handleSubmitOrder}
+                  <Button type="primary" block size="large" icon={<ShoppingCartOutlined />} disabled={selectedDates.length === 0} onClick={handleSubmitOrder}
                     style={{ background: selectedDates.length > 0 ? '#ff4d4f' : '#d9d9d9', borderColor: selectedDates.length > 0 ? '#ff4d4f' : '#d9d9d9', height: 44, fontSize: 16, fontWeight: 600 }}>
                     {t('payOrder')}
                   </Button>
@@ -558,8 +573,8 @@ export default function NewStoreDayPicker() {
           </div>
         </div>
         <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>{t('promoDaysTotal')}</span><span style={{ fontWeight: 600 }}>{selectedDates.length} {t('dayUnitSuffix')}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>{t('giftDaysDeduction')}</span><span style={{ fontWeight: 600 }}>-{selectedDates.length} {t('dayUnitSuffix')}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ color: '#595959' }}>{t('promoDaysTotal')}</span><span style={{ fontWeight: 600 }}>{selectedDates.length} {t('dayUnitCount')}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}><span>{t('giftDaysDeduction')}</span><span style={{ fontWeight: 600 }}>-{selectedDates.length} {t('dayUnitCount')}</span></div>
 
         </div>
       </Modal>
@@ -572,7 +587,7 @@ export default function NewStoreDayPicker() {
           <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('successMessage')}</p>
           <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8, marginBottom: 16 }}>
             <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
-            <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{lastSubmitDays} {t('dayUnitSuffix')}</p>
+            <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{lastSubmitDays} {t('dayUnitCount')}</p>
           </div>
         </div>
       </Modal>

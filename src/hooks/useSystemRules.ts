@@ -65,27 +65,35 @@ function buildGroups(): RuleGroup[] {
 export function useSystemRules() {
   const [groups, setGroups] = useState<RuleGroup[]>(buildGroups)
 
-  /** 更新單條規則的值（表格類型支持更新 dateFormat / min 字段） */
+  /** 更新單條規則的值（表格類型支持更新 dateFormat / min 字段；互斥分組開啟時自動關閉同組其它） */
   const updateRule = useCallback((key: string, value: unknown, field?: string) => {
-    setGroups(prev =>
-      prev.map(g => {
-        if (g.type === 'table' && field) {
-          return {
-            ...g,
-            rules: g.rules.map(r => {
-              if (r.key !== key) return r
-              if (field === 'dateFormat') return { ...r, dateFormat: value as string }
-              if (field === 'min') return { ...r, min: value as number }
-              return r
-            }),
+    setGroups(prev => {
+      // 互斥分組處理：開啟某個 switch 時，同組其它規則全部設為 false
+      let mutexKeys: string[] = []
+      if (value === true) {
+        const target = prev.flatMap(g => g.rules).find(r => r.key === key)
+        if (target?.mutexGroup) {
+          const grp = target.mutexGroup
+          mutexKeys = prev.flatMap(g => g.rules)
+            .filter(r => r.mutexGroup === grp && r.key !== key)
+            .map(r => r.key)
+        }
+      }
+      return prev.map(g => ({
+        ...g,
+        rules: g.rules.map(r => {
+          if (g.type === 'table' && field) {
+            if (r.key !== key) return r
+            if (field === 'dateFormat') return { ...r, dateFormat: value as string }
+            if (field === 'min') return { ...r, min: value as number }
+            return r
           }
-        }
-        return {
-          ...g,
-          rules: g.rules.map(r => r.key === key ? { ...r, value } : r),
-        }
-      }),
-    )
+          if (r.key === key) return { ...r, value }
+          if (mutexKeys.includes(r.key)) return { ...r, value: false }
+          return r
+        }),
+      }))
+    })
   }, [])
 
   /** 恢復所有規則為默認值 */

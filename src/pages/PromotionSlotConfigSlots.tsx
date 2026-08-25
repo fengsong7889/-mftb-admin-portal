@@ -109,14 +109,14 @@ export default function PromotionSlotConfigSlots() {
   const slotGridRef = useRef<HTMLDivElement | null>(null)
   const [slotCellWidth, setSlotCellWidth] = useState(0)
 
-  /** 加载可选算法（排除自然流量和人气商家：自然流量仅在兆底算法区域选择；人气商家在销售定价菜单配置） */
+  /** 加载可选算法（排除自然流量、人气商家、金字招牌：自然流量仅在兆底算法区域选择；人气商家在销售定价菜单配置；金字招牌只需标签不需坑位配置） */
   useEffect(() => {
     fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
       .then(res => {
         if (res.records.length > 0) {
           setAlgorithmOptions(
             res.records
-              .filter(a => a.algoType !== 7 && a.algoType !== 5)  // 排除自然流量(7)和人气商家(5)
+              .filter(a => a.algoType !== 7 && a.algoType !== 5 && !a.algoCode?.startsWith('SFJZ'))  // 排除自然流量(7)、人气商家(5)、金字招牌(SFJZ)
               .map(a => ({
                 label: a.algoName,
                 value: a.algoCode as string,

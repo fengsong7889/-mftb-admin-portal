@@ -8,50 +8,43 @@ Spring Boot 3 + MyBatis-Plus + Spring Security + JWT + MySQL 8 的后端服务�
 |------|------|
 | JDK | 17+ |
 | Maven | 3.8+ |
-| MySQL | 8.0+ |
 
 安装后验证：
 
 ```bash
 java -version
 mvn -version
-mysql --version
 ```
 
 > macOS 推荐使用 Homebrew 安装：
 > ```bash
-> brew install openjdk@17 maven mysql
-> brew services start mysql
+> brew install openjdk@17 maven
 > ```
 
-## 二、数据库初始化
+## 二、数据库
 
-1. 启动 MySQL 后，执行建表脚本：
+项目使用 SQLPub 云数据库，**无需本地安装 MySQL**：
 
-```bash
-mysql -u root -p < sql/01_init_system.sql
-```
+| 环境 | 数据库 | 地址 | 用途 |
+|------|--------|------|------|
+| 开发 | `fengsong_test` | mysql6.sqlpub.com:3311 | 本地开发、测试 |
+| 生产 | `fengsong` | Sealos 环境变量注入 | 线上运行 |
 
-2. 脚本会自动创建数据库 `mftb_admin` 及系统表，并插入初始用户。
+> ⚠️ 开发库已内置于 `application.yml` 默认配置，无需额外设置。
 
-## 三、配置
-
-编辑 `src/main/resources/application.yml`，将数据库密码改为你本地的 MySQL 密码：
-
-```yaml
-spring:
-  datasource:
-    username: root
-    password: 你的密码
-```
-
-## 四、启动
+## 三、启动
 
 ```bash
+# 方式一：使用启动脚本（推荐，自动设置 JDK 17 + 环境变量）
+bash run-local.sh
+
+# 方式二：直接 Maven 启动（需确保 JAVA_HOME 指向 JDK 17）
 mvn spring-boot:run
 ```
 
 服务启动在 `http://localhost:8080`。
+
+> `run-local.sh` 会自动设置 `DB_URL`、`JWT_SECRET` 等环境变量。生产环境通过 Sealos 平台注入不同的 `DB_URL` 指向生产库。
 
 首次启动时，`DataInitializer` 会自动把初始用户的密码重置为正确的 BCrypt 加密值：
 

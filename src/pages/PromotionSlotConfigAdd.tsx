@@ -120,7 +120,9 @@ export default function PromotionSlotConfigAdd() {
     fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
       .then(res => {
         if (res.records.length > 0) {
-          setAlgorithmOptions(res.records.map(a => ({
+          // 排除金字招牌（只需标签，不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
+          const filtered = res.records.filter(a => !a.algoCode?.startsWith('SFJZ'))
+          setAlgorithmOptions(filtered.map(a => ({
             label: a.algoName,
             value: a.algoCode as string,
             type: a.algoType,

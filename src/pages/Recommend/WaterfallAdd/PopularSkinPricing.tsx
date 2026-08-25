@@ -5,7 +5,7 @@
  * 商家購買後皮膚將應用在 APP 瀑布流列表的商家卡片上。
  *
  * 皮膚組成元素（參考 APP 實際展示樣式）：
- *  - 卡片邊框：支持 無邊框 / 選擇配色 / 上傳邊框圖 三種方式，小圖/大圖模式通用
+ *  - 卡片邊框：支持 無邊框 / 選擇配色 兩種方式，小圖/大圖模式通用
  *  - 大圖模式左側豎版主圖：必須上傳（小圖模式無需上傳圖片）
  *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播，單選；
  *    商家自己選擇一種菜品佈局風格購買
@@ -51,7 +51,6 @@ import {
 const BORDER_TYPE_OPTIONS = [
   { value: 'none', labelKey: 'recommend.popularSkin.borderNoneLabel' },
   { value: 'color', labelKey: 'recommend.popularSkin.borderColorLabel' },
-  { value: 'image', labelKey: 'recommend.popularSkin.borderImageLabel' },
 ]
 
 /** 邊框配色預設色板 */
@@ -60,7 +59,7 @@ const COLOR_PRESETS = [
 ]
 
 /** 可上傳圖片的字段 */
-type SkinImageField = 'borderImage' | 'bigImage'
+type SkinImageField = 'bigImage'
 
 /** 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播 */
 type DishLayout = 'grid' | 'carousel'
@@ -116,12 +115,10 @@ interface SkinItem {
   price?: number
   /** 菜品展示佈局（單選）：大圖拼列 / 階梯輪播，商家自選一種 */
   dishLayout: DishLayout
-  /** 邊框方式：無 / 配色 / 上傳邊框圖 */
-  borderType: 'none' | 'color' | 'image'
+  /** 邊框方式：無 / 配色 */
+  borderType: 'none' | 'color'
   /** 邊框顏色（borderType=color 時生效） */
   borderColor: string
-  /** 邊框圖（dataURL，borderType=image 時生效） */
-  borderImage: string | null
   /** 大圖模式左側豎版主圖（dataURL） */
   bigImage: string | null
 }
@@ -135,9 +132,8 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   tier: 'classic',
   price: undefined,
   dishLayout: 'grid',
-  borderType: 'image',
+  borderType: 'color',
   borderColor: '#FF4D4F',
-  borderImage: null,
   bigImage: null,
   ...partial,
 })
@@ -294,7 +290,7 @@ export default function PopularSkinPricing() {
             tier: (s.tier === 'classic' || s.tier === 'premium' || s.tier === 'flagship' || s.tier === 'ultimate') ? s.tier : 'classic',
             price: s.price,
             dishLayout: (s.dishLayout as DishLayout) || 'grid',
-            borderType: (s.borderType === 'none' || s.borderType === 'color' || s.borderType === 'image') ? s.borderType : 'color',
+            borderType: (s.borderType === 'none' || s.borderType === 'color') ? s.borderType : 'color',
             borderColor: s.borderColor || '#FF4D4F',
           })))
         }
@@ -409,10 +405,6 @@ export default function PopularSkinPricing() {
         }
         if (!skin.dishLayout) {
           message.error(t('recommend.popularSkin.selectOneDishLayout'))
-          return
-        }
-        if (skin.borderType === 'image' && !skin.borderImage) {
-          message.error(t('recommend.popularSkin.uploadBorderImage'))
           return
         }
         if (!skin.bigImage) {
@@ -548,14 +540,6 @@ export default function PopularSkinPricing() {
       ? `2px solid ${skin.borderColor}`
       : '1px solid #f0f0f0',
   })
-
-  /** 上傳邊框圖時，以覆蓋層方式套在卡片外圍 */
-  const previewBorderOverlay = (skin: SkinItem) => (
-    skin.borderType === 'image' && skin.borderImage ? (
-      <img src={skin.borderImage} alt={t('recommend.popularSkin.borderImageLabel')}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', borderRadius: 12 }} />
-    ) : null
-  )
 
   /** 店鋪名稱行（Mock 麥當勞門店，名稱前不展示連鎖圖標） */
   const previewTitleRow = () => (
@@ -959,7 +943,6 @@ export default function PopularSkinPricing() {
                       onChange={c => updateSkin(skin.id, { borderColor: c.toHexString() })}
                     />
                   )}
-                  {skin.borderType === 'image' && renderUploadBox(skin, 'borderImage', 88, 88, t('recommend.popularSkin.uploadBorderText'))}
                 </div>
                 <div>
                   <div style={fieldLabelStyle}>{requiredMark}{t('recommend.popularSkin.bigImageLabel')}</div>
@@ -1237,7 +1220,6 @@ export default function PopularSkinPricing() {
                       boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
                     }}>{t('recommend.popularSkin.yourStoreBadge')}</span>
                     <div style={previewCardStyle(previewSkin)}>
-                      {previewBorderOverlay(previewSkin)}
                       <div style={{ display: 'flex', gap: 10 }}>
                         {previewStoreLogo(76)}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1293,7 +1275,6 @@ export default function PopularSkinPricing() {
                       boxShadow: '0 2px 6px rgba(232,114,12,0.35)',
                     }}>{t('recommend.popularSkin.yourStoreBadge')}</span>
                     <div style={previewCardStyle(previewSkin)}>
-                      {previewBorderOverlay(previewSkin)}
                       <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
                         {previewSkin.bigImage
                           ? (

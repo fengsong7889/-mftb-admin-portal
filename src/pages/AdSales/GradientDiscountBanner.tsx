@@ -2,7 +2,6 @@
  * 梯度折扣横幅：在购买界面常驻展示算法配置的梯度折扣规则
  * 无敌星星（按单日时段数）与盘活复苏（按购买天数）共用
  */
-import { Tooltip } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 /** 单个梯度档位 */
@@ -16,13 +15,12 @@ interface GradientDiscountBannerProps {
   unitLabel: string       // 数量单位：'個時段' | '天'
   scopeLabel?: string     // 规则范围前缀，如无敌星星的'單日'
   currentCount: number    // 当前已选数量（用于高亮档位与凑单提示）
-  refundDisabled?: boolean // 算法不允许退款时，在同一行展示警示标签
 }
 
 /** 折扣展示文案：90 → 9折，95 → 95折 — 由组件内部使用 t() 生成 */
 // formatDiscount moved inside component to access t()
 
-export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel: _scopeLabel = '', currentCount, refundDisabled = false }: GradientDiscountBannerProps) {
+export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel: _scopeLabel = '', currentCount }: GradientDiscountBannerProps) {
   const { t } = useTranslation('adSales')
 
   /** 折扣展示文案：90 → 9折，95 → 95折 */
@@ -98,21 +96,6 @@ export default function GradientDiscountBanner({ tiers, unitLabel, scopeLabel: _
         )}
       </span>
 
-      {/* 不允许退款警示：合并在同一行，脉冲动效引起注意，悬停查看完整说明 */}
-      {refundDisabled && (
-        <Tooltip title={t('noRefundTooltip')}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'help',
-            fontSize: 14, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap',
-            padding: '5px 16px', borderRadius: 16,
-            background: 'linear-gradient(135deg, #FF4D4F, #FF7875)',
-            border: '1px solid #ff4d4f',
-            animation: 'refundWarnPulse 1.8s ease-in-out infinite',
-          }}>
-            {t('noRefund')}
-          </span>
-        </Tooltip>
-      )}
     </div>
   )
 }

@@ -361,6 +361,12 @@ export interface DateSlotGroup {
   slots: string[]
 }
 
+/** 按标签分组的购买日期（金字招牌） */
+export interface LabelDateGroup {
+  label: string
+  dates: string[]
+}
+
 /** 廣告訂單（與後端 AdOrderVO 對齊） */
 export interface AdOrder {
   id?: number
@@ -401,10 +407,12 @@ export interface AdOrder {
   giftAmount?: number | null
   /** 訂單狀態: 1=待推廣 2=推廣中 3=已推廣 4=已退款 5=已取消 */
   status: number
-  /** 購買日期列表（盤活復蘇按天售賣，明細日期去重排序） */
+  /** 购买日期列表（盤活復蘇按天售賣，明细日期去重排序） */
   purchaseDays?: string[]
-  /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
+  /** 购买皮肤列表（人氣商家明细 skin_name 去重排序） */
   skinNames?: string[]
+  /** 按标签分组的购买日期（金字招牌：每个标签对应的日期列表） */
+  labelDates?: LabelDateGroup[]
   /** 後端 LocalDateTime 統一序列化為毫秒時間戳，保留字符串兼容 */
   orderTime?: string | number
   payTime?: string | number
@@ -943,4 +951,166 @@ export function updateWaterfallStatus(id: number, status: number) {
 /** 刪除策略 */
 export function deleteWaterfall(id: number) {
   return request.delete<unknown, void>(`/ad/waterfall/${id}`, SILENT)
+}
+
+/* ==================== 廣告銷售（金字招牌: 定價） ==================== */
+
+/** 金字招牌標籤計價條目 */
+export interface SignboardLabelPrice {
+  id?: number
+  labelType: string
+  /** 場景：all_macau / district / null（統計類無場景） */
+  scenario?: string | null
+  enabled: boolean
+  price?: number
+  discountTiers?: string | null
+}
+
+/** 金字招牌計價配置（與後端 AdPricingSignboardVO 對齊） */
+export interface AdPricingSignboard {
+  id?: number
+  pricingNo?: string
+  algoId: number
+  algoName?: string
+  brand?: string
+  channel?: number
+  presaleDays?: number
+  refundEnabled?: number
+  cancelFeeTiers?: string | null
+  /** 折扣模式: global/local */
+  discountMode?: string | null
+  /** 全局折扣梯度 JSON */
+  globalDiscountTiers?: string | null
+  status?: number
+  remark?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+  signboardItems?: SignboardLabelPrice[]
+}
+
+export interface AdPricingSignboardRequest {
+  algoId: number
+  algoName?: string
+  brand?: string
+  channel?: number
+  presaleDays: number
+  refundEnabled?: number
+  cancelFeeTiers?: { remainDays: number; ratio: number }[]
+  /** 折扣模式: global=全局折扣 local=局部折扣 */
+  discountMode?: string
+  /** 全局折扣梯度 */
+  globalDiscountTiers?: { minDays: number; discount: number }[]
+  status?: number
+  remark?: string
+  signboardItems: {
+    labelType: string
+    /** 場景：all_macau / district / null（統計類不傳） */
+    scenario?: string | null
+    enabled: boolean
+    price?: number
+    discountTiers?: { minDays: number; discount: number }[]
+  }[]
+}
+
+export interface AdPricingSignboardQuery {
+  page?: number
+  size?: number
+  algoId?: number
+  brand?: string
+  status?: number
+}
+
+/** 金字招牌計價配置分頁查詢 */
+export function fetchAdSignboardPricingList(params: AdPricingSignboardQuery) {
+  return request.get<unknown, AdPageResult<AdPricingSignboard>>('/ad/pricing/signboard', { params, ...SILENT })
+}
+
+/** 金字招牌計價配置詳情 */
+export function fetchAdSignboardPricingDetail(id: number) {
+  return request.get<unknown, AdPricingSignboard>(`/ad/pricing/signboard/${id}`, SILENT)
+}
+
+/** 按算法查詢啟用中的金字招牌計價配置 */
+export function fetchAdSignboardPricingActive(algoId: number) {
+  return request.get<unknown, AdPricingSignboard>('/ad/pricing/signboard/active', { params: { algoId }, ...SILENT })
+}
+
+/** 新增金字招牌計價配置 */
+export function createAdSignboardPricing(data: AdPricingSignboardRequest) {
+  return request.post<unknown, AdPricingSignboard>('/ad/pricing/signboard', data, SILENT)
+}
+
+/** 編輯金字拑招牌計價配置 */
+export function updateAdSignboardPricing(id: number, data: AdPricingSignboardRequest) {
+  return request.put<unknown, AdPricingSignboard>(`/ad/pricing/signboard/${id}`, data, SILENT)
+}
+
+/** 金字招牌計價配置啟用/停用 */
+export function updateAdSignboardPricingStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/ad/pricing/signboard/${id}/status`, { status }, SILENT)
+}
+
+/** 刪除金字招牌計價配置 */
+export function deleteAdSignboardPricing(id: number) {
+  return request.delete<unknown, void>(`/ad/pricing/signboard/${id}`, SILENT)
+}
+
+/* ==================== 金字招牌 - 庫存 & 下單 ==================== */
+
+/** 金字招牌庫存格子 */
+export interface AdSignboardInventoryCell {
+  bizDate: string
+  labelType: string
+  /** 場景（all_macau/district/null） */
+  scenario?: string | null
+  pricePerDay: number
+  status: 'available' | 'purchased'
+}
+
+/** 金字招牌標籤定價 */
+export interface AdSignboardLabelPrice {
+  labelType: string
+  /** 場景（all_macau/district/null） */
+  scenario?: string | null
+  enabled: number | boolean
+  pricePerDay: number
+  discountTiers: string | null
+  /** 商家是否滿足該場景的資格條件 */
+  qualified?: boolean
+  /** 資格條件描述（用於前端彈窗展示） */
+  conditionDesc?: string | null
+}
+
+/** 金字招牌庫存查詢響應 */
+export interface AdSignboardInventoryVO {
+  algoId: number
+  presaleDays: number | null
+  refundEnabled: number | boolean
+  cancelFeeTiers: string | null
+  labels: AdSignboardLabelPrice[]
+  cells: AdSignboardInventoryCell[]
+}
+
+/** 金字招牌下單請求 */
+export interface AdSignboardOrderRequest {
+  algoId: number
+  groupCode: string
+  storeCode: string
+  bdEmpId?: number | null
+  giftDays?: number
+  cells: Array<{ bizDate: string; labelType: string; scenario?: string | null }>
+}
+
+/** 金字招牌 - 庫存查詢（標籤定價 + 可售格子） */
+export function fetchAdSignboardInventory(algoId: number, storeCode?: string, groupCode?: string) {
+  return request.get<unknown, AdSignboardInventoryVO>('/ad/sales/signboard/inventory', {
+    params: { algoId, storeCode, groupCode },
+    ...SILENT,
+  })
+}
+
+/** 金字招牌 - 下單 */
+export function placeAdSignboardOrder(data: AdSignboardOrderRequest) {
+  return request.post<unknown, { orderNo: string; totalAmount: number }>('/ad/sales/signboard/order', data)
 }

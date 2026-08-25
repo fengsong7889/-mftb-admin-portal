@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode, CSSProperties } from 'react'
-import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, message, InputNumber, Radio } from 'antd'
+import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, Tag, message, InputNumber, Radio } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -9,9 +9,11 @@ import {
   SkinOutlined,
   CalendarOutlined,
   ShoppingCartOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import GradientDiscountBanner from './GradientDiscountBanner'
+import NoRefundBadge from './NoRefundBadge'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { fetchGiftAvailableDays } from '../../api/gift'
@@ -329,9 +331,11 @@ export default function PopularSkinPicker() {
   // 支付成功彈窗時的支付模式（用於區分展示）
   const [paidPaymentMode, setPaidPaymentMode] = useState<'promo' | 'gift' | 'mixed'>('promo')
   // 支付規則：根據規則配置決定推廣金與贈送天數是否可混合使用
-  const { mixedPayment } = usePaymentRule(GIFT_AD_TYPE_POPULAR)
+  const { mixedPayment, switchable, mode } = usePaymentRule(GIFT_AD_TYPE_POPULAR)
   // 非混合支付時的選擇模式：'promo' = 推廣金支付, 'gift' = 贈送天數抵扣
   const [paymentMode, setPaymentMode] = useState<'promo' | 'gift'>('promo')
+  // 強制模式：僅推廣金/僅贈送天數時固定支付方式，否則跟隨用戶切換
+  const activeMode: 'promo' | 'gift' = mode === 'promo_only' ? 'promo' : mode === 'gift_only' ? 'gift' : paymentMode
   // 階梯輪播餐品指針（定價配置 carousel 時使用）
   const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
 
@@ -412,14 +416,14 @@ export default function PopularSkinPicker() {
 
   // 切換到贈送天數支付模式時，若已選皮膚日單價 > 現金價值，自動取消選擇
   useEffect(() => {
-    if (!mixedPayment && paymentMode === 'gift' && giftCashValue > 0 && selectedSkin) {
+    if (!mixedPayment && activeMode === 'gift' && giftCashValue > 0 && selectedSkin) {
       const price = skinPriceMap[selectedSkin.name] ?? selectedSkin.pricePerDay
       if (price > giftCashValue) {
         setSelectedSkinId(null)
         message.warning(t('skinAutoDeselected', { value: giftCashValue }))
       }
     }
-  }, [paymentMode, mixedPayment, giftCashValue, selectedSkin, skinPriceMap])
+  }, [activeMode, mixedPayment, giftCashValue, selectedSkin, skinPriceMap])
 
   // 自選日期可選範圍：最早次日生效，最晚 sellableDays 天內
   const customMinDate = dayjs().add(1, 'day').startOf('day')
@@ -514,7 +518,7 @@ export default function PopularSkinPicker() {
   // 贈送天數抵扣計算（基於現金價值）
   const maxGiftDaysUsable = Math.min(giftDaysBalance, effectiveDays)
   // 非混合支付選擇贈送天數抵扣時自動全部抵扣（無需用戶操作）；混合支付時才允許用戶手動選擇抵扣天數
-  const effectiveGiftDays = !mixedPayment && paymentMode === 'gift'
+  const effectiveGiftDays = !mixedPayment && activeMode === 'gift'
     ? maxGiftDaysUsable
     : Math.min(giftDaysUsed, maxGiftDaysUsable)
   // 每日折後單價（用於計算現金價值抵扣上限）
@@ -523,10 +527,10 @@ export default function PopularSkinPicker() {
   const dailyGiftCover = giftCashValue > 0 ? Math.min(dailySalePrice, giftCashValue) : dailySalePrice
   const giftDeduction = useMemo(() => {
     // 非混合支付且選擇推廣金模式時，不使用贈送天數抵扣
-    if (!mixedPayment && paymentMode === 'promo') return 0
+    if (!mixedPayment && activeMode === 'promo') return 0
     if (effectiveGiftDays <= 0 || effectiveDays === 0) return 0
     return effectiveGiftDays * dailyGiftCover
-  }, [effectiveGiftDays, effectiveDays, dailyGiftCover, mixedPayment, paymentMode])
+  }, [effectiveGiftDays, effectiveDays, dailyGiftCover, mixedPayment, activeMode])
   // 每日需補差價（混合支付時，皮膚日單價超過現金價值的部分）
   const dailySupplement = giftCashValue > 0 ? Math.max(0, dailySalePrice - giftCashValue) : 0
 
@@ -658,13 +662,13 @@ export default function PopularSkinPicker() {
     if (!selectedSkin) { message.warning(t('selectSkinFirst')); return }
     if (customDates.length === 0) { message.warning(t('selectDatesInCalendar')); return }
     // 校驗餘額是否充足
-    if (!mixedPayment && paymentMode === 'promo') {
+    if (!mixedPayment && activeMode === 'promo') {
       // 單獨使用推廣金：全額需推廣金覆蓋
       if (basePriceSummary.sale > merchantBalance) {
         message.error('推廣金餘額不足，請充值後再試')
         return
       }
-    } else if (!mixedPayment && paymentMode === 'gift') {
+    } else if (!mixedPayment && activeMode === 'gift') {
       // 單獨使用贈送天數：天數需覆蓋購買天數
       if (giftDaysBalance < effectiveDays) {
         message.error('贈送天數餘額不足，無法抵扣')
@@ -702,7 +706,7 @@ export default function PopularSkinPicker() {
       setIsPaymentModalVisible(false)
       setPaidGiftDays(effectiveGiftDays)
       setPaidPromoAmount(priceSummary.payable)
-      setPaidPaymentMode(mixedPayment ? 'mixed' : paymentMode)
+      setPaidPaymentMode(mixedPayment ? 'mixed' : activeMode)
       setMerchantBalance(prev => prev - priceSummary.payable)
       setIsSuccessModalVisible(true)
     } catch (err) {
@@ -990,8 +994,6 @@ export default function PopularSkinPicker() {
                     <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleUniqueSkin')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
                     <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoRevert')}</span>
-                    <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoLayout')}</span>
                   </div>
                 </div>
               }
@@ -1062,14 +1064,14 @@ export default function PopularSkinPicker() {
             {/* ② 選擇購買時長：自選日期（日曆跳選），滿足打烊、休息日等靈活投放需求 */}
             <Card
               title={<Space><CalendarOutlined style={{ color: '#1890FF' }} /><span>{t('selectDurationTitle')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('durationPricingHint')}</span></Space>}
+              extra={currentAlgorithmRefundEnabled === false && <NoRefundBadge />}
               bodyStyle={{ padding: '16px 20px' }}
             >
-              {/* 梯度折扣橫幅：常駐展示折扣規則與不可退款標識（同盤活復蘇） */}
+              {/* 梯度折扣橫幅：常駐展示折扣規則（同盤活復蘇） */}
               <GradientDiscountBanner
                 tiers={discountTiers.map((tier: { minDays: number; discount: number }) => ({ threshold: tier.minDays, discount: tier.discount }))}
                 unitLabel={t('unitDay')}
                 currentCount={customDates.length}
-                refundDisabled={currentAlgorithmRefundEnabled === false}
               />
 
               <div>
@@ -1180,6 +1182,8 @@ export default function PopularSkinPicker() {
                     </div>
                   </div>
 
+
+
                   {/* 日曆網格：週日開頭，綠色選中樣式與逐日購買日曆保持一致 */}
                   <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAFAFA', borderBottom: '1px solid #f0f0f0' }}>
@@ -1233,37 +1237,11 @@ export default function PopularSkinPicker() {
                       </div>
                     ))}
                   </div>
-
-                  {/* 已選日期摘要：按月分組展示 + 折扣進度提示 */}
-                  {customDates.length > 0 ? (
-                    <div style={{ marginTop: 12, background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#389E0D' }}>
-                          已選 {customDates.length} 天{currentTier ? t('enjoyingDiscount', { discount: currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount }) : ''}
-                        </span>
-                        {(() => {
-                          const nextTier = discountTiers.find((tier: { minDays: number; discount: number }) => effectiveDays < tier.minDays)
-                          return nextTier ? (
-                            <span style={{ fontSize: 12, color: '#FA8C16' }}>{t('moreForNextTier', { days: nextTier.minDays - effectiveDays, discount: nextTier.discount > 10 ? nextTier.discount / 10 : nextTier.discount })}</span>
-                          ) : null
-                        })()}
-                        <div style={{ flex: 1 }} />
-                        <Button size="small" type="link" danger onClick={handleClearCustomDates} style={{ padding: 0 }}>{t('clearAction')}</Button>
-                      </div>
-                      {customDatesByMonth.map(g => (
-                        <div key={g.month} style={{ fontSize: 12, color: '#595959', lineHeight: '20px' }}>
-                          <span style={{ fontWeight: 600 }}>{g.month}：</span>{g.days.map(d => `${d}日`).join('、')}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>{t('noDatesSelectedHint')}</div>
-                  )}
                 </div>
             </Card>
           </div>
 
-          {/* 右側：效果預覽 + 訂單結算 */}
+          {/* 右側：效果預覽 + 當前所選 + 訂單結算 */}
           <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* 效果預覽：瀑布流對比視角，上下模糊普通店鋪卡，突出當前所選皮膚 */}
             <Card size="small" title={<Space><span>📱</span><span>{t('previewTitle')}</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
@@ -1273,20 +1251,66 @@ export default function PopularSkinPicker() {
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
                   <div style={{ fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px' }}>{t('bigMode')}</div>
                   {renderWaterfallCompare(renderSkinBigPreview(selectedSkin))}
-                  {/* 風格分配說明：消除商家對固定展示風格的誤解 */}
-                  <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8, lineHeight: 1.7 }}>
-                    💡 {t('styleAutoHint')}
-                  </div>
+
                 </div>
               ) : (
                 <Empty description={t('skinEmptyHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
             </Card>
 
+            {/* 當前所選（參考無敵星星當前所選模塊） */}
+            <Card size="small" title={<Space><CalendarOutlined /><span>{t('currentSelection')}</span></Space>}
+              extra={customDates.length > 0 && <Button type="link" size="small" danger onClick={handleClearCustomDates} icon={<DeleteOutlined />}>{t('clearAction')}</Button>}>
+              {customDates.length > 0 ? (
+                <div>
+                  {/* 按日期展示已選日期（參考無敵星星樣式） */}
+                  {customDatesByMonth.map(({ month, days }) => (
+                    <div key={month} style={{ marginBottom: 12, border: '1px solid #d9f7be', borderRadius: 8, overflow: 'hidden', background: '#fcfff5' }}>
+                      <div style={{ 
+                        padding: '8px 12px', background: '#f6ffed', borderBottom: '1px solid #d9f7be',
+                      }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#389e0d' }}>📅 {month}</span>
+                      </div>
+                      <div style={{ padding: '8px 12px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {days.map(d => (
+                            <Tag key={d} color="orange" style={{ fontSize: 11, margin: 0 }}>{d}日</Tag>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* 天數合計和享受折扣橫幅（並排展示） */}
+                  <div style={{ 
+                    padding: '10px 12px', borderRadius: 8, marginBottom: 12,
+                    background: 'linear-gradient(135deg, #fff7e6, #fff1cc)',
+                    border: '1px solid #ffe58f',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('totalDaysSelected')}：</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#52c41a' }}>{t('dayCount', { count: customDates.length })}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: '#595959' }}>{t('discount')}：</span>
+                      {currentTier ? (
+                        <Tag color="orange" style={{ fontSize: 13, fontWeight: 600 }}>{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}{t('discountUnit')}</Tag>
+                      ) : (
+                        <span style={{ fontSize: 13, color: '#bfbfbf' }}>{t('noDiscount')}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Empty description={t('selectDateInCalendar')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              )}
+            </Card>
+
             {/* 訂單結算（與新店廣告購買頁訂單結算同款風格） */}
             <Card size="small" title={t('orderSettlement')}>
-              {/* 支付方式選擇（非混合支付時顯示） */}
-              {!mixedPayment && (
+              {/* 支付方式選擇（可切換模式時顯示） */}
+              {switchable && (
                 <div style={{ marginBottom: 12, padding: '10px 12px', background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 6 }}>
                   <div style={{ fontSize: 12, color: '#595959', marginBottom: 8, fontWeight: 500 }}>支付方式選擇</div>
                   <Radio.Group value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
@@ -1296,17 +1320,17 @@ export default function PopularSkinPicker() {
                 </div>
               )}
               {/* 推廣金餘額（混合支付時或非混合支付選擇推廣金時顯示） */}
-              {(mixedPayment || paymentMode === 'promo') && (
+              {(mixedPayment || activeMode === 'promo') && (
                 <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
                 </div>
               )}
               {/* 贈送天數抵扣：橙色橫幅 */}
-              {(mixedPayment || paymentMode === 'gift') && (
+              {(mixedPayment || activeMode === 'gift') && (
                 <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('remainingGiftDays')}</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDaysBalance} {t('dayUnitSuffix')}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDaysBalance} {t('dayUnitCount')}</span>
                 </div>
               )}
               {/* 價格明細（無敵星星風格：flex 左右佈局） */}
@@ -1318,7 +1342,7 @@ export default function PopularSkinPicker() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#595959' }}>享受折扣：</span>
                   {currentTier ? (
-                    <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
+                    <span style={{ fontWeight: 600, color: '#52C41A' }}>{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
                   ) : (
                     <span style={{ color: '#BFBFBF' }}>{t('noDiscount')}</span>
                   )}
@@ -1327,6 +1351,13 @@ export default function PopularSkinPicker() {
                   <span>{t('orderDiscount')}：</span>
                   <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
                 </div>
+                {/* 赠送天数抵扣金额（非混合支付时显示，混合支付在下方块内展示） */}
+                {effectiveGiftDays > 0 && giftDeduction > 0 && !mixedPayment && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                    <span>{t('giftDaysDeductLabel')}：</span>
+                    <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
+                  </div>
+                )}
                 {/* 混合支付：抵扣天數 + 現金價值抵扣明細 + 補差價 */}
                 {mixedPayment && (
                   <>
@@ -1371,23 +1402,14 @@ export default function PopularSkinPicker() {
                   </>
                 )}
                 {/* 赠送天数抵扣（borderTop 之後，同實付總額樣式） */}
-                {paymentMode === 'gift' && !mixedPayment && (
-                  <>
+                {activeMode === 'gift' && !mixedPayment && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                     <span style={{ fontWeight: 600 }}>抵扣天數：</span>
                     <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
                   </div>
-                  {/* 現金價值抵扣明細（有配置時展示） */}
-                  {giftCashValue > 0 && effectiveGiftDays > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, color: '#fa8c16' }}>
-                      <span>{t('giftDaysDeductLabel')}：</span>
-                      <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
-                    </div>
-                  )}
-                  </>
                 )}
                 {/* 實付總額（推廣金 / 混合支付顯示） */}
-                {(mixedPayment || paymentMode === 'promo') && (
+                {(mixedPayment || activeMode === 'promo') && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                     <span style={{ fontWeight: 600 }}>{t('totalPayable')}：</span>
                     <span style={{ fontWeight: 700 }}>${priceSummary.payable}</span>
@@ -1426,9 +1448,9 @@ export default function PopularSkinPicker() {
             </div>
 
             {/* ===== 推廣金支付：2列單行日期表 + 結算區同風格字段 ===== */}
-            {paymentMode === 'promo' && !mixedPayment && (
+            {activeMode === 'promo' && !mixedPayment && (
               <>
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
                   <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
                   <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                     <thead><tr style={{ background: '#fafafa' }}>
@@ -1453,7 +1475,7 @@ export default function PopularSkinPicker() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ color: '#595959' }}>享受折扣：</span>
                     {currentTier ? (
-                      <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
+                      <span style={{ fontWeight: 600, color: '#52C41A' }}>{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
                     ) : (
                       <span style={{ color: '#BFBFBF' }}>{t('noDiscount')}</span>
                     )}
@@ -1471,9 +1493,9 @@ export default function PopularSkinPicker() {
             )}
 
             {/* ===== 贈送天數抵扣：2列單行日期表 + 結算區同風格字段 ===== */}
-            {paymentMode === 'gift' && !mixedPayment && (
+            {activeMode === 'gift' && !mixedPayment && (
               <>
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
                   <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
                   <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                     <thead><tr style={{ background: '#fafafa' }}>
@@ -1498,7 +1520,7 @@ export default function PopularSkinPicker() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ color: '#595959' }}>享受折扣：</span>
                     {currentTier ? (
-                      <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
+                      <span style={{ fontWeight: 600, color: '#52C41A' }}>{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
                     ) : (
                       <span style={{ color: '#BFBFBF' }}>{t('noDiscount')}</span>
                     )}
@@ -1507,17 +1529,17 @@ export default function PopularSkinPicker() {
                     <span>{t('orderDiscount')}：</span>
                     <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                    <span style={{ fontWeight: 600 }}>抵扣天數：</span>
-                    <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
-                  </div>
-                  {/* 現金價值抵扣明細 */}
-                  {giftCashValue > 0 && effectiveGiftDays > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, color: '#fa8c16' }}>
+                  {/* 赠送天数抵扣金额 */}
+                  {effectiveGiftDays > 0 && giftDeduction > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
                       <span>{t('giftDaysDeductLabel')}：</span>
                       <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
                     </div>
                   )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                    <span style={{ fontWeight: 600 }}>抵扣天數：</span>
+                    <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
+                  </div>
                 </div>
               </>
             )}
@@ -1525,7 +1547,7 @@ export default function PopularSkinPicker() {
             {/* ===== 混合支付：2列單行日期表 + 結算區同風格字段 ===== */}
             {mixedPayment && (
               <>
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
                   <h4 style={{ marginBottom: 12, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
                   <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                     <thead><tr style={{ background: '#fafafa' }}>
@@ -1550,7 +1572,7 @@ export default function PopularSkinPicker() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ color: '#595959' }}>享受折扣：</span>
                     {currentTier ? (
-                      <span style={{ fontWeight: 600, color: '#52C41A' }}>满{currentTier.minDays}天{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
+                      <span style={{ fontWeight: 600, color: '#52C41A' }}>{currentTier.discount > 10 ? currentTier.discount / 10 : currentTier.discount}折</span>
                     ) : (
                       <span style={{ color: '#BFBFBF' }}>{t('noDiscount')}</span>
                     )}
@@ -1559,14 +1581,17 @@ export default function PopularSkinPicker() {
                     <span>{t('orderDiscount')}：</span>
                     <span style={{ fontWeight: 600 }}>-${priceSummary.saved}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                    <span style={{ fontWeight: 600 }}>抵扣天數：</span>
-                    <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
-                  </div>
-                  {/* 現金價值抵扣明細 + 補差價 */}
+                  {/* 赠送天数抵扣金额（非混合支付时显示，混合支付在下方块内展示） */}
+                  {effectiveGiftDays > 0 && giftDeduction > 0 && !mixedPayment && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
+                      <span>{t('giftDaysDeductLabel')}：</span>
+                      <span style={{ fontWeight: 600 }}>-${giftDeduction}</span>
+                    </div>
+                  )}
+                  {/* 現金價值抵扣明細（在前） */}
                   {giftCashValue > 0 && effectiveGiftDays > 0 && (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 8, fontSize: 12, color: '#595959' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#595959' }}>
                         <span>每日抵扣（{t('giftCashValueShort')}）：</span>
                         <span style={{ fontWeight: 600, color: '#E8720C' }}>${dailyGiftCover}/天</span>
                       </div>
@@ -1582,6 +1607,10 @@ export default function PopularSkinPicker() {
                       )}
                     </>
                   )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+                    <span style={{ fontWeight: 600 }}>抵扣天數：</span>
+                    <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
                     <span style={{ fontWeight: 600 }}>{t('totalPayable')}：</span>
                     <span style={{ fontWeight: 700 }}>${priceSummary.payable}</span>
@@ -1616,7 +1645,7 @@ export default function PopularSkinPicker() {
                 {paidGiftDays > 0 && (
                   <div>
                     <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
-                    <p style={{ fontSize: 30, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitSuffix')}</p>
+                    <p style={{ fontSize: 30, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitCount')}</p>
                   </div>
                 )}
               </div>
@@ -1632,7 +1661,7 @@ export default function PopularSkinPicker() {
             {paidPaymentMode === 'gift' && (
               <>
                 <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitSuffix')}</p>
+                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitCount')}</p>
               </>
             )}
           </div>
