@@ -783,19 +783,34 @@ export default function OrderDetail() {
       discountTiers: { minSlots: number; discount: number }[]
     } | undefined
     try {
-      // 按算法類型取對應計價配置：盤活復蘇(3)用 revive 定價，金字招牌(13)用 signboard 定價，其餘用星星定價
-      const p = detail.algoType === 3
-        ? await fetchAdRevivePricingActive(detail.algoId).catch(() => null)
-        : detail.algoType === 13
-          ? await fetchAdSignboardPricingActive(detail.algoId).catch(() => null)
-          : await fetchAdPricingActive(detail.algoId).catch(() => null)
-      if (p) {
-        pricing = {
-          cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers),
-          refundEnabled: p.refundEnabled === 1,
-          discountTiers: detail.algoType === 3
-            ? parseDayDiscountTiers(p.discountTiers)
-            : parseDiscountTiers(p.discountTiers),
+      // 按算法類型取對應計價配置：盤活復蘇(3)/金字招牌(13)/無敵星星分開處理，避免聯合類型收窄丟失各自字段
+      if (detail.algoType === 3) {
+        const p = await fetchAdRevivePricingActive(detail.algoId).catch(() => null)
+        if (p) {
+          pricing = {
+            cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers ?? undefined),
+            refundEnabled: p.refundEnabled === 1,
+            discountTiers: parseDayDiscountTiers(p.discountTiers),
+          }
+        }
+      } else if (detail.algoType === 13) {
+        // 金字招牌無時段梯度折扣，僅取退款開關與取消扣費梯度（globalDiscountTiers 為全局折扣，不映射為梯度展示）
+        const p = await fetchAdSignboardPricingActive(detail.algoId).catch(() => null)
+        if (p) {
+          pricing = {
+            cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers ?? undefined),
+            refundEnabled: p.refundEnabled === 1,
+            discountTiers: [],
+          }
+        }
+      } else {
+        const p = await fetchAdPricingActive(detail.algoId).catch(() => null)
+        if (p) {
+          pricing = {
+            cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers),
+            refundEnabled: p.refundEnabled === 1,
+            discountTiers: parseDiscountTiers(p.discountTiers),
+          }
         }
       }
     } catch {
