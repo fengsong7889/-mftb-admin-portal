@@ -11,9 +11,14 @@ permissions:
   contents: read
   packages: write
 
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/mftb-admin-backend
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.sha }}
     steps:
       - uses: actions/checkout@v5
 
@@ -28,10 +33,48 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
+        id: meta
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mftb-admin-backend:latest
-            ghcr.io/${{ github.repository_owner }}/mftb-admin-backend:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+  # ── 自動觸發 Sealos/K8s 重新部署 ──────────────────────────────────
+  # 前置條件（在 GitHub Settings → Secrets → Actions 中配置）：
+  #   SEALOS_KUBECONFIG      : Sealos 集群 kubeconfig 文件內容
+  #   SEALOS_DEPLOYMENT      : 後端 Deployment 名稱（預設 mftb-admin-backend）
+  #   SEALOS_NAMESPACE       : K8s namespace（預設 mftb-admin）
+  # 如未配置 SEALOS_KUBECONFIG，該步驟自動跳過，不影響鏡像構建。
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SEALOS_KUBECONFIG != '' }}
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.SEALOS_KUBECONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Rollout restart deployment
+        env:
+          DEPLOYMENT: ${{ secrets.SEALOS_DEPLOYMENT || 'mftb-admin-backend' }}
+          NAMESPACE:  ${{ secrets.SEALOS_NAMESPACE  || 'mftb-admin' }}
+          IMAGE_TAG:  ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          echo "→ 更新 ${DEPLOYMENT} 鏡像為 ${IMAGE}:${IMAGE_TAG}"
+          kubectl set image deployment/${DEPLOYMENT} \
+            ${DEPLOYMENT}=${IMAGE}:${IMAGE_TAG} \
+            -n ${NAMESPACE}
+
+          echo "→ 等待 rollout 完成（超時 180s）"
+          kubectl rollout status deployment/${DEPLOYMENT} \
+            -n ${NAMESPACE} --timeout=180s
+
+          echo "✅ 部署完成：${DEPLOYMENT} @ ${IMAGE_TAG}"
