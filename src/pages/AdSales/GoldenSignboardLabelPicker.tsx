@@ -254,9 +254,9 @@ export default function GoldenSignboardLabelPicker() {
     return r
   }, [selectedLabels, labelDates])
 
-  // 加載招牌名稱下拉（金字招牌 algoType=13，已啟用的定價配置）
+  // 加載招牌名稱下拉（金字招牌 algoType=13，僅返回有啟用定價配置的算法）
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED, algoType: AlgorithmType.GOLDEN_SIGNBOARD } as Parameters<typeof fetchAdAlgorithms>[0])
+    fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED, algoType: AlgorithmType.GOLDEN_SIGNBOARD, hasPricing: true } as Parameters<typeof fetchAdAlgorithms>[0])
       .then(res => {
         const opts = (res.records ?? [])
           .filter(a => a.updatedBy !== '系統')
@@ -287,7 +287,7 @@ export default function GoldenSignboardLabelPicker() {
     // 品牌變更後重新加載算法下拉
     if (value) {
       const backendBrand = value === 'shanfeng' ? 'flashBee' : value === 'mfood' ? 'mFood' : value
-      fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED, algoType: AlgorithmType.GOLDEN_SIGNBOARD, brand: backendBrand } as Parameters<typeof fetchAdAlgorithms>[0])
+      fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED, algoType: AlgorithmType.GOLDEN_SIGNBOARD, brand: backendBrand, hasPricing: true } as Parameters<typeof fetchAdAlgorithms>[0])
         .then(res => {
           const opts = (res.records ?? [])
             .filter(a => a.updatedBy !== '系統')

@@ -344,15 +344,17 @@ export default function AlgorithmAdd() {
     if (!first) return '—'
     return generatePreviewForCondition(labelType, first)
   }
-  /** 標籤是否「已配置」（啟用且任一場景/條件有有效數值） */
+  /** 標籤是否「已配置」（啟用且所有已開啟場景/條件均已填寫有效數值） */
   const isLabelConfigured = (labelType: string): boolean => {
     if (!(signboardEnabledLabels[labelType] ?? false)) return false
-    const hasValue = (list: QualificationCondition[]) => list.some(c => c.value !== undefined && c.value !== null)
+    const allHaveValue = (list: QualificationCondition[]) => list.length > 0 && list.every(c => c.value !== undefined && c.value !== null)
     if (COMPARISON_LABELS.includes(labelType)) {
       const sc = scenarioConfigs[labelType]
-      return !!sc && SCENARIO_DEFS.some(d => sc[d.key].enabled && hasValue(sc[d.key].conditions))
+      if (!sc) return false
+      const enabledDefs = SCENARIO_DEFS.filter(d => sc[d.key].enabled)
+      return enabledDefs.length > 0 && enabledDefs.every(d => allHaveValue(sc[d.key].conditions))
     }
-    return hasValue(aggregateConditions[labelType] || [])
+    return allHaveValue(aggregateConditions[labelType] || [])
   }
 
   /** 人氣商家 - 展示佈局類型 */
@@ -580,6 +582,23 @@ export default function AlgorithmAdd() {
       if (Number(algorithmTypeParam) === AlgorithmType.POPULAR_MERCHANT_KA && layoutMode === 'manual' && manualRules.some(r => r.position < 1)) {
         message.error(t('recommend.merchantPosMin'))
         return
+      }
+      // 金字招牌：对比类标签的场景 Switch 一旦开启，必须完成资格条件配置（所有条件均需填写数值）
+      if (selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD) {
+        for (const opt of SIGNBOARD_LABEL_OPTIONS) {
+          if (!COMPARISON_LABELS.includes(opt.value)) continue
+          const sc = scenarioConfigs[opt.value]
+          for (const def of SCENARIO_DEFS) {
+            const cfg = sc[def.key]
+            const notConfigured = cfg.conditions.length === 0
+              || cfg.conditions.some(c => c.value === undefined || c.value === null)
+            if (cfg.enabled && notConfigured) {
+              message.error(`「${opt.label}」標籤的「${def.label}」場景已開啟，請完成資格條件配置後再保存`)
+              setActiveSignboardTab(opt.value)
+              return
+            }
+          }
+        }
       }
       const payload: AdAlgorithmRequest = {
         algoName: values.name,
@@ -1183,6 +1202,9 @@ export default function AlgorithmAdd() {
                             <span style={{ fontSize: 13, fontWeight: 600, color: def.color }}>{def.label}場景</span>
                             <span style={{ fontSize: 11, color: '#8c8c8c' }}>{def.desc}；可選：{scopeOpts.map(o => o.label).join(' / ')}</span>
                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {scCfg.enabled && (scCfg.conditions.length === 0 || scCfg.conditions.some(c => c.value === undefined || c.value === null)) && (
+                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 600 }}>待配置</span>
+                              )}
                               <span style={{ fontSize: 12, color: scCfg.enabled ? '#52C41A' : '#8C8C8C' }}>{scCfg.enabled ? '已啟用' : '未啟用'}</span>
                               {!isDetailMode && (
                                 <Switch size="small" checked={scCfg.enabled}

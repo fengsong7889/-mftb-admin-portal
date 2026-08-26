@@ -23,6 +23,7 @@ import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
+import com.mftb.admin.service.AdPricingSignboardService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
@@ -51,6 +52,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
     private final AdPricingHotService hotPricingService;
+    private final AdPricingSignboardService signboardPricingService;
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
@@ -105,13 +107,19 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         return new PageResult<>(records, result.getTotal());
     }
 
-    /** 判断算法是否有启用中的定价配置 */
+    /** 判断算法是否有啟用中的定價配置 */
     private boolean hasActivePricing(Long algoId, Integer algoType) {
         if (algoId == null || algoType == null) return false;
         if (algoType == 3) {
             return revivePricingService.activeByAlgo(algoId) != null;
         } else if (algoType == 5) {
             return hotPricingService.activeByAlgo(algoId) != null;
+        } else if (algoType == 13) {
+            // 金字招牌：查獨立計價表，且需至少有一個啟用的標籤定價
+            var pricing = signboardPricingService.activeByAlgo(algoId);
+            if (pricing == null) return false;
+            return pricing.getSignboardItems() != null && pricing.getSignboardItems().stream()
+                    .anyMatch(item -> Boolean.TRUE.equals(item.getEnabled()) && item.getPrice() != null && item.getPrice().doubleValue() > 0);
         } else {
             return pricingService.activeByAlgo(algoId) != null;
         }

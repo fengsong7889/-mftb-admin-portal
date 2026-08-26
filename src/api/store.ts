@@ -222,3 +222,76 @@ export async function fetchStoreBdOptions(groupCode: string) {
     throw err
   }
 }
+
+/* ==================== 門店金字招牌數據配置 ==================== */
+
+/** 門店金字招牌數據配置 */
+export interface StoreDataConfigPayload {
+  /** 月訂單數 */
+  monthlyOrders?: number
+  /** 月復購訂單數據 */
+  monthlyRepurchaseOrders?: number
+  /** 月好評訂單數據 */
+  monthlyPositiveOrders?: number
+  /** 月訪問量 */
+  monthlyVisits?: number
+  /** 門店收藏數 */
+  storeFavorites?: number
+  /** 顧客數 */
+  monthlyCustomers?: number
+}
+
+/** 查詢門店金字招牌數據配置 */
+export async function fetchStoreDataConfig(storeId: number) {
+  try {
+    return await request.get<unknown, StoreDataConfigPayload>(`/stores/${storeId}/data-config`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) {
+      // Mock：系統按門店ID預生成一批隨機數據，避免逐個手工配置
+      return generateStoreDataConfig(storeId)
+    }
+    throw err
+  }
+}
+
+/**
+ * 系統預生成門店數據配置：以 storeId 為種子的確定性隨機（mulberry32），
+ * 同一門店每次生成的數據保持一致，不同門店數據各異，免去逐個手工配置。
+ */
+export function generateStoreDataConfig(storeId: number): StoreDataConfigPayload {
+  let seed = (storeId * 2654435761) >>> 0
+  const rnd = () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const between = (min: number, max: number) => Math.round(min + rnd() * (max - min))
+
+  const monthlyOrders = between(300, 2000)
+  return {
+    monthlyOrders,
+    // 復購訂單約佔月訂單 10%~30%
+    monthlyRepurchaseOrders: Math.round(monthlyOrders * (0.1 + rnd() * 0.2)),
+    // 好評訂單約佔月訂單 40%~80%
+    monthlyPositiveOrders: Math.round(monthlyOrders * (0.4 + rnd() * 0.4)),
+    // 訪問量約為月訂單 2~5 倍
+    monthlyVisits: monthlyOrders * between(2, 5),
+    storeFavorites: between(100, 1000),
+    // 顧客數約佔月訂單 50%~90%
+    monthlyCustomers: Math.round(monthlyOrders * (0.5 + rnd() * 0.4)),
+  }
+}
+
+/** 保存門店金字招牌數據配置 */
+export async function updateStoreDataConfig(storeId: number, data: StoreDataConfigPayload) {
+  try {
+    return await request.put<unknown, void>(`/stores/${storeId}/data-config`, data)
+  } catch (err) {
+    if (isBackendUnavailable(err)) {
+      // Mock：靜默成功
+      return
+    }
+    throw err
+  }
+}

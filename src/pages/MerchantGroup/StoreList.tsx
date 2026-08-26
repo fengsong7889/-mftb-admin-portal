@@ -8,7 +8,7 @@ import {
   PlusOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import BrandTag from '../../components/BrandTag'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
@@ -49,6 +49,7 @@ type StoreFilters = Omit<StoreQueryParams, 'page' | 'size'>
 export default function StoreList() {
   const { t } = useTranslation('store')
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   // 从集团管理跳转过来时带集团信息（groupId 用于新增时预选集团）
   const presetGroupId = searchParams.get('groupId') ? Number(searchParams.get('groupId')) : undefined
@@ -147,6 +148,10 @@ export default function StoreList() {
     setBindBdOpen(false)
     setBindBdRecord(null)
     loadData()
+  }
+
+  const handleDataConfig = (record: StoreItem) => {
+    navigate(`/store-data-config?storeId=${record.id}&storeCode=${record.storeCode}&storeName=${encodeURIComponent(record.storeName)}`)
   }
 
   const handleDelete = (record: StoreItem) => {
@@ -312,7 +317,7 @@ export default function StoreList() {
     {
       title: t('common:action'),
       key: 'action',
-      width: 190,
+      width: 240,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
@@ -321,6 +326,9 @@ export default function StoreList() {
           </Button>
           <Button type="link" size="small" onClick={() => handleBindBd(record)}>
             {t('bindBd')}
+          </Button>
+          <Button type="link" size="small" onClick={() => handleDataConfig(record)}>
+            {t('dataConfig')}
           </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
             {t('common:delete')}

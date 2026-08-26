@@ -117,6 +117,8 @@ interface PromoRecord {
   waterfallName: string // 瀑布流名称
   position: number      // 展示位置
   slot?: string         // 展示时段（无敌星星用）
+  labelName?: string    // 标签名称（金字招牌用）
+  scenario?: string | null // 场景（金字招牌用: all_macau/district/null）
   impressions: number   // 曝光量
   clicks: number        // 点击量
   clickRate: number     // 点击率（百分比）
@@ -280,10 +282,11 @@ function toDetailOrder(
   const regions = vo.regions && vo.regions.length > 0 ? vo.regions : Array.from(new Set(vo.items.map(i => i.region).filter(Boolean)))
   const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || fmt(vo.orderTime).slice(0, 10)
   // 生成推廣數據：推廣中/已推廣/已退款（推廣後退款）的訂單才有推廣數據
+  // 人氣商家已退款均為「未推廣即退款」，不產生推廣數據
   const mappedStatus = mapAdStatus(vo.status)
   const hasPromoData = mappedStatus === OrderStatus.PROMOTING
     || mappedStatus === OrderStatus.PROMOTED
-    || mappedStatus === OrderStatus.REFUNDED
+    || (mappedStatus === OrderStatus.REFUNDED && vo.algoType !== AlgorithmType.POPULAR_MERCHANT_KA)
   let promoData: PromoRecord[] | undefined
   if (hasPromoData && slotPrices.length > 0) {
     const primaryRegion = regions[0] ?? 1
@@ -293,6 +296,13 @@ function toDetailOrder(
       promoData = genNewStorePromoData(regionName, pDays)
     } else if (vo.algoType === AlgorithmType.HOT_REVIVE_AD) {
       promoData = genRevivePromoData(regionName, slotPrices)
+    } else if (vo.algoType === AlgorithmType.POPULAR_MERCHANT_KA) {
+      const pDays = vo.purchaseDays && vo.purchaseDays.length > 0 ? vo.purchaseDays : slotPrices.map(s => s.date)
+      promoData = genPopularPromoData(regionName, pDays)
+    } else if (vo.algoType === AlgorithmType.GOLDEN_SIGNBOARD) {
+      // 金字招牌：按標籤×場景×日期生成推廣數據
+      const ld = vo.labelDates && vo.labelDates.length > 0 ? vo.labelDates : []
+      promoData = genSignboardPromoData(ld)
     } else {
       promoData = genInvincibleStarPromoData(regionName, slotPrices)
     }
@@ -388,6 +398,44 @@ function genNewStorePromoData(regionName: string, purchaseDays: string[]): Promo
       clickRate: +((clk / imp) * 100).toFixed(1),
     }
   })
+}
+
+/** 人氣商家推廣數據：按購買日期逐天生成（與新店廣告結構一致，單商圈平鋪） */
+function genPopularPromoData(regionName: string, purchaseDays: string[]): PromoRecord[] {
+  return purchaseDays.map((date, i) => {
+    const imp = 900 + i * 220 + Math.floor(Math.random() * 450)
+    const clk = 70 + i * 12 + Math.floor(Math.random() * 35)
+    return {
+      date, region: regionName,
+      waterfallName: WATERFALL_NAMES[i % WATERFALL_NAMES.length],
+      position: (i % 3) + 1,
+      impressions: imp, clicks: clk,
+      clickRate: +((clk / imp) * 100).toFixed(1),
+    }
+  })
+}
+
+/** 金字招牌推廣數據：按標籤×場景×日期生成，每條記錄攜帶 labelName + scenario */
+function genSignboardPromoData(
+  labelDates: { label: string; scenario?: string | null; dates: string[] }[],
+): PromoRecord[] {
+  const records: PromoRecord[] = []
+  let idx = 0
+  labelDates.forEach(ld => {
+    ld.dates.forEach(date => {
+      const imp = 600 + idx * 150 + Math.floor(Math.random() * 400)
+      const clk = 50 + idx * 10 + Math.floor(Math.random() * 30)
+      records.push({
+        date, region: '', // 商圈由渲染層根據 scenario 動態計算
+        waterfallName: '', position: 0,
+        labelName: ld.label, scenario: ld.scenario,
+        impressions: imp, clicks: clk,
+        clickRate: +((clk / imp) * 100).toFixed(1),
+      })
+      idx++
+    })
+  })
+  return records
 }
 
 /* ---- Mock ---- */
@@ -618,9 +666,9 @@ function genPopularOrder(
   // 推廣中：僅已推廣日期產生數據；已完成：全部日期；待推廣/已退款：無數據
   const today = new Date().toISOString().split('T')[0]
   const promoData = status === OrderStatus.PROMOTED
-    ? genRevivePromoData(regionName, slotPrices)
+    ? genPopularPromoData(regionName, pDays)
     : status === OrderStatus.PROMOTING
-      ? genRevivePromoData(regionName, slotPrices.filter(sp => sp.date <= today))
+      ? genPopularPromoData(regionName, pDays.filter(d => d <= today))
       : undefined
   // 退款規則（與盤活復蘇一致）
   const cancelFeeRules = [
@@ -2049,8 +2097,7 @@ export default function OrderDetail() {
                 </div>
               ),
             },
-            // 人氣商家僅購買皮膚、無具體展示位置，不展示推廣數據 Tab
-            ...(isPopular ? [] : [{
+            ...([{
               key: 'promoData',
               label: (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
@@ -2114,6 +2161,87 @@ export default function OrderDetail() {
                   </div>
                   {(order.promoData || []).length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '24px 0', color: '#8C8C8C', fontSize: 13 }}>{t('orderDetail.noPromoData')}</div>
+                  ) : isGoldenSignboard ? (
+                    /* 金字招牌：按標籤分組，標籤名稱 + 推廣商圈 + 日期明細 */
+                    (() => {
+                      const data = order.promoData || []
+                      // 按 label+scenario 分組
+                      const labelGroups: { label: string; scenario: string | null | undefined; recs: PromoRecord[] }[] = []
+                      const labelMap = new Map<string, { label: string; scenario: string | null | undefined; recs: PromoRecord[] }>()
+                      data.forEach(rec => {
+                        const key = `${rec.labelName || ''}|${rec.scenario || ''}`
+                        if (!labelMap.has(key)) {
+                          labelMap.set(key, { label: rec.labelName || '', scenario: rec.scenario, recs: [] })
+                          labelGroups.push(labelMap.get(key)!)
+                        }
+                        labelMap.get(key)!.recs.push(rec)
+                      })
+                      return labelGroups.map(({ label: lbl, scenario: sc, recs: gRecs }, gi) => {
+                        const labelCfg = SIGNBOARD_LABEL_CN[lbl]
+                        const labelText = fmtSignboardLabel(lbl, sc)
+                        const regionDisplay = getSignboardRegionDisplay(sc)
+                        return (
+                          <div key={gi} style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                              <colgroup>
+                                <col style={{ width: '18%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '20%' }} />
+                                <col style={{ width: '16%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '18%' }} />
+                              </colgroup>
+                              <thead>
+                                <tr style={{ background: '#FAFAFA' }}>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {gRecs.map((rec, ri) => (
+                                  <tr key={ri} style={{ borderTop: ri > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                    {ri === 0 && (
+                                      <td rowSpan={gRecs.length} style={{
+                                        padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
+                                        background: `${labelCfg?.color || '#8C8C8C'}08`,
+                                        borderRight: '1px dashed #E8E8E8',
+                                      }}>
+                                        {labelCfg ? (
+                                          <Tag style={{ margin: 0, color: labelCfg.color, background: `${labelCfg.color}10`, borderColor: `${labelCfg.color}40` }}>
+                                            {labelCfg.icon} {labelText}
+                                          </Tag>
+                                        ) : <span style={{ color: '#8C8C8C' }}>{labelText || '—'}</span>}
+                                      </td>
+                                    )}
+                                    {ri === 0 && (
+                                      <td rowSpan={gRecs.length} style={{
+                                        padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
+                                        borderRight: '1px dashed #E8E8E8',
+                                      }}>
+                                        <Tag color="blue" style={{ margin: 0 }}>{regionDisplay}</Tag>
+                                      </td>
+                                    )}
+                                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                                      <span style={{
+                                        color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                        fontWeight: 600,
+                                      }}>{rec.clickRate}%</span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )
+                      })
+                    })()
                   ) : order.recommendType === RecommendType.HOT_REVIVE_AD || order.recommendType === RecommendType.NEW_STORE_AD || isPopular ? (
                     /* 盘活复苏：单商圈标题 + 平铺推广日期 */
                     (() => {
@@ -2125,7 +2253,14 @@ export default function OrderDetail() {
                             background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
                             fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
                           }}>
-                            <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
+                            {isPopular ? (
+                              <>
+                                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
+                                <Tag style={{ margin: 0, color: '#E8720C', background: '#FFF7E6', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
+                              </>
+                            ) : (
+                              <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
+                            )}
                           </div>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                             <colgroup>
