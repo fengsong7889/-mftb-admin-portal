@@ -1125,3 +1125,15 @@ export function fetchAdSignboardInventory(algoId: number, storeCode?: string, gr
 export function placeAdSignboardOrder(data: AdSignboardOrderRequest) {
   return request.post<unknown, { orderNo: string; totalAmount: number }>('/ad/sales/signboard/order', data)
 }
+
+/* ==================== 卡片排序持久化 ==================== */
+
+/** 获取指定菜单+Tab的卡片排序 */
+export function fetchCardOrder(menuKey: string, tabKey: string) {
+  return request.get<unknown, number[]>(`/card-order/${menuKey}/${tabKey}`, SILENT)
+}
+
+/** 保存指定菜单+Tab的卡片排序 */
+export function saveCardOrder(menuKey: string, tabKey: string, order: number[]) {
+  return request.put<unknown, void>(`/card-order/${menuKey}/${tabKey}`, { order }, SILENT)
+}

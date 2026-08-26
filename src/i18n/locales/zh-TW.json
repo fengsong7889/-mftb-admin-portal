@@ -2514,6 +2514,7 @@
     "discardConfirmCancel": "繼續編輯"
   },
   "promotionWordLibrary": {
+    "colRank": "排名",
     "colWord": "詞條",
     "colChannel": "所屬頻道",
     "colMatchCount": "匹配次數",

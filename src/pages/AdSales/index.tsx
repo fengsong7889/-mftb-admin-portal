@@ -74,9 +74,9 @@ export default function AdSales() {
   const [selectedApp, _setSelectedApp] = useState<AppType | null | undefined>(null)
   const [selectedTab, setSelectedTab] = useState<'delivery' | 'groupBuy'>('delivery')
 
-  // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
-  const deliveryCardOrder = useCardOrder('ad-sales-card-order-delivery', DELIVERY_CARD_TYPES)
-  const groupBuyCardOrder = useCardOrder('ad-sales-card-order-groupBuy', GROUP_BUY_CARD_TYPES)
+  // 卡片拖拽排序（順序持久化到數據庫 + localStorage，每個 Tab 獨立保存）
+  const deliveryCardOrder = useCardOrder('ad-sales-card-order-delivery', DELIVERY_CARD_TYPES, 'ad-sales')
+  const groupBuyCardOrder = useCardOrder('ad-sales-card-order-groupBuy', GROUP_BUY_CARD_TYPES, 'ad-sales')
 
   // 購買廣告 - 直接进入日期时段选择界面
   const handleGoToPurchase = (config: RecommendTypeConfig) => {

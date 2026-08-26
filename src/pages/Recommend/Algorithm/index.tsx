@@ -76,9 +76,9 @@ export default function Algorithm() {
   const selectedTypeRef = useRef<AlgorithmType | null>(initialType)
   const businessTypeRef = useRef<'delivery' | 'groupBuy'>(tabParam || 'delivery')
 
-  // 卡片拖拽排序（順序持久化到 localStorage，每個 Tab 獨立保存）
-  const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery)
-  const groupBuyCardOrder = useCardOrder('algorithm-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy)
+  // 卡片拖拽排序（順序持久化到數據庫 + localStorage，每個 Tab 獨立保存）
+  const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery, 'algorithm')
+  const groupBuyCardOrder = useCardOrder('algorithm-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy, 'algorithm')
 
   /** 算法类型标签映射（依赖 t，定义在组件内以便响应语言切换） */
   const TYPE_LABEL: Record<AlgorithmType, string> = {

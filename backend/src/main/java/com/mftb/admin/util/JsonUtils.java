@@ -21,6 +21,20 @@ public final class JsonUtils {
     private JsonUtils() {
     }
 
+    /** 解析整数 JSON数组, 解析失败返回空列表 */
+    public static List<Integer> parseIntList(String json) {
+        if (json == null || json.isBlank()) {
+            return new ArrayList<>();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<Integer>>() {
+            });
+        } catch (Exception e) {
+            log.warn("解析整数列表失败, 返回空列表: json={}, msg={}", json, e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     /** 解析角色ID JSON数组, 解析失败返回空列表 */
     public static List<Long> parseLongList(String json) {
         if (json == null || json.isBlank()) {

@@ -86,8 +86,16 @@ export default function PromotionWordLibrary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /* ---- 排名数据（按匹配数降序，跨页连续排名） ---- */
+  const rankedData = useMemo(() =>
+    [...data]
+      .sort((a, b) => b.matchCount - a.matchCount)
+      .map((item, idx) => ({ ...item, rank: (page - 1) * pageSize + idx + 1 }))
+  , [data, page, pageSize])
+
   /* ---- 列配置 ---- */
   const columnMeta = useMemo(() => [
+    { key: 'rank', title: t('promotionWordLibrary.colRank') },
     { key: 'word', title: t('promotionWordLibrary.colWord') },
     { key: 'channel', title: t('promotionWordLibrary.colChannel') },
     { key: 'matchCount', title: t('promotionWordLibrary.colMatchCount') },
@@ -187,7 +195,19 @@ export default function PromotionWordLibrary() {
   }
 
   /* ---- 表格列定义 ---- */
-  const columns: TableColumnsType<WordLibraryItem> = [
+  const columns: TableColumnsType<WordLibraryItem & { rank: number }> = [
+    {
+      title: t('promotionWordLibrary.colRank'),
+      dataIndex: 'rank',
+      key: 'rank',
+      width: 70,
+      align: 'center',
+      render: (v: number) => {
+        const colors = ['#ff4d4f', '#fa8c16', '#fadb14']
+        if (v <= 3) return <Tag color={colors[v - 1]} style={{ fontWeight: 'bold', minWidth: 32, textAlign: 'center' }}>{v}</Tag>
+        return <span style={{ color: '#999' }}>{v}</span>
+      },
+    },
     {
       title: t('promotionWordLibrary.colWord'),
       dataIndex: 'word',
@@ -296,7 +316,7 @@ export default function PromotionWordLibrary() {
       <div className="table-section">
         <Table<WordLibraryItem>
           columns={applyConfig(columns)}
-          dataSource={data}
+          dataSource={rankedData}
           rowKey="id"
           loading={loading}
           rowSelection={{

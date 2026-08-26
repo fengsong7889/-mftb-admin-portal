@@ -30,7 +30,8 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     private static final List<String> INIT_SCRIPTS = List.of(
             "09_ad_promotion.sql",
             "13_waterfall_strategy.sql",
-            "15_hot_merchant_ad.sql");
+            "15_hot_merchant_ad.sql",
+            "63_card_order.sql");
 
     private final JdbcTemplate jdbcTemplate;
 

@@ -2513,6 +2513,7 @@
         "discardConfirmCancel": "Keep Editing"
   },
   "promotionWordLibrary": {
+    "colRank": "Rank",
     "colWord": "Word",
     "colChannel": "Channel",
     "colMatchCount": "Match Count",
