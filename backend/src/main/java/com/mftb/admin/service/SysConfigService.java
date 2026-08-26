@@ -17,6 +17,13 @@ public interface SysConfigService {
     long getSessionIdleTimeoutMs();
 
     /**
+     * 获取广告点击加购锁定时长（秒）
+     * 规则配置页「广告销售规则」中配置，存于 sys_config（key=ad_click_cart_lock_seconds）；
+     * 未配置或格式非法时返回默认 60 秒
+     */
+    long getAdClickCartLockSeconds();
+
+    /**
      * 读取指定 key 的配置值
      *
      * @param configKey 配置项标识

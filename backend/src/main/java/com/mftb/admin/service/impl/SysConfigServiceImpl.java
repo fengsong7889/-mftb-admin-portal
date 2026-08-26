@@ -34,6 +34,12 @@ public class SysConfigServiceImpl implements SysConfigService {
     /** 空闲超时的配置 key */
     private static final String KEY_IDLE_TIMEOUT = "session_idle_timeout_ms";
 
+    /** 广告点击加购锁定时长的配置 key */
+    private static final String KEY_AD_CART_LOCK_SECONDS = "ad_click_cart_lock_seconds";
+
+    /** 加购锁定时长默认值（秒），与原有硬编码保持一致 */
+    private static final long DEFAULT_AD_CART_LOCK_SECONDS = 60L;
+
     @Override
     public long getSessionIdleTimeoutMs() {
         long now = System.currentTimeMillis();
@@ -41,6 +47,23 @@ public class SysConfigServiceImpl implements SysConfigService {
             loadIdleTimeoutFromDb();
         }
         return cachedIdleTimeoutMs.get();
+    }
+
+    @Override
+    public long getAdClickCartLockSeconds() {
+        try {
+            String value = getConfigValue(KEY_AD_CART_LOCK_SECONDS);
+            if (value != null && !value.isBlank()) {
+                long seconds = Long.parseLong(value.trim());
+                // 限制在前端可选范围 1~3600 秒内，避免非法值影响业务
+                return Math.min(Math.max(seconds, 1L), 3600L);
+            }
+        } catch (NumberFormatException e) {
+            log.warn("加购锁定时长配置值格式错误，使用默认 {} 秒", DEFAULT_AD_CART_LOCK_SECONDS);
+        } catch (Exception e) {
+            log.warn("读取加购锁定时长配置失败，使用默认 {} 秒: {}", DEFAULT_AD_CART_LOCK_SECONDS, e.getMessage());
+        }
+        return DEFAULT_AD_CART_LOCK_SECONDS;
     }
 
     @Override

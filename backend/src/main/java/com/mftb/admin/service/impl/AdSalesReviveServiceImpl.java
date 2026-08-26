@@ -25,6 +25,7 @@ import com.mftb.admin.service.AdSalesReviveService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.GiftService;
+import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
@@ -57,8 +58,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AdSalesReviveServiceImpl implements AdSalesReviveService {
 
-    /** 加购锁定时长（秒）: 商家加购后锁定格子，其它商家额度被占用，到期自动释放 */
-    private static final long LOCK_SECONDS = 60L;
+    /** 加购锁定时长（秒）: 商家加购后锁定格子，其它商家额度被占用，到期自动释放；
+     *  实际时长从 sys_config（ad_click_cart_lock_seconds）读取，规则配置页可修改 */
 
     /** 赠送管理中盘活复苏的广告类型标识（biz_gift_record.ad_type） */
     public static final String GIFT_AD_TYPE = "revival";
@@ -73,6 +74,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
     private final GiftService giftService;
+    private final SysConfigService sysConfigService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -367,7 +369,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
             }
         }
 
-        LocalDateTime expireAt = now.plusSeconds(LOCK_SECONDS);
+        LocalDateTime expireAt = now.plusSeconds(sysConfigService.getAdClickCartLockSeconds());
         for (AdReviveOrderRequest.CellSelection cell : request.getCells()) {
             // 先清理该格子的过期锁与本人旧锁，再写入新锁（续期）
             lockMapper.delete(new LambdaQueryWrapper<AdDayLockRevive>()

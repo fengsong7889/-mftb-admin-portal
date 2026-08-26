@@ -18,7 +18,8 @@ import java.util.Map;
  * <p>
  * 执行顺序：
  * 1. 幂等添加新数据库列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS）
- * 2. 执行迁移脚本（51_organic_score_code_normalization.sql）清理旧数据
+ * 2. 仅在检测到旧格式残留数据时执行迁移脚本（51_organic_score_code_normalization.sql）；
+ *    该脚本会删除旧编码规则，对已是新格式的数据重复执行会把用户修改过的启停状态/分值重置为默认值
  * 3. 执行种子脚本（23_organic_score.sql）INSERT IGNORE 插入新格式数据
  * 4. 执行清理脚本（52_cleanup_tmp_organic_rules.sql）清理临时编码
  */
@@ -54,9 +55,14 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
         // Step 1: 幂等添加新列
         migrateColumns();
 
-        // Step 2: 执行迁移脚本（清理旧数据 + 更新已有规则字段）
+        // Step 2: 仅在存在旧格式残留时执行迁移脚本（清理旧数据 + 更新已有规则字段）
+        // 51 脚本会删除 STB_02~09 / PLT_03 / PLT_04 等编码后由种子重建为默认值，
+        // 若对已完成迁移的库重复执行，会覆盖管理员配置的启停状态与分值，因此必须按需执行
         try {
-            executeSqlScript(MIGRATION_SCRIPT);
+            if (hasLegacyOrganicRules()) {
+                executeSqlScript(MIGRATION_SCRIPT);
+                log.info("检测到旧格式自然流量规则数据，已执行编码规范化迁移");
+            }
         } catch (Exception e) {
             log.error("自然流量评分编码规范化迁移失败：{}", e.getMessage(), e);
         }
@@ -80,6 +86,25 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
             executeSqlScript(CLEANUP_SCRIPT);
         } catch (Exception e) {
             log.error("自然流量评分临时编码清理失败：{}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 检测是否存在旧格式规则数据（旧编码 STO_* / 临时编码 *TMP* / 已废弃编码）。
+     * 新格式种子不含这些编码，命中任一即说明库尚未完成编码规范化迁移。
+     * 检测异常时保守返回 false，避免误删管理员已配置的规则。
+     */
+    private boolean hasLegacyOrganicRules() {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code LIKE 'STO\\_%'"
+                            + " OR rule_code LIKE '%TMP%'"
+                            + " OR rule_code IN ('STB_10','STB_11','STB_12','PLT_02','PLT_05','PLT_06','COM_08','COM_11')",
+                    Integer.class);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            log.warn("检测自然流量旧格式数据失败，跳过迁移脚本: {}", e.getMessage());
+            return false;
         }
     }
 

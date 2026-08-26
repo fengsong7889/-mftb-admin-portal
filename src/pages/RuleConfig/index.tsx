@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio } from 'antd'
 import {
   SettingOutlined,
@@ -10,7 +10,8 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import { useSystemRules, syncIdleTimeoutToBackend } from '../../hooks/useSystemRules'
-import { PAYMENT_AD_TYPES, derivePaymentMode, syncPaymentModeToBackend } from '../../hooks/usePaymentRule'
+import { PAYMENT_AD_TYPES, derivePaymentMode, syncPaymentModeToBackend, fetchPaymentMode } from '../../hooks/usePaymentRule'
+import { getSystemConfig, updateSystemConfig } from '../../api/systemConfig'
 import type { RuleItem, RuleGroup } from '../../constants/ruleConfig'
 
 /** 廣告類型子分組顯示名稱與配色 */
@@ -29,6 +30,41 @@ export default function RuleConfig() {
   const snapshotRef = useRef<Record<string, string>>({})
 
   const isEditing = (key: string) => !!editingGroups[key]
+
+  /* 進入頁面時從後端 DB 回讀真實配置（數據庫優先；localStorage 在新電腦/清緩存後會丟失） */
+  useEffect(() => {
+    let alive = true
+    /* 系統安全規則：空閒超時（毫秒 → 分鐘） */
+    getSystemConfig('session_idle_timeout_ms')
+      .then(res => {
+        const ms = Number(res?.value)
+        if (alive && Number.isFinite(ms) && ms > 0) {
+          updateRule('session_idle_timeout_minutes', Math.round(ms / 60000))
+        }
+      })
+      .catch(() => { /* 後端不可用時保持本地值 */ })
+    /* 廣告銷售規則：加購鎖定時長 */
+    getSystemConfig('ad_click_cart_lock_seconds')
+      .then(res => {
+        const seconds = Number(res?.value)
+        if (alive && Number.isFinite(seconds) && seconds > 0) {
+          updateRule('ad_click_cart_lock_seconds', seconds)
+        }
+      })
+      .catch(() => { /* 後端不可用時保持本地值 */ })
+    /* 廣告銷售規則：各廣告類型支付方式 */
+    PAYMENT_AD_TYPES.forEach(type => {
+      fetchPaymentMode(type).then(mode => {
+        if (!alive) return
+        updateRule(`payment_${type}_promo_only`, mode === 'promo_only')
+        updateRule(`payment_${type}_gift_only`, mode === 'gift_only')
+        updateRule(`payment_${type}_mixed`, mode === 'mixed')
+        updateRule(`payment_${type}_switchable`, mode === 'switchable')
+      })
+    })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleEdit = useCallback((groupKey: string) => {
     snapshotRef.current[groupKey] = JSON.stringify(groups)
@@ -66,6 +102,13 @@ export default function RuleConfig() {
           message.warning('本地已保存，但同步後端失敗，請檢查網絡後重試')
         })
       })
+      /* 加購鎖定時長同步到後端 DB（sys_config） */
+      const lockSeconds = getVal('ad_click_cart_lock_seconds')
+      if (typeof lockSeconds === 'number' && lockSeconds > 0) {
+        updateSystemConfig('ad_click_cart_lock_seconds', String(lockSeconds)).catch(() => {
+          message.warning('本地已保存，但同步後端失敗，請檢查網絡後重試')
+        })
+      }
     }
   }, [saveAll, groups])
 

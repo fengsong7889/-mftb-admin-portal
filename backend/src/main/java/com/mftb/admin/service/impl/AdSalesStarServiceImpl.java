@@ -24,6 +24,7 @@ import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.AdSalesStarService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
+import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
@@ -67,8 +68,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     private static final Map<String, Integer> SLOT_START_HOURS = Map.of(
             "breakfast", 6, "lunch", 10, "afternoon", 13, "dinner", 17, "supper", 21);
 
-    /** 加购锁定时长（秒）: 商家加购后锁定格子，其它商家看到已售罄，到期自动释放 */
-    private static final long LOCK_SECONDS = 60L;
+    /** 加购锁定时长（秒）: 商家加购后锁定格子，其它商家看到已售罄，到期自动释放；
+     *  实际时长从 sys_config（ad_click_cart_lock_seconds）读取，规则配置页可修改 */
 
     private final AdAlgorithmMapper algorithmMapper;
     private final AdCellLockMapper lockMapper;
@@ -78,6 +79,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     private final BizStoreMapper storeMapper;
     private final AdPricingStarService pricingService;
     private final FinAccountService accountService;
+    private final SysConfigService sysConfigService;
     private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
@@ -413,7 +415,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             }
         }
 
-        LocalDateTime expireAt = now.plusSeconds(LOCK_SECONDS);
+        LocalDateTime expireAt = now.plusSeconds(sysConfigService.getAdClickCartLockSeconds());
         for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
             // 先清理该格子的过期锁与本人旧锁，再写入新锁（续期）
             lockMapper.delete(new LambdaQueryWrapper<AdCellLock>()
