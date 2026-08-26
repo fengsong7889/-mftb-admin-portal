@@ -1089,6 +1089,8 @@ export interface AdSignboardLabelPrice {
   qualified?: boolean
   /** 資格條件描述（用於前端彈窗展示） */
   conditionDesc?: string | null
+  /** 本門店實際情況（排名/數值，用於前端彈窗展示） */
+  actualDesc?: string | null
 }
 
 /** 金字招牌庫存查詢響應 */

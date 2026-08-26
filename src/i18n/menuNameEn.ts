@@ -72,7 +72,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'login-log': 'Employee Activity',
   // 團購管理
   'group-purchase': 'Group Purchase',
-  'group-purchase-dashboard': 'Dashboard',
+  'group-purchase-dashboard': 'Flash Sale Overview',
   'flash-sale-register': 'Flash Sale Register',
   'flash-sale-stats': 'Flash Sale Stats',
   'flash-sale-price': 'Macau Flash Sale Price',

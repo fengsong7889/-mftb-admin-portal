@@ -203,7 +203,7 @@ function WaterfallAddGeneral() {
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
 
   // 可选算法列表（从后端算法库动态加载）
-  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType; algoType?: number }[]>([])
+  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; code?: string; app: AppType; algoType?: number }[]>([])
   
   // 区域计价配置
   const [selectedRegions, setSelectedRegions] = useState<Region[]>([])
@@ -291,6 +291,7 @@ function WaterfallAddGeneral() {
         const opts = (res.records ?? []).filter(a => a.updatedBy !== '系統' && !a.algoCode?.startsWith('SFJZ')).map(a => ({
           id: a.id ?? 0,
           name: a.algoName,
+          code: a.algoCode,
           algoType: a.algoType,
           app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
         }))
@@ -961,43 +962,46 @@ function WaterfallAddGeneral() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <Form.Item 
-                label={t('recommend.algoName')}
-                name="algorithmId" 
-                rules={[{ required: true, message: t('recommend.selectAlgo') }]}
-              >
-                <Select 
-                  disabled={isEditMode || isDetailMode}
-                  placeholder={t('recommend.selectAlgo')}
-                  showSearch
-                  optionFilterProp="label"
-                  options={algorithmSelectOptions.map(alg => ({
-                    label: alg.name,
-                    value: alg.id,
-                  }))}
-                  onChange={(value) => {
-                    // 根据算法自动带出所属品牌，并记录选中算法信息
-                    const selectedAlg = algorithmSelectOptions.find(alg => alg.id === value)
-                    if (selectedAlg) {
-                      setSelectedAlgorithmInfo({ id: selectedAlg.id, name: selectedAlg.name })
-                      if (selectedAlg.app) {
-                        form.setFieldsValue({ app: selectedAlg.app })
-                        setSelectedApp(selectedAlg.app)
-                      }
-                    }
-                  }}
-                />
-              </Form.Item>
-
-              <Form.Item 
                 label={t('common:brand')} 
                 name="app" 
                 rules={[{ required: true, message: t('common:selectBrand') }]}
               >
                 <Select 
-                  disabled
+                  disabled={isEditMode || isDetailMode}
                   placeholder={t('common:selectBrand')} 
                   options={tAppOptions}
-                  onChange={(value) => setSelectedApp(value)}
+                  onChange={(value) => {
+                    setSelectedApp(value)
+                    // 切換品牌後清空已選算法，需重新選擇該品牌下的算法
+                    form.setFieldsValue({ algorithmId: undefined })
+                    setSelectedAlgorithmInfo(null)
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item 
+                label={t('recommend.algoName')}
+                name="algorithmId" 
+                rules={[{ required: true, message: t('recommend.selectAlgo') }]}
+              >
+                <Select 
+                  disabled={isEditMode || isDetailMode || !selectedApp}
+                  placeholder={selectedApp ? t('recommend.selectAlgo') : t('recommend.selectBrandFirst')}
+                  showSearch
+                  optionFilterProp="label"
+                  options={algorithmSelectOptions
+                    .filter(alg => !selectedApp || alg.app === selectedApp)
+                    .map(alg => ({
+                      label: alg.code ? `${alg.name}(${alg.code})` : alg.name,
+                      value: alg.id,
+                    }))}
+                  onChange={(value) => {
+                    // 記錄選中算法信息
+                    const selectedAlg = algorithmSelectOptions.find(alg => alg.id === value)
+                    if (selectedAlg) {
+                      setSelectedAlgorithmInfo({ id: selectedAlg.id, name: selectedAlg.name })
+                    }
+                  }}
                 />
               </Form.Item>
 

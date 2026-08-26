@@ -345,7 +345,8 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
         meta[value] = { apiId: a.id as number }
         const uiBrand = BACKEND_TO_UI_BRAND[a.brand || '']
         if (uiBrand) brandOverrides[value] = uiBrand
-        return { label: a.algoName, value }
+        // 算法名稱後追加算法ID（如 WDxxxxxxxx）
+        return { label: a.algoCode ? `${a.algoName}(${a.algoCode})` : a.algoName, value }
       })
       setAlgorithmOptions(options)
       setAlgorithmMetaMap(meta)

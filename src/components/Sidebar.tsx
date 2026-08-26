@@ -486,7 +486,7 @@ const menuItems: MenuItem[] = [
       {
         key: 'group-purchase-dashboard',
         icon: <DashboardOutlined />,
-        label: '數據看板',
+        label: '秒殺數據總覽',
       },
       {
         key: 'flash-sale-register',

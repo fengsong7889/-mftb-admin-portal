@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, DatePicker, Empty, Form, InputNumber, Modal, Select, Space, message, Radio, Tag, Tooltip } from 'antd'
+import { Button, Card, DatePicker, Empty, Form, InputNumber, Modal, Select, Space, Switch, message, Radio, Tag } from 'antd'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -154,6 +154,8 @@ interface LabelPricingInfo {
   qualified: boolean
   /** 資格條件描述 */
   conditionDesc?: string | null
+  /** 本門店實際情況（排名/數值） */
+  actualDesc?: string | null
 }
 
 export default function GoldenSignboardLabelPicker() {
@@ -209,6 +211,14 @@ export default function GoldenSignboardLabelPicker() {
   const [sellableDays, setSellableDays] = useState(MAX_BUY_DAYS)
   const [refundEnabled, setRefundEnabled] = useState(false)
   const [paying, setPaying] = useState(false)
+  // 過濾不滿足條件的標籤（開啟後直接隱藏）
+  const [hideUnqualified, setHideUnqualified] = useState(false)
+
+  // 開啟過濾後是否仍有可見標籤（用於空態展示）
+  const hasVisibleLabels = useMemo(() => {
+    if (!hideUnqualified) return true
+    return labelPricings.some(lp => (lp.enabled === true || lp.enabled === 1) && lp.pricePerDay > 0 && (lp.qualified ?? true))
+  }, [hideUnqualified, labelPricings])
 
   const selectedStore = searchStoreName ? storeMap[searchStoreName] : undefined
 
@@ -254,17 +264,7 @@ export default function GoldenSignboardLabelPicker() {
     return r
   }, [selectedLabels, labelDates])
 
-  // 加載招牌名稱下拉（金字招牌 algoType=13，僅返回有啟用定價配置的算法）
-  useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, status: ServiceStatus.ENABLED, algoType: AlgorithmType.GOLDEN_SIGNBOARD, hasPricing: true } as Parameters<typeof fetchAdAlgorithms>[0])
-      .then(res => {
-        const opts = (res.records ?? [])
-          .filter(a => a.updatedBy !== '系統')
-          .map(a => ({ label: a.algoName || `招牌#${a.id}`, value: String(a.id ?? 0) }))
-        setPricingOptions(opts)
-      })
-      .catch(() => { /* 靜默 */ })
-  }, [])
+  // 招牌名稱下拉：先選品牌，再按品牌加載算法（金字招牌 algoType=13，僅返回有啟用定價配置的算法）
 
   // 加載門店下拉
   useEffect(() => {
@@ -291,7 +291,8 @@ export default function GoldenSignboardLabelPicker() {
         .then(res => {
           const opts = (res.records ?? [])
             .filter(a => a.updatedBy !== '系統')
-            .map(a => ({ label: a.algoName || `招牌#${a.id}`, value: String(a.id ?? 0) }))
+            // 算法名稱後追加算法ID（如 WDxxxxxxxx）
+            .map(a => ({ label: a.algoName ? (a.algoCode ? `${a.algoName}(${a.algoCode})` : a.algoName) : `招牌#${a.id}`, value: String(a.id ?? 0) }))
           setPricingOptions(opts)
         })
         .catch(() => setPricingOptions([]))
@@ -335,6 +336,7 @@ export default function GoldenSignboardLabelPicker() {
         enabled: lp.enabled,
         qualified: lp.qualified ?? true,
         conditionDesc: lp.conditionDesc ?? null,
+        actualDesc: lp.actualDesc ?? null,
       }))
       setLabelPricings(pricings)
       setSellableDays(inventory.presaleDays ?? MAX_BUY_DAYS)
@@ -374,25 +376,11 @@ export default function GoldenSignboardLabelPicker() {
     setPricingOptions([])
   }
 
-  // 標籤勾選/取消（key 為複合 key）
+  // 標籤勾選/取消（key 為複合 key；同標籤兩場景可同時選，互斥下沉到日期級校驗）
   const handleToggleLabel = (key: string) => {
     // 新增勾選：自動設為當前編輯標籤
     if (!selectedLabels.includes(key)) {
       setActiveDateLabel(key)
-      // 對比類標籤互斥邏輯：同一標籤的全澳/商圈只能二選一
-      const lt = keyToLabelType(key)
-      const sc = keyToScenario(key)
-      if (sc && COMPARISON_LABELS.includes(lt)) {
-        // 找出同標籤的另一個場景 key，若已選則先取消
-        const otherScenario = SCENARIO_DEFS.find(d => d.apiValue !== sc)
-        if (otherScenario) {
-          const otherKey = itemKey(lt, otherScenario.apiValue)
-          if (selectedLabels.includes(otherKey)) {
-            setLabelDates(d => { const n = { ...d }; delete n[otherKey]; return n })
-            setSelectedLabels(prev => prev.filter(l => l !== otherKey))
-          }
-        }
-      }
       setSelectedLabels(prev => [...prev, key])
       return
     }
@@ -438,6 +426,15 @@ export default function GoldenSignboardLabelPicker() {
     setActiveDateLabel(key)
   }
 
+  // 對比類標籤同標籤另一場景的 key（同一天同一標籤僅能展示一種場景）
+  const otherScenarioKeyOf = (key: string): string | null => {
+    const lt = keyToLabelType(key)
+    const sc = keyToScenario(key)
+    if (!sc || !COMPARISON_LABELS.includes(lt)) return null
+    const other = SCENARIO_DEFS.find(d => d.apiValue !== sc)
+    return other ? itemKey(lt, other.apiValue) : null
+  }
+
   // 自選日期：點擊日曆單日
   const handleCustomDateClick = (date: Dayjs | null) => {
     if (!date) return
@@ -452,6 +449,15 @@ export default function GoldenSignboardLabelPicker() {
     }
     const key = date.format('YYYY-MM-DD')
     if (!activeDateLabel) { message.warning('請先選擇要編輯的標籤'); return }
+    const currentDates = labelDates[activeDateLabel] ?? []
+    // 新增時校驗：同標籤另一場景已選該日期 → 拒絕（取消當前選擇不受限）
+    if (!currentDates.includes(key)) {
+      const otherKey = otherScenarioKeyOf(activeDateLabel)
+      if (otherKey && (labelDates[otherKey] ?? []).includes(key)) {
+        message.warning('該日期同標籤已選擇另一場景，同一天同一標籤只能展示一種場景')
+        return
+      }
+    }
     setLabelDates(prev => {
       const dates = prev[activeDateLabel] ?? []
       return { ...prev, [activeDateLabel]: dates.includes(key) ? dates.filter(d => d !== key) : [...dates, key].sort() }
@@ -467,14 +473,22 @@ export default function GoldenSignboardLabelPicker() {
   const handleBatchAdd = () => {
     if (!batchRange || !batchRange[0] || !batchRange[1]) { message.warning(t('selectDateRangeFirst')); return }
     const merged = new Set(customDates)
+    // 同標籤另一場景已選日期 → 跳過（同一天同一標籤只能展示一種場景）
+    const otherKey = activeDateLabel ? otherScenarioKeyOf(activeDateLabel) : null
+    const conflictDates = otherKey ? new Set(labelDates[otherKey] ?? []) : new Set<string>()
     let added = 0
+    let conflictSkipped = 0
     for (let d = batchRange[0].startOf('day'); !d.isAfter(batchRange[1], 'day'); d = d.add(1, 'day')) {
       if (d.isBefore(customMinDate, 'day') || d.isAfter(customMaxDate, 'day')) continue
       if (excludedWeekdays.includes(d.day())) continue
       const key = d.format('YYYY-MM-DD')
+      if (conflictDates.has(key)) { conflictSkipped++; continue }
       if (!merged.has(key)) { merged.add(key); added++ }
     }
-    if (added === 0) { message.info(t('noDatesInRange')); return }
+    if (conflictSkipped > 0) {
+      message.warning(`已跳過 ${conflictSkipped} 天：同標籤另一場景已選，同一天同一標籤只能展示一種場景`)
+    }
+    if (added === 0) { if (conflictSkipped === 0) message.info(t('noDatesInRange')); return }
     if (!activeDateLabel) return
     setLabelDates(prev => ({ ...prev, [activeDateLabel]: [...merged].sort() }))
     message.success(excludedWeekdays.length > 0 ? t('batchAddSkipRest', { count: added }) : t('batchAddSuccess', { count: added }))
@@ -675,13 +689,26 @@ export default function GoldenSignboardLabelPicker() {
             {/* ① 選擇招牌標籤 */}
             <Card
               title={
-                <Space><span>🏅</span><span>選擇招牌標籤</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>（可多選，各標籤x場景獨立計價）</span></Space>
+                <Space><span>🏅</span><span>選擇招牌標籤</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>（可多選・各標籤×場景獨立計價・點擊中間價格按鈕選購）</span></Space>
               }
               style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 20px' }}
+              extra={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>隱藏不滿足條件的標籤</span>
+                  <Switch
+                    size="small"
+                    checked={hideUnqualified}
+                    onChange={setHideUnqualified}
+                    style={{ background: hideUnqualified ? '#E8720C' : '#D9D9D9' }}
+                  />
+                </div>
+              }
             >
               {/* 對比類標籤：卡片結構，每行3列 */}
+              {hasVisibleLabels ? (
+              <>
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8, fontWeight: 500 }}>📊 對比類標籤（同標籤全澳/商圈二選一）</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8, fontWeight: 500 }}>📊 對比類標籤（同一天同一標籤僅能展示一種場景）</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {[...SIGNBOARD_LABELS].filter(l => COMPARISON_LABELS.includes(l.value)).sort((a, b) => {
                     const pa = labelPricings.filter(lp => lp.labelType === a.value)
@@ -702,31 +729,34 @@ export default function GoldenSignboardLabelPicker() {
                       const price = labelPriceMap[key] ?? 0
                       const qualified = pricing?.qualified ?? true
                       const conditionDesc = pricing?.conditionDesc ?? null
-                      const otherSelected = SCENARIO_DEFS.some(d => d.apiValue !== sd.apiValue && selectedLabels.includes(itemKey(l.value, d.apiValue)))
                       const tiers = labelDiscountMap[key] ?? []
-                      return { sd, key, isSelected, price, qualified, conditionDesc, otherSelected, tiers }
+                      return { sd, key, isSelected, price, qualified, conditionDesc, tiers }
                     })
+                    // 開啟過濾時隱藏不滿足條件的場景；無可見場景則隱藏整個標籤卡
+                    const visibleScenarios = hideUnqualified ? scenarios.filter(s => s.qualified) : scenarios
+                    if (visibleScenarios.length === 0) return null
                     const anySelected = scenarios.some(s => s.isSelected)
                     return (
-                      <div key={l.value} style={{
+                      <div key={l.value} title="點擊中間價格按鈕選購" style={{
                         width: 'calc(33.33% - 6px)', minWidth: 160,
                         borderRadius: 8,
-                        border: `1px solid ${anySelected ? l.color : l.border}`,
-                        background: anySelected ? l.bg : '#fff',
+                        border: anySelected ? '1.5px solid #E8720C' : '1px solid #E8E8E8',
+                        background: '#fff',
                         overflow: 'hidden',
+                        transition: 'border-color 0.2s',
                       }}>
                         {/* 標籤名標題行 */}
                         <div style={{
-                          padding: '3px 10px',
-                          background: l.bg,
-                          borderBottom: `1px solid ${l.color}22`,
+                          padding: '4px 10px',
+                          background: '#FAFAFA',
+                          borderBottom: '1px solid #F0F0F0',
                         }}>
                           <span style={{ fontSize: 11 }}>{l.icon}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: l.color, marginLeft: 4 }}>{l.label}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#262626', marginLeft: 4 }}>{l.label}</span>
                         </div>
                         {/* 場景按鈕區 */}
                         <div style={{ display: 'flex', gap: 6, padding: '10px 10px' }}>
-                          {scenarios.map(({ sd, key, isSelected, price, qualified, conditionDesc, otherSelected }) => (
+                          {visibleScenarios.map(({ sd, key, isSelected, price, qualified, conditionDesc }) => (
                             <div
                               key={key}
                               onClick={() => {
@@ -751,21 +781,34 @@ export default function GoldenSignboardLabelPicker() {
                               }}
                               style={{
                                 flex: 1,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                                 height: 40, borderRadius: 6,
-                                cursor: 'pointer',
-                                border: isSelected ? `1.5px solid ${sd.color}` : otherSelected ? `1px dashed ${sd.border}` : `1px solid ${sd.border}`,
-                                background: isSelected ? sd.bg : otherSelected ? '#FAFAFA' : '#fff',
-                                opacity: otherSelected && !isSelected ? 0.5 : 1,
+                                cursor: qualified ? 'pointer' : 'not-allowed',
+                                border: isSelected ? '1.5px solid #E8720C' : qualified ? '1px solid #D9D9D9' : '1px dashed #D9D9D9',
+                                background: isSelected ? '#FFF7E6' : qualified ? '#fff' : '#FAFAFA',
+                                boxShadow: isSelected ? '0 2px 6px rgba(232,114,12,0.25)' : 'none',
+                                opacity: qualified ? 1 : 0.55,
                                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                               }}
-                              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = sd.color }}
-                              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = otherSelected ? sd.border ?? '#E8E8E8' : sd.border ?? '#E8E8E8' }}
+                              onMouseEnter={e => {
+                                if (isSelected || !qualified) return
+                                e.currentTarget.style.borderColor = '#E8720C'
+                                e.currentTarget.style.transform = 'translateY(-1px)'
+                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(232,114,12,0.15)'
+                              }}
+                              onMouseLeave={e => {
+                                if (isSelected || !qualified) return
+                                e.currentTarget.style.borderColor = '#D9D9D9'
+                                e.currentTarget.style.transform = 'translateY(0)'
+                                e.currentTarget.style.boxShadow = 'none'
+                              }}
                             >
-                              {isSelected && <CheckCircleFilled style={{ fontSize: 10, color: sd.color }} />}
-                              <span style={{ fontSize: 11, color: isSelected ? sd.color : '#595959' }}>{sd.icon}{sd.label}</span>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: '#FF4D4F' }}>${price}/天</span>
-                              {otherSelected && !isSelected && <Tooltip title="同標籤另一場景已選，二選一" placement="top"><span style={{ fontSize: 9, color: '#8C8C8C' }}>🔒</span></Tooltip>}
+                              {/* 選擇指示圈：未選空心圓 → 選中實心勾 */}
+                              {isSelected
+                                ? <CheckCircleFilled style={{ fontSize: 12, color: '#E8720C', flexShrink: 0 }} />
+                                : <span style={{ width: 12, height: 12, borderRadius: '50%', border: '1.5px solid #BFBFBF', flexShrink: 0 }} />}
+                              <span style={{ fontSize: 11, color: isSelected ? '#E8720C' : qualified ? '#595959' : '#BFBFBF', fontWeight: isSelected ? 600 : 400 }}>{sd.icon}{sd.label}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: qualified ? '#FF4D4F' : '#BFBFBF' }}>${price}/天</span>
                               {!qualified && <span style={{ fontSize: 9, color: '#FF4D4F' }}>ⓘ</span>}
                             </div>
                           ))}
@@ -776,8 +819,8 @@ export default function GoldenSignboardLabelPicker() {
                           return tiers.length > 0 ? (
                             <div style={{
                               padding: '4px 10px 6px',
-                              borderTop: `1px dashed ${l.color}22`,
-                              background: anySelected ? l.bg : '#fff',
+                              borderTop: '1px dashed #F0F0F0',
+                              background: '#FAFAFA',
                               fontSize: 10, color: '#8C8C8C', textAlign: 'center',
                             }}>
                               {[...tiers].sort((a, b) => a.minDays - b.minDays).map((t, i) => (
@@ -808,6 +851,8 @@ export default function GoldenSignboardLabelPicker() {
                     const conditionDesc = pricing?.conditionDesc ?? null
                     const tiers = labelDiscountMap[l.value] ?? []
                     if (!isEnabled) return null
+                    // 開啟過濾時隱藏不滿足條件的標籤
+                    if (hideUnqualified && !qualified) return null
                     return (
                       <div key={l.value} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'stretch' }}>
                         <div
@@ -833,28 +878,44 @@ export default function GoldenSignboardLabelPicker() {
                           }}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 6,
-                            padding: '6px 14px', borderRadius: '6px 6px 0 0', cursor: 'pointer',
-                            border: isSelected ? `2px solid ${l.color}` : `1px solid ${l.border}`,
-                            borderBottom: isSelected ? `1px solid ${l.color}` : `1px solid ${l.border}`,
-                            background: isSelected ? l.bg : '#fff',
+                            padding: '6px 14px', borderRadius: '6px 6px 0 0',
+                            cursor: qualified ? 'pointer' : 'not-allowed',
+                            border: isSelected ? '1.5px solid #E8720C' : qualified ? '1px solid #D9D9D9' : '1px dashed #D9D9D9',
+                            borderBottom: isSelected ? '1px solid #E8720C' : qualified ? '1px solid #D9D9D9' : '1px dashed #D9D9D9',
+                            background: isSelected ? '#FFF7E6' : qualified ? '#fff' : '#FAFAFA',
+                            boxShadow: isSelected ? '0 2px 6px rgba(232,114,12,0.25)' : 'none',
+                            opacity: qualified ? 1 : 0.55,
                             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                           }}
-                          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = l.color }}
-                          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = l.border ?? '#E8E8E8' }}
+                          onMouseEnter={e => {
+                            if (isSelected || !qualified) return
+                            e.currentTarget.style.borderColor = '#E8720C'
+                            e.currentTarget.style.transform = 'translateY(-1px)'
+                            e.currentTarget.style.boxShadow = '0 2px 6px rgba(232,114,12,0.15)'
+                          }}
+                          onMouseLeave={e => {
+                            if (isSelected || !qualified) return
+                            e.currentTarget.style.borderColor = '#D9D9D9'
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = 'none'
+                          }}
                         >
-                          {isSelected && <CheckCircleFilled style={{ fontSize: 13, color: l.color }} />}
+                          {/* 選擇指示圈：未選空心圓 → 選中實心勾 */}
+                          {isSelected
+                            ? <CheckCircleFilled style={{ fontSize: 13, color: '#E8720C' }} />
+                            : <span style={{ width: 13, height: 13, borderRadius: '50%', border: '1.5px solid #BFBFBF', flexShrink: 0 }} />}
                           <span style={{ fontSize: 13 }}>{l.icon}</span>
-                          <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400, color: isSelected ? l.color : '#262626' }}>{l.label}</span>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: '#FF4D4F' }}>${price}</span>
-                          <span style={{ fontSize: 10, color: '#8C8C8C' }}>/天</span>
+                          <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400, color: isSelected ? '#E8720C' : qualified ? '#262626' : '#BFBFBF' }}>{l.label}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: qualified ? '#FF4D4F' : '#BFBFBF' }}>${price}</span>
+                          <span style={{ fontSize: 10, color: qualified ? '#8C8C8C' : '#BFBFBF' }}>/天</span>
                           {!qualified && <span style={{ fontSize: 10, color: '#FF4D4F', marginLeft: 2 }}>ⓘ</span>}
                         </div>
                         {/* 梯度折扣展示 */}
                         {tiers.length > 0 && (
                           <div style={{
                             padding: '2px 8px 4px', borderRadius: '0 0 6px 6px',
-                            border: isSelected ? `1px solid ${l.color}` : `1px solid ${l.border}`,
-                            borderTop: 'none', background: isSelected ? l.bg : '#FAFAFA',
+                            border: isSelected ? '1px solid #E8720C' : '1px solid #D9D9D9',
+                            borderTop: 'none', background: isSelected ? '#FFF7E6' : '#FAFAFA',
                             fontSize: 10, color: '#8C8C8C', lineHeight: 1.5,
                           }}>
                             {[...tiers].sort((a, b) => a.minDays - b.minDays).map((t, i) => (
@@ -870,6 +931,10 @@ export default function GoldenSignboardLabelPicker() {
                   })}
                 </div>
               </div>
+              </>
+              ) : (
+                <Empty description="當前無滿足條件的標籤，可關閉右上角過濾開關查看全部" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              )}
             </Card>
 
             {/* ② 選擇購買日期 */}

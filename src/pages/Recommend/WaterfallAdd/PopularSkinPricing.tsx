@@ -825,6 +825,9 @@ export default function PopularSkinPricing() {
         <div style={cardShellStyle}>
           {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend.popularSkin.basicInfoTitle'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <Form.Item label={t('recommend.popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend.popularSkin.selectApp') }]}>
+              <Select placeholder={t('recommend.popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
+            </Form.Item>
             <Form.Item label={t('recommend.popularSkin.popularNameLabel')} name="popularName" rules={[{ required: true, message: t('recommend.popularSkin.popularNamePlaceholder') }]}>
               <Input
                 placeholder={t('recommend.popularSkin.popularNamePlaceholder')}
@@ -832,9 +835,6 @@ export default function PopularSkinPricing() {
                 showCount
                 disabled={isEditMode || isDetailMode}
               />
-            </Form.Item>
-            <Form.Item label={t('recommend.popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend.popularSkin.selectApp') }]}>
-              <Select placeholder={t('recommend.popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
             </Form.Item>
             <Form.Item label={t('recommend.popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend.popularSkin.selectChannel') }]}>
               <Select placeholder={t('recommend.popularSkin.pleaseSelect')} options={channelOptions} disabled={isEditMode || isDetailMode} />

@@ -406,6 +406,10 @@ export default function PricingAdd() {
         >
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
+            <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]}>
+              <Select placeholder={t('common:selectBrand')} options={tAppOptions} />
+            </Form.Item>
+
             <Form.Item label={t('recommend.algoName')} name="algorithmType" rules={[{ required: true, message: t('recommend.selectAlgo') }]}>
               <Select
                 placeholder={t('recommend.selectAlgo')}
@@ -417,10 +421,6 @@ export default function PricingAdd() {
                   }
                 }}
               />
-            </Form.Item>
-
-            <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]}>
-              <Select placeholder={t('common:selectBrand')} options={tAppOptions} />
             </Form.Item>
 
             <Form.Item label={t('common:channel')} name="channel" rules={[{ required: true, message: t('common:selectChannel') }]}>

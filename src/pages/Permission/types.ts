@@ -519,6 +519,28 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 團購管理 - 秒殺數據總覽
+  'group-purchase-dashboard': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '批量導入' },
+  ],
+  // 團購管理 - 秒殺商品登記
+  'flash-sale-register': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '批量導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 團購管理 - 秒殺商品統計
+  'flash-sale-stats': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '批量導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 團購管理 - 澳覓秒殺價
+  'flash-sale-price': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
 }
 
 /** 获取菜单的功能操作（如果未定义则返回默认功能） */
@@ -912,6 +934,16 @@ export const menuPermissionTree: PermissionModule[] = [
     ],
   },
   {
+    key: 'group-purchase',
+    name: '團購管理',
+    children: [
+      { key: 'group-purchase-dashboard', name: '秒殺數據總覽' },
+      { key: 'flash-sale-register', name: '秒殺商品登記' },
+      { key: 'flash-sale-stats', name: '秒殺商品統計' },
+      { key: 'flash-sale-price', name: '澳覓秒殺價' },
+    ],
+  },
+  {
     key: 'hr',
     name: '集團人事',
     children: [
@@ -994,6 +1026,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'writeoff-reconcile',
   'debt-reconcile',
   'approval-center',
+  // 團購管理
+  'group-purchase-dashboard',
+  'flash-sale-register',
+  'flash-sale-stats',
+  'flash-sale-price',
   // 集團人事
   'employee-management',
   'organization-management',

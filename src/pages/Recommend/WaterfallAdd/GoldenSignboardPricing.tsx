@@ -5,7 +5,7 @@
  * 可獨立配置售價、梯度折扣。部分標籤若採用按月計算資格，則僅能購買當月；
  * 否則根據預售天數配置限制可購買天數。
  *
- * 基礎信息從算法庫已配置的金字招牌數據獲取（Select 選擇算法 → 自動帶出品牌/頻道）。
+ * 基礎信息先選品牌，再按品牌過濾算法庫下拉選擇算法（Select 選擇算法 → 自動帶出頻道）。
  * 標籤定價展示所有標籤類型，算法庫未配置的標籤置灰禁用並提示用戶先去算法庫配置。
  */
 import { useMemo, useState, useEffect } from 'react'
@@ -118,8 +118,10 @@ export default function GoldenSignboardPricing() {
   const [activeTab, setActiveTab] = useState<LabelValue>('hot')
 
   // 算法庫下拉（金字招牌 algoType=13）
-  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; app: AppType; signboardLabels: string[]; labelScenarios: Record<string, string[]> }[]>([])
+  const [algorithmSelectOptions, setAlgorithmSelectOptions] = useState<{ id: number; name: string; code?: string; app: AppType; signboardLabels: string[]; labelScenarios: Record<string, string[]> }[]>([])
   const [selectedAlgorithmInfo, setSelectedAlgorithmInfo] = useState<{ id: number; name: string } | null>(null)
+  // 所選品牌（先選品牌，再按品牌過濾可選算法）
+  const [selectedApp, setSelectedApp] = useState<AppType | undefined>(undefined)
 
   // 算法配置的標籤列表（從 params.signboardItems 解析）
   const [configuredLabels, setConfiguredLabels] = useState<LabelValue[]>([])
@@ -191,6 +193,7 @@ export default function GoldenSignboardPricing() {
           return {
             id: a.id ?? 0,
             name: a.algoName,
+            code: a.algoCode,
             app: (brandToAppType(a.brand) ?? AppType.SHANFENG) as AppType,
             signboardLabels,
             labelScenarios: labelScenariosMap,
@@ -211,7 +214,9 @@ export default function GoldenSignboardPricing() {
         // 回填算法信息
         if (data.algoId) {
           setSelectedAlgorithmInfo({ id: data.algoId, name: data.algoName || '' })
-          form.setFieldsValue({ algorithmId: data.algoId, app: brandToAppType(data.brand), channel: data.channel })
+          const app = brandToAppType(data.brand)
+          setSelectedApp(app)
+          form.setFieldsValue({ algorithmId: data.algoId, app, channel: data.channel })
         }
         if (data.presaleDays) setPresaleDays(data.presaleDays)
         if (data.refundEnabled === 1) setRefundEnabled(true)
@@ -295,19 +300,57 @@ export default function GoldenSignboardPricing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId, form])
 
+  /* ── 編輯模式：自動同步算法庫最新的「標籤x場景」結構 ──
+   * 算法庫新增的標籤/場景組合自動出現為「未定價」行，需運營手動定價保存後才上架；
+   * 已保存的定價不受影響。結構跟算法庫走，價格由人工控制。 */
+  useEffect(() => {
+    if (!isEditMode || !selectedAlgorithmInfo || algorithmSelectOptions.length === 0) return
+    const alg = algorithmSelectOptions.find(a => a.id === selectedAlgorithmInfo.id)
+    if (!alg) return
+    setConfiguredLabels(prev => {
+      const merged = [...prev]
+      alg.signboardLabels.forEach(l => {
+        if (!merged.includes(l as LabelValue)) merged.push(l as LabelValue)
+      })
+      return merged.length === prev.length ? prev : merged
+    })
+    setLabelScenarios(prev => {
+      let changed = false
+      const next = { ...prev }
+      alg.signboardLabels.forEach(l => {
+        if (!COMPARISON_LABELS.includes(l)) return
+        const algoScenarios = alg.labelScenarios[l] ?? SCENARIO_DEFS.map(d => d.apiValue)
+        const cur = next[l] ?? []
+        const added = algoScenarios.filter(s => !cur.includes(s))
+        if (added.length > 0) {
+          next[l] = [...cur, ...added]
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [isEditMode, selectedAlgorithmInfo, algorithmSelectOptions])
+
   /* ── 操作函數 ── */
 
   const handleBack = () => {
     navigate(`/promotion-waterfall?type=${AlgorithmType.GOLDEN_SIGNBOARD}`)
   }
 
-  /** 選擇算法後：自動帶出品牌 + 解析配置的標籤 */
+  /** 選擇品牌後：清空已選算法（需重新選擇該品牌下的算法） */
+  const handleBrandChange = (app: AppType) => {
+    setSelectedApp(app)
+    form.setFieldsValue({ algorithmId: undefined })
+    setSelectedAlgorithmInfo(null)
+    setConfiguredLabels([])
+    setLabelScenarios({})
+  }
+
+  /** 選擇算法後：解析配置的標籤 */
   const handleAlgorithmChange = (algoId: number) => {
     const alg = algorithmSelectOptions.find(a => a.id === algoId)
     if (!alg) return
     setSelectedAlgorithmInfo({ id: alg.id, name: alg.name })
-    // 自動帶出品牌
-    form.setFieldsValue({ app: alg.app })
     // 設置配置的標籤列表
     const labels = (alg.signboardLabels.length > 0 ? alg.signboardLabels : SIGNBOARD_LABELS.map(l => l.value)) as LabelValue[]
     setConfiguredLabels(labels)
@@ -630,10 +673,18 @@ export default function GoldenSignboardPricing() {
               const scDef = SCENARIO_DEFS.find(d => d.apiValue === sc)
               if (!scDef) return null
               const key = `${labelValue}:${sc}`
+              const unpriced = labelPrices[key] == null || labelPrices[key]! <= 0
               return (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 14, flexShrink: 0 }}>{scDef.icon}</span>
                   <span style={{ fontSize: 13, color: scDef.color, fontWeight: 500, whiteSpace: 'nowrap' }}>{scDef.label}</span>
+                  {unpriced && (
+                    <span style={{
+                      fontSize: 10, color: '#D46B08', background: '#FFF7E6',
+                      border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
+                      lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
+                    }}>未定價</span>
+                  )}
                   <InputNumber
                     style={{ flex: 1, minWidth: 0 }}
                     min={1} max={99999} precision={0}
@@ -655,6 +706,13 @@ export default function GoldenSignboardPricing() {
           }}>
             <span style={{ fontSize: 14, flexShrink: 0 }}>{getLabelConfig(labelValue).icon}</span>
             <span style={{ fontSize: 13, color: getLabelConfig(labelValue).color, fontWeight: 500, whiteSpace: 'nowrap' }}>{getLabelConfig(labelValue).label}</span>
+            {(labelPrices[labelValue] == null || labelPrices[labelValue]! <= 0) && (
+              <span style={{
+                fontSize: 10, color: '#D46B08', background: '#FFF7E6',
+                border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
+                lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
+              }}>未定價</span>
+            )}
             <InputNumber
               style={{ flex: 1, minWidth: 0 }}
               min={1} max={99999} precision={0}
@@ -718,28 +776,31 @@ export default function GoldenSignboardPricing() {
         <div style={cardShellStyle}>
           {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#E6F7FF', t('recommend.basicInfo'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]}>
+              <Select
+                disabled={isEditMode || isDetailMode}
+                placeholder={t('common:selectBrand')}
+                options={tAppOptions}
+                onChange={handleBrandChange}
+              />
+            </Form.Item>
             <Form.Item
               label={t('recommend.algoName')}
               name="algorithmId"
               rules={[{ required: true, message: t('recommend.selectAlgo') }]}
             >
               <Select
-                disabled={isEditMode || isDetailMode}
-                placeholder={t('recommend.selectAlgo')}
+                disabled={isEditMode || isDetailMode || !selectedApp}
+                placeholder={selectedApp ? t('recommend.selectAlgo') : t('recommend.selectBrandFirst')}
                 showSearch
                 optionFilterProp="label"
-                options={algorithmSelectOptions.map(alg => ({
-                  label: alg.name,
-                  value: alg.id,
-                }))}
+                options={algorithmSelectOptions
+                  .filter(alg => !selectedApp || alg.app === selectedApp)
+                  .map(alg => ({
+                    label: alg.code ? `${alg.name}(${alg.code})` : alg.name,
+                    value: alg.id,
+                  }))}
                 onChange={handleAlgorithmChange}
-              />
-            </Form.Item>
-            <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]}>
-              <Select
-                disabled
-                placeholder={t('common:selectBrand')}
-                options={tAppOptions}
               />
             </Form.Item>
             <Form.Item label={t('recommend.popularSkin.channelLabel')} name="channel" rules={[{ required: true, message: t('recommend.popularSkin.selectChannel') }]}>

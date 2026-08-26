@@ -85,7 +85,8 @@ export default function NewStoreDayPicker() {
     fetchAdAlgorithms({ algoType: 2, brand: searchBrand, status: 1, size: 100 }).then(res => {
       const records = (res.records || []).filter(a => a.updatedBy !== '系統')
       setAlgorithmOptions(
-        records.map(a => ({ label: a.algoName, value: a.id!, brand: a.brand }))
+        // 算法名稱後追加算法ID（如 WDxxxxxxxx）
+        records.map(a => ({ label: a.algoCode ? `${a.algoName}(${a.algoCode})` : a.algoName, value: a.id!, brand: a.brand }))
       )
     }).catch(() => {})
   }, [searchBrand])

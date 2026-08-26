@@ -492,7 +492,8 @@ export default function PopularSkinPicker() {
         if (!res) return
         const options = (res.records ?? [])
           .filter(p => p.skins && p.skins.length > 0)
-          .map(p => ({ label: p.algoName || p.pricingNo || '-', value: String(p.id) }))
+          // 名稱後追加配置ID（定價編號，如 DJRQxxxxxxxx）
+          .map(p => ({ label: p.algoName && p.pricingNo ? `${p.algoName}(${p.pricingNo})` : (p.algoName || p.pricingNo || '-'), value: String(p.id) }))
         setPricingOptions(options)
       }).catch(() => {})
   }, [searchBrand])
