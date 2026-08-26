@@ -48,6 +48,8 @@ public class AdSignboardInventoryVO {
         private Boolean qualified;
         /** 资格条件描述（用于前端弹窗展示） */
         private String conditionDesc;
+        /** 本门店实际情况（排名/数值，用于前端弹窗展示） */
+        private String actualDesc;
     }
 
     /** 单个格子（标签 x 场景 x 日期） */

@@ -258,7 +258,7 @@ SELECT 'PH00001', '盤活復蘇-團購版', 3, 'flashBee', 4, 4, 10,
            'purchaseLimitDays', 180
        ),
        1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'PH00001' AND deleted = 0) t);
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'PH00001') t);
 
 -- ============================================================
 -- 六、初始数据（幂等: 仅当不存在时插入）
@@ -275,5 +275,5 @@ SELECT 'WD00001', '無敵星星-首頁黃金展位', 1, 'flashBee', 1, 1, 5,
            'purchaseLimitDays', 12
        ),
        1, '系統預置示例算法', '系統'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'WD00001' AND deleted = 0) t);
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT id FROM biz_ad_algorithm WHERE algo_code = 'WD00001') t);
 

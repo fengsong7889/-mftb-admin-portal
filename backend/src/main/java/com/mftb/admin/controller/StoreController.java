@@ -6,9 +6,11 @@ import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.StoreBdVO;
 import com.mftb.admin.dto.StoreBindBdRequest;
+import com.mftb.admin.dto.StoreDataConfigDTO;
 import com.mftb.admin.dto.StoreQuery;
 import com.mftb.admin.dto.StoreRequest;
 import com.mftb.admin.dto.StoreVO;
+import com.mftb.admin.service.StoreDataConfigService;
 import com.mftb.admin.service.StoreService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ import java.util.List;
 public class StoreController {
 
     private final StoreService storeService;
+    private final StoreDataConfigService storeDataConfigService;
 
     /** 分页查询门店（集团ID/名称、门店ID/名称、所属品牌、业务频道、最后更新人、最后更新时间、创建时间） */
     @GetMapping
@@ -114,5 +117,20 @@ public class StoreController {
     public Result<Void> delete(@PathVariable Long id) {
         storeService.delete(id);
         return Result.success("门店已删除", null);
+    }
+
+    /** 查询门店金字招牌数据配置（无配置时系统按门店预生成） */
+    @GetMapping("/{id}/data-config")
+    @RequirePermission(menu = "store-list")
+    public Result<StoreDataConfigDTO> getDataConfig(@PathVariable Long id) {
+        return Result.success(storeDataConfigService.getConfig(id));
+    }
+
+    /** 保存门店金字招牌数据配置 */
+    @PutMapping("/{id}/data-config")
+    @RequirePermission(menu = "store-list", action = "edit")
+    public Result<Void> updateDataConfig(@PathVariable Long id, @RequestBody StoreDataConfigDTO request) {
+        storeDataConfigService.updateConfig(id, request);
+        return Result.success("配置已保存", null);
     }
 }

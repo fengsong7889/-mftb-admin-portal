@@ -1,5 +1,7 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.dto.StoreDataConfigDTO;
+import com.mftb.admin.service.StoreDataConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -26,6 +28,8 @@ public class BizDataInitializer implements CommandLineRunner {
         createMerchantGroupTableIfAbsent();
         createStoreTableIfAbsent();
         createStoreBdTableIfAbsent();
+        createStoreDataConfigTableIfAbsent();
+        createFlashSaleTablesIfAbsent();
         createGiftRecordTableIfAbsent();
         createGiftConsumeTableIfAbsent();
         createWordLibraryTableIfAbsent();
@@ -36,6 +40,8 @@ public class BizDataInitializer implements CommandLineRunner {
         cleanupDuplicateSeedStores();
         seedMerchantGroups();
         seedStores();
+        seedStoreDataConfigs();
+        seedFlashSalePeriods();
         migrateStoreAddress();
         seedWordLibrary();
         seedWorkflowConfig();
@@ -222,6 +228,193 @@ public class BizDataInitializer implements CommandLineRunner {
                         + "UNIQUE KEY uk_store_code (store_code)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店表'");
         log.info("已自动创建门店表 biz_store");
+    }
+
+    /** 门店金字招牌数据配置表 (对应脚本 backend/sql/61_store_data_config.sql) */
+    private void createStoreDataConfigTableIfAbsent() {
+        if (tableExists("biz_store_data_config")) {
+            return;
+        }
+        jdbcTemplate.execute(
+                "CREATE TABLE biz_store_data_config ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                        + "store_id BIGINT NOT NULL COMMENT '门店主键 (关联 biz_store.id)', "
+                        + "monthly_orders INT NOT NULL DEFAULT 0 COMMENT '月订单数', "
+                        + "monthly_repurchase_orders INT NOT NULL DEFAULT 0 COMMENT '月复购订单数据', "
+                        + "monthly_positive_orders INT NOT NULL DEFAULT 0 COMMENT '月好评订单数据', "
+                        + "monthly_visits INT NOT NULL DEFAULT 0 COMMENT '月访问量', "
+                        + "store_favorites INT NOT NULL DEFAULT 0 COMMENT '门店收藏数', "
+                        + "monthly_customers INT NOT NULL DEFAULT 0 COMMENT '顾客数', "
+                        + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                        + "UNIQUE KEY uk_store_id (store_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店金字招牌数据配置表'");
+        log.info("已自动创建门店数据配置表 biz_store_data_config");
+    }
+
+    /** 秒杀模块建表: 期数/登记/阶梯/统计/汇总 + 黑榜阈值配置 + 种子期数（幂等，对应 62_flash_sale_module.sql） */
+    private void createFlashSaleTablesIfAbsent() {
+        if (!tableExists("biz_flash_sale_period")) {
+            jdbcTemplate.execute(
+                    "CREATE TABLE biz_flash_sale_period ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                            + "period_no INT NOT NULL COMMENT '期数', "
+                            + "start_date DATE NULL COMMENT '开始日期', "
+                            + "end_date DATE NULL COMMENT '结束日期', "
+                            + "status TINYINT NOT NULL DEFAULT 2 COMMENT '状态: 1=进行中, 2=已结束', "
+                            + "remark VARCHAR(255) NULL COMMENT '备注', "
+                            + "deleted TINYINT NOT NULL DEFAULT 0, "
+                            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                            + "UNIQUE KEY uk_period_no (period_no)"
+                            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀期数表'");
+            log.info("已自动创建秒杀期数表 biz_flash_sale_period");
+        }
+        if (!tableExists("biz_flash_sale_register")) {
+            jdbcTemplate.execute(
+                    "CREATE TABLE biz_flash_sale_register ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                            + "period_id BIGINT NOT NULL COMMENT '期数ID', "
+                            + "seq_no INT NULL COMMENT '序号', "
+                            + "subsidy_type VARCHAR(20) NOT NULL COMMENT '补贴类型', "
+                            + "store_codes VARCHAR(512) NULL COMMENT '门店编码', "
+                            + "store_names VARCHAR(1024) NULL COMMENT '门店名称', "
+                            + "bd_names VARCHAR(255) NULL COMMENT 'BD姓名', "
+                            + "product_id VARCHAR(32) NOT NULL COMMENT '商品ID', "
+                            + "product_name VARCHAR(255) NULL COMMENT '商品名称', "
+                            + "product_type VARCHAR(20) NULL COMMENT '商品类型', "
+                            + "max_purchase VARCHAR(50) NULL COMMENT '每人最多购买', "
+                            + "price_type VARCHAR(10) NOT NULL DEFAULT 'single' COMMENT '价格类型', "
+                            + "original_price DECIMAL(10,2) NULL COMMENT '原价', "
+                            + "group_price DECIMAL(10,2) NULL COMMENT '团购价', "
+                            + "flash_sale_price DECIMAL(10,2) NULL COMMENT '秒杀价', "
+                            + "flash_sale_stock INT NULL COMMENT '秒杀库存(单一价格)', "
+                            + "current_sales INT NOT NULL DEFAULT 0 COMMENT '本期秒杀销量', "
+                            + "deleted TINYINT NOT NULL DEFAULT 0, "
+                            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                            + "UNIQUE KEY uk_period_product (period_id, product_id), "
+                            + "KEY idx_period (period_id)"
+                            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀商品登记表'");
+            log.info("已自动创建秒杀商品登记表 biz_flash_sale_register");
+        }
+        if (!tableExists("biz_flash_sale_price_tier")) {
+            jdbcTemplate.execute(
+                    "CREATE TABLE biz_flash_sale_price_tier ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                            + "owner_type VARCHAR(10) NOT NULL COMMENT '归属: register/stats', "
+                            + "owner_id BIGINT NOT NULL COMMENT '归属记录ID', "
+                            + "tier_no INT NOT NULL COMMENT '阶梯序号', "
+                            + "tier_price DECIMAL(10,2) NOT NULL COMMENT '阶梯价', "
+                            + "tier_stock INT NOT NULL DEFAULT 0 COMMENT '阶梯库存', "
+                            + "tier_subsidy DECIMAL(10,2) NULL COMMENT '阶梯补贴', "
+                            + "KEY idx_owner (owner_type, owner_id)"
+                            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀价阶梯表'");
+            log.info("已自动创建秒杀价阶梯表 biz_flash_sale_price_tier");
+        }
+        if (!tableExists("biz_flash_sale_stats")) {
+            jdbcTemplate.execute(
+                    "CREATE TABLE biz_flash_sale_stats ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                            + "period_id BIGINT NOT NULL COMMENT '期数ID', "
+                            + "product_id VARCHAR(32) NOT NULL COMMENT '商品ID', "
+                            + "product_name VARCHAR(255) NULL COMMENT '商品名称', "
+                            + "store_names TEXT NULL COMMENT '商品门店', "
+                            + "price_type VARCHAR(10) NOT NULL DEFAULT 'single' COMMENT '价格类型', "
+                            + "flash_sale_price DECIMAL(10,2) NULL COMMENT '秒杀价(单一价格)', "
+                            + "order_users INT NULL COMMENT '下单用户', "
+                            + "total_price DECIMAL(12,2) NULL COMMENT '总价', "
+                            + "total_orders INT NULL COMMENT '订单总数', "
+                            + "total_sales INT NULL COMMENT '商品总销量', "
+                            + "actual_amount DECIMAL(12,2) NULL COMMENT '实付金额', "
+                            + "order_users_change DECIMAL(10,4) NULL COMMENT '下单用户环比', "
+                            + "total_price_change DECIMAL(10,4) NULL COMMENT '总价环比', "
+                            + "total_orders_change DECIMAL(10,4) NULL COMMENT '订单总数环比', "
+                            + "total_sales_change DECIMAL(10,4) NULL COMMENT '商品总销量环比', "
+                            + "actual_amount_change DECIMAL(10,4) NULL COMMENT '实付金额环比', "
+                            + "subsidy_type VARCHAR(20) NULL COMMENT '是否补贴品', "
+                            + "discount_rate DECIMAL(10,6) NULL COMMENT '折扣率', "
+                            + "last_period_subsidy VARCHAR(20) NULL COMMENT '上期有无补贴', "
+                            + "bd_name VARCHAR(50) NULL COMMENT '所属BD', "
+                            + "deleted TINYINT NOT NULL DEFAULT 0, "
+                            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                            + "UNIQUE KEY uk_period_product (period_id, product_id), "
+                            + "KEY idx_period (period_id)"
+                            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀商品统计表'");
+            log.info("已自动创建秒杀商品统计表 biz_flash_sale_stats");
+        }
+        if (!tableExists("biz_flash_sale_summary")) {
+            jdbcTemplate.execute(
+                    "CREATE TABLE biz_flash_sale_summary ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                            + "period_id BIGINT NOT NULL COMMENT '期数ID', "
+                            + "stat_date DATE NULL COMMENT '统计日期（NULL=整期合计行）', "
+                            + "total_payable DECIMAL(12,2) NULL COMMENT '总应付金额', "
+                            + "total_actual DECIMAL(12,2) NULL COMMENT '总实付金额', "
+                            + "total_orders INT NULL COMMENT '订单总数', "
+                            + "total_sales INT NULL COMMENT '商品总销量', "
+                            + "total_products INT NULL COMMENT '总商品数', "
+                            + "sold_products INT NULL COMMENT '动销商品数', "
+                            + "buyers INT NULL COMMENT '购买人数(已去重)', "
+                            + "repurchase_buyers INT NULL COMMENT '复购人数', "
+                            + "repurchase_rate DECIMAL(10,6) NULL COMMENT '复购率', "
+                            + "avg_order_value DECIMAL(10,2) NULL COMMENT '人均客单价', "
+                            + "deleted TINYINT NOT NULL DEFAULT 0, "
+                            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                            + "UNIQUE KEY uk_period_date (period_id, stat_date)"
+                            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='秒杀每日汇总表'");
+            log.info("已自动创建秒杀每日汇总表 biz_flash_sale_summary");
+        }
+        // 黑榜阈值配置
+        if (tableExists("sys_config")) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_config (config_key, config_value, description) "
+                            + "SELECT 'flash_sale_blacklist_threshold', '10', '秒杀近3期销量黑榜阈值' "
+                            + "WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'flash_sale_blacklist_threshold')");
+        }
+    }
+
+    /** 种子期数: 第84/85期（幂等） */
+    private void seedFlashSalePeriods() {
+        if (!tableExists("biz_flash_sale_period")) {
+            return;
+        }
+        jdbcTemplate.update(
+                "INSERT INTO biz_flash_sale_period (period_no, start_date, end_date, status, remark) "
+                        + "SELECT 84, '2026-08-06', '2026-08-08', 2, '第84期秒杀' "
+                        + "WHERE NOT EXISTS (SELECT 1 FROM biz_flash_sale_period WHERE period_no = 84)");
+        jdbcTemplate.update(
+                "INSERT INTO biz_flash_sale_period (period_no, start_date, end_date, status, remark) "
+                        + "SELECT 85, '2026-08-13', '2026-08-15', 2, '第85期秒杀' "
+                        + "WHERE NOT EXISTS (SELECT 1 FROM biz_flash_sale_period WHERE period_no = 85)");
+    }
+
+    /** 为所有存量门店预生成金字招牌数据配置 (幂等: 仅补缺失门店, 按 storeId 种子确定性随机) */
+    private void seedStoreDataConfigs() {
+        if (!tableExists("biz_store_data_config") || !tableExists("biz_store")) {
+            return;
+        }
+        List<Long> storeIds = jdbcTemplate.queryForList(
+                "SELECT s.id FROM biz_store s LEFT JOIN biz_store_data_config c ON c.store_id = s.id "
+                        + "WHERE s.deleted = 0 AND c.id IS NULL ORDER BY s.id",
+                Long.class);
+        for (Long storeId : storeIds) {
+            StoreDataConfigDTO dto = StoreDataConfigService.generate(storeId);
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO biz_store_data_config "
+                            + "(store_id, monthly_orders, monthly_repurchase_orders, monthly_positive_orders, "
+                            + "monthly_visits, store_favorites, monthly_customers, updated_by) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    storeId, dto.getMonthlyOrders(), dto.getMonthlyRepurchaseOrders(),
+                    dto.getMonthlyPositiveOrders(), dto.getMonthlyVisits(), dto.getStoreFavorites(),
+                    dto.getMonthlyCustomers(), "系統預生成");
+        }
+        if (!storeIds.isEmpty()) {
+            log.info("已为 {} 家门店预生成金字招牌数据配置", storeIds.size());
+        }
     }
 
     /** 门店绑定BD关系表（一家门店可绑定多个BD） */

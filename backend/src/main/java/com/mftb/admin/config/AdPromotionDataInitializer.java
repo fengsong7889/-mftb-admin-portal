@@ -36,20 +36,30 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        try {
-            for (String script : INIT_SCRIPTS) {
+        // 各脚本/步骤独立容错: 单条失败仅记录日志, 不阻断后续初始化
+        for (String script : INIT_SCRIPTS) {
+            try {
                 executeSqlScript(script);
+            } catch (Exception e) {
+                log.error("执行 {} 失败: {}", script, e.getMessage(), e);
             }
-            ensureSellTimeSlotsColumn();
-            ensureSlotDiscountsColumn();
-            ensureOrderExtraColumns();
-            ensureStockAndGiftColumns();
-            ensureStoreRegionColumn();
-            ensureCellLockGroupKey();
-            migrateAdConsumeDetails();
-            repairAdDetailActualChange();
+        }
+        runSafely("biz_ad_pricing_star.sell_time_slots 补列", this::ensureSellTimeSlotsColumn);
+        runSafely("biz_ad_pricing_star.slot_discounts 补列", this::ensureSlotDiscountsColumn);
+        runSafely("biz_ad_order 扩展列补齐", this::ensureOrderExtraColumns);
+        runSafely("库存与赠送快照列补齐", this::ensureStockAndGiftColumns);
+        runSafely("biz_store.region 补列", this::ensureStoreRegionColumn);
+        runSafely("biz_ad_cell_lock 唯一键升级", this::ensureCellLockGroupKey);
+        runSafely("存量广告消费明细迁移", this::migrateAdConsumeDetails);
+        runSafely("广告明细实收变动修复", this::repairAdDetailActualChange);
+    }
+
+    /** 单步容错执行: 异常仅记录不抛出 */
+    private void runSafely(String name, Runnable task) {
+        try {
+            task.run();
         } catch (Exception e) {
-            log.error("广告推广表初始化失败: {}", e.getMessage(), e);
+            log.error("广告推广初始化 [{}] 失败: {}", name, e.getMessage(), e);
         }
     }
 

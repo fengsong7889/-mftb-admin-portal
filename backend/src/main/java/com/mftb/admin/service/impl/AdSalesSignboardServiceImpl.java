@@ -6,23 +6,27 @@ import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingSignboardVO;
 import com.mftb.admin.dto.AdSignboardInventoryVO;
 import com.mftb.admin.dto.AdSignboardOrderRequest;
+import com.mftb.admin.dto.StoreDataConfigDTO;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemSignboard;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
+import com.mftb.admin.entity.BizStoreDataConfig;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
+import com.mftb.admin.mapper.BizStoreDataConfigMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdPricingSignboardService;
 import com.mftb.admin.service.AdSalesSignboardService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.GiftService;
+import com.mftb.admin.service.StoreDataConfigService;
 import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
@@ -37,12 +41,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 金字招牌广告销售服务实现（库存查询 + 下单扣款）
@@ -64,10 +70,12 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
     private final AdAlgorithmMapper algorithmMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final BizStoreMapper storeMapper;
+    private final BizStoreDataConfigMapper storeDataConfigMapper;
     private final AdPricingSignboardService pricingService;
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
     private final GiftService giftService;
+    private final StoreDataConfigService storeDataConfigService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -82,7 +90,8 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
 
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
-        Set<String> purchased = purchasedCells(algoId, groupCode, today, endDate);
+        // 订单主表 algoId 存的是定价配置ID，此处必须用 pricing.getId() 匹配已购格子
+        Set<String> purchased = purchasedCells(pricing.getId(), groupCode, today, endDate);
 
         AdSignboardInventoryVO vo = new AdSignboardInventoryVO();
         vo.setAlgoId(algoId);
@@ -90,10 +99,11 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         vo.setRefundEnabled(pricing.getRefundEnabled());
         vo.setCancelFeeTiers(pricing.getCancelFeeTiers());
 
-        // 加载算法配置中的场景资格条件
+        // 加载算法配置中的场景资格条件 + 构建当前门店的资格评估上下文
         Map<String, Map<String, ScenarioCondition>> algoConditions = loadAlgoConditions(pricing.getAlgoId());
+        EvalContext evalCtx = buildEvalContext(pricing.getBrand(), pricing.getChannel(), storeCode);
 
-        // 标签计价信息（含场景 + 资格条件）
+        // 标签计价信息（含场景 + 资格条件 + 实际评估结果）
         for (AdPricingSignboardVO.LabelPriceItem label : pricing.getSignboardItems()) {
             AdSignboardInventoryVO.LabelPrice lp = new AdSignboardInventoryVO.LabelPrice();
             lp.setLabelType(label.getLabelType());
@@ -101,8 +111,8 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             lp.setEnabled(label.getEnabled());
             lp.setPricePerDay(label.getPrice());
             lp.setDiscountTiers(label.getDiscountTiers());
-            // 填充资格条件信息
-            fillQualificationInfo(lp, algoConditions);
+            // 填充资格条件信息（按当前门店数据实时评估）
+            fillQualificationInfo(lp, algoConditions, evalCtx);
             vo.getLabels().add(lp);
         }
 
@@ -177,13 +187,21 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             }
         }
 
-        // 3. 重复购买校验
-        Set<String> purchased = purchasedCells(request.getAlgoId(), request.getGroupCode(), today, endDate);
+        // 3. 重复购买校验（订单主表 algoId 存的是定价配置ID，必须用 pricing.getId() 匹配）
+        Set<String> purchased = purchasedCells(pricing.getId(), request.getGroupCode(), today, endDate);
         for (String key : requestKeys) {
             if (purchased.contains(key)) {
                 throw new BusinessException("該標籤在所选日期已購買，不能重複購買");
             }
         }
+
+        // 3.5 对比类标签资格校验 + 同一天同一标签场景互斥校验
+        BizStore store = StringUtils.hasText(request.getStoreCode())
+                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
+                        .eq(BizStore::getStoreCode, request.getStoreCode())
+                        .last("LIMIT 1"))
+                : null;
+        validateComparisonCells(pricing, request, store, purchased);
 
         // 4. 计价: 按标签x场景分别计算原价 → 按该组合天数匹配梯度折扣
         BigDecimal originalTotal = BigDecimal.ZERO;
@@ -218,11 +236,6 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
 
         // 5. 赠送天数抵扣
         int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
-        BizStore store = StringUtils.hasText(request.getStoreCode())
-                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
-                        .eq(BizStore::getStoreCode, request.getStoreCode())
-                        .last("LIMIT 1"))
-                : null;
         BigDecimal giftDeduction = BigDecimal.ZERO;
         if (giftDays > 0) {
             if (store == null) {
@@ -401,11 +414,37 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         return labelType + ":" + (scenario != null ? scenario : "");
     }
 
-    /* ==================== 资格条件解析 ==================== */
+    /* ==================== 资格条件解析与评估 ==================== */
+
+    /** 单条资格条件 */
+    private static class Condition {
+        String metric;
+        String comparison;
+        double value;
+        /** 与下一条条件的关系: and/or */
+        String nextOperator;
+    }
 
     /** 场景资格条件（从算法配置解析） */
     private static class ScenarioCondition {
         String conditionDesc;
+        final List<Condition> conditions = new ArrayList<>();
+    }
+
+    /** 资格评估结果 */
+    private static class QualificationResult {
+        boolean qualified;
+        /** 本门店实际情况描述（排名/数值），供前端弹窗展示 */
+        String actualDesc;
+    }
+
+    /** 评估上下文: 当前门店数据 + 按品牌/频道过滤后的对比组 */
+    private static class EvalContext {
+        BizStoreDataConfig current;
+        final List<BizStoreDataConfig> allMacauGroup = new ArrayList<>();
+        final List<BizStoreDataConfig> districtGroup = new ArrayList<>();
+        boolean storeMissing = false;
+        boolean regionMissing = false;
     }
 
     /**
@@ -434,6 +473,20 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
                     if (!(scObj instanceof Map<?, ?> scMap)) continue;
                     ScenarioCondition sc = new ScenarioCondition();
                     sc.conditionDesc = buildConditionDesc(scMap);
+                    Object condsObj = scMap.get("conditions");
+                    if (condsObj instanceof List<?> conds) {
+                        for (Object cObj : conds) {
+                            if (!(cObj instanceof Map<?, ?> cMap)) continue;
+                            Condition c = new Condition();
+                            c.metric = cMap.get("qualificationMetric") != null
+                                    ? String.valueOf(cMap.get("qualificationMetric")) : "";
+                            c.comparison = cMap.get("qualificationComparison") != null
+                                    ? String.valueOf(cMap.get("qualificationComparison")) : "ranking";
+                            c.value = parseDouble(cMap.get("qualificationValue"));
+                            c.nextOperator = "or".equals(String.valueOf(cMap.get("nextOperator"))) ? "or" : "and";
+                            sc.conditions.add(c);
+                        }
+                    }
                     labelConditions.put(scenarioKey, sc);
                 }
                 result.put(labelType, labelConditions);
@@ -443,6 +496,223 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             log.warn("招牌算法场景条件解析失败: algoId={}, msg={}", algo != null ? algo.getId() : null, e.getMessage());
         }
         return result;
+    }
+
+    private static double parseDouble(Object obj) {
+        if (obj == null) return 0;
+        try {
+            return Double.parseDouble(String.valueOf(obj));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * 构建资格评估上下文: 加载当前门店数据配置，并按定价的品牌+业务频道过滤对比组
+     * （全澳 = 所有匹配门店；商圈 = 与当前门店 region 相同的匹配门店）
+     */
+    private EvalContext buildEvalContext(String brand, Integer channel, String storeCode) {
+        EvalContext ctx = new EvalContext();
+        if (!StringUtils.hasText(storeCode)) {
+            ctx.storeMissing = true;
+            return ctx;
+        }
+        BizStore store = storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
+                .eq(BizStore::getStoreCode, storeCode).last("LIMIT 1"));
+        if (store == null) {
+            ctx.storeMissing = true;
+            return ctx;
+        }
+        if (store.getRegion() == null) {
+            ctx.regionMissing = true;
+        }
+        // 当前门店无配置时自动预生成（按 storeId 种子确定性随机）
+        ctx.current = storeDataConfigMapper.selectOne(new LambdaQueryWrapper<BizStoreDataConfig>()
+                .eq(BizStoreDataConfig::getStoreId, store.getId()));
+        if (ctx.current == null) {
+            StoreDataConfigDTO generated = storeDataConfigService.getConfig(store.getId());
+            ctx.current = new BizStoreDataConfig();
+            ctx.current.setStoreId(store.getId());
+            ctx.current.setMonthlyOrders(generated.getMonthlyOrders());
+            ctx.current.setMonthlyRepurchaseOrders(generated.getMonthlyRepurchaseOrders());
+            ctx.current.setMonthlyPositiveOrders(generated.getMonthlyPositiveOrders());
+            ctx.current.setMonthlyVisits(generated.getMonthlyVisits());
+            ctx.current.setStoreFavorites(generated.getStoreFavorites());
+            ctx.current.setMonthlyCustomers(generated.getMonthlyCustomers());
+        }
+        // 对比组: 品牌+频道匹配且已配置数据的有效门店
+        Map<Long, BizStoreDataConfig> cfgByStoreId = storeDataConfigMapper.selectList(null).stream()
+                .collect(Collectors.toMap(BizStoreDataConfig::getStoreId, c -> c, (a, b) -> a));
+        List<BizStore> stores = storeMapper.selectList(null);
+        for (BizStore s : stores) {
+            if (!matchesBrandChannel(s, brand, channel)) continue;
+            BizStoreDataConfig c = cfgByStoreId.get(s.getId());
+            if (c == null) continue;
+            ctx.allMacauGroup.add(c);
+            if (store.getRegion() != null && store.getRegion().equals(s.getRegion())) {
+                ctx.districtGroup.add(c);
+            }
+        }
+        // 确保当前门店参与排名（品牌/频道不匹配或配置刚生成时补入）
+        if (ctx.allMacauGroup.stream().noneMatch(c -> c.getStoreId().equals(store.getId()))) {
+            ctx.allMacauGroup.add(ctx.current);
+        }
+        if (store.getRegion() != null
+                && ctx.districtGroup.stream().noneMatch(c -> c.getStoreId().equals(store.getId()))) {
+            ctx.districtGroup.add(ctx.current);
+        }
+        return ctx;
+    }
+
+    /** 门店是否属于定价适用的品牌+业务频道（门店两字段均为逗号分隔多值） */
+    private static boolean matchesBrandChannel(BizStore store, String brand, Integer channel) {
+        if (StringUtils.hasText(brand)) {
+            if (!StringUtils.hasText(store.getBrand())
+                    || !List.of(store.getBrand().split(",")).contains(brand)) {
+                return false;
+            }
+        }
+        if (channel != null) {
+            if (!StringUtils.hasText(store.getBizChannel())
+                    || !List.of(store.getBizChannel().split(",")).contains(String.valueOf(channel))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 评估当前门店是否满足场景条件（排名基于门店数据配置，与标签购买情况无关）
+     * <p>
+     * ranking: 对比组内排名 ≤ 值；percentage: 排名占比 ≤ 值%（前 X% 的商家）；absolute: 指标值 ≥ 值。
+     * 多条条件按 nextOperator 以 and/or 左折叠组合。
+     */
+    private static QualificationResult evaluate(String scenarioKey, ScenarioCondition sc, EvalContext ctx) {
+        QualificationResult r = new QualificationResult();
+        if (ctx.storeMissing) {
+            // 未选门店时展示阶段不拦截，下单时强制校验
+            r.qualified = true;
+            return r;
+        }
+        if ("district".equals(scenarioKey) && ctx.regionMissing) {
+            r.qualified = false;
+            r.actualDesc = "門店未設置所屬商圈，無法參與商圈對比";
+            return r;
+        }
+        List<BizStoreDataConfig> group = "district".equals(scenarioKey) ? ctx.districtGroup : ctx.allMacauGroup;
+        String scopeLabel = "district".equals(scenarioKey) ? "商圈內" : "全澳";
+        Boolean overall = null;
+        StringBuilder actual = new StringBuilder();
+        for (int i = 0; i < sc.conditions.size(); i++) {
+            Condition c = sc.conditions.get(i);
+            if (i > 0) {
+                actual.append("or".equals(sc.conditions.get(i - 1).nextOperator) ? " 或 " : " 且 ");
+            }
+            int currentValue = metricValue(c.metric, ctx.current);
+            // 竞争排名: 并列同名次（1 + 严格大于本门店的商家数）
+            int rank = 1;
+            for (BizStoreDataConfig g : group) {
+                if (metricValue(c.metric, g) > currentValue) rank++;
+            }
+            boolean pass;
+            switch (c.comparison) {
+                case "percentage" -> {
+                    pass = group.isEmpty() || rank * 100.0 <= c.value * group.size();
+                    actual.append(scopeLabel).append(metricLabel(c.metric))
+                            .append("前 ").append((int) c.value).append("%，本門店：第 ")
+                            .append(rank).append("/").append(group.size()).append(" 名");
+                }
+                case "absolute" -> {
+                    pass = currentValue >= (int) c.value;
+                    actual.append(scopeLabel).append(metricLabel(c.metric))
+                            .append(" ≥ ").append((int) c.value).append("，本門店：").append(currentValue);
+                }
+                default -> {
+                    pass = rank <= (int) c.value;
+                    actual.append(scopeLabel).append(metricLabel(c.metric))
+                            .append("前 ").append((int) c.value).append(" 名，本門店：第 ")
+                            .append(rank).append(" 名");
+                }
+            }
+            actual.append(pass ? " ✔" : " ✘");
+            if (overall == null) {
+                overall = pass;
+            } else if ("or".equals(sc.conditions.get(i - 1).nextOperator)) {
+                overall = overall || pass;
+            } else {
+                overall = overall && pass;
+            }
+        }
+        r.qualified = overall == null || overall;
+        r.actualDesc = actual.toString();
+        return r;
+    }
+
+    /** 指标值映射: 算法配置指标 → 门店数据配置字段 */
+    private static int metricValue(String metric, BizStoreDataConfig c) {
+        if (c == null) return 0;
+        return switch (metric) {
+            case "monthlyOrders" -> nz(c.getMonthlyOrders());
+            case "monthlyRepurchase" -> nz(c.getMonthlyRepurchaseOrders());
+            case "monthlyRating" -> nz(c.getMonthlyPositiveOrders());
+            case "monthlyVisits" -> nz(c.getMonthlyVisits());
+            case "storeFavorites", "favoritesCount" -> nz(c.getStoreFavorites());
+            case "monthlyCustomers", "customerCount" -> nz(c.getMonthlyCustomers());
+            default -> 0;
+        };
+    }
+
+    private static int nz(Integer v) {
+        return v == null ? 0 : v;
+    }
+
+    /** 下单时校验对比类标签: 资格 + 同一天同一标签仅能展示一种场景（订单内互斥 + 与已购互斥） */
+    private void validateComparisonCells(AdPricingSignboardVO pricing, AdSignboardOrderRequest request,
+                                         BizStore store, Set<String> purchased) {
+        List<AdSignboardOrderRequest.CellSelection> comparisonCells = request.getCells().stream()
+                .filter(c -> StringUtils.hasText(c.getScenario())).toList();
+        if (comparisonCells.isEmpty()) {
+            return;
+        }
+        if (store == null) {
+            throw new BusinessException("請選擇門店後再購買對比類標籤");
+        }
+        Map<String, Map<String, ScenarioCondition>> algoConditions = loadAlgoConditions(pricing.getAlgoId());
+        EvalContext ctx = buildEvalContext(pricing.getBrand(), pricing.getChannel(), request.getStoreCode());
+        for (AdSignboardOrderRequest.CellSelection cell : comparisonCells) {
+            String scenarioKey = "all_macau".equals(cell.getScenario()) ? "allMacau" : "district";
+            Map<String, ScenarioCondition> labelConds = algoConditions.get(cell.getLabelType());
+            ScenarioCondition sc = labelConds != null ? labelConds.get(scenarioKey) : null;
+            if (sc == null || sc.conditions.isEmpty()) {
+                continue;
+            }
+            QualificationResult r = evaluate(scenarioKey, sc, ctx);
+            if (!r.qualified) {
+                throw new BusinessException("門店不滿足 " + cell.getLabelType() + " 標籤（"
+                        + ("all_macau".equals(cell.getScenario()) ? "全澳對比" : "商圈對比") + "）購買條件："
+                        + (r.actualDesc != null ? r.actualDesc : "資格不符"));
+            }
+        }
+        // 同一天同一标签只能展示一种场景
+        Map<String, Set<LocalDate>> orderDates = new LinkedHashMap<>();
+        for (AdSignboardOrderRequest.CellSelection cell : comparisonCells) {
+            orderDates.computeIfAbsent(labelKey(cell.getLabelType(), cell.getScenario()), k -> new HashSet<>())
+                    .add(cell.getBizDate());
+        }
+        for (AdSignboardOrderRequest.CellSelection cell : comparisonCells) {
+            String otherScenario = "all_macau".equals(cell.getScenario()) ? "district" : "all_macau";
+            String otherLabel = "all_macau".equals(otherScenario) ? "全澳對比" : "商圈對比";
+            Set<LocalDate> otherOrderDates = orderDates.getOrDefault(
+                    labelKey(cell.getLabelType(), otherScenario), Set.of());
+            if (otherOrderDates.contains(cell.getBizDate())) {
+                throw new BusinessException(cell.getBizDate() + " 的 " + cell.getLabelType()
+                        + " 標籤同時選擇了兩種場景，同一天同一標籤只能展示一種場景");
+            }
+            if (purchased.contains(cellKey(cell.getBizDate(), cell.getLabelType(), otherScenario))) {
+                throw new BusinessException(cell.getBizDate() + " 的 " + cell.getLabelType() + " 標籤已購買"
+                        + otherLabel + "場景，同一天同一標籤只能展示一種場景");
+            }
+        }
     }
 
     /** 构建单个场景的条件描述文本 */
@@ -468,9 +738,7 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             Object valueObj = cond.get("qualificationValue");
             String value = valueObj != null ? String.valueOf(valueObj) : "";
             String scopeLabel = "districtMerchants".equals(scope) ? "商圈內" : "全澳";
-            String metricLabel = metricLabel(metric);
-            String comparisonLabel = comparisonLabel(comparison, value);
-            sb.append(scopeLabel).append(metricLabel).append(comparisonLabel);
+            sb.append(scopeLabel).append(metricLabel(metric)).append(comparisonLabel(comparison, value));
         }
         return sb.toString();
     }
@@ -479,10 +747,10 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         return switch (metric) {
             case "monthlyVisits" -> "月訪問量";
             case "monthlyOrders" -> "月訂單量";
-            case "monthlyRepurchase" -> "月復購率";
-            case "monthlyRating" -> "月好評率";
-            case "favoritesCount" -> "收藏人數";
-            case "customerCount" -> "顧客數";
+            case "monthlyRepurchase" -> "月復購訂單數據";
+            case "monthlyRating" -> "月好評訂單數據";
+            case "storeFavorites", "favoritesCount" -> "門店收藏";
+            case "monthlyCustomers", "customerCount" -> "顧客數";
             default -> metric;
         };
     }
@@ -490,15 +758,16 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
     private static String comparisonLabel(String comparison, String value) {
         return switch (comparison) {
             case "ranking" -> "排名前 " + value + " 名";
-            case "percentage" -> "≥ " + value + "%";
+            case "percentage" -> "前 " + value + "% 的商家";
             case "absolute" -> "≥ " + value;
             default -> "≥ " + value;
         };
     }
 
-    /** 根据算法条件填充 LabelPrice 的资格信息 */
+    /** 根据算法条件 + 当前门店数据填充 LabelPrice 的资格信息 */
     private static void fillQualificationInfo(AdSignboardInventoryVO.LabelPrice lp,
-                                              Map<String, Map<String, ScenarioCondition>> algoConditions) {
+                                              Map<String, Map<String, ScenarioCondition>> algoConditions,
+                                              EvalContext ctx) {
         // 统计类标签无场景，默认合格
         if (lp.getScenario() == null) {
             lp.setQualified(true);
@@ -508,16 +777,16 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         // 对比类标签：查找算法配置中对应的场景条件
         String scenarioKey = "all_macau".equals(lp.getScenario()) ? "allMacau" : "district";
         Map<String, ScenarioCondition> labelConditions = algoConditions.get(lp.getLabelType());
-        if (labelConditions == null || !labelConditions.containsKey(scenarioKey)) {
-            // 算法无此场景配置，默认合格
+        ScenarioCondition sc = labelConditions != null ? labelConditions.get(scenarioKey) : null;
+        if (sc == null || sc.conditions.isEmpty()) {
+            // 算法无此场景条件配置，默认合格
             lp.setQualified(true);
             lp.setConditionDesc(null);
             return;
         }
-        ScenarioCondition sc = labelConditions.get(scenarioKey);
-        String desc = sc != null ? sc.conditionDesc : "";
-        lp.setConditionDesc(desc.isEmpty() ? null : desc);
-        // 所有场景均允许选择，条件描述供前端展示
-        lp.setQualified(true);
+        lp.setConditionDesc(sc.conditionDesc.isEmpty() ? null : sc.conditionDesc);
+        QualificationResult r = evaluate(scenarioKey, sc, ctx);
+        lp.setQualified(r.qualified);
+        lp.setActualDesc(r.actualDesc);
     }
 }

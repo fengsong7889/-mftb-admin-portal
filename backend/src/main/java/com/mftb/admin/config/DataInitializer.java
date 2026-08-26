@@ -352,7 +352,7 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("login-log", "Employee Activity"),
                 // 團購管理
                 Map.entry("group-purchase", "Group Purchase"),
-                Map.entry("group-purchase-dashboard", "Dashboard"),
+                Map.entry("group-purchase-dashboard", "Flash Sale Overview"),
                 Map.entry("flash-sale-register", "Flash Sale Register"),
                 Map.entry("flash-sale-stats", "Flash Sale Stats"),
                 Map.entry("flash-sale-price", "Macau Flash Sale Price"),
@@ -577,7 +577,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("approval",            new String[]{"審批管理",          "finance",            "3"});
         menus.put("approval-center",     new String[]{"審批中心",         "approval",           "1"});
         // ── 團購管理 ──
-        menus.put("group-purchase-dashboard", new String[]{"數據看板",     "group-purchase",      "1"});
+        menus.put("group-purchase-dashboard", new String[]{"秒殺數據總覽",     "group-purchase",      "1"});
         menus.put("flash-sale-register", new String[]{"秒殺商品登記",     "group-purchase",      "2"});
         menus.put("flash-sale-stats",   new String[]{"秒殺商品統計",     "group-purchase",      "3"});
         menus.put("flash-sale-price",   new String[]{"澳覓秒殺價",       "group-purchase",      "4"});
