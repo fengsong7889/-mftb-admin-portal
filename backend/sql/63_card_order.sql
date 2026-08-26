@@ -1,4 +1,4 @@
--- 卡片排序持久化表（全局共享，按菜单+Tab维度保存）
+-- 卡片排序持久化表（全局共享，按菜单+Tab维度保存，所有用户共享同一排序）
 CREATE TABLE IF NOT EXISTS sys_card_order (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     menu_key VARCHAR(50) NOT NULL COMMENT '菜单标识: algorithm / waterfall / ad-sales',

@@ -51,18 +51,26 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ secrets.SEALOS_KUBECONFIG != '' }}
+    env:
+      HAS_SEALOS: ${{ secrets.SEALOS_KUBECONFIG != '' && 'true' || 'false' }}
     steps:
+      - name: Skip if no kubeconfig
+        if: env.HAS_SEALOS != 'true'
+        run: echo "SEALOS_KUBECONFIG not configured, skipping deploy"
+
       - name: Set up kubectl
+        if: env.HAS_SEALOS == 'true'
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
+        if: env.HAS_SEALOS == 'true'
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.SEALOS_KUBECONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
       - name: Rollout restart deployment
+        if: env.HAS_SEALOS == 'true'
         env:
           DEPLOYMENT: ${{ secrets.SEALOS_DEPLOYMENT || 'mftb-admin-backend' }}
           NAMESPACE:  ${{ secrets.SEALOS_NAMESPACE  || 'mftb-admin' }}
