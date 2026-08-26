@@ -271,7 +271,8 @@ export default function HintConfig() {
       title: t('hintConfig.colLastUpdateTime'),
       dataIndex: 'lastUpdateTime',
       key: 'lastUpdateTime',
-      width: 170,
+      width: 180,
+      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
       title: t('hintConfig.colStatus'),

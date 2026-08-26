@@ -341,15 +341,15 @@ export default function DataPermission() {
 
   const roleColumns: TableColumnsType<GroupedAuthRow> = [
     { title: t('dataPermission.colRoleName'), dataIndex: 'targetName', key: 'targetName', width: 180 },
-    { title: t('dataPermission.colGroupName'), key: 'groupName', render: renderGroupSummary },
+    { title: t('dataPermission.colGroupName'), key: 'groupName', width: 200, render: renderGroupSummary },
     { title: t('dataPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => t('dataPermission.personCount', { count: v }) },
     { title: t('dataPermission.colUpdatedBy'), dataIndex: 'latestUpdatedBy', key: 'latestUpdatedBy', width: 120, render: (v: string) => v || '-' },
     {
       title: t('dataPermission.colUpdatedAt'),
       dataIndex: 'latestUpdatedAt',
       key: 'latestUpdatedAt',
-      width: 170,
-      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      width: 180,
+      render: (date: string) => (date ? <span style={{ whiteSpace: 'nowrap' }}>{dayjs(date).format('YYYY-MM-DD HH:mm:ss')}</span> : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]
@@ -357,15 +357,15 @@ export default function DataPermission() {
   const deptColumns: TableColumnsType<GroupedAuthRow> = [
     { title: t('dataPermission.colDeptName'), dataIndex: 'targetName', key: 'targetName', width: 180 },
     { title: t('organization.colParentDept'), dataIndex: 'parentName', key: 'parentName', width: 150, render: (v: string) => v || '-' },
-    { title: t('dataPermission.colGroupName'), key: 'groupName', render: renderGroupSummary },
+    { title: t('dataPermission.colGroupName'), key: 'groupName', width: 200, render: renderGroupSummary },
     { title: t('dataPermission.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 110, render: (v: number) => t('dataPermission.personCount', { count: v }) },
     { title: t('dataPermission.colUpdatedBy'), dataIndex: 'latestUpdatedBy', key: 'latestUpdatedBy', width: 120, render: (v: string) => v || '-' },
     {
       title: t('dataPermission.colUpdatedAt'),
       dataIndex: 'latestUpdatedAt',
       key: 'latestUpdatedAt',
-      width: 170,
-      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      width: 180,
+      render: (date: string) => (date ? <span style={{ whiteSpace: 'nowrap' }}>{dayjs(date).format('YYYY-MM-DD HH:mm:ss')}</span> : '-'),
     },
     { title: t('common.colAction'), key: 'action', width: 180, render: (_, record) => renderActions(record) },
   ]

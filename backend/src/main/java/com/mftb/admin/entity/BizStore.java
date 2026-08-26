@@ -40,6 +40,9 @@ public class BizStore {
     /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（与广告定价商圈枚举一致） */
     private Integer region;
 
+    /** 门店地址（用户手动输入） */
+    private String address;
+
     /** 最后更新人 */
     private String updatedBy;
 

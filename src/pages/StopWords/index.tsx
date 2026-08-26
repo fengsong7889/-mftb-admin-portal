@@ -39,21 +39,27 @@ export default function StopWords() {
       title: t('stopWords.colStopWord'),
       dataIndex: 'word',
       key: 'word',
+      width: 150,
       render: (text: string) => <Tag color="red">{text}</Tag>,
     },
     {
       title: t('common.colCreateTime'),
       dataIndex: 'createTime',
       key: 'createTime',
+      width: 180,
+      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
       title: t('common.colCreator'),
       dataIndex: 'creator',
       key: 'creator',
+      width: 150,
     },
     {
       title: t('common.colAction'),
       key: 'action',
+      width: 140,
+      fixed: 'right' as const,
       render: (_: unknown, record: StopWord) => (
         <Space size="small">
           <Button

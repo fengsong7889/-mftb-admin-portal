@@ -18,6 +18,7 @@ import com.mftb.admin.entity.AdOrderItemSignboard;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdPricingHot;
+import com.mftb.admin.entity.AdPricingHotSkin;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
@@ -29,6 +30,7 @@ import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.AdPricingHotMapper;
+import com.mftb.admin.mapper.AdPricingHotSkinMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
@@ -78,6 +80,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderItemSignboardMapper signboardItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingHotMapper hotPricingMapper;
+    private final AdPricingHotSkinMapper hotSkinMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
@@ -581,6 +584,12 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : signboardItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemSignboard>()
                         .in(AdOrderItemSignboard::getOrderId, signboardOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemSignboard::getOrderId));
+        // 人氣商家：構建 skinName → tier 映射（從定價配置表查皮膚等級）
+        Map<String, String> skinTierMap = hotOrderIds.isEmpty() ? Map.of()
+                : hotSkinMapper.selectList(new LambdaQueryWrapper<AdPricingHotSkin>().isNotNull(AdPricingHotSkin::getTier))
+                .stream().collect(Collectors.toMap(
+                        AdPricingHotSkin::getSkinName, AdPricingHotSkin::getTier,
+                        (a, b) -> a));
         for (AdOrderVO vo : records) {
             if (isNewStoreType(vo.getAlgoType())) {
                 List<AdOrderItemNewStore> items = newStoreByOrder.getOrDefault(vo.getId(), List.of());
@@ -610,8 +619,14 @@ public class AdOrderServiceImpl implements AdOrderService {
                 vo.setPurchaseDays(items.stream().map(AdOrderItemHot::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
                         .map(Object::toString).toList());
-                vo.setSkinNames(items.stream().map(AdOrderItemHot::getSkinName)
-                        .filter(java.util.Objects::nonNull).distinct().sorted().toList());
+                List<String> skinNames = items.stream().map(AdOrderItemHot::getSkinName)
+                        .filter(java.util.Objects::nonNull).distinct().sorted().toList();
+                vo.setSkinNames(skinNames);
+                // 皮膚等級：根據 skinName 查定價配置的 tier
+                vo.setSkinTiers(skinNames.stream()
+                        .map(skinTierMap::get)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct().sorted().toList());
                 continue;
             }
             if (isSignboardType(vo.getAlgoType())) {
@@ -625,17 +640,24 @@ public class AdOrderServiceImpl implements AdOrderService {
                 // 標籤類型列表：明細去重排序
                 vo.setSkinNames(items.stream().map(AdOrderItemSignboard::getLabelType)
                         .filter(java.util.Objects::nonNull).distinct().sorted().toList());
-                // 按標籤分組日期：供列表頁展示「標籤 + 日期」
+                // 按標籤+場景分組日期：供列表頁展示「標籤(場景) + 日期」
                 Map<String, List<String>> labelDateMap = new LinkedHashMap<>();
                 items.stream()
                         .filter(i -> i.getLabelType() != null && i.getBizDate() != null)
                         .sorted(java.util.Comparator.comparing(AdOrderItemSignboard::getBizDate))
-                        .forEach(i -> labelDateMap.computeIfAbsent(i.getLabelType(), k -> new ArrayList<>())
-                                .add(i.getBizDate().toString()));
+                        .forEach(i -> {
+                            String key = i.getLabelType() + "|" + (i.getScenario() != null ? i.getScenario() : "");
+                            labelDateMap.computeIfAbsent(key, k -> new ArrayList<>())
+                                    .add(i.getBizDate().toString());
+                        });
                 // 去重日期
                 List<AdOrderVO.LabelDateGroup> labelDates = new ArrayList<>();
-                labelDateMap.forEach((label, dates) -> labelDates.add(
-                        new AdOrderVO.LabelDateGroup(label, dates.stream().distinct().sorted().toList())));
+                labelDateMap.forEach((key, dates) -> {
+                    String[] parts = key.split("\\|", -1);
+                    String label = parts[0];
+                    String scenario = parts.length > 1 && !parts[1].isEmpty() ? parts[1] : null;
+                    labelDates.add(new AdOrderVO.LabelDateGroup(label, scenario, dates.stream().distinct().sorted().toList()));
+                });
                 vo.setLabelDates(labelDates);
                 continue;
             }
@@ -685,6 +707,24 @@ public class AdOrderServiceImpl implements AdOrderService {
                         Integer region = storeRegionMap.get(vo.getStoreCode());
                         vo.setRegions(region != null ? List.of(region) : new ArrayList<>());
                     });
+        }
+        // 所有訂單類型：從門店地址回填 storeAddress（門店自身地址，與購買商圈區分）
+        List<String> allStoreCodes = records.stream()
+                .filter(r -> StringUtils.hasText(r.getStoreCode()))
+                .map(AdOrderVO::getStoreCode).distinct().toList();
+        if (!allStoreCodes.isEmpty()) {
+            Map<String, String> allStoreAddressMap = storeMapper.selectList(
+                    new LambdaQueryWrapper<BizStore>()
+                            .in(BizStore::getStoreCode, allStoreCodes)
+                            .select(BizStore::getStoreCode, BizStore::getAddress))
+                    .stream()
+                    .filter(s -> StringUtils.hasText(s.getAddress()))
+                    .collect(Collectors.toMap(BizStore::getStoreCode, BizStore::getAddress, (a, b) -> a));
+            records.forEach(vo -> {
+                if (StringUtils.hasText(vo.getStoreCode())) {
+                    vo.setStoreAddress(allStoreAddressMap.get(vo.getStoreCode()));
+                }
+            });
         }
         // 存量订单无 algo_code 快照 → 回查算法表补齐
         List<Long> missingAlgoIds = records.stream()

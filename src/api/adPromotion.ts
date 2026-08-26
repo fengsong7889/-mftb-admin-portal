@@ -365,6 +365,8 @@ export interface DateSlotGroup {
 /** 按标签分组的购买日期（金字招牌） */
 export interface LabelDateGroup {
   label: string
+  /** 場景: all_macau=全澳對比, district=商圈對比, null/undefined=統計類 */
+  scenario?: string | null
   dates: string[]
 }
 
@@ -391,6 +393,8 @@ export interface AdOrder {
   operatorName?: string
   /** 所属商圈（明细去重聚合） */
   regions?: number[]
+  /** 门店地址（来自 biz_store.address，门店自身地址） */
+  storeAddress?: string
   /** 购买时段（明细去重聚合, breakfast/lunch/afternoon/dinner/supper） */
   mealSlots?: string[]
   /** 按日期分组的购买时段（無敵星星：每个日期对应的时段列表） */
@@ -414,6 +418,8 @@ export interface AdOrder {
   purchaseDays?: string[]
   /** 购买皮肤列表（人氣商家明细 skin_name 去重排序） */
   skinNames?: string[]
+  /** 皮膚等級列表（人氣商家：根據 skin_name 查定價配置 tier 去重排序） */
+  skinTiers?: string[]
   /** 按标签分组的购买日期（金字招牌：每个标签对应的日期列表） */
   labelDates?: LabelDateGroup[]
   /** 後端 LocalDateTime 統一序列化為毫秒時間戳，保留字符串兼容 */

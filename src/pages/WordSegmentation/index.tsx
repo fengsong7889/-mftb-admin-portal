@@ -139,7 +139,8 @@ export default function WordSegmentation() {
       title: t('wordSegmentation.colLastUpdateTime'),
       dataIndex: 'updateTime',
       key: 'updateTime',
-      width: 170,
+      width: 180,
+      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
       title: t('common.colAction'),

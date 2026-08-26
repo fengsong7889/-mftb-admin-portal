@@ -92,6 +92,28 @@ const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: s
   customers: { label: '顧客數', icon: '👥', color: '#13C2C2' },
 }
 
+/** 金字招牌場景 → 中文後綴 */
+const SIGNBOARD_SCENARIO_CN: Record<string, string> = {
+  all_macau: '全澳對比',
+  district: '商圈對比',
+}
+
+/** 格式化標籤+場景顯示（如：熱門-全澳對比） */
+function formatSignboardLabel(label: string, scenario?: string | null): string {
+  const cfg = SIGNBOARD_LABEL_CN[label]
+  const name = cfg?.label || label
+  const suffix = scenario ? SIGNBOARD_SCENARIO_CN[scenario] : null
+  return suffix ? `${name}-${suffix}` : name
+}
+
+/** 皮膚等級 → 中文翻譯（高端寶石色系：黛青绿 → 皇家蓝 → 帝王紫 → 香槟金） */
+const SKIN_TIER_CN: Record<string, { label: string; color: string }> = {
+  classic:  { label: '經典版', color: '#08979C' },
+  premium:  { label: '精選版', color: '#2F54EB' },
+  flagship: { label: '旗艦版', color: '#722ED1' },
+  ultimate: { label: '至尊版', color: '#D48806' },
+}
+
 // 下单人类型枚举
 enum OrderOperatorType {
   MERCHANT = 1,  // 商家
@@ -116,7 +138,8 @@ interface OrderItem {
   mealSlots: string[]       // 無敵星星：購買時段
   dateSlots?: DateSlotGroup[] // 無敵星星：按日期分組的購買時段
   purchaseDays?: string[]    // 盤活復蘇/人氣商家/金字招牌：購買日期列表
-  skinName?: string          // 人氣商家：皮膚套件名稱
+  skinName?: string          // 人氣商家：皮膚名稱
+  skinTiers?: string[]       // 人氣商家：皮膚等級列表
   labelDates?: LabelDateGroup[] // 金字招牌：按標籤分組的購買日期
   purchaseDate: string
   originalPrice: number
@@ -204,7 +227,8 @@ function toOrderItem(vo: AdOrder): OrderItem {
     mealSlots,
     dateSlots,
     purchaseDays,
-    skinName: vo.algoType === 13 ? vo.skinNames?.[0] : undefined,
+    skinName: vo.algoType === 5 ? vo.skinNames?.[0] : undefined,
+    skinTiers: vo.skinTiers,
     labelDates: vo.labelDates,
     purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
@@ -350,6 +374,8 @@ export default function PromotionOrderManage() {
     operatorKeyword: '',   // 下单人搜索关键字
     refundOperatorKeyword: '', // 退款人搜索关键字
     cancelOperatorKeyword: '', // 取消人搜索关键字
+    labelFilter: undefined as string | undefined, // 金字招牌：購買內容標籤篩選
+    skinTierFilter: undefined as string | undefined, // 人氣商家：皮膚等級篩選
   })
 
   // 根据 orderType 过滤对应类型的订单
@@ -409,6 +435,14 @@ export default function PromotionOrderManage() {
         const matchName = (order.cancelOperatorName || '').toLowerCase().includes(kw)
         if (!matchId && !matchName) return false
       }
+      if (filters.labelFilter) {
+        const hasLabel = order.labelDates?.some(ld => ld.label === filters.labelFilter)
+        if (!hasLabel) return false
+      }
+      if (filters.skinTierFilter) {
+        const hasTier = order.skinTiers?.includes(filters.skinTierFilter)
+        if (!hasTier) return false
+      }
       return true
     })
   }, [filters, orderType, orders])
@@ -421,8 +455,12 @@ export default function PromotionOrderManage() {
     { key: 'algorithmInfo', title: orderType === '人氣商家' ? '配置ID/人氣名稱' : t('promotionOrderManage.colAlgorithmInfo') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'channel', title: t('common.colChannel') },
-    { key: 'region', title: t('promotionOrderManage.colRegion') },
-    { key: 'purchaseContent', title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colSkinDays') : t('promotionOrderManage.purchaseContent') },
+    ...(orderType !== '人氣商家' && orderType !== '金字招牌' ? [{ key: 'region', title: t('promotionOrderManage.colRegion') }] : []),
+    ...(orderType === '人氣商家' ? [
+      { key: 'skinTier', title: t('promotionOrderManage.colSkinTier') },
+      { key: 'skinName', title: t('promotionOrderManage.colSkinName') },
+    ] : []),
+    { key: 'purchaseContent', title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colPromoDays') : t('promotionOrderManage.purchaseContent') },
     ...(orderType !== '新店廣告' ? [
       { key: 'originalPrice', title: t('promotionOrderManage.colOrderAmount') },
       { key: 'discount', title: t('promotionOrderManage.colDiscount') },
@@ -448,7 +486,7 @@ export default function PromotionOrderManage() {
     { key: 'action', title: t('common.colAction') },
   ], [orderType, t])
 
-  const { configComponent, applyConfig } = useColumnConfig('promotion-order-manage-standalone', columnMeta, [
+  const { configComponent, applyConfig } = useColumnConfig('promotion-order-manage-standalone-v2', columnMeta, [
     { key: 'orderNo', visible: true, locked: 'head' as const },
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
@@ -511,11 +549,11 @@ export default function PromotionOrderManage() {
       width: 120,
       render: (channel: RecommendChannel) => channelLabel(channel),
     },
-    {
+    ...(orderType !== '人氣商家' && orderType !== '金字招牌' ? [{
       title: t('promotionOrderManage.colRegion'),
       dataIndex: 'region',
       key: 'region',
-      width: 220,
+      width: 140,
       render: (region: Region | Region[]) => {
         const regions = Array.isArray(region) ? region : [region]
         const maxShow = 2
@@ -555,11 +593,38 @@ export default function PromotionOrderManage() {
           </Space>
         )
       },
-    },
+    }] : []),
+    // 人氣商家：皮膚等級列
+    ...(orderType === '人氣商家' ? [{
+      title: t('promotionOrderManage.colSkinTier'),
+      key: 'skinTier',
+      width: 120,
+      render: (_: unknown, record: OrderItem) => {
+        if (!record.skinTiers || record.skinTiers.length === 0) return <span style={{ color: '#8C8C8C' }}>—</span>
+        return (
+          <Space direction="vertical" size={2}>
+            {record.skinTiers.map((tier: string, i: number) => {
+              const cfg = SKIN_TIER_CN[tier]
+              return <Tag key={i} color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.label || tier}</Tag>
+            })}
+          </Space>
+        )
+      },
+    }] : []),
+    // 人氣商家：皮膚名稱列
+    ...(orderType === '人氣商家' ? [{
+      title: t('promotionOrderManage.colSkinName'),
+      key: 'skinName',
+      width: 150,
+      render: (_: unknown, record: OrderItem) => {
+        if (!record.skinName) return <span style={{ color: '#8C8C8C' }}>—</span>
+        return <Tag color="geekblue" style={{ margin: 0 }}>{record.skinName}</Tag>
+      },
+    }] : []),
     {
-      title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colSkinDays') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
+      title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colPromoDays') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
-      width: 220,
+      width: orderType === '金字招牌' ? 320 : 140,
       render: (_, record) => {
         // 金字招牌：展示標籤 + 日期（最多3個標籤，超出 +X 弹窗）
         if (orderType === '金字招牌' || record.recommendType === RecommendType.GOLDEN_SIGNBOARD) {
@@ -576,7 +641,7 @@ export default function PromotionOrderManage() {
                   return (
                     <div key={li}>
                       <div style={{ marginBottom: 4 }}>
-                        <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {cfg?.label || lg.label}</Tag>
+                        <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {formatSignboardLabel(lg.label, lg.scenario)}</Tag>
                       </div>
                       <Space wrap size={4}>
                         {lg.dates.map((d, di) => (
@@ -604,18 +669,18 @@ export default function PromotionOrderManage() {
                   )
                   return (
                     <div key={li} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {cfg?.label || lg.label}</Tag>
+                      <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {formatSignboardLabel(lg.label, lg.scenario)}</Tag>
                       {firstDate && (
                         <span style={{ fontSize: 12, color: '#595959' }}>{firstDate}</span>
                       )}
                       {moreCount > 0 && (
                         <Popover
                           content={allDatesContent}
-                          title={`${cfg?.label || lg.label} 全部日期`}
+                          title={`${formatSignboardLabel(lg.label, lg.scenario)} 全部日期`}
                           trigger="click"
                           placement="bottomLeft"
                         >
-                          <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{moreCount}日期</span>
+                          <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{moreCount}</span>
                         </Popover>
                       )}
                     </div>
@@ -632,7 +697,7 @@ export default function PromotionOrderManage() {
           return <span style={{ color: '#bfbfbf' }}>-</span>
         }
         if (orderType === '盤活復蘇' || orderType === '新店廣告' || orderType === '人氣商家' || record.recommendType === RecommendType.HOT_REVIVE_AD || record.recommendType === RecommendType.NEW_STORE_AD || record.recommendType === RecommendType.POPULAR_MERCHANT_KA) {
-          // 盤活復蘇/人氣商家：展示天數（人氣商家額外展示皮膚套件），點擊弹窗查看具體日期
+          // 盤活復蘇/人氣商家/新店廣告：展示天數，點擊弹窗查看具體日期
           if (record.purchaseDays && record.purchaseDays.length > 0) {
             const days = record.purchaseDays.length
 
@@ -654,7 +719,8 @@ export default function PromotionOrderManage() {
                 placement="bottomLeft"
               >
                 <Space size={4} style={{ cursor: 'pointer' }}>
-                  {record.skinName && <Tag color="geekblue" style={{ margin: 0 }}>{record.skinName}</Tag>}
+                  {/* 人氣商家：皮膚名稱已拆分到獨立列，不再在此展示 */}
+                  {record.skinName && orderType !== '人氣商家' && <Tag color="geekblue" style={{ margin: 0 }}>{record.skinName}</Tag>}
                   <Tag color="green" style={{ margin: 0 }}>{t('promotionOrderManage.daysUnit', { count: days })}</Tag>
                   <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12, color: '#1890ff' }}>
                     {t('promotionOrderManage.view')}
@@ -876,8 +942,8 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colRefundTime'),
       dataIndex: 'refundTime',
       key: 'refundTime',
-      width: 160,
-      render: (time: string | undefined) => time || <span style={{ color: '#bfbfbf' }}>-</span>,
+      width: 175,
+      render: (time: string | undefined) => time ? <span style={{ whiteSpace: 'nowrap' }}>{time}</span> : <span style={{ color: '#bfbfbf' }}>-</span>,
     }] : []),
     // 取消人 - 僅新店廣告顯示
     ...(orderType === '新店廣告' ? [{
@@ -898,8 +964,8 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colCancelTime'),
       dataIndex: 'cancelTime',
       key: 'cancelTime',
-      width: 160,
-      render: (time: string | undefined) => time || <span style={{ color: '#bfbfbf' }}>-</span>,
+      width: 175,
+      render: (time: string | undefined) => time ? <span style={{ whiteSpace: 'nowrap' }}>{time}</span> : <span style={{ color: '#bfbfbf' }}>-</span>,
     }] : []),
     {
       title: t('promotionOrderManage.colOperator'),
@@ -919,7 +985,8 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colOrderTime'),
       dataIndex: 'orderTime',
       key: 'orderTime',
-      width: 160,
+      width: 175,
+      render: (time: string) => time ? <span style={{ whiteSpace: 'nowrap' }}>{time}</span> : '-',
     },
     {
       title: t('common.colAction'),
@@ -955,6 +1022,8 @@ export default function PromotionOrderManage() {
       operatorKeyword: '',
       refundOperatorKeyword: '',
       cancelOperatorKeyword: '',
+      labelFilter: undefined,
+      skinTierFilter: undefined,
     })
   }
 
@@ -1128,19 +1197,51 @@ export default function PromotionOrderManage() {
                 }
               />
             </Form.Item>
-            <Form.Item label={t('promotionOrderManage.colPromoRegion')}>
-              <TreeSelect
-                placeholder={t('common.all')}
-                allowClear
-                showSearch
-                treeDefaultExpandAll
-                treeNodeFilterProp="title"
-                value={filters.region}
-                onChange={value => setFilters({ ...filters, region: value })}
-                treeData={regionTreeData}
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
+            {orderType !== '人氣商家' && orderType !== '金字招牌' && (
+              <Form.Item label={t('promotionOrderManage.colPromoRegion')}>
+                <TreeSelect
+                  placeholder={t('common.all')}
+                  allowClear
+                  showSearch
+                  treeDefaultExpandAll
+                  treeNodeFilterProp="title"
+                  value={filters.region}
+                  onChange={value => setFilters({ ...filters, region: value })}
+                  treeData={regionTreeData}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            )}
+            {orderType === '金字招牌' && (
+              <Form.Item label={'購買內容'}>
+                <Select
+                  placeholder={t('common.all')}
+                  allowClear
+                  value={filters.labelFilter}
+                  onChange={value => setFilters({ ...filters, labelFilter: value })}
+                  options={Object.entries(SIGNBOARD_LABEL_CN).map(([key, cfg]) => ({
+                    label: `${cfg.icon} ${cfg.label}`,
+                    value: key,
+                  }))}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            )}
+            {orderType === '人氣商家' && (
+              <Form.Item label={t('promotionOrderManage.colSkinTier')}>
+                <Select
+                  placeholder={t('common.all')}
+                  allowClear
+                  value={filters.skinTierFilter}
+                  onChange={value => setFilters({ ...filters, skinTierFilter: value })}
+                  options={Object.entries(SKIN_TIER_CN).map(([key, cfg]) => ({
+                    label: cfg.label,
+                    value: key,
+                  }))}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            )}
             <Form.Item label={t('promotionOrderManage.colOrderStatus')}>
               <Select
                 placeholder={t('common.all')}

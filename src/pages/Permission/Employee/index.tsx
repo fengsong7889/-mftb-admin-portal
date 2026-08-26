@@ -417,6 +417,7 @@ export default function EmployeeManagement() {
       title: t('employee.colRoleAuth'),
       dataIndex: 'functionRoleIds',
       key: 'functionRoleIds',
+      width: 200,
       render: (roleIds: number[]) => renderRoleTags(roleIds),
     },
     {
@@ -455,8 +456,8 @@ export default function EmployeeManagement() {
       title: t('employee.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 165,
-      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      width: 180,
+      render: (date: string) => (date ? <span style={{ whiteSpace: 'nowrap' }}>{dayjs(date).format('YYYY-MM-DD HH:mm:ss')}</span> : '-'),
     },
     {
       title: t('common.colAction'),

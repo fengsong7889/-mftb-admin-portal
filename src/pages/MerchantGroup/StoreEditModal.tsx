@@ -62,6 +62,7 @@ export default function StoreEditModal({
           storeName: editingRecord.storeName,
           loginAccount: editingRecord.loginAccount,
           region: editingRecord.region ?? undefined,
+          address: editingRecord.address ?? undefined,
         })
         // 品牌改為多選（Checkbox），值為逗號分隔字符串
         form.setFieldValue('brand', editingRecord.brand ? editingRecord.brand.split(',').map(s => s.trim()).filter(Boolean) : [])
@@ -156,6 +157,13 @@ export default function StoreEditModal({
             treeDefaultExpandAll
             treeData={STORE_REGION_TREE}
           />
+        </Form.Item>
+        <Form.Item
+          name="address"
+          label={t('addressLabel')}
+          rules={[{ max: 256, message: t('addressMax') }]}
+        >
+          <Input placeholder={t('addressPlaceholder')} />
         </Form.Item>
         <Form.Item
           name="loginAccount"

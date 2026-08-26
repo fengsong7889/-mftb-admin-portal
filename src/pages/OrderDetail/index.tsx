@@ -136,6 +136,7 @@ interface OrderItem {
   groupName: string
   storeId: string
   storeName: string
+  storeAddress?: string  // 门店地址（来自 biz_store.address）
   purchaseDate: string
   originalPrice: number
   discountPrice: number
@@ -151,7 +152,7 @@ interface OrderItem {
   promoStartDate?: string // 推广开始日期
   promoData?: PromoRecord[] // 推广数据
   purchaseDays?: string[] // 新店廣告/人氣商家：推廣日期列表
-  skinName?: string // 人氣商家：皮膚套件名稱
+  skinName?: string // 人氣商家：皮膚名稱
   giftDays?: number // 贈送天數抵扣快照（抵扣天數）
   giftAmount?: number // 贈送抵扣金額快照
   terminalTime?: string // 終態（已退款/已取消/已中止/已完成）發生的日期時間
@@ -161,7 +162,7 @@ interface OrderItem {
   /** 数据来源：api=后端真实数据 mock=演示数据 */
   source?: 'api' | 'mock'
   /** 金字招牌：按标签分组的购买日期 */
-  labelDates?: { label: string; dates: string[] }[]
+  labelDates?: { label: string; scenario?: string | null; dates: string[] }[]
 }
 
 /* ---- 后端订单映射 ---- */
@@ -310,6 +311,7 @@ function toDetailOrder(
     groupName: vo.groupName || '-',
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
+    storeAddress: vo.storeAddress,
     purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,
     discountPrice: vo.originalAmount - vo.discountAmount,
@@ -325,7 +327,7 @@ function toDetailOrder(
     promoStartDate: firstBizDate,
     purchaseDays: vo.purchaseDays,
     skinName: vo.skinNames?.[0] || vo.items.find(i => i.skinName)?.skinName || undefined,
-    labelDates: vo.labelDates?.map(ld => ({ label: ld.label, dates: ld.dates })),
+    labelDates: vo.labelDates?.map(ld => ({ label: ld.label, scenario: ld.scenario, dates: ld.dates })),
     giftDays: vo.giftDays ?? 0,
     giftAmount: vo.giftAmount ?? 0,
     promoData,
@@ -499,7 +501,8 @@ function genOrder(
   return {
     id, orderNo, algorithmId: algoId, promotionName: promoName, app, channel, region,
     recommendType: recType, slotPosition: slotPos, groupId: gid, groupName: gname,
-    storeId: sid, storeName: sname, purchaseDate: pdate, originalPrice: orig,
+    storeId: sid, storeName: sname, storeAddress: '',
+    purchaseDate: pdate, originalPrice: orig,
     discountPrice: disc, actualPrice: actual, status, orderTime: otime, payTime: ptime,
     promoStartDate: isPast ? '2025-06-15' : '2026-08-11',
     slotPrices, gradientDiscount: gradDisc, cancelFeeRules, promoData,
@@ -596,7 +599,7 @@ function genPopularDays(startDate: string, days: number): string[] {
   })
 }
 
-// 人氣商家訂單：皮膚套件按天計價（參考盤活復蘇按天模式），滿7天享95折梯度；付費購買，支持退款
+// 人氣商家訂單：皮膚名稱按天計價（參考盤活復蘇按天模式），滿7天享95折梯度；付費購買，支持退款
 function genPopularOrder(
   id: string, orderNo: string, algoId: string, promoName: string,
   app: AppType, channel: RecommendChannel, region: number, slotPos: number,
@@ -929,6 +932,34 @@ export default function OrderDetail() {
     repurchase: { label: '復購', icon: '\uD83D\uDD04', color: '#722ED1' },
     favorites: { label: '收藏', icon: '\u2764\uFE0F', color: '#EB2F96' },
     customers: { label: '顧客數', icon: '\uD83D\uDC65', color: '#13C2C2' },
+  }
+
+  /** 金字招牌場景 → 中文後綴 */
+  const SIGNBOARD_SCENARIO_CN: Record<string, string> = {
+    all_macau: '全澳對比',
+    district: '商圈對比',
+  }
+
+  /** 格式化標籤+場景顯示（如：熱門-全澳對比） */
+  const fmtSignboardLabel = (label: string, scenario?: string | null) => {
+    const cfg = SIGNBOARD_LABEL_CN[label]
+    const name = cfg?.label || label
+    const suffix = scenario ? SIGNBOARD_SCENARIO_CN[scenario] : null
+    return suffix ? `${name}-${suffix}` : name
+  }
+
+  /** 根據場景獲取推廣商圈顯示文案 */
+  const getSignboardRegionDisplay = (scenario?: string | null) => {
+    if (scenario === 'all_macau' || !scenario) {
+      // 全澳對比 或 統計類（無場景）→ 全澳區域
+      return '全澳區域'
+    }
+    if (scenario === 'district') {
+      // 商圈對比 → 門店所在區域
+      const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
+      return regionVal ? t(REGION_LABEL_KEY[regionVal]) : '—'
+    }
+    return '—'
   }
 
   // 新店廣告已取消：保留「待推廣 / 推廣中」節點展示，但因未推廣即取消，兩節點以另色標記並打叉
@@ -1307,7 +1338,7 @@ export default function OrderDetail() {
                   {/* 购买商家信息 */}
                   <Card title={<CardTitle icon={<ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={t('orderDetail.buyMerchantInfo')} />}
                     style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: '16px 24px' } }}>
-        <Descriptions column={2} labelStyle={{ color: '#8c8c8c', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
+        <Descriptions column={3} labelStyle={{ color: '#8c8c8c', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
           <Descriptions.Item label={t('orderDetail.colGroup')}>
             <span>{order.groupName}</span>
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.groupId })}</span>
@@ -1315,6 +1346,9 @@ export default function OrderDetail() {
           <Descriptions.Item label={t('orderDetail.colStore')}>
             <span>{order.storeName}</span>
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.storeId })}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label={t('orderDetail.colStoreRegion')}>
+            {order.storeAddress || <span style={{ color: '#BFBFBF' }}>—</span>}
           </Descriptions.Item>
         </Descriptions>
                   </Card>
@@ -1354,7 +1388,7 @@ export default function OrderDetail() {
                   const labelCfg = SIGNBOARD_LABEL_CN[ld.label]
                   return (
                     <Tag key={idx} color={labelCfg?.color || 'geekblue'}>
-                      {labelCfg ? `${labelCfg.icon} ${labelCfg.label}` : ld.label}
+                      {labelCfg ? `${labelCfg.icon} ${fmtSignboardLabel(ld.label, ld.scenario)}` : fmtSignboardLabel(ld.label, ld.scenario)}
                     </Tag>
                   )
                 }) || (order.skinName && (
@@ -1438,7 +1472,9 @@ export default function OrderDetail() {
                           {si === 0 && (
                             <td rowSpan={rSlots.length} style={{
                               padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
-                              background: '#FAFAFA', borderRight: '1px solid #f0f0f0',
+                              background: 'transparent',
+                              borderLeft: rSlots.length > 1 ? '1px dashed #E8E8E8' : 'none',
+                              borderRight: rSlots.length > 1 ? '1px dashed #E8E8E8' : 'none',
                             }}>
                               <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[r])}</Tag>
                             </td>
@@ -1470,16 +1506,9 @@ export default function OrderDetail() {
               }}>
                 {isPopular ? (
                   <>
-                    {/* 人氣商家：商圈與皮膚套件分屬不同維度，各自加字段標籤前綴並用豎線分隔，避免混淆 */}
-                    <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
-                    <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
-                    {order.skinName && (
-                      <>
-                        <span style={{ width: 1, height: 14, background: '#E0E0E0' }} />
-                        <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                        <Tag style={{ margin: 0, color: '#E8720C', background: '#FFF7E6', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
-                      </>
-                    )}
+                    {/* 人氣商家：購買皮膚，無推廣商圈，只展示皮膚名稱 */}
+                    <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
+                    <Tag style={{ margin: 0, color: '#E8720C', background: '#FFF7E6', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinDailyNote')}</span>
                   </>
                 ) : (
@@ -1590,40 +1619,50 @@ export default function OrderDetail() {
           )
         })()}
 
-        {/* 金字招牌：標籤類型 + 購買日期與價格 */}
+        {/* 金字招牌：標籤 + 推廣商圈 + 購買日期與價格 */}
         {isGoldenSignboard && (() => {
-          const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
+          // 構建日期 → (label, scenario) 映射，供每行查找所屬標籤
+          const dateToLabel = new Map<string, { label: string; scenario?: string | null }>()
+          order.labelDates?.forEach(ld => {
+            ld.dates.forEach(d => dateToLabel.set(d, { label: ld.label, scenario: ld.scenario }))
+          })
+          // 計算標籤名稱 + 推廣商圈的 rowSpan 合併
+          const rows = order.slotPrices.map((sp) => {
+            const info = dateToLabel.get(sp.date)
+            return info ? `${info.label}|${info.scenario || ''}` : '__none__'
+          })
+          const rowSpans = rows.map((key, i) => {
+            if (i === 0) {
+              // 往前看無，往後看連續相同
+              let span = 1
+              while (i + span < rows.length && rows[i + span] === key) span++
+              return span
+            }
+            if (rows[i] === rows[i - 1]) return 0 // 被合併
+            let span = 1
+            while (i + span < rows.length && rows[i + span] === key) span++
+            return span
+          })
           return (
             <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
               <div style={{
                 background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                fontSize: 13, fontWeight: 600, color: '#262626',
               }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
-                <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
-                {order.labelDates && order.labelDates.length > 0 && (
-                  <>
-                    <span style={{ width: 1, height: 14, background: '#E0E0E0' }} />
-                    <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                    {order.labelDates.map((ld, idx) => {
-                      const labelCfg = SIGNBOARD_LABEL_CN[ld.label]
-                      return (
-                        <Tag key={idx} style={{ margin: 0, color: labelCfg?.color || '#8C8C8C', background: `${labelCfg?.color || '#8C8C8C'}10`, borderColor: `${labelCfg?.color || '#8C8C8C'}40` }}>
-                          {labelCfg ? `${labelCfg.icon} ${labelCfg.label}` : ld.label}
-                        </Tag>
-                      )
-                    })}
-                  </>
-                )}
+                {t('orderDetail.slotTitleGoldenSignboard')}
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <colgroup>
-                  <col style={{ width: '35%' }} />
-                  <col style={{ width: '30%' }} />
-                  <col style={{ width: '35%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '28%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '25%' }} />
                 </colgroup>
                 <thead>
                   <tr style={{ background: '#FAFAFA' }}>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
                     <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
                     <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
                     <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
@@ -1632,8 +1671,33 @@ export default function OrderDetail() {
                 <tbody>
                   {order.slotPrices.map((sp, i) => {
                     const dayStatus = getDayStatus(sp.date)
+                    const labelInfo = dateToLabel.get(sp.date)
+                    const labelCfg = labelInfo ? SIGNBOARD_LABEL_CN[labelInfo.label] : null
+                    const rs = rowSpans[i]
                     return (
                       <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                        {rs > 0 && (
+                          <td rowSpan={rs} style={{
+                            padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
+                            background: rs > 1 ? `${labelCfg?.color || '#8C8C8C'}08` : 'transparent',
+                            borderRight: '1px dashed #E8E8E8',
+                          }}>
+                            {labelCfg ? (
+                              <Tag style={{ margin: 0, color: labelCfg.color, background: `${labelCfg.color}10`, borderColor: `${labelCfg.color}40` }}>
+                                {labelCfg.icon} {fmtSignboardLabel(labelInfo!.label, labelInfo!.scenario)}
+                              </Tag>
+                            ) : <span style={{ color: '#8C8C8C' }}>—</span>}
+                          </td>
+                        )}
+                        {rs > 0 && (
+                          <td rowSpan={rs} style={{
+                            padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
+                            background: 'transparent',
+                            borderRight: '1px dashed #E8E8E8',
+                          }}>
+                            <Tag color="blue" style={{ margin: 0 }}>{labelInfo ? getSignboardRegionDisplay(labelInfo.scenario) : '—'}</Tag>
+                          </td>
+                        )}
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.date}</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>
@@ -1985,7 +2049,7 @@ export default function OrderDetail() {
                 </div>
               ),
             },
-            // 人氣商家僅購買皮膚套件、無具體展示位置，不展示推廣數據 Tab
+            // 人氣商家僅購買皮膚、無具體展示位置，不展示推廣數據 Tab
             ...(isPopular ? [] : [{
               key: 'promoData',
               label: (

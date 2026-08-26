@@ -226,7 +226,7 @@ export default function PromotionSlotConfig() {
       title: t('promotionSlotConfig.colLastUpdateTime'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 170,
+      width: 180,
       render: (v: string | number) => <span style={{ whiteSpace: 'nowrap' }}>{v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>,
     },
     {

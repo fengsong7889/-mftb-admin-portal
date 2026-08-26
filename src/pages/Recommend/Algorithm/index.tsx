@@ -350,7 +350,7 @@ export default function Algorithm() {
       render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
     },
     {
-      title: t('algorithm.colLastUpdateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      title: t('algorithm.colLastUpdateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180,
       render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
     },
     {

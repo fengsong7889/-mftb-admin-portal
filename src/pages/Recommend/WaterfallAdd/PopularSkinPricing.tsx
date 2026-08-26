@@ -67,14 +67,14 @@ type DishLayout = 'grid' | 'carousel'
 /** 皮膚段位（等級越高視覺效果越好、價格越貴） */
 type SkinTier = 'classic' | 'premium' | 'flagship' | 'ultimate'
 const SKIN_TIER_OPTIONS: { value: SkinTier; labelKey: string; descKey: string; color: string; bg: string; badge: React.CSSProperties; icon?: string }[] = [
-  { value: 'classic',   labelKey: 'recommend.popularSkin.skinTierClassic',   descKey: 'recommend.popularSkin.skinTierClassicDesc',   color: '#8C8C8C', bg: '#F5F5F5',
-    badge: { fontSize: 12, fontWeight: 500, color: '#8C8C8C', background: '#F5F5F5', borderRadius: 4, padding: '1px 10px', border: '1px solid #E8E8E8' } },
-  { value: 'premium',   labelKey: 'recommend.popularSkin.skinTierPremium',   descKey: 'recommend.popularSkin.skinTierPremiumDesc',   color: '#1890FF', bg: '#E6F7FF',
-    badge: { fontSize: 12, fontWeight: 600, color: '#1890FF', background: 'linear-gradient(135deg, #E6F7FF, #BAE7FF)', borderRadius: 4, padding: '1px 10px', border: '1px solid #91D5FF', boxShadow: '0 1px 3px rgba(24,144,255,0.15)' } },
-  { value: 'flagship',  labelKey: 'recommend.popularSkin.skinTierFlagship',  descKey: 'recommend.popularSkin.skinTierFlagshipDesc',  color: '#E8720C', bg: '#FFF7E6',
-    badge: { fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #E8720C, #F5A623)', borderRadius: 4, padding: '1px 10px', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 2px 6px rgba(232,114,12,0.3)', textShadow: '0 1px 2px rgba(0,0,0,0.15)' } },
-  { value: 'ultimate',  labelKey: 'recommend.popularSkin.skinTierUltimate',  descKey: 'recommend.popularSkin.skinTierUltimateDesc',  color: '#722ED1', bg: '#F9F0FF', icon: '✦',
-    badge: { fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #722ED1, #B24BF3, #722ED1)', backgroundSize: '200% 200%', borderRadius: 4, padding: '1px 10px', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 2px 8px rgba(114,46,209,0.4), inset 0 1px 0 rgba(255,255,255,0.2)', textShadow: '0 1px 3px rgba(0,0,0,0.2)', animation: 'tierShimmer 2.5s ease-in-out infinite' } },
+  { value: 'classic',   labelKey: 'recommend.popularSkin.skinTierClassic',   descKey: 'recommend.popularSkin.skinTierClassicDesc',   color: '#08979C', bg: '#E6FFFB',
+    badge: { fontSize: 12, fontWeight: 600, color: '#08979C', background: 'linear-gradient(135deg, #E6FFFB, #B5F5EC)', borderRadius: 4, padding: '1px 10px', border: '1px solid #87E8DE', boxShadow: '0 1px 3px rgba(8,151,156,0.15)' } },
+  { value: 'premium',   labelKey: 'recommend.popularSkin.skinTierPremium',   descKey: 'recommend.popularSkin.skinTierPremiumDesc',   color: '#2F54EB', bg: '#F0F5FF',
+    badge: { fontSize: 12, fontWeight: 600, color: '#2F54EB', background: 'linear-gradient(135deg, #F0F5FF, #D6E4FF)', borderRadius: 4, padding: '1px 10px', border: '1px solid #ADC6FF', boxShadow: '0 1px 3px rgba(47,84,235,0.15)' } },
+  { value: 'flagship',  labelKey: 'recommend.popularSkin.skinTierFlagship',  descKey: 'recommend.popularSkin.skinTierFlagshipDesc',  color: '#722ED1', bg: '#F9F0FF',
+    badge: { fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #722ED1, #9254DE)', borderRadius: 4, padding: '1px 10px', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 2px 6px rgba(114,46,209,0.35)', textShadow: '0 1px 2px rgba(0,0,0,0.15)' } },
+  { value: 'ultimate',  labelKey: 'recommend.popularSkin.skinTierUltimate',  descKey: 'recommend.popularSkin.skinTierUltimateDesc',  color: '#D48806', bg: '#FFFBE6', icon: '✦',
+    badge: { fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #D48806, #FFC53D, #D48806)', backgroundSize: '200% 200%', borderRadius: 4, padding: '1px 10px', border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 2px 8px rgba(212,136,6,0.4), inset 0 1px 0 rgba(255,255,255,0.2)', textShadow: '0 1px 3px rgba(0,0,0,0.2)', animation: 'tierShimmer 2.5s ease-in-out infinite' } },
 ]
 /** 按段位 value 取配置 */
 const getTierConfig = (tier: SkinTier) => SKIN_TIER_OPTIONS.find(o => o.value === tier) ?? SKIN_TIER_OPTIONS[0]
@@ -179,6 +179,96 @@ const buildMockSkins = (): SkinItem[] => [
     bigImage: buildMockBigImage('#595959', '#8C8C8C', '簡約無框'),
   }),
 ]
+
+/** 皮膚等級分段選擇器（參考會員等級樣式：圓角容器 + 分隔線 + 滑動選中膠囊） */
+function TierSelector({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: SkinTier
+  onChange: (tier: SkinTier) => void
+  disabled?: boolean
+}) {
+  const { t } = useTranslation()
+  const idx = Math.max(0, SKIN_TIER_OPTIONS.findIndex(o => o.value === value))
+  const selectedColor = SKIN_TIER_OPTIONS[idx].color
+
+  return (
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      padding: 3,
+      borderRadius: 8,
+      background: '#f2f3f5',
+      opacity: disabled ? 0.6 : 1,
+      transition: 'opacity 0.3s',
+    }}>
+      {/* 滑動選中膠囊 */}
+      <div style={{
+        position: 'absolute',
+        top: 3,
+        bottom: 3,
+        left: 3,
+        width: `calc((100% - 6px) / ${SKIN_TIER_OPTIONS.length})`,
+        transform: `translateX(${idx * 100}%)`,
+        borderRadius: 6,
+        background: selectedColor,
+        boxShadow: `0 2px 6px ${selectedColor}45`,
+        transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), background-color 0.3s, box-shadow 0.3s',
+        pointerEvents: 'none',
+      }}>
+        {/* 頂部高光，增加膠囊質感 */}
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 6,
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0) 60%)',
+        }} />
+      </div>
+      {SKIN_TIER_OPTIONS.map((opt, i) => {
+        const selected = i === idx
+        return (
+          <div
+            key={opt.value}
+            onClick={() => !disabled && onChange(opt.value)}
+            style={{
+              position: 'relative',
+              flex: 1,
+              textAlign: 'center',
+              padding: '5px 0',
+              fontSize: 12,
+              lineHeight: '18px',
+              fontWeight: selected ? 600 : 400,
+              color: selected ? '#fff' : '#8c8c8c',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              transition: 'color 0.25s',
+              userSelect: 'none',
+              zIndex: 1,
+            }}
+            onMouseEnter={e => { if (!disabled && !selected) e.currentTarget.style.color = '#595959' }}
+            onMouseLeave={e => { if (!disabled && !selected) e.currentTarget.style.color = '#8c8c8c' }}
+          >
+            {t(opt.labelKey)}
+            {/* 分隔線（與選中項相鄰時淡出） */}
+            {i < SKIN_TIER_OPTIONS.length - 1 && (
+              <span style={{
+                position: 'absolute',
+                right: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 1,
+                height: 12,
+                background: 'rgba(0,0,0,0.1)',
+                opacity: i === idx || i + 1 === idx ? 0 : 1,
+                transition: 'opacity 0.25s',
+                pointerEvents: 'none',
+              }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function PopularSkinPricing() {
   const { t } = useTranslation()
@@ -885,25 +975,20 @@ export default function PopularSkinPricing() {
                 </div>
                 <div>
                   <div style={fieldLabelStyle}>{t('recommend.popularSkin.skinTierLabel')}</div>
-                  <Radio.Group
+                  <TierSelector
                     value={skin.tier}
+                    onChange={v => updateSkin(skin.id, { tier: v })}
                     disabled={isDetailMode}
-                    onChange={e => updateSkin(skin.id, { tier: e.target.value })}
-                    optionType="button"
-                    buttonStyle="solid"
-                    size="small"
-                  >
-                    {SKIN_TIER_OPTIONS.map(opt => {
-                      const tc = getTierConfig(opt.value)
-                      return (
-                        <Radio.Button key={opt.value} value={opt.value}
-                          style={skin.tier === opt.value ? { background: tc.bg, borderColor: tc.color, color: tc.color, fontWeight: 600 } : {}}
-                        >
-                          {t(opt.labelKey)}
-                        </Radio.Button>
-                      )
-                    })}
-                  </Radio.Group>
+                  />
+                  {/* 選中等級描述 */}
+                  <div style={{
+                    fontSize: 11, color: getTierConfig(skin.tier).color,
+                    marginTop: 6, lineHeight: '16px',
+                    transition: 'color 0.3s ease',
+                    padding: '2px 0',
+                  }}>
+                    {t(getTierConfig(skin.tier).descKey)}
+                  </div>
                 </div>
               </div>
 

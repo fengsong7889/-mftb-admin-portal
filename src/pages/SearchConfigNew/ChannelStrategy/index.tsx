@@ -481,7 +481,7 @@ export default function DimensionStrategy() {
       { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
       { title: t('channelStrategy.colDesc'), dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
       { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
-      { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 150, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+      { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string) => <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v}</Text> },
       { title: t('common.colAction'), key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: ActivityRecord) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleActEdit(r) }}>{t('common.edit')}</Button>
@@ -499,7 +499,7 @@ export default function DimensionStrategy() {
       { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
       { title: t('channelStrategy.colDesc'), dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
       { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
-      { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 150, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+      { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string) => <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v}</Text> },
       { title: t('common.colAction'), key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: AdRecord) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleAdEdit(r) }}>{t('common.edit')}</Button>

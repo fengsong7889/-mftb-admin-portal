@@ -186,6 +186,7 @@ public class StoreServiceImpl implements StoreService {
             store.setBizChannel(request.getBizChannel());
             store.setLoginAccount(request.getLoginAccount());
             store.setRegion(request.getRegion());
+            store.setAddress(request.getAddress());
             store.setUpdatedBy(operatorResolver.currentOperatorName());
             store.setDeleted(0);
             try {
@@ -214,6 +215,7 @@ public class StoreServiceImpl implements StoreService {
         store.setBizChannel(request.getBizChannel());
         store.setLoginAccount(request.getLoginAccount());
         store.setRegion(request.getRegion());
+        store.setAddress(request.getAddress());
         store.setUpdatedBy(operatorResolver.currentOperatorName());
         storeMapper.updateById(store);
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());

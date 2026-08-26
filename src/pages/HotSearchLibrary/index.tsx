@@ -278,7 +278,8 @@ export default function HotSearchLibrary() {
       title: t('hotSearchLibrary.colAddedBy'), dataIndex: 'addedBy', key: 'addedBy', width: 140, ellipsis: true,
     },
     {
-      title: t('hotSearchLibrary.colAddedTime'), dataIndex: 'addedTime', key: 'addedTime', width: 150,
+      title: t('hotSearchLibrary.colAddedTime'), dataIndex: 'addedTime', key: 'addedTime', width: 180,
+      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
       title: t('common.colAction'), key: 'action', width: 140, fixed: 'right',

@@ -555,7 +555,7 @@ export default function HotSearchConfig() {
     { title: t('hotSearchConfig.colRegion'), dataIndex: 'region', key: 'region', width: 100, render: (v: string[]) => v.map(r => regionMap[r]).join('、') },
     { title: t('hotSearchConfig.colTimeSlot'), dataIndex: 'timeSlot', key: 'timeSlot', width: 100, render: (v: string) => timeSlotMap[v] || v },
     { title: t('hotSearchConfig.colDisplayMode'), dataIndex: 'displayMode', key: 'displayMode', width: 80, render: (v: string) => <Tag color={v === 'image' ? 'purple' : 'cyan'}>{displayModeMap[v] || t('dict.displayMode.textShort')}</Tag> },
-    { title: t('hotSearchConfig.colDateRange'), key: 'dateRange', width: 170, render: (_: unknown, r: HotSearchRecord) => `${r.startDate} ~ ${r.endDate}` },
+    { title: t('hotSearchConfig.colDateRange'), key: 'dateRange', width: 210, render: (_: unknown, r: HotSearchRecord) => <span style={{ whiteSpace: 'nowrap' }}>{`${r.startDate} ~ ${r.endDate}`}</span> },
     { 
       title: t('hotSearchConfig.colSortOrder'), 
       dataIndex: 'sortOrder', 

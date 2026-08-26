@@ -32,7 +32,9 @@ public class AdOrderVO {
     private Integer operatorType;
     private String operatorId;
     private String operatorName;
-    /** 所属商圈（明细去重聚合） */
+    /** 门店地址（来自 biz_store.address，门店自身地址） */
+    private String storeAddress;
+    /** 购买商圈（明细去重聚合） */
     private List<Integer> regions;
     /** 購買時段（明細去重聚合, 如 breakfast/lunch） */
     private List<String> mealSlots;
@@ -42,6 +44,8 @@ public class AdOrderVO {
     private List<String> purchaseDays;
     /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
     private List<String> skinNames;
+    /** 皮膚等級列表（人氣商家：根據 skin_name 查定價配置 tier 去重排序） */
+    private List<String> skinTiers;
     /** 按標籤分組的購買日期（金字招牌：每個標籤對應的日期列表） */
     private List<LabelDateGroup> labelDates;
     private Integer itemCount;
@@ -81,11 +85,14 @@ public class AdOrderVO {
     @Data
     public static class LabelDateGroup {
         private String label;
+        /** 場景: all_macau=全澳對比, district=商圈對比, null=統計類 */
+        private String scenario;
         private List<String> dates;
 
         public LabelDateGroup() {}
-        public LabelDateGroup(String label, List<String> dates) {
+        public LabelDateGroup(String label, String scenario, List<String> dates) {
             this.label = label;
+            this.scenario = scenario;
             this.dates = dates;
         }
     }

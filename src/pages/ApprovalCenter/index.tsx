@@ -357,7 +357,7 @@ export default function ApprovalCenter() {
       render: (v: string) => (approvalTypeMapKeys[v] ? t(approvalTypeMapKeys[v]) : v),
     },
     { title: t('approvalCenter.colApplicant'), dataIndex: 'applicant', key: 'applicant', width: 130 },
-    { title: t('approvalCenter.colApplyTime'), dataIndex: 'applyTime', key: 'applyTime', width: 160 },
+    { title: t('approvalCenter.colApplyTime'), dataIndex: 'applyTime', key: 'applyTime', width: 180, render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-' },
     // 固定三級審批列（業務主管 → 運營主管 → 財務主管），無論流程配置如何調整均按位置映射
     {
       title: t('approvalCenter.colBiz'),
@@ -372,7 +372,7 @@ export default function ApprovalCenter() {
         {
           title: t('approvalCenter.colApproveTime'),
           key: 'biz_time',
-          width: 160,
+          width: 180,
           render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.bizApproveTime || '--'}</span>,
         },
         {
@@ -396,7 +396,7 @@ export default function ApprovalCenter() {
         {
           title: t('approvalCenter.colApproveTime'),
           key: 'ops_time',
-          width: 160,
+          width: 180,
           render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.opsApproveTime || '--'}</span>,
         },
         {
@@ -420,7 +420,7 @@ export default function ApprovalCenter() {
         {
           title: t('approvalCenter.colApproveTime'),
           key: 'fin_time',
-          width: 160,
+          width: 180,
           render: (_: unknown, r: ApprovalRecord) => <span style={{ whiteSpace: 'nowrap' }}>{r.finApproveTime || '--'}</span>,
         },
         {

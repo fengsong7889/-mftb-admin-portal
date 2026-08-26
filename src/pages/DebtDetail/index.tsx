@@ -342,7 +342,7 @@ export default function DebtDetail() {
     },
     { title: t('debtDetail.colRemarkShort'), dataIndex: 'remark', key: 'remark', width: 380 },
     { title: t('debtDetail.colOperator'), dataIndex: 'operator', key: 'operator', width: 110 },
-    { title: t('debtDetail.colOperateTime'), dataIndex: 'operateTime', key: 'operateTime', width: 170 },
+    { title: t('debtDetail.colOperateTime'), dataIndex: 'operateTime', key: 'operateTime', width: 180, render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-' },
     {
       title: t('common.colAction'), key: 'action', width: 80, align: 'center',
       render: (_, record) => (

@@ -341,7 +341,7 @@ export default function SynonymConfig() {
       ),
     },
     { title: t('synonymConfig.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
-    { title: t('synonymConfig.colUpdateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 170 },
+    { title: t('synonymConfig.colUpdateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 180, render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-' },
     {
       title: t('common.colAction'),
       key: 'action',

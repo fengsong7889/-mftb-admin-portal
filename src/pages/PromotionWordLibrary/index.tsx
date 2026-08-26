@@ -192,7 +192,7 @@ export default function PromotionWordLibrary() {
       title: t('promotionWordLibrary.colWord'),
       dataIndex: 'word',
       key: 'word',
-      width: 100,
+      width: 150,
       render: (val: string) => <span style={{ fontWeight: 600, color: '#2D3436' }}>{val}</span>,
     },
     {
@@ -211,7 +211,7 @@ export default function PromotionWordLibrary() {
       render: (val: number) => <span>{val.toLocaleString()}</span>,
     },
     { title: t('promotionWordLibrary.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 150 },
-    { title: t('promotionWordLibrary.colUpdateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 150 },
+    { title: t('promotionWordLibrary.colUpdateTime'), dataIndex: 'updateTime', key: 'updateTime', width: 180, render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-' },
     {
       title: t('common.colStatus'),
       dataIndex: 'status',

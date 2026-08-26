@@ -36,6 +36,7 @@ public class BizDataInitializer implements CommandLineRunner {
         cleanupDuplicateSeedStores();
         seedMerchantGroups();
         seedStores();
+        migrateStoreAddress();
         seedWordLibrary();
         seedWorkflowConfig();
         syncStoreCodeSequence();
@@ -124,6 +125,33 @@ public class BizDataInitializer implements CommandLineRunner {
         log.info("已将 {} 条存量门店ID迁移为 MD 自增序列", ids.size());
     }
 
+    /** 存量门店地址迁移: 若 biz_store 缺少 address 列则自动添加，并为存量门店填充澳门真实地址 */
+    private void migrateStoreAddress() {
+        if (!tableExists("biz_store")) return;
+        if (!columnExists("biz_store", "address")) {
+            jdbcTemplate.execute("ALTER TABLE biz_store ADD COLUMN address VARCHAR(256) NULL COMMENT '门店地址' AFTER region");
+            log.info("已为 biz_store 添加 address 列");
+        }
+        // 为存量门店填充澳门真实地址（按 store_code 精确匹配，仅填充 address 为 NULL 的记录）
+        String[][] addrSeed = {
+                {"MD000009", "澳門新馬路128號"},
+                {"MD000010", "澳門氹仔官也街56號"},
+                {"MD000011", "澳門新馬路168號"},
+                {"MD000012", "澳門黑沙環馬路88號"},
+                {"MD000013", "澳門氹仔官也街美食廣場2樓"},
+                {"MD000014", "澳門議事亭前地18號"},
+        };
+        int updated = 0;
+        for (String[] s : addrSeed) {
+            updated += jdbcTemplate.update(
+                    "UPDATE biz_store SET address = ? WHERE store_code = ? AND address IS NULL AND deleted = 0",
+                    s[1], s[0]);
+        }
+        if (updated > 0) {
+            log.info("已为 {} 条存量门店填充地址数据", updated);
+        }
+    }
+
     /** 存量业务频道迁移: 中文文本值改为全局统一枚举码 (1=美食外卖 2=超市百货 3=团购到店) */
     private void migrateLegacyBizChannels() {
         int updated = 0;
@@ -184,6 +212,8 @@ public class BizDataInitializer implements CommandLineRunner {
                         + "brand VARCHAR(64) NULL COMMENT '所属品牌: flashBee / mFood / flashBee,mFood', "
                         + "biz_channel VARCHAR(128) NULL COMMENT '业务频道（可多选逗号分隔）', "
                         + "login_account VARCHAR(64) NULL COMMENT '登录主账号', "
+                        + "region INT NULL COMMENT '所在区域/商圈', "
+                        + "address VARCHAR(256) NULL COMMENT '门店地址', "
                         + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
                         + "deleted TINYINT DEFAULT 0 COMMENT '逻辑删除', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
@@ -464,6 +494,14 @@ public class BizDataInitializer implements CommandLineRunner {
                 "SELECT COUNT(*) FROM information_schema.TABLES "
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
                 Integer.class, table);
+        return count != null && count > 0;
+    }
+
+    private boolean columnExists(String table, String column) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
         return count != null && count > 0;
     }
 }

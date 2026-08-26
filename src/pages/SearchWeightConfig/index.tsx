@@ -698,7 +698,8 @@ export default function SearchWeightConfig() {
       title: t('common.colOperateTime'),
       dataIndex: 'operateTime',
       key: 'operateTime',
-      width: 160,
+      width: 180,
+      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
       title: t('searchWeight.colAction'),

@@ -429,7 +429,7 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colRegion'),
       dataIndex: 'region',
       key: 'region',
-      width: 220,
+      width: 140,
       render: (region: Region | Region[]) => {
         const regions = Array.isArray(region) ? region : [region]
         const maxShow = 2
@@ -473,7 +473,7 @@ export default function PromotionOrderManage() {
     {
       title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : orderType === '盤活復蘇' ? t('promotionOrderManage.purchaseDaysTitle') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
-      width: 220,
+      width: orderType === '金字招牌' ? 320 : 140,
       render: (_, record) => {
         // 金字招牌：展示標籤 + 日期（最多3個標籤，超出 +X 弹窗）
         if (orderType === '金字招牌' || record.recommendType === RecommendType.GOLDEN_SIGNBOARD) {
@@ -730,7 +730,8 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colOrderTime'),
       dataIndex: 'orderTime',
       key: 'orderTime',
-      width: 160,
+      width: 175,
+      render: (time: string) => time ? <span style={{ whiteSpace: 'nowrap' }}>{time}</span> : '-',
     },
     {
       title: t('common.colAction'),

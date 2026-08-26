@@ -228,7 +228,8 @@ export default function PromotionReportOrder() {
       title: t('promotionReport.colPromotionPeriod'),
       dataIndex: 'promotionPeriod',
       key: 'promotionPeriod',
-      width: 160,
+      width: 200,
+      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
       title: t('promotionReport.colImpressions'),

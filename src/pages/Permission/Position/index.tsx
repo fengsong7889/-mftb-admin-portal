@@ -228,8 +228,8 @@ export default function PositionManagement() {
       title: t('position.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 170,
-      render: (date: string) => (date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      width: 180,
+      render: (date: string) => (date ? <span style={{ whiteSpace: 'nowrap' }}>{dayjs(date).format('YYYY-MM-DD HH:mm:ss')}</span> : '-'),
     },
     {
       title: t('common.colAction'),

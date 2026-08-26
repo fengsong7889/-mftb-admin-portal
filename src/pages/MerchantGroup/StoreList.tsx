@@ -191,6 +191,7 @@ export default function StoreList() {
       { title: t('colBizChannel'), dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
       { title: t('colLoginAccount'), dataIndex: 'loginAccount' },
       { title: t('colRegion'), dataIndex: 'region' },
+      { title: t('colAddress'), dataIndex: 'address' },
       { title: t('colBindBd'), dataIndex: 'bdList', render: (v: unknown) => (Array.isArray(v) ? (v as StoreBdItem[]).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') : '') },
       { title: t('colUpdatedBy'), dataIndex: 'updatedBy' },
       { title: t('colUpdatedAt'), dataIndex: 'updatedAt' },
@@ -268,6 +269,14 @@ export default function StoreList() {
       width: 120,
       render: (val: number | null | undefined) =>
         val ? (REGION_LABEL_KEY[val] ? t(`translation:${REGION_LABEL_KEY[val]}`) : String(val)) : '-',
+    },
+    {
+      title: t('colAddress'),
+      dataIndex: 'address',
+      key: 'address',
+      width: 240,
+      ellipsis: true,
+      render: (val: string) => val || '-',
     },
     {
       title: t('colBindBd'),

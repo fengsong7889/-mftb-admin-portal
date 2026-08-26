@@ -304,7 +304,7 @@ export default function BatchDetail() {
     { title: t('common.colStoreName'), dataIndex: 'storeName', key: 'storeName', width: 140, render: (v: string) => v === '--' ? <span style={{ color: '#999' }}>--</span> : v },
     { title: t('common.colChannel'), dataIndex: 'channel', key: 'channel', width: 90 },
     { title: t('common.colChangeType'), dataIndex: 'changeType', key: 'changeType', width: 150 },
-    { title: t('common.colTradeTime'), dataIndex: 'tradeTime', key: 'tradeTime', width: 170 },
+    { title: t('common.colTradeTime'), dataIndex: 'tradeTime', key: 'tradeTime', width: 180, render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-' },
     { title: t('common.colVirtualChange'), dataIndex: 'virtualChange', key: 'virtualChange', width: 140, align: 'right' as const, render: renderChange },
     { title: t('common.colActualChange'), dataIndex: 'actualChange', key: 'actualChange', width: 140, align: 'right' as const, render: renderChange },
     { title: t('batchDetail.colRelated'), dataIndex: 'relatedId', key: 'relatedId', width: 190, render: (v: string) => <span style={{ color: '#8C8C8C' }}>{v}</span> },
