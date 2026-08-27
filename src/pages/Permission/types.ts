@@ -85,6 +85,23 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'import', label: '導入' },
     { key: 'export', label: '導出' },
   ],
+  // 流量沙盤（商家推廣工具）：均為查詢型頁面，僅查看與導出
+  'waterfall-simulation': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'algorithm-simulation': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'merchant-score-insight': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'merchant-promotion-diagnose': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
   // 店鋪推廣（推廣通）
   'promotion-sales-config': [
     { key: 'view', label: '查看' },
@@ -835,6 +852,16 @@ export const menuPermissionTree: PermissionModule[] = [
       },
       { key: 'ad-sales', name: '廣告銷售' },
       { key: 'promotion-word-library', name: '詞庫管理' },
+      {
+        key: 'traffic-sandbox',
+        name: '實驗沙盤',
+        children: [
+          { key: 'waterfall-simulation', name: '瀑布流推演' },
+          { key: 'algorithm-simulation', name: '算法推演' },
+          { key: 'merchant-score-insight', name: '商家評分透視' },
+          { key: 'merchant-promotion-diagnose', name: '商家推廣診斷' },
+        ],
+      },
     ],
   },
   {
@@ -992,6 +1019,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'promotion-waterfall',
   'ad-sales',
   'promotion-word-library',
+  // 商家推廣工具 - 流量沙盤
+  'waterfall-simulation',
+  'algorithm-simulation',
+  'merchant-score-insight',
+  'merchant-promotion-diagnose',
   // 商家推廣工具 - 贈送管理
   'gift-detail',
   'gift-consume-detail',
@@ -1070,6 +1102,11 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/promotion-waterfall-add': 'promotion-waterfall',
   '/ad-sales': 'ad-sales',
   '/promotion-word-library': 'promotion-word-library',
+  // 商家推廣工具 - 流量沙盤
+  '/waterfall-simulation': 'waterfall-simulation',
+  '/algorithm-simulation': 'algorithm-simulation',
+  '/merchant-score-insight': 'merchant-score-insight',
+  '/merchant-promotion-diagnose': 'merchant-promotion-diagnose',
   // 商家推廣工具 - 贈送管理
   '/gift-detail': 'gift-detail',
   '/gift-add': 'gift-detail',

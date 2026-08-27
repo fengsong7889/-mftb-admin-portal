@@ -24,6 +24,12 @@ export const MENU_NAME_EN: Record<string, string> = {
   'gift-consume-detail': 'Consumption Details',
   'ad-sales': 'Ad Sales',
   'promotion-word-library': 'Word Library',
+  // 流量沙盤
+  'traffic-sandbox': 'Experiment Sandbox',
+  'waterfall-simulation': 'Waterfall Simulation',
+  'algorithm-simulation': 'Algorithm Simulation',
+  'merchant-score-insight': 'Merchant Score Insight',
+  'merchant-promotion-diagnose': 'Promotion Diagnosis',
   // 推广通
   'promotion-tool': 'Promotion Pass',
   'promotion_tool': 'Promotion Pass',

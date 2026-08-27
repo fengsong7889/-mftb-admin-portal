@@ -68,6 +68,11 @@ const PromotionSlotConfigSlots = lazy(() => import('./pages/PromotionSlotConfigS
 const PromotionSalesConfig = lazy(() => import('./pages/PromotionSalesConfig'))
 const AdSales = lazy(() => import('./pages/AdSales'))
 const PromotionWordLibrary = lazy(() => import('./pages/PromotionWordLibrary'))
+// 流量沙盤
+const WaterfallSimulation = lazy(() => import('./pages/TrafficSandbox/WaterfallSimulation'))
+const AlgorithmSimulation = lazy(() => import('./pages/TrafficSandbox/AlgorithmSimulation'))
+const MerchantScoreInsight = lazy(() => import('./pages/TrafficSandbox/MerchantScoreInsight'))
+const MerchantPromotionDiagnose = lazy(() => import('./pages/TrafficSandbox/MerchantPromotionDiagnose'))
 const PromotionOrderManage = lazy(() => import('./pages/PromotionOrderManage'))
 const PromotionOrderManageStandalone = lazy(() => import('./pages/PromotionOrderManageStandalone'))
 const OrderDetail = lazy(() => import('./pages/OrderDetail'))
@@ -191,6 +196,11 @@ function AuthenticatedLayout() {
               <Route path="/promotion-sales-config" element={<PromotionSalesConfig />} />
               <Route path="/ad-sales" element={<AdSales />} />
               <Route path="/promotion-word-library" element={<PromotionWordLibrary />} />
+              {/* 流量沙盤 */}
+              <Route path="/waterfall-simulation" element={<WaterfallSimulation />} />
+              <Route path="/algorithm-simulation" element={<AlgorithmSimulation />} />
+              <Route path="/merchant-score-insight" element={<MerchantScoreInsight />} />
+              <Route path="/merchant-promotion-diagnose" element={<MerchantPromotionDiagnose />} />
               <Route path="/promotion-order-manage" element={<PromotionOrderManageStandalone />} />
               <Route path="/order-detail" element={<OrderDetail />} />
               <Route path="/merchant-order-manage" element={<PromotionOrderManage />} />

@@ -308,6 +308,11 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("gift-consume-detail", "Consumption Details"),
                 Map.entry("ad-sales", "Ad Sales"),
                 Map.entry("promotion-word-library", "Word Library"),
+                Map.entry("traffic-sandbox", "Experiment Sandbox"),
+                Map.entry("waterfall-simulation", "Waterfall Simulation"),
+                Map.entry("algorithm-simulation", "Algorithm Simulation"),
+                Map.entry("merchant-score-insight", "Merchant Score Insight"),
+                Map.entry("merchant-promotion-diagnose", "Promotion Diagnosis"),
                 Map.entry("promotion-tool", "Promotion Pass"),
                 Map.entry("promotion_tool", "Promotion Pass"),
                 Map.entry("promotion-sales-config", "Store Promotion"),
@@ -537,6 +542,12 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-manage",         new String[]{"贈送管理",         "merchant_promotion", "5"});
         menus.put("ad-sales",            new String[]{"廣告銷售",         "merchant_promotion", "6"});
         menus.put("promotion-word-library", new String[]{"詞庫管理",     "merchant_promotion", "7"});
+        // ── 商家推廣工具 > 流量沙盤 ──
+        menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "8"});
+        menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "1"});
+        menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "2"});
+        menus.put("merchant-score-insight",   new String[]{"商家評分透視", "traffic-sandbox",    "3"});
+        menus.put("merchant-promotion-diagnose", new String[]{"商家推廣診斷", "traffic-sandbox", "4"});
         // ── 商家推廣工具 > 贈送管理 ──
         menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
@@ -625,11 +636,12 @@ public class DataInitializer implements CommandLineRunner {
                     String curName = (String) row.get("name");
                     Number curParentRaw = (Number) row.get("parent_id");
                     Long curParentId = curParentRaw != null ? curParentRaw.longValue() : null;
-                    int curSort = ((Number) row.get("sort_order")).intValue();
-                    boolean needUpdate = !name.equals(curName)
-                            || !java.util.Objects.equals(curParentId, parentId)
-                            || curSort != sort;
-                    if (needUpdate) {
+                    // 僅當名稱/層級與種子不一致（占位數據）時才連同排序一起修正；
+                    // 名稱/層級已與種子一致時，視為用戶在「菜單配置」中自定義過排序，
+                    // 不覆蓋 sort_order，避免重啟後用戶調整的菜單順序被重置
+                    boolean placeholderLike = !name.equals(curName)
+                            || !java.util.Objects.equals(curParentId, parentId);
+                    if (placeholderLike) {
                         jdbcTemplate.update(
                                 "UPDATE sys_menu SET name = ?, parent_id = ?, sort_order = ? WHERE id = ?",
                                 name, parentId, sort, existing);

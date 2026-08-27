@@ -52,6 +52,11 @@ import {
   ScheduleOutlined,
   MenuOutlined,
   BranchesOutlined,
+  ExperimentOutlined,
+  NodeIndexOutlined,
+  DeploymentUnitOutlined,
+  TrophyOutlined,
+  MedicineBoxOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -108,6 +113,11 @@ const keyToPath: Record<string, string> = {
   'data-permission': '/data-permission',
   // 商家推广工具 - 词库管理
   'promotion-word-library': '/promotion-word-library',
+  // 商家推广工具 - 流量沙盤
+  'waterfall-simulation': '/waterfall-simulation',
+  'algorithm-simulation': '/algorithm-simulation',
+  'merchant-score-insight': '/merchant-score-insight',
+  'merchant-promotion-diagnose': '/merchant-promotion-diagnose',
   // 系統設置
   // 注意:以下菜单项暂未实现对应页面
   // 'menu-management': '/menu-management',
@@ -271,6 +281,33 @@ const menuItems: MenuItem[] = [
         key: 'promotion-word-library',
         icon: <ReadOutlined />,
         label: '詞庫管理',
+      },
+      {
+        key: 'traffic-sandbox',
+        icon: <ExperimentOutlined />,
+        label: '實驗沙盤',
+        children: [
+          {
+            key: 'waterfall-simulation',
+            icon: <NodeIndexOutlined />,
+            label: '瀑布流推演',
+          },
+          {
+            key: 'algorithm-simulation',
+            icon: <DeploymentUnitOutlined />,
+            label: '算法推演',
+          },
+          {
+            key: 'merchant-score-insight',
+            icon: <TrophyOutlined />,
+            label: '商家評分透視',
+          },
+          {
+            key: 'merchant-promotion-diagnose',
+            icon: <MedicineBoxOutlined />,
+            label: '商家推廣診斷',
+          },
+        ],
       },
     ],
   },
@@ -604,6 +641,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'gift-consume-detail': <FileTextOutlined />,
   'ad-sales': <ShoppingFilled />,
   'promotion-word-library': <ReadOutlined />,
+  // 商家推廣工具 - 流量沙盤
+  'traffic-sandbox': <ExperimentOutlined />,
+  'waterfall-simulation': <NodeIndexOutlined />,
+  'algorithm-simulation': <DeploymentUnitOutlined />,
+  'merchant-score-insight': <TrophyOutlined />,
+  'merchant-promotion-diagnose': <MedicineBoxOutlined />,
   'promotion-tool': <ThunderboltOutlined />,
   // 兼容后端种子数据中的下划线命名（推廣通顶级菜单）
   'promotion_tool': <ThunderboltOutlined />,
