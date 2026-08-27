@@ -450,7 +450,7 @@ export default function Algorithm() {
                       ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP.delivery.includes(card.type)),
                       card => card.type,
                     ).map(card => {
-                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.ORGANIC_TRAFFIC || card.type === AlgorithmType.GUESS_YOU_LIKE || card.type === AlgorithmType.GOLDEN_SIGNBOARD
+                        const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.ORGANIC_TRAFFIC || card.type === AlgorithmType.GUESS_YOU_LIKE || card.type === AlgorithmType.GOLDEN_SIGNBOARD || card.type === AlgorithmType.TRAFFIC_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
                         return renderAlgoCard(card, enabled, 'delivery', deliveryCardOrder.getDragProps(card.type))
                       })}
                   </div>

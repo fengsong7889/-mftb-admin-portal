@@ -45,7 +45,7 @@ export enum AlgorithmType {
   NEW_STORE_AD = 2,       // 新店广告
   HOT_REVIVE_AD = 3,      // 盘活复苏
   EXCLUSIVE_MERCHANT = 4, // 独家商家
-  TRAFFIC_AD = 15,        // 流量广告（後端未定義，前端預留）
+  TRAFFIC_AD = 15,        // 投流廣告
   GUESS_YOU_LIKE = 6,     // 猜你喜欢
   ORGANIC_TRAFFIC = 7,    // 自然流量
   POPULAR_MERCHANT_KA = 5, // 人气商家
