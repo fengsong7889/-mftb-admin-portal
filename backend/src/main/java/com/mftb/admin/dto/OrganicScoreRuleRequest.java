@@ -73,6 +73,9 @@ public class OrganicScoreRuleRequest {
     /** 屏蔽商家列表 JSON 字符串 */
     private String blockedMerchants;
 
+    /** 活动加分配置 JSON 字符串（STB_ACT 活動加分規則使用） */
+    private String activityItems;
+
     /** 服务状态: 1=启用 2=停用 */
     @NotNull(message = "状态不能为空")
     private Integer status;

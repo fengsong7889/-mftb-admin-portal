@@ -62,6 +62,14 @@ export default function RuleConfig() {
         updateRule(`payment_${type}_switchable`, mode === 'switchable')
       })
     })
+    /* 算法配置規則：維度權重配置顯示開關 */
+    getSystemConfig('organic_traffic_show_dimension_weight')
+      .then(res => {
+        if (alive && (res?.value === 'true' || res?.value === 'false')) {
+          updateRule('organic_traffic_show_dimension_weight', res.value === 'true')
+        }
+      })
+      .catch(() => { /* 後端不可用時保持本地值 */ })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -110,6 +118,17 @@ export default function RuleConfig() {
         })
       }
     }
+
+    // 算法配置規則保存時，同步維度權重顯示開關到後端 DB（跨設備/清緩存不丟失）
+    if (groupKey === 'algorithm_config') {
+      const group = groups.find(g => g.key === 'algorithm_config')
+      const showRule = group?.rules.find(r => r.key === 'organic_traffic_show_dimension_weight')
+      if (showRule && typeof showRule.value === 'boolean') {
+        updateSystemConfig('organic_traffic_show_dimension_weight', String(showRule.value)).catch(() => {
+          message.warning('本地已保存，但同步後端失敗，請檢查網絡後重試')
+        })
+      }
+    }
   }, [saveAll, groups])
 
   const handleCancel = useCallback((groupKey: string) => {
@@ -136,6 +155,10 @@ export default function RuleConfig() {
         // 将该组规则恢复为默认值并保存
         group?.rules.forEach(r => updateRule(r.key, r.defaultValue))
         saveAll()
+        // 算法配置規則重置時同步默認值到後端 DB
+        if (groupKey === 'algorithm_config') {
+          updateSystemConfig('organic_traffic_show_dimension_weight', 'true').catch(() => { /* 靜默 */ })
+        }
         message.success(`「${group?.title}」已恢復默認規則`)
       },
     })

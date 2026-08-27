@@ -137,6 +137,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setDeductionPerOrder(request.getDeductionPerOrder());
         entity.setDecayCoefficient(request.getDecayCoefficient());
         entity.setBlockedMerchants(request.getBlockedMerchants());
+        entity.setActivityItems(request.getActivityItems());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
@@ -173,6 +174,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setDeductionPerOrder(request.getDeductionPerOrder());
         entity.setDecayCoefficient(request.getDecayCoefficient());
         entity.setBlockedMerchants(request.getBlockedMerchants());
+        entity.setActivityItems(request.getActivityItems());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -355,6 +357,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setDeductionPerOrder(entity.getDeductionPerOrder());
         vo.setDecayCoefficient(entity.getDecayCoefficient());
         vo.setBlockedMerchants(entity.getBlockedMerchants());
+        vo.setActivityItems(entity.getActivityItems());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());

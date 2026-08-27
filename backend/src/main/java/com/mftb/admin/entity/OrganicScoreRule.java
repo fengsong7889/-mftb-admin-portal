@@ -80,6 +80,9 @@ public class OrganicScoreRule {
     /** 屏蔽商家列表 JSON（店鋪代碼數組） */
     private String blockedMerchants;
 
+    /** 活动加分配置 JSON（[{activityId, activityName, score}]，僅 STB_ACT 規則使用） */
+    private String activityItems;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

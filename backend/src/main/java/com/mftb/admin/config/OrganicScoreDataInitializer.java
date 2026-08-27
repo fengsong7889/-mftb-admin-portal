@@ -46,6 +46,7 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
         NEW_COLUMNS.put("deduction_per_order", "INT DEFAULT NULL COMMENT '每單固定扣分'");
         NEW_COLUMNS.put("decay_coefficient",   "DECIMAL(10,4) DEFAULT NULL COMMENT '衰減係數'");
         NEW_COLUMNS.put("blocked_merchants",   "JSON DEFAULT NULL COMMENT '屏蔽商家列表 JSON'");
+        NEW_COLUMNS.put("activity_items",      "JSON DEFAULT NULL COMMENT '活動加分配置 JSON'");
     }
 
     private final JdbcTemplate jdbcTemplate;

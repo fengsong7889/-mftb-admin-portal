@@ -117,6 +117,11 @@ export function fetchAdAlgorithmDetail(id: number) {
   return request.get<unknown, AdAlgorithm>(`/ad/algorithms/${id}`, SILENT)
 }
 
+/** 按算法ID（algoCode）獲取算法名稱與狀態；不存在時拋錯 */
+export function fetchAdAlgorithmByCode(algoCode: string) {
+  return request.get<unknown, AdAlgorithm>(`/ad/algorithms/by-code/${encodeURIComponent(algoCode)}`, SILENT)
+}
+
 /** 新增算法 */
 export function createAdAlgorithm(data: AdAlgorithmRequest) {
   return request.post<unknown, AdAlgorithm>('/ad/algorithms', data, SILENT)

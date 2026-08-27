@@ -54,6 +54,13 @@ public class AdAlgorithmController {
         return Result.success(algorithmService.detail(id));
     }
 
+    /** 按算法ID（algoCode）获取算法名称与状态（自然流量「活動加分」配置聯動用） */
+    @GetMapping("/by-code/{algoCode}")
+    @RequirePermission(menu = "promotion-algorithm")
+    public Result<AdAlgorithmVO> getByCode(@PathVariable String algoCode) {
+        return Result.success(algorithmService.getByCode(algoCode));
+    }
+
     /** 新增算法 */
     @PostMapping
     @RequirePermission(menu = "promotion-algorithm", action = "create")

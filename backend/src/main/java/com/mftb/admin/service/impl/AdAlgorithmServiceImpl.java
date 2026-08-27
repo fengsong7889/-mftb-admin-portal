@@ -179,6 +179,21 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     }
 
     @Override
+    public AdAlgorithmVO getByCode(String algoCode) {
+        if (!StringUtils.hasText(algoCode)) {
+            throw new BusinessException("算法ID不能为空");
+        }
+        AdAlgorithm entity = algorithmMapper.selectOne(
+                new LambdaQueryWrapper<AdAlgorithm>()
+                        .eq(AdAlgorithm::getAlgoCode, algoCode.trim())
+                        .last("LIMIT 1"));
+        if (entity == null) {
+            throw new BusinessException("算法不存在: " + algoCode);
+        }
+        return AdAlgorithmVO.from(entity);
+    }
+
+    @Override
     public AdAlgorithmVO create(AdAlgorithmRequest request) {
         AdAlgorithm entity = new AdAlgorithm();
         entity.setAlgoCode(generateCode(request.getAlgoName(), request.getAlgoType()));

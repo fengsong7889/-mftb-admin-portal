@@ -173,6 +173,16 @@ export interface ScoreConditionItem {
   score: number
 }
 
+/** 活動加分子項（一個對象 → 固定加分，僅 STB_ACT 規則使用；暫以算法庫算法ID對接驗證，後續切換為系統活動） */
+export interface ActivityScoreItem {
+  /** 對象ID（暫存算法庫算法ID，如 SFWD20260812000；後續切換為活動ID） */
+  activityId: string
+  /** 對象名稱（保存時快照：算法名稱/活動名稱） */
+  activityName?: string
+  /** 固定加分分值 */
+  score: number
+}
+
 /** 高峰時段定義 */
 export interface PeakTimeRange {
   /** 標籤（如「午高峰」） */
@@ -220,6 +230,8 @@ export interface OrganicScoreRule {
   decayCoefficient?: number
   /** 屏蔽商家列表（店鋪代碼，即使滿足條件也不扶持） */
   blockedMerchants?: string[]
+  /** 活動加分配置（僅 STB_ACT 規則使用；暫按算法庫算法ID配置，每個算法獨立計分） */
+  activityItems?: ActivityScoreItem[]
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
@@ -281,6 +293,7 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },
   { id: 'STB_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '統計天數內（含當天），每取消一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
   { id: 'STB_09', dimension: ScoreDimension.STORE, name: '超時接單', description: '統計天數內（含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 60, status: ENABLED, builtin: true },
+  { id: 'STB_ACT', dimension: ScoreDimension.STORE, name: '活動加分', description: '店鋪報名參與活動即得固定加分；暫以算法庫算法ID配置驗證（後續對接系統活動），系統自動獲取名稱與狀態，每個獨立計分', mode: ScoreMode.RULE_BONUS, score: 0, activityItems: [], status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
   { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },

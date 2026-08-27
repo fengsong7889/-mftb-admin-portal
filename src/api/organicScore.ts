@@ -31,6 +31,7 @@ export interface OrganicRuleVO {
   decayCoefficient?: number
   timeRangeScores?: string
   blockedMerchants?: string
+  activityItems?: string
   status: number
   builtin: number
   sortOrder: number
@@ -65,6 +66,7 @@ export interface OrganicRulePayload {
   decayCoefficient?: number
   timeRangeScores?: string
   blockedMerchants?: string
+  activityItems?: string
   status: number
 }
 

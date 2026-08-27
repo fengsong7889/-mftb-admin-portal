@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS `biz_organic_score_rule` (
   `deduction_per_order` INT         DEFAULT NULL COMMENT '每單固定扣分',
   `decay_coefficient`   DECIMAL(10,4) DEFAULT NULL COMMENT '衰減係數',
   `blocked_merchants`   JSON          DEFAULT NULL COMMENT '屏蔽商家列表 JSON',
+  `activity_items`      JSON          DEFAULT NULL COMMENT '活動加分配置 JSON',
   `status`            INT           NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用',
   `builtin`           TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '是否系統內置: 1=是 0=否',
   `sort_order`        INT           NOT NULL DEFAULT 0 COMMENT '排序號',
@@ -101,6 +102,9 @@ INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `
 ('STB_07', 2, '出餐超時', '統計天數內（不含當天），每超時一單固定扣分，即時生效', 3, 0, 7, 70, 1, 1, 9, 'system'),
 ('STB_08', 2, '取消訂單', '統計天數內（含當天），每取消一單固定扣分，即時生效', 3, 0, 7, 80, 1, 1, 10, 'system'),
 ('STB_09', 2, '超時接單', '統計天數內（含當天），每超時一單固定扣分，即時生效', 3, 0, 7, 60, 1, 1, 11, 'system');
+
+INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `activity_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
+('STB_ACT', 2, '活動加分', '店鋪報名參與系統活動即得固定加分；按活動ID配置，系統自動獲取活動名稱與狀態，每個活動獨立計分', 1, 0, '[]', 1, 1, 12, 'system');
 
 -- ===== 平台維度 =====
 INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `decay_coefficient`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES

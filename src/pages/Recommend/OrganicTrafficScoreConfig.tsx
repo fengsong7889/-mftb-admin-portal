@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert } from 'antd'
+import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
@@ -14,7 +14,7 @@ import {
   RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
   TIME_PERIOD_KEYS, TIME_PERIOD_LABELS,
   TIER_DIRECTION_LABEL,
-  type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange,
+  type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
@@ -23,6 +23,7 @@ import {
   type OrganicRuleVO,
 } from '@/api/organicScore'
 import { fetchStores } from '@/api/store'
+import { fetchAdAlgorithms, fetchAdAlgorithmByCode, type AdAlgorithm } from '@/api/adPromotion'
 
 
 /** 維度順序（界面展示順序） */
@@ -120,6 +121,7 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     decayCoefficient: vo.decayCoefficient ?? undefined,
     timeRangeScores: vo.timeRangeScores ? (() => { try { return JSON.parse(vo.timeRangeScores) as TimeRangeScores } catch { return undefined } })() : undefined,
     blockedMerchants: vo.blockedMerchants ? (() => { try { return JSON.parse(vo.blockedMerchants) as string[] } catch { return undefined } })() : undefined,
+    activityItems: vo.activityItems ? (() => { try { return JSON.parse(vo.activityItems) as ActivityScoreItem[] } catch { return undefined } })() : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
   }
@@ -232,6 +234,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           if (r.id === 'STB_01') {
             r.name = '主營時段加分'
           }
+          if (r.id === 'STB_ACT') {
+            r.name = '活動加分'
+            r.dimension = ScoreDimension.STORE
+            if (!r.activityItems) r.activityItems = []
+          }
           if (r.id === 'PLT_01') {
             r.name = '距離衰減'
             if (!r.decayCoefficient) r.decayCoefficient = 5
@@ -249,6 +256,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             }
           }
         })
+        // 保底：STB_ACT 活動加分尚未種子時，以前端默認模板補充（只讀展示不影響）
+        if (!loaded.some(r => r.id === 'STB_ACT')) {
+          const tpl = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_ACT')
+          if (tpl) loaded.push({ ...tpl })
+        }
         setRules(mergeReviewRules(loaded))
       }
       if (config.dimensions.length > 0) {
@@ -355,6 +367,55 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       })))
     }).catch(() => { /* 靜默請求 */ })
   }, [])
+
+  /* ---- 活動加分（STB_ACT）相關狀態（暫對接算法庫，後續切換為系統活動） ---- */
+  /** 算法庫列表（用於算法名稱/狀態展示與輸入聯想） */
+  const [algoOptions, setAlgoOptions] = useState<AdAlgorithm[]>([])
+  /** 按行索引記錄算法查詢加載態 */
+  const [algoFetching, setAlgoFetching] = useState<Record<number, boolean>>({})
+
+  /** 加載算法庫列表 */
+  useEffect(() => {
+    fetchAdAlgorithms({ page: 1, size: 200 })
+      .then(res => setAlgoOptions(res?.records ?? []))
+      .catch(() => { /* 靜默請求 */ })
+  }, [])
+
+  /** 更新活動加分配置的某一行 */
+  const updateActivityItem = (ruleId: string, index: number, patch: Partial<ActivityScoreItem>) => {
+    setInlineForm(prev => {
+      const rule = prev[ruleId] || {}
+      const items = [...((rule.activityItems || []) as ActivityScoreItem[])]
+      items[index] = { ...items[index], ...patch }
+      return { ...prev, [ruleId]: { ...rule, activityItems: items } }
+    })
+  }
+
+  /** 通過算法ID獲取算法名稱與狀態 */
+  const handleFetchAlgo = async (ruleId: string, index: number) => {
+    const items = (inlineForm[ruleId]?.activityItems || []) as ActivityScoreItem[]
+    const code = items[index]?.activityId?.trim()
+    if (!code) {
+      message.warning('請輸入算法ID')
+      return
+    }
+    setAlgoFetching(prev => ({ ...prev, [index]: true }))
+    try {
+      const algo = await fetchAdAlgorithmByCode(code)
+      if (algo) {
+        updateActivityItem(ruleId, index, { activityName: algo.algoName })
+        // 同步到選項緩存（保證名稱/狀態為實時值）
+        setAlgoOptions(prev => [algo, ...prev.filter(a => a.algoCode !== algo.algoCode)])
+        message.success(`已獲取算法：${algo.algoName}`)
+      } else {
+        message.error(`算法不存在：${code}`)
+      }
+    } catch (err) {
+      message.error(err instanceof Error && err.message ? err.message : '算法查詢失敗，請稍後重試')
+    } finally {
+      setAlgoFetching(prev => ({ ...prev, [index]: false }))
+    }
+  }
 
   /** 門店搜索過濾 */
   const filteredStores = useMemo(() => {
@@ -517,6 +578,24 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         return
       }
     }
+    // STB_ACT 活動加分校驗：每行需填活動ID與加分分值（分值 > 0）
+    if (ruleId === 'STB_ACT') {
+      const items: ActivityScoreItem[] = (values as any).activityItems || []
+      if (items.length === 0) {
+        message.warning('請至少配置一個活動')
+        return
+      }
+      for (let i = 0; i < items.length; i++) {
+        if (!items[i].activityId?.trim()) {
+          message.warning(`第 ${i + 1} 行請輸入算法ID`)
+          return
+        }
+        if (!items[i].score || items[i].score <= 0) {
+          message.warning(`第 ${i + 1} 行請配置活動加分分值`)
+          return
+        }
+      }
+    }
     const payload = {
       dimension: values.dimension!,
       name: values.name!,
@@ -537,6 +616,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       decayCoefficient: (values as any).decayCoefficient,
       timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
       blockedMerchants: (values as any).blockedMerchants ? JSON.stringify((values as any).blockedMerchants) : undefined,
+      activityItems: (values as any).activityItems?.length
+        ? JSON.stringify(((values as any).activityItems as ActivityScoreItem[]).map(it => ({
+            activityId: it.activityId.trim(),
+            activityName: algoOptions.find(a => a.algoCode === it.activityId.trim())?.algoName ?? it.activityName,
+            score: it.score,
+          })))
+        : undefined,
       status: values.status!,
     }
     try {
@@ -549,6 +635,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       // 保留前端編輯過的屏蔽商家（API 可能未返回該字段）
       if ((values as any).blockedMerchants !== undefined) {
         savedRule.blockedMerchants = (values as any).blockedMerchants
+      }
+      // 保留前端編輯過的活動加分配置（API 可能未返回該字段）
+      if ((values as any).activityItems !== undefined) {
+        savedRule.activityItems = (values as any).activityItems
       }
       setRules(prev => prev.map(r => r.id === ruleId ? savedRule : r))
       message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
@@ -747,6 +837,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       deductionPerOrder: (values as any).deductionPerOrder,
       decayCoefficient: (values as any).decayCoefficient,
       timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
+      // STB_ACT 活動加分：保留已有配置（彈窗路徑不編輯活動明細）
+      activityItems: editingRule?.id === 'STB_ACT'
+        ? JSON.stringify(editingRule.activityItems || [])
+        : undefined,
       status: values.status,
     }
     try {
@@ -945,7 +1039,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         <>
                           {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && (
                             <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
-                              {(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A')
+                              {(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
                                 ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
                                 : MODE_LABEL[rule.mode]}
                             </Tag>
@@ -980,7 +1074,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           {rule.id === 'PLT_01' && (
                             <Tag color="#1890FF" style={{ fontSize: 11, margin: 0 }}>距離衰減</Tag>
                           )}
-                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && ((rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
+
+                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && ((rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
                             rule.mode === ScoreMode.AMOUNT_MULTIPLIER
                               ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_01' ? '立減金額' : rule.id === 'COM_02' ? '運費金額' : rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
                               : <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>分值 +{rule.score} 分 <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>（直接加固定分）</span></span>
@@ -1038,6 +1133,48 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
+                        {/* STB_ACT 活動加分配置只讀顯示（參考 STB_09 超時接單風格：信息與分數均居左） */}
+                        {rule.id === 'STB_ACT' && (() => {
+                          const items = rule.activityItems || []
+                          return (
+                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                              {items.length === 0 ? (
+                                <div style={{ fontSize: 12, color: '#8C8C8C' }}>尚未配置，請點擊編輯添加算法並配置固定加分</div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {items.map((item, idx) => {
+                                    const live = algoOptions.find(a => a.algoCode === item.activityId)
+                                    const name = live?.algoName ?? item.activityName ?? '—'
+                                    const status = live?.status
+                                    return (
+                                      <div key={item.activityId || idx} style={{
+                                        display: 'flex', alignItems: 'center', gap: 12,
+                                        padding: '10px 12px', background: '#f6ffed', borderRadius: 6,
+                                      }}>
+                                        <span style={{ fontSize: 12, color: '#1890FF', fontFamily: 'monospace' }}>{item.activityId}</span>
+                                        <span style={{ fontSize: 13, color: '#595959' }}>{name}</span>
+                                        <Tag color={status === 1 ? 'success' : status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
+                                          {status === 1 ? '啟用' : status === 2 ? '停用' : '未知'}
+                                        </Tag>
+                                        <span style={{
+                                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                          height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                          color: '#52C41A', background: '#f6ffed', border: '1px solid #b7eb8f',
+                                        }}>
+                                          固定加分
+                                        </span>
+                                        <span style={{ fontWeight: 600, fontSize: 15, color: '#52C41A' }}>+{item.score} 分</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                                備注：暫以算法庫算法ID對接驗證（後續切換為系統活動）；店鋪報名參與即獲得對應固定加分，名稱與狀態與算法庫實時同步，停用後不再計分
+                              </div>
+                            </div>
+                          )
+                        })()}
                         {/* STB_02 營業狀態配置只讀顯示 */}
                         {rule.id === 'STB_02' && (() => {
                           const defaultSTB02 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_02')
@@ -1551,7 +1688,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
                             {rule.description}
                           </div>
-                          {rule.prerequisites && rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && (
+                          {rule.prerequisites && rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && (
                             <div style={{
                               display: 'inline-flex', alignItems: 'center', gap: 6,
                               padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
@@ -1566,13 +1703,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     ) : (
                       /* 編輯模式 */
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: (rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'STB_02' || rule.id === 'STB_03' || rule.id === 'PLT_03' || rule.id === 'PLT_04' || rule.id === 'STB_05' || rule.id === 'STB_06' || rule.id === 'STB_07' || rule.id === 'STB_08' || rule.id === 'STB_09' || rule.id === 'PLT_01' || rule.id === 'PLT_02A') ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: (rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'STB_02' || rule.id === 'STB_03' || rule.id === 'PLT_03' || rule.id === 'PLT_04' || rule.id === 'STB_05' || rule.id === 'STB_06' || rule.id === 'STB_07' || rule.id === 'STB_08' || rule.id === 'STB_09' || rule.id === 'PLT_01' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT') ? '1fr' : '1fr 1fr', gap: 12 }}>
                           <div>
                             <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>規則名稱</div>
                             <Input value={form.name} maxLength={30} showCount
                               onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], name: e.target.value } }) as any)} />
                           </div>
-                          {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A') && (
+                          {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
@@ -2198,6 +2335,67 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
+                        {/* STB_ACT 活動加分自定義編輯（算法ID → 名稱/狀態 + 固定加分，暫對接算法庫） */}
+                        {rule.id === 'STB_ACT' && (() => {
+                          const items: ActivityScoreItem[] = ((form as any).activityItems || [])
+                          return (
+                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {items.length === 0 && (
+                                  <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: '8px 0' }}>請點擊下方「添加算法」，輸入算法ID後系統自動獲取算法名稱與狀態</div>
+                                )}
+                                {items.map((item, idx) => {
+                                  const live = algoOptions.find(a => a.algoCode === item.activityId?.trim())
+                                  return (
+                                    <div key={idx} style={{
+                                      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                                      padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
+                                    }}>
+                                      <AutoComplete
+                                        value={item.activityId}
+                                        style={{ width: 200 }}
+                                        placeholder="輸入/選擇算法ID"
+                                        options={algoOptions.filter(a => !!a.algoCode).map(a => ({ value: a.algoCode, label: `${a.algoCode} - ${a.algoName}` }))}
+                                        onChange={val => updateActivityItem(rule.id, idx, { activityId: val })}
+                                      />
+                                      <Button size="small" loading={algoFetching[idx]} onClick={() => handleFetchAlgo(rule.id, idx)}
+                                        style={{ borderRadius: 4 }}>查詢</Button>
+                                      <span style={{ fontSize: 13, color: '#262626', fontWeight: 500, minWidth: 110 }}>
+                                        {live?.algoName ?? item.activityName ?? '—'}
+                                      </span>
+                                      <Tag color={live?.status === 1 ? 'success' : live?.status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
+                                        {live?.status === 1 ? '啟用' : live?.status === 2 ? '停用' : '未知'}
+                                      </Tag>
+                                      <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
+                                      <InputNumber value={item.score} min={1} max={500} style={{ width: 110 }}
+                                        addonAfter="分" placeholder="輸入分數"
+                                        onChange={val => updateActivityItem(rule.id, idx, { score: val ?? 0 })} />
+                                      <Button type="link" danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => {
+                                          setInlineForm(prev => {
+                                            const r = prev[rule.id] || {}
+                                            const next = ((r.activityItems || []) as ActivityScoreItem[]).filter((_, i) => i !== idx)
+                                            return { ...prev, [rule.id]: { ...r, activityItems: next } }
+                                          })
+                                        }} />
+                                    </div>
+                                  )
+                                })}
+                                <Button size="small" icon={<PlusOutlined />} style={{ alignSelf: 'flex-start', borderRadius: 4 }}
+                                  onClick={() => {
+                                    setInlineForm(prev => {
+                                      const r = prev[rule.id] || {}
+                                      const next = [...((r.activityItems || []) as ActivityScoreItem[]), { activityId: '', score: 0 }]
+                                      return { ...prev, [rule.id]: { ...r, activityItems: next } }
+                                    })
+                                  }}>添加算法</Button>
+                              </div>
+                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                                備注：暫以算法庫算法ID對接驗證，後續有活動功能後再切換為活動對接；輸入算法ID後系統自動獲取算法名稱與狀態，店鋪報名參與即得固定加分，每個獨立計分、可累加
+                              </div>
+                            </div>
+                          )
+                        })()}
                         {/* STB_01/STB_04 主營時段/店鋪標籤自定義編輯（固定加分，無下拉框） */}
                         {(rule.id === 'STB_01' || rule.id === 'STB_04') && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
@@ -2208,8 +2406,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                           </div>
                         )}
-                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04 顯示標準計分方式 */}
-                        {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && (
+                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT 顯示標準計分方式 */}
+                        {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
@@ -2274,11 +2472,18 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   }
 
 
-  /** 是否顯示維度權重與計算配置區（由規則配置菜單控制） */
-  const showDimensionWeight = useMemo(
+  /** 是否顯示維度權重與計算配置區（由規則配置菜單控制；後端 DB 優先，localStorage 兜底） */
+  const [showDimensionWeight, setShowDimensionWeight] = useState(
     () => getSystemRuleValue<boolean>('organic_traffic_show_dimension_weight') !== false,
-    [],
   )
+  useEffect(() => {
+    getSystemConfig('organic_traffic_show_dimension_weight')
+      .then(res => {
+        if (res?.value === 'true') setShowDimensionWeight(true)
+        else if (res?.value === 'false') setShowDimensionWeight(false)
+      })
+      .catch(() => { /* 後端不可用時保持本地值 */ })
+  }, [])
 
   return (
     <Spin spinning={loading}>

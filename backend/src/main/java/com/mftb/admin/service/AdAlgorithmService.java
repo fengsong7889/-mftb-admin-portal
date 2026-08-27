@@ -19,6 +19,9 @@ public interface AdAlgorithmService {
     /** 算法详情 */
     AdAlgorithmVO detail(Long id);
 
+    /** 按算法ID（algoCode）精确查询算法，不存在时抛业务异常 */
+    AdAlgorithmVO getByCode(String algoCode);
+
     /** 新增算法（自动生成算法ID） */
     AdAlgorithmVO create(AdAlgorithmRequest request);
 
