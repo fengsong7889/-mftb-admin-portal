@@ -2542,7 +2542,19 @@
     "placeholderWord": "請輸入詞條",
     "placeholderWordExample": "請輸入詞條（如：牛肉面）",
     "placeholderSelectChannel": "請選擇所屬頻道",
-    "placeholderRemark": "請輸入備註說明（選填）"
+    "placeholderRemark": "請輸入備註說明（選填）",
+    "segmentPlaceholder": "可直接輸入單個詞條，或輸入菜名、食材等文本後點擊分詞自動識別並多選（如：紅燒牛肉面 酸辣湯 炒飯）",
+    "doSegment": "分詞",
+    "segmentResult": "分詞結果",
+    "segmentSelected": "已選 {{count}}/{{total}}",
+    "segmentSelectAll": "全選",
+    "segmentDeselectAll": "取消全選",
+    "segmentInputEmpty": "請輸入待分詞的文本",
+    "segmentNoResult": "未識別到有效詞條",
+    "segmentError": "分詞失敗，請稍後重試",
+    "batchAddSuccess": "成功新增 {{count}} 個詞條",
+    "batchAddPartial": "成功新增 {{success}} 個詞條，{{skip}} 個已存在被跳過",
+    "wordRequired": "請至少輸入或選擇一個詞條"
   },
   "algorithm": {
     "typeInvincibleStar": "無敵星星",

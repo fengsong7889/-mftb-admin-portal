@@ -3,9 +3,11 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.SegmentRequest;
 import com.mftb.admin.dto.WordLibraryImportResult;
 import com.mftb.admin.dto.WordLibraryRequest;
 import com.mftb.admin.dto.WordLibraryVO;
+import com.mftb.admin.service.SegmentationService;
 import com.mftb.admin.service.WordLibraryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ import java.util.List;
 public class WordLibraryController {
 
     private final WordLibraryService wordLibraryService;
+    private final SegmentationService segmentationService;
 
     /** 词库列表（分页） */
     @GetMapping
@@ -82,5 +85,12 @@ public class WordLibraryController {
     @RequirePermission(menu = "promotion-word-library", action = "import")
     public Result<WordLibraryImportResult> batchImport(@RequestBody List<WordLibraryRequest> requests) {
         return Result.success(wordLibraryService.batchImport(requests));
+    }
+
+    /** 智能分词：对输入文本进行分词，返回词条列表 */
+    @PostMapping("/segment")
+    @RequirePermission(menu = "promotion-word-library")
+    public Result<List<String>> segment(@Valid @RequestBody SegmentRequest request) {
+        return Result.success(segmentationService.segment(request.getText()));
     }
 }

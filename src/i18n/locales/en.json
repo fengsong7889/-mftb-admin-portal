@@ -2541,7 +2541,19 @@
     "placeholderWord": "Enter word",
     "placeholderWordExample": "Enter word (e.g. Beef Noodles)",
     "placeholderSelectChannel": "Select channel",
-    "placeholderRemark": "Enter remark (optional)"
+    "placeholderRemark": "Enter remark (optional)",
+    "segmentPlaceholder": "Enter a single word directly, or enter dish names / ingredients text then click Segment to auto-detect and multi-select (e.g. Braised Beef Noodles Hot & Sour Soup Fried Rice)",
+    "doSegment": "Segment",
+    "segmentResult": "Segmentation Results",
+    "segmentSelected": "Selected {{count}}/{{total}}",
+    "segmentSelectAll": "Select All",
+    "segmentDeselectAll": "Deselect All",
+    "segmentInputEmpty": "Please enter text to segment",
+    "segmentNoResult": "No valid words identified",
+    "segmentError": "Segmentation failed, please try again",
+    "batchAddSuccess": "Successfully added {{count}} words",
+    "batchAddPartial": "Successfully added {{success}} words, {{skip}} duplicates skipped",
+    "wordRequired": "Please enter or select at least one word"
   },
   "algorithm": {
     "typeInvincibleStar": "Invincible Star",

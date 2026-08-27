@@ -62,3 +62,13 @@ export async function toggleWordLibraryStatus(id: number) {
 export async function deleteWordLibraryItem(id: number) {
   return request.delete<unknown, void>(`/word-library/${id}`)
 }
+
+/** 智能分词：对输入文本进行分词，返回词条列表 */
+export async function segmentWords(text: string) {
+  try {
+    return await request.post<unknown, string[]>('/word-library/segment', { text }, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}

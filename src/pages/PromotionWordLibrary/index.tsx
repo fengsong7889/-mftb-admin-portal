@@ -6,6 +6,7 @@ import {
   ReloadOutlined,
   PlusOutlined,
   ExportOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useTranslation } from 'react-i18next'
@@ -15,6 +16,7 @@ import {
   updateWordLibraryItem,
   toggleWordLibraryStatus,
   deleteWordLibraryItem,
+  segmentWords,
 } from '../../api/wordLibrary'
 import type { WordLibraryItem } from '../../api/wordLibrary'
 
@@ -59,6 +61,12 @@ export default function PromotionWordLibrary() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  /* ---- 分词相关状态 ---- */
+  const [segmentInput, setSegmentInput] = useState('')
+  const [segmentResults, setSegmentResults] = useState<string[]>([])
+  const [selectedWords, setSelectedWords] = useState<string[]>([])
+  const [segmentLoading, setSegmentLoading] = useState(false)
 
   /* ---- 数据加载 ---- */
   const loadData = useCallback(async (p = page, ps = pageSize) => {
@@ -126,6 +134,10 @@ export default function PromotionWordLibrary() {
     setEditingRecord(null)
     form.resetFields()
     form.setFieldsValue({ status: true })
+    // 重置分词状态
+    setSegmentInput('')
+    setSegmentResults([])
+    setSelectedWords([])
     setIsModalOpen(true)
   }
 
@@ -174,20 +186,100 @@ export default function PromotionWordLibrary() {
 
   const handleSave = async () => {
     const values = await form.validateFields()
-    const payload = {
-      word: values.word,
-      channel: values.channel,
-      status: values.status ? 1 : 2,
-      remark: values.remark,
-    }
-    if (editingRecord) {
-      await updateWordLibraryItem(editingRecord.id, payload)
+    const channel = values.channel
+    const status = values.status ? 1 : 2
+    const remark = values.remark
+
+    if (!editingRecord) {
+      // 新增模式：收集所有待创建的词条（智能分词与手动输入已合并为同一输入框）
+      let wordsToCreate: string[] = []
+
+      if (segmentResults.length > 0) {
+        // 已分词：仅创建选中的词条
+        wordsToCreate = [...selectedWords]
+      } else if (segmentInput.trim()) {
+        // 未分词：将输入内容整体作为词条（手动输入模式）
+        wordsToCreate = [segmentInput.trim()]
+      }
+
+      // 去重
+      const uniqueWords = [...new Set(wordsToCreate)]
+
+      if (uniqueWords.length === 0) {
+        message.warning(t('promotionWordLibrary.wordRequired'))
+        return
+      }
+
+      if (uniqueWords.length === 1) {
+        // 单条新增
+        await createWordLibraryItem({ word: uniqueWords[0], channel, status, remark })
+        message.success(t('promotionWordLibrary.addSuccess'))
+      } else {
+        // 批量新增（逐条创建，跳过已存在的重复词）
+        let successCount = 0
+        let skipCount = 0
+        for (const word of uniqueWords) {
+          try {
+            await createWordLibraryItem({ word, channel, status, remark })
+            successCount++
+          } catch {
+            skipCount++
+          }
+        }
+        if (skipCount > 0) {
+          message.info(t('promotionWordLibrary.batchAddPartial', { success: successCount, skip: skipCount }))
+        } else {
+          message.success(t('promotionWordLibrary.batchAddSuccess', { count: successCount }))
+        }
+      }
     } else {
-      await createWordLibraryItem(payload)
+      // 编辑模式：单条更新
+      const payload = {
+        word: values.word,
+        channel,
+        status,
+        remark,
+      }
+      await updateWordLibraryItem(editingRecord.id, payload)
+      message.success(t('promotionWordLibrary.editSuccess'))
     }
-    message.success(editingRecord ? t('promotionWordLibrary.editSuccess') : t('promotionWordLibrary.addSuccess'))
     setIsModalOpen(false)
     loadData()
+  }
+
+  /* ---- 分词操作 ---- */
+  const handleSegment = async () => {
+    if (!segmentInput.trim()) {
+      message.warning(t('promotionWordLibrary.segmentInputEmpty'))
+      return
+    }
+    setSegmentLoading(true)
+    try {
+      const results = await segmentWords(segmentInput)
+      setSegmentResults(results)
+      setSelectedWords([...results]) // 默认全选
+      if (results.length === 0) {
+        message.info(t('promotionWordLibrary.segmentNoResult'))
+      }
+    } catch {
+      message.error(t('promotionWordLibrary.segmentError'))
+    } finally {
+      setSegmentLoading(false)
+    }
+  }
+
+  const handleToggleWord = (word: string) => {
+    setSelectedWords(prev =>
+      prev.includes(word) ? prev.filter(w => w !== word) : [...prev, word]
+    )
+  }
+
+  const handleSelectAllWords = () => {
+    if (selectedWords.length === segmentResults.length) {
+      setSelectedWords([])
+    } else {
+      setSelectedWords([...segmentResults])
+    }
   }
 
   const handleExport = () => {
@@ -351,17 +443,88 @@ export default function PromotionWordLibrary() {
         onCancel={() => setIsModalOpen(false)}
         okText={t('common.confirm')}
         cancelText={t('common.cancel')}
-        width={600}
+        width={640}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item
-            label={t('promotionWordLibrary.colWord')}
-            name="word"
-            rules={[{ required: true, message: t('promotionWordLibrary.placeholderWord') }]}
-          >
-            <Input placeholder={t('promotionWordLibrary.placeholderWordExample')} />
-          </Form.Item>
+          {/* 编辑模式：单条词条输入 */}
+          {editingRecord && (
+            <Form.Item
+              label={t('promotionWordLibrary.colWord')}
+              name="word"
+              rules={[{ required: true, message: t('promotionWordLibrary.placeholderWord') }]}
+            >
+              <Input placeholder={t('promotionWordLibrary.placeholderWordExample')} />
+            </Form.Item>
+          )}
+
+          {/* 新增模式：统一输入框（支持直接输入词条 / 输入文本后智能分词多选） */}
+          {!editingRecord && (
+            <Form.Item label={t('promotionWordLibrary.colWord')} required>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Input.TextArea
+                  rows={3}
+                  value={segmentInput}
+                  onChange={e => setSegmentInput(e.target.value)}
+                  placeholder={t('promotionWordLibrary.segmentPlaceholder')}
+                  style={{ borderRadius: 6 }}
+                />
+                <Button
+                  type="primary"
+                  icon={<ThunderboltOutlined />}
+                  loading={segmentLoading}
+                  disabled={!segmentInput.trim()}
+                  onClick={handleSegment}
+                  style={{ alignSelf: 'flex-end' }}
+                >
+                  {t('promotionWordLibrary.doSegment')}
+                </Button>
+
+                {segmentResults.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: '#595959' }}>
+                        {t('promotionWordLibrary.segmentResult')}
+                        <span style={{ color: '#8C8C8C', marginLeft: 4 }}>
+                          ({t('promotionWordLibrary.segmentSelected', { count: selectedWords.length, total: segmentResults.length })})
+                        </span>
+                      </span>
+                      <Button type="link" size="small" onClick={handleSelectAllWords}>
+                        {selectedWords.length === segmentResults.length
+                          ? t('promotionWordLibrary.segmentDeselectAll')
+                          : t('promotionWordLibrary.segmentSelectAll')}
+                      </Button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {segmentResults.map(word => {
+                        const isSelected = selectedWords.includes(word)
+                        return (
+                          <Tag
+                            key={word}
+                            color={isSelected ? '#E8720C' : undefined}
+                            style={{
+                              cursor: 'pointer',
+                              padding: '4px 10px',
+                              fontSize: 13,
+                              borderRadius: 4,
+                              transition: 'all 0.2s',
+                              borderColor: isSelected ? '#E8720C' : '#d9d9d9',
+                              color: isSelected ? '#fff' : '#595959',
+                              backgroundColor: isSelected ? '#E8720C' : '#fafafa',
+                            }}
+                            onClick={() => handleToggleWord(word)}
+                          >
+                            {word}
+                          </Tag>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Form.Item>
+          )}
+
           <Form.Item
             label={t('promotionWordLibrary.colChannel')}
             name="channel"
