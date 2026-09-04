@@ -11,6 +11,11 @@ server:
 spring:
   application:
     name: mftb-admin
+  task:
+    scheduling:
+      # 定时任务启动延迟 120 秒，确保 DataInitializer schema 迁移先完成
+      # 避免 @Scheduled 任务在 avatar_url 等列创建前就执行查询导致崩溃
+      initial-delay: 120000
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     # 数据库连接信息必须通过环境变量 DB_URL/DB_USERNAME/DB_PASSWORD 注入，禁止在代码库中保留默认凭据
