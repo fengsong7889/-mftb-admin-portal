@@ -202,10 +202,30 @@ const keyToPath: Record<string, string> = {
   // AI 模型授权管理 / 配额管理（二级菜单）
   'ai-dept-model-auth': '/ai-dept-model-auth',
   'ai-emp-model-auth': '/ai-emp-model-auth',
-  'ai-pos-auth': '/ai-emp-model-auth#position',   // 按职位授权 - Tab2
-  'ai-role-auth': '/ai-emp-model-auth#role',      // 角色授权 - Tab3
+  'ai-pos-auth': '/ai-pos-auth',
   'ai-dept-quota': '/ai-dept-quota',
   'ai-emp-quota': '/ai-emp-quota',
+  // 订单管理
+  'promotion-order-manage': '/promotion-order-manage',
+  // 门店数据配置
+  'store-data-config': '/store-data-config',
+  // 地图規劃
+  'map-planning': '/map-planning',
+  // 赠送管理子页面
+  'gift-add': '/gift-add',
+  'gift-detail-view': '/gift-detail-view',
+  // AI 子页面（编辑/详情）
+  'ai-model-edit': '/ai-model-edit',
+  'ai-model-detail': '/ai-model-detail',
+  'ai-dept-auth-edit': '/ai-dept-auth-edit',
+  'ai-dept-auth-detail': '/ai-dept-auth-detail',
+  'ai-pos-auth-edit': '/ai-pos-auth-edit',
+  'ai-pos-auth-detail': '/ai-pos-auth-detail',
+  'ai-role-auth-edit': '/ai-role-auth-edit',
+  'ai-role-auth-detail': '/ai-role-auth-detail',
+  'ai-dept-quota-edit': '/ai-dept-quota-edit',
+  'ai-dept-quota-detail': '/ai-dept-quota-detail',
+  'ai-tool-registry': '/ai-tool-registry',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -225,10 +245,12 @@ const noPageKeys = new Set([
   'group-buy-store', 'group-buy-product',
 ])
 
-/** 路由路径 → 菜单 key 映射（用于高亮） */
-const pathToKey: Record<string, string> = {}
+/** 路由路径 → 菜单 key 映射（用于高亮 & MenuTabs 名称统一） */
+export const pathToKey: Record<string, string> = {}
 Object.entries(keyToPath).forEach(([key, path]) => {
-  pathToKey[path] = key
+  // 去除 hash 片段，确保 pathToKey 的 key 是纯路径
+  const cleanPath = path.split('#')[0]
+  pathToKey[cleanPath] = key
 })
 
 const menuItems: MenuItem[] = [

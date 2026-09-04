@@ -18,7 +18,7 @@ import type {
   EmployeeModelOverride,
 } from '../../api/mock/aiPlatformMock'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { CAPABILITY_SHORT_FIELDS } from './empAuth/modelAuthCapability'
+import { CAPABILITY_SHORT_FIELDS, type CapabilityKey } from './empAuth/modelAuthCapability'
 
 export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } = {}) {
   const navigate = useNavigate()
@@ -58,6 +58,30 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
     models.forEach((m) => { map[String(m.id)] = m.name })
     return map
   }, [models])
+
+  /** 模型 id → AiModel 完整對象（用於構建能力配置） */
+  const modelMap = useMemo(() => {
+    const map: Record<number, AiModel> = {}
+    models.forEach((m) => { map[m.id] = m })
+    return map
+  }, [models])
+
+  /** 為部門策略構建 modelConfigs：後端列表未返回時，從 modelIds + 模型能力自動構建 */
+  const buildModelConfigs = (row: DeptAuthGroupItem) => {
+    if (row.modelConfigs?.length) return row.modelConfigs
+    if (!row.modelIds?.length) return []
+    return row.modelIds.map((id) => {
+      const m = modelMap[id]
+      return {
+        modelId: id,
+        visionSupport: (m?.visionSupport ?? 0) as number,
+        functionCalling: (m?.functionCalling ?? 0) as number,
+        jsonMode: (m?.jsonMode ?? 0) as number,
+        streaming: (m?.streaming ?? 0) as number,
+        thinkingMode: (m?.thinkingMode ?? 0) as number,
+      }
+    })
+  }
 
   /* ══════════════ Tab1: 部門模型權控（分組策略模式） ══════════════ */
   const [queryGroupName, setQueryGroupName] = useState('')
@@ -216,8 +240,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
     {
       key: 'capabilities', title: '授權能力', width: 220,
       render: (_: unknown, row: DeptAuthGroupItem) => {
-        const configs = row.modelConfigs
-        if (!configs?.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>未配置</span>
+        const configs = buildModelConfigs(row)
+        if (!configs.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>未配置</span>
         // 去重：收集所有模型中已啟用的能力
         const enabledCaps = CAPABILITY_SHORT_FIELDS.filter(({ key }) =>
           configs.some((c) => c[key] === 1),

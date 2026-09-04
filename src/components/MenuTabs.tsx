@@ -4,6 +4,7 @@ import { CloseOutlined, HomeOutlined } from '@ant-design/icons'
 import { fetchMenuTree } from '../api/menu'
 import type { MenuVO } from '../api/menu'
 import { translateMenuName } from '../i18n/menuNameEn'
+import { pathToKey } from './Sidebar'
 import { useTranslation } from 'react-i18next'
 import './MenuTabs.css'
 
@@ -20,7 +21,7 @@ const TABS_STORAGE_KEY = 'menu_tabs_history'
 const HOME_TAB: MenuTab = { path: '/', title: '首頁' }
 
 /**
- * 从后端菜单树构建 path → { key, name } 映射
+ * 从后端菜单树构建 path → { key, name } 映射 + menuKey → name 映射
  * 递归遍历所有层级菜单
  */
 function buildPathMap(menus: MenuVO[], result: Record<string, { key: string; name: string }> = {}) {
@@ -33,6 +34,64 @@ function buildPathMap(menus: MenuVO[], result: Record<string, { key: string; nam
     }
   }
   return result
+}
+
+function buildKeyNameMap(menus: MenuVO[], result: Record<string, string> = {}) {
+  for (const m of menus) {
+    result[m.menuKey] = m.name
+    if (m.children?.length) {
+      buildKeyNameMap(m.children, result)
+    }
+  }
+  return result
+}
+
+/** 子页面 → 父菜单 menuKey（用于从后端获取父页面名称） */
+const SUB_PAGE_PARENT_KEY: Record<string, string> = {
+  '/recharge-add': 'account-balance',
+  '/transfer-add': 'account-balance',
+  '/deduct-add': 'account-balance',
+  '/merge-add': 'account-balance',
+  '/batch-detail': 'batch-query',
+  '/debt-detail': 'debt-reconcile',
+  '/approval-detail': 'approval-center',
+  '/search-verify-detail': 'search-verify',
+  '/promotion-algorithm-add': 'promotion-algorithm',
+  '/promotion-slot-config-add': 'promotion-slot-config',
+  '/promotion-waterfall-add': 'promotion-waterfall',
+  '/order-detail': 'promotion-order-manage',
+  '/gift-add': 'gift-detail',
+  '/gift-detail-view': 'gift-detail',
+  '/ai-model-edit': 'ai-model-list',
+  '/ai-model-detail': 'ai-model-list',
+  '/ai-dept-auth-edit': 'ai-dept-model-auth',
+  '/ai-dept-auth-detail': 'ai-dept-model-auth',
+  '/ai-pos-auth-edit': 'ai-pos-auth',
+  '/ai-pos-auth-detail': 'ai-pos-auth',
+  '/ai-role-auth-edit': 'ai-dept-model-auth',
+  '/ai-role-auth-detail': 'ai-dept-model-auth',
+  '/ai-dept-quota-edit': 'ai-dept-quota',
+  '/ai-dept-quota-detail': 'ai-dept-quota',
+  '/workflow-config/detail': 'workflow-config',
+  '/page-description-editor': 'menu-config',
+  '/page-prd-view': 'menu-config',
+}
+
+/** 子页面类型后缀（仅用于无后端父菜单的极端降级） */
+const SUB_PAGE_SUFFIX: Record<string, string> = {
+  '/recharge-add': '-新增', '/transfer-add': '-新增', '/deduct-add': '-新增', '/merge-add': '-新增',
+  '/batch-detail': '-詳情', '/debt-detail': '-詳情', '/approval-detail': '-詳情',
+  '/search-verify-detail': '-詳情',
+  '/promotion-algorithm-add': '-新增', '/promotion-slot-config-add': '-新增', '/promotion-waterfall-add': '-新增',
+  '/order-detail': '-詳情',
+  '/gift-add': '-新增', '/gift-detail-view': '-詳情',
+  '/ai-model-edit': '-編輯', '/ai-model-detail': '-詳情',
+  '/ai-dept-auth-edit': '-編輯', '/ai-dept-auth-detail': '-詳情',
+  '/ai-pos-auth-edit': '-編輯', '/ai-pos-auth-detail': '-詳情',
+  '/ai-role-auth-edit': '-編輯', '/ai-role-auth-detail': '-詳情',
+  '/ai-dept-quota-edit': '-編輯', '/ai-dept-quota-detail': '-詳情',
+  '/workflow-config/detail': '-詳情',
+  '/page-description-editor': '-編輯', '/page-prd-view': '-詳情',
 }
 
 /** 静态 fallback：path → 名称（后端菜单不可用时降级） */
@@ -152,12 +211,34 @@ const SUB_PAGE_NAME: Record<string, string> = {
   '/page-prd-view': 'PRD文檔-詳情',
 }
 
-/** 匹配二级页面名称（支持动态路由前缀） */
+/** 匹配二级页面名称（支持动态路由前缀）—— 仅作为最终降级 */
 function matchSubPage(path: string): string | null {
   if (SUB_PAGE_NAME[path]) return SUB_PAGE_NAME[path]
   for (const [prefix, name] of Object.entries(SUB_PAGE_NAME)) {
     if (path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
       return name
+    }
+  }
+  return null
+}
+
+/** 查找子页面对应的父菜单 menuKey（支持动态路由前缀） */
+function findParentKey(path: string): string | null {
+  if (SUB_PAGE_PARENT_KEY[path]) return SUB_PAGE_PARENT_KEY[path]
+  for (const [prefix, parentKey] of Object.entries(SUB_PAGE_PARENT_KEY)) {
+    if (path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
+      return parentKey
+    }
+  }
+  return null
+}
+
+/** 查找子页面后缀（支持动态路由前缀） */
+function findSubPageSuffix(path: string): string | null {
+  if (SUB_PAGE_SUFFIX[path]) return SUB_PAGE_SUFFIX[path]
+  for (const [prefix, suffix] of Object.entries(SUB_PAGE_SUFFIX)) {
+    if (path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
+      return suffix
     }
   }
   return null
@@ -174,14 +255,16 @@ export default function MenuTabs() {
   const { i18n: i18nInstance } = useTranslation()
   const [tabs, setTabs] = useState<MenuTab[]>([HOME_TAB])
   const [pathNameMap, setPathNameMap] = useState<Record<string, { key: string; name: string }>>({})
+  const [keyNameMap, setKeyNameMap] = useState<Record<string, string>>({})
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  /** 加载后端菜单树，构建 path → name 映射 */
+  /** 加载后端菜单树，构建 path → name 及 menuKey → name 映射 */
   useEffect(() => {
     let cancelled = false
     fetchMenuTree().then((tree) => {
       if (!cancelled && tree.length > 0) {
         setPathNameMap(buildPathMap(tree))
+        setKeyNameMap(buildKeyNameMap(tree))
       }
     }).catch(() => { /* 静默，使用 fallback */ })
     return () => { cancelled = true }
@@ -209,20 +292,37 @@ export default function MenuTabs() {
     } catch { /* 忽略存储错误 */ }
   }, [tabs])
 
-  /** 获取路径对应的菜单名称 */
+  /** 获取路径对应的菜单名称（统一从后端菜单配置获取，保持与侧边栏一致） */
   const getMenuName = useCallback((pathname: string): string => {
     const normalized = normalizePath(pathname)
-    // 优先检查二级页面（新增/编辑/详情）
-    const subPageName = matchSubPage(normalized)
-    if (subPageName) return subPageName
-    // 后端菜单树
+
+    // 1. 后端菜单树 path 直接匹配
     const backendEntry = pathNameMap[normalized]
     if (backendEntry) {
       return translateMenuName(backendEntry.key, backendEntry.name)
     }
-    // 降级 fallback
+
+    // 2. 通过 pathToKey（与侧边栏共享）找到 menuKey，再从后端 keyNameMap 获取名称
+    const menuKey = pathToKey[normalized]
+    if (menuKey && keyNameMap[menuKey]) {
+      return translateMenuName(menuKey, keyNameMap[menuKey])
+    }
+
+    // 3. 子页面：从后端获取父页面名称 + 后缀
+    const parentKey = findParentKey(normalized)
+    if (parentKey) {
+      const parentName = keyNameMap[parentKey]
+      if (parentName) {
+        const suffix = findSubPageSuffix(normalized) || ''
+        return translateMenuName(parentKey, parentName) + suffix
+      }
+    }
+
+    // 4. 后端菜单不可用时的降级 fallback
+    const subPageName = matchSubPage(normalized)
+    if (subPageName) return subPageName
     return FALLBACK_PATH_NAME[normalized] || normalized.replace(/^\//, '').replace(/-/g, ' ')
-  }, [pathNameMap, i18nInstance.language])
+  }, [pathNameMap, keyNameMap, i18nInstance.language])
 
   /** 路由变化时自动添加/激活标签 */
   useEffect(() => {

@@ -37,7 +37,7 @@ public class DataInitializer implements CommandLineRunner {
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
     private static final String V_SCHEMA = "core:schema-v1";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
-    private static final String V_MENU_SEED = "core:menu-seed-v8";
+    private static final String V_MENU_SEED = "core:menu-seed-v9";
 
     @Override
     public void run(String... args) {
@@ -398,6 +398,7 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("promotion-tool", "Promotion Pass"),
                 Map.entry("promotion_tool", "Promotion Pass"),
                 Map.entry("promotion-sales-config", "Store Promotion"),
+                Map.entry("promotion-order-manage", "Order Management"),
                 Map.entry("promotion-report-group", "Report Analysis"),
                 Map.entry("promotion-report-overview", "Overview"),
                 Map.entry("promotion-report-order", "Order Report"),
@@ -684,6 +685,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
         // ── 推廣通 ──
         menus.put("promotion-sales-config", new String[]{"店鋪推廣",     "promotion_tool",     "1"});
+        menus.put("promotion-order-manage", new String[]{"訂單管理",     "promotion_tool",     "3"});
         menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "2"});
         menus.put("promotion-report-overview", new String[]{"數據概覽",  "promotion-report-group", "1"});
         menus.put("promotion-report-order", new String[]{"訂單效果報表", "promotion-report-group", "2"});
@@ -821,14 +823,7 @@ public class DataInitializer implements CommandLineRunner {
             log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
         }
 
-        // 清理 promotion-order-manage 菜单残留（已从推广通二级菜单中移除）
-        Long pomId = queryMenuIdByKey("promotion-order-manage");
-        if (pomId != null) {
-            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", pomId);
-            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", pomId);
-            jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", pomId);
-            log.info("已清理 promotion-order-manage 菜单及关联权限记录");
-        }
+
     }
 
     /** 修复转账/合并流程批次号唯一约束：从 (batch_no) 改为 (batch_no, group_code) */

@@ -98,6 +98,8 @@ export default function DeptAuthGroupEdit() {
   const [models, setModels] = useState<AiModel[]>([])
   const [deptOptions, setDeptOptions] = useState<DeptOption[]>([])
   const [selectedDeptIds, setSelectedDeptIds] = useState<number[]>([])
+  /** 左侧树勾选的部门（待确认，点击箭头后才移入右侧） */
+  const [checkedDeptIds, setCheckedDeptIds] = useState<number[]>([])
   const [deptSearchKw, setDeptSearchKw] = useState('')
   const [modelAuths, setModelAuths] = useState<ModelAuthState[]>([])
   const [detail, setDetail] = useState<DeptAuthGroupDetail | null>(null)
@@ -355,7 +357,11 @@ export default function DeptAuthGroupEdit() {
                   可選部門（{deptOptions.length}）
                 </span>
                 <a
-                  onClick={() => setSelectedDeptIds(deptOptions.map((d) => d.deptId))}
+                  onClick={() => {
+                    // 全选：将所有未入选的部门加入勾选
+                    const unchecked = deptOptions.map((d) => d.deptId).filter((id) => !selectedDeptIds.includes(id))
+                    setCheckedDeptIds(unchecked)
+                  }}
                   style={{ fontSize: 12 }}
                 >全選</a>
               </div>
@@ -372,8 +378,8 @@ export default function DeptAuthGroupEdit() {
                 <Tree
                   checkable
                   defaultExpandedKeys={deptRootKeys}
-                  checkedKeys={selectedDeptIds}
-                  onCheck={(keys) => setSelectedDeptIds(keys as number[])}
+                  checkedKeys={checkedDeptIds}
+                  onCheck={(keys) => setCheckedDeptIds(keys as number[])}
                   treeData={deptTree as unknown as TreeDataNode[]}
                   fieldNames={{ key: 'value', title: 'title', children: 'children' }}
                   filterTreeNode={(node) => {
@@ -392,8 +398,12 @@ export default function DeptAuthGroupEdit() {
                 type="primary"
                 size="small"
                 icon={<span style={{ fontSize: 16 }}>›</span>}
-                onClick={() => setSelectedDeptIds(deptOptions.map((d) => d.deptId))}
-                disabled={selectedDeptIds.length === deptOptions.length}
+                onClick={() => {
+                  // 将勾选部门移入右侧（去重）
+                  setSelectedDeptIds((prev) => [...new Set([...prev, ...checkedDeptIds])])
+                  setCheckedDeptIds([])
+                }}
+                disabled={checkedDeptIds.length === 0}
                 style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
               />
               <Button
