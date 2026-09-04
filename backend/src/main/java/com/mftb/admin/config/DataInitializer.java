@@ -161,6 +161,9 @@ public class DataInitializer implements CommandLineRunner {
         addColumnIfAbsent("sys_user", "quick_favorites",
                 "ALTER TABLE sys_user ADD COLUMN quick_favorites VARCHAR(1024) NULL "
                         + "COMMENT '快捷入口菜单key列表，JSON数组格式' AFTER force_logout_reason");
+        addColumnIfAbsent("sys_user", "avatar_url",
+                "ALTER TABLE sys_user ADD COLUMN avatar_url VARCHAR(512) NULL "
+                        + "COMMENT '用户选中的在线头像URL（IconFont/DiceBear等外部URL）' AFTER avatar");
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
     }
 
