@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Button, Tooltip, message, Modal, Select } from 'antd'
 import {
@@ -6,7 +6,6 @@ import {
   LockOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
-  SafetyOutlined,
   GlobalOutlined,
   WechatOutlined,
   AlipayCircleOutlined,
@@ -24,37 +23,6 @@ import {
   langSysName,
 } from '../../utils/translationConfig'
 import '../../styles/components.css'
-
-/* ---- 动物验证码题库（key 化，渲染时按当前语言翻译） ---- */
-interface AnimalQuestion {
-  key: string
-  emoji: string
-  options: string[]
-  answer: string
-}
-
-const animalQuestions: AnimalQuestion[] = [
-  { key: 'cat', emoji: '🐱', options: ['cat', 'dog', 'rabbit'], answer: 'cat' },
-  { key: 'dog', emoji: '🐶', options: ['cat', 'dog', 'fish'], answer: 'dog' },
-  { key: 'panda', emoji: '🐼', options: ['panda', 'polarBear', 'penguin'], answer: 'panda' },
-  { key: 'rabbit', emoji: '🐰', options: ['hamster', 'rabbit', 'cat'], answer: 'rabbit' },
-  { key: 'fox', emoji: '🦊', options: ['dog', 'fox', 'wolf'], answer: 'fox' },
-  { key: 'monkey', emoji: '🐵', options: ['gorilla', 'monkey', 'bear'], answer: 'monkey' },
-  { key: 'penguin', emoji: '🐧', options: ['penguin', 'pigeon', 'duck'], answer: 'penguin' },
-  { key: 'lion', emoji: '🦁', options: ['tiger', 'lion', 'bear'], answer: 'lion' },
-]
-
-/** 调侃语条数（与语言包 login.teasing 保持一致） */
-const TEASING_COUNT = 10
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
 
 /* ---- 视频源配置 ---- */
 // 本地视频(随项目构建部署到 GitHub Pages / 本地开发)
@@ -153,15 +121,6 @@ export default function Login() {
       label: `${LANG_INFO[code]?.flag ?? '🌐'} ${langSysName(code, sysLang)}`,
     })), [sysLang])
 
-  // 验证码状态
-  const [captchaStage, setCaptchaStage] = useState<'checkbox' | 'quiz' | 'success'>('checkbox')
-  const [currentQuestion, setCurrentQuestion] = useState(() => animalQuestions[Math.floor(Math.random() * animalQuestions.length)])
-  const [shuffledOptions, setShuffledOptions] = useState(() => shuffleArray(currentQuestion.options))
-  const [selectedAnimal, setSelectedAnimal] = useState<string | null>(null)
-  const [captchaResult, setCaptchaResult] = useState<'success' | 'error' | null>(null)
-  const [optionStates, setOptionStates] = useState<Record<string, 'correct' | 'wrong' | ''>>({})
-  const [errorMsg, setErrorMsg] = useState('')
-
   // 字段错误提示
   const [usernameError, setUsernameError] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -209,60 +168,12 @@ export default function Login() {
     applyLoginLanguage(lang)
   }
 
-  /** 点击验证码复选框 → 展示动物识别题目 */
-  const handleCaptchaClick = useCallback(() => {
-    if (captchaStage !== 'checkbox') return
-    if (!username.trim()) {
-      setUsernameError(t('login.empIdRequired'))
-      return
-    }
-    setUsernameError('')
-    setCaptchaStage('quiz')
-    setSelectedAnimal(null)
-    setCaptchaResult(null)
-    setOptionStates({})
-  }, [captchaStage, username, t])
-
-  /** 选择动物选项 → 立即判断 */
-  const handleSelectAnimal = (option: string) => {
-    if (captchaResult === 'success') return
-    setSelectedAnimal(option)
-
-    if (option === currentQuestion.answer) {
-      setOptionStates({ [option]: 'correct' })
-      setCaptchaResult('success')
-      setTimeout(() => {
-        setCaptchaStage('success')
-      }, 800)
-    } else {
-      setOptionStates({
-        [option]: 'wrong',
-        [currentQuestion.answer]: 'correct',
-      })
-      setCaptchaResult('error')
-      // 随机调侃提示语（按语言包翻译）
-      const randomMsg = t(`login.teasing.${Math.floor(Math.random() * TEASING_COUNT)}`)
-      setErrorMsg(randomMsg)
-      // 2秒后重置题目
-      setTimeout(() => {
-        const newQ = animalQuestions[Math.floor(Math.random() * animalQuestions.length)]
-        setCurrentQuestion(newQ)
-        setShuffledOptions(shuffleArray(newQ.options))
-        setSelectedAnimal(null)
-        setCaptchaResult(null)
-        setOptionStates({})
-        setErrorMsg('')
-      }, 2000)
-    }
-  }
-
   /** 登录 */
   const handleLogin = () => {
     let hasError = false
     if (!username.trim()) { setUsernameError(t('login.empIdRequired')); hasError = true }
     else { setUsernameError('') }
 
-    if (captchaStage !== 'success') return
     if (!password.trim()) { setPasswordError(t('login.pwdRequired')); hasError = true }
     else { setPasswordError('') }
 
@@ -292,13 +203,12 @@ export default function Login() {
     if (e.key === 'Enter') handleLogin()
   }
 
-  const canLogin = username.trim() && captchaStage === 'success' && password.trim()
+  const canLogin = username.trim() && password.trim()
 
   // 按钮 tooltip 提示
   const getBtnTooltip = () => {
     if (canLogin) return ''
     if (!username.trim()) return t('login.empIdRequired')
-    if (captchaStage !== 'success') return t('login.todoVerify')
     if (!password.trim()) return t('login.pwdRequired')
     return ''
   }
@@ -370,86 +280,26 @@ export default function Login() {
               {usernameError && <div className="field-error-tip">{usernameError}</div>}
             </div>
 
-            {/* 验证码区域 */}
+            {/* 密码输入 */}
             <div className="login-field-v2">
-              <label>{t('login.captchaLabel')}</label>
-              {/* 验证复选框 */}
-              <div
-                className={`captcha-checkbox ${captchaStage === 'success' ? 'verified' : ''}`}
-                onClick={handleCaptchaClick}
-              >
-                <div className="check-box">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </div>
-                <span className="captcha-label">
-                  {captchaStage === 'success' ? t('login.captchaVerified') : t('login.captchaClick')}
-                </span>
-                <div className="captcha-brand">
-                  <div className="captcha-brand-icon">
-                    <SafetyOutlined />
-                  </div>
-                  <span>MFTB</span>
-                </div>
-              </div>
-
-              {/* 动物识别验证码面板 */}
-              {captchaStage === 'quiz' && (
-                <div className="captcha-animal-panel">
-                  <div className="captcha-animal-title">{t('login.animalTitle')}</div>
-                  <div className="captcha-animal-display">
-                    <div className="captcha-animal-emoji">{currentQuestion.emoji}</div>
-                  </div>
-                  <div className="captcha-animal-options">
-                    {shuffledOptions.map(option => (
-                      <div
-                        key={option}
-                        className={`captcha-animal-option ${
-                          selectedAnimal === option ? 'selected' : ''
-                        } ${optionStates[option] || ''}`}
-                        onClick={() => handleSelectAnimal(option)}
-                      >
-                        {t(`login.animals.${option}`)}
-                      </div>
-                    ))}
-                  </div>
-                  {captchaResult === 'error' && (
-                    <div className="captcha-message error">
-                      {errorMsg || t('login.captchaFallbackError')}
-                    </div>
-                  )}
-                  {captchaResult === 'success' && (
-                    <div className="captcha-message success">
-                      {t('login.captchaSuccessMsg')}
-                    </div>
-                  )}
-                </div>
-              )}
+              <label>{t('login.pwdLabel')}</label>
+              <Input
+                size="large"
+                placeholder={t('login.pwdPlaceholder')}
+                prefix={<LockOutlined style={{ color: '#5a5080' }} />}
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setPasswordError('') }}
+                onKeyDown={handleKeyDown}
+                status={passwordError ? 'error' : undefined}
+                suffix={
+                  <span className="pwd-toggle" onClick={() => setShowPwd(!showPwd)}>
+                    {showPwd ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                  </span>
+                }
+              />
+              {passwordError && <div className="field-error-tip">{passwordError}</div>}
             </div>
-
-            {/* 密码输入 - 仅在验证通过后显示 */}
-            {captchaStage === 'success' && (
-              <div className="login-field-v2" style={{ animation: 'captchaSlideIn 0.3s ease' }}>
-                <label>{t('login.pwdLabel')}</label>
-                <Input
-                  size="large"
-                  placeholder={t('login.pwdPlaceholder')}
-                  prefix={<LockOutlined style={{ color: '#5a5080' }} />}
-                  type={showPwd ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => { setPassword(e.target.value); setPasswordError('') }}
-                  onKeyDown={handleKeyDown}
-                  status={passwordError ? 'error' : undefined}
-                  suffix={
-                    <span className="pwd-toggle" onClick={() => setShowPwd(!showPwd)}>
-                      {showPwd ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-                    </span>
-                  }
-                />
-                {passwordError && <div className="field-error-tip">{passwordError}</div>}
-              </div>
-            )}
 
             {/* 登录按钮 */}
             <Tooltip title={getBtnTooltip() || undefined} placement="top">

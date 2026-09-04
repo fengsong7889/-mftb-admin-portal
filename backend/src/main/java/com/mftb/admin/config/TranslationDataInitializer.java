@@ -34,12 +34,17 @@ public class TranslationDataInitializer implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate;
     private final TranslationService translationService;
     private final ObjectMapper objectMapper;
+    private final SchemaVersionTracker versionTracker;
 
     @Override
     public void run(String... args) {
         try {
-            createTables();
-            seedLanguages();
+            // 基础建表与默认语言种子: 一次性, 版本化后重启跳过 (启动提速)
+            versionTracker.applyOnce("translation:base-v1", () -> {
+                createTables();
+                seedLanguages();
+            });
+            // "活"逻辑: 菜单种子化可能新增菜单, 需同步为翻译字段; 增量同步成本极低, 每次执行
             syncMenuNames();
             List<Long> newIds = syncI18nKeys();
             if (!newIds.isEmpty()) {

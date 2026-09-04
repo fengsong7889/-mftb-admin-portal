@@ -34,31 +34,39 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
             "63_card_order.sql");
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaVersionTracker versionTracker;
 
     @Override
     public void run(String... args) {
-        // 各脚本/步骤独立容错: 单条失败仅记录日志, 不阻断后续初始化
+        // 各脚本/步骤独立容错 + 独立版本: 已执行的步骤重启时直接跳过 (启动提速);
+        // 脚本内容变更后递增脚本名后的版本号 (如 :v1 → :v2) 即可重跑
         for (String script : INIT_SCRIPTS) {
             try {
-                executeSqlScript(script);
+                versionTracker.applyOnce("adpromo:" + script + ":v1", () -> {
+                    try {
+                        executeSqlScript(script);
+                    } catch (java.io.IOException e) {
+                        throw new IllegalStateException("读取初始化脚本失败: " + script, e);
+                    }
+                });
             } catch (Exception e) {
                 log.error("执行 {} 失败: {}", script, e.getMessage(), e);
             }
         }
-        runSafely("biz_ad_pricing_star.sell_time_slots 补列", this::ensureSellTimeSlotsColumn);
-        runSafely("biz_ad_pricing_star.slot_discounts 补列", this::ensureSlotDiscountsColumn);
-        runSafely("biz_ad_order 扩展列补齐", this::ensureOrderExtraColumns);
-        runSafely("库存与赠送快照列补齐", this::ensureStockAndGiftColumns);
-        runSafely("biz_store.region 补列", this::ensureStoreRegionColumn);
-        runSafely("biz_ad_cell_lock 唯一键升级", this::ensureCellLockGroupKey);
-        runSafely("存量广告消费明细迁移", this::migrateAdConsumeDetails);
-        runSafely("广告明细实收变动修复", this::repairAdDetailActualChange);
+        runSafely("biz_ad_pricing_star.sell_time_slots 补列", "adpromo:sell_time_slots:v1", this::ensureSellTimeSlotsColumn);
+        runSafely("biz_ad_pricing_star.slot_discounts 补列", "adpromo:slot_discounts:v1", this::ensureSlotDiscountsColumn);
+        runSafely("biz_ad_order 扩展列补齐", "adpromo:order_extra_cols:v1", this::ensureOrderExtraColumns);
+        runSafely("库存与赠送快照列补齐", "adpromo:stock_gift_cols:v1", this::ensureStockAndGiftColumns);
+        runSafely("biz_store.region 补列", "adpromo:store_region:v1", this::ensureStoreRegionColumn);
+        runSafely("biz_ad_cell_lock 唯一键升级", "adpromo:cell_lock_uk:v1", this::ensureCellLockGroupKey);
+        runSafely("存量广告消费明细迁移", "adpromo:consume_migrate:v1", this::migrateAdConsumeDetails);
+        runSafely("广告明细实收变动修复", "adpromo:actual_change_fix:v1", this::repairAdDetailActualChange);
     }
 
-    /** 单步容错执行: 异常仅记录不抛出 */
-    private void runSafely(String name, Runnable task) {
+    /** 单步容错执行: 异常仅记录不抛出, 版本化后重启跳过已完成步骤 */
+    private void runSafely(String name, String versionKey, Runnable task) {
         try {
-            task.run();
+            versionTracker.applyOnce(versionKey, task);
         } catch (Exception e) {
             log.error("广告推广初始化 [{}] 失败: {}", name, e.getMessage(), e);
         }

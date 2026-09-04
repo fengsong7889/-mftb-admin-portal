@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import { AlgorithmType, Region, RecommendChannel, AppType } from '../Recommend/constants'
+import { BIZ_CHANNEL, type BizChannelValue } from '../../constants/bizChannel'
 
 /** 时段状态枚举 */
 export enum TimeSlotStatus {
@@ -114,10 +115,10 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
   },
   {
     type: AlgorithmType.TRAFFIC_AD,
-    name: '流量廣告',
+    name: '投流廣告',
     icon: '📊',
-    description: '精準流量投放，覆蓋目標用戶群體',
-    enabled: false,
+    description: '精準匹配目標用戶，買得越多曝光越多',
+    enabled: true,
   },
   {
     type: AlgorithmType.EXCLUSIVE_MERCHANT,
@@ -191,7 +192,7 @@ export function generateMockInventory(region: Region, algorithmType?: AlgorithmT
     [AlgorithmType.INVINCIBLE_STAR]: '無敵星星',
     [AlgorithmType.NEW_STORE_AD]: '新店廣告',
     [AlgorithmType.HOT_REVIVE_AD]: '盤活復蘇',
-    [AlgorithmType.TRAFFIC_AD]: '流量廣告',
+    [AlgorithmType.TRAFFIC_AD]: '投流廣告',
     [AlgorithmType.ORGANIC_TRAFFIC]: '自然流量',
     [AlgorithmType.EXCLUSIVE_MERCHANT]: '獨家商家',
     [AlgorithmType.GUESS_YOU_LIKE]: '猜你喜歡',
@@ -329,3 +330,179 @@ export function getNoDiscountSlotsByRow(date: string): number[] {
 
   return noDiscountConfig[rowIndex % 6] || []
 }
+
+/* ========== 投流廣告：流量包定價與訂單（對標 DUO+ 預付流量包模型） ========== */
+
+/** 預設檔位（流量包套餐） */
+export interface TrafficPackageTier {
+  id: string
+  name: string              // 檔位名稱
+  impressions: number       // 曝光次數
+  price: number             // 價格 (MOP)
+  validityDays?: number     // 有效期（天）— 已停用：流量包消耗完畢即退出，不再設有效期
+  onSale: boolean           // 是否上架
+  sort: number              // 排序
+  discountEnabled?: boolean   // 折扣開關
+  discount?: number           // 折扣（折，如 8.5 = 85 折）
+  discountTimeMode?: 'limited' | 'unlimited'  // 折扣時間模式：限定時間 / 不限時間（一直打折）
+  discountStartDate?: string  // 折扣活動開始日期（限定時間模式）
+  discountEndDate?: string    // 折扣活動結束日期（限定時間模式）
+}
+
+/** 階梯單價行（自定義數量計價） */
+export interface TrafficPriceLadderRow {
+  id: string
+  minQty: number            // 區間下限（含）
+  maxQty: number            // 區間上限（含），0 表示無上限
+  unitPrice: number         // 單次曝光單價 (MOP)
+}
+
+/** 單個業務頻道的定價配置 */
+export interface TrafficChannelPricing {
+  bizChannel: BizChannelValue
+  tiers: TrafficPackageTier[]
+  ladder: TrafficPriceLadderRow[]
+  customMinQty: number        // 自定義最低購買量
+  customStep: number          // 自定義購買步長
+  customValidityDays?: number // 自定義購買有效期 — 已停用（消耗完畢即退出）
+  status?: 'enabled' | 'disabled'   // 頻道級啟停（停用後該頻道流量包停止售賣）
+  allowRefund?: boolean             // 是否允許訂單退款
+  refundFeePercent?: number         // 退款手續費比例（%）：手續費 = 退款金額 × 比例，0 = 免費退
+}
+
+/** 流量包訂單 */
+export interface TrafficPackageOrder {
+  orderNo: string
+  merchantName: string
+  bizChannel: BizChannelValue
+  mode: 'tier' | 'custom'       // 購買方式：預設檔位 / 自定義數量
+  tierName?: string             // 檔位名稱（档位購買時）
+  impressions: number           // 購買曝光次數
+  amount: number                // 訂單金額 (MOP)
+  validityDays?: number         // 有效期 — 已停用（消耗完畢即退出）
+  deliverySlot?: 'business' | 'allday'  // 投流時段：主營時段投流 / 全天投流
+  status: 'paid'                // Mock：提交即已支付
+  createTime: string
+}
+
+const TRAFFIC_PRICING_STORAGE_KEY = 'traffic-package-pricing'
+const TRAFFIC_ORDER_STORAGE_KEY = 'traffic-package-orders'
+
+/** 生成 3 個業務頻道的默認定價配置（與銷售定價頁一致） */
+export function generateDefaultTrafficPricing(): TrafficChannelPricing[] {
+  return [
+    {
+      bizChannel: BIZ_CHANNEL.FOOD_DELIVERY,
+      tiers: [
+        { id: 'food-t1', name: '體驗包', impressions: 1000, price: 200, validityDays: 7, onSale: true, sort: 1 },
+        { id: 'food-t2', name: '成長包', impressions: 5000, price: 900, validityDays: 30, onSale: true, sort: 2 },
+        { id: 'food-t3', name: '爆款包', impressions: 10000, price: 1600, validityDays: 60, onSale: true, sort: 3 },
+      ],
+      ladder: [
+        { id: 'food-l1', minQty: 1, maxQty: 999, unitPrice: 0.25 },
+        { id: 'food-l2', minQty: 1000, maxQty: 4999, unitPrice: 0.2 },
+        { id: 'food-l3', minQty: 5000, maxQty: 0, unitPrice: 0.16 },
+      ],
+      customMinQty: 100,
+      customStep: 100,
+      customValidityDays: 30,
+      status: 'enabled',
+      allowRefund: true,
+      refundFeePercent: 0,
+    },
+    {
+      bizChannel: BIZ_CHANNEL.SUPERMARKET,
+      tiers: [
+        { id: 'super-t1', name: '體驗包', impressions: 1000, price: 180, validityDays: 7, onSale: true, sort: 1 },
+        { id: 'super-t2', name: '成長包', impressions: 5000, price: 800, validityDays: 30, onSale: true, sort: 2 },
+        { id: 'super-t3', name: '爆款包', impressions: 10000, price: 1450, validityDays: 60, onSale: true, sort: 3 },
+      ],
+      ladder: [
+        { id: 'super-l1', minQty: 1, maxQty: 999, unitPrice: 0.22 },
+        { id: 'super-l2', minQty: 1000, maxQty: 4999, unitPrice: 0.18 },
+        { id: 'super-l3', minQty: 5000, maxQty: 0, unitPrice: 0.15 },
+      ],
+      customMinQty: 100,
+      customStep: 100,
+      customValidityDays: 30,
+      status: 'enabled',
+      allowRefund: true,
+      refundFeePercent: 0,
+    },
+    {
+      bizChannel: BIZ_CHANNEL.GROUP_BUY,
+      tiers: [
+        { id: 'group-t1', name: '體驗包', impressions: 1000, price: 220, validityDays: 7, onSale: true, sort: 1 },
+        { id: 'group-t2', name: '成長包', impressions: 5000, price: 990, validityDays: 30, onSale: true, sort: 2 },
+        { id: 'group-t3', name: '爆款包', impressions: 10000, price: 1760, validityDays: 60, onSale: true, sort: 3 },
+      ],
+      ladder: [
+        { id: 'group-l1', minQty: 1, maxQty: 999, unitPrice: 0.28 },
+        { id: 'group-l2', minQty: 1000, maxQty: 4999, unitPrice: 0.22 },
+        { id: 'group-l3', minQty: 5000, maxQty: 0, unitPrice: 0.18 },
+      ],
+      customMinQty: 100,
+      customStep: 100,
+      customValidityDays: 30,
+      status: 'enabled',
+      allowRefund: true,
+      refundFeePercent: 0,
+    },
+  ]
+}
+
+/** 讀取定價配置（優先讀取銷售定價頁已保存的配置） */
+export function loadTrafficPricing(): TrafficChannelPricing[] {
+  try {
+    const raw = localStorage.getItem(TRAFFIC_PRICING_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as TrafficChannelPricing[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch { /* 解析失敗回退默認配置 */ }
+  return generateDefaultTrafficPricing()
+}
+
+/** 按購買數量查找命中的階梯單價 */
+export function findLadderUnitPrice(ladder: TrafficPriceLadderRow[], qty: number): number | null {
+  const row = ladder.find(r => qty >= r.minQty && (r.maxQty === 0 || qty <= r.maxQty))
+  return row ? row.unitPrice : null
+}
+
+/** 計算自定義數量訂單金額（數量 × 命中階梯單價） */
+export function calcCustomAmount(ladder: TrafficPriceLadderRow[], qty: number): number {
+  const unitPrice = findLadderUnitPrice(ladder, qty)
+  if (unitPrice === null) return 0
+  return Math.round(qty * unitPrice * 100) / 100
+}
+
+/** 讀取流量包訂單列表 */
+export function loadTrafficOrders(): TrafficPackageOrder[] {
+  try {
+    const raw = localStorage.getItem(TRAFFIC_ORDER_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as TrafficPackageOrder[]
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch { /* 解析失敗返回空列表 */ }
+  return []
+}
+
+/** 保存流量包訂單 */
+export function saveTrafficOrder(order: TrafficPackageOrder): void {
+  const orders = loadTrafficOrders()
+  orders.unshift(order)
+  localStorage.setItem(TRAFFIC_ORDER_STORAGE_KEY, JSON.stringify(orders))
+}
+
+/** Mock 門店列表（購買時選擇商家） */
+export const MOCK_TRAFFIC_MERCHANTS = [
+  { value: 'M1001', label: 'M1001 · 澳門張記牛雜（新馬路店）' },
+  { value: 'M1002', label: 'M1002 · 氹仔貓山王榴蓮甜品' },
+  { value: 'M1003', label: 'M1003 · 皇朝區金龍茶餐廳' },
+  { value: 'M1004', label: 'M1004 · 筷子基順德公魚腐火鍋' },
+  { value: 'M1005', label: 'M1005 · 路環安德魯餅店' },
+  { value: 'M1006', label: 'M1006 · 新橋區大利來豬扒包' },
+  { value: 'M1007', label: 'M1007 · 皇朝區御品軒日式拉麵' },
+  { value: 'M1008', label: 'M1008 · 氹仔官也街誠昌飯店' },
+]

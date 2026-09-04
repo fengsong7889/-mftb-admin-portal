@@ -63,6 +63,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'finance': 'Finance',
   'promotion': 'Promotion Funds',
   'account-balance': 'Account Balance',
+  'consume-risk': 'Consumption Risk',
   'batch-query': 'Batch Query',
   'detail-query': 'Detail Query',
   'merchant-reconcile': 'Merchant Reconciliation',
@@ -93,6 +94,30 @@ export const MENU_NAME_EN: Record<string, string> = {
   'translation-manage': 'Translation Config',
   'rule-config': 'Rule Config',
   'workflow-config': 'Workflow Config',
+  'ai-assistant': 'AI Center (AI)',
+  'ai_model_hub': 'Model Access',
+  'ai_quota_auth': 'Authorization & Quota',
+  'ai_tool_registry': 'Tool Registry',
+  'ai_usage_stats': 'Energy Statistics',
+  'ai_energy_detail': 'Energy Detail',
+  // 智能中心 (AI) - 拆分后的新菜单 key
+  'ai-models': 'Model Management',
+  'ai-model-provider': 'Provider Management',
+  'ai-model-list': 'Model Info',
+  'ai-auth-quota': 'Authorization & Quota',
+  'ai-auth': 'Model Authorization',
+  'ai-quota': 'Quota Policy',
+  // AI 配额与策略（拆分后的分组与子菜单）
+  'ai-auth-manage': 'Model Access Control',
+  'ai-quota-manage': 'Quota Management',
+  'ai-dept-model-auth': 'Dept Model Access',
+  'ai-emp-model-auth': 'Employee Model Access',
+  'ai-pos-auth': 'Position-Based Authorization',    // 按职位授权
+  'ai-role-auth': 'Role-Based Authorization',       // 角色授权
+  'ai-dept-quota': 'Department Quota',
+  'ai-emp-quota': 'Employee Quota',
+  // 能耗與賬單
+  'ai-energy-billing': 'Energy & Billing',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
 }

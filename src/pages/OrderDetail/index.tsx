@@ -1,13 +1,14 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from 'i18next'
-import { Button, Tag, Descriptions, Card, Empty, Modal, message, Tabs, Spin, Result } from 'antd'
+import { Button, Tag, Descriptions, Card, Empty, Modal, message, Space, Tabs, Spin, Result } from 'antd'
 import {
-  ArrowLeftOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined,
+  CheckOutlined, ClockCircleOutlined, CloseOutlined,
   ShopOutlined, FileTextOutlined, DollarOutlined,
   ExclamationCircleOutlined, RollbackOutlined, DownOutlined, RightOutlined,
-  BarChartOutlined, EyeOutlined, AimOutlined,
+  BarChartOutlined, EyeOutlined, AimOutlined, FireOutlined, HourglassOutlined,
 } from '@ant-design/icons'
+import DetailPageHeader from '../../components/DetailPageHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchAdOrderDetail,
@@ -20,6 +21,8 @@ import {
   type AdOrderDetail,
 } from '../../api/adPromotion'
 import { AlgorithmType, REGION_LABEL_KEY } from '../Recommend/constants'
+import { BIZ_CHANNEL } from '../../constants/bizChannel'
+import { loadTrafficPricing } from '../AdSales/types'
 import dayjs from 'dayjs'
 
 /* ---- 数字动画 Hook ---- */
@@ -85,6 +88,13 @@ enum OrderStatus {
 enum AppType { SHANFENG = 1, MFOOD = 2 }
 
 enum RecommendChannel { DELIVERY = 2, GROUP_BUY = 3, SUPERMARKET = 4 }
+
+/** 投流廣告：訂單業務頻道 → 定價配置業務頻道（讀取退款開關/手續費比例配置） */
+const ORDER_CHANNEL_TO_TRAFFIC_BIZ: Record<number, string> = {
+  [RecommendChannel.DELIVERY]: BIZ_CHANNEL.FOOD_DELIVERY,
+  [RecommendChannel.SUPERMARKET]: BIZ_CHANNEL.SUPERMARKET,
+  [RecommendChannel.GROUP_BUY]: BIZ_CHANNEL.GROUP_BUY,
+}
 
 // 商圈名称映射：统一引用全局商圈数据（含珠海区域）
 
@@ -165,6 +175,12 @@ interface OrderItem {
   source?: 'api' | 'mock'
   /** 金字招牌：按标签分组的购买日期 */
   labelDates?: { label: string; scenario?: string | null; dates: string[] }[]
+  /** 投流廣告：購買方式（預設檔位 / 自定義） */
+  trafficMode?: 'tier' | 'custom'
+  /** 投流廣告：流量包名稱（檔位購買時） */
+  trafficPackageName?: string
+  /** 投流廣告：購買曝光次數 */
+  trafficImpressions?: number
 }
 
 /* ---- 后端订单映射 ---- */
@@ -593,6 +609,44 @@ const mockOrders: OrderItem[] = [
   genOrder('113','ORD20250703113','ALG003','盤活復甦·珠海精選',AppType.SHANFENG,RecommendChannel.SUPERMARKET,3,RecommendType.HOT_REVIVE_AD,4,'G10001','澳門美食集團','S20003','珠海旗艦店','2025-07-03',3200,2880,2880,OrderStatus.PROMOTED,'2025-07-03 07:40:00',undefined,[0,1,2],0,null),
   genOrder('114','ORD20250702114','ALG003','盤活復甦·全時段推廣',AppType.MFOOD,RecommendChannel.SUPERMARKET,1,RecommendType.HOT_REVIVE_AD,1,'G10002','閃蜂餐飲連鎖','S20004','黑沙環店','2025-07-02',7000,6300,6300,OrderStatus.PROMOTED,'2025-07-02 06:20:00','2025-07-02 06:25:00',[0,1,2,3,4,0,1],0,null,6300),
   genOrder('115','ORD20250701115','ALG003','盤活復甦·閃購特惠',AppType.SHANFENG,RecommendChannel.DELIVERY,6,RecommendType.HOT_REVIVE_AD,5,'G10003','大灣區餐飲集團','S20005','新馬路店','2025-07-01',3800,3420,3420,OrderStatus.PROMOTED,'2025-07-01 10:05:00','2025-07-01 10:10:00',[0,1,2],0,null,3420),
+  // ── TODO: 投流廣告訂單（與訂單列表 mock 對應，樣式調試用），確認後刪除 ──
+  {
+    id: 'DDLL202609010001', orderNo: 'DDLL202609010001',
+    algorithmId: 'SFLL20260818008', promotionName: '投流廣告·精準曝光',
+    app: AppType.SHANFENG, channel: RecommendChannel.DELIVERY, region: 1,
+    recommendType: RecommendType.TRAFFIC_AD, slotPosition: 0,
+    groupId: 'G1001', groupName: '澳門張記牛雜', storeId: 'M1001', storeName: '新馬路店', storeAddress: '',
+    purchaseDate: '2026-09-01', originalPrice: 900, discountPrice: 810, actualPrice: 810,
+    status: OrderStatus.PENDING_PROMOTION, orderTime: '2026-09-01 10:30:00', payTime: '2026-09-01 10:31:00',
+    slotPrices: [], gradientDiscount: null, cancelFeeRules: [], refundEnabled: true,
+    giftDays: 2, giftAmount: 90,
+    trafficMode: 'tier', trafficPackageName: '成長包', trafficImpressions: 5000,
+    source: 'mock',
+  },
+  {
+    id: 'DDLL202609010002', orderNo: 'DDLL202609010002',
+    algorithmId: 'SFLL20260818008', promotionName: '投流廣告·精準曝光',
+    app: AppType.MFOOD, channel: RecommendChannel.SUPERMARKET, region: 6,
+    recommendType: RecommendType.TRAFFIC_AD, slotPosition: 0,
+    groupId: 'G1002', groupName: '氹仔貓山王榴蓮甜品', storeId: 'M1002', storeName: '氹仔官也街店', storeAddress: '',
+    purchaseDate: '2026-09-01', originalPrice: 1548, discountPrice: 1548, actualPrice: 1548,
+    status: OrderStatus.PROMOTING, orderTime: '2026-09-01 14:05:00', payTime: '2026-09-01 14:06:00',
+    slotPrices: [], gradientDiscount: null, cancelFeeRules: [], refundEnabled: true,
+    trafficMode: 'custom', trafficImpressions: 8600,
+    promoData: Array.from({ length: 3 }, (_, i) => {
+      const imp = 2200 + i * 800 + Math.floor(Math.random() * 500)
+      const clk = 110 + i * 40 + Math.floor(Math.random() * 30)
+      return {
+        date: ['2026-09-01', '2026-09-02', '2026-09-03'][i],
+        region: i18n.t(REGION_LABEL_KEY[6]) || '花城市區',
+        waterfallName: WATERFALL_NAMES[i % WATERFALL_NAMES.length],
+        position: (i % 3) + 1,
+        impressions: imp, clicks: clk,
+        clickRate: +((clk / imp) * 100).toFixed(1),
+      }
+    }),
+    source: 'mock',
+  },
 ]
 
 /* ---- 新店廣告 Mock ---- */
@@ -970,6 +1024,7 @@ export default function OrderDetail() {
   const isPopular = order.recommendType === RecommendType.POPULAR_MERCHANT_KA
   const isRevive = order.recommendType === RecommendType.HOT_REVIVE_AD
   const isGoldenSignboard = order.recommendType === RecommendType.GOLDEN_SIGNBOARD
+  const isTrafficAd = order.recommendType === RecommendType.TRAFFIC_AD
 
   /** 金字招牌標籤類型 → 中文翻譯映射 */
   const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: string }> = {
@@ -1091,6 +1146,25 @@ export default function OrderDetail() {
   // 已退款：以「實付推廣金額」(actualPaid) 為基準計算退款，保證與費用明細一致，一目了然
   const refundAmountByPaid = Math.round(actualPaid * (1 - (refundInfo?.feePercent ?? 0) / 100))
 
+  // 投流廣告退款：商家購買的是曝光次數，按「投流廣告定價配置」的計算公式退款 ——
+  // 已消耗曝光按訂單實際單價扣除不予退還，剩餘未消耗曝光價值退還商家，手續費比例取自頻道定價配置
+  // 退款金額 = 剩餘未消耗曝光 × 訂單實際單價 − 退款手續費；實際單價 = 實付金額 ÷ 購買次數；手續費 = 可退金額 × 手續費比例
+  const trafficRefund = isTrafficAd ? (() => {
+    const purchased = order.trafficImpressions ?? 0
+    const consumed = (order.promoData ?? []).reduce((s, d) => s + d.impressions, 0)
+    const remaining = Math.max(0, purchased - consumed)
+    const unitPrice = purchased > 0 ? order.actualPrice / purchased : 0
+    const channelPricing = loadTrafficPricing().find(p => p.bizChannel === ORDER_CHANNEL_TO_TRAFFIC_BIZ[order.channel])
+    const feePercent = channelPricing?.refundFeePercent ?? 0
+    const grossRefund = Math.round(remaining * unitPrice * 100) / 100
+    const feeAmount = Math.round(grossRefund * feePercent) / 100
+    const refundAmount = Math.max(0, Math.round((grossRefund - feeAmount) * 100) / 100)
+    return {
+      purchased, consumed, remaining, unitPrice, feePercent, grossRefund, feeAmount, refundAmount,
+      allowRefund: channelPricing?.allowRefund !== false,
+    }
+  })() : null
+
   const handleRefund = () => {
     setRefundModalVisible(true)
   }
@@ -1114,54 +1188,27 @@ export default function OrderDetail() {
       }
       return
     }
-    const newStatus = isNewStore ? OrderStatus.CANCELLED : OrderStatus.PROMOTED
-    setOrder(prev => prev ? { ...prev, status: newStatus } : null)
+    // 投流廣告：退款按剩餘曝光折算，退款後狀態為「已退款」並記錄退款金額
+    const newStatus = isNewStore ? OrderStatus.CANCELLED : isTrafficAd ? OrderStatus.REFUNDED : OrderStatus.PROMOTED
+    setOrder(prev => prev ? { ...prev, status: newStatus, ...(isTrafficAd ? { refundAmount: trafficRefund?.refundAmount } : {}) } : null)
     setRefundModalVisible(false)
     message.success(isNewStore ? t('orderDetail.cancelSuccess') : t('orderDetail.refundSuccessShort'))
   }
 
   return (
     <div className="content-area">
-      {/* 顶部导航栏 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
-      }}>
-        {/* 顶部渐变装饰线 */}
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          {/* 左侧：返回 + 标题 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate(backToListPath)}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>{t('common.back')}</Button>
-            {/* 分隔线 */}
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            {/* 标题区 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('orderDetail.detailTitle')}</h2>
-              <Tag color={statusInfo.color} style={{
-                fontSize: 12, padding: '2px 10px', borderRadius: 4,
-                fontWeight: 500, animation: 'statusPulse 2.5s ease-in-out infinite',
-                margin: 0,
-              }}>{statusInfo.label}</Tag>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 顶部导航栏（全局詳情頁統一規範：紫色頂條 + 橙色返回；訂單無編輯頁，不展示編輯按鈕） */}
+      <DetailPageHeader
+        title={t('orderDetail.detailTitle')}
+        tags={
+          <Tag color={statusInfo.color} style={{
+            fontSize: 12, padding: '2px 10px', borderRadius: 4,
+            fontWeight: 500, animation: 'statusPulse 2.5s ease-in-out infinite',
+            margin: 0,
+          }}>{statusInfo.label}</Tag>
+        }
+        onBack={() => navigate(backToListPath)}
+      />
 
       {/* 订单状态流程 */}
       <div style={{
@@ -1446,6 +1493,17 @@ export default function OrderDetail() {
                 ))}
               </div>
             </Descriptions.Item>
+          ) : isTrafficAd ? (
+            <Descriptions.Item label="購買內容">
+              <Space size={4}>
+                <Tag color={order.trafficMode === 'custom' ? 'purple' : 'orange'} style={{ margin: 0 }}>
+                  {order.trafficMode === 'custom' ? '自定義' : (order.trafficPackageName || '-')}
+                </Tag>
+                <span style={{ fontSize: 13, color: '#595959' }}>
+                  {(order.trafficImpressions ?? 0).toLocaleString()} 次曝光
+                </span>
+              </Space>
+            </Descriptions.Item>
           ) : order.skinName && (
             <Descriptions.Item label={t('orderDetail.skinKit')}>
               <Tag color="geekblue">{order.skinName}</Tag>
@@ -1459,7 +1517,7 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : t('orderDetail.slotTitleStar')} />
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : isTrafficAd ? '購買流量包' : t('orderDetail.slotTitleStar')} />
             <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
@@ -1469,6 +1527,23 @@ export default function OrderDetail() {
         style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: slotsCollapsed ? '0 24px' : '16px 24px' } }}>
 
         {!slotsCollapsed && (<>
+        {/* 投流廣告：流量包購買信息（按曝光計價，無日期/時段明細） */}
+        {isTrafficAd && (
+          <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{
+              background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
+              fontSize: 13, fontWeight: 600, color: '#262626',
+            }}>
+              {order.trafficMode === 'custom' ? '自定義曝光次數' : (order.trafficPackageName || '流量包')}
+            </div>
+            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 13 }}>
+              <span style={{ color: '#8C8C8C' }}>購買曝光次數：</span>
+              <span style={{ fontWeight: 700, color: '#E8720C', fontSize: 16 }}>
+                {(order.trafficImpressions ?? 0).toLocaleString()} 次
+              </span>
+            </div>
+          </div>
+        )}
         {/* 无敌星星：按日期分组，每天展示商圈、时段、原价、折扣、折后价 */}
         {order.recommendType === RecommendType.INVINCIBLE_STAR && slotsByDate.map(([date, slots]) => (
           <div key={date} style={{
@@ -2125,12 +2200,20 @@ export default function OrderDetail() {
                       const uniqueSlots = new Set(data.filter(d => d.slot).map(d => `${d.date}-${d.slot}`)).size
                       const totalImpressions = data.reduce((s, d) => s + d.impressions, 0)
                       const totalClicks = data.reduce((s, d) => s + d.clicks, 0)
-                      return [
+                      // 投流廣告：購買曝光量 / 已消耗曝光量 / 剩余曝光量 / 平均點擊率
+                      const trafficStats = isTrafficAd ? [
+                        { label: '購買曝光量', value: <AnimatedNumber value={order.trafficImpressions ?? 0} />, icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
+                        { label: '已消耗曝光量', value: <AnimatedNumber value={totalImpressions} />, icon: <FireOutlined />, color: '#E8720C', bg: '#FFF7E6' },
+                        { label: '剩余曝光量', value: <AnimatedNumber value={Math.max(0, (order.trafficImpressions ?? 0) - totalImpressions)} />, icon: <HourglassOutlined />, color: '#52C41A', bg: '#F6FFED' },
+                        { label: t('orderDetail.statAvgCtr'), value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+                      ] : null
+                      const stats = trafficStats ?? [
                         { label: t('orderDetail.statTotalImpressions'), value: <AnimatedNumber value={totalImpressions} />, icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
                         { label: t('orderDetail.statTotalClicks'), value: <AnimatedNumber value={totalClicks} />, icon: <AimOutlined />, color: '#52C41A', bg: '#F6FFED' },
                         { label: isStar ? t('orderDetail.statPromoSlots') : t('orderDetail.statPromoDays'), value: isStar ? <AnimatedNumber value={uniqueSlots} suffix={t('orderDetail.slotsSuffix')} /> : <AnimatedNumber value={uniqueDates} suffix={t('orderDetail.daysSuffix')} />, icon: <ClockCircleOutlined />, color: '#722ED1', bg: '#F9F0FF' },
                         { label: t('orderDetail.statAvgCtr'), value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: '#E8720C', bg: '#FFF7E6' },
-                      ].map((stat, i) => (
+                      ]
+                      return stats.map((stat, i) => (
                         <div key={i} style={{
                           padding: '16px', borderRadius: 12, background: stat.bg,
                           border: `1px solid ${stat.color}22`, textAlign: 'center',
@@ -2242,8 +2325,8 @@ export default function OrderDetail() {
                         )
                       })
                     })()
-                  ) : order.recommendType === RecommendType.HOT_REVIVE_AD || order.recommendType === RecommendType.NEW_STORE_AD || isPopular ? (
-                    /* 盘活复苏：单商圈标题 + 平铺推广日期 */
+                  ) : order.recommendType === RecommendType.HOT_REVIVE_AD || order.recommendType === RecommendType.NEW_STORE_AD || isPopular || isTrafficAd ? (
+                    /* 盤活復蘇/人氣商家/投流廣告：平铺推廣日期明細（投流按曝光計價） */
                     (() => {
                       const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
                       const data = order.promoData || []
@@ -2258,21 +2341,51 @@ export default function OrderDetail() {
                                 <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
                                 <Tag style={{ margin: 0, color: '#E8720C', background: '#FFF7E6', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
                               </>
+                            ) : isTrafficAd ? (
+                              <>
+                                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>流量包</span>
+                                <Tag style={{
+                                  margin: 0,
+                                  color: order.trafficMode === 'custom' ? '#722ED1' : '#E8720C',
+                                  background: order.trafficMode === 'custom' ? '#F9F0FF' : '#FFF7E6',
+                                  borderColor: order.trafficMode === 'custom' ? '#D3ADF7' : '#FFD591',
+                                }}>
+                                  📊 {order.trafficMode === 'custom' ? '自定義' : (order.trafficPackageName || '-')}
+                                </Tag>
+                                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+                                  {(order.trafficImpressions ?? 0).toLocaleString()} 次曝光
+                                </span>
+                              </>
                             ) : (
                               <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
                             )}
                           </div>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                             <colgroup>
-                              <col style={{ width: '25%' }} />
-                              <col style={{ width: '25%' }} />
-                              <col style={{ width: '25%' }} />
-                              <col style={{ width: '25%' }} />
+                              {isTrafficAd ? (
+                                <>
+                                  <col style={{ width: '20%' }} />
+                                  <col style={{ width: '20%' }} />
+                                  <col style={{ width: '20%' }} />
+                                  <col style={{ width: '20%' }} />
+                                  <col style={{ width: '20%' }} />
+                                </>
+                              ) : (
+                                <>
+                                  <col style={{ width: '25%' }} />
+                                  <col style={{ width: '25%' }} />
+                                  <col style={{ width: '25%' }} />
+                                  <col style={{ width: '25%' }} />
+                                </>
+                              )}
                             </colgroup>
                             <thead>
                               <tr style={{ background: '#FAFAFA' }}>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                {isTrafficAd && (
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>消耗金額</th>
+                                )}
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
                                 <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
@@ -2282,6 +2395,11 @@ export default function OrderDetail() {
                                 <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
+                                  {isTrafficAd && (
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', color: '#E8720C', fontWeight: 500 }}>
+                                      MOP {(rec.impressions * (trafficRefund?.unitPrice ?? 0)).toFixed(2)}
+                                    </td>
+                                  )}
                                   <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                     <span style={{
@@ -2408,7 +2526,8 @@ export default function OrderDetail() {
         <Button onClick={() => navigate(backToListPath)}>
           {t('orderDetail.backToList')}
         </Button>
-        {(order.status === OrderStatus.PENDING_PROMOTION || order.status === OrderStatus.PROMOTING) && order.refundEnabled !== false && (
+        {(order.status === OrderStatus.PENDING_PROMOTION || order.status === OrderStatus.PROMOTING) && order.refundEnabled !== false
+          && !(isTrafficAd && trafficRefund?.allowRefund === false) && (
           <Button type="primary" danger icon={<RollbackOutlined />}
             onClick={handleRefund}>
             {isNewStore ? t('orderDetail.cancelPromo') : t('orderDetail.applyRefund')}
@@ -2462,6 +2581,45 @@ export default function OrderDetail() {
                 <span style={{ color: '#E8720C', fontWeight: 600 }}>{t('orderDetail.daysUnit', { count: order.purchaseDays?.length || 0 })}</span>
               </Descriptions.Item>
             </Descriptions>
+          </div>
+        ) : trafficRefund ? (
+          <div>
+            {/* 投流廣告：按定價配置的計算公式退款（退還剩餘未消耗曝光價值 − 手續費） */}
+            <div style={{
+              background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 8,
+              padding: 16, marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.8 }}>
+                投流廣告按曝光次數計費：已消耗曝光按實際單價扣除不予退還，剩餘未消耗曝光折算金額退還至推廣金餘額
+                <br />
+                · 發起退款後，該訂單立即停止投放
+                <br />
+                · 僅退還實付部分，贈送曝光（如有）不予退款
+              </div>
+            </div>
+            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+              <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
+              <Descriptions.Item label="購買曝光量">{trafficRefund.purchased.toLocaleString()} 次</Descriptions.Item>
+              <Descriptions.Item label="已消耗曝光量">
+                <span style={{ color: '#E8720C', fontWeight: 600 }}>{trafficRefund.consumed.toLocaleString()} 次</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="剩餘未消耗曝光">
+                <span style={{ color: '#52C41A', fontWeight: 600 }}>{trafficRefund.remaining.toLocaleString()} 次</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="訂單實際單價">MOP {trafficRefund.unitPrice.toFixed(4)} / 次</Descriptions.Item>
+              <Descriptions.Item label="退款手續費">
+                {trafficRefund.feePercent}% · MOP {trafficRefund.feeAmount.toFixed(2)}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('orderDetail.refundAmountLabel')}>
+                <span style={{ color: '#52C41A', fontSize: 16, fontWeight: 700 }}>
+                  MOP {trafficRefund.refundAmount.toFixed(2)}
+                </span>
+              </Descriptions.Item>
+            </Descriptions>
+            <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', background: '#FAFAFA', padding: '8px 12px', borderRadius: 6 }}>
+              退款金額 = 剩餘未消耗曝光 {trafficRefund.remaining.toLocaleString()} × 實際單價 {trafficRefund.unitPrice.toFixed(4)} − 手續費 {trafficRefund.feePercent}% = MOP {trafficRefund.refundAmount.toFixed(2)}
+              <br />（實際單價 = 實付金額 MOP {order.actualPrice} ÷ 購買曝光 {trafficRefund.purchased.toLocaleString()} 次）
+            </div>
           </div>
         ) : payMode === 'gift' && refundInfo?.isPromoting ? (
           <div>

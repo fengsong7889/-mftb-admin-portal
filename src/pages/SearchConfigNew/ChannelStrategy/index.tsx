@@ -462,6 +462,16 @@ export default function DimensionStrategy() {
 
   /* ============================ 商業維度 ============================ */
 
+  /** 切換活動狀態 */
+  const handleActToggleStatus = (r: ActivityRecord) => {
+    updateBiz(p => ({ ...p, activities: p.activities.map(a => a.key === r.key ? { ...a, status: !a.status } : a) }))
+  }
+
+  /** 切換廣告狀態 */
+  const handleAdToggleStatus = (r: AdRecord) => {
+    updateBiz(p => ({ ...p, ads: p.ads.map(a => a.key === r.key ? { ...a, status: !a.status } : a) }))
+  }
+
   const renderCommercial = () => {
     const isActivity = commercialSubTab === 'activity'
     const filteredActivities = bizCfg.activities.filter(r => {
@@ -478,16 +488,13 @@ export default function DimensionStrategy() {
       { title: t('channelStrategy.colAppChannel'), dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
       { title: t('channelStrategy.colBoostValue'), dataIndex: 'boostValue', key: 'boostValue', width: 80, render: (v: number, r: ActivityRecord) => r.boostMethod === 'weight_multiply' ? `${r.weightValue}×${r.multiplyValue}` : v },
       { title: t('channelStrategy.colBoostMethod'), dataIndex: 'boostMethod', key: 'boostMethod', width: 100, render: (v: BoostMethod) => <Tag color={v === 'fixed' ? 'blue' : 'purple'}>{boostMethodMap[v]}</Tag> },
-      { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
+      { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (_: unknown, r: ActivityRecord) => <Switch checked={r.status} checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} onChange={() => handleActToggleStatus(r)} /> },
       { title: t('channelStrategy.colDesc'), dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
       { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
       { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string) => <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v}</Text> },
-      { title: t('common.colAction'), key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: ActivityRecord) => (
+      { title: t('common.colAction'), key: 'action', width: 120, fixed: 'right', render: (_: unknown, r: ActivityRecord) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleActEdit(r) }}>{t('common.edit')}</Button>
-          <Button type="link" size="small" danger={r.status} onClick={e => { e.preventDefault(); updateBiz(p => ({ ...p, activities: p.activities.map(a => a.key === r.key ? { ...a, status: !a.status } : a) })) }}>
-            {r.status ? t('common.disable') : t('common.enable')}
-          </Button>
           <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleActDelete(r) }}>{t('common.delete')}</Button>
         </Space>
       )},
@@ -496,16 +503,13 @@ export default function DimensionStrategy() {
     const adCols: TableColumnsType<AdRecord> = [
       { title: t('channelStrategy.colAdType'), dataIndex: 'adType', key: 'adType', width: 120, render: (v: string) => <Tag color="orange">{adTypeMap[v] || v}</Tag> },
       { title: t('channelStrategy.colAppChannel'), dataIndex: 'appChannel', key: 'appChannel', width: 100, render: (v: AppChannelType) => v === 'all' ? <Tag color={appChannelColorMap[v]}>{appChannelMap[v]}</Tag> : <BrandTag value={v} /> },
-      { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
+      { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (_: unknown, r: AdRecord) => <Switch checked={r.status} checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} onChange={() => handleAdToggleStatus(r)} /> },
       { title: t('channelStrategy.colDesc'), dataIndex: 'description', key: 'description', width: 200, ellipsis: { showTitle: false }, render: (v: string) => <Tooltip placement="topLeft" title={v}>{v || '-'}</Tooltip> },
       { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
       { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string) => <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v}</Text> },
-      { title: t('common.colAction'), key: 'action', width: 160, fixed: 'right', render: (_: unknown, r: AdRecord) => (
+      { title: t('common.colAction'), key: 'action', width: 120, fixed: 'right', render: (_: unknown, r: AdRecord) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleAdEdit(r) }}>{t('common.edit')}</Button>
-          <Button type="link" size="small" danger={r.status} onClick={e => { e.preventDefault(); updateBiz(p => ({ ...p, ads: p.ads.map(a => a.key === r.key ? { ...a, status: !a.status } : a) })) }}>
-            {r.status ? t('common.disable') : t('common.enable')}
-          </Button>
           {r.deletable !== false && (
             <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleAdDelete(r) }}>{t('common.delete')}</Button>
           )}
@@ -559,13 +563,10 @@ export default function DimensionStrategy() {
       { title: t('channelStrategy.colFactorName'), dataIndex: 'factorName', width: 140 },
       { title: t('channelStrategy.colBoostValue'), dataIndex: 'bonusValue', width: 100, render: (v: number) => v },
       { title: t('channelStrategy.colDesc'), dataIndex: 'description', render: (v: string) => <Text type="secondary">{v}</Text> },
-      { title: t('common.colStatus'), dataIndex: 'enabled', width: 80, render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? t('common.enable') : t('common.disable')}</Tag> },
-      { title: t('common.colAction'), key: 'action', width: 140, fixed: 'right', render: (_: unknown, r: StoreFactor) => (
+      { title: t('common.colStatus'), dataIndex: 'enabled', width: 80, render: (_: unknown, r: StoreFactor) => <Switch checked={r.enabled} checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} onChange={() => handleStoreToggle(r)} /> },
+      { title: t('common.colAction'), key: 'action', width: 80, fixed: 'right', render: (_: unknown, r: StoreFactor) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleStoreEdit(r) }}>{t('common.edit')}</Button>
-          <Button type="link" size="small" danger={r.enabled} onClick={e => { e.preventDefault(); handleStoreToggle(r) }}>
-            {r.enabled ? t('common.disable') : t('common.enable')}
-          </Button>
         </Space>
       )},
     ]

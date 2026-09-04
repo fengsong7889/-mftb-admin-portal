@@ -9,10 +9,12 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, Region, RecommendChannel, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
 import { useCardOrder } from '../../hooks/useCardOrder'
-import DateTimeGrid from './DateTimeGrid'
-import DayPicker from './DayPicker'
-import NewStoreDayPicker from './NewStoreDayPicker'
-import PopularSkinPicker from './PopularSkinPicker'
+import DateTimeGrid from '../AdSales/DateTimeGrid'
+import DayPicker from '../AdSales/DayPicker'
+import NewStoreDayPicker from '../AdSales/NewStoreDayPicker'
+import PopularSkinPicker from '../AdSales/PopularSkinPicker'
+import TrafficPackagePicker from '../AdSales/TrafficPackagePicker'
+import GoldenSignboardLabelPicker from '../AdSales/GoldenSignboardLabelPicker'
 import {
   type InventoryItem,
   type RecommendTypeConfig,
@@ -27,6 +29,7 @@ const DELIVERY_CARD_TYPES: AlgorithmType[] = [
   AlgorithmType.NEW_STORE_AD,
   AlgorithmType.TRAFFIC_AD,
   AlgorithmType.POPULAR_MERCHANT_KA,
+  AlgorithmType.GOLDEN_SIGNBOARD,
 ]
 const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [
   AlgorithmType.INVINCIBLE_STAR,
@@ -82,8 +85,8 @@ export default function PromotionSalesConfig() {
       message.info(t('notAvailable'))
       return
     }
-    // 新店广告：进入赠送天数选购界面；人气商家：进入皮肤套件选购界面（均无需库存数据）
-    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA) {
+    // 新店广告：进入赠送天数选购界面；人气商家：进入皮肤套件选购界面；投流广告：进入流量包定价配置界面（均无需库存数据）
+    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA || config.type === AlgorithmType.GOLDEN_SIGNBOARD || config.type === AlgorithmType.TRAFFIC_AD) {
       setSelectedAlgorithmType(config.type)
       setSelectedInventory(null)
       setCurrentStep(1)
@@ -154,7 +157,9 @@ export default function PromotionSalesConfig() {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType ? t('buyAdTitle') : t('adSalesTitle')}
+                {currentStep >= 1 && selectedAlgorithmType
+                  ? t('buyAd')
+                  : t('adSalesTitle')}
               </h2>
               {currentStep >= 1 && selectedAlgorithmType && (
                 <div style={{
@@ -179,14 +184,14 @@ export default function PromotionSalesConfig() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 18px',
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}>{t('viewOrder')}</Button>
+              }}>{t('viewOrders')}</Button>
           )}
         </div>
       </div>
 
       {/* Step 1: 选择推荐类型 */}
       {currentStep === 0 && (
-        <Card title={t('selectRecommendType')} style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '5px 24px' }}>
           <Tabs
             defaultActiveKey="delivery"
             onChange={(key) => setSelectedTab(key as 'delivery' | 'groupBuy')}
@@ -229,21 +234,19 @@ export default function PromotionSalesConfig() {
                                     navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
                                   }}
                                 >
-                                  {t('viewOrder')}
+                                  {t('viewOrders')}
                                 </Button>
-                                {config.type !== AlgorithmType.NEW_STORE_AD && (
-                                  <Button
-                                    type="primary"
-                                    size="small"
-                                    icon={<ShoppingCartOutlined />}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleGoToPurchase(config)
-                                    }}
-                                  >
-                                    {t('buyAd')}
-                                  </Button>
-                                )}
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<ShoppingCartOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleGoToPurchase(config)
+                                  }}
+                                >
+                                  {t('buyAd')}
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -291,7 +294,7 @@ export default function PromotionSalesConfig() {
                                     navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
                                   }}
                                 >
-                                  {t('viewOrder')}
+                                  {t('viewOrders')}
                                 </Button>
                                 <Button
                                   type="primary"
@@ -321,22 +324,37 @@ export default function PromotionSalesConfig() {
       {/* Step 2: 選擇贈送推廣天數並提交訂單 - 新店廣告 */}
       {currentStep === 1 && selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
-          <NewStoreDayPicker />
+          <NewStoreDayPicker storeMode />
         </Card>
       )}
 
       {/* Step 2: 选择皮肤套件并购买 - 人氣商家 */}
       {currentStep === 1 && selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
-          <PopularSkinPicker />
+          <PopularSkinPicker storeMode />
+        </Card>
+      )}
+
+      {/* Step 2: 流量包選購 - 投流廣告 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.TRAFFIC_AD && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <TrafficPackagePicker storeMode />
+        </Card>
+      )}
+
+      {/* Step 2: 選擇招牌標籤並購買 - 金字招牌 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <GoldenSignboardLabelPicker storeMode />
         </Card>
       )}
 
       {/* Step 2: 选择时段并加购 - 無敵星星 */}
-      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
+      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.TRAFFIC_AD && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DateTimeGrid
             inventoryItem={selectedInventory}
+            storeMode
           />
         </Card>
       )}
@@ -346,6 +364,7 @@ export default function PromotionSalesConfig() {
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DayPicker
             inventoryItem={selectedInventory}
+            storeMode
           />
         </Card>
       )}

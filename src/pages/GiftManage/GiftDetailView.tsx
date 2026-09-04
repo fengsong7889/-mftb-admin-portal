@@ -17,9 +17,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
+import DetailPageHeader from '../../components/DetailPageHeader'
 import type { GiftRecordItem } from '../../api/gift'
 import { fetchGiftRecordDetail, fetchGiftRecordsByStore, deductGiftDays } from '../../api/gift'
 import { fillGiftApprovalNoFallback } from '../../utils/approvalStore'
+import { getSystemRuleValue } from '../../hooks/useSystemRules'
 
 const { RangePicker } = DatePicker
 
@@ -91,8 +93,26 @@ function mapToRecord(item: GiftRecordItem, fallbackApprovalNo?: string): GiftRec
 
 const PAGE_SIZE = 5
 
-type GiftStatus = 'valid' | 'exhausted'
-const getStatus = (r: GiftRecord): GiftStatus => (r.remainingDays > 0 ? 'valid' : 'exhausted')
+type GiftStatus = 'valid' | 'exhausted' | 'expired'
+const isExpired = (r: GiftRecord): boolean =>
+  !!r.expireDate && dayjs(r.expireDate).startOf('day').isBefore(dayjs().startOf('day'))
+const getStatus = (r: GiftRecord): GiftStatus => {
+  if (r.remainingDays <= 0) return 'exhausted'
+  if (isExpired(r)) return 'expired'
+  return 'valid'
+}
+
+/* ---- 到期提醒閾值（天）：從規則配置讀取，默認 15 天 ---- */
+function getExpiringRemindDays(): number {
+  return getSystemRuleValue<number>('gift_expire_remind_days') || 15
+}
+
+/** 僅可用（未用完、未到期）的記錄需要到期提醒，返回距到期剩餘天數 */
+function getDaysToExpire(r: GiftRecord): number | null {
+  if (!r.expireDate || r.remainingDays <= 0 || isExpired(r)) return null
+  const daysLeft = dayjs(r.expireDate).startOf('day').diff(dayjs().startOf('day'), 'day')
+  return daysLeft <= getExpiringRemindDays() ? daysLeft : null
+}
 
 export default function GiftDetailView() {
   const { t } = useTranslation('giftDetailView')
@@ -179,9 +199,10 @@ export default function GiftDetailView() {
     const totalGift = records.reduce((s, r) => s + r.giftDays, 0)
     const remaining = records.reduce((s, r) => s + r.remainingDays, 0)
     const consumed = totalGift - remaining
-    const validCount = records.filter(r => r.remainingDays > 0).length
-    const exhaustedCount = records.length - validCount
-    return { totalGift, remaining, consumed, count: records.length, validCount, exhaustedCount }
+    const validCount = records.filter(r => getStatus(r) === 'valid').length
+    const exhaustedCount = records.filter(r => getStatus(r) === 'exhausted').length
+    const expiredCount = records.filter(r => getStatus(r) === 'expired').length
+    return { totalGift, remaining, consumed, count: records.length, validCount, exhaustedCount, expiredCount }
   }, [records])
 
   const filteredRecords = useMemo(() => {
@@ -259,7 +280,9 @@ export default function GiftDetailView() {
     { label: t('statTotalGift'), value: stats.totalGift, unit: t('statUnitDay'), color: '#1890FF', bg: '#E6F4FF' },
     { label: t('statConsumed'), value: stats.consumed, unit: t('statUnitDay'), color: '#FF7A45', bg: '#FFF2E8' },
     { label: t('statRemaining'), value: stats.remaining, unit: t('statUnitDay'), color: '#52C41A', bg: '#F6FFED' },
-    { label: t('statCount'), value: stats.count, unit: t('statUnitValid', { valid: stats.validCount, exhausted: stats.exhaustedCount }), color: '#722ED1', bg: '#F9F0FF' },
+    { label: t('statCount'), value: stats.count, unit: stats.expiredCount > 0
+      ? t('statUnitWithExpired', { valid: stats.validCount, exhausted: stats.exhaustedCount, expired: stats.expiredCount })
+      : t('statUnitValid', { valid: stats.validCount, exhausted: stats.exhaustedCount }), color: '#722ED1', bg: '#F9F0FF' },
   ]
 
   if (loading) {
@@ -280,36 +303,11 @@ export default function GiftDetailView() {
 
   return (
     <div>
-      {/* 頁面標題 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3,
-          background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%',
-        }} />
-        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button
-              type="primary"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/gift-detail')}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}
-            >
-              {t('common:back')}
-            </Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('pageTitle')}</h2>
-          </div>
-        </div>
-      </div>
+      {/* 頁面標題（全局詳情頁統一規範：紫色頂條 + 橙色返回；無編輯頁，不展示編輯按鈕） */}
+      <DetailPageHeader
+        title={t('pageTitle')}
+        onBack={() => navigate('/gift-detail')}
+      />
 
       {/* 商家基本信息 */}
       <div style={{
@@ -426,6 +424,7 @@ export default function GiftDetailView() {
               { label: t('statusAll'), value: 'all' },
               { label: t('statusValid'), value: 'valid' },
               { label: t('statusExhausted'), value: 'exhausted' },
+              { label: t('statusExpired'), value: 'expired' },
             ]}
           />
           <RangePicker
@@ -453,6 +452,7 @@ export default function GiftDetailView() {
               const expanded = expandedKeys.has(record.key)
               const status = getStatus(record)
               const noRemaining = record.remainingDays <= 0
+              const daysToExpire = getDaysToExpire(record)
               return (
                 <div
                   key={record.key}
@@ -483,16 +483,24 @@ export default function GiftDetailView() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('remainingDaysLabel')}</span>
-                      <span style={{ fontSize: 16, color: noRemaining ? '#8C8C8C' : '#52C41A', fontWeight: 700 }}>{record.remainingDays}</span>
+                      <span style={{ fontSize: 16, color: noRemaining ? '#8C8C8C' : status === 'expired' ? '#FF4D4F' : '#52C41A', fontWeight: 700 }}>{record.remainingDays}</span>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('dayUnit')}</span>
-                      <Tag color={status === 'valid' ? 'success' : 'default'} style={{ margin: 0 }}>
-                        {status === 'valid' ? t('statusValid') : t('statusExhausted')}
+                      <Tag color={status === 'valid' ? 'success' : status === 'expired' ? 'error' : 'default'} style={{ margin: 0 }}>
+                        {status === 'valid' ? t('statusValid') : status === 'expired' ? t('statusExpired') : t('statusExhausted')}
                       </Tag>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('validDaysLabel')}</span>
                       <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{record.validDays} {t('validDaysUnit')}</span>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('expireDatePrefix', { date: record.expireDate })}</span>
+                      {daysToExpire !== null && (
+                        <Tag
+                          color="error"
+                          style={{ margin: 0, animation: 'refundWarnPulse 1.8s ease-in-out infinite' }}
+                        >
+                          {t('expiringUrgent', { days: daysToExpire })}
+                        </Tag>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('approvalNoLabel')}</span>

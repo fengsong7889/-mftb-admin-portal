@@ -175,7 +175,6 @@ export default function AlgorithmSimulation() {
     },
     {
       title: t('algorithmSimulation.colStoreName'), dataIndex: 'storeName', width: 200,
-      render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     { title: t('algorithmSimulation.colGroupName'), dataIndex: 'groupName', width: 150 },
     {

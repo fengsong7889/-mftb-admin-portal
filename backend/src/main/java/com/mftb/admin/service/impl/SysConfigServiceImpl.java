@@ -25,6 +25,12 @@ public class SysConfigServiceImpl implements SysConfigService {
     /** 缓存的空闲超时值（毫秒） */
     private final AtomicLong cachedIdleTimeoutMs = new AtomicLong(DEFAULT_IDLE_TIMEOUT_MS);
 
+    /** 通用配置值缓存（key → 值与过期时间），供高频读取场景使用 */
+    private final java.util.Map<String, CachedValue> valueCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 缓存值条目（null 值同样缓存，避免 key 不存在时反复查库） */
+    private record CachedValue(String value, long expiresAt) { }
+
     /** 缓存上次加载时间戳 */
     private volatile long lastLoadTime = 0;
 
@@ -75,6 +81,26 @@ public class SysConfigServiceImpl implements SysConfigService {
     }
 
     @Override
+    public String getConfigValueCached(String configKey) {
+        CachedValue cached = valueCache.get(configKey);
+        if (cached != null && cached.expiresAt() > System.currentTimeMillis()) {
+            return cached.value();
+        }
+        String value;
+        try {
+            value = getConfigValue(configKey);
+        } catch (Exception e) {
+            log.warn("读取配置 {} 失败，本次不走缓存: {}", configKey, e.getMessage());
+            return null;
+        }
+        valueCache.put(configKey, new CachedValue(value, System.currentTimeMillis() + CACHE_TTL_MS));
+        if (valueCache.size() > 200) {
+            valueCache.entrySet().removeIf(entry -> entry.getValue().expiresAt() <= System.currentTimeMillis());
+        }
+        return value;
+    }
+
+    @Override
     public void updateConfig(String configKey, String configValue) {
         // 尝试更新（UPSERT 语义）
         int rows = sysConfigMapper.update(null,
@@ -97,7 +123,8 @@ public class SysConfigServiceImpl implements SysConfigService {
                                 .set(SysConfig::getConfigValue, configValue));
             }
         }
-        // 立即刷新缓存
+        // 立即刷新缓存（通用值缓存直接失效对应 key）
+        valueCache.remove(configKey);
         if (KEY_IDLE_TIMEOUT.equals(configKey)) {
             try {
                 cachedIdleTimeoutMs.set(Long.parseLong(configValue));

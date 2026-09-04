@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete } from 'antd'
+import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
@@ -124,6 +124,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     activityItems: vo.activityItems ? (() => { try { return JSON.parse(vo.activityItems) as ActivityScoreItem[] } catch { return undefined } })() : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
+    updatedBy: vo.updatedBy || undefined,
+    updatedAt: vo.updateTime || undefined,
   }
 }
 
@@ -1001,24 +1003,29 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                   <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>{rule.id}</Tag>
                   <span style={{ width: 14, flexShrink: 0 }} />
                   {/* 規則名稱 */}
-                  <span style={{ fontWeight: 500, color: '#262626', fontSize: 14 }}>{rule.name}</span>
+                  <Tooltip
+                    title={rule.updatedBy || rule.updatedAt ? (
+                      <span>
+                        {rule.updatedBy && <>最後修改人：<strong>{rule.updatedBy}</strong></>}
+                        {rule.updatedBy && rule.updatedAt && <span> · </span>}
+                        {rule.updatedAt && <span>{rule.updatedAt}</span>}
+                      </span>
+                    ) : undefined}
+                  >
+                    <span style={{ fontWeight: 500, color: '#262626', fontSize: 14 }}>{rule.name}</span>
+                  </Tooltip>
                   {/* 右側：狀態 + 操作 */}
                   <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <Tag color={rule.status === ServiceStatus.ENABLED ? 'success' : 'default'} style={{ margin: 0 }}>
-                      {rule.status === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
-                    </Tag>
+                    <Switch
+                      checked={rule.status === ServiceStatus.ENABLED}
+                      checkedChildren={t('common.enable')}
+                      unCheckedChildren={t('common.disable')}
+                      disabled={readOnly}
+                      onChange={() => handleToggleStatus(rule)}
+                      size="small"
+                    />
                     {!readOnly && (
-                      <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
-                        <Button
-                          type="link" size="small"
-                          danger={rule.status === ServiceStatus.ENABLED}
-                          style={rule.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
-                          onClick={e => { e.stopPropagation(); handleToggleStatus(rule) }}
-                        >
-                          {rule.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
-                        </Button>
-                        <Button type="link" size="small" danger onClick={e => { e.stopPropagation(); handleDelete(rule) }}>{t('common.delete')}</Button>
-                      </Space>
+                      <Button type="link" size="small" danger onClick={e => { e.stopPropagation(); handleDelete(rule) }}>{t('common.delete')}</Button>
                     )}
                   </div>
                 </div>
@@ -1095,6 +1102,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               )}
                             </>
                           ))}
+
+                          {/* 最後更新信息（只讀模式） */}
+                          {(rule.updatedBy || rule.updatedAt) && (
+                            <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              {rule.updatedBy && <>修改人：<span style={{ color: '#595959' }}>{rule.updatedBy}</span></>}
+                              {rule.updatedBy && rule.updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
+                              {rule.updatedAt && <span>{rule.updatedAt}</span>}
+                            </span>
+                          )}
 
                           {!readOnly && (
                             <div style={{ flexShrink: 0 }}>

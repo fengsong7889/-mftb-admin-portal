@@ -1918,211 +1918,6 @@
 .bee-fly, .bee-main, .bee-laptop { display: none; }
 .deco-cloud, .float-panel, .deco-cards, .deco-books, .deco-phone { display: none; }
 
-/* ========================================================================
-   登录验证码组件
-   ======================================================================== */
-
-/* 验证码复选框 */
-.captcha-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 1.5px solid rgba(176,96,255,0.2);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: rgba(20,15,40,0.5);
-  user-select: none;
-}
-.captcha-checkbox:hover {
-  border-color: #00f0ff;
-  background: rgba(0,240,255,0.05);
-}
-.captcha-checkbox.verified {
-  border-color: #00ff88;
-  background: rgba(0,255,136,0.08);
-  cursor: default;
-}
-.captcha-checkbox .check-box {
-  width: 22px;
-  height: 22px;
-  border: 2px solid rgba(176,96,255,0.3);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-  flex-shrink: 0;
-}
-.captcha-checkbox:hover .check-box {
-  border-color: #00f0ff;
-}
-.captcha-checkbox.verified .check-box {
-  border-color: #00ff88;
-  background: #00ff88;
-}
-.captcha-checkbox .check-box svg {
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.3s;
-}
-.captcha-checkbox.verified .check-box svg {
-  opacity: 1;
-  transform: scale(1);
-}
-.captcha-checkbox .captcha-label {
-  font-size: 13px;
-  color: #9088b0;
-  flex: 1;
-}
-.captcha-checkbox .captcha-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 10px;
-  color: #5a5080;
-}
-.captcha-checkbox .captcha-brand-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #b060ff, #00f0ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-/* 动物验证码弹窗 */
-.captcha-animal-panel {
-  background: rgba(20,15,40,0.7);
-  border: 1.5px solid rgba(0,240,255,0.2);
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-top: 6px;
-  animation: captchaSlideIn 0.3s ease;
-}
-@keyframes captchaSlideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.captcha-animal-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #c0b8e0;
-  margin-bottom: 6px;
-  text-align: center;
-}
-.captcha-animal-display {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 10px;
-}
-.captcha-animal-emoji {
-  font-size: 52px;
-  line-height: 1;
-  padding: 8px 18px;
-  background: rgba(30,25,55,0.8);
-  border-radius: 14px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 20px rgba(0,240,255,0.08);
-  animation: captchaEmojiPop 0.4s ease;
-}
-@keyframes captchaEmojiPop {
-  from { transform: scale(0.5); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-.captcha-animal-options {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-.captcha-animal-option {
-  flex: 1;
-  max-width: 120px;
-  padding: 8px 6px;
-  border: 1.5px solid rgba(176,96,255,0.2);
-  border-radius: 10px;
-  background: rgba(20,15,40,0.6);
-  cursor: pointer;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: #c0b8e0;
-  transition: all 0.2s;
-}
-.captcha-animal-option:hover {
-  border-color: #00f0ff;
-  background: rgba(0,240,255,0.08);
-  transform: translateY(-2px);
-}
-.captcha-animal-option.selected {
-  border-color: #00f0ff;
-  background: rgba(0,240,255,0.12);
-  color: #00f0ff;
-}
-.captcha-animal-option.correct {
-  border-color: #00ff88;
-  background: rgba(0,255,136,0.1);
-  color: #00ff88;
-}
-.captcha-animal-option.wrong {
-  border-color: #ff4060;
-  background: rgba(255,64,96,0.1);
-  color: #ff4060;
-}
-.captcha-confirm-btn {
-  margin-top: 14px;
-  width: 100%;
-  height: 36px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  background: linear-gradient(135deg, #F39C12, #E67E22);
-  color: white;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.captcha-confirm-btn:hover {
-  box-shadow: 0 4px 12px rgba(243,156,18,0.3);
-  transform: translateY(-1px);
-}
-.captcha-confirm-btn:disabled {
-  background: #D9D9D9;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-/* 验证码结果消息 */
-.captcha-message {
-  margin-top: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: center;
-  animation: captchaMsgFade 0.3s ease;
-}
-@keyframes captchaMsgFade {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.captcha-message.success {
-  color: #00ff88;
-  background: rgba(0,255,136,0.08);
-  border: 1px solid rgba(0,255,136,0.3);
-}
-.captcha-message.error {
-  color: #ff4060;
-  background: rgba(255,64,96,0.08);
-  border: 1px solid rgba(255,64,96,0.3);
-}
-
 /* 输入框下方提示 */
 .field-error-tip {
   font-size: 12px;
@@ -2338,6 +2133,7 @@
 .algo-card-wrapper--geekblue::before { background: linear-gradient(90deg, #2f54eb, #85a5ff); }
 .algo-card-wrapper--orange::before { background: linear-gradient(90deg, #E8720C, #FFB347); }
 .algo-card-wrapper--yellow::before { background: linear-gradient(90deg, #fadb14, #fff566); }
+.algo-card-wrapper--teal::before { background: linear-gradient(90deg, #08979c, #36cfc9); }
 
 /* Card lift + shadow on hover */
 .algo-card-wrapper:hover {
@@ -2578,5 +2374,34 @@
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-default:hover {
   border-color: #1677FF;
   color: #1677FF;
+}
+
+/* ── 表單標籤幫助提示（label + ? 圖標 + Tooltip） ── */
+.label-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.label-tip .label-tip-icon {
+  font-size: 13px;
+  color: #8C8C8C;
+  cursor: help;
+  transition: color 0.2s;
+}
+.label-tip .label-tip-icon:hover {
+  color: #E8720C;
+}
+
+/* ========================================================================
+   Tooltip 全局白底黑字
+   ======================================================================== */
+.ant-tooltip .ant-tooltip-inner {
+  background: #ffffff !important;
+  color: #262626 !important;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.ant-tooltip .ant-tooltip-arrow::before {
+  background: #ffffff !important;
 }
 

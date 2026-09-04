@@ -14,6 +14,7 @@ import DayPicker from './DayPicker'
 import NewStoreDayPicker from './NewStoreDayPicker'
 import PopularSkinPicker from './PopularSkinPicker'
 import GoldenSignboardLabelPicker from './GoldenSignboardLabelPicker'
+import TrafficPackagePicker from './TrafficPackagePicker'
 import {
   type InventoryItem,
   type RecommendTypeConfig,
@@ -84,8 +85,8 @@ export default function AdSales() {
       message.info(t('notAvailable'))
       return
     }
-    // 新店广告、人气商家、金字招牌：进入各自选购界面（无需库存数据）
-    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA || config.type === AlgorithmType.GOLDEN_SIGNBOARD) {
+    // 新店广告、人气商家、金字招牌：进入各自选购界面；投流广告：进入流量包选购界面（均无需库存数据）
+    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA || config.type === AlgorithmType.GOLDEN_SIGNBOARD || config.type === AlgorithmType.TRAFFIC_AD) {
       setSelectedAlgorithmType(config.type)
       setSelectedInventory(null)
       setCurrentStep(1)
@@ -156,7 +157,9 @@ export default function AdSales() {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType ? t('buyAd') : t('adSalesTitle')}
+                {currentStep >= 1 && selectedAlgorithmType
+                  ? t('buyAd')
+                  : t('adSalesTitle')}
               </h2>
               {currentStep >= 1 && selectedAlgorithmType && (
                 <div style={{
@@ -339,8 +342,15 @@ export default function AdSales() {
         </Card>
       )}
 
+      {/* Step 2: 流量包選購 - 投流廣告 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.TRAFFIC_AD && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <TrafficPackagePicker />
+        </Card>
+      )}
+
       {/* Step 2: 选择时段并加购 - 無敵星星 */}
-      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
+      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedAlgorithmType !== AlgorithmType.TRAFFIC_AD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DateTimeGrid
             inventoryItem={selectedInventory}

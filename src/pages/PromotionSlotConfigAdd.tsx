@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined, AppstoreOutlined, ThunderboltOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import BrandTag from '../components/BrandTag'
+import DetailPageHeader from '../components/DetailPageHeader'
 import {
   fetchAdAlgorithms, fetchWaterfallDetail, createWaterfall, updateWaterfall,
 } from '../api/adPromotion'
@@ -437,16 +438,19 @@ export default function PromotionSlotConfigAdd() {
       key: 'status',
       width: 80,
       align: 'center',
-      render: (v: number) => (
-        <Tag color={v === 1 ? 'success' : 'default'}>
-          {v === 1 ? t('promotionSlotConfig:enabled') : t('promotionSlotConfig:disabled')}
-        </Tag>
+      render: (_: unknown, record: SlotAlgorithm) => (
+        <Switch
+          checked={record.status === 1}
+          checkedChildren={t('promotionSlotConfig:enabled')}
+          unCheckedChildren={t('promotionSlotConfig:disabled')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     ...(!isDetailMode ? [{
       title: t('common:colAction'),
       key: 'action',
-      width: 200,
+      width: 150,
       align: 'center' as const,
       render: (_: unknown, record: SlotAlgorithm) => {
         const index = slotAlgorithms.findIndex(s => s.position === record.position)
@@ -468,15 +472,6 @@ export default function PromotionSlotConfigAdd() {
           >
             {t('promotionSlotConfig:moveDown')}
           </Button>
-          <Button
-            type="link"
-            size="small"
-            danger={record.status === 1}
-            style={record.status === 2 ? { color: '#52c41a' } : undefined}
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === 1 ? t('promotionSlotConfig:disabled') : t('promotionSlotConfig:enabled')}
-          </Button>
           <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
             {t('common:delete')}
           </Button>
@@ -488,7 +483,19 @@ export default function PromotionSlotConfigAdd() {
 
   return (
     <div className="content-area">
-      {/* 页面头部 */}
+      {/* 页面头部：详情模式走全局详情规范（紫条+橙返回+权限门控紫编辑），新增/编辑模式保留橙色头部 */}
+      {isDetailMode ? (
+        <DetailPageHeader
+          title={t('promotionSlotConfig:slotConfigDetail')}
+          onBack={handleBack}
+          onEdit={() => {
+            const p = new URLSearchParams(searchParams)
+            p.delete('mode')
+            navigate(`/promotion-slot-config-add?${p.toString()}`)
+          }}
+          menuKey="promotion-slot-config"
+        />
+      ) : (
       <div style={{
         position: 'relative', background: '#fff', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -513,11 +520,12 @@ export default function PromotionSlotConfigAdd() {
               }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isDetailMode ? t('promotionSlotConfig:slotConfigDetail') : isEditMode ? t('promotionSlotConfig:editSlotConfig') : t('promotionSlotConfig:addSlotConfig')}
+              {isEditMode ? t('promotionSlotConfig:editSlotConfig') : t('promotionSlotConfig:addSlotConfig')}
             </h2>
           </div>
         </div>
       </div>
+      )}
 
       <Form form={form} layout="vertical" disabled={isDetailMode}>
         {/* 基础信息 */}

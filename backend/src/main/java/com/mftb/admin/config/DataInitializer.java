@@ -32,12 +32,33 @@ public class DataInitializer implements CommandLineRunner {
     private final SysUserMapper sysUserMapper;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaVersionTracker versionTracker;
+
+    /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
+    private static final String V_SCHEMA = "core:schema-v1";
+    /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
+    private static final String V_MENU_SEED = "core:menu-seed-v8";
 
     @Override
     public void run(String... args) {
-        migrateSchema();
-        fixFinBatchUniqueKey();
-        migrateBuiltinAccounts();
+        // 一次性迁移按版本执行, 已执行的步骤重启时直接跳过 (启动提速);
+        // 菜单种子独立版本: 菜单改动只需递增 V_MENU_SEED, 不影响其他迁移
+        versionTracker.applyOnce(V_SCHEMA, this::migrateSchema);
+        versionTracker.applyOnce(V_MENU_SEED, () -> {
+            seedSystemMenus();
+            seedMenuEnglishNames();
+            adjustAiCenterMenus();
+        });
+        // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
+        // 否则 resolveMenuId 会为尚未种子的菜单键创建占位菜单(name=menu_key, parent_id=NULL),
+        // 被菜单树 buildTree 的孤儿兜底逻辑顶成一级菜单(生产事故: 實驗沙盤子菜单顶到一级)
+        versionTracker.applyOnce("core:legacy-perm-migrate-v1", () -> {
+            migrateRolePermissions();
+            migrateDepartmentPermissions();
+        });
+        versionTracker.applyOnce("core:fin-batch-uk-v1", this::fixFinBatchUniqueKey);
+        versionTracker.applyOnce("core:builtin-accounts-v1", this::migrateBuiltinAccounts);
+        // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
         migrateDeptCodeToBM();
         resetPasswordIfNeeded("MF00001", "111222");
@@ -134,9 +155,70 @@ public class DataInitializer implements CommandLineRunner {
         migrateRoleMenuTable();
         migrateDepartmentMenuTable();
         createDataAuthorizationTable();
-        seedSystemMenus();
-        // 再回填一次英文名: 确保本次新种子化的菜单也能拿到 name_en
-        seedMenuEnglishNames();
+        migrateFinRiskStatusColumn();
+        migrateFinRiskReleaseColumns();
+        migrateFinRiskSimplifyColumns();
+        addColumnIfAbsent("sys_user", "quick_favorites",
+                "ALTER TABLE sys_user ADD COLUMN quick_favorites VARCHAR(1024) NULL "
+                        + "COMMENT '快捷入口菜单key列表，JSON数组格式' AFTER force_logout_reason");
+        // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
+    }
+
+    /** 消费风控登记制: biz_fin_risk_config 新增 status 列 (表存在时才迁移, 与 66_fin_risk_config_status.sql 等效) */
+    private void migrateFinRiskStatusColumn() {
+        Integer tables = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_fin_risk_config'",
+                Integer.class);
+        if (tables == null || tables == 0) {
+            return;
+        }
+        addColumnIfAbsent("biz_fin_risk_config", "status",
+                "ALTER TABLE biz_fin_risk_config ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'enabled' "
+                        + "COMMENT '状态: enabled=启用 disabled=停用' AFTER risk_mode");
+    }
+
+    /** 消费风控已付池增强: 未付部分释放方式 release_mode + 每月释放比例 monthly_release_ratio (与 67 脚本等效) */
+    private void migrateFinRiskReleaseColumns() {
+        Integer tables = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_fin_risk_config'",
+                Integer.class);
+        if (tables == null || tables == 0) {
+            return;
+        }
+        addColumnIfAbsent("biz_fin_risk_config", "release_mode",
+                "ALTER TABLE biz_fin_risk_config ADD COLUMN release_mode VARCHAR(16) NOT NULL DEFAULT 'repay' "
+                        + "COMMENT '未付部分释放方式: repay=还款释放 monthly=每月比例释放' AFTER status");
+        addColumnIfAbsent("biz_fin_risk_config", "monthly_release_ratio",
+                "ALTER TABLE biz_fin_risk_config ADD COLUMN monthly_release_ratio DECIMAL(6,4) NULL "
+                        + "COMMENT '每月释放比例(小数, 如0.1000=10%/月, monthly模式生效)' AFTER release_mode");
+    }
+
+    /** 风控模型简化: 废弃 risk_mode / fixed_limit_amount / monthly_release_amount 列 (与 68 脚本等效) */
+    private void migrateFinRiskSimplifyColumns() {
+        Integer tables = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_fin_risk_config'",
+                Integer.class);
+        if (tables == null || tables == 0) {
+            return;
+        }
+        dropColumnIfPresent("biz_fin_risk_config", "risk_mode");
+        dropColumnIfPresent("biz_fin_risk_config", "fixed_limit_amount");
+        dropColumnIfPresent("biz_fin_risk_config", "monthly_release_amount");
+    }
+
+    /** 列存在时删除 */
+    private void dropColumnIfPresent(String table, String column) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
+        if (count != null && count > 0) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " DROP COLUMN " + column);
+            log.info("已自动废弃字段 {}.{}", table, column);
+        }
     }
 
     /** 回填存量员工的职级序列快照 (仅处理空值, 可重复执行) */
@@ -343,6 +425,7 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("finance", "Finance"),
                 Map.entry("promotion", "Promotion Funds"),
                 Map.entry("account-balance", "Account Balance"),
+                Map.entry("consume-risk", "Consumption Risk"),
                 Map.entry("batch-query", "Batch Query"),
                 Map.entry("detail-query", "Detail Query"),
                 Map.entry("merchant-reconcile", "Merchant Reconciliation"),
@@ -370,11 +453,52 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("translation-manage", "Translation Config"),
                 Map.entry("rule-config", "Rule Config"),
                 Map.entry("workflow-config", "Workflow Config"),
-                Map.entry("merchant-order-manage", "Order Management"));
+                Map.entry("merchant-order-manage", "Order Management"),
+                Map.entry("ai-assistant", "AI Center (AI)"),
+                Map.entry("ai_model_hub", "Model Access"),
+                Map.entry("ai_quota_auth", "Authorization & Quota"),
+                Map.entry("ai_tool_registry", "Tool Registry"),
+                Map.entry("ai_usage_stats", "Energy Statistics"),
+                Map.entry("ai_energy_detail", "Energy Detail"),
+                Map.entry("ai_energy_control", "Energy Control"),
+                Map.entry("ai-energy-billing", "Energy & Billing"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
                     "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
                     entry.getValue(), entry.getKey());
+        }
+    }
+
+    /**
+     * 一次性調整 (隨 V_MENU_SEED v6 執行):
+     * - 新增「能耗與賬單」二级目录，将能耗統計/能耗明細降级为三级
+     * - 硬删除 ai_energy_control 菜单及角色/部门关联权限（seedSystemMenus 只增不删，需在此显式清理）
+     */
+    private void adjustAiCenterMenus() {
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'AI Center (AI)' WHERE menu_key = 'ai-assistant'");
+        // 新增「能耗與賬單」二级目录，将能耗統計/能耗明細降级为三级
+        Long billingId = queryMenuIdByKey("ai-energy-billing");
+        Long assistantId = queryMenuIdByKey("ai-assistant");
+        if (billingId == null && assistantId != null) {
+            jdbcTemplate.update(
+                "INSERT INTO sys_menu (parent_id, menu_key, name, path, component, icon, type, sort_order, actions, status, updated_by, deleted) "
+                + "VALUES (?, 'ai-energy-billing', '能耗與賬單', NULL, NULL, 'ThunderboltOutlined', 1, 5, '[\"view\"]', 1, 'system', 0)",
+                assistantId);
+            billingId = queryMenuIdByKey("ai-energy-billing");
+            log.info("已新增能耗與賬單目录菜单 (id={})", billingId);
+        }
+        if (billingId != null) {
+            jdbcTemplate.update("UPDATE sys_menu SET parent_id = ?, sort_order = 1, name_en = 'Energy Statistics' WHERE menu_key = 'ai_usage_stats' AND parent_id != ?", billingId, billingId);
+            jdbcTemplate.update("UPDATE sys_menu SET parent_id = ?, sort_order = 2, name_en = 'Energy Detail' WHERE menu_key = 'ai_energy_detail' AND parent_id != ?", billingId, billingId);
+            jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Energy & Billing' WHERE menu_key = 'ai-energy-billing' AND (name_en IS NULL OR name_en = '')");
+        }
+        // 删除能耗管控菜单及关联权限
+        Long controlId = queryMenuIdByKey("ai_energy_control");
+        if (controlId != null) {
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", controlId);
+            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", controlId);
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", controlId);
+            log.info("已删除无用的能耗管控菜单 (id={})", controlId);
         }
     }
 
@@ -397,7 +521,7 @@ public class DataInitializer implements CommandLineRunner {
             addColumnIfAbsent("sys_role_menu", "actions",
                     "ALTER TABLE sys_role_menu ADD COLUMN actions TEXT NULL COMMENT '允许的操作 JSON数组'");
         }
-        migrateRolePermissions();
+        // 旧 JSON 权限迁移由 migrateSchema 在菜单种子化之后统一触发, 避免为未种子菜单创建占位菜单
     }
 
     /** 部门-菜单权限关联表: 不存在则创建, 并迁移旧 JSON 权限 */
@@ -416,7 +540,7 @@ public class DataInitializer implements CommandLineRunner {
                             + ") COMMENT='部门-菜单权限关联表'");
             log.info("已自动创建部门菜单关联表 sys_department_menu");
         }
-        migrateDepartmentPermissions();
+        // 旧 JSON 权限迁移由 migrateSchema 在菜单种子化之后统一触发, 避免为未种子菜单创建占位菜单
     }
 
     /** 数据授权表: 不存在则创建 */
@@ -516,8 +640,14 @@ public class DataInitializer implements CommandLineRunner {
         return menuId;
     }
 
-    /** 种子系统菜单: 确保前端定义的所有菜单在 sys_menu 中存在 (幂等) */
+    /** 种子系统菜单：确保前端定义的所有菜单在 sys_menu 中存在 (幂等) */
     private void seedSystemMenus() {
+        // 清理旧的 AI 菜单占位数据（为新的层级结构做准备）
+        log.info("开始清理旧的 AI 菜单占位数据...");
+        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE '%ai%')");
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE '%ai%')");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key LIKE '%ai%' OR menu_key = 'ai-assistant'");
+
         // key -> [name, parentKey|null, sort]
         Map<String, String[]> menus = new LinkedHashMap<>();
         // ── 顶级菜单 ──
@@ -527,10 +657,11 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("promotion_tool",      new String[]{"推廣通",           null,  "4"});
         menus.put("search",              new String[]{"搜索管理",          null,  "5"});
         menus.put("finance",             new String[]{"財務管理",          null,  "6"});
-        menus.put("group-purchase",      new String[]{"團購管理",          null,  "7"});
-        menus.put("hr",                  new String[]{"集團人事",          null,  "8"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "9"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "10"});
+        menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
+        menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
+        menus.put("hr",                  new String[]{"集團人事",          null,  "9"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "10"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "11"});
         // ── 商戶集團管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
@@ -580,6 +711,7 @@ public class DataInitializer implements CommandLineRunner {
         // ── 財務管理 ──
         menus.put("promotion",           new String[]{"推廣金管理",       "finance",            "1"});
         menus.put("account-balance",     new String[]{"賬戶餘額",         "promotion",          "1"});
+        menus.put("consume-risk",        new String[]{"消費風控",         "promotion",          "4"});
         menus.put("batch-query",         new String[]{"批次查詢",         "promotion",          "2"});
         menus.put("detail-query",        new String[]{"明細查詢",         "promotion",          "3"});
         menus.put("merchant-reconcile",  new String[]{"商戶通對賬",       "finance",            "2"});
@@ -587,6 +719,21 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("debt-reconcile",      new String[]{"欠款對賬",         "merchant-reconcile", "2"});
         menus.put("approval",            new String[]{"審批管理",          "finance",            "3"});
         menus.put("approval-center",     new String[]{"審批中心",         "approval",           "1"});
+        // ── 智能中心 (AI)：拆分二级菜单（模型管理、授权与配额） ──
+        menus.put("ai-models",            new String[]{"模型管理",      "ai-assistant",    "1"});
+        menus.put("ai-model-provider",    new String[]{"供应商管理",    "ai-models",       "1"});
+        menus.put("ai-model-list",        new String[]{"模型信息",      "ai-models",       "2"});
+        // AI 授权与配额：模型授权管理 / 配额管理 升级二级菜单（直挂智能中心）
+        menus.put("ai-auth-manage",       new String[]{"模型授权管理", "ai-assistant",    "2"});
+        menus.put("ai-dept-model-auth",   new String[]{"部门模型权控",       "ai-auth-manage",    "1"});
+        menus.put("ai-emp-model-auth",    new String[]{"员工模型权控",       "ai-auth-manage",    "2"});
+        menus.put("ai-quota-manage",      new String[]{"配额管理",           "ai-assistant",    "3"});
+        menus.put("ai-dept-quota",        new String[]{"部门额度",           "ai-quota-manage",   "1"});
+        menus.put("ai-emp-quota",         new String[]{"员工额度",           "ai-quota-manage",   "2"});
+        menus.put("ai_tool_registry",    new String[]{"工具註冊中心",   "ai-assistant",       "4"});
+        menus.put("ai-energy-billing",   new String[]{"能耗與賬單",     "ai-assistant",       "5"});
+        menus.put("ai_usage_stats",      new String[]{"能耗統計",       "ai-energy-billing",  "1"});
+        menus.put("ai_energy_detail",    new String[]{"能耗明細",       "ai-energy-billing",  "2"});
         // ── 團購管理 ──
         menus.put("group-purchase-dashboard", new String[]{"秒殺數據總覽",     "group-purchase",      "1"});
         menus.put("flash-sale-register", new String[]{"秒殺商品登記",     "group-purchase",      "2"});
@@ -666,21 +813,10 @@ public class DataInitializer implements CommandLineRunner {
         }
         if (created > 0) {
             log.info("已种子化 {} 个系统菜单到 sys_menu", created);
-            // 自动为 admin 角色授予新创建的菜单权限
-            Long adminRoleId = jdbcTemplate.queryForObject(
-                    "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
-            if (adminRoleId != null) {
-                for (Map.Entry<String, String[]> entry : menus.entrySet()) {
-                    Long menuId = queryMenuIdByKey(entry.getKey());
-                    if (menuId != null) {
-                        jdbcTemplate.update(
-                                "INSERT IGNORE INTO sys_role_menu (role_id, menu_id) VALUES (?, ?)",
-                                adminRoleId, menuId);
-                    }
-                }
-                log.info("已为 admin 角色补充新菜单权限");
-            }
         }
+        // 確保 admin 角色持有全部種子菜單權限（幂等）；並回填歷史授權中缺失的 actions——
+        // actions 為空會導致「功能角色登錄（非 sys_user.role=admin）」的用戶 hasMenuPermission 判定失敗，菜單不可見/不可進
+        ensureAdminMenuGrants(menus);
         if (updated > 0) {
             log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
         }
@@ -713,6 +849,33 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    /**
+     * 确保 admin 角色持有全部种子菜单权限（幂等）。
+     * 使用 ON DUPLICATE KEY UPDATE + CASE 仅回填 actions 为空的旧授权，
+     * 不覆盖已有的非空 actions（保留角色管理页面的自定义配置）。
+     * actions 为空会导致功能角色登录（非 sys_user.role=admin）的用户菜单不可见/不可进。
+     */
+    private void ensureAdminMenuGrants(Map<String, String[]> menus) {
+        Long adminRoleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
+        if (adminRoleId == null) {
+            return;
+        }
+        String defaultActions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
+        for (String menuKey : menus.keySet()) {
+            Long menuId = queryMenuIdByKey(menuKey);
+            if (menuId == null) {
+                continue;
+            }
+            jdbcTemplate.update(
+                    "INSERT INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?) "
+                            + "ON DUPLICATE KEY UPDATE actions = CASE "
+                            + "WHEN actions IS NULL OR actions = '' OR actions = '[]' THEN VALUES(actions) "
+                            + "ELSE actions END",
+                    adminRoleId, menuId, defaultActions);
+        }
+    }
+
     /** 根据 menu_key 查询菜单ID (不存在返回 null) */
     private Long queryMenuIdByKey(String menuKey) {
         List<Long> ids = jdbcTemplate.queryForList(
@@ -721,44 +884,31 @@ public class DataInitializer implements CommandLineRunner {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
-    /** 确保所有部门拥有 ad-sales 菜单权限，并授权全量商家数据范围 */
+    /**
+     * 确保所有部门拥有 ad-sales 菜单权限，并授权全量商家数据范围。
+     * <p>
+     * "活"逻辑: 新增部门/新增商家集团时需自动补齐授权, 每次启动执行;
+     * 已改为集合式单条 SQL, 无新增数据时仅 3 条查询开销。
+     */
     private void ensureDeptAdSalesPermission() {
         String actions = "[\"view\",\"create\",\"edit\",\"export\"]";
-        List<Long> deptIds = jdbcTemplate.queryForList(
-                "SELECT id FROM sys_department WHERE deleted = 0 AND status = 1", Long.class);
-        if (deptIds.isEmpty()) {
-            return;
+        // 1) 菜单权限: 为所有有效部门补齐 ad-sales 菜单授权 (单条集合 SQL 替代逐部门循环)
+        Long menuId = queryMenuIdByKey("ad-sales");
+        if (menuId != null) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_department_menu (dept_id, menu_id, actions) "
+                            + "SELECT d.id, ?, ? FROM sys_department d WHERE d.deleted = 0 AND d.status = 1 "
+                            + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
+                    menuId, actions);
         }
-        // 1) 菜单权限: ad-sales
-        for (String menuKey : new String[]{"ad-sales"}) {
-            Long menuId = queryMenuIdByKey(menuKey);
-            if (menuId == null) {
-                continue;
-            }
-            for (Long deptId : deptIds) {
-                jdbcTemplate.update(
-                        "INSERT INTO sys_department_menu (dept_id, menu_id, actions) VALUES (?, ?, ?) "
-                                + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
-                        deptId, menuId, actions);
-            }
-            log.info("已确保 {} 个部门拥有 [{}] 菜单权限", deptIds.size(), menuKey);
-        }
-        // 2) 数据范围授权: 将所有现存商家集团授权给各部门（幂等插入）
-        List<String> groupCodes = jdbcTemplate.queryForList(
-                "SELECT DISTINCT group_code FROM biz_merchant_group WHERE deleted = 0 AND group_code IS NOT NULL AND group_code != ''",
-                String.class);
-        if (groupCodes.isEmpty()) {
-            return;
-        }
-        int inserted = 0;
-        for (Long deptId : deptIds) {
-            for (String gc : groupCodes) {
-                int rows = jdbcTemplate.update(
-                        "INSERT IGNORE INTO sys_data_authorization (target_type, target_id, group_code, status, deleted) VALUES ('department', ?, ?, 1, 0)",
-                        deptId, gc);
-                inserted += rows;
-            }
-        }
+        // 2) 数据范围授权: 部门 × 商家集团 全量补齐 (单条集合 SQL 替代双层循环, 幂等)
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_data_authorization (target_type, target_id, group_code, status, deleted) "
+                        + "SELECT 'department', d.id, g.group_code, 1, 0 "
+                        + "FROM sys_department d "
+                        + "CROSS JOIN (SELECT DISTINCT group_code FROM biz_merchant_group "
+                        + "WHERE deleted = 0 AND group_code IS NOT NULL AND group_code != '') g "
+                        + "WHERE d.deleted = 0 AND d.status = 1");
         if (inserted > 0) {
             log.info("已补充 {} 条部门-商家集团数据授权记录", inserted);
         }

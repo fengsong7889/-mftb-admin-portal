@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
+import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -240,10 +240,13 @@ export default function RoleManagement() {
       dataIndex: 'status',
       key: 'status',
       width: 90,
-      render: (value: number) => (
-        value === ROLE_STATUS.ENABLED
-          ? <Tag color="success">{t('roleManagement.statusEnabled')}</Tag>
-          : <Tag color="default">{t('roleManagement.statusDisabled')}</Tag>
+      render: (_: unknown, record: RoleItem) => (
+        <Switch
+          checked={record.status === ROLE_STATUS.ENABLED}
+          checkedChildren={t('roleManagement.statusEnabled')}
+          unCheckedChildren={t('roleManagement.statusDisabled')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -281,7 +284,7 @@ export default function RoleManagement() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 230,
+      width: 180,
       render: (_, record) => (
         <Space size={4}>
           {hasPermission('role-management:edit') && (
@@ -292,11 +295,6 @@ export default function RoleManagement() {
           {hasPermission('role-management:edit') && (
             <Button type="link" size="small" onClick={() => handleOpenBind(record)}>
               {t('roleManagement.bindAccount')}
-            </Button>
-          )}
-          {hasPermission('role-management:edit') && (
-            <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-              {record.status === ROLE_STATUS.ENABLED ? t('common.disable') : t('common.enable')}
             </Button>
           )}
           {hasPermission('role-management:delete') && (

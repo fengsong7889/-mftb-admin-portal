@@ -30,7 +30,8 @@ USER app
 
 EXPOSE 8080
 
-# JVM 优化：适配低内存环境（256-512MB）
-ENV JAVA_OPTS="-Xms128m -Xmx384m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+# JVM 优化：堆按容器内存百分比弹性分配（容器感知，自动适配 Sealos 配额，建议配额 >=1G）；
+# 限制 Metaspace 与线程栈，防止非堆内存挤爆容器限额触发 OOM；OOM 时快速退出交由编排重建
+ENV JAVA_OPTS="-XX:InitialRAMPercentage=50.0 -XX:MaxRAMPercentage=60.0 -XX:MaxMetaspaceSize=192m -Xss512k -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

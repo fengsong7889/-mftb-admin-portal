@@ -73,7 +73,7 @@ const SLOT_TYPE_STYLE: Record<number, { bg: string; border: string; text: string
   12: { bg: '#B5F5EC', border: '#13C2C2', text: '#086E6E' },  // 点金广告 - 青色
   13: { bg: '#D6E4FF', border: '#2F54EB', text: '#1D39C4' },  // 金字招牌 - 极客蓝
   14: { bg: '#FFD8BF', border: '#FA541C', text: '#CB3B00' },  // 商品促销 - 火橘
-  15: { bg: '#FFFABE', border: '#FADB14', text: '#8B7200' },  // 投流广告 - 黄色
+  15: { bg: '#E6FFFB', border: '#08979C', text: '#006D75' },  // 投流广告 - 深青蓝
 }
 const DEFAULT_SLOT_STYLE = { bg: '#FFF1B8', border: '#D4A017', text: '#8B6914' }
 

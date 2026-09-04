@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button, Space, Input, InputNumber, Select, Table, Tag, Modal, Form, DatePicker,
-  ColorPicker, Upload, message, Popover, Radio,
+  ColorPicker, Upload, message, Popover, Radio, Switch,
 } from 'antd'
 import type { TableColumnsType, RadioChangeEvent } from 'antd'
 import {
@@ -575,7 +575,7 @@ export default function HotSearchConfig() {
         />
       )
     },
-    { title: t('hotSearchConfig.colStatus'), dataIndex: 'status', key: 'status', width: 65, render: (v: string) => v === 'active' ? <Tag color="success">{t('dict.status.enable')}</Tag> : <Tag color="default">{t('dict.status.disable')}</Tag> },
+    { title: t('hotSearchConfig.colStatus'), dataIndex: 'status', key: 'status', width: 80, render: (v: string) => <Switch checked={v === 'active'} checkedChildren={t('dict.status.enable')} unCheckedChildren={t('dict.status.disable')} disabled /> },
     {
       title: t('common.colAction'), key: 'action', width: 160, fixed: 'right',
       render: (_: unknown, record: HotSearchRecord) => (

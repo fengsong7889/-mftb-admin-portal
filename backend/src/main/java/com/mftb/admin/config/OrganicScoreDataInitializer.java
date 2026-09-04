@@ -50,43 +50,57 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
     }
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaVersionTracker versionTracker;
 
     @Override
     public void run(String... args) {
-        // Step 1: 幂等添加新列
-        migrateColumns();
+        // 各步骤按版本执行, 重启时已执行的直接跳过 (启动提速)
+        // Step 1: 幂等添加新列 (一次性, 版本化)
+        versionTracker.applyOnce("organic:columns-v1", this::migrateColumns);
 
         // Step 2: 仅在存在旧格式残留时执行迁移脚本（清理旧数据 + 更新已有规则字段）
         // 51 脚本会删除 STB_02~09 / PLT_03 / PLT_04 等编码后由种子重建为默认值，
-        // 若对已完成迁移的库重复执行，会覆盖管理员配置的启停状态与分值，因此必须按需执行
+        // 若对已完成迁移的库重复执行，会覆盖管理员配置的启停状态与分值，因此必须按需执行;
+        // 无残留时直接标记完成, 后续重启不再检测也不再执行 (避免误覆盖管理员配置)
         try {
-            if (hasLegacyOrganicRules()) {
-                executeSqlScript(MIGRATION_SCRIPT);
-                log.info("检测到旧格式自然流量规则数据，已执行编码规范化迁移");
-            }
+            versionTracker.applyOnce("organic:migrate-51-v1", () -> {
+                if (hasLegacyOrganicRules()) {
+                    runSqlScript(MIGRATION_SCRIPT);
+                    log.info("检测到旧格式自然流量规则数据，已执行编码规范化迁移");
+                }
+            });
         } catch (Exception e) {
             log.error("自然流量评分编码规范化迁移失败：{}", e.getMessage(), e);
         }
-        
+
         // Step 3: 执行重命名脚本（STO_ → STB_/PLT_ 前缀规范化）
         try {
-            executeSqlScript(RENAME_SCRIPT);
+            versionTracker.applyOnce("organic:rename-53-v1", () -> runSqlScript(RENAME_SCRIPT));
         } catch (Exception e) {
             log.error("自然流量评分编码重命名失败：{}", e.getMessage(), e);
         }
-        
+
         // Step 4: 执行种子脚本（INSERT IGNORE 插入新格式数据）
         try {
-            executeSqlScript(INIT_SCRIPT);
+            versionTracker.applyOnce("organic:seed-23-v1", () -> runSqlScript(INIT_SCRIPT));
         } catch (Exception e) {
             log.error("自然流量评分配置初始化失败：{}", e.getMessage(), e);
         }
-        
-        // Step 5: 清理临时编码
+
+        // Step 5: 清理临时编码 (一次性, 版本化)
         try {
-            executeSqlScript(CLEANUP_SCRIPT);
+            versionTracker.applyOnce("organic:cleanup-52-v1", () -> runSqlScript(CLEANUP_SCRIPT));
         } catch (Exception e) {
             log.error("自然流量评分临时编码清理失败：{}", e.getMessage(), e);
+        }
+    }
+
+    /** 在版本化 lambda 内执行脚本, 将受检异常转为运行时异常 */
+    private void runSqlScript(String scriptName) {
+        try {
+            executeSqlScript(scriptName);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("读取初始化脚本失败: " + scriptName, e);
         }
     }
 

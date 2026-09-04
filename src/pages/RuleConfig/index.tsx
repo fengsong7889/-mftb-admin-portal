@@ -20,6 +20,7 @@ const SUB_GROUP_META: Record<string, { label: string; color: string }> = {
   revival: { label: '盤活復蘇', color: '#E8720C' },
   popular_merchant: { label: '人氣商家', color: '#722ED1' },
   golden_signboard: { label: '金字招牌', color: '#FA8C16' },
+  traffic_ad: { label: '投流廣告', color: '#13C2C2' },
 }
 
 export default function RuleConfig() {
@@ -228,7 +229,7 @@ export default function RuleConfig() {
     }
   }
 
-  /* 將規則列表拆分為渲染單元：互斥組（同 mutexGroup 合併為一行）+ 單條規則 */
+  /* 將規則列表拆分為渲染單元：互斥組（同 mutexGroup 合併為一行）+ 單條規則；單價表另行整塊渲染 */
   type RenderUnit = { type: 'single'; rule: RuleItem } | { type: 'mutex'; rules: RuleItem[] }
   const toUnits = (rules: RuleItem[]): RenderUnit[] => {
     const units: RenderUnit[] = []
@@ -256,7 +257,9 @@ export default function RuleConfig() {
         <div style={{ fontSize: 14, fontWeight: 500, color: '#262626', marginBottom: 2 }}>{rule.label}</div>
         <div style={{ fontSize: 12, color: '#8C8C8C' }}>{rule.description || ''}</div>
       </div>
-      <div style={{ marginLeft: 16, flexShrink: 0 }}>{renderControl(rule, groupEditing)}</div>
+      <div style={{ marginLeft: 16, flexShrink: 0 }}>
+        {renderControl(rule, groupEditing)}
+      </div>
     </div>
   )
 

@@ -305,7 +305,6 @@ export default function PromotionWordLibrary() {
       dataIndex: 'word',
       key: 'word',
       width: 150,
-      render: (val: string) => <span style={{ fontWeight: 600, color: '#2D3436' }}>{val}</span>,
     },
     {
       title: t('promotionWordLibrary.colChannel'),
@@ -329,10 +328,13 @@ export default function PromotionWordLibrary() {
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (status: number) => (
-        <Tag color={status === 1 ? 'success' : 'default'}>
-          {status === 1 ? t('common.enable') : t('common.disable')}
-        </Tag>
+      render: (_: unknown, record: WordLibraryItem) => (
+        <Switch
+          checked={record.status === 1}
+          checkedChildren={t('common.enable')}
+          unCheckedChildren={t('common.disable')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -347,14 +349,11 @@ export default function PromotionWordLibrary() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 100,
+      width: 80,
       fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
-          <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === 1 ? t('common.disable') : t('common.enable')}
-          </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),

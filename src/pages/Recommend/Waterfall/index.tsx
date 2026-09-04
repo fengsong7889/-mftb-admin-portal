@@ -22,6 +22,21 @@ import type { WaterfallSlotConfig } from '../types'
 import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
+import { loadTrafficPricing, saveTrafficPricing, loadTrafficPricingSavedAt } from '../../PromotionSalesConfig/types'
+import { BIZ_CHANNEL } from '../../../constants/bizChannel'
+
+/** 投流廣告：定價配置業務頻道碼 → 列表行業務頻道值 */
+const TRAFFIC_CHANNEL_TO_BIZ: Record<string, string> = {
+  [BIZ_CHANNEL.FOOD_DELIVERY]: 'food',
+  [BIZ_CHANNEL.SUPERMARKET]: 'supermarket',
+  [BIZ_CHANNEL.GROUP_BUY]: 'groupBuy',
+}
+/** 列表行業務頻道值 → 定價配置業務頻道碼 */
+const BIZ_TO_TRAFFIC_CHANNEL: Record<string, string> = {
+  food: BIZ_CHANNEL.FOOD_DELIVERY,
+  supermarket: BIZ_CHANNEL.SUPERMARKET,
+  groupBuy: BIZ_CHANNEL.GROUP_BUY,
+}
 
 /** 各業務類型（tab）對應的廣告類型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
@@ -168,7 +183,34 @@ export default function Waterfall() {
   const tAlgorithmTypeOptions = useMemo(() => ALGORITHM_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const tRegionOptions = useMemo(() => REGION_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
-  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家 + 金字招牌并行拉取后合并）+ 算法列表 */
+  /** 生成投流廣告定價列表行（每個業務頻道一行，數據來源為本地流量包定價配置） */
+  const buildTrafficPricingRows = (): WaterfallSlotConfig[] => {
+    const savedAt = loadTrafficPricingSavedAt()
+    return loadTrafficPricing().map((cp, idx) => {
+      const biz = TRAFFIC_CHANNEL_TO_BIZ[cp.bizChannel] ?? 'food'
+      return {
+        id: 900 + idx,
+        pricingNo: `TP${String(idx + 1).padStart(6, '0')}`,
+        promotionName: `${ALGORITHM_TYPE_LABEL[AlgorithmType.TRAFFIC_AD]}・${BIZ_CHANNEL_LABEL[biz] ?? biz}`,
+        app: AppType.SHANFENG,
+        channel: RecommendChannel.DELIVERY,
+        bizChannel: biz,
+        slotPosition: 0,
+        algorithmId: AlgorithmType.TRAFFIC_AD,
+        algorithmName: ALGORITHM_TYPE_LABEL[AlgorithmType.TRAFFIC_AD],
+        algorithmType: AlgorithmType.TRAFFIC_AD,
+        merchantLimit: 'unlimited' as const,
+        regionLimit: 'unlimited' as const,
+        status: cp.status === 'disabled' ? ServiceStatus.DISABLED : ServiceStatus.ENABLED,
+        updatedBy: '-',
+        updatedAt: savedAt,
+        createdAt: savedAt,
+        source: 'mock' as const,
+      }
+    })
+  }
+
+  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家 + 金字招牌并行拉取后合并 + 投流广告本地配置）+ 算法列表 */
   useEffect(() => {
     let mounted = true
     Promise.all([
@@ -185,6 +227,7 @@ export default function Waterfall() {
           ...(reviveRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.HOT_REVIVE_AD)),
           ...(hotRes.records ?? []).map(vo => toPricingRow(vo as unknown as AdPricingStar, AlgorithmType.POPULAR_MERCHANT_KA)),
           ...(signboardRes.records ?? []).map(vo => toPricingRow({ ...vo, presaleDays: vo.presaleDays ?? 0 } as AdPricingStar, AlgorithmType.GOLDEN_SIGNBOARD)),
+          ...buildTrafficPricingRows(),
         ]
         setDataList(list)
         // 缓存全量算法列表（排除金字招牌，只需标签不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
@@ -371,6 +414,19 @@ export default function Waterfall() {
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       onOk: async () => {
+        // 投流廣告：頻道級啟停（寫回定價配置的 status 字段）
+        if (record.algorithmType === AlgorithmType.TRAFFIC_AD) {
+          const target = BIZ_TO_TRAFFIC_CHANNEL[record.bizChannel ?? '']
+          if (target) {
+            const nextStatus = newStatus === ServiceStatus.ENABLED ? 'enabled' as const : 'disabled' as const
+            const next = loadTrafficPricing().map(cp => cp.bizChannel === target ? { ...cp, status: nextStatus } : cp)
+            saveTrafficPricing(next)
+          }
+          setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+          setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
+          message.success(t('waterfall.toggleSuccess', { action: actionText }))
+          return
+        }
         if (record.source === 'api') {
           try {
             if (record.algorithmType === AlgorithmType.HOT_REVIVE_AD) {
@@ -451,10 +507,13 @@ export default function Waterfall() {
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (v: ServiceStatus) => (
-        <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
-          {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
-        </Tag>
+      render: (_: unknown, record: WaterfallSlotConfig) => (
+        <Switch
+          checked={record.status === ServiceStatus.ENABLED}
+          checkedChildren={t('common.enable')}
+          unCheckedChildren={t('common.disable')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -478,7 +537,7 @@ export default function Waterfall() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 200,
+      width: 140,
       fixed: 'right' as const,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
@@ -496,23 +555,16 @@ export default function Waterfall() {
           >
             {t('common.edit')}
           </Button>
-          <Button 
-            type="link" 
-            size="small" 
-            danger={record.status === ServiceStatus.ENABLED}
-            style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined}
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
-          </Button>
-          <Button 
-            type="link" 
-            size="small" 
-            danger
-            onClick={() => handleDelete(record)}
-          >
-            {t('common.delete')}
-          </Button>
+          {record.algorithmType !== AlgorithmType.TRAFFIC_AD && (
+            <Button 
+              type="link" 
+              size="small" 
+              danger
+              onClick={() => handleDelete(record)}
+            >
+              {t('common.delete')}
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -577,7 +629,7 @@ export default function Waterfall() {
                     card => card.type,
                   ).map(card => {
                       const cardOrder = tabKey === 'delivery' ? deliveryCardOrder : groupBuyCardOrder
-                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.GOLDEN_SIGNBOARD
+                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.GOLDEN_SIGNBOARD || card.type === AlgorithmType.TRAFFIC_AD
                       return (
                         <div
                           key={card.type}

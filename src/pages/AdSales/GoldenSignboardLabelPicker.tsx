@@ -158,7 +158,7 @@ interface LabelPricingInfo {
   actualDesc?: string | null
 }
 
-export default function GoldenSignboardLabelPicker() {
+export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: boolean }) {
   const { t } = useTranslation('adSales')
   const { t: tr } = useTranslation()
   const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
@@ -318,10 +318,10 @@ export default function GoldenSignboardLabelPicker() {
   const handleSearch = async () => {
     if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
     if (!searchBrand) { message.warning(t('selectBrand')); return }
-    if (!searchStoreName) { message.warning(t('selectStore')); return }
+    if (!storeMode && !searchStoreName) { message.warning(t('selectStore')); return }
 
     const algoId = Number(searchAlgorithm)
-    const store = storeMap[searchStoreName]
+    const store = searchStoreName ? storeMap[searchStoreName] : undefined
     const groupCode = store?.groupCode
     const storeCode = store?.storeCode
 
@@ -651,7 +651,7 @@ export default function GoldenSignboardLabelPicker() {
     <div>
       {/* 查詢區域 - 與其它購買界面保持一致 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
-        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: storeMode ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px 12px' }}>
           <Form.Item label={t('brandLabel')}>
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
@@ -660,12 +660,16 @@ export default function GoldenSignboardLabelPicker() {
             <Select placeholder={searchBrand ? '請選擇算法名稱' : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
               options={pricingOptions} disabled={!searchBrand} />
           </Form.Item>
-          <Form.Item label={t('storeNameLabel')}>
-            <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
-          </Form.Item>
-          <Form.Item label={t('bdLabel')}>
-            <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={v => setSearchBD(v)} allowClear showSearch optionFilterProp="label" options={bdOptions} />
-          </Form.Item>
+          {!storeMode && (
+            <Form.Item label={t('storeNameLabel')}>
+              <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
+            </Form.Item>
+          )}
+          {!storeMode && (
+            <Form.Item label={t('bdLabel')}>
+              <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={v => setSearchBD(v)} allowClear showSearch optionFilterProp="label" options={bdOptions} />
+            </Form.Item>
+          )}
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>

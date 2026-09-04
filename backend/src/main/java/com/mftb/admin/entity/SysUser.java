@@ -89,6 +89,12 @@ public class SysUser {
     /** 强制下线原因: operator=管理员操作, account_disabled=账号被停用 */
     private String forceLogoutReason;
 
+    /** 快捷入口菜单 key 列表，JSON 数组格式如 ["account-balance","batch-query"] */
+    private String quickFavorites;
+
+    /** 用户选中的在线头像 URL（IconFont/DiceBear 等外部 URL） */
+    private String avatarUrl;
+
     /** 最后更新人 */
     private String updatedBy;
 

@@ -2,6 +2,11 @@ server:
   port: 8080
   servlet:
     context-path: /
+  tomcat:
+    threads:
+      # 管理后台并发低，限制线程数降低线程栈内存占用（配合 -Xss512k）
+      max: 100
+      min-spare: 10
 
 spring:
   application:
@@ -9,13 +14,24 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     # 数据库连接信息必须通过环境变量 DB_URL/DB_USERNAME/DB_PASSWORD 注入，禁止在代码库中保留默认凭据
-    url: ${DB_URL}
+    url: ${DB_URL}&socketTimeout=15000&connectTimeout=10000
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    # 添加连接和查询超时配置，避免远程数据库慢查询导致前端超时
+    hikari:
+      connection-timeout: 30000
+      max-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000
+      keepalive-timeout: 60000
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 5MB
 
 # MyBatis-Plus 配置
 mybatis-plus:
@@ -23,8 +39,10 @@ mybatis-plus:
   type-aliases-package: com.mftb.admin.entity
   configuration:
     map-underscore-to-camel-case: true
-    # 开发环境用 StdOutImpl，生产环境通过环境变量设置为 NoLoggingImpl 或 Slf4jImpl
-    log-impl: ${MYBATIS_LOG_IMPL:org.apache.ibatis.logging.stdout.StdOutImpl}
+    # 默认走 Slf4j 跟随 logging.level 控制（生产 info 不打印 SQL）；StdOutImpl 逐条打印 stdout 仅开发调试时通过环境变量启用
+    log-impl: ${MYBATIS_LOG_IMPL:org.apache.ibatis.logging.slf4j.Slf4jImpl}
+    # 全局 SQL 执行超时（秒），防止慢查询
+    default-timeout: 10
   global-config:
     db-config:
       # 主键自增
@@ -58,8 +76,9 @@ translation:
 
 # CORS 跨域配置
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3002,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3002,http://127.0.0.1:5173,https://fengsong7889.github.io}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3005,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3005,http://127.0.0.1:5173,https://fengsong7889.github.io}
 
 logging:
   level:
-    com.mftb.admin: ${LOG_LEVEL:debug}
+    # 生产默认 info（debug 会逐请求打印日志推高 CPU）；开发调试通过环境变量 LOG_LEVEL=debug 开启
+    com.mftb.admin: ${LOG_LEVEL:info}

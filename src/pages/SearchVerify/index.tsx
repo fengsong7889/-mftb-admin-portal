@@ -461,7 +461,6 @@ function SearchVerifyPage() {
     },
     {
       title: t('searchVerify.colMerchantName'), dataIndex: 'merchantName', width: 160,
-      render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
       title: t('searchVerify.colChannel'), dataIndex: 'businessChannel', width: 100,

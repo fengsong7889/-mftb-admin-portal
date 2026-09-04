@@ -16,8 +16,8 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { fetchFinAccounts, fetchFinBatches, submitDeductApply } from '../../api/finance'
-import type { DeductApplyPayload } from '../../api/finance'
+import { fetchFinAccounts, fetchFinBatches, submitDeductApply, fetchFinRiskConfig } from '../../api/finance'
+import type { DeductApplyPayload, FinRiskRow } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
@@ -149,6 +149,8 @@ export default function DeductAdd() {
   /** 充值批次選項：該集團的充值批次 */
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([])
   const [deductAmount, setDeductAmount] = useState<number>(0)
+  /** 集團風控信息（消費扣款可用額度提示） */
+  const [riskRow, setRiskRow] = useState<FinRiskRow | null>(null)
   const [certificateFiles, setCertificateFiles] = useState<UploadFile[]>([])
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -168,6 +170,14 @@ export default function DeductAdd() {
     fetchFinAccounts({ page: 1, size: 1, groupId: groupIdParam, brand: brandParam })
       .then(res => setSourceVirtualBalance(Number(res.records?.[0]?.virtualBalance) || 0))
       .catch(() => setSourceVirtualBalance(0))
+  }, [groupIdParam, brandParam])
+
+  // 加載集團風控信息（消費扣款受限時展示可用額度）
+  useEffect(() => {
+    if (!groupIdParam) return
+    fetchFinRiskConfig(groupIdParam, brandParam)
+      .then(setRiskRow)
+      .catch(() => setRiskRow(null))
   }, [groupIdParam, brandParam])
 
   // 加載門店選項（集團下且所屬品牌與集團一致）
@@ -536,6 +546,23 @@ export default function DeductAdd() {
 
           {/* ====== 消費扣款 ====== */}
           {deductMethod === 'consume' && (
+            <>
+            {/* 風控提示：集團有未結清欠款時展示消費扣款可用額度 */}
+            {riskRow && riskRow.unsettledDebt > 0 && (
+              <div style={{
+                marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+                background: riskRow.limited && deductAmount > Number(riskRow.availableAmount ?? 0) ? '#FFF1F0' : '#FFF7E6',
+                border: `1px solid ${riskRow.limited && deductAmount > Number(riskRow.availableAmount ?? 0) ? '#FFA39E' : '#FFD591'}`,
+                fontSize: 12, lineHeight: 1.8,
+                color: riskRow.limited && deductAmount > Number(riskRow.availableAmount ?? 0) ? '#CF1322' : '#AD6800',
+              }}>
+                {riskRow.limited
+                  ? t('accountBalance.consumeRiskLimitHint', {
+                      available: riskRow.availableAmount == null ? '--' : Number(riskRow.availableAmount).toLocaleString(),
+                    })
+                  : t('accountBalance.consumeRiskExemptHint')}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px 24px' }}>
               <Form.Item label={t('common:colChannel')} name="consumeChannel" rules={[{ required: true, message: t('accountBalance.selectBusinessChannel') }]}>
                 <Select placeholder={t('accountBalance.selectBusinessChannel')} options={tBusinessChannelOptions} allowClear />
@@ -582,6 +609,7 @@ export default function DeductAdd() {
                 </div>
               )}
             </div>
+            </>
           )}
 
           {/* ====== 充值批次扣款 ====== */}

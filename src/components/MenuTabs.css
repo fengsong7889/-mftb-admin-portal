@@ -1,0 +1,157 @@
+/* ========================================================================
+   MenuTabs 菜单栏目标
+   ======================================================================== */
+.menu-tabs-bar {
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0 16px;
+  position: relative;
+  z-index: 9;
+}
+
+.menu-tabs-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 6px 0;
+}
+
+.menu-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 单个标签项 */
+.menu-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #595959;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 160px;
+}
+
+.menu-tab-item:hover {
+  color: #E8720C;
+  background: #fff7e6;
+  border-color: #ffd591;
+}
+
+/* 激活态 */
+.menu-tab-item--active {
+  color: #E8720C;
+  background: #fff;
+  border-color: #E8720C;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(232, 114, 12, 0.12);
+}
+
+.menu-tab-item--active:hover {
+  background: #fff;
+  border-color: #E8720C;
+}
+
+/* 首页图标 */
+.menu-tab-home-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* 标签标题 */
+.menu-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+}
+
+/* 关闭按钮 */
+.menu-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 9px;
+  color: #bfbfbf;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.menu-tab-close:hover {
+  background: #ff4d4f;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+/* 激活标签的关闭按钮 */
+.menu-tab-item--active .menu-tab-close {
+  color: #E8720C;
+}
+
+.menu-tab-item--active .menu-tab-close:hover {
+  background: #ff4d4f;
+  color: #fff;
+}
+
+/* 非激活标签关闭按钮 hover 时显示 */
+.menu-tab-item:not(.menu-tab-item--active):hover .menu-tab-close {
+  color: #8c8c8c;
+}
+
+/* 右键菜单 */
+.menu-tabs-context {
+  position: fixed;
+  z-index: 1000;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  min-width: 120px;
+  animation: menuTabCtxIn 0.15s ease;
+}
+
+@keyframes menuTabCtxIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.menu-tabs-context-item {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #262626;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.menu-tabs-context-item:hover {
+  background: #f5f5f5;
+}
+
+.menu-tabs-context-item--danger {
+  color: #ff4d4f;
+}
+
+.menu-tabs-context-item--danger:hover {
+  background: #fff1f0;
+}

@@ -48,6 +48,16 @@ public class AdOrderVO {
     private List<String> skinTiers;
     /** 按標籤分組的購買日期（金字招牌：每個標籤對應的日期列表） */
     private List<LabelDateGroup> labelDates;
+    /** 業務頻道（投流廣告: 1=美食外賣 2=超市百貨 3=團購到店，自定價配置回填） */
+    private Integer bizChannel;
+    /** 購買方式（投流廣告: tier=預設檔位, custom=自定義曝光） */
+    private String trafficMode;
+    /** 流量包名稱（投流廣告: 套餐名稱或自定義曝光次數） */
+    private String trafficPackageName;
+    /** 購買曝光次數（投流廣告） */
+    private Long trafficImpressions;
+    /** 投流時段（投流廣告: business=營業時間, allday=全天） */
+    private String deliverySlot;
     private Integer itemCount;
     private BigDecimal originalAmount;
     private BigDecimal discountAmount;

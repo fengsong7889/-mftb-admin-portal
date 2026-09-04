@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Table, Tag, Button, Input, Select, DatePicker, Modal, Form, message } from 'antd'
+import { Table, Tag, Button, Input, Select, DatePicker, Modal, Form, message, Switch } from 'antd'
 import dayjs from 'dayjs'
 import {
   SearchOutlined,
@@ -153,10 +153,13 @@ export default function WorkflowConfig() {
       key: 'enabled',
       width: 80,
       align: 'center',
-      render: (enabled: boolean) => (
-        enabled
-          ? <Tag color="success">啟用</Tag>
-          : <Tag color="default">停用</Tag>
+      render: (_: unknown, record: WorkflowDefinition) => (
+        <Switch
+          checked={record.enabled}
+          checkedChildren="啟用"
+          unCheckedChildren="停用"
+          onChange={() => handleToggle(record.id)}
+        />
       ),
     },
     {
@@ -176,7 +179,7 @@ export default function WorkflowConfig() {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 150,
       fixed: 'right',
       render: (_: unknown, record: WorkflowDefinition) => (
         <div style={{ display: 'flex', gap: 4 }}>
@@ -187,10 +190,6 @@ export default function WorkflowConfig() {
           <Button type="link" size="small"
             onClick={() => navigate(`/workflow-config/${record.id}`)}>
             編輯
-          </Button>
-          <Button type="link" size="small"
-            onClick={() => handleToggle(record.id)}>
-            {record.enabled ? '停用' : '啟用'}
           </Button>
           <Button type="link" size="small" danger
             onClick={() => handleDelete(record)}>

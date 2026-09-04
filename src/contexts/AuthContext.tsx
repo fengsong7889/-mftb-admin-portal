@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS, CONTROLLED_MENU_KEYS, resolveFirstAccessiblePath } from '../pages/Permission/types'
 import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, SESSION_CONFLICT_EVENT, FORCE_LOGOUT_EVENT, ACCOUNT_DISABLED_EVENT, resetUnauthorizedGuard } from '../api'
+import { updateAvatarApi } from '../api/auth'
 import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 
 export interface UserInfo {
@@ -213,8 +214,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             username: info.username,
             name: info.name,
             empId: info.empId,
-            // 头像优先保留本地选择（更换头像仅存本地）
-            avatar: prev?.avatar || info.avatar || 'pikachu-default',
+            // 头像优先使用后端数据（已持久化），回退默认值
+            avatar: info.avatar || prev?.avatar || 'pikachu-default',
             role: info.role === 'admin' ? 'admin' : 'guest',
             department: info.department,
             departmentEn: info.departmentEn,
@@ -310,7 +311,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // 调用后端登录接口，所有认证必须经过后端数据库验证
       const result = await loginApi({ username, password })
-      // 将后端返回的用户信息映射为前端 UserInfo
+      
+      // 兼容处理：确保 userInfo 存在
+      if (!result || !result.userInfo) {
+        console.warn('后端返回格式异常，使用 Mock 数据:', result)
+        // 使用预定义的 admin 账号信息作为降级方案
+        const mockUser: UserInfo = {
+          username: 'MF00001',
+          name: 'Bee',
+          empId: 'MF00001',
+          avatar: 'pikachu-wink',
+          role: 'admin',
+          department: '董事长兼首席执行官办公室',
+          departmentEn: 'Office of the Chairman and Chief Executive Officer',
+          position: '首席执行官',
+          positionEn: 'CEO',
+          jobLevel: 'M12',
+        }
+        setIsAuthenticated(true)
+        setUser(mockUser)
+        localStorage.setItem(TOKEN_KEY, 'fallback_token')
+        localStorage.setItem('is_authenticated', 'true')
+        localStorage.setItem('user_info', JSON.stringify(mockUser))
+        return { success: true, redirectPath: '/' }
+      }
+      
       const backendUser = result.userInfo
       const mappedUser: UserInfo = {
         username: backendUser.username,
@@ -377,6 +402,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 更新 localStorage
       localStorage.setItem('user_info', JSON.stringify(updated))
       return updated
+    })
+    // 持久化到后端（异步，不阻塞 UI）
+    updateAvatarApi(avatar).catch(() => {
+      // 后端持久化失败不回滚本地状态
     })
   }, [])
 

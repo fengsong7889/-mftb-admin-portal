@@ -10,7 +10,7 @@ import {
   SYSTEM_RULE_STORAGE_KEY,
   type RuleGroup,
 } from '../constants/ruleConfig'
-import { updateSystemConfig } from '../api/systemConfig'
+import { updateSystemConfig, getSystemConfigSilent } from '../api/systemConfig'
 
 /* ==================== 工具函數 ==================== */
 
@@ -153,6 +153,53 @@ export function useSystemRules() {
 export async function syncIdleTimeoutToBackend(minutes: number): Promise<void> {
   const ms = String(minutes * 60 * 1000)
   await updateSystemConfig('session_idle_timeout_ms', ms)
+}
+
+/* ==================== AI 模型使用權限（賬號白名單） ==================== */
+
+/** AI 模型賬號白名單規則 key（localStorage 與後端 sys_config 共用同名 key） */
+export const AI_MODEL_ACCOUNT_RULE_KEYS = {
+  QW: 'ai_model_qw_accounts',
+  DS: 'ai_model_ds_accounts',
+} as const
+
+export type AiModelKey = keyof typeof AI_MODEL_ACCOUNT_RULE_KEYS
+
+/**
+ * sys_config.config_value 可存長度上限（對應後端表結構 VARCHAR(2000)）
+ * 白名單以 JSON 數組存放，賬號過多會超出字段長度導致後端寫入失敗（限制靜默失效）
+ */
+export const SYS_CONFIG_VALUE_MAX_LENGTH = 2000
+
+/** 解析賬號白名單：兼容 JSON 數組與逗號分隔字符串，異常值按「不限制」處理 */
+export function parseAccountWhitelist(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(item => String(item))
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.map(item => String(item))
+    } catch { /* 非 JSON，按逗號分隔處理 */ }
+    return raw.split(',').map(item => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
+/** 賬號是否在白名單內（空白名單 = 全部賬號可用） */
+export function isAccountAllowed(accounts: string[], username?: string): boolean {
+  if (accounts.length === 0) return true
+  return Boolean(username && accounts.includes(username))
+}
+
+/** 讀取各模型的賬號白名單：後端優先（跨賬號/跨設備生效），後端不可用時回退 localStorage */
+export async function fetchAiModelAccounts(): Promise<Record<AiModelKey, string[]>> {
+  const models = Object.keys(AI_MODEL_ACCOUNT_RULE_KEYS) as AiModelKey[]
+  const entries = await Promise.all(models.map(async model => {
+    const key = AI_MODEL_ACCOUNT_RULE_KEYS[model]
+    const remote = await getSystemConfigSilent(key)
+    const accounts = remote === null ? parseAccountWhitelist(getSystemRuleValue(key)) : parseAccountWhitelist(remote)
+    return [model, accounts] as const
+  }))
+  return Object.fromEntries(entries) as Record<AiModelKey, string[]>
 }
 
 /* ==================== 同步讀取（供非組件場景使用） ==================== */

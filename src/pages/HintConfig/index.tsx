@@ -1,7 +1,7 @@
 import { useState , useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, message, Switch } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   SearchOutlined,
@@ -279,28 +279,24 @@ export default function HintConfig() {
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (v: string) => v === 'active'
-        ? <Tag color="success">{t('dict.status.active')}</Tag>
-        : <Tag color="default">{t('dict.status.inactive')}</Tag>,
+      render: (_: unknown, record: HintRecord) => (
+        <Switch
+          checked={record.status === 'active'}
+          checkedChildren={t('dict.status.active')}
+          unCheckedChildren={t('dict.status.inactive')}
+          onChange={() => handleToggleStatus(record)}
+        />
+      ),
     },
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 180,
+      width: 130,
       fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleDetail(record)}>{t('common.detail')}</Button>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
-          <Button
-            type="link"
-            size="small"
-            danger={record.status === 'active'}
-            style={record.status !== 'active' ? { color: '#52c41a' } : undefined}
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === 'active' ? t('common.disable') : t('common.enable')}
-          </Button>
         </Space>
       ),
     },

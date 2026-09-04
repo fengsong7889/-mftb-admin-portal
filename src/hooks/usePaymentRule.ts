@@ -6,7 +6,7 @@ import { getSystemConfig, updateSystemConfig } from '../api/systemConfig'
 export type PaymentMode = 'promo_only' | 'gift_only' | 'mixed' | 'switchable'
 
 /** 支持獨立配置支付方式的廣告類型 */
-export const PAYMENT_AD_TYPES = ['revival', 'popular_merchant', 'golden_signboard'] as const
+export const PAYMENT_AD_TYPES = ['revival', 'popular_merchant', 'golden_signboard', 'traffic_ad'] as const
 
 /** 校驗是否為合法支付模式 */
 export function isValidPaymentMode(v: unknown): v is PaymentMode {

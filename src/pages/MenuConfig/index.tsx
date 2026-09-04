@@ -486,10 +486,13 @@ export default function MenuConfig() {
       key: 'status',
       width: 80,
       align: 'center',
-      render: (status: string) => (
-        status === 'enabled'
-          ? <Tag color="success" style={{ borderRadius: 4 }}>{t('common.enable')}</Tag>
-          : <Tag color="default" style={{ borderRadius: 4 }}>{t('common.disable')}</Tag>
+      render: (_: unknown, record: MenuItem) => (
+        <Switch
+          checked={record.status === 'enabled'}
+          checkedChildren={t('common.enable')}
+          unCheckedChildren={t('common.disable')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -517,14 +520,6 @@ export default function MenuConfig() {
             <Tooltip title={t('menuConfig.tooltipMoveDown')}>
               <Button type="link" size="small" icon={<ArrowDownOutlined />} onClick={() => handleMove(record.id, 'down')} />
             </Tooltip>
-            <Button
-              type="link"
-              size="small"
-              danger={record.status === 'enabled'}
-              onClick={() => handleToggleStatus(record)}
-            >
-              {record.status === 'enabled' ? t('common.disable') : t('common.enable')}
-            </Button>
           </Space>
         )
       },

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload, Switch } from 'antd'
 import type { TableColumnsType } from 'antd'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
@@ -233,7 +233,6 @@ export default function HotSearchLibrary() {
     },
     {
       title: t('hotSearchLibrary.colWord'), dataIndex: 'word', key: 'word', width: 180,
-      render: (text: string) => <span style={{ fontWeight: 600 }}>{text}</span>,
     },
     {
       title: t('hotSearchLibrary.colCategory'), dataIndex: 'category', key: 'category', width: 110,
@@ -271,8 +270,15 @@ export default function HotSearchLibrary() {
       render: (v: string) => <Tag color={v === 'top' ? 'orange' : 'default'}>{displayPositionMap[v] || v}</Tag>,
     },
     {
-      title: t('hotSearchLibrary.colStatus'), dataIndex: 'status', key: 'status', width: 70,
-      render: (v: string) => v === 'active' ? <Tag color="success">{t('dict.status.active')}</Tag> : <Tag color="default">{t('dict.status.inactive')}</Tag>,
+      title: t('hotSearchLibrary.colStatus'), dataIndex: 'status', key: 'status', width: 80,
+      render: (_: unknown, record: HotSearchWord) => (
+        <Switch
+          checked={record.status === 'active'}
+          checkedChildren={t('dict.status.active')}
+          unCheckedChildren={t('dict.status.inactive')}
+          onChange={() => handleToggleStatus(record)}
+        />
+      ),
     },
     {
       title: t('hotSearchLibrary.colAddedBy'), dataIndex: 'addedBy', key: 'addedBy', width: 140, ellipsis: true,
@@ -282,13 +288,10 @@ export default function HotSearchLibrary() {
       render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
     },
     {
-      title: t('common.colAction'), key: 'action', width: 140, fixed: 'right',
+      title: t('common.colAction'), key: 'action', width: 100, fixed: 'right',
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
-          <Button type="link" size="small" danger={record.status === 'active'} style={record.status !== 'active' ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
-            {record.status === 'active' ? t('common.disable') : t('common.enable')}
-          </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),

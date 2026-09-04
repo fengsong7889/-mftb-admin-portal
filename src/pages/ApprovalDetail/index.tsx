@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Tag, Input, Modal, Table, message } from 'antd'
 import {
-  ArrowLeftOutlined,
   UndoOutlined,
   ExclamationCircleOutlined,
   FileImageOutlined,
   FilePdfOutlined,
   EyeOutlined,
 } from '@ant-design/icons'
+import DetailPageHeader from '../../components/DetailPageHeader'
 import './ApprovalDetail.css'
 import {
   approveCurrentNode,
@@ -757,43 +757,19 @@ export default function ApprovalDetail() {
 
   return (
     <div className="approval-detail-page">
-      {/* 顶部标题栏 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/approval-center')}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-            >{t('common.back')}</Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {typeTitleMapKeys[type] ? t(typeTitleMapKeys[type]) : type}
-              </h2>
-              <Tag color="blue">{data.brand}</Tag>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
-              <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
-            </div>
-          </div>
+      {/* 顶部标题栏（全局詳情頁統一規範：紫色頂條 + 橙色返回；審批操作保留在右側，無編輯頁） */}
+      <DetailPageHeader
+        title={typeTitleMapKeys[type] ? t(typeTitleMapKeys[type]) : type}
+        tags={
+          <>
+            <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>
+            <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
+            <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
+          </>
+        }
+        onBack={() => navigate('/approval-center')}
+        extra={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={() => navigate('/approval-center')}>{t('common.back')}</Button>
             {data.hasRevoke && (
               <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
             )}
@@ -804,8 +780,8 @@ export default function ApprovalDetail() {
               </>
             )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* 主体内容 */}
       <div className="approval-detail-body">

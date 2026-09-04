@@ -28,6 +28,7 @@ import com.mftb.admin.mapper.WorkflowConfigMapper;
 import com.mftb.admin.service.ApproverResolverService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.service.FinApprovalService;
+import com.mftb.admin.service.FinRiskService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.WorkflowConfigService;
 import com.mftb.admin.util.BizSeqService;
@@ -81,6 +82,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private final WorkflowConfigMapper workflowConfigMapper;
     private final FinAccountService accountService;
     private final FinWriteChainService writeChainService;
+    private final FinRiskService finRiskService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final WorkflowConfigService workflowConfigService;
@@ -231,6 +233,15 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (FinExtras.nonNull(from.getVirtualBalance()).compareTo(amount) < 0) {
             throw new BusinessException("转账金额超出转出集团推广金余额");
         }
+        // 风控拦截：转账按 FIFO 拆分会触碰含未结清欠款的批次时禁止发起（白名单集团同样受限）
+        List<FinRiskService.FinTransferBlock> blocks =
+                finRiskService.checkTransferBatches(request.getFromGroupId(), amount);
+        if (!blocks.isEmpty()) {
+            String batchNos = blocks.stream().map(FinRiskService.FinTransferBlock::batchNo)
+                    .distinct().reduce((a, b) -> a + "、" + b).orElse("");
+            throw new BusinessException("本次转账将扣及充值批次「" + batchNos
+                    + "」，该批次尚有未结清欠款，禁止发起转账；如需转账请先结清对应批次欠款");
+        }
 
         Map<String, Object> extra = new LinkedHashMap<>();
         extra.put("fromGroupId", request.getFromGroupId());
@@ -264,6 +275,10 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         String method = StringUtils.hasText(request.getDeductMethod()) ? request.getDeductMethod() : "account";
         if ("batch".equals(method) && !StringUtils.hasText(request.getBatchNo())) {
             throw new BusinessException("批次扣款需指定充值批次");
+        }
+        // 消费风控：仅消费扣款纳入限额管控（账户扣款/批次扣款为财务资金回收操作，不受限）
+        if ("consume".equals(method)) {
+            finRiskService.requireConsumable(request.getGroupId(), request.getBrand(), amount);
         }
 
         Map<String, Object> extra = new LinkedHashMap<>();

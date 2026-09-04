@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.FinDebtBillMapper;
 import com.mftb.admin.mapper.FinDebtRepaymentMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.FinAccountService;
+import com.mftb.admin.service.FinRiskService;
 import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.FinExtras;
@@ -69,6 +70,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
     private final FinDebtBillMapper debtBillMapper;
     private final FinDebtRepaymentMapper repaymentMapper;
     private final FinAccountService accountService;
+    private final FinRiskService finRiskService;
     private final BizSeqService bizSeqService;
 
     @Override
@@ -179,6 +181,8 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         if (fromAccount == null || FinExtras.nonNull(fromAccount.getVirtualBalance()).compareTo(amount) < 0) {
             throw new BusinessException("转出集团推广金余额不足，无法完成转账");
         }
+        // 风控拦截：转账按 FIFO 拆分会触碰含未结清欠款的批次时禁止发起，防止资产转移跑路
+        requireTransferBatchesClean(fromGroup, amount);
         accountService.getOrCreate(toGroup, toGroupName, approval.getBrand());
 
         // 仅为转入方创建 1 条批次
@@ -221,6 +225,18 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         saveDetail(inRow, deltas);
 
         applyDeltas(deltas, approval.getBrand());
+    }
+
+    /** 转账欠款批次拦截：按 FIFO 模拟拆分触碰欠款批次时抛出异常并列出批次号 */
+    private void requireTransferBatchesClean(String groupCode, BigDecimal amount) {
+        List<FinRiskService.FinTransferBlock> blocks = finRiskService.checkTransferBatches(groupCode, amount);
+        if (blocks.isEmpty()) {
+            return;
+        }
+        String batchNos = blocks.stream().map(FinRiskService.FinTransferBlock::batchNo)
+                .distinct().reduce((a, b) -> a + "、" + b).orElse("");
+        throw new BusinessException("本次转账将扣及充值批次「" + batchNos
+                + "」，该批次尚有未结清欠款，禁止发起转账；如需转账请先结清对应批次欠款");
     }
 
     /* ==================== 扣款 ==================== */
@@ -326,6 +342,8 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
                                  String storeCode, String storeName, String channel,
                                  BigDecimal amount, String changeType, String bd,
                                  String remark, String flowNo, LocalDateTime tradeTime) {
+        // 消费风控：有未结清欠款的集团按风控配置限额，超限直接拦截（白名单/无欠款集团不受限）
+        finRiskService.requireConsumable(groupCode, brand, amount);
         List<DeductPart> parts = splitByFifo(groupCode, amount);
         Map<String, BalanceDelta> deltas = new LinkedHashMap<>();
         boolean multi = parts.size() > 1;

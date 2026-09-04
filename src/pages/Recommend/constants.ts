@@ -76,7 +76,7 @@ export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.NEW_STORE_AD]: 'green',
   [AlgorithmType.HOT_REVIVE_AD]: 'magenta',
   [AlgorithmType.EXCLUSIVE_MERCHANT]: 'purple',
-  [AlgorithmType.TRAFFIC_AD]: 'yellow',
+  [AlgorithmType.TRAFFIC_AD]: 'teal',
   [AlgorithmType.GUESS_YOU_LIKE]: 'blue',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'lime',
   [AlgorithmType.POPULAR_MERCHANT_KA]: 'red',

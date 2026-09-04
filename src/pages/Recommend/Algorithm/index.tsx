@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Space, Table, Tag, Card, Tabs, Modal, message } from 'antd'
+import { Button, Space, Table, Tag, Card, Tabs, Modal, message, Switch } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -339,10 +339,13 @@ export default function Algorithm() {
     },
     {
       title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
-      render: (v: ServiceStatus) => (
-        <Tag color={v === ServiceStatus.ENABLED ? 'success' : 'default'}>
-          {v === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')}
-        </Tag>
+      render: (_: unknown, record: AlgorithmRecord) => (
+        <Switch
+          checked={record.status === ServiceStatus.ENABLED}
+          checkedChildren={t('common.enable')}
+          unCheckedChildren={t('common.disable')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -354,14 +357,11 @@ export default function Algorithm() {
       render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
     },
     {
-      title: t('common.colAction'), key: 'action', width: 280,
+      title: t('common.colAction'), key: 'action', width: 220,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>{t('common.detail')}</Button>
           <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>{t('common.edit')}</Button>
-          <Button type="link" size="small" danger={record.status === ServiceStatus.ENABLED} style={record.status !== ServiceStatus.ENABLED ? { color: '#52c41a' } : undefined} onClick={() => handleToggleStatus(record)}>
-            {record.status === ServiceStatus.ENABLED ? t('common.disable') : t('common.enable')}
-          </Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
             {t('common.delete')}
           </Button>

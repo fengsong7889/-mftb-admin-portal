@@ -47,6 +47,7 @@ import {
   RedEnvelopeOutlined,
   UserOutlined,
   ApartmentOutlined,
+  RobotOutlined,
   IdcardOutlined,
   SolutionOutlined,
   ScheduleOutlined,
@@ -57,6 +58,11 @@ import {
   DeploymentUnitOutlined,
   TrophyOutlined,
   MedicineBoxOutlined,
+  CloudServerOutlined,
+  ToolOutlined,
+  DesktopOutlined, // AI 模型相关
+  BankOutlined, // 权限管理相关
+  DollarOutlined, // 额度策略
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -72,6 +78,7 @@ const keyToPath: Record<string, string> = {
   'store-list': '/store-list',
   // 财务管理 - 推广金管理
   'account-balance': '/account-balance',
+  'consume-risk': '/consume-risk',
   'batch-query': '/batch-query',
   'detail-query': '/detail-query',
   // 财务管理 - 商户通对账
@@ -182,6 +189,23 @@ const keyToPath: Record<string, string> = {
   'translation-manage': '/translation-manage',
   'rule-config': '/rule-config',
   'workflow-config': '/workflow-config',
+  // 智能中心(AI)
+  'ai_model_hub': '/ai-model-hub',
+  'ai_quota_auth': '/ai-quota-auth',
+  'ai_tool_registry': '/ai-tool-registry',
+  'ai_usage_stats': '/ai-usage-stats',
+  'ai_energy_detail': '/ai-energy-detail',
+  // 智能中心(AI) - 拆分后的新菜单 key
+  'ai-model-provider': '/ai-model-provider',
+  'ai-model-list': '/ai-model-list',
+  'ai-auth': '/ai-auth',
+  // AI 模型授权管理 / 配额管理（二级菜单）
+  'ai-dept-model-auth': '/ai-dept-model-auth',
+  'ai-emp-model-auth': '/ai-emp-model-auth',
+  'ai-pos-auth': '/ai-emp-model-auth#position',   // 按职位授权 - Tab2
+  'ai-role-auth': '/ai-emp-model-auth#role',      // 角色授权 - Tab3
+  'ai-dept-quota': '/ai-dept-quota',
+  'ai-emp-quota': '/ai-emp-quota',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -473,6 +497,11 @@ const menuItems: MenuItem[] = [
             label: '賬戶餘額',
           },
           {
+            key: 'consume-risk',
+            icon: <SafetyCertificateOutlined />,
+            label: '消費風控',
+          },
+          {
             key: 'batch-query',
             icon: <SearchOutlined />,
             label: '批次查詢',
@@ -678,6 +707,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'finance': <MoneyCollectOutlined />,
   'promotion': <WalletOutlined />,
   'account-balance': <AccountBookOutlined />,
+  'consume-risk': <SafetyCertificateOutlined />,
   'batch-query': <SearchOutlined />,
   'detail-query': <FileSearchOutlined />,
   'merchant-reconcile': <AuditOutlined />,
@@ -705,6 +735,35 @@ const keyToIcon: Record<string, ReactNode> = {
   'translation-manage': <GlobalOutlined />,
   'rule-config': <SwapOutlined />,
   'workflow-config': <ApartmentOutlined />,
+  // 智能中心 (AI)
+  'ai-assistant': <RobotOutlined />,
+  'ai_model_hub': <CloudServerOutlined />,
+  'ai_quota_auth': <SafetyCertificateOutlined />,
+  'ai-tool-registry': <ToolOutlined />,
+  'ai_tool_registry': <ToolOutlined />,
+  'ai-usage-stats': <LineChartOutlined />,
+  'ai_usage_stats': <LineChartOutlined />,
+  'ai-energy-detail': <FileSearchOutlined />,
+  'ai_energy_detail': <FileSearchOutlined />,
+  'ai-energy-billing': <ThunderboltOutlined />,
+  'ai-models': <DesktopOutlined />,        // AI 模型管理 - 电脑显示器
+  'models': <DesktopOutlined />,
+  'ai-auth-quota': <SafetyCertificateOutlined />, // 授权与配额 - 安全证书
+  'ai-model-provider': <CloudServerOutlined />,  // 供应商管理 - 云服务器
+  'model-provider': <CloudServerOutlined />,
+  'ai-model-list': <AppstoreOutlined />,   // 模型信息 - 应用商店
+  'model-list': <AppstoreOutlined />,
+  'ai-auth': <BankOutlined />,             // 权限管理 - 银行/金融机构
+  'ai-quota': <DollarOutlined />,          // 额度策略 - 金额符号（与授权与配额去重）
+  // AI 模型授权管理 / 配额管理（分组 + 子菜单图标）
+  'ai-dept-model-auth': <ApartmentOutlined />,    // 按部门配置模型 - 组织架构
+  'ai-emp-model-auth': <TeamOutlined />,          // 按员工/角色配置模型 - 团队
+  'ai-pos-auth': <IdcardOutlined />,             // 按职位授权 - 职位徽章
+  'ai-role-auth': <UserOutlined />,              // 角色授权 - 用户
+  'ai-auth-manage': <SafetyCertificateOutlined />, // 模型授权管理 - 安全认证
+  'ai-quota-manage': <DollarOutlined />,       // 配额管理 - 金额符号
+  'ai-dept-quota': <AccountBookOutlined />,    // 部门额度 - 账本
+  'ai-emp-quota': <MoneyCollectOutlined />,    // 员工额度 - 收款
 }
 
 /** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */

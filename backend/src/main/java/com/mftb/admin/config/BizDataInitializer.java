@@ -22,29 +22,46 @@ import java.util.List;
 public class BizDataInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaVersionTracker versionTracker;
+
+    /** 建表版本: 新增建表步骤时递增版本号 */
+    private static final String V_TABLES = "biz:tables-v1";
+    /** 存量迁移版本: 编号/频道等一次性存量迁移, 新增迁移时递增版本号 */
+    private static final String V_LEGACY = "biz:legacy-migrate-v1";
+    /** 种子数据版本: 新增/调整种子数据时递增版本号 */
+    private static final String V_SEED = "biz:seed-v1";
 
     @Override
     public void run(String... args) {
-        createMerchantGroupTableIfAbsent();
-        createStoreTableIfAbsent();
-        createStoreBdTableIfAbsent();
-        createStoreDataConfigTableIfAbsent();
-        createFlashSaleTablesIfAbsent();
-        createGiftRecordTableIfAbsent();
-        createGiftConsumeTableIfAbsent();
-        createWordLibraryTableIfAbsent();
-        createWorkflowConfigTableIfAbsent();
-        migrateLegacyGroupCodes();
-        migrateLegacyStoreCodes();
-        migrateLegacyBizChannels();
-        cleanupDuplicateSeedStores();
-        seedMerchantGroups();
-        seedStores();
+        // 一次性步骤按版本执行, 重启时已执行的直接跳过 (启动提速)
+        versionTracker.applyOnce(V_TABLES, () -> {
+            createMerchantGroupTableIfAbsent();
+            createStoreTableIfAbsent();
+            createStoreBdTableIfAbsent();
+            createStoreDataConfigTableIfAbsent();
+            createFlashSaleTablesIfAbsent();
+            createGiftRecordTableIfAbsent();
+            createGiftConsumeTableIfAbsent();
+            createWordLibraryTableIfAbsent();
+            createWorkflowConfigTableIfAbsent();
+        });
+        versionTracker.applyOnce(V_LEGACY, () -> {
+            migrateLegacyGroupCodes();
+            migrateLegacyStoreCodes();
+            migrateLegacyBizChannels();
+            cleanupDuplicateSeedStores();
+        });
+        versionTracker.applyOnce(V_SEED, () -> {
+            seedMerchantGroups();
+            seedStores();
+            seedFlashSalePeriods();
+            migrateStoreAddress();
+            seedWordLibrary();
+            seedWorkflowConfig();
+        });
+        // "活"逻辑: 新增门店需自动补齐金字招牌数据配置, 每次启动执行 (无缺失时仅 1 条查询)
         seedStoreDataConfigs();
-        seedFlashSalePeriods();
-        migrateStoreAddress();
-        seedWordLibrary();
-        seedWorkflowConfig();
+        // 门店编码序号兜底同步, 每次启动执行 (成本极低)
         syncStoreCodeSequence();
     }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, message } from 'antd'
+import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TranslationOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -386,10 +386,13 @@ export default function OrganizationManagement() {
       dataIndex: 'status',
       key: 'status',
       width: 90,
-      render: (value: number) => (
-        value === DEPT_STATUS.ENABLED
-          ? <Tag color="success">{t('organization.statusValid')}</Tag>
-          : <Tag color="error">{t('organization.statusInvalid')}</Tag>
+      render: (_: unknown, record: DepartmentItem) => (
+        <Switch
+          checked={record.status === DEPT_STATUS.ENABLED}
+          checkedChildren={t('organization.statusValid')}
+          unCheckedChildren={t('organization.statusInvalid')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     { title: t('organization.colDeptCode'), dataIndex: 'code', key: 'code', width: 140 },
@@ -406,17 +409,12 @@ export default function OrganizationManagement() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 180,
+      width: 130,
       render: (_, record) => (
         <Space size={4}>
           {hasPermission('organization-management:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
               {t('common.edit')}
-            </Button>
-          )}
-          {hasPermission('organization-management:edit') && (
-            <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-              {record.status === DEPT_STATUS.ENABLED ? t('common.disable') : t('common.enable')}
             </Button>
           )}
           {hasPermission('organization-management:delete') && (

@@ -235,6 +235,10 @@ export interface OrganicScoreRule {
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
+  /** 最後更新人 */
+  updatedBy?: string
+  /** 最後更新時間 */
+  updatedAt?: string
 }
 
 /** 各維度默認權重（總和需為 100） */

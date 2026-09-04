@@ -109,7 +109,6 @@ export default function HotSearchVerify() {
     },
     {
       title: t('hotSearchVerify.colWord'), dataIndex: 'word', width: 180,
-      render: (v: string) => <span style={{ fontWeight: 600, fontSize: 14 }}>{v}</span>,
     },
     {
       title: t('hotSearchVerify.colType'), dataIndex: 'type', width: 100,

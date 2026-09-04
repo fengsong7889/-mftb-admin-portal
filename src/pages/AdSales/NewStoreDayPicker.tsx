@@ -48,7 +48,7 @@ function AnimatedNumber({ value, suffix }: { value: number; suffix?: string }) {
 
 // algorithm/store/BD options from backend
 
-export default function NewStoreDayPicker() {
+export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }) {
   const { t } = useTranslation('adSales')
   const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
   const navigate = useNavigate()
@@ -315,7 +315,7 @@ export default function NewStoreDayPicker() {
     <div>
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
-        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: storeMode ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px 12px' }}>
           <Form.Item label={t('brandLabel')}>
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
               options={[{ label: t('flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} />
@@ -324,14 +324,18 @@ export default function NewStoreDayPicker() {
             <Select placeholder={searchBrand ? t('dpAlgoPlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
               options={algorithmOptions} disabled={!searchBrand} />
           </Form.Item>
-          <Form.Item label={t('storeNameLabel')}>
-            <Select placeholder={t('storeSearchHint')} value={searchStoreCode} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
-          </Form.Item>
-          <Form.Item label={t('bdLabel')}>
-            <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
-              filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
-              options={bdOptions} />
-          </Form.Item>
+          {!storeMode && (
+            <Form.Item label={t('storeNameLabel')}>
+              <Select placeholder={t('storeSearchHint')} value={searchStoreCode} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={storeOptions} />
+            </Form.Item>
+          )}
+          {!storeMode && (
+            <Form.Item label={t('bdLabel')}>
+              <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
+                filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
+                options={bdOptions} />
+            </Form.Item>
+          )}
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>

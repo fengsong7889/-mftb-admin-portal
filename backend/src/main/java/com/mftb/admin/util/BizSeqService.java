@@ -53,6 +53,8 @@ public class BizSeqService {
     public static final String RULE_PRICING_REVIVE = "config_pricing_revive";
     /** 金字招牌定价 */
     public static final String RULE_PRICING_SIGNBOARD = "config_pricing_signboard";
+    /** 投流广告定价 */
+    public static final String RULE_PRICING_TRAFFIC = "config_pricing_traffic";
     /** 新店广告赠送ID */
     public static final String RULE_GIFT_NEW_STORE = "gift_new_store";
     /** 人气商家赠送ID */

@@ -52,3 +52,27 @@ export function getUserInfo() {
     headers: { [SILENT_HEADER]: '1' },
   })
 }
+
+/** 获取当前用户快捷入口 */
+export function fetchQuickFavorites() {
+  return request.get<unknown, string[]>('/auth/quick-favorites', {
+    headers: { [SILENT_HEADER]: '1' },
+  })
+}
+
+/** 保存当前用户快捷入口 */
+export function saveQuickFavorites(keys: string[]) {
+  return request.put<unknown, void>('/auth/quick-favorites', keys)
+}
+
+/** 更新当前用户头像（持久化到后端） */
+export function updateAvatarApi(avatar: string) {
+  return request.put<unknown, void>('/auth/avatar', { avatar })
+}
+
+/** 上传头像图片，返回 Base64 Data URL */
+export function uploadAvatarApi(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<unknown, { base64: string }>('/auth/avatar/upload', formData)
+}

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
+import MenuTabs from './components/MenuTabs'
 import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
@@ -24,6 +25,7 @@ const DetailQuery = lazy(() => import('./pages/DetailQuery'))
 const WriteoffReconcile = lazy(() => import('./pages/WriteoffReconcile'))
 const DebtReconcile = lazy(() => import('./pages/DebtReconcile'))
 const DebtDetail = lazy(() => import('./pages/DebtDetail'))
+const ConsumeRisk = lazy(() => import('./pages/ConsumeRisk'))
 const WordSegmentation = lazy(() => import('./pages/WordSegmentation'))
 const HintConfig = lazy(() => import('./pages/HintConfig'))
 const HintPreview = lazy(() => import('./pages/HintPreview'))
@@ -100,6 +102,30 @@ const FlashSalePrice = lazy(() => import('./pages/GroupPurchase/FlashSalePrice')
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
+// AI 智能中心（拆分后）
+const AiModelProvider = lazy(() => import('./pages/AiModelProvider'))
+const AiModelList = lazy(() => import('./pages/AiModelList'))
+const AiModelEdit = lazy(() => import('./pages/AiModelList/AiModelEdit'))
+const AiModelDetail = lazy(() => import('./pages/AiModelList/AiModelDetail'))
+// AI 配额与策略管理 - 子菜单（独立页面）
+import AiDeptModelAuth from './pages/AiQuotaAuth/QuotaAndPolicy'
+import { AiDeptQuota } from './pages/AiQuotaAuth/QuotaAndPolicy'
+import AiEmployeeAuthControl from './pages/AiQuotaAuth/AiEmployeeAuthControl'
+import AiEmpQuotaControl from './pages/AiQuotaAuth/AiEmpQuotaControl'
+import AiPositionAuth from './pages/AiQuotaAuth/AiPositionAuth'
+const DeptAuthGroupEdit = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupEdit'))
+const DeptAuthGroupDetail = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupDetail'))
+// 部门额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门模型权控）
+const DeptQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/deptQuota/DeptQuotaEdit'))
+const DeptQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/deptQuota/DeptQuotaDetail'))
+// 员工模型权控 - 按职位/角色授权的独立编辑页与详情页
+const EmpPosAuthEdit = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpPosAuthEdit'))
+const EmpPosAuthDetail = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpPosAuthDetail'))
+const EmpRoleAuthEdit = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpRoleAuthEdit'))
+const EmpRoleAuthDetail = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpRoleAuthDetail'))
+const AiToolRegistry = lazy(() => import('./pages/AiToolRegistry'))
+const AiUsageStats = lazy(() => import('./pages/AiUsageStats'))
+const AiEnergyDetail = lazy(() => import('./pages/AiEnergyDetail'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -127,6 +153,7 @@ function AuthenticatedLayout() {
       <Sidebar collapsed={collapsed} />
       <Layout>
         <HeaderBar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+        <MenuTabs />
         <Content className="app-content">
           <RouteErrorBoundary key={location.pathname}>
             <Suspense fallback={<PageLoading />}>
@@ -135,6 +162,7 @@ function AuthenticatedLayout() {
               <Route path="/" element={<Home />} />
               {/* 財務管理 */}
               <Route path="/account-balance" element={<AccountBalance />} />
+              <Route path="/consume-risk" element={<ConsumeRisk />} />
               <Route path="/recharge-add" element={<RechargeAdd />} />
               <Route path="/transfer-add" element={<TransferAdd />} />
               <Route path="/deduct-add" element={<DeductAdd />} />
@@ -224,6 +252,29 @@ function AuthenticatedLayout() {
               <Route path="/menu-config" element={<MenuConfig />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
               <Route path="/rule-config" element={<RuleConfig />} />
+              // AI 智能中心（拆分后）
+              <Route path="/ai-model-provider" element={<AiModelProvider />} />
+              <Route path="/ai-model-list" element={<AiModelList />} />
+                            <Route path="/ai-model-edit" element={<AiModelEdit />} />
+                            <Route path="/ai-model-detail" element={<AiModelDetail />} />
+              {/* AI 配额与策略管理 - 子菜单 */}
+              <Route path="/ai-dept-model-auth" element={<AiDeptModelAuth />} />
+              <Route path="/ai-emp-model-auth" element={<AiEmployeeAuthControl />} />
+              <Route path="/ai-pos-auth" element={<AiPositionAuth />} />
+              <Route path="/ai-dept-auth-edit" element={<DeptAuthGroupEdit />} />
+              <Route path="/ai-dept-auth-detail" element={<DeptAuthGroupDetail />} />
+              <Route path="/ai-pos-auth-edit" element={<EmpPosAuthEdit />} />
+              <Route path="/ai-pos-auth-detail" element={<EmpPosAuthDetail />} />
+              <Route path="/ai-role-auth-edit" element={<EmpRoleAuthEdit />} />
+              <Route path="/ai-role-auth-detail" element={<EmpRoleAuthDetail />} />
+              <Route path="/ai-dept-quota" element={<AiDeptQuota />} />
+              <Route path="/ai-dept-quota-edit" element={<DeptQuotaEdit />} />
+              <Route path="/ai-dept-quota-detail" element={<DeptQuotaDetail />} />
+              <Route path="/ai-emp-quota" element={<AiEmpQuotaControl />} />
+
+              <Route path="/ai-tool-registry" element={<AiToolRegistry />} />
+              <Route path="/ai-usage-stats" element={<AiUsageStats />} />
+              <Route path="/ai-energy-detail" element={<AiEnergyDetail />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />

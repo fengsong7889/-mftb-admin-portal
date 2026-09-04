@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Modal, Form, DatePicker, InputNumber, message, Switch } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
@@ -685,8 +685,14 @@ export default function SearchWeightConfig() {
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (v: string) =>
-        v === 'active' ? <Tag color="success">{t('searchWeight.statusActive')}</Tag> : <Tag color="default">{t('searchWeight.statusInactive')}</Tag>,
+      render: (_: unknown, record: InterventionRecord) => (
+        <Switch
+          checked={record.status === 'active'}
+          checkedChildren={t('searchWeight.statusActive')}
+          unCheckedChildren={t('searchWeight.statusInactive')}
+          onChange={() => handleToggleStatus(record)}
+        />
+      ),
     },
     {
       title: t('searchWeight.colOperator'),
@@ -704,7 +710,7 @@ export default function SearchWeightConfig() {
     {
       title: t('searchWeight.colAction'),
       key: 'action',
-      width: 180,
+      width: 120,
       fixed: 'right',
       render: (_, record) => {
         const canEdit =
@@ -729,17 +735,6 @@ export default function SearchWeightConfig() {
               }}
             >
               {t('common.edit')}
-            </Button>
-            <Button
-              type="link"
-              size="small"
-              danger={record.status === 'active'}
-              onClick={(e) => {
-                e.preventDefault()
-                handleToggleStatus(record)
-              }}
-            >
-              {record.status === 'active' ? t('searchWeight.statusInactive') : t('searchWeight.statusActive')}
             </Button>
           </Space>
         )

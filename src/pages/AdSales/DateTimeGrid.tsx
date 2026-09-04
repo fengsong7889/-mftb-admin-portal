@@ -81,6 +81,7 @@ const _MOCK_REGION_COMBINATIONS: RegionCombination[] = [
 
 interface DateTimeGridProps {
   inventoryItem: InventoryItem
+  storeMode?: boolean
 }
 
 /** Mock数据 - 店铺列表（含BD信息） */
@@ -211,7 +212,7 @@ function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
   return date.startOf('day').subtract(sellableDays - 1, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
 }
 
-export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
+export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridProps) {
   const { t } = useTranslation('adSales')
   const navigate = useNavigate()
   // 从规则配置动态读取锁定时长
@@ -819,7 +820,7 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
     <div>
       {/* 查询区域 - 始终显示 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
-          <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px' }}>
+          <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: storeMode ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px 12px' }}>
             <Form.Item label={t('brandLabel')}>
               <Select
                 placeholder={t('brandAutoHint')}
@@ -844,32 +845,36 @@ export default function DateTimeGrid({ inventoryItem }: DateTimeGridProps) {
                 disabled={!searchBrand}
               />
             </Form.Item>
-            <Form.Item label={t('storeNameLabel')}>
-              <Select
-                placeholder={t('storeSearchHint')}
-                value={searchStoreName}
-                onChange={handleStoreChange}
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                options={storeOptions}
-              />
-            </Form.Item>
-            <Form.Item label={t('bdLabel')}>
-              <Select
-                placeholder={t('bdAutoHint')}
-                value={searchBD}
-                onChange={(v) => setSearchBD(v)}
-                allowClear
-                showSearch
-                filterOption={(input, option) => {
-                  const keyword = input.toLowerCase()
-                  const label = (option?.label ?? '').toString().toLowerCase()
-                  return label.includes(keyword)
-                }}
-                options={bdOptions}
-              />
-            </Form.Item>
+            {!storeMode && (
+              <Form.Item label={t('storeNameLabel')}>
+                <Select
+                  placeholder={t('storeSearchHint')}
+                  value={searchStoreName}
+                  onChange={handleStoreChange}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  options={storeOptions}
+                />
+              </Form.Item>
+            )}
+            {!storeMode && (
+              <Form.Item label={t('bdLabel')}>
+                <Select
+                  placeholder={t('bdAutoHint')}
+                  value={searchBD}
+                  onChange={(v) => setSearchBD(v)}
+                  allowClear
+                  showSearch
+                  filterOption={(input, option) => {
+                    const keyword = input.toLowerCase()
+                    const label = (option?.label ?? '').toString().toLowerCase()
+                    return label.includes(keyword)
+                  }}
+                  options={bdOptions}
+                />
+              </Form.Item>
+            )}
             <Form.Item>
               <div className="search-actions">
                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('searchQuery')}</Button>

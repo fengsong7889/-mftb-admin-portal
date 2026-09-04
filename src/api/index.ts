@@ -2,3 +2,7 @@ export { default as request, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, SESSION_CONFLIC
 export type { ApiResult, SessionConflictDetail, ForceLogoutDetail } from './request'
 export { login, logout, getUserInfo } from './auth'
 export type { LoginParams, LoginResult, UserInfo } from './auth'
+export * from './aiProvider'
+export * from './aiModel'
+export * from './deptAuthGroup'
+export * from './iconfont'

@@ -62,7 +62,7 @@ const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
   [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
-  [RecommendType.TRAFFIC_AD]: '流量廣告',
+  [RecommendType.TRAFFIC_AD]: '投流廣告',
   [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
   [RecommendType.GOLDEN_SIGNBOARD]: '金字招牌',
 }

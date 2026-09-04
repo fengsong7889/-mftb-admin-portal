@@ -413,7 +413,7 @@ export default function BatchQuery() {
       width: 80,
       fixed: 'right',
       render: (_, record) => (
-        <a onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}&groupId=${record.groupId}`)}>{t('common.detail')}</a>
+        <Button type="link" onClick={() => navigate(`/batch-detail?key=${record.key}&type=${record.batchType}&batchNo=${record.batchNo}&groupId=${record.groupId}`)}>{t('common.detail')}</Button>
       ),
     },
   ]

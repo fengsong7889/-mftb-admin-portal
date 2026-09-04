@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Tag, Tabs, Modal, Descriptions, Empty } from 'antd'
 import {
-  ArrowLeftOutlined,
   TeamOutlined,
   ApartmentOutlined,
   NodeIndexOutlined,
 } from '@ant-design/icons'
+import DetailPageHeader from '../../components/DetailPageHeader'
 import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
 import {
   APPROVAL_TYPE_OPTIONS,
@@ -334,42 +334,15 @@ export default function WorkflowDetail() {
 
   return (
     <div className="content-area">
-      {/* ── 頂部標題欄 ── */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3,
-          background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%',
-        }} />
-        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button
-              type="primary"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/workflow-config')}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-            >
-              返回
-            </Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {workflow.name}詳情
-              </h2>
-              {workflow.enabled ? <Tag color="success" style={{ margin: 0 }}>啟用</Tag> : <Tag style={{ margin: 0 }}>停用</Tag>}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* ── 頂部標題欄（全局統一規範：詳情頁紫色頂條 + 橙色返回 + 權限門控紫色編輯） ── */}
+      <DetailPageHeader
+        title="審批流程詳情"
+        tags={workflow.enabled ? <Tag color="success" style={{ margin: 0 }}>啟用</Tag> : <Tag style={{ margin: 0 }}>停用</Tag>}
+        meta={workflow.name}
+        onBack={() => navigate('/workflow-config')}
+        onEdit={() => navigate(`/workflow-config/${id}`)}
+        menuKey="workflow-config"
+      />
 
       {/* ── 詳情 Tabs：流程配置查看 / 流程圖 ── */}
       <div style={{

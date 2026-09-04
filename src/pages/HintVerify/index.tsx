@@ -193,7 +193,6 @@ export default function HintVerify() {
     { title: t('hintVerify.colHintId'), dataIndex: 'hintId', width: 110 },
     {
       title: t('hintVerify.colHintWord'), dataIndex: 'hintWord', width: 160,
-      render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
       title: t('hintVerify.colPriority'), dataIndex: 'priority', width: 80, align: 'center',

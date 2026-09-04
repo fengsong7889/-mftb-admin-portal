@@ -25,6 +25,7 @@ import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingSignboardService;
 import com.mftb.admin.service.AdPricingStarService;
+import com.mftb.admin.service.AdPricingTrafficService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -53,6 +54,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private final AdPricingReviveService revivePricingService;
     private final AdPricingHotService hotPricingService;
     private final AdPricingSignboardService signboardPricingService;
+    private final AdPricingTrafficService trafficPricingService;
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
@@ -120,6 +122,9 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
             if (pricing == null) return false;
             return pricing.getSignboardItems() != null && pricing.getSignboardItems().stream()
                     .anyMatch(item -> Boolean.TRUE.equals(item.getEnabled()) && item.getPrice() != null && item.getPrice().doubleValue() > 0);
+        } else if (algoType == 15) {
+            // 投流广告：任一业务频道存在启用中的定价配置即可售
+            return trafficPricingService.hasActivePricing(algoId);
         } else {
             return pricingService.activeByAlgo(algoId) != null;
         }
@@ -130,6 +135,11 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         Integer blockMerchant;
         String blockListJson;
         AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
+        // 投流广告无屏蔽商家功能，直接放行；金字招牌同理（无屏蔽配置字段）
+        if (algorithm != null && algorithm.getAlgoType() != null
+                && (algorithm.getAlgoType() == 15 || algorithm.getAlgoType() == 13)) {
+            return false;
+        }
         if (algorithm != null && algorithm.getAlgoType() != null && algorithm.getAlgoType() == 3) {
             AdPricingReviveVO pricing = revivePricingService.activeByAlgo(algoId);
             if (pricing == null || pricing.getBlockMerchant() == null || pricing.getBlockMerchant() != 1) {

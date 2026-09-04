@@ -32,6 +32,14 @@ public interface SysConfigService {
     String getConfigValue(String configKey);
 
     /**
+     * 读取指定 key 的配置值（带 5 分钟内存缓存，供高频读取场景使用，如 LLM 计价）
+     *
+     * @param configKey 配置项标识
+     * @return 配置值字符串，不存在时返回 null；updateConfig 后立即失效
+     */
+    String getConfigValueCached(String configKey);
+
+    /**
      * 更新配置值（同时刷新内存缓存）
      *
      * @param configKey   配置项标识

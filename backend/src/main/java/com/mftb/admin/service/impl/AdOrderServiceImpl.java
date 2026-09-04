@@ -16,9 +16,11 @@ import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemSignboard;
 import com.mftb.admin.entity.AdOrderItemStar;
+import com.mftb.admin.entity.AdOrderItemTraffic;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdPricingHot;
 import com.mftb.admin.entity.AdPricingHotSkin;
+import com.mftb.admin.entity.AdPricingTraffic;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinDetail;
@@ -28,9 +30,11 @@ import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
+import com.mftb.admin.mapper.AdOrderItemTrafficMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.AdPricingHotMapper;
 import com.mftb.admin.mapper.AdPricingHotSkinMapper;
+import com.mftb.admin.mapper.AdPricingTrafficMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
 import com.mftb.admin.service.AdOrderService;
@@ -78,9 +82,11 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderItemNewStoreMapper newStoreItemMapper;
     private final AdOrderItemHotMapper hotItemMapper;
     private final AdOrderItemSignboardMapper signboardItemMapper;
+    private final AdOrderItemTrafficMapper trafficItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingHotMapper hotPricingMapper;
     private final AdPricingHotSkinMapper hotSkinMapper;
+    private final AdPricingTrafficMapper trafficPricingMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
@@ -162,6 +168,13 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .eq(AdOrderItemSignboard::getOrderId, order.getId())
                             .orderByAsc(AdOrderItemSignboard::getBizDate)
                             .orderByAsc(AdOrderItemSignboard::getLabelType));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        } else if (isTraffic(order)) {
+            // 投流广告：一单一条流量包明细，展示字段已由 fillSummaries 回填
+            List<AdOrderItemTraffic> items = trafficItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTraffic>()
+                            .eq(AdOrderItemTraffic::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemTraffic::getId));
             items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
         } else {
             List<AdOrderItemStar> items = itemMapper.selectList(
@@ -266,6 +279,22 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 signboardItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isTraffic(order)) {
+            // 投流广告退款: 剩余未消耗曝光 × 实际单价 × (1 − 手续费%)，手续费比例取明细快照
+            List<AdOrderItemTraffic> items = trafficItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTraffic>()
+                            .eq(AdOrderItemTraffic::getOrderId, order.getId())
+                            .in(AdOrderItemTraffic::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemTraffic item : items) {
+                BigDecimal refundPrice = calcTrafficRefundPrice(item);
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                trafficItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else {
@@ -395,6 +424,20 @@ public class AdOrderServiceImpl implements AdOrderService {
                 signboardItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
+        } else if (isTraffic(order)) {
+            // 投流广告取消: 与退款同公式（剩余未消耗曝光折算）
+            List<AdOrderItemTraffic> items = trafficItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTraffic>()
+                            .eq(AdOrderItemTraffic::getOrderId, order.getId())
+                            .in(AdOrderItemTraffic::getDeliveryStatus, 1, 2));
+            if (items.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
+            for (AdOrderItemTraffic item : items) {
+                BigDecimal refundPrice = calcTrafficRefundPrice(item);
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                trafficItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
         } else {
             List<AdOrderItemStar> items = itemMapper.selectList(
                     new LambdaQueryWrapper<AdOrderItemStar>()
@@ -477,6 +520,12 @@ public class AdOrderServiceImpl implements AdOrderService {
                     new LambdaQueryWrapper<AdOrderItemSignboard>()
                             .eq(AdOrderItemSignboard::getOrderId, vo.getId()));
             return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemSignboard::getBizDate).toList(), today, status);
+        } else if (isTrafficType(vo.getAlgoType())) {
+            // 投流广告: 无日期维度，仍有投放中明细 → 推广中，否则 → 已推广（曝光消耗完毕或已退款）
+            Long delivering = trafficItemMapper.selectCount(new LambdaQueryWrapper<AdOrderItemTraffic>()
+                    .eq(AdOrderItemTraffic::getOrderId, vo.getId())
+                    .eq(AdOrderItemTraffic::getDeliveryStatus, 1));
+            return delivering != null && delivering > 0 ? 2 : 3;
         }
         return status;
     }
@@ -554,7 +603,8 @@ public class AdOrderServiceImpl implements AdOrderService {
         }
         List<Long> starOrderIds = records.stream()
                 .filter(r -> !isReviveType(r.getAlgoType()) && !isNewStoreType(r.getAlgoType())
-                        && !isHotType(r.getAlgoType()) && !isSignboardType(r.getAlgoType()))
+                        && !isHotType(r.getAlgoType()) && !isSignboardType(r.getAlgoType())
+                        && !isTrafficType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> reviveOrderIds = records.stream().filter(r -> isReviveType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
@@ -563,6 +613,8 @@ public class AdOrderServiceImpl implements AdOrderService {
         List<Long> hotOrderIds = records.stream().filter(r -> isHotType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> signboardOrderIds = records.stream().filter(r -> isSignboardType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        List<Long> trafficOrderIds = records.stream().filter(r -> isTrafficType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         Map<Long, List<AdOrderItemStar>> byOrder = starOrderIds.isEmpty() ? Map.of()
                 : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
@@ -584,6 +636,10 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : signboardItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemSignboard>()
                         .in(AdOrderItemSignboard::getOrderId, signboardOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemSignboard::getOrderId));
+        Map<Long, List<AdOrderItemTraffic>> trafficByOrder = trafficOrderIds.isEmpty() ? Map.of()
+                : trafficItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemTraffic>()
+                        .in(AdOrderItemTraffic::getOrderId, trafficOrderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemTraffic::getOrderId));
         // 人氣商家：構建 skinName → tier 映射（從定價配置表查皮膚等級）
         Map<String, String> skinTierMap = hotOrderIds.isEmpty() ? Map.of()
                 : hotSkinMapper.selectList(new LambdaQueryWrapper<AdPricingHotSkin>().isNotNull(AdPricingHotSkin::getTier))
@@ -661,6 +717,20 @@ public class AdOrderServiceImpl implements AdOrderService {
                 vo.setLabelDates(labelDates);
                 continue;
             }
+            if (isTrafficType(vo.getAlgoType())) {
+                // 投流广告：一单一条流量包明细，回填购买方式/套餐名/曝光/投流时段（业务频道在循环后按定价配置回填）
+                List<AdOrderItemTraffic> items = trafficByOrder.getOrDefault(vo.getId(), List.of());
+                vo.setRegions(new ArrayList<>());   // 投流广告无商圈
+                vo.setMealSlots(new ArrayList<>()); // 投流广告无餐段
+                AdOrderItemTraffic first = items.isEmpty() ? null : items.get(0);
+                if (first != null) {
+                    vo.setTrafficMode(first.getMode());
+                    vo.setTrafficPackageName(first.getPackageName());
+                    vo.setTrafficImpressions(first.getImpressions() == null ? null : first.getImpressions().longValue());
+                    vo.setDeliverySlot(first.getDeliverySlot());
+                }
+                continue;
+            }
             List<AdOrderItemStar> items = byOrder.getOrDefault(vo.getId(), List.of());
             vo.setRegions(items.stream().map(AdOrderItemStar::getRegion)
                     .filter(java.util.Objects::nonNull).distinct().sorted().toList());
@@ -688,6 +758,18 @@ public class AdOrderServiceImpl implements AdOrderService {
                 dateSlots.add(new AdOrderVO.DateSlotGroup(Integer.parseInt(parts[0]), parts[1], slotList));
             });
             vo.setDateSlots(dateSlots);
+        }
+        // 投流广告订单: algoId 指向定价配置表，从 biz_ad_pricing_traffic 回填业务频道（前端退款公式按频道取手续费配置）
+        List<Long> trafficPricingIds = records.stream()
+                .filter(r -> isTrafficType(r.getAlgoType()) && r.getAlgoId() != null)
+                .map(AdOrderVO::getAlgoId).distinct().toList();
+        if (!trafficPricingIds.isEmpty()) {
+            Map<Long, Integer> bizChannelMap = trafficPricingMapper.selectBatchIds(trafficPricingIds)
+                    .stream().filter(p -> p.getBizChannel() != null)
+                    .collect(Collectors.toMap(AdPricingTraffic::getId, AdPricingTraffic::getBizChannel, (a, b) -> a));
+            records.stream()
+                    .filter(r -> isTrafficType(r.getAlgoType()) && r.getAlgoId() != null)
+                    .forEach(r -> r.setBizChannel(bizChannelMap.get(r.getAlgoId())));
         }
         // 新店廣告 + 金字招牌：從門店綁定區域回填商圈
         List<String> newStoreCodes = records.stream()
@@ -804,6 +886,15 @@ public class AdOrderServiceImpl implements AdOrderService {
         return algoType != null && algoType == 13;
     }
 
+    /** 投流广告订单（algo_type=15） */
+    private static boolean isTraffic(AdOrder order) {
+        return isTrafficType(order.getAlgoType());
+    }
+
+    private static boolean isTrafficType(Integer algoType) {
+        return algoType != null && algoType == 15;
+    }
+
     /** 无敌星星订单（algo_type=1） */
     private static boolean isStarType(Integer algoType) {
         return algoType != null && algoType == 1;
@@ -834,6 +925,12 @@ public class AdOrderServiceImpl implements AdOrderService {
                 if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
                 cancelFeeTiersJson = pricing.getCancelFeeTiers();
             }
+        } else if (isTraffic(order)) {
+            // 投流广告: algoId 即定价配置ID，无取消扣费梯度（按剩余曝光折算，手续费存明细快照）
+            AdPricingTraffic pricing = trafficPricingMapper.selectById(order.getAlgoId());
+            if (pricing != null && refundEnabled == null) {
+                refundEnabled = pricing.getRefundEnabled();
+            }
         } else {
             AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());
             if (pricing != null) {
@@ -855,6 +952,19 @@ public class AdOrderServiceImpl implements AdOrderService {
         BigDecimal feeRate = matchCancelFeeRate(cancelFeeTiersJson, remainDays);
         return AdCalcUtils.round2(salePrice
                 .multiply(BigDecimal.valueOf(100).subtract(feeRate))
+                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+    }
+
+    /** 投流广告应退金额 = 剩余未消耗曝光 × 实际单价 × (100 − 手续费比例) / 100 */
+    private static BigDecimal calcTrafficRefundPrice(AdOrderItemTraffic item) {
+        int purchased = item.getImpressions() == null ? 0 : item.getImpressions();
+        int consumed = item.getConsumedImpressions() == null ? 0 : item.getConsumedImpressions();
+        int remaining = Math.max(0, purchased - consumed);
+        BigDecimal unitPrice = item.getUnitPrice() == null ? BigDecimal.ZERO : item.getUnitPrice();
+        BigDecimal feePercent = item.getRefundFeePercent() == null
+                ? BigDecimal.ZERO : BigDecimal.valueOf(item.getRefundFeePercent());
+        return AdCalcUtils.round2(unitPrice.multiply(BigDecimal.valueOf(remaining))
+                .multiply(BigDecimal.valueOf(100).subtract(feePercent))
                 .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
     }
 

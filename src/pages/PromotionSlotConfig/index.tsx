@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, DatePicker } from 'antd'
+import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, DatePicker, Switch } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
@@ -209,10 +209,13 @@ export default function PromotionSlotConfig() {
       key: 'status',
       width: 80,
       align: 'center',
-      render: (v: number) => (
-        <Tag color={v === 1 ? 'success' : 'default'}>
-          {statusLabel(v)}
-        </Tag>
+      render: (_: unknown, record: WaterfallStrategy) => (
+        <Switch
+          checked={record.status === 1}
+          checkedChildren={t('common.enable')}
+          unCheckedChildren={t('common.disable')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -232,7 +235,7 @@ export default function PromotionSlotConfig() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 240,
+      width: 180,
       fixed: 'right' as const,
       render: (_, record) => (
         <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
@@ -242,15 +245,6 @@ export default function PromotionSlotConfig() {
             onClick={() => handleViewDetail(record)}
           >
             {t('promotionSlotConfig.detail')}
-          </Button>
-          <Button 
-            type="link" 
-            size="small"
-            danger={record.status === 1}
-            style={record.status !== 1 ? { color: '#52c41a' } : undefined}
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === 1 ? t('common.disable') : t('common.enable')}
           </Button>
           <Button 
             type="link" 

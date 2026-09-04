@@ -237,6 +237,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'export', label: '導出' },
   ],
+  // 消费风控（推广金消费限额/白名单维护）
+  'consume-risk': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
   // 批次查询
   'batch-query': [
     { key: 'view', label: '查看' },
@@ -373,6 +378,28 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
+  ],
+  // 智能中心(AI) > 模型接入 / 授權與配額 / 工具註冊中心
+  'ai_model_hub': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai_quota_auth': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai_tool_registry': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // AI 能耗管理：能耗統計 / 能耗明細（刪除無用的能耗管控）→ 
+  'ai_usage_stats': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'ai_energy_detail': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
   ],
   // 系统模板
   'system-template': [
@@ -939,6 +966,7 @@ export const menuPermissionTree: PermissionModule[] = [
         name: '推廣金管理',
         children: [
           { key: 'account-balance', name: '賬戶餘額' },
+          { key: 'consume-risk', name: '消費風控' },
           { key: 'batch-query', name: '批次查詢' },
           { key: 'detail-query', name: '明細查詢' },
         ],
@@ -999,6 +1027,52 @@ export const menuPermissionTree: PermissionModule[] = [
       { key: 'workflow-config', name: '流程配置' },
     ],
   },
+  {
+    key: 'ai-assistant',
+    name: '智能中心(AI)',
+    children: [
+      {
+        key: 'ai-models',
+        name: '模型管理',
+        children: [
+          { key: 'ai-model-provider', name: '供應商管理' },
+          { key: 'ai-model-list', name: '模型信息' },
+        ],
+      },
+      {
+        key: 'ai-auth-manage',
+        name: '模型授權管理',
+        children: [
+          { key: 'ai-dept-model-auth', name: '部門模型權控' },
+          {
+            key: 'ai-emp-model-auth',
+            name: '員工模型權控',
+            children: [
+              { key: 'ai-pos-auth', name: '按職位授權' },
+              { key: 'ai-role-auth', name: '角色授權' },
+            ],
+          },
+        ],
+      },
+      {
+        key: 'ai-quota-manage',
+        name: '配額管理',
+        children: [
+          { key: 'ai-dept-quota', name: '部門額度' },
+          { key: 'ai-emp-quota', name: '員工額度' },
+        ],
+      },
+      { key: 'ai_tool_registry', name: '工具註冊中心' },
+      {
+        key: 'ai-energy-billing',
+        name: '能耗與賬單',
+        children: [
+          { key: 'ai_usage_stats', name: '能耗統計' },
+          { key: 'ai_energy_detail', name: '能耗明細' },
+        ],
+      },
+    ],
+  },
 ]
 
 /**
@@ -1053,6 +1127,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'hot-search-report',
   // 財務管理
   'account-balance',
+  'consume-risk',
   'batch-query',
   'detail-query',
   'writeoff-reconcile',
@@ -1077,6 +1152,18 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'translation-manage',
   'rule-config',
   'workflow-config',
+  // 智能中心 (AI)
+  'ai-model-provider',
+  'ai-model-list',
+  'ai-dept-model-auth',
+  'ai-emp-model-auth',
+  'ai-pos-auth',
+  'ai-role-auth',
+  'ai-dept-quota',
+  'ai-emp-quota',
+  'ai_tool_registry',
+  'ai_usage_stats',
+  'ai_energy_detail',
 ]
 
 /**
@@ -1144,6 +1231,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hot-search-report': 'hot-search-report',
   // 財務管理 - 推廣金管理
   '/account-balance': 'account-balance',
+  '/consume-risk': 'consume-risk',
   '/recharge-add': 'account-balance',
   '/transfer-add': 'account-balance',
   '/deduct-add': 'account-balance',
@@ -1172,6 +1260,20 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/translation-manage': 'translation-manage',
   '/rule-config': 'rule-config',
   '/workflow-config': 'workflow-config',
+  // AI 智能中心（拆分后）
+  '/ai-model-provider': 'ai-model-provider',
+  '/ai-model-list': 'ai-model-list',
+  '/ai-dept-model-auth': 'ai-dept-model-auth',
+  '/ai-emp-model-auth': 'ai-emp-model-auth',
+  '/ai-pos-auth': 'ai-pos-auth',
+  '/ai-role-auth': 'ai-role-auth',
+  '/ai-dept-quota': 'ai-dept-quota',
+  '/ai-dept-quota-edit': 'ai-dept-quota',
+  '/ai-dept-quota-detail': 'ai-dept-quota',
+  '/ai-emp-quota': 'ai-emp-quota',
+  '/ai-tool-registry': 'ai_tool_registry',
+  '/ai-usage-stats': 'ai_usage_stats',
+  '/ai-energy-detail': 'ai_energy_detail',
 }
 
 /**

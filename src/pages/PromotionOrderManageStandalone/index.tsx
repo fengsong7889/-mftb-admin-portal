@@ -59,7 +59,7 @@ const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.INVINCIBLE_STAR]: '無敵星星',
   [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
   [RecommendType.NEW_STORE_AD]: '新店廣告',
-  [RecommendType.TRAFFIC_AD]: '流量廣告',
+  [RecommendType.TRAFFIC_AD]: '投流廣告',
   [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
   [RecommendType.GOLDEN_SIGNBOARD]: '金字招牌',
 }
@@ -141,6 +141,9 @@ interface OrderItem {
   skinName?: string          // 人氣商家：皮膚名稱
   skinTiers?: string[]       // 人氣商家：皮膚等級列表
   labelDates?: LabelDateGroup[] // 金字招牌：按標籤分組的購買日期
+  trafficMode?: 'tier' | 'custom'      // 投流廣告：購買方式（預設檔位 / 自定義）
+  trafficPackageName?: string          // 投流廣告：流量包名稱（檔位購買時）
+  trafficImpressions?: number          // 投流廣告：購買曝光次數
   purchaseDate: string
   originalPrice: number
   discountPrice: number
@@ -345,18 +348,86 @@ export default function PromotionOrderManage() {
     return entry ? (Number(entry[0]) as RecommendType) : undefined
   }, [orderType])
 
-  // 訂單數據：直接調用後端 API
+  // 訂單數據：直接調用後端 API（+ mock 投流廣告數據供樣式調試）
   const [orders, setOrders] = useState<OrderItem[]>([])
+  // ── TODO: 投流廣告 mock 數據（樣式調試用），確認後刪除 ──
+  const mockTrafficOrder: OrderItem = {
+    id: 'DDLL202609010001',
+    orderNo: 'DDLL202609010001',
+    algorithmId: 'SFLL20260818008',
+    promotionName: '投流廣告·精準曝光',
+    app: AppType.SHANFENG,
+    channel: RecommendChannel.DELIVERY,
+    region: Region.KOKSAA,
+    recommendType: RecommendType.TRAFFIC_AD,
+    slotPosition: 0,
+    groupId: 'G1001',
+    groupName: '澳門張記牛雜',
+    storeId: 'M1001',
+    storeName: '新馬路店',
+    mealSlots: [],
+    trafficMode: 'tier',
+    trafficPackageName: '成長包',
+    trafficImpressions: 5000,
+    purchaseDate: '2026-09-01',
+    originalPrice: 900,
+    discountPrice: 810,
+    actualPrice: 810,
+    discountAmount: 90,
+    giftDays: 2,
+    status: OrderStatus.PENDING_PROMOTION,
+    orderTime: '2026-09-01 10:30:00',
+    payTime: '2026-09-01 10:31:00',
+    operatorType: OrderOperatorType.STAFF,
+    operatorId: 'EMP001',
+    operatorName: '陳志明',
+    source: 'mock',
+  }
+  // ── TODO: 投流廣告自定義購買 mock（樣式調試用），確認後刪除 ──
+  const mockTrafficOrderCustom: OrderItem = {
+    id: 'DDLL202609010002',
+    orderNo: 'DDLL202609010002',
+    algorithmId: 'SFLL20260818008',
+    promotionName: '投流廣告·精準曝光',
+    app: AppType.MFOOD,
+    channel: RecommendChannel.SUPERMARKET,
+    region: Region.FAHUA,
+    recommendType: RecommendType.TRAFFIC_AD,
+    slotPosition: 0,
+    groupId: 'G1002',
+    groupName: '氹仔貓山王榴蓮甜品',
+    storeId: 'M1002',
+    storeName: '氹仔官也街店',
+    mealSlots: [],
+    trafficMode: 'custom',
+    trafficImpressions: 8600,
+    purchaseDate: '2026-09-01',
+    originalPrice: 1548,
+    discountPrice: 1548,
+    actualPrice: 1548,
+    status: OrderStatus.PROMOTING,
+    orderTime: '2026-09-01 14:05:00',
+    payTime: '2026-09-01 14:06:00',
+    operatorType: OrderOperatorType.MERCHANT,
+    operatorId: 'M1002',
+    operatorName: '林嘉欣',
+    source: 'mock',
+  }
   useEffect(() => {
     const loadOrders = () => {
       fetchAdOrders({ page: 1, size: 200 })
         .then(res => {
           const rows = (res.records ?? []).map(toOrderItem)
+          rows.unshift(mockTrafficOrder, mockTrafficOrderCustom)
           setOrders(rows)
         })
-        .catch(() => {})
+        .catch(() => {
+          // API 失敗時仍展示 mock 數據，確保調試可見
+          setOrders([mockTrafficOrder, mockTrafficOrderCustom])
+        })
     }
     loadOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [filters, setFilters] = useState({
@@ -376,6 +447,7 @@ export default function PromotionOrderManage() {
     cancelOperatorKeyword: '', // 取消人搜索关键字
     labelFilter: undefined as string | undefined, // 金字招牌：購買內容標籤篩選
     skinTierFilter: undefined as string | undefined, // 人氣商家：皮膚等級篩選
+    trafficPackageFilter: undefined as string | undefined, // 投流廣告：流量包篩選（'custom' = 自定義，其餘為流量包名稱）
   })
 
   // 根据 orderType 过滤对应类型的订单
@@ -443,6 +515,13 @@ export default function PromotionOrderManage() {
         const hasTier = order.skinTiers?.includes(filters.skinTierFilter)
         if (!hasTier) return false
       }
+      if (filters.trafficPackageFilter) {
+        if (filters.trafficPackageFilter === 'custom') {
+          if (order.trafficMode !== 'custom') return false
+        } else if (order.trafficMode !== 'tier' || order.trafficPackageName !== filters.trafficPackageFilter) {
+          return false
+        }
+      }
       return true
     })
   }, [filters, orderType, orders])
@@ -455,7 +534,7 @@ export default function PromotionOrderManage() {
     { key: 'algorithmInfo', title: orderType === '人氣商家' ? '配置ID/人氣名稱' : t('promotionOrderManage.colAlgorithmInfo') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'channel', title: t('common.colChannel') },
-    ...(orderType !== '人氣商家' && orderType !== '金字招牌' ? [{ key: 'region', title: t('promotionOrderManage.colRegion') }] : []),
+    ...(orderType !== '人氣商家' && orderType !== '金字招牌' && orderType !== '投流廣告' ? [{ key: 'region', title: t('promotionOrderManage.colRegion') }] : []),
     ...(orderType === '人氣商家' ? [
       { key: 'skinTier', title: t('promotionOrderManage.colSkinTier') },
       { key: 'skinName', title: t('promotionOrderManage.colSkinName') },
@@ -549,7 +628,7 @@ export default function PromotionOrderManage() {
       width: 120,
       render: (channel: RecommendChannel) => channelLabel(channel),
     },
-    ...(orderType !== '人氣商家' && orderType !== '金字招牌' ? [{
+    ...(orderType !== '人氣商家' && orderType !== '金字招牌' && orderType !== '投流廣告' ? [{
       title: t('promotionOrderManage.colRegion'),
       dataIndex: 'region',
       key: 'region',
@@ -626,6 +705,21 @@ export default function PromotionOrderManage() {
       key: 'purchaseContent',
       width: orderType === '金字招牌' ? 320 : 140,
       render: (_, record) => {
+        // 投流廣告：展示流量包名稱 + 曝光次數（自定義購買展示「自定義」）
+        if (orderType === '投流廣告' || record.recommendType === RecommendType.TRAFFIC_AD) {
+          if (!record.trafficImpressions) return <span style={{ color: '#bfbfbf' }}>-</span>
+          const isCustom = record.trafficMode === 'custom'
+          return (
+            <Space direction="vertical" size={2}>
+              <Tag color={isCustom ? 'purple' : 'orange'} style={{ margin: 0 }}>
+                {isCustom ? '自定義' : (record.trafficPackageName || '-')}
+              </Tag>
+              <span style={{ fontSize: 12, color: '#595959' }}>
+                {record.trafficImpressions.toLocaleString()} 次曝光
+              </span>
+            </Space>
+          )
+        }
         // 金字招牌：展示標籤 + 日期（最多3個標籤，超出 +X 弹窗）
         if (orderType === '金字招牌' || record.recommendType === RecommendType.GOLDEN_SIGNBOARD) {
           if (record.labelDates && record.labelDates.length > 0) {
@@ -1024,6 +1118,7 @@ export default function PromotionOrderManage() {
       cancelOperatorKeyword: '',
       labelFilter: undefined,
       skinTierFilter: undefined,
+      trafficPackageFilter: undefined,
     })
   }
 
@@ -1197,7 +1292,7 @@ export default function PromotionOrderManage() {
                 }
               />
             </Form.Item>
-            {orderType !== '人氣商家' && orderType !== '金字招牌' && (
+            {orderType !== '人氣商家' && orderType !== '金字招牌' && orderType !== '投流廣告' && (
               <Form.Item label={t('promotionOrderManage.colPromoRegion')}>
                 <TreeSelect
                   placeholder={t('common.all')}
@@ -1208,6 +1303,28 @@ export default function PromotionOrderManage() {
                   value={filters.region}
                   onChange={value => setFilters({ ...filters, region: value })}
                   treeData={regionTreeData}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            )}
+            {orderType === '投流廣告' && (
+              <Form.Item label={'流量包'}>
+                <Select
+                  placeholder={t('common.all')}
+                  allowClear
+                  value={filters.trafficPackageFilter}
+                  onChange={value => setFilters({ ...filters, trafficPackageFilter: value })}
+                  options={[
+                    // 從當前類型訂單中收集不重複的流量包名稱，另附「自定義」選項
+                    ...Array.from(new Set(
+                      orders
+                        .filter(o => o.recommendType === RecommendType.TRAFFIC_AD && o.trafficMode === 'tier' && o.trafficPackageName)
+                        .map(o => o.trafficPackageName as string),
+                    )).map(name => ({ label: name, value: name })),
+                    ...(orders.some(o => o.recommendType === RecommendType.TRAFFIC_AD && o.trafficMode === 'custom')
+                      ? [{ label: '自定義', value: 'custom' }]
+                      : []),
+                  ]}
                   style={{ width: '100%' }}
                 />
               </Form.Item>

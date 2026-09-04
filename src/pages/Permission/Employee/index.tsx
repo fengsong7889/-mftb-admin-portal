@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, TreeSelect, message } from 'antd'
+import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -439,10 +439,13 @@ export default function EmployeeManagement() {
       dataIndex: 'status',
       key: 'status',
       width: 90,
-      render: (value: number) => (
-        value === EMPLOYEE_STATUS.ENABLED
-          ? <Tag color="success">{t('employee.statusEnabled')}</Tag>
-          : <Tag color="default">{t('employee.statusDisabled')}</Tag>
+      render: (_: unknown, record: EmployeeItem) => (
+        <Switch
+          checked={record.status === EMPLOYEE_STATUS.ENABLED}
+          checkedChildren={t('employee.statusEnabled')}
+          unCheckedChildren={t('employee.statusDisabled')}
+          onChange={() => handleToggleStatus(record)}
+        />
       ),
     },
     {
@@ -462,7 +465,7 @@ export default function EmployeeManagement() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 200,
+      width: 160,
       render: (_, record) => {
         const isBuiltinAdmin = record.username === BUILTIN_ADMIN
         return (
@@ -475,11 +478,6 @@ export default function EmployeeManagement() {
             {hasPermission('employee-management:edit') && (
               <Button type="link" size="small" onClick={() => handleOpenResetPwd(record)}>
                 {t('employee.resetPassword')}
-              </Button>
-            )}
-            {!isBuiltinAdmin && hasPermission('employee-management:edit') && (
-              <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-                {record.status === EMPLOYEE_STATUS.ENABLED ? t('common.disable') : t('common.enable')}
               </Button>
             )}
             {!isBuiltinAdmin && hasPermission('employee-management:delete') && (

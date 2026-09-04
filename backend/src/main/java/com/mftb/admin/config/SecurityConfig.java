@@ -43,7 +43,7 @@ public class SecurityConfig {
     }
 
     /** CORS 允许的域名（逗号分隔），通过环境变量 CORS_ALLOWED_ORIGINS 注入 */
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3002,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3002,http://127.0.0.1:5173,https://fengsong7889.github.io}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://localhost:3005,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:5173,http://127.0.0.1:3005,https://fengsong7889.github.io}")
     private String allowedOrigins;
 
     /** 白名单: 无需认证即可访问 */
@@ -68,10 +68,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WHITE_LIST).permitAll()
                         .anyRequest().authenticated())
-                // 未认证处理: 返回 401 JSON
+                // 未认证处理：返回 401 JSON
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(200);
+                            response.setStatus(401);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                             Result<Void> result = Result.error(ResultCode.UNAUTHORIZED);

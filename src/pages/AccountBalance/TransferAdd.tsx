@@ -16,8 +16,8 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
-import { fetchFinAccounts, submitTransferApply } from '../../api/finance'
-import type { FinAccount, TransferApplyPayload } from '../../api/finance'
+import { fetchFinAccounts, submitTransferApply, fetchFinRiskConfig, checkFinTransferBatches } from '../../api/finance'
+import type { FinAccount, TransferApplyPayload, FinRiskRow, FinTransferBlock } from '../../api/finance'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -106,11 +106,38 @@ export default function TransferAdd() {
   /** 同品牌推廣金賬戶列表（轉出餘額與轉入集團选项均由此派生） */
   const [accounts, setAccounts] = useState<FinAccount[]>([])
 
+  /** 轉出集團風控信息（未結清欠款提示） */
+  const [riskInfo, setRiskInfo] = useState<FinRiskRow | null>(null)
+  /** 當前轉賬金額會觸碰的欠款批次（非空=提交將被攔截） */
+  const [blockedBatches, setBlockedBatches] = useState<FinTransferBlock[]>([])
+
   useEffect(() => {
     fetchFinAccounts({ page: 1, size: 500, brand: brandParam })
       .then(res => setAccounts(res.records || []))
       .catch(() => setAccounts([]))
   }, [brandParam])
+
+  /** 加載轉出集團風控信息（有未結清欠款時展示提示） */
+  useEffect(() => {
+    if (!groupIdParam) return
+    fetchFinRiskConfig(groupIdParam, brandParam)
+      .then(setRiskInfo)
+      .catch(() => setRiskInfo(null))
+  }, [groupIdParam, brandParam])
+
+  /** 轉賬金額變化時檢查是否觸碰欠款批次（防抖） */
+  useEffect(() => {
+    if (!groupIdParam || transferAmount <= 0) {
+      setBlockedBatches([])
+      return
+    }
+    const timer = setTimeout(() => {
+      checkFinTransferBatches(groupIdParam, transferAmount)
+        .then(setBlockedBatches)
+        .catch(() => setBlockedBatches([]))
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [groupIdParam, transferAmount])
 
   /** 轉出集團賬戶（虛擬餘額/狀態） */
   const sourceAccount = accounts.find(a => a.groupId === groupIdParam)
@@ -150,6 +177,12 @@ export default function TransferAdd() {
       }
       if (transferAmount > sourceVirtualBalance) {
         message.warning(t('accountBalance.amountExceedBalance'))
+        return
+      }
+      if (blockedBatches.length > 0) {
+        message.error(t('accountBalance.transferBlockedDesc', {
+          batches: blockedBatches.map(b => b.batchNo).join('、'),
+        }))
         return
       }
       if (certificateFiles.length === 0) {
@@ -448,6 +481,29 @@ export default function TransferAdd() {
           {transferAmount > 0 && (
             <div style={{ fontSize: 12, color: '#E8720C', fontWeight: 500, marginBottom: 16 }}>
               {amountToChinese(transferAmount)}
+            </div>
+          )}
+
+          {/* 風控提示：集團存在未結清欠款 / 本次轉賬觸碰欠款批次 */}
+          {riskInfo && riskInfo.unsettledDebt > 0 && (
+            <div style={{
+              marginTop: 4, marginBottom: blockedBatches.length > 0 ? 0 : 16,
+              padding: '10px 14px', borderRadius: 8,
+              background: blockedBatches.length > 0 ? '#FFF1F0' : '#FFF7E6',
+              border: `1px solid ${blockedBatches.length > 0 ? '#FFA39E' : '#FFD591'}`,
+              fontSize: 12, lineHeight: 1.8,
+              color: blockedBatches.length > 0 ? '#CF1322' : '#AD6800',
+            }}>
+              {blockedBatches.length > 0 ? (
+                <>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{t('accountBalance.transferBlockedTitle')}</div>
+                  {t('accountBalance.transferBlockedDesc', {
+                    batches: blockedBatches.map(b => b.batchNo).join('、'),
+                  })}
+                </>
+              ) : (
+                t('accountBalance.transferDebtWarn', { amount: Number(riskInfo.unsettledDebt).toLocaleString() })
+              )}
             </div>
           )}
         </div>

@@ -17,6 +17,7 @@ import {
   EditOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import DetailPageHeader from '../../../components/DetailPageHeader'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { 
@@ -34,6 +35,7 @@ import {
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
 import GoldenSignboardPricing from './GoldenSignboardPricing'
+import TrafficPackagePricing from './TrafficPackagePricing'
 import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, fetchAdPricingList, fetchAdRevivePricingList, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
 import { fetchStores } from '../../../api/store'
 
@@ -148,6 +150,10 @@ export default function WaterfallAdd() {
   // 金字招牌：基礎信息同人氣商家
   if (typeParam && Number(typeParam) === AlgorithmType.GOLDEN_SIGNBOARD) {
     return <GoldenSignboardPricing />
+  }
+  // 投流廣告：流量包定價配置（預設檔位 + 階梯單價，按業務頻道配置）
+  if (typeParam && Number(typeParam) === AlgorithmType.TRAFFIC_AD) {
+    return <TrafficPackagePricing />
   }
   return <WaterfallAddGeneral />
 }
@@ -909,7 +915,22 @@ function WaterfallAddGeneral() {
 
   return (
     <div className="content-area">
-      {/* 顶部标题栏 */}
+      {/* 顶部标题栏：详情模式走全局详情规范（紫条+橙返回+权限门控紫编辑），新增/编辑模式保留橙色头部 */}
+      {isDetailMode ? (
+        <DetailPageHeader
+          title={t('recommend.pricingDetailTitle')}
+          meta={urlAlgorithmType != null && (
+            <>{TYPE_ICON[urlAlgorithmType]} {(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.labelKey ? t(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)!.labelKey) : '')}</>
+          )}
+          onBack={handleBack}
+          onEdit={() => {
+            const p = new URLSearchParams(searchParams)
+            p.delete('mode')
+            navigate(`/promotion-waterfall-add?${p.toString()}`)
+          }}
+          menuKey="promotion-waterfall"
+        />
+      ) : (
       <div style={{
         position: 'relative', background: '#fff', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -936,7 +957,7 @@ function WaterfallAddGeneral() {
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {isDetailMode ? t('recommend.pricingDetailTitle') : isEditMode ? t('recommend.editPricingTitle') : t('recommend.addPricingTitle')}
+                {isEditMode ? t('recommend.editPricingTitle') : t('recommend.addPricingTitle')}
               </h2>
               {urlAlgorithmType != null && (
                 <span style={{ fontSize: 14, color: '#595959' }}>
@@ -947,6 +968,7 @@ function WaterfallAddGeneral() {
           </div>
         </div>
       </div>
+      )}
 
       {/* 表单内容区域 */}
       <div style={{ padding: 0 }}>

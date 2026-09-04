@@ -532,3 +532,100 @@ export function addFinDebtRepayment(billNo: string, data: DebtRepaymentPayload) 
 export function deleteFinDebtRepayment(id: number) {
   return request.delete<unknown, void>(`/fin/debts/repayments/${id}`, SILENT)
 }
+
+/* ==================== 消費風控 ==================== */
+
+/** 風控模式: repay=還款釋放 | monthly=每月比例釋放 */
+export type FinRiskMode = 'repay' | 'monthly'
+
+/** 消費風控列表行 */
+export interface FinRiskRow {
+  groupId: string
+  groupName: string
+  brand: string
+  /** 未結清欠款合計 */
+  unsettledDebt: number
+  /** 累計已付金額（全額池 + 分期已付） */
+  paidPool: number
+  /** 累計已消費（廣告消費 + 消費扣款 - 退款） */
+  totalConsumed: number
+  /** 當月釋放額度（monthly=Σ批次未付×比例；repay=0） */
+  monthlyRelease: number
+  /** 當前可用額度（null/undefined=不限額；後端 Jackson non_null 會省略 null 字段） */
+  availableAmount: number | null | undefined
+  /** 是否受限額管控 */
+  limited: boolean
+  /** 登記狀態: enabled=啟用 disabled=停用 */
+  status: string
+  /** 風控模式: repay=還款釋放 monthly=每月比例釋放 */
+  releaseMode: string
+  /** 每月釋放比例（小數） */
+  monthlyReleaseRatio?: number | null
+  /** 賬戶狀態（與賬戶餘額菜單同步）: normal / frozen / mergeFrozen / cancelled */
+  accountStatus: string
+  remark?: string | null
+  updatedBy?: string | null
+  updatedAt?: string | null
+}
+
+/** 消費風控列表查詢參數 */
+export interface FinRiskQuery {
+  page?: number
+  size?: number
+  groupId?: string
+  groupName?: string
+  brand?: string
+  /** 風控模式: repay / monthly */
+  releaseMode?: string
+  /** 賬戶狀態: normal / frozen / mergeFrozen / cancelled */
+  accountStatus?: string
+  /** 最後更新人（模糊） */
+  updatedBy?: string
+  /** 最後更新時間起 YYYY-MM-DD */
+  updatedFrom?: string
+  /** 最後更新時間止 YYYY-MM-DD */
+  updatedTo?: string
+}
+
+/** 風控配置保存請求 */
+export interface FinRiskConfigPayload {
+  groupId: string
+  groupName: string
+  brand: string
+  /** 風控模式: repay=還款釋放 monthly=每月比例釋放 */
+  releaseMode?: string
+  /** 每月釋放比例（小數，如 0.1=10%/月） */
+  monthlyReleaseRatio?: number | null
+  remark?: string
+}
+
+/** 轉賬會觸碰的欠款批次 */
+export interface FinTransferBlock {
+  batchNo: string
+  unsettledAmount: number
+}
+
+/** 消費風控分頁查詢 */
+export function fetchFinRiskPage(params: FinRiskQuery) {
+  return request.get<unknown, FinPageResult<FinRiskRow>>('/fin/risk', { params, ...SILENT })
+}
+
+/** 保存風控配置（新增默認啟用） */
+export function saveFinRiskConfig(payload: FinRiskConfigPayload) {
+  return request.put<unknown, void>('/fin/risk/config', payload, SILENT)
+}
+
+/** 單集團風控配置與額度明細（配置彈窗/扣款頁可用額度提示） */
+export function fetchFinRiskConfig(groupId: string, brand: string) {
+  return request.get<unknown, FinRiskRow>('/fin/risk/config', { params: { groupId, brand }, ...SILENT })
+}
+
+/** 啟用/停用風控登記（停用後不限制消費） */
+export function saveFinRiskStatus(groupId: string, brand: string, status: string) {
+  return request.put<unknown, void>('/fin/risk/config/status', null, { params: { groupId, brand, status }, ...SILENT })
+}
+
+/** 轉賬欠款批次檢查（返回會觸碰的欠款批次，空數組=放行） */
+export function checkFinTransferBatches(groupId: string, amount: number) {
+  return request.get<unknown, FinTransferBlock[]>('/fin/risk/transfer-check', { params: { groupId, amount }, ...SILENT })
+}

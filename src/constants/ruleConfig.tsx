@@ -106,6 +106,19 @@ const AD_SALES_RULES: RuleItem[] = [
   ...paymentModeRules('revival'),
   ...paymentModeRules('popular_merchant'),
   ...paymentModeRules('golden_signboard'),
+  ...paymentModeRules('traffic_ad'),
+  {
+    key: 'payment_traffic_gift_day_value',
+    label: '投流廣告贈送天數抵扣單價',
+    description: '投流廣告按曝光計價無天數維度，使用贈送天數抵扣時每天折算的推廣金金額',
+    type: 'number',
+    value: 150,
+    defaultValue: 150,
+    unit: 'MOP/天',
+    min: 1,
+    max: 100000,
+    subGroup: 'traffic_ad',
+  },
   {
     key: 'ad_click_cart_lock_seconds',
     label: '廣告點擊加購鎖定時長',
@@ -121,6 +134,26 @@ const AD_SALES_RULES: RuleItem[] = [
 
 /** 贈送管理規則（按廣告類型獨立配置） */
 const GIFT_MANAGEMENT_RULES: RuleItem[] = [
+  /* ── 到期提醒（全局） ── */
+  {
+    key: 'gift_expire_remind_days',
+    label: '到期提醒天數',
+    description: '距離贈送到期≤此天數時，在贈送明細頁顯示紅色脈沖提醒',
+    type: 'number',
+    value: 15,
+    defaultValue: 15,
+    unit: '天',
+    min: 1,
+    max: 90,
+  },
+  {
+    key: 'gift_expire_remind_frequency',
+    label: '到期提醒頻率',
+    description: '梯度提醒天數，以逗號分隔。例如：15,7,1 表示距離到期前 15、7、1 天各推送一次消息到系統鈴鐺',
+    type: 'text',
+    value: '15,7,1',
+    defaultValue: '15,7,1',
+  },
   /* ── 新店廣告 ── */
   {
     key: 'gift_limit_new_store',

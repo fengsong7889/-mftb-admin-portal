@@ -21,13 +21,20 @@ import java.util.Map;
 public class BizSeqRuleInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    private final SchemaVersionTracker versionTracker;
+
+    /** 初始化版本: 新增规则种子/补列步骤时递增版本号 */
+    private static final String V_INIT = "seq:init-v1";
 
     @Override
     public void run(String... args) {
-        createRuleTableIfAbsent();
-        seedRules();
-        ensureBizCodeColumns();
-        backfillPositionCodes();
+        // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
+        versionTracker.applyOnce(V_INIT, () -> {
+            createRuleTableIfAbsent();
+            seedRules();
+            ensureBizCodeColumns();
+            backfillPositionCodes();
+        });
     }
 
     /** 编号生成规则配置表 */
@@ -83,6 +90,7 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 {"config_pricing_hot", "人氣商家定價", "廣告銷售", "DJRQ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"config_pricing_revive", "盤活復蘇定價", "廣告銷售", "DJPH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"config_pricing_signboard", "金字招牌定價", "廣告銷售", "DJZP", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"config_pricing_traffic", "投流廣告定價", "廣告銷售", "DJTL", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"gift_new_store", "新店廣告贈送ID", "推廣贈送", "XDZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"gift_popular", "人氣商家贈送ID", "推廣贈送", "RQZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"gift_revive", "盤活復蘇贈送ID", "推廣贈送", "PHZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
