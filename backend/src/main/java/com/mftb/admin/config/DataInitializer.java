@@ -35,7 +35,8 @@ public class DataInitializer implements CommandLineRunner {
     private final SchemaVersionTracker versionTracker;
 
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
-    private static final String V_SCHEMA = "core:schema-v4";
+    // v5: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
+    private static final String V_SCHEMA = "core:schema-v5";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
     private static final String V_MENU_SEED = "core:menu-seed-v9";
 
@@ -168,6 +169,9 @@ public class DataInitializer implements CommandLineRunner {
         migrateAvatarMediumText();
         // AI 中心表自动创建 (85/88/68 脚本等效, 幂等)
         migrateAiCenterTables();
+        // ai_dept_auth_group 新增 description 字段
+        addColumnIfAbsent("ai_dept_auth_group", "description",
+                "ALTER TABLE ai_dept_auth_group ADD COLUMN description VARCHAR(500) NULL COMMENT '策略描述' AFTER name");
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
     }
 
@@ -364,7 +368,9 @@ public class DataInitializer implements CommandLineRunner {
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS ai_dept_auth_group ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            + "name VARCHAR(100) NOT NULL, data_residency TINYINT DEFAULT 0,"
+            + "config_code VARCHAR(32) DEFAULT NULL COMMENT '配置ID（按编号生成规则 ai_dept_model_auth 生成）',"
+            + "name VARCHAR(100) NOT NULL, description VARCHAR(500) DEFAULT NULL,"
+            + "data_residency TINYINT DEFAULT 0,"
             + "status TINYINT DEFAULT 1, total_employee_count INT DEFAULT 0,"
             + "updated_by VARCHAR(50) DEFAULT NULL, deleted TINYINT DEFAULT 0,"
             + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"

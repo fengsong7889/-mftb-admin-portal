@@ -19,7 +19,10 @@ export interface ModelConfigItem {
 /** 策略列表项 */
 export interface DeptAuthGroupItem {
   id: number
+  /** 配置ID（编号生成规则 ai_dept_model_auth，如 BMMX20260906000） */
+  configCode?: string
   name: string
+  description?: string
   dataResidency: number
   status: number
   totalEmployeeCount: number
@@ -44,7 +47,10 @@ export interface DeptItem {
 /** 策略详情 */
 export interface DeptAuthGroupDetail {
   id: number
+  /** 配置ID（编号生成规则 ai_dept_model_auth） */
+  configCode?: string
   name: string
+  description?: string
   dataResidency: number
   status: number
   totalEmployeeCount: number
@@ -58,6 +64,7 @@ export interface DeptAuthGroupDetail {
 /** 策略新增/编辑请求 */
 export interface GroupSaveRequest {
   name: string
+  description?: string
   dataResidency?: number
   status?: number
   deptIds: number[]

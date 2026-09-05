@@ -1,6 +1,7 @@
 package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.entity.AiPositionModelMapping;
 import com.mftb.admin.mapper.AiPositionModelMapper;
@@ -24,6 +25,9 @@ import java.util.List;
 @Tag(name = "AI 智能中心 - 权限管理", description = "职位模型权限管理接口")
 public class AiPositionAuthController {
 
+    /** 本菜单标识（sys_menu.menu_key），员工模型权控页 */
+    private static final String MENU = "ai-emp-model-auth";
+
     private final AiPositionModelMapper positionMapper;
     private final JdbcTemplate jdbcTemplate;
 
@@ -32,6 +36,7 @@ public class AiPositionAuthController {
      */
     @GetMapping
     @Operation(summary = "查询职位权限映射列表")
+    @RequirePermission(menu = MENU)
     public Result<List<AiPositionAuthVO>> list(@RequestParam(required = false) Long positionId,
                                                @RequestParam(required = false) String name) {
         String sql = """
@@ -86,6 +91,7 @@ public class AiPositionAuthController {
      */
     @PostMapping("/batch")
     @Operation(summary = "批量配置职位模型权限")
+    @RequirePermission(menu = MENU, action = "edit")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> batchSetPermissions(@Valid @RequestBody BatchPositionAuthRequest request) {
         for (PositionBatchItem item : request.getItems()) {
@@ -133,6 +139,7 @@ public class AiPositionAuthController {
      */
     @DeleteMapping("/{positionId}/{modelId}")
     @Operation(summary = "删除职位模型权限映射")
+    @RequirePermission(menu = MENU, action = "delete")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> deleteMapping(@PathVariable Long positionId, 
                                          @PathVariable Long modelId) {

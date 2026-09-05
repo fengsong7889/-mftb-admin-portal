@@ -8,14 +8,27 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../api/position'
 import {
   loadPosRules,
-  savePosRules,
   loadRoleAuthConfigs,
-  saveRoleAuthConfigs,
+  clampModelConfigs,
+  POS_RULE_STORAGE_KEY,
+  ROLE_AUTH_STORAGE_KEY,
   CAPABILITY_SHORT_FIELDS,
   type PosAuthRule,
   type RoleAuthConfig,
   type ModelAuthConfig,
 } from './empAuth/modelAuthCapability'
+import {
+  fetchPosStrategies,
+  createPosStrategy,
+  togglePosStrategyStatus,
+  deletePosStrategy,
+  fetchRoleAuths,
+  createRoleAuth,
+  toggleRoleAuthStatus,
+  deleteRoleAuth,
+  type PosStrategyItem,
+  type RoleAuthItem,
+} from '../../api/empAuth'
 
 /**
  * 员工模型权控 - 两种授权方式融合页
@@ -57,18 +70,69 @@ export default function AiEmployeeAuthControl() {
   const [ruleLevelFilter, setRuleLevelFilter] = useState<string[]>([])
   const [ruleStatusFilter, setRuleStatusFilter] = useState<string | undefined>(undefined)
 
-  /** 模型就绪后从 localStorage 载入授权规则（含旧结构自动迁移） */
-  useEffect(() => {
-    if (models.length > 0) {
-      setPosRules(loadPosRules(models))
+  /** localStorage 歷史配置（mock 階段）一次性遷移到後端：盡力逐條上傳，完成後清空本地並標記，避免重複遷移 */
+  const MIGRATED_KEY = 'emp_auth_migrated_v1'
+  const migrateLegacyData = async () => {
+    if (localStorage.getItem(MIGRATED_KEY) === '1') return
+    const legacyRules = loadPosRules(models)
+    for (const r of legacyRules) {
+      try {
+        await createPosStrategy({
+          strategyName: r.ruleName, sequences: r.sequence, jobLevels: r.jobLevels,
+          modelConfigs: r.modelConfigs, dataResidency: r.dataResidency,
+          description: r.description, status: r.status,
+        })
+      } catch { /* 單條失敗跳過，不阻斷整體遷移 */ }
     }
-  }, [models])
-
-  /** 更新规则并持久化（localStorage 模拟后端） */
-  const persistPosRules = (rules: PosAuthRule[]) => {
-    setPosRules(rules)
-    savePosRules(rules)
+    const legacyRoles = loadRoleAuthConfigs(models)
+    for (const c of legacyRoles) {
+      try {
+        await createRoleAuth({
+          roleCode: c.roleId, roleName: c.roleName, description: c.description,
+          userIds: c.userIds, modelConfigs: c.modelConfigs,
+          dataResidency: c.dataResidency, status: c.status,
+        })
+      } catch { /* 角色編碼衝突或失敗跳過 */ }
+    }
+    localStorage.removeItem(POS_RULE_STORAGE_KEY)
+    localStorage.removeItem(ROLE_AUTH_STORAGE_KEY)
+    localStorage.setItem(MIGRATED_KEY, '1')
   }
+
+  /** 從後端載入職位授權策略（首次進入先執行歷史數據遷移） */
+  const reloadPosRules = async () => {
+    const list = await fetchPosStrategies()
+    setPosRules(list.map((item: PosStrategyItem) => ({
+      id: item.id,
+      configCode: item.configCode,
+      ruleName: item.ruleName,
+      sequence: item.sequence ?? [],
+      jobLevels: item.jobLevels ?? [],
+      modelConfigs: clampModelConfigs(item.modelConfigs ?? [], models),
+      dataResidency: item.dataResidency,
+      description: item.description ?? '',
+      status: item.status,
+      createdAt: item.createdAt ?? '',
+      updatedBy: item.updatedBy,
+      updatedAt: item.updatedAt,
+    })))
+  }
+
+  /** 模型就緒後：遷移 localStorage 歷史數據 → 載入後端策略（能力開關按模型上限收斂） */
+  useEffect(() => {
+    if (models.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await migrateLegacyData()
+        if (!cancelled) await reloadPosRules()
+      } catch {
+        if (!cancelled) message.error('加載授權策略失敗')
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models])
 
   const filteredRules = useMemo(() => posRules.filter((r) => {
     if (ruleQuery && !r.ruleName.toLowerCase().includes(ruleQuery.toLowerCase())) return false
@@ -79,7 +143,7 @@ export default function AiEmployeeAuthControl() {
   }), [posRules, ruleQuery, ruleSeqFilter, ruleLevelFilter, ruleStatusFilter])
 
   /* ── 导航至独立页面（全局统一：取消弹窗） ── */
-  const handleRuleCreate = () => navigate('/ai-pos-auth-edit')
+  const handleRuleCreate = () => navigate('/ai-pos-auth-edit?type=add')
   const handleRuleEdit = (rule: PosAuthRule) => navigate(`/ai-pos-auth-edit?id=${rule.id}`)
   const handleRuleDetail = (rule: PosAuthRule) => navigate(`/ai-pos-auth-detail?id=${rule.id}`)
 
@@ -92,13 +156,14 @@ export default function AiEmployeeAuthControl() {
       centered: true,
       className: 'custom-confirm-modal',
       width: 520,
-      content: `删除后授权规则「${rule.ruleName}」立即失效，匹配该职级序列/职级的职位不再获得此授权。`,
+      content: `删除后授权策略「${rule.ruleName}」立即失效，匹配该职级序列/职级的职位不再获得此授权。`,
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
-      onOk: () => {
-        persistPosRules(posRules.filter((r) => r.id !== rule.id))
-        message.success('规则已删除')
+      onOk: async () => {
+        await deletePosStrategy(rule.id)
+        await reloadPosRules()
+        message.success('策略已删除')
       },
     })
   }
@@ -115,21 +180,23 @@ export default function AiEmployeeAuthControl() {
       className: 'custom-confirm-modal',
       width: 520,
       content: isEnable
-        ? `确定要启用授权规则「${rule.ruleName}」吗？启用后匹配该职级序列/职级的职位将重新获得对应模型访问权。`
-        : `确定要停用授权规则「${rule.ruleName}」吗？停用后匹配该职级序列/职级的职位将立即失去对应模型访问权。`,
+        ? `确定要启用授权策略「${rule.ruleName}」吗？启用后匹配该职级序列/职级的职位将重新获得对应模型访问权。`
+        : `确定要停用授权策略「${rule.ruleName}」吗？停用后匹配该职级序列/职级的职位将立即失去对应模型访问权。`,
       okText: '确定',
       cancelText: '取消',
       okButtonProps: isEnable ? undefined : { danger: true },
-      onOk: () => {
-        persistPosRules(posRules.map((r) => (r.id === rule.id ? { ...r, status: isEnable ? 1 : 0 } : r)))
-        message.success(isEnable ? '规则已启用' : '规则已停用')
+      onOk: async () => {
+        await togglePosStrategyStatus(rule.id, isEnable ? 1 : 0)
+        await reloadPosRules()
+        message.success(isEnable ? '策略已启用' : '策略已停用')
       },
     })
   }
 
   /* ── 表格列定义（职位授权规则） ── */
   const posColumnMeta = [
-    { key: 'ruleName', title: '规则名称' },
+    { key: 'configCode', title: '配置ID' },
+    { key: 'ruleName', title: '策略名称' },
     { key: 'sequence', title: '职级序列' },
     { key: 'jobLevel', title: '职级' },
     { key: 'modelConfigs', title: '授权模型' },
@@ -201,7 +268,11 @@ export default function AiEmployeeAuthControl() {
   }
 
   const posColumns: ColumnsType<PosAuthRule> = [
-    { title: '规则名称', dataIndex: 'ruleName', key: 'ruleName', width: 160 },
+    {
+      title: '配置ID', dataIndex: 'configCode', key: 'configCode', width: 160, align: 'center',
+      render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
+    },
+    { title: '策略名称', dataIndex: 'ruleName', key: 'ruleName', width: 160 },
     {
       title: '职级序列', dataIndex: 'sequence', key: 'sequence', width: 130, align: 'center',
       render: (seqs: string[]) => (seqs?.length
@@ -260,10 +331,10 @@ export default function AiEmployeeAuthControl() {
         style={{ marginBottom: 16 }}
         message={
           <span>
-            按职位授权通过配置授权规则（职级序列 + 职级 + 授权模型）批量下发模型权限，匹配规则的职位下所有员工自动获得对应模型访问权，授权细化到模型能力顆粒度。
+            按职位授权通过配置授权策略（职级序列 + 职级 + 授权模型）批量下发模型权限，匹配策略的职位下所有员工自动获得对应模型访问权，授权细化到模型能力顆粒度。
             <span style={{ color: '#8C8C8C' }}>
-              当员工同时匹配多条职位规则或多个角色时，模型访问权限取所有角色授权的<b>并集</b>（即员工可访问所有角色授权的模型合集）；
-              优先级：员工个人覆盖 &gt; 职位规则 &gt; 角色规则。
+              当员工同时匹配多条职位策略或多个角色时，模型访问权限取所有角色授权的<b>并集</b>（即员工可访问所有角色授权的模型合集）；
+              优先级：员工个人覆盖 &gt; 职位策略 &gt; 角色策略。
             </span>
           </span>
         }
@@ -271,8 +342,8 @@ export default function AiEmployeeAuthControl() {
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="规则名称">
-            <Input value={ruleQuery} placeholder="请输入规则名称" allowClear onChange={(e) => setRuleQuery(e.target.value)} />
+          <Form.Item label="策略名称">
+            <Input value={ruleQuery} placeholder="请输入策略名称" allowClear onChange={(e) => setRuleQuery(e.target.value)} />
           </Form.Item>
           <Form.Item label="职级序列">
             <Select value={ruleSeqFilter} placeholder="全部" allowClear onChange={(v) => setRuleSeqFilter(v)} options={POSITION_SEQUENCE_OPTIONS} />
@@ -303,7 +374,7 @@ export default function AiEmployeeAuthControl() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <span style={{ fontSize: 13, color: '#595959' }}>共 {filteredRules.length} 条授权规则</span>
+          <span style={{ fontSize: 13, color: '#595959' }}>共 {filteredRules.length} 条授权策略</span>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleRuleCreate}>新增</Button>
@@ -317,8 +388,8 @@ export default function AiEmployeeAuthControl() {
         loading={loading}
         columns={posColumns}
         dataSource={filteredRules}
-        scroll={{ x: 1210 }}
-        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 条规则` }}
+        scroll={{ x: 1370 }}
+        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 条策略` }}
       />
     </>
   )
@@ -327,11 +398,38 @@ export default function AiEmployeeAuthControl() {
   const [roleConfigs, setRoleConfigs] = useState<RoleAuthConfig[]>([])
   const [roleQuery, setRoleQuery] = useState('')
 
-  /** 模型就绪后从 localStorage 载入角色授权配置（含旧结构自动迁移） */
+  /** 從後端載入角色授權配置（能力開關按模型上限收斂） */
+  const reloadRoleConfigs = async () => {
+    const list = await fetchRoleAuths()
+    setRoleConfigs(list.map((item: RoleAuthItem) => ({
+      roleId: item.roleId,
+      configCode: item.configCode,
+      roleName: item.roleName,
+      description: item.description ?? '',
+      modelConfigs: clampModelConfigs(item.modelConfigs ?? [], models),
+      userIds: item.userIds ?? [],
+      dataResidency: item.dataResidency,
+      status: item.status,
+      createdAt: item.createdAt ?? '',
+      updatedBy: item.updatedBy,
+      updatedAt: item.updatedAt,
+    })))
+  }
+
+  /** 模型就緒後載入後端角色授權（localStorage 遷移已在 Tab1 的加載流程中統一執行） */
   useEffect(() => {
-    if (models.length > 0) {
-      setRoleConfigs(loadRoleAuthConfigs(models))
-    }
+    if (models.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await migrateLegacyData()
+        if (!cancelled) await reloadRoleConfigs()
+      } catch {
+        if (!cancelled) message.error('加載角色授權失敗')
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [models])
 
   const filteredRoles = useMemo(() => roleConfigs.filter((c) => {
@@ -340,7 +438,7 @@ export default function AiEmployeeAuthControl() {
   }), [roleConfigs, roleQuery])
 
   /* ── 导航至独立页面（全局统一：取消弹窗） ── */
-  const handleRoleCreate = () => navigate('/ai-role-auth-edit')
+  const handleRoleCreate = () => navigate('/ai-role-auth-edit?type=add')
   const handleRoleEdit = (config: RoleAuthConfig) => navigate(`/ai-role-auth-edit?roleId=${config.roleId}`)
   const handleRoleDetail = (config: RoleAuthConfig) => navigate(`/ai-role-auth-detail?roleId=${config.roleId}`)
 
@@ -358,22 +456,48 @@ export default function AiEmployeeAuthControl() {
       okText: '移除',
       okButtonProps: { danger: true },
       cancelText: '取消',
-      onOk: () => {
-        const next = roleConfigs.filter((c) => c.roleId !== config.roleId)
-        setRoleConfigs(next)
-        saveRoleAuthConfigs(next)
+      onOk: async () => {
+        await deleteRoleAuth(config.roleId)
+        await reloadRoleConfigs()
         message.success('角色授权配置已移除')
+      },
+    })
+  }
+
+  /** 切換角色授權啟用/停用狀態（帶二次確認彈窗，遵循全局統一規範） */
+  const handleRoleToggleStatus = (config: RoleAuthConfig) => {
+    const isEnable = config.status !== 1
+    Modal.confirm({
+      title: isEnable ? '确认启用' : '确认停用',
+      icon: (
+        <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+      ),
+      centered: true,
+      className: 'custom-confirm-modal',
+      width: 520,
+      content: isEnable
+        ? `确定要启用角色「${config.roleName}」的模型授權嗎？启用后綁定員工將重新獲得該角色授予的模型訪問權。`
+        : `确定要停用角色「${config.roleName}」的模型授權嗎？停用后綁定員工將立即失去該角色授予的模型訪問權。`,
+      okText: '确定',
+      cancelText: '取消',
+      okButtonProps: isEnable ? undefined : { danger: true },
+      onOk: async () => {
+        await toggleRoleAuthStatus(config.roleId, isEnable ? 1 : 0)
+        await reloadRoleConfigs()
+        message.success(isEnable ? '角色授權已啟用' : '角色授權已停用')
       },
     })
   }
 
   /* ── 表格列定义（角色授权） ── */
   const roleColumnMeta = [
+    { key: 'configCode', title: '配置ID' },
     { key: 'roleName', title: '角色名称' },
     { key: 'modelConfigs', title: '授权模型' },
     { key: 'capabilities', title: '授權能力' },
     { key: 'dataResidency', title: '數據不出域' },
     { key: 'userCount', title: '绑定员工数' },
+    { key: 'status', title: '状态' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updatedAt', title: '最後更新時間' },
     { key: 'action', title: '操作' },
@@ -381,6 +505,10 @@ export default function AiEmployeeAuthControl() {
   const { configComponent: roleConfigComponent } = useColumnConfig('ai-role-auth', roleColumnMeta, [{ key: 'action', visible: true, locked: 'tail' as const }])
 
   const roleColumns: ColumnsType<RoleAuthConfig> = [
+    {
+      title: '配置ID', dataIndex: 'configCode', key: 'configCode', width: 160, align: 'center',
+      render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
+    },
     { title: '角色名称', dataIndex: 'roleName', width: 180 },
     {
       title: '授权模型', dataIndex: 'modelConfigs', key: 'modelConfigs', width: 200,
@@ -399,6 +527,17 @@ export default function AiEmployeeAuthControl() {
       render: (_, row) => `${row.userIds.length}人`,
     },
     {
+      title: '状态', dataIndex: 'status', key: 'status', width: 80, align: 'center',
+      render: (_: unknown, row: RoleAuthConfig) => (
+        <Switch
+          checked={row.status === 1}
+          checkedChildren="启用"
+          unCheckedChildren="停用"
+          onChange={() => handleRoleToggleStatus(row)}
+        />
+      ),
+    },
+    {
       title: '最後更新人', dataIndex: 'updatedBy', width: 100,
       render: (v: string) => v || '-',
     },
@@ -411,7 +550,7 @@ export default function AiEmployeeAuthControl() {
       render: (_, row) => (
         <>
           <Button type="link" onClick={() => handleRoleDetail(row)}>详情</Button>
-          <Button type="link" onClick={() => handleRoleEdit(row)}>配置</Button>
+          <Button type="link" onClick={() => handleRoleEdit(row)}>编辑</Button>
           <Button type="link" danger onClick={() => handleRoleConfigRemove(row)}>移除</Button>
         </>
       ),
@@ -459,7 +598,7 @@ export default function AiEmployeeAuthControl() {
         loading={loading}
         columns={roleColumns}
         dataSource={filteredRoles}
-        scroll={{ x: 1220 }}
+        scroll={{ x: 1460 }}
         pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 个角色` }}
       />
     </>

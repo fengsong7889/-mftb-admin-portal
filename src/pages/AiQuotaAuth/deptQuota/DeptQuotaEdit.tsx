@@ -7,10 +7,9 @@ import {
   FundOutlined, PoweroffOutlined,
 } from '@ant-design/icons'
 import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '../../../api'
+import { fetchDeptQuotaDetail, saveDeptQuota, type DeptQuotaRequest,
+  type QuotaPeriod, type QuotaType, type OverLimitAction, type AllocateMode, type Currency } from '../../../api/deptQuota'
 import {
-  loadDeptQuotas,
-  saveDeptQuotas,
-  getDeptQuotaById,
   buildDeptTree,
   QUOTA_PERIOD_LABEL,
   QUOTA_TYPE_LABEL,
@@ -19,12 +18,6 @@ import {
   ALLOCATE_MODE_LABEL,
   CURRENCY_SYMBOL,
   CURRENCY_OPTIONS,
-  type DeptQuotaPolicy,
-  type QuotaPeriod,
-  type QuotaType,
-  type OverLimitAction,
-  type AllocateMode,
-  type Currency,
 } from './deptQuotaStore'
 
 /** 格式化時間為 YYYY-MM-DD HH:mm:ss */
@@ -49,6 +42,8 @@ export default function DeptQuotaEdit() {
   const [models, setModels] = useState<AiModel[]>([])
   const [deptOptions, setDeptOptions] = useState<DeptOption[]>([])
   const [selectedDeptIds, setSelectedDeptIds] = useState<number[]>([])
+  /** 左侧树勾选的部门（待确认，点击箭头后才移入右侧） */
+  const [checkedDeptIds, setCheckedDeptIds] = useState<number[]>([])
   const [deptSearchKw, setDeptSearchKw] = useState('')
 
   /**
@@ -68,27 +63,28 @@ export default function DeptQuotaEdit() {
         setDeptOptions(depts)
 
         if (quotaId) {
-          // 依實時部門選項解析後再回填
-          const policy = getDeptQuotaById(quotaId, depts)
-          if (!policy) {
-            message.error('額度策略不存在或已刪除')
-            navigate('/ai-dept-quota')
-            return
-          }
-          form.setFieldsValue({
-            name: policy.name,
-            description: policy.description ?? '',
-            allocateMode: policy.allocateMode,
-            period: policy.period,
-            quotaType: policy.quotaType,
-            quotaValue: policy.quotaValue,
-            currency: policy.currency,
-            softThreshold: policy.softThreshold,
-            overLimitAction: policy.overLimitAction,
-            downgradeModelId: policy.downgradeModelId ?? undefined,
-            status: policy.status,
-          })
-          setSelectedDeptIds(policy.deptIds)
+          // 從後端 API 載入詳情
+          fetchDeptQuotaDetail(Number(quotaId)).then((policy) => {
+            if (!policy) {
+              message.error('額度策略不存在或已刪除')
+              navigate('/ai-dept-quota')
+              return
+            }
+            form.setFieldsValue({
+              name: policy.name,
+              description: policy.description ?? '',
+              allocateMode: policy.allocateMode,
+              period: policy.period,
+              quotaType: policy.quotaType,
+              quotaValue: policy.quotaValue,
+              currency: policy.currency,
+              softThreshold: policy.softThreshold,
+              overLimitAction: policy.overLimitAction,
+              downgradeModelId: policy.downgradeModelId ?? undefined,
+              status: policy.status,
+            })
+            setSelectedDeptIds(policy.deptIds)
+          }).catch(() => { message.error('加載詳情失敗') })
         }
       })
       .catch(() => { if (!cancelled) message.error('加載數據失敗') })
@@ -105,8 +101,19 @@ export default function DeptQuotaEdit() {
   const softThreshold = Form.useWatch('softThreshold', form) as number | undefined
   const overLimitAction = Form.useWatch('overLimitAction', form) as OverLimitAction | undefined
 
-  /** 部門樹數據 */
-  const deptTree = useMemo(() => buildDeptTree(deptOptions), [deptOptions])
+  /** 部門樹原始數據 */
+  const deptTreeRaw = useMemo(() => buildDeptTree(deptOptions), [deptOptions])
+  /** 部門樹數據（已選部門標記 disabled，防止重複勾選） */
+  const deptTree = useMemo(() => {
+    const selectedSet = new Set(selectedDeptIds)
+    const markDisabled = (nodes: typeof deptTreeRaw): typeof deptTreeRaw =>
+      nodes.map((n) => ({
+        ...n,
+        disabled: selectedSet.has(n.value),
+        children: n.children ? markDisabled(n.children) : undefined,
+      }))
+    return markDisabled(deptTreeRaw)
+  }, [deptTreeRaw, selectedDeptIds])
   const deptRootKeys = useMemo(() => deptTree.map((n) => n.value), [deptTree])
 
   /** 已選部門人數合計 */
@@ -170,14 +177,25 @@ export default function DeptQuotaEdit() {
 
     setSaving(true)
     try {
-      const all = loadDeptQuotas()
-      if (isEdit && quotaId) {
-        saveDeptQuotas(all.map((p) => (p.id === quotaId ? { ...p, ...base } : p)))
-        message.success('額度策略已更新')
-      } else {
-        saveDeptQuotas([...all, { ...base, id: `dq_${Date.now()}`, createdAt: now, usedValue: 0 } as DeptQuotaPolicy])
-        message.success('額度策略已創建')
+      const payload: DeptQuotaRequest = {
+        ...(isEdit && quotaId ? { id: Number(quotaId) } : {}),
+        name: String(values.name).trim(),
+        description: (values.description ?? '') as string,
+        deptIds: selectedDeptIds,
+        deptNames: matched.map((d) => d.deptName),
+        totalEmployeeCount: matched.reduce((s, d) => s + d.employeeCount, 0),
+        allocateMode: String(values.allocateMode),
+        period: String(values.period),
+        quotaType: String(values.quotaType),
+        quotaValue: Number(values.quotaValue),
+        currency: String(values.currency ?? 'CNY'),
+        softThreshold: (values.softThreshold ?? 80) as number,
+        overLimitAction: String(values.overLimitAction),
+        downgradeModelId: values.overLimitAction === 'downgrade' ? (values.downgradeModelId ?? null) : null,
+        status: (values.status ?? 1) as number,
       }
+      await saveDeptQuota(payload)
+      message.success(isEdit ? '額度策略已更新' : '額度策略已創建')
       navigate('/ai-dept-quota')
     } finally {
       setSaving(false)
@@ -229,7 +247,7 @@ export default function DeptQuotaEdit() {
               }}>返回</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯部門額度策略' : '新增部門額度策略'}
+              {isEdit ? '編輯部門額度' : '新增部門額度'}
             </h2>
           </div>
         </div>
@@ -286,7 +304,11 @@ export default function DeptQuotaEdit() {
                 borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>可選部門（{deptOptions.length}）</span>
-                <a onClick={() => setSelectedDeptIds(deptOptions.map((d) => d.deptId))} style={{ fontSize: 12 }}>全選</a>
+                <a onClick={() => {
+                  // 全选：将所有未入选的部门加入勾选
+                  const unchecked = deptOptions.map((d) => d.deptId).filter((id) => !selectedDeptIds.includes(id))
+                  setCheckedDeptIds(unchecked)
+                }} style={{ fontSize: 12 }}>全選</a>
               </div>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                 <Input placeholder="搜索部門名稱或編碼" allowClear size="small" value={deptSearchKw} onChange={(e) => setDeptSearchKw(e.target.value)} />
@@ -295,8 +317,12 @@ export default function DeptQuotaEdit() {
                 <Tree
                   checkable
                   defaultExpandedKeys={deptRootKeys}
-                  checkedKeys={selectedDeptIds}
-                  onCheck={(keys) => setSelectedDeptIds(keys as number[])}
+                  checkedKeys={checkedDeptIds}
+                  onCheck={(keys) => {
+                    // 過濾已選部門，避免 disabled 節點殘留在 checkedDeptIds 中
+                    const raw = Array.isArray(keys) ? keys : keys.checked
+                    setCheckedDeptIds((raw as number[]).filter((id) => !selectedDeptIds.includes(id)))
+                  }}
                   treeData={deptTree as unknown as TreeDataNode[]}
                   fieldNames={{ key: 'value', title: 'title', children: 'children' }}
                   filterTreeNode={(node) => {
@@ -312,8 +338,20 @@ export default function DeptQuotaEdit() {
             {/* 中間：操作按鈕 */}
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
               <Button type="primary" size="small" icon={<span style={{ fontSize: 16 }}>›</span>}
-                onClick={() => setSelectedDeptIds(deptOptions.map((d) => d.deptId))}
-                disabled={selectedDeptIds.length === deptOptions.length}
+                onClick={() => {
+                  // 將勾選部門移入右側（去重 + 過濾已選）
+                  const newIds = checkedDeptIds.filter((id) => !selectedDeptIds.includes(id))
+                  if (newIds.length === 0) {
+                    message.warning('所選部門已添加，無需重複添加')
+                    setCheckedDeptIds([])
+                    return
+                  }
+                  const skipped = checkedDeptIds.length - newIds.length
+                  setSelectedDeptIds((prev) => [...new Set([...prev, ...newIds])])
+                  setCheckedDeptIds([])
+                  if (skipped > 0) message.warning(`已跳過 ${skipped} 個已添加的部門`)
+                }}
+                disabled={checkedDeptIds.length === 0}
                 style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }} />
               <Button size="small" icon={<span style={{ fontSize: 16 }}>‹</span>}
                 onClick={() => setSelectedDeptIds([])} disabled={selectedDeptIds.length === 0} />
@@ -406,7 +444,7 @@ export default function DeptQuotaEdit() {
             </Form.Item>
           </div>
 
-          {/* 限額值 + 計價幣種（費用時） */}
+          {/* 限額值 + 軟限額提醒閾值（並排展示） */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="quotaValue" label="限額值" rules={[{ required: true, message: '請輸入限額值' }]}>
               <InputNumber<number>
@@ -418,21 +456,23 @@ export default function DeptQuotaEdit() {
                 parser={(v) => Number(`${v ?? ''}`.replace(/,/g, ''))}
               />
             </Form.Item>
-            {quotaType === 'cost' && (
+            <Form.Item
+              name="softThreshold"
+              label={<span>軟限額提醒閾值 <span style={{ color: '#8C8C8C', fontWeight: 400, fontSize: 12 }}>（達此比例時通知，不阻斷）</span></span>}
+            >
+              <Slider min={10} max={100} step={5} marks={{ 50: '50%', 80: '80%', 100: '100%' }}
+                tooltip={{ formatter: (v) => `${v}%` }} />
+            </Form.Item>
+          </div>
+
+          {/* 計價幣種（僅費用類型時） */}
+          {quotaType === 'cost' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
               <Form.Item name="currency" label="計價幣種" rules={[{ required: true }]}>
                 <Select options={CURRENCY_OPTIONS} />
               </Form.Item>
-            )}
-          </div>
-
-          {/* 軟限額提醒閾值 */}
-          <Form.Item
-            name="softThreshold"
-            label={<span>軟限額提醒閾值 <span style={{ color: '#8C8C8C', fontWeight: 400, fontSize: 12 }}>（用量達此比例時通知員工與主管，不阻斷請求）</span></span>}
-          >
-            <Slider min={10} max={100} step={5} marks={{ 50: '50%', 80: '80%', 100: '100%' }}
-              tooltip={{ formatter: (v) => `${v}%` }} />
-          </Form.Item>
+            </div>
+          )}
 
           {/* 超額動作 */}
           <Form.Item name="overLimitAction" label="超出限額後動作" rules={[{ required: true }]}>

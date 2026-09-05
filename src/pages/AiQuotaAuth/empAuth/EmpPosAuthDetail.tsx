@@ -7,7 +7,8 @@ import { fetchModels, type AiModel } from '../../../api'
 import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
 import AnimatedNumber from '../../../components/AnimatedNumber'
 import { ModelAuthSectionReadonly } from './ModelAuthSection'
-import { loadPosRules, type PosAuthRule } from './modelAuthCapability'
+import { clampModelConfigs, type PosAuthRule } from './modelAuthCapability'
+import { getPosStrategyById } from '../../../api/empAuth'
 
 /**
  * 按職位授權 - 詳情獨立頁（參考部門模型權控詳情頁佈局）
@@ -31,16 +32,30 @@ export default function EmpPosAuthDetail() {
     }
     let cancelled = false
     setLoading(true)
-    fetchModels({ status: 1 })
-      .then((modelList) => {
+    ;(async () => {
+      try {
+        const [modelList, detail] = await Promise.all([fetchModels({ status: 1 }), getPosStrategyById(ruleId)])
         if (cancelled) return
         setModels(modelList)
-        const found = loadPosRules(modelList).find((r) => r.id === ruleId) ?? null
-        setRule(found)
-        if (!found) message.error('授權規則不存在或已刪除')
-      })
-      .catch(() => { if (!cancelled) message.error('加載詳情失敗') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+        setRule({
+          id: detail.id,
+          ruleName: detail.ruleName,
+          sequence: detail.sequence ?? [],
+          jobLevels: detail.jobLevels ?? [],
+          modelConfigs: clampModelConfigs(detail.modelConfigs ?? [], modelList),
+          dataResidency: detail.dataResidency,
+          description: detail.description ?? '',
+          status: detail.status,
+          createdAt: detail.createdAt ?? '',
+          updatedBy: detail.updatedBy,
+          updatedAt: detail.updatedAt,
+        })
+      } catch {
+        if (!cancelled) message.error('授權策略不存在或已刪除')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     return () => { cancelled = true }
   }, [ruleId, navigate])
 
@@ -57,7 +72,7 @@ export default function EmpPosAuthDetail() {
   if (!rule) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>授權規則信息加載失敗</div>
+        <div style={{ fontSize: 16, color: '#8C8C8C' }}>授權策略信息加載失敗</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>返回列表</Button>
       </div>
     )
@@ -160,7 +175,7 @@ export default function EmpPosAuthDetail() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {([
-            { label: '規則名稱', value: rule.ruleName },
+            { label: '策略名稱', value: rule.ruleName },
             { label: '描述', value: rule.description || '-' },
             { label: '狀態', value: rule.status === 1 ? '啟用' : '停用' },
             { label: '最後更新人', value: rule.updatedBy ?? '-' },

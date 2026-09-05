@@ -2,16 +2,18 @@ package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AiProviderDTO;
 import com.mftb.admin.entity.AiProvider;
 import com.mftb.admin.mapper.AiProviderMapper;
+import com.mftb.admin.util.ProviderKeyCipher;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,19 +21,25 @@ import java.util.List;
 /**
  * AI 供应商管理控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/ai/providers")
 @RequiredArgsConstructor
 @Tag(name = "AI 智能中心", description = "AI 智能中心相关接口")
 public class AiProviderController {
 
+    /** 本菜单标识（sys_menu.menu_key），供应商管理页 */
+    private static final String MENU = "ai-model-provider";
+
     private final AiProviderMapper providerMapper;
+    private final ProviderKeyCipher keyCipher;
 
     /**
      * 获取供应商列表
      */
     @GetMapping
     @Operation(summary = "查询供应商列表")
+    @RequirePermission(menu = MENU)
     public Result<List<AiProviderDTO.ProviderVO>> list(
         @RequestParam(required = false) String providerKey,
         @RequestParam(required = false) String name,
@@ -63,6 +71,7 @@ public class AiProviderController {
      */
     @GetMapping("/{id}")
     @Operation(summary = "获取供应商详情")
+    @RequirePermission(menu = MENU)
     public Result<AiProviderDTO.ProviderVO> getById(@PathVariable Long id) {
         AiProvider provider = providerMapper.selectById(id);
         if (provider == null) {
@@ -76,13 +85,16 @@ public class AiProviderController {
      */
     @PostMapping
     @Operation(summary = "新增供应商")
+    @RequirePermission(menu = MENU, action = "create")
     public Result<Boolean> create(@Valid @RequestBody AiProviderDTO.ProviderSaveRequest request) {
         try {
             AiProvider provider = new AiProvider();
             BeanUtils.copyProperties(request, provider);
-            
+            // API Key 加密落库（禁止明文存储）
+            provider.setApiKey(keyCipher.encrypt(request.getApiKey()));
+
             // 默认设置为非默认供应商
-            if (request.getIsDefault() == 1) {
+            if (request.getIsDefault() != null && request.getIsDefault() == 1) {
                 // 如果设为默认，先将所有其他供应商的 is_default 设为 0
                 providerMapper.update(null, 
                     new LambdaUpdateWrapper<AiProvider>().set(AiProvider::getIsDefault, 0));
@@ -92,10 +104,12 @@ public class AiProviderController {
             providerMapper.insert(provider);
             return Result.success(true);
         } catch (Exception e) {
-            if (e.getMessage().contains("Duplicate entry")) {
+            String msg = e.getMessage();
+            if (msg != null && msg.contains("Duplicate entry")) {
                 return Result.error("供应商标识已存在");
             }
-            return Result.error("创建失败：" + e.getMessage());
+            log.error("新增供应商失败", e);
+            return Result.error("创建失败，请稍后重试");
         }
     }
 
@@ -104,16 +118,27 @@ public class AiProviderController {
      */
     @PutMapping("/{id}")
     @Operation(summary = "更新供应商")
+    @RequirePermission(menu = MENU, action = "edit")
     public Result<Boolean> update(@PathVariable Long id, @Valid @RequestBody AiProviderDTO.ProviderSaveRequest request) {
         AiProvider existing = providerMapper.selectById(id);
         if (existing == null) {
             return Result.error("供应商不存在");
         }
-        
+
+        // 保留旧密文：copyProperties 会用请求值覆盖 apiKey，随后根据是否重填决定取舍
+        String oldApiKey = existing.getApiKey();
         BeanUtils.copyProperties(request, existing);
-        
+
+        // API Key 处理：前端未重填（空 / 含脱敏占位符 ****）则保留原密钥，否则重新加密
+        String reqKey = request.getApiKey();
+        if (reqKey == null || reqKey.isBlank() || reqKey.contains("****")) {
+            existing.setApiKey(oldApiKey);
+        } else {
+            existing.setApiKey(keyCipher.encrypt(reqKey));
+        }
+
         // 如果修改了 is_default，先清空其他供应商的默认设置
-        if (request.getIsDefault() == 1) {
+        if (request.getIsDefault() != null && request.getIsDefault() == 1) {
             providerMapper.update(null, 
                 new LambdaUpdateWrapper<AiProvider>()
                     .ne(AiProvider::getId, id)
@@ -129,6 +154,7 @@ public class AiProviderController {
      */
     @DeleteMapping("/{id}")
     @Operation(summary = "删除供应商")
+    @RequirePermission(menu = MENU, action = "delete")
     public Result<Boolean> delete(@PathVariable Long id) {
         AiProvider existing = providerMapper.selectById(id);
         if (existing == null) {
@@ -136,7 +162,7 @@ public class AiProviderController {
         }
         
         // 如果是默认供应商，不能删除
-        if (existing.getIsDefault() == 1) {
+        if (existing.getIsDefault() != null && existing.getIsDefault() == 1) {
             return Result.error("默认供应商无法删除");
         }
         
@@ -151,13 +177,14 @@ public class AiProviderController {
         AiProviderDTO.ProviderVO vo = new AiProviderDTO.ProviderVO();
         BeanUtils.copyProperties(entity, vo);
         
-        // API Key 脱敏显示
-        if (entity.getApiKey() != null && entity.getApiKey().length() > 4) {
-            String maskedKey = entity.getApiKey().substring(0, 4) + "****" + 
-                              entity.getApiKey().substring(entity.getApiKey().length() - 4);
+        // API Key 脱敏显示（先解密再脱敏，密文/历史明文均适用）
+        String plainKey = keyCipher.decrypt(entity.getApiKey());
+        if (plainKey != null && plainKey.length() > 8) {
+            String maskedKey = plainKey.substring(0, 4) + "****" +
+                              plainKey.substring(plainKey.length() - 4);
             vo.setApiKeyMasked(maskedKey);
         } else {
-            vo.setApiKeyMasked("***");
+            vo.setApiKeyMasked(plainKey == null || plainKey.isEmpty() ? "" : "***");
         }
         
         // 格式化时间

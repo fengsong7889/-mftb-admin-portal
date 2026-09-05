@@ -232,6 +232,7 @@ export default function DeptAuthGroupDetail() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {([
             { label: '策略名稱', value: detail.name },
+            { label: '描述', value: detail.description || '-' },
             { label: '數據不出域', value: detail.dataResidency === 1 ? '已啟用' : '未啟用' },
             { label: '狀態', value: detail.status === 1 ? '啟用' : '停用' },
             { label: '最後更新人', value: detail.updatedBy ?? '-' },

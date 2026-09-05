@@ -10,6 +10,7 @@
 DROP TABLE IF EXISTS `ai_dept_auth_group`;
 CREATE TABLE `ai_dept_auth_group` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
+    `config_code` VARCHAR(32) DEFAULT NULL COMMENT '配置ID（按编号生成规则 ai_dept_model_auth 生成）',
     `name` VARCHAR(100) NOT NULL COMMENT '策略名称',
     `data_residency` TINYINT DEFAULT 0 COMMENT '数据不出域：1=启用 0=未启用',
     `status` TINYINT DEFAULT 1 COMMENT '状态：1=启用 0=停用',

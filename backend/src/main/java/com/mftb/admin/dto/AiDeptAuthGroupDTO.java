@@ -21,7 +21,10 @@ public class AiDeptAuthGroupDTO {
         private static final long serialVersionUID = 1L;
 
         private Long id;
+        /** 配置ID（编号生成规则 ai_dept_model_auth） */
+        private String configCode;
         private String name;
+        private String description;
         private Integer dataResidency;
         private Integer status;
         private Integer totalEmployeeCount;
@@ -47,7 +50,10 @@ public class AiDeptAuthGroupDTO {
         private static final long serialVersionUID = 1L;
 
         private Long id;
+        /** 配置ID（编号生成规则 ai_dept_model_auth） */
+        private String configCode;
         private String name;
+        private String description;
         private Integer dataResidency;
         private Integer status;
         private Integer totalEmployeeCount;
@@ -105,6 +111,9 @@ public class AiDeptAuthGroupDTO {
 
         @NotBlank(message = "策略名称不能为空")
         private String name;
+
+        /** 策略描述 */
+        private String description;
 
         /** 数据不出域 */
         private Integer dataResidency;

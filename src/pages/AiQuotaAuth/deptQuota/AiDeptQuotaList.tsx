@@ -4,11 +4,9 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { fetchDeptOptions, fetchModels, type DeptOption, type AiModel } from '../../../api'
+import { fetchDeptQuotas, deleteDeptQuota, toggleDeptQuotaStatus, type DeptQuotaVO, type QuotaPeriod } from '../../../api/deptQuota'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
-  loadDeptQuotas,
-  saveDeptQuotas,
-  resolveDeptRefs,
   usagePercent,
   usageColor,
   usedText,
@@ -17,8 +15,6 @@ import {
   ALLOCATE_MODE_LABEL,
   OVER_LIMIT_ACTION_LABEL,
   OVER_LIMIT_TAG,
-  type DeptQuotaPolicy,
-  type QuotaPeriod,
 } from './deptQuotaStore'
 
 /**
@@ -29,15 +25,14 @@ export default function AiDeptQuotaList() {
   const navigate = useNavigate()
 
   /* ── 基礎數據 ── */
-  const [policies, setPolicies] = useState<DeptQuotaPolicy[]>([])
+  const [policies, setPolicies] = useState<DeptQuotaVO[]>([])
   const [deptOptions, setDeptOptions] = useState<DeptOption[]>([])
   const [models, setModels] = useState<AiModel[]>([])
   const [loading, setLoading] = useState(false)
 
-  /** 依實時部門選項解析策略的部門名稱 / 人數 */
-  const reload = (depts: DeptOption[]) => {
-    const raw = loadDeptQuotas()
-    setPolicies(raw.map((p) => resolveDeptRefs(p, depts)))
+  /** 從後端 API 載入部門額度列表 */
+  const reload = () => {
+    fetchDeptQuotas().then(setPolicies).catch(() => setPolicies([]))
   }
 
   useEffect(() => {
@@ -50,7 +45,7 @@ export default function AiDeptQuotaList() {
       if (cancelled) return
       setDeptOptions(depts)
       setModels(modelList)
-      reload(depts)
+      reload()
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -94,12 +89,12 @@ export default function AiDeptQuotaList() {
   const totalEmployeeCount = useMemo(() => policies.reduce((s, p) => s + p.totalEmployeeCount, 0), [policies])
 
   /* ── 導航至獨立頁面 ── */
-  const handleCreate = () => navigate('/ai-dept-quota-edit')
-  const handleEdit = (row: DeptQuotaPolicy) => navigate(`/ai-dept-quota-edit?id=${row.id}`)
-  const handleDetail = (row: DeptQuotaPolicy) => navigate(`/ai-dept-quota-detail?id=${row.id}`)
+  const handleCreate = () => navigate('/ai-dept-quota-edit?type=add')
+  const handleEdit = (row: DeptQuotaVO) => navigate(`/ai-dept-quota-edit?id=${row.id}`)
+  const handleDetail = (row: DeptQuotaVO) => navigate(`/ai-dept-quota-detail?id=${row.id}`)
 
   /* ── 刪除（二次確認） ── */
-  const handleDelete = (row: DeptQuotaPolicy) => {
+  const handleDelete = (row: DeptQuotaVO) => {
     Modal.confirm({
       title: '確認刪除該額度策略？',
       content: `刪除後「${row.name}」立即失效，關聯的 ${row.deptNames.length || row.deptIds.length} 個部門員工不再受此限額約束。`,
@@ -107,16 +102,16 @@ export default function AiDeptQuotaList() {
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => {
-        const next = loadDeptQuotas().filter((p) => p.id !== row.id)
-        saveDeptQuotas(next)
-        reload(deptOptions)
-        message.success(`策略「${row.name}」已刪除`)
+        deleteDeptQuota(row.id).then(() => {
+          message.success(`策略「${row.name}」已刪除`)
+          reload()
+        })
       },
     })
   }
 
   /* ── 啟停（二次確認） ── */
-  const handleToggle = (row: DeptQuotaPolicy) => {
+  const handleToggle = (row: DeptQuotaVO) => {
     const toDisable = row.status === 1
     const actionText = toDisable ? '停用' : '啟用'
     Modal.confirm({
@@ -125,16 +120,17 @@ export default function AiDeptQuotaList() {
       okText: '確認',
       cancelText: '取消',
       onOk: () => {
-        const next = loadDeptQuotas().map((p) => (p.id === row.id ? { ...p, status: toDisable ? 0 : 1, updatedBy: 'admin', updatedAt: new Date().toISOString() } : p))
-        saveDeptQuotas(next)
-        reload(deptOptions)
-        message.success(`策略「${row.name}」已${actionText}`)
+        toggleDeptQuotaStatus(row.id, toDisable ? 0 : 1).then(() => {
+          message.success(`策略「${row.name}」已${actionText}`)
+          reload()
+        })
       },
     })
   }
 
   /* ── 列字段配置 ── */
   const columnMeta = [
+    { key: 'configCode', title: '配置ID' },
     { key: 'name', title: '策略名稱' },
     { key: 'deptNames', title: '適用部門' },
     { key: 'totalEmployeeCount', title: '覆蓋人數' },
@@ -153,7 +149,11 @@ export default function AiDeptQuotaList() {
   ])
 
   /* ── 表格列 ── */
-  const columns: ColumnsType<DeptQuotaPolicy> = [
+  const columns: ColumnsType<DeptQuotaVO> = [
+    {
+      key: 'configCode', title: '配置ID', dataIndex: 'configCode', width: 160, align: 'center',
+      render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
+    },
     { key: 'name', title: '策略名稱', dataIndex: 'name', width: 180 },
     {
       key: 'deptNames', title: '適用部門', dataIndex: 'deptNames', width: 240,
@@ -179,7 +179,7 @@ export default function AiDeptQuotaList() {
     { key: 'totalEmployeeCount', title: '覆蓋人數', dataIndex: 'totalEmployeeCount', width: 100, align: 'right', render: (v: number) => `${v.toLocaleString()} 人` },
     {
       key: 'allocateMode', title: '額度分配', dataIndex: 'allocateMode', width: 120, align: 'center',
-      render: (v: DeptQuotaPolicy['allocateMode']) => (
+      render: (v: DeptQuotaVO['allocateMode']) => (
         <Tag color={v === 'per_capita' ? 'blue' : 'default'}>{ALLOCATE_MODE_LABEL[v]}</Tag>
       ),
     },
@@ -211,7 +211,7 @@ export default function AiDeptQuotaList() {
     { key: 'softThreshold', title: '軟提醒', dataIndex: 'softThreshold', width: 90, align: 'center', render: (v: number) => `${v}%` },
     {
       key: 'overLimitAction', title: '超額動作', dataIndex: 'overLimitAction', width: 150, align: 'center',
-      render: (v: DeptQuotaPolicy['overLimitAction'], row) => (
+      render: (v: DeptQuotaVO['overLimitAction'], row) => (
         <Tag color={OVER_LIMIT_TAG[v]}>
           {OVER_LIMIT_ACTION_LABEL[v]}{v === 'downgrade' && row.downgradeModelId ? ` · ${modelName[row.downgradeModelId] ?? ''}` : ''}
         </Tag>

@@ -111,7 +111,7 @@ const AiModelDetail = lazy(() => import('./pages/AiModelList/AiModelDetail'))
 import AiDeptModelAuth from './pages/AiQuotaAuth/QuotaAndPolicy'
 import { AiDeptQuota } from './pages/AiQuotaAuth/QuotaAndPolicy'
 import AiEmployeeAuthControl from './pages/AiQuotaAuth/AiEmployeeAuthControl'
-import AiEmpQuotaControl from './pages/AiQuotaAuth/AiEmpQuotaControl'
+import EmpQuotaList from './pages/AiQuotaAuth/empQuota/EmpQuotaList'
 import AiPositionAuth from './pages/AiQuotaAuth/AiPositionAuth'
 const DeptAuthGroupEdit = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupEdit'))
 const DeptAuthGroupDetail = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupDetail'))
@@ -123,6 +123,11 @@ const EmpPosAuthEdit = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpPosAuth
 const EmpPosAuthDetail = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpPosAuthDetail'))
 const EmpRoleAuthEdit = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpRoleAuthEdit'))
 const EmpRoleAuthDetail = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpRoleAuthDetail'))
+// 员工额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门额度）
+const EmpQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaEdit'))
+const EmpQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaDetail'))
+const RoleQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaEdit'))
+const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaDetail'))
 const AiToolRegistry = lazy(() => import('./pages/AiToolRegistry'))
 const AiUsageStats = lazy(() => import('./pages/AiUsageStats'))
 const AiEnergyDetail = lazy(() => import('./pages/AiEnergyDetail'))
@@ -270,7 +275,11 @@ function AuthenticatedLayout() {
               <Route path="/ai-dept-quota" element={<AiDeptQuota />} />
               <Route path="/ai-dept-quota-edit" element={<DeptQuotaEdit />} />
               <Route path="/ai-dept-quota-detail" element={<DeptQuotaDetail />} />
-              <Route path="/ai-emp-quota" element={<AiEmpQuotaControl />} />
+              <Route path="/ai-emp-quota" element={<EmpQuotaList />} />
+                            <Route path="/ai-emp-quota-edit" element={<EmpQuotaEdit />} />
+                            <Route path="/ai-emp-quota-detail" element={<EmpQuotaDetail />} />
+                            <Route path="/ai-role-quota-edit" element={<RoleQuotaEdit />} />
+                            <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
 
               <Route path="/ai-tool-registry" element={<AiToolRegistry />} />
               <Route path="/ai-usage-stats" element={<AiUsageStats />} />

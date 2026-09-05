@@ -435,7 +435,7 @@ export default function RuleConfig() {
                       const computeExample = (prefix: string, df: string | undefined, sl: number | undefined) => {
                         if (prefix === '-') return ''
                         const seq = sl ? '0'.repeat(sl) : '0000'
-                        const datePart = df === 'YYYYMMDD' ? '20260812' : df === 'YYMM' ? '2608' : ''
+                        const datePart = df === 'YYYYMMDD' ? '20260812' : df === 'YYYYMM' ? '202608' : df === 'YYMM' ? '2608' : ''
                         return `${prefix}${datePart}${seq}`
                       }
 
@@ -449,6 +449,8 @@ export default function RuleConfig() {
                         if (menu === '銷售定價') return { label: '定價', color: '#E8720C' }
                         if (menu === '推廣贈送') return { label: '贈送', color: '#F5222D' }
                         if (menu === '員工管理' || menu === '組織管理' || menu === '職位管理') return { label: '人事', color: '#FAAD14' }
+                        if (menu === '模型授權管理') return { label: '權控', color: '#722ED1' }
+                        if (menu === '配額管理') return { label: '額度', color: '#52C41A' }
                         if (key.startsWith('ad_order_')) return { label: '訂單', color: '#1890FF' }
                         if (key.startsWith('config_pricing_')) return { label: '定價', color: '#E8720C' }
                         if (key.startsWith('algo_')) return { label: '算法', color: '#722ED1' }
@@ -555,7 +557,7 @@ export default function RuleConfig() {
                                           </td>
                                           <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
                                             <span style={{ fontSize: 12, color: '#595959' }}>
-                                              {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
+                                              {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYYYMM' || dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
                                             </span>
                                           </td>
                                           <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>

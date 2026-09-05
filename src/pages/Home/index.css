@@ -207,6 +207,16 @@
   animation: aiPulse 2s ease-in-out infinite;
 }
 
+/* 未開通：灰色狀態點，停止脈衝動畫，傳達「不可用」的靜止感 */
+.home-ai-status--blocked {
+  color: #8C8C8C;
+}
+
+.home-ai-status--blocked i {
+  background: #BFBFBF;
+  animation: none;
+}
+
 @keyframes aiPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4); }
   50% { box-shadow: 0 0 0 4px rgba(82, 196, 26, 0); }
@@ -301,6 +311,81 @@
   box-shadow: 0 2px 8px rgba(24, 144, 255, 0.25);
 }
 
+/* 未開通：橙黃警示膠囊，引導點擊查看原因（我的用量 / 引擎膠囊共用） */
+.home-ai-engine--blocked {
+  color: #D46B08;
+  background: #FFF7E6;
+  border-color: #FFD591;
+}
+
+.home-ai-engine--blocked i {
+  background: #E8720C;
+}
+
+.home-ai-engine--blocked:hover {
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.25);
+}
+
+/* 未開通模型下拉面板：自繪白底卡片 + 頂部品牌橙漸變條（與消息區引導卡同一設計語言） */
+.home-ai-engine-panel {
+  position: relative;
+  width: 300px;
+  padding: 26px 20px 20px;
+  text-align: center;
+  background: #fff;
+  border: 1px solid #FFE7BA;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(232, 114, 12, 0.12);
+  overflow: hidden;
+}
+
+.home-ai-engine-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
+}
+
+/* 未開通下拉：移除 antd 容器默認白底/陰影/內邊距，避免與自繪卡片形成雙重邊框 */
+.home-ai-engine-dropdown.ant-dropdown {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.home-ai-engine-panel-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  background: #FFF7E6;
+  border: 1px solid #FFE7BA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #D46B08;
+  font-size: 18px;
+}
+
+.home-ai-engine-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 6px;
+}
+
+.home-ai-engine-panel-desc {
+  font-size: 12px;
+  color: #8C8C8C;
+  line-height: 1.7;
+}
+
 /* 下拉箭頭：提示膠囊可點擊選模式 */
 .home-ai-engine-caret {
   font-size: 9px;
@@ -371,6 +456,96 @@
 @keyframes heroFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
+}
+
+/* 未開通引導卡：白底卡片容器 + 頂部品牌橙漸變條（呼應全局頁面頭部設計語言），區別於裸文本平鋪 */
+.home-ai-hero-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid #FFE7BA;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(232, 114, 12, 0.08);
+  padding: 36px 40px;
+  overflow: hidden;
+}
+
+.home-ai-hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
+}
+
+.home-ai-hero-card h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+/* 描述限寬 + 加大行高，多行說明文字更易讀 */
+.home-ai-hero-card p {
+  margin: 0 auto 24px;
+  max-width: 420px;
+  line-height: 1.8;
+}
+
+/* 未開通 Hero 圖標：鎖定圓底，取消浮動動畫，傳達穩定的「暫未開放」感 */
+.home-ai-hero-icon--blocked {
+  background: linear-gradient(135deg, #FFF7E6, #FFE7BA);
+  border: 1px solid #FFD591;
+  color: #D46B08;
+  font-size: 28px;
+  animation: none;
+}
+
+/* 未開通行動按鈕：品牌橙主按鈕，引導查看用量/開通狀態 */
+.home-ai-blocked-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 22px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #E8720C, #F39C12);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.28);
+}
+
+.home-ai-blocked-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(232, 114, 12, 0.36);
+}
+
+.home-ai-blocked-action:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* 對話中未開通警示橫幅：替代快捷提問條，與輸入區禁用態呼應 */
+.home-ai-blocked-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-top: 1px solid #FFE7BA;
+  background: #FFFBF5;
+  color: #D46B08;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.home-ai-blocked-banner .anticon {
+  flex-shrink: 0;
+  font-size: 13px;
 }
 
 .home-ai-hero h4 {
@@ -460,8 +635,13 @@
 }
 
 .home-chat-bubble.user .home-chat-avatar {
-  background: linear-gradient(135deg, #1890ff, #40a9ff);
+  background: transparent;
   color: #fff;
+  overflow: hidden;
+}
+
+.home-chat-bubble.user .home-chat-avatar--default {
+  background: linear-gradient(135deg, #1890ff, #40a9ff);
 }
 
 .home-chat-content {

@@ -1,6 +1,7 @@
 package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AiDeptAuthGroupDTO;
 import com.mftb.admin.entity.AiDeptAuthGroup;
@@ -9,6 +10,7 @@ import com.mftb.admin.entity.AiDeptAuthGroupModel;
 import com.mftb.admin.mapper.AiDeptAuthGroupDeptMapper;
 import com.mftb.admin.mapper.AiDeptAuthGroupMapper;
 import com.mftb.admin.mapper.AiDeptAuthGroupModelMapper;
+import com.mftb.admin.util.BizSeqService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,16 +32,21 @@ import java.util.stream.Collectors;
 @Tag(name = "AI 智能中心 - 部门模型权控", description = "部门模型授权策略管理接口")
 public class AiDeptAuthGroupController {
 
+    /** 本菜单标识（sys_menu.menu_key），部门模型权控页 */
+    private static final String MENU = "ai-dept-model-auth";
+
     private final AiDeptAuthGroupMapper groupMapper;
     private final AiDeptAuthGroupDeptMapper groupDeptMapper;
     private final AiDeptAuthGroupModelMapper groupModelMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final BizSeqService bizSeqService;
 
     /**
      * 获取策略列表
      */
     @GetMapping
     @Operation(summary = "查询部门模型授权策略列表")
+    @RequirePermission(menu = MENU)
     public Result<List<AiDeptAuthGroupDTO.GroupVO>> list(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Integer dataResidency) {
@@ -60,6 +67,7 @@ public class AiDeptAuthGroupController {
         for (AiDeptAuthGroup g : groups) {
             AiDeptAuthGroupDTO.GroupVO vo = new AiDeptAuthGroupDTO.GroupVO();
             vo.setId(g.getId());
+            vo.setConfigCode(g.getConfigCode());
             vo.setName(g.getName());
             vo.setDataResidency(g.getDataResidency());
             vo.setStatus(g.getStatus());
@@ -116,6 +124,7 @@ public class AiDeptAuthGroupController {
      */
     @GetMapping("/{id}")
     @Operation(summary = "获取策略详情")
+    @RequirePermission(menu = MENU)
     public Result<AiDeptAuthGroupDTO.GroupDetailVO> detail(@PathVariable Long id) {
         AiDeptAuthGroup group = groupMapper.selectById(id);
         if (group == null) {
@@ -124,6 +133,7 @@ public class AiDeptAuthGroupController {
 
         AiDeptAuthGroupDTO.GroupDetailVO vo = new AiDeptAuthGroupDTO.GroupDetailVO();
         vo.setId(group.getId());
+        vo.setConfigCode(group.getConfigCode());
         vo.setName(group.getName());
         vo.setDataResidency(group.getDataResidency());
         vo.setStatus(group.getStatus());
@@ -181,6 +191,7 @@ public class AiDeptAuthGroupController {
      */
     @PostMapping
     @Operation(summary = "新增部门模型授权策略")
+    @RequirePermission(menu = MENU, action = "create")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> create(@Valid @RequestBody AiDeptAuthGroupDTO.GroupSaveRequest request) {
         // 计算总人数
@@ -188,6 +199,7 @@ public class AiDeptAuthGroupController {
 
         // 插入主表
         AiDeptAuthGroup group = new AiDeptAuthGroup();
+        group.setConfigCode(bizSeqService.next(BizSeqService.RULE_AI_DEPT_MODEL_AUTH));
         group.setName(request.getName());
         group.setDataResidency(request.getDataResidency() != null ? request.getDataResidency() : 0);
         group.setStatus(request.getStatus() != null ? request.getStatus() : 1);
@@ -227,6 +239,7 @@ public class AiDeptAuthGroupController {
      */
     @PutMapping("/{id}")
     @Operation(summary = "编辑部门模型授权策略")
+    @RequirePermission(menu = MENU, action = "edit")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> update(@PathVariable Long id,
                                   @Valid @RequestBody AiDeptAuthGroupDTO.GroupSaveRequest request) {
@@ -281,6 +294,7 @@ public class AiDeptAuthGroupController {
      */
     @PutMapping("/{id}/status")
     @Operation(summary = "启停策略")
+    @RequirePermission(menu = MENU, action = "edit")
     public Result<Boolean> toggleStatus(@PathVariable Long id, @RequestParam Integer status) {
         AiDeptAuthGroup group = groupMapper.selectById(id);
         if (group == null) {
@@ -296,6 +310,7 @@ public class AiDeptAuthGroupController {
      */
     @DeleteMapping("/{id}")
     @Operation(summary = "删除策略")
+    @RequirePermission(menu = MENU, action = "delete")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> delete(@PathVariable Long id) {
         AiDeptAuthGroup group = groupMapper.selectById(id);
@@ -317,6 +332,7 @@ public class AiDeptAuthGroupController {
      */
     @GetMapping("/dept-options")
     @Operation(summary = "获取部门选项列表")
+    @RequirePermission(menu = MENU)
     public Result<List<AiDeptAuthGroupDTO.DeptOptionVO>> deptOptions() {
         List<AiDeptAuthGroupDTO.DeptOptionVO> options = jdbcTemplate.query(
                 "SELECT id, code, name, parent_id, (SELECT COUNT(*) FROM sys_user u WHERE u.department_id = sys_department.id AND u.deleted = 0) AS user_count FROM sys_department WHERE deleted = 0 ORDER BY sort ASC, id ASC",

@@ -1,6 +1,7 @@
 package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.entity.AiRoleModelMapping;
 import com.mftb.admin.mapper.AiRoleModelMapper;
@@ -23,6 +24,9 @@ import java.util.List;
 @Tag(name = "AI 智能中心 - 权限管理", description = "角色模型权限管理接口")
 public class AiRoleAuthController {
 
+    /** 本菜单标识（sys_menu.menu_key），员工模型权控页 */
+    private static final String MENU = "ai-emp-model-auth";
+
     private final AiRoleModelMapper roleMapper;
     private final JdbcTemplate jdbcTemplate;
 
@@ -31,6 +35,7 @@ public class AiRoleAuthController {
      */
     @GetMapping
     @Operation(summary = "查询角色权限映射列表")
+    @RequirePermission(menu = MENU)
     public Result<List<AiRoleAuthVO>> list(@RequestParam(required = false) Long roleId,
                                            @RequestParam(required = false) String name) {
         String sql = """
@@ -85,6 +90,7 @@ public class AiRoleAuthController {
      */
     @PostMapping("/batch")
     @Operation(summary = "批量配置角色模型权限")
+    @RequirePermission(menu = MENU, action = "edit")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> batchSetPermissions(@RequestBody BatchRoleAuthRequest request) {
         for (RoleBatchItem item : request.getItems()) {
@@ -132,6 +138,7 @@ public class AiRoleAuthController {
      */
     @DeleteMapping("/{roleId}/{modelId}")
     @Operation(summary = "删除角色模型权限映射")
+    @RequirePermission(menu = MENU, action = "delete")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> deleteMapping(@PathVariable Long roleId, 
                                          @PathVariable Long modelId) {

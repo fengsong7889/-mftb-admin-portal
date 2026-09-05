@@ -107,7 +107,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   /* ── 導航至獨立頁面 ── */
   const handleGroupCreate = () => {
-    navigate('/ai-dept-auth-edit')
+    navigate('/ai-dept-auth-edit?type=add')
   }
 
   const handleGroupEdit = (row: DeptAuthGroupItem) => {
@@ -160,6 +160,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   /* ── 列字段配置（部門權控） ── */
   const deptColumnMeta = [
+    { key: 'configCode', title: '配置ID' },
     { key: 'name', title: '策略名稱' },
     { key: 'deptNames', title: '適用部門' },
     { key: 'totalEmployeeCount', title: '覆蓋人數' },
@@ -178,6 +179,10 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   /* ── 表格列（部門權控） ── */
   const deptColumns: ColumnsType<DeptAuthGroupItem> = [
+    {
+      key: 'configCode', title: '配置ID', dataIndex: 'configCode', width: 160, align: 'center',
+      render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
+    },
     { key: 'name', title: '策略名稱', dataIndex: 'name', width: 170 },
     {
       key: 'deptNames', title: '適用部門', dataIndex: 'deptNames', width: 260,

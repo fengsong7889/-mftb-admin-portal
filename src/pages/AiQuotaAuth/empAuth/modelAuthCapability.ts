@@ -53,6 +53,8 @@ export interface ModelAuthConfig {
 /** 职位授权规则：一条规则 = 职级序列 + 职级 + 授权模型（能力顆粒度）的批量授权策略 */
 export interface PosAuthRule {
   id: string
+  /** 配置ID（编号生成规则 ai_emp_pos_model_auth） */
+  configCode?: string
   ruleName: string
   sequence: string[]
   jobLevels: string[]
@@ -73,11 +75,17 @@ export interface PosAuthRule {
  */
 export interface RoleAuthConfig {
   roleId: string  // 自定義角色 ID（格式：custom_role_xxx）
+  /** 配置ID（编号生成规则 ai_emp_role_model_auth） */
+  configCode?: string
   roleName: string  // 自定義角色名稱
+  /** 角色描述（選填） */
+  description?: string
   modelConfigs: ModelAuthConfig[]
   userIds: number[]  // 綁定員工 ID 列表
   /** 數據不出域（1=開啟，0=關閉） */
   dataResidency: number
+  /** 啟用狀態（1=啟用，0=停用；停用後綁定員工立即失去該角色授予的模型訪問權） */
+  status: number
   createdAt: string
   updatedBy?: string
   updatedAt?: string
@@ -112,7 +120,8 @@ export const clampModelConfigs = (configs: ModelAuthConfig[], models: AiModel[])
     }
   })
 
-/** 讀取职位授权规则（兼容舊 modelIds 結構，自動遷移為 modelConfigs） */
+/** 讀取职位授权规则（兼容舊 modelIds 結構，自動遷移為 modelConfigs）
+ *  僅用於 localStorage 歷史數據一次性遷移到後端（AiEmployeeAuthControl），新數據直接走 empAuth API */
 export function loadPosRules(models: AiModel[]): PosAuthRule[] {
   type RawRule = {
     id?: string; ruleName?: string; description?: string; createdAt?: string
@@ -148,16 +157,13 @@ export function loadPosRules(models: AiModel[]): PosAuthRule[] {
   }
 }
 
-export function savePosRules(rules: PosAuthRule[]): void {
-  localStorage.setItem(POS_RULE_STORAGE_KEY, JSON.stringify(rules))
-}
-
-/** 讀取角色授权配置（自定義角色，roleId 為 string；兼容舊 number 結構並自動遷移） */
+/** 讀取角色授权配置（自定義角色，roleId 為 string；兼容舊 number 結構並自動遷移）
+ *  僅用於 localStorage 歷史數據一次性遷移到後端（AiEmployeeAuthControl），新數據直接走 empAuth API */
 export function loadRoleAuthConfigs(models: AiModel[]): RoleAuthConfig[] {
   type RawConfig = {
-    roleId?: number | string; roleName?: string; name?: string
+    roleId?: number | string; roleName?: string; name?: string; description?: string
     modelIds?: RawModelRef[]; modelConfigs?: ModelAuthConfig[]
-    dataResidency?: number
+    dataResidency?: number; status?: number
     userIds?: number[]; createdAt?: string; updatedAt?: string; updatedBy?: string
   }
   try {
@@ -174,8 +180,10 @@ export function loadRoleAuthConfigs(models: AiModel[]): RoleAuthConfig[] {
         return {
           roleId,
           roleName: c.roleName ?? c.name ?? '',
+          description: c.description ?? '',
           modelConfigs: clampModelConfigs(configs, models),
           dataResidency: c.dataResidency ?? 0,
+          status: c.status ?? 1,  // 舊數據無狀態字段，默認啟用
           userIds: c.userIds ?? [],
           createdAt: c.createdAt ?? new Date().toISOString(),
           updatedBy: c.updatedBy,
@@ -185,10 +193,6 @@ export function loadRoleAuthConfigs(models: AiModel[]): RoleAuthConfig[] {
   } catch {
     return []
   }
-}
-
-export function saveRoleAuthConfigs(configs: RoleAuthConfig[]): void {
-  localStorage.setItem(ROLE_AUTH_STORAGE_KEY, JSON.stringify(configs))
 }
 
 /** 統計單個模型授權配置中已開啟的能力數 */

@@ -51,14 +51,16 @@ interface DeptTreeNode {
   title: string
   deptCode: string
   deptName: string
+  disabled?: boolean
   children?: DeptTreeNode[]
 }
 
 /** 判断模型本身是否支持某能力 */
 const modelSupports = (model: AiModel, key: CapabilityKey): boolean => (model[key] ?? 0) === 1
 
-/** 由扁平部門列表構建樹（依據 parentId），標題含編碼便於區分重名部門 */
-const buildDeptTree = (list: DeptOption[]): DeptTreeNode[] => {
+/** 由扁平部門列表構建樹（依據 parentId），標題含編碼便於區分重名部門；已選部門標記 disabled */
+const buildDeptTree = (list: DeptOption[], selectedIds: number[]): DeptTreeNode[] => {
+  const selectedSet = new Set(selectedIds)
   const map = new Map<number, DeptTreeNode>()
   list.forEach((d) => {
     map.set(d.deptId, {
@@ -66,6 +68,7 @@ const buildDeptTree = (list: DeptOption[]): DeptTreeNode[] => {
       title: `${d.deptName}（${d.deptCode ?? '-'}）`,
       deptCode: d.deptCode ?? '',
       deptName: d.deptName,
+      disabled: selectedSet.has(d.deptId),
       children: [],
     })
   })
@@ -125,6 +128,7 @@ export default function DeptAuthGroupEdit() {
           setDetail(detailData)
           form.setFieldsValue({
             name: detailData.name,
+            description: detailData.description,
             dataResidency: detailData.dataResidency,
             status: detailData.status,
           })
@@ -157,8 +161,8 @@ export default function DeptAuthGroupEdit() {
   /** 數據不出域是否開啟（開啟後僅可授權私有化部署模型） */
   const residencyOn = Form.useWatch('dataResidency', form) === 1
 
-  /** 部門樹數據 */
-  const deptTree = useMemo(() => buildDeptTree(deptOptions), [deptOptions])
+  /** 部門樹數據（已選部門標記 disabled，防止重複勾選） */
+  const deptTree = useMemo(() => buildDeptTree(deptOptions, selectedDeptIds), [deptOptions, selectedDeptIds])
 
   /** 部門樹默認展開鍵：僅根節點（二級部門默認折疊，避免撐高頁面） */
   const deptRootKeys = useMemo(() => deptTree.map((n) => n.value), [deptTree])
@@ -240,6 +244,7 @@ export default function DeptAuthGroupEdit() {
 
     const payload = {
       name: values.name,
+      description: (values.description ?? '') as string,
       dataResidency: values.dataResidency ?? 0,
       status: values.status ?? 1,
       deptIds: selectedDeptIds,
@@ -324,6 +329,9 @@ export default function DeptAuthGroupEdit() {
             <Form.Item name="name" label="策略名稱" rules={[{ required: true, message: '請輸入策略名稱' }]}>
               <Input placeholder="如：研發通用、門店標準配置" maxLength={50} />
             </Form.Item>
+            <Form.Item name="description" label="描述">
+              <Input placeholder="請輸入策略描述（選填）" maxLength={200} allowClear />
+            </Form.Item>
           </div>
         </div>
 
@@ -379,7 +387,11 @@ export default function DeptAuthGroupEdit() {
                   checkable
                   defaultExpandedKeys={deptRootKeys}
                   checkedKeys={checkedDeptIds}
-                  onCheck={(keys) => setCheckedDeptIds(keys as number[])}
+                  onCheck={(keys) => {
+                    // 過濾已選部門，避免 disabled 節點殘留在 checkedDeptIds 中
+                    const raw = Array.isArray(keys) ? keys : keys.checked
+                    setCheckedDeptIds((raw as number[]).filter((id) => !selectedDeptIds.includes(id)))
+                  }}
                   treeData={deptTree as unknown as TreeDataNode[]}
                   fieldNames={{ key: 'value', title: 'title', children: 'children' }}
                   filterTreeNode={(node) => {
@@ -399,9 +411,17 @@ export default function DeptAuthGroupEdit() {
                 size="small"
                 icon={<span style={{ fontSize: 16 }}>›</span>}
                 onClick={() => {
-                  // 将勾选部门移入右侧（去重）
-                  setSelectedDeptIds((prev) => [...new Set([...prev, ...checkedDeptIds])])
+                  // 將勾選部門移入右側（去重 + 過濾已選）
+                  const newIds = checkedDeptIds.filter((id) => !selectedDeptIds.includes(id))
+                  if (newIds.length === 0) {
+                    message.warning('所選部門已添加，無需重複添加')
+                    setCheckedDeptIds([])
+                    return
+                  }
+                  const skipped = checkedDeptIds.length - newIds.length
+                  setSelectedDeptIds((prev) => [...new Set([...prev, ...newIds])])
                   setCheckedDeptIds([])
+                  if (skipped > 0) message.warning(`已跳過 ${skipped} 個已添加的部門`)
                 }}
                 disabled={checkedDeptIds.length === 0}
                 style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}

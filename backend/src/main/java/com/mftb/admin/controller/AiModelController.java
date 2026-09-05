@@ -2,6 +2,7 @@ package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AiModelDTO;
 import com.mftb.admin.entity.AiModel;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -25,11 +27,15 @@ import java.util.List;
  * - 限流与多模态字段
  * - 缓存命中价/币种
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/ai/models")
 @RequiredArgsConstructor
 @Tag(name = "AI 智能中心 - 模型管理", description = "AI 模型 CRUD 接口")
 public class AiModelController {
+
+    /** 本菜单标识（sys_menu.menu_key），模型列表页 */
+    private static final String MENU = "ai-model-list";
 
     private final AiModelMapper modelMapper;
     private final JdbcTemplate jdbcTemplate;
@@ -39,6 +45,7 @@ public class AiModelController {
      */
     @GetMapping
     @Operation(summary = "查询模型列表")
+    @RequirePermission(menu = MENU)
     public Result<List<AiModelDTO.ModelVO>> list(
         @RequestParam(required = false) String modelKey,
         @RequestParam(required = false) String name,
@@ -84,6 +91,7 @@ public class AiModelController {
      */
     @GetMapping("/{id}")
     @Operation(summary = "获取模型详情")
+    @RequirePermission(menu = MENU)
     public Result<AiModelDTO.ModelVO> getById(@PathVariable Long id) {
         AiModel model = modelMapper.selectById(id);
         if (model == null) {
@@ -101,6 +109,7 @@ public class AiModelController {
      */
     @PostMapping
     @Operation(summary = "新增模型")
+    @RequirePermission(menu = MENU, action = "create")
     public Result<Boolean> create(@Valid @RequestBody AiModelDTO.ModelSaveRequest request) {
         try {
             // 检查 model_key 是否已存在
@@ -123,7 +132,8 @@ public class AiModelController {
             modelMapper.insert(model);
             return Result.success(true);
         } catch (Exception e) {
-            return Result.error("创建失败：" + e.getMessage());
+            log.error("新增模型失败", e);
+            return Result.error("创建失败，请稍后重试");
         }
     }
 
@@ -132,6 +142,7 @@ public class AiModelController {
      */
     @PutMapping("/{id}")
     @Operation(summary = "更新模型")
+    @RequirePermission(menu = MENU, action = "edit")
     public Result<Boolean> update(@PathVariable Long id, @Valid @RequestBody AiModelDTO.ModelSaveRequest request) {
         AiModel existing = modelMapper.selectById(id);
         if (existing == null) {
@@ -154,6 +165,7 @@ public class AiModelController {
      */
     @DeleteMapping("/{id}")
     @Operation(summary = "删除模型")
+    @RequirePermission(menu = MENU, action = "delete")
     public Result<Boolean> delete(@PathVariable Long id) {
         AiModel existing = modelMapper.selectById(id);
         if (existing == null) {
@@ -162,51 +174,6 @@ public class AiModelController {
 
         modelMapper.deleteById(id);
         return Result.success(true);
-    }
-
-    /**
-     * 临时：执行 schema 迁移（idempotent）
-     * 用于 86/87 号 SQL 中的字段添加与约束变更
-     * 只在第一次部署时需要，前端调用后即可删除
-     */
-    @PostMapping("/migrate")
-    @Operation(summary = "[临时] 执行 ai_model 表 schema 迁移")
-    public Result<Integer> migrate() {
-        int count = 0;
-        String[] alters = new String[] {
-            "ALTER TABLE ai_model ADD COLUMN version VARCHAR(64) DEFAULT NULL COMMENT '模型版本号' AFTER name",
-            "ALTER TABLE ai_model ADD COLUMN api_compat VARCHAR(20) DEFAULT 'openai' COMMENT 'API 兼容格式' AFTER description",
-            "ALTER TABLE ai_model ADD COLUMN modalities VARCHAR(100) DEFAULT 'text' COMMENT '支持模态' AFTER api_compat",
-            "ALTER TABLE ai_model ADD COLUMN vision_support TINYINT(1) DEFAULT 0 COMMENT '是否支持图像理解' AFTER modalities",
-            "ALTER TABLE ai_model ADD COLUMN function_calling TINYINT(1) DEFAULT 0 COMMENT '是否支持工具调用' AFTER vision_support",
-            "ALTER TABLE ai_model ADD COLUMN json_mode TINYINT(1) DEFAULT 0 COMMENT '是否支持 JSON 模式' AFTER function_calling",
-            "ALTER TABLE ai_model ADD COLUMN streaming TINYINT(1) DEFAULT 1 COMMENT '是否支持流式响应' AFTER json_mode",
-            "ALTER TABLE ai_model ADD COLUMN thinking_mode TINYINT(1) DEFAULT 0 COMMENT '是否支持思考模式' AFTER streaming",
-            "ALTER TABLE ai_model ADD COLUMN cached_input_price DECIMAL(10,4) DEFAULT NULL COMMENT '缓存命中价' AFTER output_price",
-            "ALTER TABLE ai_model ADD COLUMN currency VARCHAR(10) DEFAULT 'CNY' COMMENT '计费币种' AFTER cached_input_price",
-            "ALTER TABLE ai_model ADD COLUMN concurrency_limit INT DEFAULT NULL COMMENT '并发限制' AFTER currency",
-            "ALTER TABLE ai_model ADD COLUMN updated_by VARCHAR(50) DEFAULT NULL COMMENT '最后更新人' AFTER sort_order",
-            // 87 号：联合唯一约束 (provider_id, model_key, version)，支持多版本共存
-            "ALTER TABLE ai_model DROP INDEX uk_model_key",
-            "ALTER TABLE ai_model ADD UNIQUE KEY uk_provider_key_version (provider_id, model_key, version)",
-        };
-        for (String sql : alters) {
-            try {
-                jdbcTemplate.execute(sql);
-                count++;
-            } catch (Exception e) {
-                String msg = e.getMessage() == null ? "" : e.getMessage();
-                boolean idempotent = msg.contains("Duplicate column")
-                    || msg.contains("already exists")
-                    || msg.contains("check that column/key exists")
-                    || msg.contains("doesn't exist")
-                    || msg.contains("Duplicate key name");
-                if (!idempotent) {
-                    return Result.error("迁移失败 [step=" + count + "]: " + msg);
-                }
-            }
-        }
-        return Result.success(count);
     }
 
     /**

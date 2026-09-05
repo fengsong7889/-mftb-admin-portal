@@ -77,12 +77,25 @@ public class BizSeqService {
     public static final String RULE_DEPT_CODE = "dept_code";
     /** 职位ID */
     public static final String RULE_POSITION_ID = "position_id";
+    /** 部门模型权控配置ID */
+    public static final String RULE_AI_DEPT_MODEL_AUTH = "ai_dept_model_auth";
+    /** 员工模型权控-按职位配置ID */
+    public static final String RULE_AI_EMP_POS_MODEL_AUTH = "ai_emp_pos_model_auth";
+    /** 员工模型权控-按角色配置ID */
+    public static final String RULE_AI_EMP_ROLE_MODEL_AUTH = "ai_emp_role_model_auth";
+    /** 部门额度配置ID */
+    public static final String RULE_AI_DEPT_QUOTA = "ai_dept_quota";
+    /** 员工额度-按职位配置ID */
+    public static final String RULE_AI_EMP_POS_QUOTA = "ai_emp_pos_quota";
+    /** 员工额度-按角色配置ID */
+    public static final String RULE_AI_EMP_ROLE_QUOTA = "ai_emp_role_quota";
 
     /** 无日期维度规则在序号表中的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";
 
     private static final DateTimeFormatter FMT_DAY = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter FMT_MONTH = DateTimeFormatter.ofPattern("yyMM");
+    private static final DateTimeFormatter FMT_MONTH_FULL = DateTimeFormatter.ofPattern("yyyyMM");
 
     private final BizSeqMapper bizSeqMapper;
     private final SysBizSeqRuleMapper ruleMapper;
@@ -97,8 +110,19 @@ public class BizSeqService {
      * @return 如 DDWD202608120000
      */
     public String next(String ruleKey) {
+        return next(ruleKey, LocalDate.now());
+    }
+
+    /**
+     * 按规则 key + 指定日期生成业务编号（存量数据回填时按创建日期补号使用）
+     *
+     * @param ruleKey sys_biz_seq_rule.rule_key，如 ad_order_star
+     * @param date    编号日期段基准日
+     * @return 如 DDWD202608120000
+     */
+    public String next(String ruleKey, LocalDate date) {
         SysBizSeqRule rule = requireRule(ruleKey);
-        String datePart = formatDate(rule.getDateFormat());
+        String datePart = formatDate(rule.getDateFormat(), date);
         String seqDateKey = datePart.isEmpty() ? FIXED_DATE_KEY : datePart;
 
         bizSeqMapper.initSeq(rule.getPrefix(), seqDateKey);
@@ -216,15 +240,15 @@ public class BizSeqService {
         return cache;
     }
 
-    /** 规则日期格式 → 当日日期段（空串表示无日期维度） */
-    private String formatDate(String dateFormat) {
+    /** 规则日期格式 → 指定日期的日期段（空串表示无日期维度） */
+    private String formatDate(String dateFormat, LocalDate date) {
         if (dateFormat == null || dateFormat.isEmpty()) {
             return "";
         }
-        LocalDate today = LocalDate.now();
         return switch (dateFormat) {
-            case "YYYYMMDD" -> today.format(FMT_DAY);
-            case "YYMM" -> today.format(FMT_MONTH);
+            case "YYYYMMDD" -> date.format(FMT_DAY);
+            case "YYYYMM" -> date.format(FMT_MONTH_FULL);
+            case "YYMM" -> date.format(FMT_MONTH);
             default -> throw new BusinessException("不支持的编号日期格式: " + dateFormat);
         };
     }

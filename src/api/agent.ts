@@ -381,8 +381,18 @@ export interface LlmEngineStatus {
 
 /** 查詢代理當前路由到的模型通道；失敗返回 null，不影響對話 */
 export async function fetchEngineStatus(): Promise<LlmEngineStatus | null> {
+  return probeEngineStatus(getEngineMode())
+}
+
+/**
+ * 以指定模式探測引擎狀態（不讀本地記錄的模式）：
+ * 首頁用它分別探 primary / off-peak 兩條通道，得到網關真實接入的模型清單
+ */
+export async function probeEngineStatus(mode: LlmEngineMode): Promise<LlmEngineStatus | null> {
   try {
-    const res = await fetch(`${window.location.origin}/api/llm/status`, { headers: engineModeHeaders() })
+    const res = await fetch(`${window.location.origin}/api/llm/status`, {
+      headers: { ...engineModeHeaders(), 'x-llm-mode': mode },
+    })
     if (!res.ok) return null
     return (await res.json()) as LlmEngineStatus
   } catch {

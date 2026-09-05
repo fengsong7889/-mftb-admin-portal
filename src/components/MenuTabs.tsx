@@ -6,6 +6,7 @@ import type { MenuVO } from '../api/menu'
 import { translateMenuName } from '../i18n/menuNameEn'
 import { pathToKey } from './Sidebar'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import './MenuTabs.css'
 
 /** 标签页信息 */
@@ -46,52 +47,75 @@ function buildKeyNameMap(menus: MenuVO[], result: Record<string, string> = {}) {
   return result
 }
 
-/** 子页面 → 父菜单 menuKey（用于从后端获取父页面名称） */
-const SUB_PAGE_PARENT_KEY: Record<string, string> = {
-  '/recharge-add': 'account-balance',
-  '/transfer-add': 'account-balance',
-  '/deduct-add': 'account-balance',
-  '/merge-add': 'account-balance',
-  '/batch-detail': 'batch-query',
-  '/debt-detail': 'debt-reconcile',
-  '/approval-detail': 'approval-center',
-  '/search-verify-detail': 'search-verify',
-  '/promotion-algorithm-add': 'promotion-algorithm',
-  '/promotion-slot-config-add': 'promotion-slot-config',
-  '/promotion-waterfall-add': 'promotion-waterfall',
-  '/order-detail': 'promotion-order-manage',
-  '/gift-add': 'gift-detail',
-  '/gift-detail-view': 'gift-detail',
-  '/ai-model-edit': 'ai-model-list',
-  '/ai-model-detail': 'ai-model-list',
-  '/ai-dept-auth-edit': 'ai-dept-model-auth',
-  '/ai-dept-auth-detail': 'ai-dept-model-auth',
-  '/ai-pos-auth-edit': 'ai-pos-auth',
-  '/ai-pos-auth-detail': 'ai-pos-auth',
-  '/ai-role-auth-edit': 'ai-dept-model-auth',
-  '/ai-role-auth-detail': 'ai-dept-model-auth',
-  '/ai-dept-quota-edit': 'ai-dept-quota',
-  '/ai-dept-quota-detail': 'ai-dept-quota',
-  '/workflow-config/detail': 'workflow-config',
-  '/page-description-editor': 'menu-config',
-  '/page-prd-view': 'menu-config',
+/**
+ * 子页面完整标题 —— 与页面标题（H2 / DetailPageHeader）完全一致，优先级最高
+ * fixed：固定标题；add/edit：新增/編輯标题（判定与页面 isEdit 一致：editParam 参数非空且 mode≠detail，editParam 默认 'id'）
+ * typeParam/typeMap/typeDefault：标题按 query 参数值切换（如審批中心按 type、贈送管理按 mode）
+ * 值以 'i18n:' 前缀标识 i18n key（随语言切换），其余为页面硬编码文案原样使用
+ */
+interface SubPageTitle {
+  fixed?: string
+  add?: string
+  edit?: string
+  editParam?: string
+  typeParam?: string
+  typeDefault?: string
+  typeMap?: Record<string, string>
 }
 
-/** 子页面类型后缀（仅用于无后端父菜单的极端降级） */
-const SUB_PAGE_SUFFIX: Record<string, string> = {
-  '/recharge-add': '-新增', '/transfer-add': '-新增', '/deduct-add': '-新增', '/merge-add': '-新增',
-  '/batch-detail': '-詳情', '/debt-detail': '-詳情', '/approval-detail': '-詳情',
-  '/search-verify-detail': '-詳情',
-  '/promotion-algorithm-add': '-新增', '/promotion-slot-config-add': '-新增', '/promotion-waterfall-add': '-新增',
-  '/order-detail': '-詳情',
-  '/gift-add': '-新增', '/gift-detail-view': '-詳情',
-  '/ai-model-edit': '-編輯', '/ai-model-detail': '-詳情',
-  '/ai-dept-auth-edit': '-編輯', '/ai-dept-auth-detail': '-詳情',
-  '/ai-pos-auth-edit': '-編輯', '/ai-pos-auth-detail': '-詳情',
-  '/ai-role-auth-edit': '-編輯', '/ai-role-auth-detail': '-詳情',
-  '/ai-dept-quota-edit': '-編輯', '/ai-dept-quota-detail': '-詳情',
-  '/workflow-config/detail': '-詳情',
-  '/page-description-editor': '-編輯', '/page-prd-view': '-詳情',
+const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
+  // 财务管理
+  '/recharge-add': { fixed: 'i18n:accountBalance.rechargePageTitle' },
+  '/transfer-add': { fixed: 'i18n:accountBalance.transferTitle' },
+  '/deduct-add': { fixed: 'i18n:accountBalance.deductPageTitle' },
+  '/merge-add': { fixed: 'i18n:accountBalance.mergePageTitle' },
+  '/batch-detail': { fixed: 'i18n:batchDetail.pageTitle' },
+  '/debt-detail': { fixed: 'i18n:debtDetail.pageTitle' },
+  '/approval-detail': {
+    typeParam: 'type',
+    typeDefault: 'recharge',
+    typeMap: {
+      recharge: 'i18n:approvalDetail.typeTitleRecharge',
+      deduct: 'i18n:approvalDetail.typeTitleDeduct',
+      transfer: 'i18n:approvalDetail.typeTitleTransfer',
+      merge: 'i18n:approvalDetail.typeTitleMerge',
+      gift: 'i18n:approvalDetail.typeTitleGift',
+    },
+  },
+  // 搜索校验（动态路由 /search-verify-detail/:id）
+  '/search-verify-detail': { fixed: 'i18n:searchVerifyDetail.title' },
+  // 商家推广工具
+  '/promotion-algorithm-add': { add: 'i18n:recommend.addAlgo', edit: 'i18n:recommend.editAlgo' },
+  '/promotion-slot-config-add': { add: 'i18n:promotionSlotConfig:addSlotConfig', edit: 'i18n:promotionSlotConfig:editSlotConfig' },
+  '/promotion-waterfall-add': { add: 'i18n:recommend.addPricingTitle', edit: 'i18n:recommend.editPricingTitle' },
+  '/order-detail': { fixed: 'i18n:orderDetail.detailTitle' },
+  // 赠送管理（?mode=gift → 贈送廣告天數；否则新增推廣贈送）
+  '/gift-add': {
+    typeParam: 'mode',
+    typeMap: { gift: 'i18n:giftAdd.giftAdDays' },
+    add: 'i18n:giftAdd.addGift',
+  },
+  '/gift-detail-view': { fixed: 'i18n:giftDetailView.pageTitle' },
+  // AI 智能中心（页面标题硬编码）
+  '/ai-model-edit': { fixed: '編輯模型' },
+  '/ai-model-detail': { fixed: '模型詳情' },
+  '/ai-dept-auth-edit': { add: '新增模型授權-部門', edit: '編輯模型授權-部門' },
+  '/ai-dept-auth-detail': { fixed: '授權模型詳情-部門' },
+  '/ai-pos-auth-edit': { add: '新增模型授權-職位', edit: '編輯模型授權-職位' },
+  '/ai-pos-auth-detail': { fixed: '授權模型詳情-職位' },
+  '/ai-role-auth-edit': { add: '新增模型授權-角色', edit: '編輯模型授權-角色', editParam: 'roleId' },
+  '/ai-role-auth-detail': { fixed: '授權模型詳情-角色' },
+  '/ai-dept-quota-edit': { add: '新增部門額度', edit: '編輯部門額度' },
+  '/ai-dept-quota-detail': { fixed: '部門額度詳情' },
+  '/ai-emp-quota-edit': { add: '新增模型額度-職位', edit: '編輯模型額度-職位' },
+  '/ai-emp-quota-detail': { fixed: '額度詳情-職位' },
+  '/ai-role-quota-edit': { add: '新增模型額度-角色', edit: '編輯模型額度-角色' },
+  '/ai-role-quota-detail': { fixed: '額度詳情-角色' },
+  // 审批流程（动态路由 /workflow-config/detail/:id）
+  '/workflow-config/detail': { fixed: '審批流程詳情' },
+  // 页面说明（页面标题含动态页面名，取静态主体）
+  '/page-description-editor': { fixed: '編輯界面說明' },
+  '/page-prd-view': { fixed: '界面需求說明' },
 }
 
 /** 静态 fallback：path → 名称（后端菜单不可用时降级） */
@@ -170,89 +194,82 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/merchant-promotion-diagnose': '推廣診斷',
 }
 
-/**
- * 二级页面（新增/编辑/详情）→ 父菜单名称 + 类型 映射
- * 格式：path → '父菜单名称-类型'
- */
-const SUB_PAGE_NAME: Record<string, string> = {
-  // 财务管理
-  '/recharge-add': '賬戶餘額-新增',
-  '/transfer-add': '賬戶餘額-新增',
-  '/deduct-add': '賬戶餘額-新增',
-  '/merge-add': '賬戶餘額-新增',
-  '/batch-detail': '批次查詢-詳情',
-  '/debt-detail': '欠款對賬-詳情',
-  '/approval-detail': '審批中心-詳情',
-  // 搜索校验
-  '/search-verify-detail': '搜索校驗-詳情',
-  // 商家推广工具
-  '/promotion-algorithm-add': '算法庫-新增',
-  '/promotion-slot-config-add': '坑位策略-新增',
-  '/promotion-waterfall-add': '瀑布流定價-新增',
-  '/order-detail': '訂單管理-詳情',
-  // 赠送管理
-  '/gift-add': '贈送管理-新增',
-  '/gift-detail-view': '贈送管理-詳情',
-  // AI 智能中心
-  '/ai-model-edit': '模型列表-編輯',
-  '/ai-model-detail': '模型列表-詳情',
-  '/ai-dept-auth-edit': '部門授權-編輯',
-  '/ai-dept-auth-detail': '部門授權-詳情',
-  '/ai-pos-auth-edit': '職位授權-編輯',
-  '/ai-pos-auth-detail': '職位授權-詳情',
-  '/ai-role-auth-edit': '角色授權-編輯',
-  '/ai-role-auth-detail': '角色授權-詳情',
-  '/ai-dept-quota-edit': '部門額度-編輯',
-  '/ai-dept-quota-detail': '部門額度-詳情',
-  // 审批流程
-  '/workflow-config/detail': '審批流程-詳情',
-  // 页面说明
-  '/page-description-editor': '頁面說明-編輯',
-  '/page-prd-view': 'PRD文檔-詳情',
-}
-
-/** 匹配二级页面名称（支持动态路由前缀）—— 仅作为最终降级 */
-function matchSubPage(path: string): string | null {
-  if (SUB_PAGE_NAME[path]) return SUB_PAGE_NAME[path]
-  for (const [prefix, name] of Object.entries(SUB_PAGE_NAME)) {
-    if (path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
-      return name
-    }
-  }
-  return null
-}
-
-/** 查找子页面对应的父菜单 menuKey（支持动态路由前缀） */
-function findParentKey(path: string): string | null {
-  if (SUB_PAGE_PARENT_KEY[path]) return SUB_PAGE_PARENT_KEY[path]
-  for (const [prefix, parentKey] of Object.entries(SUB_PAGE_PARENT_KEY)) {
-    if (path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
-      return parentKey
-    }
-  }
-  return null
-}
-
-/** 查找子页面后缀（支持动态路由前缀） */
-function findSubPageSuffix(path: string): string | null {
-  if (SUB_PAGE_SUFFIX[path]) return SUB_PAGE_SUFFIX[path]
-  for (const [prefix, suffix] of Object.entries(SUB_PAGE_SUFFIX)) {
-    if (path.startsWith(prefix + '/') || path.startsWith(prefix + '?')) {
-      return suffix
-    }
-  }
-  return null
-}
-
 /** 标准化路径：去除 query string 和 hash */
 function normalizePath(pathname: string): string {
   return pathname.split('?')[0].split('#')[0]
 }
 
+/** 解析标题文案：'i18n:' 前缀走 t() 翻译（随语言切换），否则为页面硬编码文案原样返回 */
+function resolveTitle(raw: string, t: TFunction): string {
+  return raw.startsWith('i18n:') ? t(raw.slice(5)) : raw
+}
+
+/** 匹配子页面完整标题（与页面标题一致；支持动态路由前缀与 query 参数区分新增/編輯/类型） */
+function matchFullTitle(pathname: string, t: TFunction): string | null {
+  const normalized = normalizePath(pathname)
+  let entry = SUB_PAGE_FULL_TITLE[normalized]
+  if (!entry) {
+    // 动态路由前缀匹配（如 /search-verify-detail/:id、/workflow-config/detail/:id）
+    for (const [prefix, e] of Object.entries(SUB_PAGE_FULL_TITLE)) {
+      if (normalized.startsWith(prefix + '/')) { entry = e; break }
+    }
+  }
+  if (!entry) return null
+
+  const qs = pathname.split('?')[1]
+  const params = qs ? new URLSearchParams(qs) : null
+
+  // 标题按 query 参数值切换（如審批中心按 type、贈送管理按 mode）
+  if (entry.typeParam && entry.typeMap) {
+    const typeValue = params?.get(entry.typeParam) ?? entry.typeDefault ?? ''
+    if (entry.typeMap[typeValue]) return resolveTitle(entry.typeMap[typeValue], t)
+  }
+
+  if (entry.fixed) return resolveTitle(entry.fixed, t)
+  if (entry.add && entry.edit) {
+    // 与页面 isEdit 判定一致：editParam（默认 id）非空且 mode≠detail 为編輯模式
+    const editParam = entry.editParam ?? 'id'
+    const isEdit = !!params?.get(editParam) && params.get('mode') !== 'detail'
+    return resolveTitle(isEdit ? entry.edit : entry.add, t)
+  }
+  return null
+}
+
+/** 需要保留 query string 的路径（用于区分新增/编辑等模式，与标签标题联动） */
+const TAB_PATHS_WITH_QUERY = new Set([
+  '/promotion-algorithm-add',
+  '/promotion-slot-config-add',
+  '/promotion-waterfall-add',
+  '/gift-add',
+  '/approval-detail',
+  '/ai-dept-auth-edit',
+  '/ai-dept-auth-detail',
+  '/ai-pos-auth-edit',
+  '/ai-pos-auth-detail',
+  '/ai-role-auth-edit',
+  '/ai-role-auth-detail',
+  '/ai-dept-quota-edit',
+  '/ai-dept-quota-detail',
+  '/ai-emp-quota-edit',
+  '/ai-emp-quota-detail',
+  '/ai-role-quota-edit',
+  '/ai-role-quota-detail',
+])
+
+/** Tab 路径：特定路径保留 query string 以区分新增/编辑 */
+function tabPath(pathname: string): string {
+  const normalized = normalizePath(pathname)
+  if (TAB_PATHS_WITH_QUERY.has(normalized)) {
+    const qs = pathname.split('?')[1]
+    return qs ? `${normalized}?${qs}` : normalized
+  }
+  return normalized
+}
+
 export default function MenuTabs() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { i18n: i18nInstance } = useTranslation()
+  const { i18n: i18nInstance, t } = useTranslation()
   const [tabs, setTabs] = useState<MenuTab[]>([HOME_TAB])
   const [pathNameMap, setPathNameMap] = useState<Record<string, { key: string; name: string }>>({})
   const [keyNameMap, setKeyNameMap] = useState<Record<string, string>>({})
@@ -292,50 +309,44 @@ export default function MenuTabs() {
     } catch { /* 忽略存储错误 */ }
   }, [tabs])
 
-  /** 获取路径对应的菜单名称（统一从后端菜单配置获取，保持与侧边栏一致） */
+  /** 获取路径对应的菜单名称（子页面优先用与页面标题一致的完整标题，菜单页与侧边栏一致） */
   const getMenuName = useCallback((pathname: string): string => {
     const normalized = normalizePath(pathname)
 
-    // 1. 后端菜单树 path 直接匹配
+    // 1. 子页面完整标题（与页面标题完全一致，优先级最高）
+    const fullTitle = matchFullTitle(pathname, t)
+    if (fullTitle) return fullTitle
+
+    // 2. 后端菜单树 path 直接匹配
     const backendEntry = pathNameMap[normalized]
     if (backendEntry) {
       return translateMenuName(backendEntry.key, backendEntry.name)
     }
 
-    // 2. 通过 pathToKey（与侧边栏共享）找到 menuKey，再从后端 keyNameMap 获取名称
+    // 3. 通过 pathToKey（与侧边栏共享）找到 menuKey，再从后端 keyNameMap 获取名称
     const menuKey = pathToKey[normalized]
     if (menuKey && keyNameMap[menuKey]) {
       return translateMenuName(menuKey, keyNameMap[menuKey])
     }
 
-    // 3. 子页面：从后端获取父页面名称 + 后缀
-    const parentKey = findParentKey(normalized)
-    if (parentKey) {
-      const parentName = keyNameMap[parentKey]
-      if (parentName) {
-        const suffix = findSubPageSuffix(normalized) || ''
-        return translateMenuName(parentKey, parentName) + suffix
-      }
-    }
-
     // 4. 后端菜单不可用时的降级 fallback
-    const subPageName = matchSubPage(normalized)
-    if (subPageName) return subPageName
     return FALLBACK_PATH_NAME[normalized] || normalized.replace(/^\//, '').replace(/-/g, ' ')
-  }, [pathNameMap, keyNameMap, i18nInstance.language])
+  }, [pathNameMap, keyNameMap, t])
 
   /** 路由变化时自动添加/激活标签 */
   useEffect(() => {
-    const currentPath = normalizePath(location.pathname)
-    if (currentPath === '/login') return
+    // location.pathname 不含 query string，需拼接 location.search
+    const fullPath = location.pathname + location.search
+    const currentTabPath = tabPath(fullPath)
+    if (normalizePath(currentTabPath) === '/login') return
 
     setTabs((prev) => {
-      const exists = prev.find(t => t.path === currentPath)
+      const exists = prev.find(t => t.path === currentTabPath)
       if (exists) return prev
-      const title = getMenuName(currentPath)
-      return [...prev, { path: currentPath, title }]
+      const title = getMenuName(currentTabPath)
+      return [...prev, { path: currentTabPath, title }]
     })
-  }, [location.pathname, getMenuName])
+  }, [location.pathname, location.search, getMenuName])
 
   /** 语言变化时刷新所有标签名称 */
   useEffect(() => {
@@ -347,9 +358,10 @@ export default function MenuTabs() {
 
   /** 点击标签：导航到对应路径 */
   const handleTabClick = useCallback((path: string) => {
-    if (path === normalizePath(location.pathname)) return
+    const currentFullPath = location.pathname + location.search
+    if (path === tabPath(currentFullPath)) return
     navigate(path)
-  }, [navigate, location.pathname])
+  }, [navigate, location.pathname, location.search])
 
   /** 关闭标签 */
   const handleClose = useCallback((e: React.MouseEvent, path: string) => {
@@ -358,16 +370,17 @@ export default function MenuTabs() {
       if (prev.length <= 1) return prev
       const idx = prev.findIndex(t => t.path === path)
       const next = prev.filter(t => t.path !== path)
-      if (path === normalizePath(location.pathname) && next.length > 0) {
+      const currentFullPath = location.pathname + location.search
+      if (path === tabPath(currentFullPath) && next.length > 0) {
         const targetIdx = Math.min(idx, next.length - 1)
         navigate(next[targetIdx].path)
       }
       return next
     })
-  }, [navigate, location.pathname])
+  }, [navigate, location.pathname, location.search])
 
   /** 当前激活的路径 */
-  const activePath = normalizePath(location.pathname)
+  const activePath = tabPath(location.pathname + location.search)
 
   /** 自动滚动激活标签到可视区域 */
   useEffect(() => {

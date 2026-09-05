@@ -1,11 +1,14 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.util.BizSeqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -22,9 +25,13 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
+    private final BizSeqService bizSeqService;
 
     /** 初始化版本: 新增规则种子/补列步骤时递增版本号 */
     private static final String V_INIT = "seq:init-v1";
+
+    /** 增量版本: AI 权控/额度配置ID规则种子 + 业务表补列 + 存量回填 */
+    private static final String V_INIT_AI_CONFIG_CODE = "seq:init-v2";
 
     @Override
     public void run(String... args) {
@@ -34,6 +41,11 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
             seedRules();
             ensureBizCodeColumns();
             backfillPositionCodes();
+        });
+        versionTracker.applyOnce(V_INIT_AI_CONFIG_CODE, () -> {
+            seedAiConfigCodeRules();
+            ensureAiConfigCodeColumns();
+            backfillAiConfigCodes();
         });
     }
 
@@ -159,6 +171,89 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                     String.format("%s%0" + seqLength + "d", prefix, ++seq), id);
         }
         log.info("已为 {} 个存量职位回填职位ID（{} 前缀）", ids.size(), prefix);
+    }
+
+    /** AI 权控/额度配置ID规则种子（模型授权管理 + 配额管理，与前端「编号生成规则」界面一致） */
+    private void seedAiConfigCodeRules() {
+        String[][] rules = {
+                /* rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, remark */
+                {"ai_dept_model_auth", "部門模型權控", "模型授權管理", "BMMX", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"ai_emp_pos_model_auth", "員工模型權控-按職位", "模型授權管理", "ZWMX", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"ai_emp_role_model_auth", "員工模型權控-按角色", "模型授權管理", "JSMX", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"ai_dept_quota", "部門額度", "配額管理", "BMED", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"ai_emp_pos_quota", "員工額度-按職位", "配額管理", "ZWED", "YYYYMM", "3", "0", "{prefix} + YYYYMM + {n}位自增序號"},
+                {"ai_emp_role_quota", "員工額度-按角色", "配額管理", "JSED", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+        };
+        int inserted = 0;
+        for (String[] r : rules) {
+            inserted += jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_biz_seq_rule "
+                            + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, remark) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    r[0], r[1], r[2], r[3], r[4], Integer.parseInt(r[5]), Integer.parseInt(r[6]), r[7]);
+        }
+        if (inserted > 0) {
+            log.info("已写入 {} 条 AI 权控/额度配置ID编号规则种子数据", inserted);
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** AI 权控/额度业务表补充配置ID字段（存量库无需手动跑 ALTER；新库建表脚本已含该列） */
+    private void ensureAiConfigCodeColumns() {
+        ensureColumn("ai_dept_auth_group", "config_code",
+                "VARCHAR(32) NULL COMMENT '配置ID（按编号生成规则 ai_dept_model_auth 生成）' AFTER id");
+        ensureColumn("ai_emp_pos_auth_strategy", "config_code",
+                "VARCHAR(32) NULL COMMENT '配置ID（按编号生成规则 ai_emp_pos_model_auth 生成）' AFTER id");
+        ensureColumn("ai_emp_role_auth", "config_code",
+                "VARCHAR(32) NULL COMMENT '配置ID（按编号生成规则 ai_emp_role_model_auth 生成）' AFTER id");
+        ensureColumn("ai_dept_quota_policy", "config_code",
+                "VARCHAR(32) NULL COMMENT '配置ID（按编号生成规则 ai_dept_quota 生成）' AFTER id");
+        ensureColumn("ai_emp_quota_policy", "config_code",
+                "VARCHAR(32) NULL COMMENT '配置ID（按编号生成规则 ai_emp_pos_quota 生成）' AFTER id");
+        ensureColumn("ai_role_quota_policy", "config_code",
+                "VARCHAR(32) NULL COMMENT '配置ID（按编号生成规则 ai_emp_role_quota 生成）' AFTER id");
+    }
+
+    /** 存量数据回填配置ID（按创建日期补号，同日数据顺序自增，仅处理空值，幂等） */
+    private void backfillAiConfigCodes() {
+        String[][] tables = {
+                /* table, rule_key */
+                {"ai_dept_auth_group", BizSeqService.RULE_AI_DEPT_MODEL_AUTH},
+                {"ai_emp_pos_auth_strategy", BizSeqService.RULE_AI_EMP_POS_MODEL_AUTH},
+                {"ai_emp_role_auth", BizSeqService.RULE_AI_EMP_ROLE_MODEL_AUTH},
+                {"ai_dept_quota_policy", BizSeqService.RULE_AI_DEPT_QUOTA},
+                {"ai_emp_quota_policy", BizSeqService.RULE_AI_EMP_POS_QUOTA},
+                {"ai_role_quota_policy", BizSeqService.RULE_AI_EMP_ROLE_QUOTA},
+        };
+        for (String[] t : tables) {
+            if (!tableExists(t[0]) || !columnExists(t[0], "config_code")) {
+                continue;
+            }
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT id, created_at FROM " + t[0] + " WHERE config_code IS NULL OR config_code = '' ORDER BY id");
+            for (Map<String, Object> row : rows) {
+                Long id = ((Number) row.get("id")).longValue();
+                String code = bizSeqService.next(t[1], toLocalDate(row.get("created_at")));
+                jdbcTemplate.update("UPDATE " + t[0] + " SET config_code = ? WHERE id = ?", code, id);
+            }
+            if (!rows.isEmpty()) {
+                log.info("已为表 {} 的 {} 条存量数据回填配置ID", t[0], rows.size());
+            }
+        }
+    }
+
+    /** DATETIME 列值 → 日期（兼容驱动返回 LocalDateTime / Timestamp 两种类型） */
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDateTime dateTime) {
+            return dateTime.toLocalDate();
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        if (value instanceof LocalDate date) {
+            return date;
+        }
+        return LocalDate.now();
     }
 
     /** 表不存在时跳过（表由各自脚本/初始化器创建），列不存在时追加 */

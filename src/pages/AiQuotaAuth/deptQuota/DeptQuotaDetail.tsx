@@ -5,8 +5,8 @@ import { AppstoreOutlined, TeamOutlined, BarChartOutlined, FundOutlined } from '
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AnimatedNumber from '../../../components/AnimatedNumber'
 import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '../../../api'
+import { fetchDeptQuotaDetail, type DeptQuotaVO } from '../../../api/deptQuota'
 import {
-  getDeptQuotaById,
   usagePercent,
   usageColor,
   quotaText,
@@ -18,7 +18,6 @@ import {
   OVER_LIMIT_TAG,
   ALLOCATE_MODE_LABEL,
   CURRENCY_SYMBOL,
-  type DeptQuotaPolicy,
 } from './deptQuotaStore'
 
 /**
@@ -32,7 +31,7 @@ export default function DeptQuotaDetail() {
   const quotaId = searchParams.get('id')
 
   const [loading, setLoading] = useState(true)
-  const [policy, setPolicy] = useState<DeptQuotaPolicy | null>(null)
+  const [policy, setPolicy] = useState<DeptQuotaVO | null>(null)
   const [models, setModels] = useState<AiModel[]>([])
   const [deptOptions, setDeptOptions] = useState<DeptOption[]>([])
 
@@ -45,14 +44,14 @@ export default function DeptQuotaDetail() {
     let cancelled = false
     setLoading(true)
     Promise.all([
+      fetchDeptQuotaDetail(Number(quotaId)).catch(() => null),
       fetchDeptOptions().catch(() => [] as DeptOption[]),
       fetchModels({ status: 1 }).catch(() => [] as AiModel[]),
     ])
-      .then(([depts, modelList]) => {
+      .then(([found, depts, modelList]) => {
         if (cancelled) return
         setDeptOptions(depts)
         setModels(modelList)
-        const found = getDeptQuotaById(quotaId, depts)
         setPolicy(found)
         if (!found) message.error('額度策略不存在或已刪除')
       })

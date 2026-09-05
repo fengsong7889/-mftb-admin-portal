@@ -1,10 +1,14 @@
 package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.common.ResultCode;
+import com.mftb.admin.dto.AiMyCenterDTO;
 import com.mftb.admin.dto.AiQuotaDTO;
 import com.mftb.admin.entity.AiQuotaConfig;
 import com.mftb.admin.mapper.AiQuotaConfigMapper;
+import com.mftb.admin.service.AiMyCenterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,14 +29,33 @@ import java.util.List;
 @Tag(name = "AI 智能中心 - 配额管理", description = "部门/员工配额管理接口")
 public class AiQuotaController {
 
+    /** 部门额度菜单标识 */
+    private static final String MENU_DEPT = "ai-dept-quota";
+    /** 员工额度菜单标识 */
+    private static final String MENU_EMP = "ai-emp-quota";
+    /** 配额管理（二级目录）菜单标识，用于部门/员工共用的删除接口 */
+    private static final String MENU_QUOTA_MANAGE = "ai-quota-manage";
+
     private final AiQuotaConfigMapper quotaMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final AiMyCenterService myCenterService;
+
+    /**
+     * 查询当前账号的额度维度与真实用量（首页「我的用量」数据源）
+     */
+    @GetMapping("/my")
+    @Operation(summary = "查询我的额度维度与用量")
+    public Result<AiMyCenterDTO.MyQuotaUsageVO> myQuotaUsage() {
+        AiMyCenterDTO.MyQuotaUsageVO vo = myCenterService.myQuotaUsage();
+        return vo != null ? Result.success(vo) : Result.error(ResultCode.UNAUTHORIZED);
+    }
 
     /**
      * 查询部门配额列表
      */
     @GetMapping("/departments")
     @Operation(summary = "查询部门配额列表")
+    @RequirePermission(menu = MENU_DEPT)
     public Result<List<AiQuotaDTO.QuotaVO>> listDeptQuotas(@RequestBody(required = false) 
                                                             AiQuotaDTO.DeptQuotaQueryRequest query) {
         String sql = """
@@ -62,7 +85,7 @@ public class AiQuotaController {
             }
         }
         
-        sql += " ORDER BY q.sort_order ASC, q.id ASC";
+        sql += " ORDER BY q.id ASC";
         
         List<AiQuotaDTO.QuotaVO> results = jdbcTemplate.query(sql, params.toArray(), (rs, rowNum) -> {
             AiQuotaDTO.QuotaVO vo = new AiQuotaDTO.QuotaVO();
@@ -92,6 +115,7 @@ public class AiQuotaController {
      */
     @GetMapping("/employees")
     @Operation(summary = "查询员工配额列表")
+    @RequirePermission(menu = MENU_EMP)
     public Result<List<AiQuotaDTO.QuotaVO>> listEmpQuotas(@RequestBody(required = false) 
                                                            AiQuotaDTO.EmpQuotaQueryRequest query) {
         String sql = """
@@ -155,6 +179,7 @@ public class AiQuotaController {
      */
     @PostMapping("/departments")
     @Operation(summary = "批量设置部门配额")
+    @RequirePermission(menu = MENU_DEPT, action = "edit")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> batchSetDeptQuotas(@Valid @RequestBody AiQuotaDTO.BatchQuotaRequest request) {
         for (AiQuotaDTO.QuotaConfigRequest config : request.getQuotas()) {
@@ -168,6 +193,7 @@ public class AiQuotaController {
      */
     @PostMapping("/employees")
     @Operation(summary = "批量设置员工配额")
+    @RequirePermission(menu = MENU_EMP, action = "edit")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> batchSetEmpQuotas(@Valid @RequestBody AiQuotaDTO.BatchQuotaRequest request) {
         for (AiQuotaDTO.QuotaConfigRequest config : request.getQuotas()) {
@@ -180,13 +206,17 @@ public class AiQuotaController {
      * 保存或更新配额配置
      */
     private void saveOrUpdateQuota(AiQuotaDTO.QuotaConfigRequest request) {
-        // 检查是否已存在该配置的记录
-        AiQuotaConfig existing = quotaMapper.selectOne(
-            new LambdaQueryWrapper<AiQuotaConfig>()
-                .eq(AiQuotaConfig::getQuotaType, request.getQuotaType())
-                .eq(AiQuotaConfig::getTargetId, request.getTargetId())
-                .eq(AiQuotaConfig::getModelId, request.getModelId() != null ? request.getModelId() : (Object) null)
-        );
+        // 检查是否已存在该配置的记录（modelId 为 null 时必须用 IS NULL 匹配，
+        // 否则 eq(column, null) 生成 model_id = NULL 恒不命中，导致重复插入撞唯一键）
+        LambdaQueryWrapper<AiQuotaConfig> dupWrapper = new LambdaQueryWrapper<AiQuotaConfig>()
+            .eq(AiQuotaConfig::getQuotaType, request.getQuotaType())
+            .eq(AiQuotaConfig::getTargetId, request.getTargetId());
+        if (request.getModelId() != null) {
+            dupWrapper.eq(AiQuotaConfig::getModelId, request.getModelId());
+        } else {
+            dupWrapper.isNull(AiQuotaConfig::getModelId);
+        }
+        AiQuotaConfig existing = quotaMapper.selectOne(dupWrapper);
         
         if (existing != null) {
             // 更新现有记录
@@ -215,6 +245,7 @@ public class AiQuotaController {
      */
     @DeleteMapping("/{type}/{targetId}")
     @Operation(summary = "删除目标配额配置")
+    @RequirePermission(menu = MENU_QUOTA_MANAGE, action = "delete")
     @Transactional(rollbackFor = Exception.class)
     public Result<Boolean> deleteQuota(@PathVariable String type, @PathVariable Long targetId) {
         int deleted = quotaMapper.delete(

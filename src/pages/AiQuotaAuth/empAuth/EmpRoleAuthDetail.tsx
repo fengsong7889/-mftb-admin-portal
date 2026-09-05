@@ -6,7 +6,8 @@ import { fetchModels, type AiModel } from '../../../api'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import AnimatedNumber from '../../../components/AnimatedNumber'
 import { ModelAuthSectionReadonly } from './ModelAuthSection'
-import { loadRoleAuthConfigs, type RoleAuthConfig } from './modelAuthCapability'
+import { clampModelConfigs, type RoleAuthConfig } from './modelAuthCapability'
+import { getRoleAuthByCode } from '../../../api/empAuth'
 
 /**
  * 角色授權 - 詳情獨立頁（參考部門模型權控詳情頁佈局）
@@ -31,20 +32,34 @@ export default function EmpRoleAuthDetail() {
     }
     let cancelled = false
     setLoading(true)
-    Promise.all([
-      fetchModels({ status: 1 }),
-      fetchEmployees({ page: 1, size: 200, status: 1 }),  // 真實員工 API
-    ])
-      .then(([modelList, empResult]) => {
+    ;(async () => {
+      try {
+        const [modelList, empResult, detail] = await Promise.all([
+          fetchModels({ status: 1 }),
+          fetchEmployees({ page: 1, size: 200, status: 1 }),  // 真實員工 API
+          getRoleAuthByCode(roleIdParam),
+        ])
         if (cancelled) return
         setModels(modelList)
         setEmployees(empResult.records || [])
-        const found = loadRoleAuthConfigs(modelList).find((c) => c.roleId === roleIdParam) ?? null
-        setConfig(found)
-        if (!found) message.error('該角色尚未配置模型授權')
-      })
-      .catch(() => { if (!cancelled) message.error('加載詳情失敗') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+        setConfig({
+          roleId: detail.roleId,
+          roleName: detail.roleName,
+          description: detail.description ?? '',
+          modelConfigs: clampModelConfigs(detail.modelConfigs ?? [], modelList),
+          userIds: detail.userIds ?? [],
+          dataResidency: detail.dataResidency,
+          status: detail.status,
+          createdAt: detail.createdAt ?? '',
+          updatedBy: detail.updatedBy,
+          updatedAt: detail.updatedAt,
+        })
+      } catch {
+        if (!cancelled) message.error('該角色尚未配置模型授權或已被移除')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     return () => { cancelled = true }
   }, [roleIdParam, navigate])
 
@@ -104,7 +119,7 @@ export default function EmpRoleAuthDetail() {
             <div>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff', display: 'flex', alignItems: 'center', gap: 10 }}>
                 授權模型詳情-角色
-                <Tag color="success">啟用</Tag>
+                {config.status === 1 ? <Tag color="success">啟用</Tag> : <Tag color="default">停用</Tag>}
               </h2>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
                 {config.roleName} · 最後更新：{config.updatedBy ?? '-'} · {config.updatedAt ?? '-'}
@@ -194,8 +209,9 @@ export default function EmpRoleAuthDetail() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {([
             { label: '角色名稱', value: config.roleName },
+            { label: '描述', value: config.description || '-' },
             { label: '角色類型', value: '自定義角色（非權限系統角色）' },
-            { label: '角色狀態', value: '啟用' },
+            { label: '角色狀態', value: config.status === 1 ? '啟用' : '停用' },
             { label: '最後更新人', value: config.updatedBy ?? '-' },
             { label: '創建時間', value: config.createdAt ?? '-' },
             { label: '更新時間', value: config.updatedAt ?? '-' },

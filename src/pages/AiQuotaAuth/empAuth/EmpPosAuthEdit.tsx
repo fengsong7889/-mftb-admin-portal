@@ -6,11 +6,10 @@ import { fetchModels, type AiModel } from '../../../api'
 import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS } from '../../../api/position'
 import { ModelAuthSection } from './ModelAuthSection'
 import {
-  loadPosRules,
-  savePosRules,
   clampModelConfigs,
   type ModelAuthConfig,
 } from './modelAuthCapability'
+import { createPosStrategy, getPosStrategyById, updatePosStrategy } from '../../../api/empAuth'
 
 /**
  * 按職位授權 - 新增 / 編輯獨立頁（全局統一：取消彈窗，參考部門模型權控）
@@ -33,40 +32,43 @@ export default function EmpPosAuthEdit() {
   const [dataResidency, setDataResidency] = useState(0)
 
   /**
-   * 一次性加載：模型列表 +（編輯模式）規則詳情。
+   * 一次性加載：模型列表 +（編輯模式）策略詳情（API）。
    * 合併為單個 effect 以避免「詳情先於模型返回」導致能力回填丟失的競態。
    */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetchModels({ status: 1 })
-      .then((modelList) => {
+    ;(async () => {
+      try {
+        const modelList = await fetchModels({ status: 1 })
         if (cancelled) return
         setModels(modelList)
         if (ruleId) {
-          const rule = loadPosRules(modelList).find((r) => r.id === ruleId)
-          if (rule) {
-            form.setFieldsValue({
-              ruleName: rule.ruleName,
-              sequence: rule.sequence,
-              jobLevels: rule.jobLevels,
-              description: rule.description ?? '',
-              status: rule.status,
-            })
-            setModelAuths(clampModelConfigs(rule.modelConfigs, modelList))
-            setDataResidency(rule.dataResidency ?? 0)
-          } else {
-            message.error('授權規則不存在或已刪除')
-            navigate('/ai-emp-model-auth')
-          }
+          const rule = await getPosStrategyById(ruleId)
+          if (cancelled) return
+          form.setFieldsValue({
+            ruleName: rule.ruleName,
+            sequence: rule.sequence ?? [],
+            jobLevels: rule.jobLevels ?? [],
+            description: rule.description ?? '',
+            status: rule.status,
+          })
+          setModelAuths(clampModelConfigs(rule.modelConfigs ?? [], modelList))
+          setDataResidency(rule.dataResidency ?? 0)
         }
-      })
-      .catch(() => { if (!cancelled) message.error('加載數據失敗') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      } catch {
+        if (!cancelled) {
+          message.error(ruleId ? '授權策略不存在或已刪除' : '加載數據失敗')
+          if (ruleId) navigate('/ai-emp-model-auth')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     return () => { cancelled = true }
   }, [ruleId, form, navigate])
 
-  /* ── 保存 ── */
+  /* ── 保存（寫後端，首頁「我的授權模型」按策略命中聚合） ── */
   const handleSave = async () => {
     const values = await form.validateFields()
 
@@ -75,30 +77,28 @@ export default function EmpPosAuthEdit() {
       return
     }
 
-    const now = new Date().toISOString()
-    const rules = loadPosRules(models)
     const payload = {
-      ruleName: String(values.ruleName).trim(),
-      sequence: (values.sequence ?? []) as string[],
+      strategyName: String(values.ruleName).trim(),
+      sequences: (values.sequence ?? []) as string[],
       jobLevels: (values.jobLevels ?? []) as string[],
       modelConfigs: modelAuths,
       dataResidency,
       description: (values.description ?? '') as string,
       status: (values.status ?? 1) as number,
-      updatedBy: 'admin',
-      updatedAt: now,
     }
 
     setSaving(true)
     try {
       if (isEdit && ruleId) {
-        savePosRules(rules.map((r) => (r.id === ruleId ? { ...r, ...payload } : r)))
-        message.success('職位授權規則已更新，匹配的職位自動生效')
+        await updatePosStrategy(ruleId, payload)
+        message.success('職位授權策略已更新，匹配的職位自動生效')
       } else {
-        savePosRules([...rules, { id: `rule_${Date.now()}`, createdAt: now, ...payload }])
-        message.success('職位授權規則已創建，匹配的職位自動生效')
+        await createPosStrategy(payload)
+        message.success('職位授權策略已創建，匹配的職位自動生效')
       }
       navigate('/ai-emp-model-auth')
+    } catch {
+      message.error('保存失敗，請稍後重試')
     } finally {
       setSaving(false)
     }
@@ -157,11 +157,11 @@ export default function EmpPosAuthEdit() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="ruleName" label="規則名稱" rules={[{ required: true, message: '請輸入規則名稱' }]}>
+            <Form.Item name="ruleName" label="策略名稱" rules={[{ required: true, message: '請輸入策略名稱' }]}>
               <Input placeholder="如：M序列高職級全模型授權" maxLength={50} allowClear />
             </Form.Item>
             <Form.Item name="description" label="描述">
-              <Input placeholder="請輸入規則描述（選填）" maxLength={200} allowClear />
+              <Input placeholder="請輸入策略描述（選填）" maxLength={200} allowClear />
             </Form.Item>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function EmpPosAuthEdit() {
               getValueFromEvent={(checked) => checked ? 1 : 0}
               getValueProps={(value) => ({ checked: value === 1 })}
               style={{ marginBottom: 0 }}
-              extra="停用後匹配該規則的職位將立即失去對應模型訪問權"
+              extra="停用後匹配該策略的職位將立即失去對應模型訪問權"
             >
               <Switch checkedChildren="啟用" unCheckedChildren="停用" />
             </Form.Item>

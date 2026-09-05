@@ -19,8 +19,14 @@ public class AiDeptAuthGroup {
     @TableId
     private Long id;
 
+    /** 配置ID（按编号生成规则 ai_dept_model_auth 生成，如 BMMX20260906000） */
+    private String configCode;
+
     /** 策略名称 */
     private String name;
+
+    /** 策略描述 */
+    private String description;
 
     /** 数据不出域：1=启用 0=未启用 */
     private Integer dataResidency;

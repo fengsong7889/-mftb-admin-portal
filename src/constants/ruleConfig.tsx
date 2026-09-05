@@ -395,6 +395,14 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'dept_code', label: '部門編碼', type: 'table', value: 'BM', defaultValue: 'BM', dateFormat: '', min: 5, max: 5, unit: 'BM00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '組織管理' },
       /* ── 職位管理 ── */
       { key: 'position_id', label: '職位ID', type: 'table', value: 'ZW', defaultValue: 'ZW', dateFormat: '', min: 5, max: 5, unit: 'ZW00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '職位管理' },
+      /* ── 模型授權管理 ── */
+      { key: 'ai_dept_model_auth', label: '部門模型權控', type: 'table', value: 'BMMX', defaultValue: 'BMMX', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'BMMX20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '模型授權管理' },
+      { key: 'ai_emp_pos_model_auth', label: '員工模型權控-按職位', type: 'table', value: 'ZWMX', defaultValue: 'ZWMX', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'ZWMX20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '模型授權管理' },
+      { key: 'ai_emp_role_model_auth', label: '員工模型權控-按角色', type: 'table', value: 'JSMX', defaultValue: 'JSMX', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'JSMX20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '模型授權管理' },
+      /* ── 配額管理 ── */
+      { key: 'ai_dept_quota', label: '部門額度', type: 'table', value: 'BMED', defaultValue: 'BMED', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'BMED20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '配額管理' },
+      { key: 'ai_emp_pos_quota', label: '員工額度-按職位', type: 'table', value: 'ZWED', defaultValue: 'ZWED', dateFormat: 'YYYYMM', min: 3, max: 3, unit: 'ZWED202608000', remark: '{prefix} + YYYYMM + {n}位自增序號', menu: '配額管理' },
+      { key: 'ai_emp_role_quota', label: '員工額度-按角色', type: 'table', value: 'JSED', defaultValue: 'JSED', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'JSED20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '配額管理' },
     ],
   },
 ]
