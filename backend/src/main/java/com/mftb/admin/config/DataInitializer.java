@@ -35,7 +35,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SchemaVersionTracker versionTracker;
 
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
-    private static final String V_SCHEMA = "core:schema-v1";
+    private static final String V_SCHEMA = "core:schema-v2";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
     private static final String V_MENU_SEED = "core:menu-seed-v9";
 
@@ -164,7 +164,29 @@ public class DataInitializer implements CommandLineRunner {
         addColumnIfAbsent("sys_user", "avatar_url",
                 "ALTER TABLE sys_user ADD COLUMN avatar_url VARCHAR(512) NULL "
                         + "COMMENT '用户选中的在线头像URL（IconFont/DiceBear等外部URL）' AFTER avatar");
+        // 73_avatar_mediumtext.sql 等效: avatar 字段扩容支持 base64 Data URL
+        migrateAvatarMediumText();
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
+    }
+
+    /** avatar 字段扩容: VARCHAR(255) → MEDIUMTEXT, 支持 base64 Data URL / DiceBear URL 等长文本存储 (与 73_avatar_mediumtext.sql 等效) */
+    private void migrateAvatarMediumText() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'avatar'",
+                Integer.class);
+        if (count == null || count == 0) {
+            return;
+        }
+        String type = jdbcTemplate.queryForObject(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'avatar'",
+                String.class);
+        if (!"mediumtext".equalsIgnoreCase(type)) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE sys_user MODIFY COLUMN avatar MEDIUMTEXT COMMENT '头像（pikachu expression / dicebear URL / base64）'");
+            log.info("已将 sys_user.avatar 扩容为 MEDIUMTEXT");
+        }
     }
 
     /** 消费风控登记制: biz_fin_risk_config 新增 status 列 (表存在时才迁移, 与 66_fin_risk_config_status.sql 等效) */
