@@ -35,7 +35,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SchemaVersionTracker versionTracker;
 
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
-    private static final String V_SCHEMA = "core:schema-v3";
+    private static final String V_SCHEMA = "core:schema-v4";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
     private static final String V_MENU_SEED = "core:menu-seed-v9";
 
@@ -410,6 +410,45 @@ public class DataInitializer implements CommandLineRunner {
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 助手使用统计明细'");
 
         log.info("AI 中心表自动创建完成 (幂等, 已存在则跳过)");
+
+        // ---- 种子数据: 供应商 + 模型 (INSERT IGNORE 幂等) ----
+        jdbcTemplate.execute(
+            "INSERT IGNORE INTO ai_provider (provider_key, name, description, api_base_url, status, is_default, sort_order) VALUES"
+            + " ('dashscope', '阿里云百炼', '阿里云百炼大模型平台 (通义千问系列)', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 1, 1, 1),"
+            + " ('deepseek', 'DeepSeek', 'DeepSeek 大模型', 'https://api.deepseek.com/v1', 1, 0, 2)");
+
+        // 模型种子: 使用子查询获取 provider_id, 避免硬编码自增 ID
+        jdbcTemplate.execute(
+            "INSERT IGNORE INTO ai_model (provider_id, model_key, name, version, description, api_compat, type, deploy_type,"
+            + " modalities, vision_support, function_calling, json_mode, streaming, thinking_mode,"
+            + " context_window, max_output_tokens, input_price, output_price, cached_input_price, currency,"
+            + " status, sort_order)"
+            + " SELECT p.id, 'qwen3.7-flash', '通义千问 3.7 Flash', NULL, '阿里云百炼 qwen3.7-flash 轻量模型',"
+            + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
+            + " 131072, 8192, 0.200000, 0.800000, 0.040000, 'CNY', 1, 1"
+            + " FROM ai_provider p WHERE p.provider_key = 'dashscope' LIMIT 1");
+
+        jdbcTemplate.execute(
+            "INSERT IGNORE INTO ai_model (provider_id, model_key, name, version, description, api_compat, type, deploy_type,"
+            + " modalities, vision_support, function_calling, json_mode, streaming, thinking_mode,"
+            + " context_window, max_output_tokens, input_price, output_price, cached_input_price, currency,"
+            + " status, sort_order)"
+            + " SELECT p.id, 'deepseek-chat', 'DeepSeek Chat', NULL, 'DeepSeek-V3 对话模型',"
+            + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 1,"
+            + " 65536, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 2"
+            + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
+
+        jdbcTemplate.execute(
+            "INSERT IGNORE INTO ai_model (provider_id, model_key, name, version, description, api_compat, type, deploy_type,"
+            + " modalities, vision_support, function_calling, json_mode, streaming, thinking_mode,"
+            + " context_window, max_output_tokens, input_price, output_price, cached_input_price, currency,"
+            + " status, sort_order)"
+            + " SELECT p.id, 'deepseek-v4-flash', 'DeepSeek V4 Flash', NULL, 'DeepSeek V4 Flash 轻量模型',"
+            + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
+            + " 65536, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 3"
+            + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
+
+        log.info("AI 供应商与模型种子数据插入完成 (幂等)");
     }
 
     /** 消费风控登记制: biz_fin_risk_config 新增 status 列 (表存在时才迁移, 与 66_fin_risk_config_status.sql 等效) */
