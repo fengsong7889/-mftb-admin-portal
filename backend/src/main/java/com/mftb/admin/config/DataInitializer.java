@@ -166,6 +166,8 @@ public class DataInitializer implements CommandLineRunner {
                         + "COMMENT '用户选中的在线头像URL（IconFont/DiceBear等外部URL）' AFTER avatar");
         // 73_avatar_mediumtext.sql 等效: avatar 字段扩容支持 base64 Data URL
         migrateAvatarMediumText();
+        // AI 中心表自动创建 (85/88/68 脚本等效, 幂等)
+        migrateAiCenterTables();
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
     }
 
@@ -187,6 +189,227 @@ public class DataInitializer implements CommandLineRunner {
                     "ALTER TABLE sys_user MODIFY COLUMN avatar MEDIUMTEXT COMMENT '头像（pikachu expression / dicebear URL / base64）'");
             log.info("已将 sys_user.avatar 扩容为 MEDIUMTEXT");
         }
+    }
+
+    /**
+     * AI 中心表自动创建 (85_ai_center_tables / 88_dept_auth_group / 68_llm_usage 脚本等效)
+     * 包含 ai_provider, ai_model(含 86/92 增量列), ai_department_auth, ai_employee_auth,
+     * ai_position_model_mapping, ai_role_model_mapping, ai_usage_log, ai_quota_config,
+     * ai_tool_registry, ai_dept_auth_group, ai_dept_auth_group_dept, ai_dept_auth_group_model,
+     * biz_llm_usage 共 13 张表。全部使用 CREATE TABLE IF NOT EXISTS，幂等安全。
+     */
+    private void migrateAiCenterTables() {
+        // 1. ai_provider
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_provider ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "provider_key VARCHAR(50) NOT NULL UNIQUE COMMENT '供应商标识',"
+            + "name VARCHAR(100) NOT NULL COMMENT '供应商名称',"
+            + "description VARCHAR(500) DEFAULT NULL COMMENT '供应商描述',"
+            + "api_base_url VARCHAR(500) DEFAULT NULL COMMENT 'API 基础 URL',"
+            + "api_key VARCHAR(500) DEFAULT NULL COMMENT 'API Key(加密存储)',"
+            + "status TINYINT DEFAULT 1 COMMENT '状态：1=启用 0=停用',"
+            + "is_default TINYINT DEFAULT 0 COMMENT '是否默认供应商',"
+            + "config_json TEXT DEFAULT NULL COMMENT '配置信息 JSON',"
+            + "sort_order INT DEFAULT 0 COMMENT '排序',"
+            + "deleted TINYINT DEFAULT 0 COMMENT '逻辑删除',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "INDEX idx_provider_key (provider_key), INDEX idx_status (status)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 供应商表'");
+
+        // 2. ai_model (含 86 能力字段 + 92 deploy_type, 唯一约束用 87 新版)
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_model ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "provider_id BIGINT DEFAULT NULL COMMENT '供应商 ID',"
+            + "model_key VARCHAR(50) NOT NULL COMMENT '模型标识',"
+            + "name VARCHAR(100) NOT NULL COMMENT '模型名称',"
+            + "version VARCHAR(64) DEFAULT NULL COMMENT '模型版本号',"
+            + "description VARCHAR(500) DEFAULT NULL COMMENT '模型描述',"
+            + "api_compat VARCHAR(20) DEFAULT 'openai' COMMENT 'API 兼容格式',"
+            + "modalities VARCHAR(100) DEFAULT 'text' COMMENT '支持模态',"
+            + "vision_support TINYINT DEFAULT 0 COMMENT '视觉理解',"
+            + "function_calling TINYINT DEFAULT 0 COMMENT '工具调用',"
+            + "json_mode TINYINT DEFAULT 0 COMMENT 'JSON 模式',"
+            + "streaming TINYINT DEFAULT 1 COMMENT '流式响应',"
+            + "thinking_mode TINYINT DEFAULT 0 COMMENT '思考模式',"
+            + "type VARCHAR(50) DEFAULT 'chat' COMMENT '模型类型',"
+            + "deploy_type VARCHAR(20) NOT NULL DEFAULT 'cloud' COMMENT '部署类型',"
+            + "context_window INT DEFAULT 0 COMMENT '上下文窗口',"
+            + "max_output_tokens INT DEFAULT 0 COMMENT '最大输出 tokens',"
+            + "input_price DECIMAL(10,6) DEFAULT 0 COMMENT '输入价格',"
+            + "output_price DECIMAL(10,6) DEFAULT 0 COMMENT '输出价格',"
+            + "cached_input_price DECIMAL(10,4) DEFAULT NULL COMMENT '缓存命中输入价',"
+            + "currency VARCHAR(10) DEFAULT 'CNY' COMMENT '计费币种',"
+            + "concurrency_limit INT DEFAULT NULL COMMENT '并发限制',"
+            + "status TINYINT DEFAULT 1 COMMENT '状态',"
+            + "sort_order INT DEFAULT 0 COMMENT '排序',"
+            + "updated_by VARCHAR(50) DEFAULT NULL COMMENT '最后更新人',"
+            + "deleted TINYINT DEFAULT 0 COMMENT '逻辑删除',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_provider_key_version (provider_id, model_key, version),"
+            + "INDEX idx_provider_id (provider_id), INDEX idx_status (status)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 模型表'");
+
+        // 3. ai_department_auth
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_department_auth ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "department_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
+            + "has_permission TINYINT DEFAULT 1, limit_type VARCHAR(20) DEFAULT 'none',"
+            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, custom_limit INT DEFAULT 0,"
+            + "start_date DATE DEFAULT NULL, end_date DATE DEFAULT NULL,"
+            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_dept_model (department_id, model_id),"
+            + "INDEX idx_department_id (department_id), INDEX idx_model_id (model_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门模型权限表'");
+
+        // 4. ai_employee_auth
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_employee_auth ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "employee_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
+            + "has_permission TINYINT DEFAULT 1, limit_type VARCHAR(20) DEFAULT 'none',"
+            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, custom_limit INT DEFAULT 0,"
+            + "current_daily_usage BIGINT DEFAULT 0, current_monthly_usage BIGINT DEFAULT 0,"
+            + "reset_date DATE DEFAULT NULL,"
+            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_employee_model (employee_id, model_id),"
+            + "INDEX idx_employee_id (employee_id), INDEX idx_model_id (model_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='员工模型权限表'");
+
+        // 5. ai_position_model_mapping
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_position_model_mapping ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "position_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
+            + "permission_level VARCHAR(20) DEFAULT 'full',"
+            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, priority INT DEFAULT 0,"
+            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_position_model (position_id, model_id),"
+            + "INDEX idx_position_id (position_id), INDEX idx_model_id (model_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='职位模型权限映射表'");
+
+        // 6. ai_role_model_mapping
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_role_model_mapping ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "role_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
+            + "permission_level VARCHAR(20) DEFAULT 'full',"
+            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, priority INT DEFAULT 0,"
+            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_role_model (role_id, model_id),"
+            + "INDEX idx_role_id (role_id), INDEX idx_model_id (model_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色模型权限映射表'");
+
+        // 7. ai_usage_log
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_usage_log ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "target_type VARCHAR(20) NOT NULL, target_id BIGINT NOT NULL,"
+            + "model_id BIGINT NOT NULL, user_id BIGINT DEFAULT NULL,"
+            + "request_tokens INT DEFAULT 0, response_tokens INT DEFAULT 0, total_tokens INT DEFAULT 0,"
+            + "cost_amount DECIMAL(10,6) DEFAULT 0, prompt_text TEXT DEFAULT NULL,"
+            + "error_message VARCHAR(500) DEFAULT NULL, duration_ms INT DEFAULT 0,"
+            + "request_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "INDEX idx_target_type_id (target_type, target_id),"
+            + "INDEX idx_model_id (model_id), INDEX idx_request_time (request_time),"
+            + "INDEX idx_user_id (user_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 用量日志表'");
+
+        // 8. ai_quota_config
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_quota_config ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "quota_type VARCHAR(20) NOT NULL, target_id BIGINT NOT NULL,"
+            + "model_id BIGINT DEFAULT NULL,"
+            + "daily_quota INT DEFAULT 0, monthly_quota INT DEFAULT 0,"
+            + "used_today BIGINT DEFAULT 0, used_month BIGINT DEFAULT 0,"
+            + "quota_period_start DATE DEFAULT NULL, quota_period_end DATE DEFAULT NULL,"
+            + "auto_reset TINYINT DEFAULT 1, reset_day_of_month TINYINT DEFAULT 1,"
+            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_quota_target_model (quota_type, target_id, model_id),"
+            + "INDEX idx_quota_type_id (quota_type, target_id), INDEX idx_model_id (model_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门/员工额度配置表'");
+
+        // 9. ai_tool_registry
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_tool_registry ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "tool_key VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(100) NOT NULL,"
+            + "description VARCHAR(500) DEFAULT NULL, category VARCHAR(50) DEFAULT 'general',"
+            + "version VARCHAR(20) DEFAULT '1.0.0', author VARCHAR(100) DEFAULT NULL,"
+            + "icon VARCHAR(100) DEFAULT NULL, api_endpoint VARCHAR(500) DEFAULT NULL,"
+            + "config_schema TEXT DEFAULT NULL, is_enabled TINYINT DEFAULT 1,"
+            + "sort_order INT DEFAULT 0, status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "INDEX idx_category (category), INDEX idx_status (status)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 工具注册表'");
+
+        // 10. ai_dept_auth_group (88_dept_auth_group)
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_dept_auth_group ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "name VARCHAR(100) NOT NULL, data_residency TINYINT DEFAULT 0,"
+            + "status TINYINT DEFAULT 1, total_employee_count INT DEFAULT 0,"
+            + "updated_by VARCHAR(50) DEFAULT NULL, deleted TINYINT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "INDEX idx_status (status)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门模型授权策略主表'");
+
+        // 11. ai_dept_auth_group_dept
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_dept_auth_group_dept ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "group_id BIGINT NOT NULL, department_id BIGINT NOT NULL,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_group_dept (group_id, department_id),"
+            + "INDEX idx_group_id (group_id), INDEX idx_department_id (department_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略-部门关联表'");
+
+        // 12. ai_dept_auth_group_model
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS ai_dept_auth_group_model ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "group_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
+            + "vision_support TINYINT DEFAULT 1, function_calling TINYINT DEFAULT 1,"
+            + "json_mode TINYINT DEFAULT 1, streaming TINYINT DEFAULT 1,"
+            + "thinking_mode TINYINT DEFAULT 1, priority INT DEFAULT 0,"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+            + "UNIQUE KEY uk_group_model (group_id, model_id),"
+            + "INDEX idx_group_id (group_id), INDEX idx_model_id (model_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略-模型授权与能力配置表'");
+
+        // 13. biz_llm_usage (68_llm_usage)
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS biz_llm_usage ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
+            + "username VARCHAR(64) NOT NULL, mode VARCHAR(16) NOT NULL,"
+            + "channel VARCHAR(16) NOT NULL, model VARCHAR(64) NOT NULL,"
+            + "prompt_tokens INT NOT NULL DEFAULT 0, completion_tokens INT NOT NULL DEFAULT 0,"
+            + "cached_tokens INT NOT NULL DEFAULT 0,"
+            + "cost DECIMAL(12,6) NOT NULL DEFAULT 0, currency VARCHAR(8) NOT NULL DEFAULT '',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            + "INDEX idx_user_time (username, created_at), INDEX idx_time (created_at)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 助手使用统计明细'");
+
+        log.info("AI 中心表自动创建完成 (幂等, 已存在则跳过)");
     }
 
     /** 消费风控登记制: biz_fin_risk_config 新增 status 列 (表存在时才迁移, 与 66_fin_risk_config_status.sql 等效) */
