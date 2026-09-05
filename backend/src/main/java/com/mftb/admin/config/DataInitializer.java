@@ -35,7 +35,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SchemaVersionTracker versionTracker;
 
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
-    private static final String V_SCHEMA = "core:schema-v2";
+    private static final String V_SCHEMA = "core:schema-v3";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
     private static final String V_MENU_SEED = "core:menu-seed-v9";
 
