@@ -9,6 +9,7 @@ import {
   Modal,
   Radio,
   Select,
+  Space,
   Switch,
   Table,
   Tabs,
@@ -74,6 +75,7 @@ interface QuotaFormValues {
   softThreshold: number
   overLimitAction: OverLimitAction
   downgradeModelId?: string | null
+  downgradeExemptQuota?: number | null
 }
 
 export default function AiQuotaAuth() {
@@ -189,6 +191,7 @@ export default function AiQuotaAuth() {
         softThreshold: policy.softThreshold,
         overLimitAction: policy.overLimitAction,
         downgradeModelId: policy.downgradeModelId,
+        downgradeExemptQuota: policy.downgradeExemptQuota,
       })
     }
   }
@@ -197,9 +200,9 @@ export default function AiQuotaAuth() {
     policyForm.validateFields().then((values) => {
       const payload = { ...values } as QuotaFormValues
       if (editingPolicy === 'new') {
-        setPolicies((prev) => [...prev, { id: `p${Date.now()}`, status: 1, downgradeModelId: payload.overLimitAction === 'downgrade' ? (payload.downgradeModelId ?? null) : null, ...payload }])
+        setPolicies((prev) => [...prev, { id: `p${Date.now()}`, status: 1, downgradeModelId: payload.overLimitAction === 'downgrade' ? (payload.downgradeModelId ?? null) : null, downgradeExemptQuota: payload.overLimitAction === 'downgrade' ? (payload.downgradeExemptQuota ?? null) : null, ...payload }])
       } else if (editingPolicy) {
-        setPolicies((prev) => prev.map((p) => (p.id === editingPolicy.id ? { ...p, ...payload, downgradeModelId: payload.overLimitAction === 'downgrade' ? (payload.downgradeModelId ?? null) : null } : p)))
+        setPolicies((prev) => prev.map((p) => (p.id === editingPolicy.id ? { ...p, ...payload, downgradeModelId: payload.overLimitAction === 'downgrade' ? (payload.downgradeModelId ?? null) : null, downgradeExemptQuota: payload.overLimitAction === 'downgrade' ? (payload.downgradeExemptQuota ?? null) : null } : p)))
       }
       setEditingPolicy(null)
       message.success('額度策略已保存，網關將在每次請求前檢查額度')
@@ -291,10 +294,10 @@ export default function AiQuotaAuth() {
     {
       title: '操作', key: 'action', width: 110, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleOverrideEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => { setOverrides((prev) => prev.filter((o) => o.username !== row.username)); message.success('已移除該員工的額外授權') }}>移除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -329,10 +332,10 @@ export default function AiQuotaAuth() {
     {
       title: '操作', key: 'action', width: 110, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => openPolicyForm(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handlePolicyDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -642,9 +645,14 @@ export default function AiQuotaAuth() {
             shouldUpdate={(prev, cur) => prev.overLimitAction !== cur.overLimitAction}
           >
             {({ getFieldValue }) => getFieldValue('overLimitAction') === 'downgrade' ? (
-              <Form.Item name="downgradeModelId" label="降級目標模型" rules={[{ required: true, message: '請選擇降級目標模型' }]}>
-                <Select placeholder="請選擇降級目標模型" options={models.map((m) => ({ value: m.id, label: m.displayName }))} />
-              </Form.Item>
+              <>
+                <Form.Item name="downgradeModelId" label="降級目標模型" rules={[{ required: true, message: '請選擇降級目標模型' }]}>
+                  <Select placeholder="請選擇降級目標模型" options={models.map((m) => ({ value: m.id, label: m.displayName }))} />
+                </Form.Item>
+                <Form.Item name="downgradeExemptQuota" label="降級豁免額度" tooltip="主額度用完後，降級模型可獨立使用的額外額度（跟隨主額度分配方式）">
+                  <InputNumber min={0} style={{ width: '100%' }} placeholder="留空表示不設獨立豁免額度" />
+                </Form.Item>
+              </>
             ) : null}
           </Form.Item>
         </Form>

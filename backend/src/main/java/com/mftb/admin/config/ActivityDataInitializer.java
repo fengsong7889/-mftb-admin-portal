@@ -27,7 +27,7 @@ public class ActivityDataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // 版本化执行: 已执行过则重启时直接跳过 (启动提速); 脚本内容变更后递增版本号即可重跑;
-        // 失败时异常外抛, 版本不记录, 下次启动重试
+        // 版本号格式: v{major}.{minor} (如 v1 → v1.1); 失败时异常外抛, 版本不记录, 下次启动重试
         try {
             versionTracker.applyOnce("activity:64_activity_module:v1", () -> {
                 try {

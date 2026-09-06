@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Checkbox, Form, Input, Modal, Select, Switch, Table, Tag, message, Alert, InputNumber } from 'antd'
+import { Button, Checkbox, Form, Input, Modal, Select, Space, Switch, Table, Tag, message, Alert, InputNumber } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { fetchMockModels } from '../../api/mock/aiPlatformMock'
@@ -246,10 +246,10 @@ export default function AiPositionAuth() {
     {
       title: '操作', key: 'action', width: 140, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleMappingEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handleMappingDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.common.ResultCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
@@ -30,6 +31,7 @@ import java.util.List;
 /**
  * Spring Security 配置
  */
+@Slf4j
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -95,14 +97,30 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
+    /** CORS 默认白名单：环境变量未设置或解析后为空时回退使用（避免空名单拒绝所有跨域请求） */
+    private static final String DEFAULT_CORS_ORIGINS =
+            "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://localhost:3005,"
+                    + "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:5173,http://127.0.0.1:3005,"
+                    + "https://fengsong7889.github.io";
+
     /** CORS 跨域配置 */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+        // 环境变量设置为空字符串时，@Value 占位符不会回退默认值（变量已存在）,
+        // 解析结果为空列表会导致所有带 Origin 头的请求被拒为 403 Invalid CORS request,
+        // 因此此处对空值显式回退默认白名单
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList();
+        if (origins.isEmpty()) {
+            log.warn("cors.allowed-origins 解析后为空（环境变量 CORS_ALLOWED_ORIGINS 设为空值？），回退默认白名单");
+            origins = Arrays.stream(DEFAULT_CORS_ORIGINS.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));

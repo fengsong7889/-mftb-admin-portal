@@ -27,11 +27,14 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     private final SchemaVersionTracker versionTracker;
     private final BizSeqService bizSeqService;
 
-    /** 初始化版本: 新增规则种子/补列步骤时递增版本号 */
+    /** 初始化版本: 新增规则种子/补列步骤时递增 minor 版本号 (格式: v{major}.{minor}) */
     private static final String V_INIT = "seq:init-v1";
 
     /** 增量版本: AI 权控/额度配置ID规则种子 + 业务表补列 + 存量回填 */
     private static final String V_INIT_AI_CONFIG_CODE = "seq:init-v2";
+
+    /** 增量版本: AI 对话编号规则种子 + 补列 + 存量回填 */
+    private static final String V_INIT_AI_CONVERSATION = "seq:init-v3";
 
     @Override
     public void run(String... args) {
@@ -46,6 +49,11 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
             seedAiConfigCodeRules();
             ensureAiConfigCodeColumns();
             backfillAiConfigCodes();
+        });
+        versionTracker.applyOnce(V_INIT_AI_CONVERSATION, () -> {
+            seedAiConversationRule();
+            ensureAiConversationColumn();
+            backfillAiConversationIds();
         });
     }
 
@@ -254,6 +262,43 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
             return date;
         }
         return LocalDate.now();
+    }
+
+    /** AI 对话编号规则种子（DH + YYYYMMDD + 7位自增序号） */
+    private void seedAiConversationRule() {
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "ai_conversation", "對話編號", "AI智能中心", "DH", "YYYYMMDD", 5, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入 AI 对话编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** AI 对话表补充 conversation_id 字段 */
+    private void ensureAiConversationColumn() {
+        ensureColumn("ai_conversation", "conversation_id",
+                "VARCHAR(32) NULL COMMENT '对话编号（DH+YYYYMMDD+7位自增序号）' AFTER id");
+    }
+
+    /** 存量对话数据回填对话编号（按创建日期补号，幂等） */
+    private void backfillAiConversationIds() {
+        if (!tableExists("ai_conversation") || !columnExists("ai_conversation", "conversation_id")) {
+            return;
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, created_at FROM ai_conversation WHERE conversation_id IS NULL OR conversation_id = '' ORDER BY id");
+        for (Map<String, Object> row : rows) {
+            Long id = ((Number) row.get("id")).longValue();
+            String code = bizSeqService.next(BizSeqService.RULE_AI_CONVERSATION, toLocalDate(row.get("created_at")));
+            jdbcTemplate.update("UPDATE ai_conversation SET conversation_id = ? WHERE id = ?", code, id);
+        }
+        if (!rows.isEmpty()) {
+            log.info("已为 {} 条存量对话回填对话编号", rows.size());
+        }
     }
 
     /** 表不存在时跳过（表由各自脚本/初始化器创建），列不存在时追加 */

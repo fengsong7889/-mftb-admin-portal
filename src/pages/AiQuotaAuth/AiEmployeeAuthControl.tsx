@@ -314,11 +314,11 @@ export default function AiEmployeeAuthControl() {
     {
       title: '操作', key: 'action', width: 170, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleRuleDetail(row)}>详情</Button>
           <Button type="link" onClick={() => handleRuleEdit(row)}>编辑</Button>
           <Button type="link" danger onClick={() => handleRuleDelete(row)}>删除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -548,11 +548,11 @@ export default function AiEmployeeAuthControl() {
     {
       title: '操作', key: 'action', width: 170, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleRoleDetail(row)}>详情</Button>
           <Button type="link" onClick={() => handleRoleEdit(row)}>编辑</Button>
           <Button type="link" danger onClick={() => handleRoleConfigRemove(row)}>移除</Button>
-        </>
+        </Space>
       ),
     },
   ]

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, Modal, Select, Table, Tag, TreeSelect, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import { ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -343,7 +343,7 @@ export default function LoginLog() {
       width: 120,
       fixed: 'right',
       render: (_: unknown, record: LoginLogRecord) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           {record.logoutTime == null && hasPermission('login-log:forceLogout') && (
             <Button type="link" danger size="small" onClick={() => handleForceLogout(record)}>
               {t('loginLog.btnForceLogout')}
@@ -352,7 +352,7 @@ export default function LoginLog() {
           <Button type="link" danger size="small" onClick={() => handleDelete(record)}>
             {t('common.delete')}
           </Button>
-        </>
+        </Space>
       ),
     },
   ]

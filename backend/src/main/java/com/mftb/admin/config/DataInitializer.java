@@ -34,11 +34,25 @@ public class DataInitializer implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
 
-    /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增版本号 */
-    // v5: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
+    /* ──────────────────────────────────────────────────────────
+     *  产品版本号 (Semantic Versioning: major.minor.patch)
+     *  — 与 pom.xml / package.json / sys_config(product_version) 保持同步
+     *  — major: 不兼容的重大变更    — minor: 向下兼容的功能新增
+     *  — patch: 向下兼容的问题修复
+     * ────────────────────────────────────────────────────────── */
+    public static final String PRODUCT_VERSION = "1.0.0";
+
+    /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增 minor 版本号 */
+    // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
     private static final String V_SCHEMA = "core:schema-v5";
-    /** 菜单种子版本：新增/调整种子菜单或英文名时递增版本号，无需全量重跑其他迁移 */
-    private static final String V_MENU_SEED = "core:menu-seed-v9";
+    /** 菜单种子版本：新增/调整种子菜单或英文名时递增 minor 版本号，无需全量重跑其他迁移 */
+    // v11: 「工具註冊中心」更名為「AI 操作授權」，menu_key 由 ai_tool_registry 迁移为 ai-operation-auth
+    //      （seedSystemMenus 會先刪除所有含 ai 的舊菜單及授權關聯再重建，舊 key 自動清理）
+    // v12: 新增「MCP 服務」菜單；ai-access-request 併入主種子
+    //      （獨立初始化器種的 AI 菜單會被本類的 '%ai%' 清理誤刪且 applyOnce 不會重跑，必須併入主種子）
+    // v13: 「模型信息」更名為「模型接入」
+    // v14: 新增「对话审计」菜單
+    private static final String V_MENU_SEED = "core:menu-seed-v14";
 
     @Override
     public void run(String... args) {
@@ -64,6 +78,21 @@ public class DataInitializer implements CommandLineRunner {
         migrateDeptCodeToBM();
         resetPasswordIfNeeded("MF00001", "111222");
         ensureDeptAdSalesPermission();
+        // 同步产品版本号到 sys_config (每次启动保持与代码一致)
+        syncProductVersion();
+    }
+
+    /** 将代码中声明的产品版本号同步写入 sys_config (幂等: INSERT ... ON DUPLICATE KEY UPDATE) */
+    private void syncProductVersion() {
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_config (config_key, config_value, description) VALUES (?, ?, ?) "
+                            + "ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)",
+                    "product_version", PRODUCT_VERSION,
+                    "产品版本号 (Semantic Versioning), 与 pom.xml / package.json 同步");
+        } catch (Exception e) {
+            log.warn("产品版本号同步失败: {}", e.getMessage());
+        }
     }
 
     /** 内置账号迁移: 登录账号统一为工号, 移除 guest 账号 (旧库 admin 账号由 migrateEmpIdToMF 统一重编号) */
@@ -197,10 +226,12 @@ public class DataInitializer implements CommandLineRunner {
 
     /**
      * AI 中心表自动创建 (85_ai_center_tables / 88_dept_auth_group / 68_llm_usage 脚本等效)
-     * 包含 ai_provider, ai_model(含 86/92 增量列), ai_department_auth, ai_employee_auth,
-     * ai_position_model_mapping, ai_role_model_mapping, ai_usage_log, ai_quota_config,
-     * ai_tool_registry, ai_dept_auth_group, ai_dept_auth_group_dept, ai_dept_auth_group_model,
-     * biz_llm_usage 共 13 张表。全部使用 CREATE TABLE IF NOT EXISTS，幂等安全。
+     * 包含 ai_provider, ai_model(含 86/92 增量列), ai_employee_auth, ai_quota_config,
+     * ai_dept_auth_group, ai_dept_auth_group_dept, ai_dept_auth_group_model,
+     * biz_llm_usage 共 8 张表。全部使用 CREATE TABLE IF NOT EXISTS，幂等安全。
+     * 注：一代 ai_position_model_mapping / ai_role_model_mapping / ai_department_auth /
+     * ai_usage_log / ai_tool_registry 已随授权源收敛到二代（ai_dept_auth_group* /
+     * ai_emp_pos_auth_strategy / ai_emp_role_auth）与 biz_llm_usage 计量而退役，不再建表。
      */
     private void migrateAiCenterTables() {
         // 1. ai_provider
@@ -257,22 +288,7 @@ public class DataInitializer implements CommandLineRunner {
             + "INDEX idx_provider_id (provider_id), INDEX idx_status (status)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 模型表'");
 
-        // 3. ai_department_auth
-        jdbcTemplate.execute(
-            "CREATE TABLE IF NOT EXISTS ai_department_auth ("
-            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            + "department_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
-            + "has_permission TINYINT DEFAULT 1, limit_type VARCHAR(20) DEFAULT 'none',"
-            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, custom_limit INT DEFAULT 0,"
-            + "start_date DATE DEFAULT NULL, end_date DATE DEFAULT NULL,"
-            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
-            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
-            + "UNIQUE KEY uk_dept_model (department_id, model_id),"
-            + "INDEX idx_department_id (department_id), INDEX idx_model_id (model_id)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门模型权限表'");
-
-        // 4. ai_employee_auth
+        // 3. ai_employee_auth
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS ai_employee_auth ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
@@ -288,51 +304,7 @@ public class DataInitializer implements CommandLineRunner {
             + "INDEX idx_employee_id (employee_id), INDEX idx_model_id (model_id)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='员工模型权限表'");
 
-        // 5. ai_position_model_mapping
-        jdbcTemplate.execute(
-            "CREATE TABLE IF NOT EXISTS ai_position_model_mapping ("
-            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            + "position_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
-            + "permission_level VARCHAR(20) DEFAULT 'full',"
-            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, priority INT DEFAULT 0,"
-            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
-            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
-            + "UNIQUE KEY uk_position_model (position_id, model_id),"
-            + "INDEX idx_position_id (position_id), INDEX idx_model_id (model_id)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='职位模型权限映射表'");
-
-        // 6. ai_role_model_mapping
-        jdbcTemplate.execute(
-            "CREATE TABLE IF NOT EXISTS ai_role_model_mapping ("
-            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            + "role_id BIGINT NOT NULL, model_id BIGINT NOT NULL,"
-            + "permission_level VARCHAR(20) DEFAULT 'full',"
-            + "daily_limit INT DEFAULT 0, monthly_limit INT DEFAULT 0, priority INT DEFAULT 0,"
-            + "status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
-            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
-            + "UNIQUE KEY uk_role_model (role_id, model_id),"
-            + "INDEX idx_role_id (role_id), INDEX idx_model_id (model_id)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色模型权限映射表'");
-
-        // 7. ai_usage_log
-        jdbcTemplate.execute(
-            "CREATE TABLE IF NOT EXISTS ai_usage_log ("
-            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            + "target_type VARCHAR(20) NOT NULL, target_id BIGINT NOT NULL,"
-            + "model_id BIGINT NOT NULL, user_id BIGINT DEFAULT NULL,"
-            + "request_tokens INT DEFAULT 0, response_tokens INT DEFAULT 0, total_tokens INT DEFAULT 0,"
-            + "cost_amount DECIMAL(10,6) DEFAULT 0, prompt_text TEXT DEFAULT NULL,"
-            + "error_message VARCHAR(500) DEFAULT NULL, duration_ms INT DEFAULT 0,"
-            + "request_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            + "INDEX idx_target_type_id (target_type, target_id),"
-            + "INDEX idx_model_id (model_id), INDEX idx_request_time (request_time),"
-            + "INDEX idx_user_id (user_id)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 用量日志表'");
-
-        // 8. ai_quota_config
+        // 4. ai_quota_config
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS ai_quota_config ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
@@ -349,22 +321,7 @@ public class DataInitializer implements CommandLineRunner {
             + "INDEX idx_quota_type_id (quota_type, target_id), INDEX idx_model_id (model_id)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门/员工额度配置表'");
 
-        // 9. ai_tool_registry
-        jdbcTemplate.execute(
-            "CREATE TABLE IF NOT EXISTS ai_tool_registry ("
-            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
-            + "tool_key VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(100) NOT NULL,"
-            + "description VARCHAR(500) DEFAULT NULL, category VARCHAR(50) DEFAULT 'general',"
-            + "version VARCHAR(20) DEFAULT '1.0.0', author VARCHAR(100) DEFAULT NULL,"
-            + "icon VARCHAR(100) DEFAULT NULL, api_endpoint VARCHAR(500) DEFAULT NULL,"
-            + "config_schema TEXT DEFAULT NULL, is_enabled TINYINT DEFAULT 1,"
-            + "sort_order INT DEFAULT 0, status TINYINT DEFAULT 1, deleted TINYINT DEFAULT 0,"
-            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
-            + "INDEX idx_category (category), INDEX idx_status (status)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 工具注册表'");
-
-        // 10. ai_dept_auth_group (88_dept_auth_group)
+        // 5. ai_dept_auth_group (88_dept_auth_group)
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS ai_dept_auth_group ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
@@ -378,7 +335,7 @@ public class DataInitializer implements CommandLineRunner {
             + "INDEX idx_status (status)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门模型授权策略主表'");
 
-        // 11. ai_dept_auth_group_dept
+        // 6. ai_dept_auth_group_dept
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS ai_dept_auth_group_dept ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
@@ -388,7 +345,7 @@ public class DataInitializer implements CommandLineRunner {
             + "INDEX idx_group_id (group_id), INDEX idx_department_id (department_id)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略-部门关联表'");
 
-        // 12. ai_dept_auth_group_model
+        // 7. ai_dept_auth_group_model
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS ai_dept_auth_group_model ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
@@ -402,7 +359,7 @@ public class DataInitializer implements CommandLineRunner {
             + "INDEX idx_group_id (group_id), INDEX idx_model_id (model_id)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略-模型授权与能力配置表'");
 
-        // 13. biz_llm_usage (68_llm_usage)
+        // 8. biz_llm_usage (68_llm_usage)
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS biz_llm_usage ("
             + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
@@ -747,15 +704,19 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("translation-manage", "Translation Config"),
                 Map.entry("rule-config", "Rule Config"),
                 Map.entry("workflow-config", "Workflow Config"),
+                Map.entry("version-history", "Version History"),
                 Map.entry("merchant-order-manage", "Order Management"),
                 Map.entry("ai-assistant", "AI Center (AI)"),
                 Map.entry("ai_model_hub", "Model Access"),
                 Map.entry("ai_quota_auth", "Authorization & Quota"),
-                Map.entry("ai_tool_registry", "Tool Registry"),
+                Map.entry("ai-operation-auth", "AI Operation Authorization"),
                 Map.entry("ai_usage_stats", "Energy Statistics"),
                 Map.entry("ai_energy_detail", "Energy Detail"),
                 Map.entry("ai_energy_control", "Energy Control"),
-                Map.entry("ai-energy-billing", "Energy & Billing"));
+                Map.entry("ai-energy-billing", "Energy & Billing"),
+                Map.entry("ai-mcp-service", "MCP Services"),
+                Map.entry("ai-access-request", "AI Access Application"),
+                Map.entry("ai-conversation-audit", "Conversation Audit"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
                     "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
@@ -1017,7 +978,7 @@ public class DataInitializer implements CommandLineRunner {
         // ── 智能中心 (AI)：拆分二级菜单（模型管理、授权与配额） ──
         menus.put("ai-models",            new String[]{"模型管理",      "ai-assistant",    "1"});
         menus.put("ai-model-provider",    new String[]{"供应商管理",    "ai-models",       "1"});
-        menus.put("ai-model-list",        new String[]{"模型信息",      "ai-models",       "2"});
+        menus.put("ai-model-list",        new String[]{"模型接入",      "ai-models",       "2"});
         // AI 授权与配额：模型授权管理 / 配额管理 升级二级菜单（直挂智能中心）
         menus.put("ai-auth-manage",       new String[]{"模型授权管理", "ai-assistant",    "2"});
         menus.put("ai-dept-model-auth",   new String[]{"部门模型权控",       "ai-auth-manage",    "1"});
@@ -1025,10 +986,14 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("ai-quota-manage",      new String[]{"配额管理",           "ai-assistant",    "3"});
         menus.put("ai-dept-quota",        new String[]{"部门额度",           "ai-quota-manage",   "1"});
         menus.put("ai-emp-quota",         new String[]{"员工额度",           "ai-quota-manage",   "2"});
-        menus.put("ai_tool_registry",    new String[]{"工具註冊中心",   "ai-assistant",       "4"});
+        menus.put("ai-operation-auth",   new String[]{"AI 操作授權",     "ai-assistant",       "4"});
         menus.put("ai-energy-billing",   new String[]{"能耗與賬單",     "ai-assistant",       "5"});
         menus.put("ai_usage_stats",      new String[]{"能耗統計",       "ai-energy-billing",  "1"});
         menus.put("ai_energy_detail",    new String[]{"能耗明細",       "ai-energy-billing",  "2"});
+        menus.put("ai-mcp-service",      new String[]{"MCP 服務",       "ai-assistant",       "6"});
+        // 與 102_ai_access_request_menu.sql 同源：併入主種子，防止 '%ai%' 清理後獨立初始化器不重跑導致菜單丟失
+        menus.put("ai-access-request",   new String[]{"AI 使用申請",    "ai-assistant",      "10"});
+        menus.put("ai-conversation-audit", new String[]{"对话审计",     "ai-assistant",       "7"});
         // ── 團購管理 ──
         menus.put("group-purchase-dashboard", new String[]{"秒殺數據總覽",     "group-purchase",      "1"});
         menus.put("flash-sale-register", new String[]{"秒殺商品登記",     "group-purchase",      "2"});
@@ -1048,6 +1013,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("translation-manage",  new String[]{"多語言配置",         "system-config",      "2"});
         menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "3"});
         menus.put("workflow-config",     new String[]{"流程配置",         "system-config",      "4"});
+        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "5"});
 
         int created = 0;
         int updated = 0;

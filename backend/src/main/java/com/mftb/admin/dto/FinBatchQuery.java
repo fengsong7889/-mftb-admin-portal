@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -48,6 +49,12 @@ public class FinBatchQuery extends FinPageQuery {
     /** 交易时间-结束日期 */
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate tradeTo;
+
+    /** 充值金额下限（虚拟推广金，元）——AI 助手「充值了 10 万」类查询的过滤条件 */
+    private BigDecimal amountMin;
+
+    /** 充值金额上限（虚拟推广金，元） */
+    private BigDecimal amountMax;
 
     public LocalDateTime tradeFromTime() {
         return startOf(tradeFrom);

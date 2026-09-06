@@ -89,6 +89,8 @@ public class BizSeqService {
     public static final String RULE_AI_EMP_POS_QUOTA = "ai_emp_pos_quota";
     /** 员工额度-按角色配置ID */
     public static final String RULE_AI_EMP_ROLE_QUOTA = "ai_emp_role_quota";
+    /** 对话编号 */
+    public static final String RULE_AI_CONVERSATION = "ai_conversation";
 
     /** 无日期维度规则在序号表中的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";

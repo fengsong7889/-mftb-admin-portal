@@ -52,6 +52,11 @@ function loadWorkflows(): WorkflowDefinition[] {
           }]
           migrated = true
         }
+        // 遷移 3：AI 申請流程名稱修正
+        if (wf.workflowKey === 'ai_access' && wf.name === 'AI申請') {
+          wf.name = 'AI申請審批'
+          migrated = true
+        }
       }
       if (migrated) persistWorkflows(data)
       return data
@@ -65,10 +70,20 @@ function persistWorkflows(workflows: WorkflowDefinition[]) {
   localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(workflows))
 }
 
-/** 初始化：若 localStorage 無數據則寫入預置默認流程 */
+/** 初始化：若 localStorage 無數據則寫入預置默認流程；已有數據時合併新增的默認流程 */
 function initWorkflows(): WorkflowDefinition[] {
   const saved = loadWorkflows()
-  if (saved.length > 0) return saved
+  if (saved.length > 0) {
+    // 合併缺失的默認流程（如新增的 AI 申請流程）
+    const existingKeys = new Set(saved.map(wf => wf.workflowKey))
+    const missing = DEFAULT_WORKFLOWS.filter(wf => !existingKeys.has(wf.workflowKey))
+    if (missing.length > 0) {
+      const merged = [...saved, ...missing]
+      persistWorkflows(merged)
+      return merged
+    }
+    return saved
+  }
   persistWorkflows(DEFAULT_WORKFLOWS)
   return DEFAULT_WORKFLOWS
 }

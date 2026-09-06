@@ -55,6 +55,12 @@ public class FinBatchServiceImpl implements FinBatchService {
         if (StringUtils.hasText(query.getBd())) {
             wrapper.like(FinBatch::getBd, query.getBd());
         }
+        if (query.getAmountMin() != null) {
+            wrapper.ge(FinBatch::getVirtualAmount, query.getAmountMin());
+        }
+        if (query.getAmountMax() != null) {
+            wrapper.le(FinBatch::getVirtualAmount, query.getAmountMax());
+        }
         if (query.tradeFromTime() != null) {
             wrapper.ge(FinBatch::getTradeTime, query.tradeFromTime());
         }

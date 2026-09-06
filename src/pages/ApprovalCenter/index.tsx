@@ -27,6 +27,7 @@ const approvalTypeMapKeys: Record<string, string> = {
   transfer: 'approvalCenter.typeTransfer',
   merge: 'approvalCenter.typeMerge',
   gift: 'approvalCenter.typeGift',
+  ai_access: 'approvalCenter.typeAiAccess',
 }
 
 /** 流程狀態映射（i18n key） */
@@ -109,10 +110,10 @@ function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boole
   return true
 }
 
-/** 贈送（ZS）審批暫為前端流程：後端查詢結果需合併本地贈送審批記錄 */
-function localGiftApprovals(query: FinApprovalQuery): ApprovalRecord[] {
+/** 前端流程審批（贈送、AI 申請）：後端查詢結果需合併本地審批記錄 */
+function localFrontendApprovals(query: FinApprovalQuery): ApprovalRecord[] {
   return (getApprovalRecords() as ApprovalRecord[])
-    .filter(r => r.approvalType === 'gift' && matchesApprovalQuery(r, query))
+    .filter(r => (r.approvalType === 'gift' || r.approvalType === 'ai_access') && matchesApprovalQuery(r, query))
 }
 
 export default function ApprovalCenter() {
@@ -129,6 +130,7 @@ export default function ApprovalCenter() {
     { label: t('approvalCenter.typeTransfer'), value: 'transfer' },
     { label: t('approvalCenter.typeMerge'), value: 'merge' },
     { label: t('approvalCenter.typeGift'), value: 'gift' },
+    { label: t('approvalCenter.typeAiAccess'), value: 'ai_access' },
   ]
 
   /** 流程狀態選項 */
@@ -201,13 +203,13 @@ export default function ApprovalCenter() {
     try {
       const res = await fetchFinApprovals(query)
       const records = (res.records ?? []) as ApprovalRecord[]
-      const extraGifts = localGiftApprovals(query)
+      const extraLocal = localFrontendApprovals(query)
         .filter(g => !records.some(r => r.flowNo === g.flowNo))
-      const merged = [...extraGifts, ...records]
+      const merged = [...extraLocal, ...records]
       // 合并后按申请时间倒序排列
       merged.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
       setData(merged)
-      setTotal((res.total ?? 0) + extraGifts.length)
+      setTotal((res.total ?? 0) + extraLocal.length)
     } finally {
       setLoading(false)
     }
@@ -268,8 +270,8 @@ export default function ApprovalCenter() {
       okText: t('approvalCenter.cancelOk'),
       cancelText: t('common.cancel'),
       onOk: async () => {
-        // 贈送 TG 流程為前端記錄，直接本地撤銷，不調後端
-        if (record.approvalType === 'gift') {
+        // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷，不調後端
+        if (record.approvalType === 'gift' || record.approvalType === 'ai_access') {
           updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' })
         } else {
           await cancelFinApproval(record.flowNo)

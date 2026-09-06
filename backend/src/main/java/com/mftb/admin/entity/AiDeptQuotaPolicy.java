@@ -29,6 +29,7 @@ public class AiDeptQuotaPolicy {
     private Integer softThreshold;
     private String overLimitAction;
     private Long downgradeModelId;
+    private BigDecimal downgradeExemptQuota;
     private BigDecimal usedValue;
     private Integer status;
 

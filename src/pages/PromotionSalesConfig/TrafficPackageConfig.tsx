@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Tabs, Table, Button, Modal, Form, Input, InputNumber, Switch, Tag, Popconfirm, message } from 'antd'
+import { Tabs, Table, Button, Modal, Form, Input, InputNumber, Switch, Tag, Popconfirm, message, Space } from 'antd'
 import { PlusOutlined, SaveOutlined } from '@ant-design/icons'
 import { BIZ_CHANNEL } from '../../constants/bizChannel'
 import {
@@ -153,12 +153,12 @@ export default function TrafficPackageConfig() {
     {
       title: t('trafficAction'), key: 'action', width: 120,
       render: (_: unknown, r: TrafficPackageTier) => (
-        <div style={{ display: 'flex', gap: 4 }}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => openEditTier(r)}>{t('trafficEdit')}</Button>
           <Popconfirm title={t('trafficDeleteTierConfirm')} onConfirm={() => handleDeleteTier(r.id)}>
             <Button type="link" size="small" danger>{t('trafficDelete')}</Button>
           </Popconfirm>
-        </div>
+        </Space>
       ),
     },
   ]

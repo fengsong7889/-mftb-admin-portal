@@ -12,6 +12,7 @@ import {
   Switch,
   Table,
   Tag,
+  Space,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -37,7 +38,7 @@ const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 /** 參數白名單示意（新增行模板） */
 const EMPTY_PARAM: ToolParam = { name: '', type: 'string', required: false, whitelist: [], desc: '' }
 
-export default function AiToolRegistry() {
+export default function AiOperationAuth() {
   /* ── 數據 ── */
   const [tools, setTools] = useState<ToolDefinition[]>([])
   const [loading, setLoading] = useState(false)
@@ -85,7 +86,7 @@ export default function AiToolRegistry() {
     { key: 'action', title: '操作' },
   ]
 
-  const { configComponent, applyConfig } = useColumnConfig('ai-tool-registry', columnMeta, [
+  const { configComponent, applyConfig } = useColumnConfig('ai-operation-auth', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
@@ -183,10 +184,10 @@ export default function AiToolRegistry() {
     {
       title: '操作', key: 'action', width: 140, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => openToolForm(row)}>編輯</Button>
           <Button type="link" onClick={() => setLogTool(row)}>調用日誌</Button>
-        </>
+        </Space>
       ),
     },
   ]

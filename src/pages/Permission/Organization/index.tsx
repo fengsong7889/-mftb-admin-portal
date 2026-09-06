@@ -411,7 +411,7 @@ export default function OrganizationManagement() {
       key: 'action',
       width: 130,
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           {hasPermission('organization-management:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
               {t('common.edit')}

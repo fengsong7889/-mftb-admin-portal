@@ -11,6 +11,15 @@ server:
 spring:
   application:
     name: mftb-admin
+  mail:
+    # MCP 外部服務（email_sender）SMTP 配置：全部透過環境變量注入，本地未配置時發送會友好報錯
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
   task:
     scheduling:
       # 定时任务启动延迟 120 秒，确保 DataInitializer schema 迁移先完成

@@ -469,7 +469,7 @@ export default function EmployeeManagement() {
       render: (_, record) => {
         const isBuiltinAdmin = record.username === BUILTIN_ADMIN
         return (
-          <Space size={4}>
+          <Space size={0} split={<span className="action-split">|</span>}>
             {hasPermission('employee-management:edit') && (
               <Button type="link" size="small" onClick={() => handleEdit(record)}>
                 {t('common.edit')}

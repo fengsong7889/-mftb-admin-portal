@@ -1809,7 +1809,7 @@ function WaterfallAddGeneral() {
                 if (isDetailMode) return <span style={{ color: '#bfbfbf' }}>—</span>
                 const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
                 return (
-                  <Space size={4}>
+                  <Space size={0} split={<span className="action-split">|</span>}>
                     {isLastRow && (
                       <Button
                         type="link"

@@ -78,6 +78,7 @@ public class AiDeptQuotaServiceImpl implements AiDeptQuotaService {
         entity.setSoftThreshold(request.getSoftThreshold() != null ? request.getSoftThreshold() : 80);
         entity.setOverLimitAction(request.getOverLimitAction());
         entity.setDowngradeModelId(request.getDowngradeModelId());
+        entity.setDowngradeExemptQuota(request.getDowngradeExemptQuota());
         entity.setStatus(request.getStatus() != null ? request.getStatus() : 1);
         entity.setUpdatedBy(operator);
 
@@ -126,6 +127,7 @@ public class AiDeptQuotaServiceImpl implements AiDeptQuotaService {
         vo.setSoftThreshold(e.getSoftThreshold());
         vo.setOverLimitAction(e.getOverLimitAction());
         vo.setDowngradeModelId(e.getDowngradeModelId());
+        vo.setDowngradeExemptQuota(e.getDowngradeExemptQuota());
         vo.setUsedValue(e.getUsedValue());
         vo.setStatus(e.getStatus());
         vo.setCreatedBy(e.getCreatedBy());

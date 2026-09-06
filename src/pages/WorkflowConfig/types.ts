@@ -223,6 +223,7 @@ export const APPROVAL_TYPE_OPTIONS = [
   { label: '扣款', value: 'deduct' },
   { label: '合併', value: 'merge' },
   { label: '贈送', value: 'gift' },
+  { label: 'AI申請', value: 'ai_access' },
 ]
 
 /** 品牌選項（用於審批人按品牌配置） */

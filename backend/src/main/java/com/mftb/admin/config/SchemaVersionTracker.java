@@ -12,8 +12,24 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 重启时已执行的步骤直接跳过, 避免每次启动全量重跑初始化 SQL (启动提速)。
  * <p>
  * 用法: 用 {@link #applyOnce(String, Runnable)} 包裹一次性逻辑,
- * versionKey 带版本号 (如 "core:menu-seed-v1");
- * 种子数据变更需要重新执行时, 递增版本号即可 (如 v1 → v2)。
+ * versionKey 带版本号; 种子数据变更需要重新执行时, 递增版本号即可。
+ * <p>
+ * <b>版本键命名约定 (Semantic Versioning 风格):</b>
+ * <ul>
+ *   <li>格式: {@code {module}:{step}-v{major}.{minor}}</li>
+ *   <li>major — 结构性变更 (表结构重构 / 数据模型颠覆), 需要全新环境才需重置</li>
+ *   <li>minor — 增量变更 (补列 / 新增种子数据 / 修复脚本), 每次变更递增</li>
+ *   <li>示例: {@code core:schema-v5.0} → {@code core:schema-v5.1} → {@code core:schema-v6.0}</li>
+ *   <li>历史遗留键仍使用 {@code v{N}} 格式 (如 {@code v1}), 新键应使用点分格式</li>
+ * </ul>
+ * <p>
+ * <b>产品版本号</b> 采用标准语义化版本 {@code major.minor.patch} (如 {@code 1.0.0}),
+ * 存储在 sys_config 表 (key=product_version), 与 pom.xml / package.json 同步。
+ * <ul>
+ *   <li>major — 不兼容的重大变更 (架构重构 / 数据模型颠覆)</li>
+ *   <li>minor — 向下兼容的功能新增 (新模块 / 新接口)</li>
+ *   <li>patch — 向下兼容的问题修复 (Bug 修复 / 小优化)</li>
+ * </ul>
  * <p>
  * 注意: 需要每次启动都执行的"活"逻辑 (如新增部门自动授权) 不要用本组件包裹。
  */

@@ -71,6 +71,10 @@ public class AiModelController {
             wrapper.apply("FIND_IN_SET({0}, modalities) > 0", modality);
         }
 
+        // 只展示真正接入的模型：模型启用 + 供应商启用 + 供应商已配置有效 API Key（排除测试占位）
+        wrapper.eq(AiModel::getStatus, 1);
+        wrapper.apply("provider_id IN (SELECT id FROM ai_provider WHERE status = 1 AND deleted = 0 AND api_key IS NOT NULL AND LENGTH(api_key) > 15 AND api_key NOT LIKE '%test%')");
+
         wrapper.orderByAsc(AiModel::getSortOrder, AiModel::getId);
         List<AiModel> models = modelMapper.selectList(wrapper);
 

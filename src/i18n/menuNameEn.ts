@@ -94,16 +94,17 @@ export const MENU_NAME_EN: Record<string, string> = {
   'translation-manage': 'Translation Config',
   'rule-config': 'Rule Config',
   'workflow-config': 'Workflow Config',
+  'version-history': 'Version History',
   'ai-assistant': 'AI Center (AI)',
   'ai_model_hub': 'Model Access',
   'ai_quota_auth': 'Authorization & Quota',
-  'ai_tool_registry': 'Tool Registry',
+  'ai-operation-auth': 'AI Operation Authorization',
   'ai_usage_stats': 'Energy Statistics',
   'ai_energy_detail': 'Energy Detail',
   // 智能中心 (AI) - 拆分后的新菜单 key
   'ai-models': 'Model Management',
   'ai-model-provider': 'Provider Management',
-  'ai-model-list': 'Model Info',
+  'ai-model-list': 'Model Access',
   'ai-auth-quota': 'Authorization & Quota',
   'ai-auth': 'Model Authorization',
   'ai-quota': 'Quota Policy',
@@ -118,6 +119,10 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai-emp-quota': 'Employee Quota',
   // 能耗與賬單
   'ai-energy-billing': 'Energy & Billing',
+  // AI 使用申請（與 en.json aiApply.pageTitle 保持一致）
+  'ai-access-request': 'AI Access Application',
+  // MCP 服務
+  'ai-mcp-service': 'MCP Services',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
 }

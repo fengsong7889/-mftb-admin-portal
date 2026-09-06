@@ -451,6 +451,7 @@ export default function RuleConfig() {
                         if (menu === '員工管理' || menu === '組織管理' || menu === '職位管理') return { label: '人事', color: '#FAAD14' }
                         if (menu === '模型授權管理') return { label: '權控', color: '#722ED1' }
                         if (menu === '配額管理') return { label: '額度', color: '#52C41A' }
+                        if (menu === 'AI智能中心') return { label: '對話', color: '#13C2C2' }
                         if (key.startsWith('ad_order_')) return { label: '訂單', color: '#1890FF' }
                         if (key.startsWith('config_pricing_')) return { label: '定價', color: '#E8720C' }
                         if (key.startsWith('algo_')) return { label: '算法', color: '#722ED1' }

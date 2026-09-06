@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Modal, Popover, Select, Switch, Table, Tabs, Tag, message, Alert } from 'antd'
+import { Button, Form, Input, Modal, Popover, Select, Space, Switch, Table, Tabs, Tag, message, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -309,11 +309,11 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
     {
       key: 'action', title: '操作', width: 180, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleGroupDetail(row)}>詳情</Button>
           <Button type="link" onClick={() => handleGroupEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handleGroupDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -417,10 +417,10 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
     {
       title: '操作', key: 'action', width: 110, align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleOverrideEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handleOverrideDelete(row)}>移除</Button>
-        </>
+        </Space>
       ),
     },
   ]

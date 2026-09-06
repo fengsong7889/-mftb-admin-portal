@@ -44,7 +44,7 @@ interface ApprovalTimelineItem {
 
 /** 审批详情数据 */
 interface ApprovalDetailData {
-  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift'
+  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift' | 'ai_access'
   applicant: string
   applyDate: string
   flowNo: string
@@ -105,6 +105,11 @@ interface ApprovalDetailData {
   giftAdType?: string
   giftDays?: number
   giftValidDays?: number
+  // AI 申請
+  aiRequestType?: string
+  aiUsageDescription?: string
+  aiUsageScenarios?: string[]
+  aiUsageFrequency?: string
   // 通用
   groupId?: string
   groupName?: string
@@ -563,6 +568,17 @@ function toDetailData(record: FinApproval, t?: (key: string) => string): Approva
       })),
     }
   }
+  if (record.approvalType === 'ai_access') {
+    const scenarios = Array.isArray(extra.usageScenarios) ? (extra.usageScenarios as string[]) : []
+    return {
+      ...base,
+      aiRequestType: str(extra.requestType),
+      aiUsageDescription: str(extra.usageDescription),
+      aiUsageScenarios: scenarios,
+      aiUsageFrequency: str(extra.usageFrequency),
+      notes: str(extra.usageDescription),
+    }
+  }
   return base
 }
 
@@ -610,8 +626,8 @@ export default function ApprovalDetail() {
   }, [flowNo, fallbackDetail])
 
   const handleApprove = () => {
-    // 贈送 ZS 流程為前端審批，需校驗當前人是否具備當前節點角色權限
-    if (type === 'gift') {
+    // 前端流程（贈送、AI 申請）需校驗當前人是否具備當前節點角色權限
+    if (type === 'gift' || type === 'ai_access') {
       const localRecord = getApprovalRecordByFlowNo(flowNo)
       if (localRecord) {
         const check = hasNodeApprovalRole(localRecord)
@@ -629,8 +645,9 @@ export default function ApprovalDetail() {
       onOk: async () => {
         setSubmitting(true)
         try {
-          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；贈送 TG 流程為前端記錄，直接本地審批
-          const result = type === 'gift'
+          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批
+          const isFrontendFlow = type === 'gift' || type === 'ai_access'
+          const result = isFrontendFlow
             ? approveCurrentNode(flowNo)
             : await approveFinApproval(flowNo)
           if (result) {
@@ -662,8 +679,8 @@ export default function ApprovalDetail() {
     if (!rejectReason.trim()) {
       return
     }
-    // 贈送 ZS 流程為前端審批，需校驗當前人是否具備當前節點角色權限
-    if (type === 'gift') {
+    // 前端流程（贈送、AI 申請）需校驗當前人是否具備當前節點角色權限
+    if (type === 'gift' || type === 'ai_access') {
       const localRecord = getApprovalRecordByFlowNo(flowNo)
       if (localRecord) {
         const check = hasNodeApprovalRole(localRecord)
@@ -675,8 +692,9 @@ export default function ApprovalDetail() {
     }
     setSubmitting(true)
     try {
-      // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；贈送 TG 流程直接本地駁回
-      const rejectedNode = type === 'gift'
+      // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回
+      const isFrontendFlow = type === 'gift' || type === 'ai_access'
+      const rejectedNode = isFrontendFlow
         ? rejectCurrentNode(flowNo, rejectReason)
         : (await rejectFinApproval(flowNo, rejectReason), null)
       message.success(rejectedNode
@@ -698,8 +716,8 @@ export default function ApprovalDetail() {
   const handleRevokeConfirm = async () => {
     setSubmitting(true)
     try {
-      // 贈送 TG 流程為前端記錄，直接本地撤銷，不調後端
-      if (type === 'gift') {
+      // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷，不調後端
+      if (type === 'gift' || type === 'ai_access') {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
       } else {
         await cancelFinApproval(flowNo)
@@ -1243,6 +1261,45 @@ export default function ApprovalDetail() {
             </div>
           )}
 
+          {/* AI 申請類型 */}
+          {type === 'ai_access' && (
+            <div className="approval-section">
+              <div className="approval-section-title approval-section-title--purple">{t('approvalDetail.aiAccessInfo')}</div>
+              <div className="approval-info-grid">
+                <div className="approval-info-item">
+                  <span className="approval-info-label">{t('approvalDetail.aiRequestType')}</span>
+                  <span className="approval-info-value">
+                    <Tag color={data.aiRequestType === 'model_only' ? 'blue' : data.aiRequestType === 'quota_only' ? 'orange' : 'green'}>
+                      {t(`aiApply.type${data.aiRequestType === 'model_only' ? 'ModelOnly' : data.aiRequestType === 'quota_only' ? 'QuotaOnly' : 'ModelAndQuota'}`)}
+                    </Tag>
+                  </span>
+                </div>
+                {data.aiUsageFrequency && (
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">{t('aiApply.usageFrequency')}</span>
+                    <span className="approval-info-value">{t(`aiApply.freq${data.aiUsageFrequency === 'occasional' ? 'Occasional' : data.aiUsageFrequency === 'regular' ? 'Regular' : 'Heavy'}`)}</span>
+                  </div>
+                )}
+                {data.aiUsageScenarios && data.aiUsageScenarios.length > 0 && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('aiApply.usageScenarios')}</span>
+                    <span className="approval-info-value">
+                      {data.aiUsageScenarios.map(s => (
+                        <Tag key={s} color="geekblue" style={{ marginRight: 4, marginBottom: 4 }}>
+                          {t(`aiApply.scenario${s === 'copywriting' ? 'Copywriting' : s === 'data_analysis' ? 'DataAnalysis' : s === 'image_understanding' ? 'Image' : s === 'code_assist' ? 'Code' : s === 'customer_service' ? 'CS' : s === 'translation' ? 'Translation' : 'Other'}`)}
+                        </Tag>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                  <span className="approval-info-label">{t('aiApply.usageDescription')}</span>
+                  <span className="approval-info-value">{data.aiUsageDescription}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 相关凭证 */}
           <div className="approval-section">
             <div className="approval-section-title">{t('approvalDetail.documents')}</div>
@@ -1333,8 +1390,8 @@ export default function ApprovalDetail() {
         )}
         {isPending && (
           <>
-            {/* 赠送审批角色权限提示：显示当前节点所需角色 */}
-            {type === 'gift' && (() => {
+            {/* 前端流程審批角色權限提示（贈送、AI 申請） */}
+            {(type === 'gift' || type === 'ai_access') && (() => {
               const localRecord = getApprovalRecordByFlowNo(flowNo)
               if (!localRecord) return null
               const requiredRole = getRequiredApprovalRole(localRecord)

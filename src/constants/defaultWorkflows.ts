@@ -54,7 +54,7 @@ const defaultRoutingRule = (nodeIds: string[]): RoutingRule[] => [
 
 const now = new Date().toISOString()
 
-/** 5 種預置默認流程 */
+/** 5 種預置默認流程 + AI 申請流程 */
 const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
@@ -130,6 +130,21 @@ const rawDefaults: WorkflowDefinition[] = [
     routingRules: [],
     rejectBehavior: 'restart',
     timeoutHours: 24,
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: '系統',
+  },
+  {
+    id: uid(),
+    workflowKey: 'ai_access',
+    name: 'AI申請審批',
+    approvalType: 'ai_access',
+    description: '員工 AI 助手使用權限與額度申請審批流程',
+    enabled: true,
+    nodes: [bizNode(1), opsNode(2)],
+    routingRules: [],
+    rejectBehavior: 'restart',
+    timeoutHours: 48,
     createdAt: now,
     updatedAt: now,
     updatedBy: '系統',

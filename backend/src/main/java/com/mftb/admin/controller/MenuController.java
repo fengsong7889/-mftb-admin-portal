@@ -36,9 +36,8 @@ public class MenuController {
         return Result.success(menuService.list());
     }
 
-    /** 查询菜单树 */
+    /** 查询菜单树（首頁解析菜單名稱用，所有登錄用戶可訪問） */
     @GetMapping("/tree")
-    @RequirePermission(menu = "menu-config")
     public Result<List<MenuVO>> tree() {
         return Result.success(menuService.tree());
     }

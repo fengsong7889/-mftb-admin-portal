@@ -39,7 +39,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // 各脚本/步骤独立容错 + 独立版本: 已执行的步骤重启时直接跳过 (启动提速);
-        // 脚本内容变更后递增脚本名后的版本号 (如 :v1 → :v2) 即可重跑
+        // 脚本内容变更后递增脚本名后的版本号 (如 :v1 → :v1.1) 即可重跑
         for (String script : INIT_SCRIPTS) {
             try {
                 versionTracker.applyOnce("adpromo:" + script + ":v1", () -> {

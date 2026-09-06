@@ -231,7 +231,7 @@ export default function GroupList() {
       width: 200,
       fixed: 'right',
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleViewStores(record)}>
             {t('viewStores')}
           </Button>

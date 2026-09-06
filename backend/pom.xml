@@ -31,6 +31,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Mail：MCP 外部服務（email_sender）服務端發送能力 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

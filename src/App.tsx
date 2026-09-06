@@ -102,6 +102,8 @@ const FlashSalePrice = lazy(() => import('./pages/GroupPurchase/FlashSalePrice')
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
+const VersionHistoryPage = lazy(() => import('./pages/VersionHistory'))
+const VersionHistoryDetailPage = lazy(() => import('./pages/VersionHistory/VersionHistoryDetail'))
 // AI 智能中心（拆分后）
 const AiModelProvider = lazy(() => import('./pages/AiModelProvider'))
 const AiModelList = lazy(() => import('./pages/AiModelList'))
@@ -128,9 +130,14 @@ const EmpQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaEdi
 const EmpQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaDetail'))
 const RoleQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaEdit'))
 const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaDetail'))
-const AiToolRegistry = lazy(() => import('./pages/AiToolRegistry'))
+const AiOperationAuth = lazy(() => import('./pages/AiOperationAuth'))
 const AiUsageStats = lazy(() => import('./pages/AiUsageStats'))
 const AiEnergyDetail = lazy(() => import('./pages/AiEnergyDetail'))
+const AiConversationAudit = lazy(() => import('./pages/AiConversationAudit'))
+const AiConversationAuditDetail = lazy(() => import('./pages/AiConversationAudit/Detail'))
+// AI 使用申請
+const AiAccessApply = lazy(() => import('./pages/AiAccessApply'))
+const McpService = lazy(() => import('./pages/McpService'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -257,6 +264,8 @@ function AuthenticatedLayout() {
               <Route path="/menu-config" element={<MenuConfig />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
               <Route path="/rule-config" element={<RuleConfig />} />
+              <Route path="/version-history" element={<VersionHistoryPage />} />
+              <Route path="/version-history-detail/:id" element={<VersionHistoryDetailPage />} />
               // AI 智能中心（拆分后）
               <Route path="/ai-model-provider" element={<AiModelProvider />} />
               <Route path="/ai-model-list" element={<AiModelList />} />
@@ -281,9 +290,14 @@ function AuthenticatedLayout() {
                             <Route path="/ai-role-quota-edit" element={<RoleQuotaEdit />} />
                             <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
 
-              <Route path="/ai-tool-registry" element={<AiToolRegistry />} />
+              <Route path="/ai-operation-auth" element={<AiOperationAuth />} />
               <Route path="/ai-usage-stats" element={<AiUsageStats />} />
               <Route path="/ai-energy-detail" element={<AiEnergyDetail />} />
+              {/* AI 使用申請 */}
+              <Route path="/ai-access-apply" element={<AiAccessApply />} />
+              <Route path="/ai-mcp-service" element={<McpService />} />
+              <Route path="/ai-conversation-audit" element={<AiConversationAudit />} />
+              <Route path="/ai-conversation-audit/:id" element={<AiConversationAuditDetail />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />

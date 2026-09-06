@@ -55,6 +55,9 @@ public class AiRoleQuotaPolicy {
     /** 降級目標模型ID */
     private Long downgradeModelId;
 
+    /** 降級豁免額度 */
+    private BigDecimal downgradeExemptQuota;
+
     /** 本期已用量 */
     private BigDecimal usedValue;
 

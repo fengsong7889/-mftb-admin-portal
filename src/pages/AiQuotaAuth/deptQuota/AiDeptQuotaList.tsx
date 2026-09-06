@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Form, Input, Modal, Popover, Progress, Select, Switch, Table, Tag, message } from 'antd'
+import { Alert, Button, Form, Input, Modal, Popover, Progress, Select, Space, Switch, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -228,11 +228,11 @@ export default function AiDeptQuotaList() {
     {
       key: 'action', title: '操作', width: 160, align: 'center', fixed: 'right',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleDetail(row)}>詳情</Button>
           <Button type="link" onClick={() => handleEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handleDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -288,6 +288,7 @@ export default function AiDeptQuotaList() {
         showIcon
         style={{ marginBottom: 16 }}
         message="每條策略可關聯多個部門，共享同一套額度規則。網關在每次請求前校驗用量：達到軟提醒閾值時通知員工與主管，超出限額則按「超額動作」處理（拒絕 / 審批 / 降級）。"
+        description={<span style={{ color: '#8C8C8C', fontSize: 12 }}>「超額動作」與「降級目標模型」配置需網關側配合才能實際生效，當前僅作策略記錄與展示。</span>}
       />
 
       {/* 操作區 */}

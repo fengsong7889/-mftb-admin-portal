@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Button, Tag, Spin, Progress, message } from 'antd'
+import { Button, Tag, Spin, Progress, Tooltip, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AppstoreOutlined, TeamOutlined, BarChartOutlined, FundOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, TeamOutlined, BarChartOutlined, FundOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AnimatedNumber from '../../../components/AnimatedNumber'
 import { fetchModels, type AiModel } from '../../../api'
@@ -162,7 +162,7 @@ export default function RoleQuotaDetail() {
           <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>限額類型</div><div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{QUOTA_TYPE_LABEL[policy.quotaType]}</div></div>
           <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>限額值</div><div style={{ fontSize: 14, color: '#E8720C', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaText(policy)}</div></div>
           <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>軟限額提醒閾值</div><div style={{ fontSize: 14, color: '#FAAD14', fontWeight: 600 }}>{policy.softThreshold}%</div></div>
-          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>超出限額動作</div><Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{OVER_LIMIT_ACTION_LABEL[policy.overLimitAction]}</Tag></div>
+          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>超出限額動作 <Tooltip title="該配置需網關側配合才能實際生效，當前僅作策略記錄與展示"><QuestionCircleOutlined style={{ fontSize: 12, color: '#BFBFBF', cursor: 'help' }} /></Tooltip></div><Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{OVER_LIMIT_ACTION_LABEL[policy.overLimitAction]}</Tag><div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>需網關側配合生效，當前為策略配置</div></div>
           {policy.overLimitAction === 'downgrade' && (
             <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>降級目標模型</div><div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{downgradeModelName ?? '-'}</div></div>
           )}

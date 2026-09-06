@@ -889,6 +889,11 @@
   color: #FF7875;
   background: rgba(255, 77, 79, 0.06);
 }
+/* 表格操作列按钮间竖线分隔符 */
+.action-split {
+  color: #d9d9d9;
+  margin: 0 4px;
+}
 
 /* --- 弹窗/表单底部按钮（确认/取消/返回） --- */
 .ant-modal-footer {

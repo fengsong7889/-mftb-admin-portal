@@ -379,7 +379,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
-  // 智能中心(AI) > 模型接入 / 授權與配額 / 工具註冊中心
+  // 智能中心(AI) > 模型接入 / 授權與配額 / AI 操作授權
   'ai_model_hub': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
@@ -388,7 +388,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
-  'ai_tool_registry': [
+  'ai-operation-auth': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
@@ -400,6 +400,17 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'ai_energy_detail': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
+  ],
+  // AI 使用申請
+  'ai-access-request': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // MCP 服務
+  'ai-mcp-service': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
   ],
   // 系统模板
   'system-template': [
@@ -1025,6 +1036,7 @@ export const menuPermissionTree: PermissionModule[] = [
       { key: 'translation-manage', name: '多語言配置' },
       { key: 'rule-config', name: '規則配置' },
       { key: 'workflow-config', name: '流程配置' },
+      { key: 'version-history', name: '版本管理' },
     ],
   },
   {
@@ -1036,7 +1048,7 @@ export const menuPermissionTree: PermissionModule[] = [
         name: '模型管理',
         children: [
           { key: 'ai-model-provider', name: '供應商管理' },
-          { key: 'ai-model-list', name: '模型信息' },
+          { key: 'ai-model-list', name: '模型接入' },
         ],
       },
       {
@@ -1062,7 +1074,7 @@ export const menuPermissionTree: PermissionModule[] = [
           { key: 'ai-emp-quota', name: '員工額度' },
         ],
       },
-      { key: 'ai_tool_registry', name: '工具註冊中心' },
+      { key: 'ai-operation-auth', name: 'AI 操作授權' },
       {
         key: 'ai-energy-billing',
         name: '能耗與賬單',
@@ -1071,6 +1083,8 @@ export const menuPermissionTree: PermissionModule[] = [
           { key: 'ai_energy_detail', name: '能耗明細' },
         ],
       },
+      { key: 'ai-access-request', name: 'AI 使用申請' },
+      { key: 'ai-mcp-service', name: 'MCP 服務' },
     ],
   },
 ]
@@ -1081,8 +1095,6 @@ export const menuPermissionTree: PermissionModule[] = [
  * 其餘原型菜單暫不受控，所有登錄用戶可見
  */
 export const CONTROLLED_MENU_KEYS: string[] = [
-  // 首頁
-  'home',
   // 商戶集團管理
   'merchant-group-list',
   'store-list',
@@ -1161,9 +1173,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ai-role-auth',
   'ai-dept-quota',
   'ai-emp-quota',
-  'ai_tool_registry',
+  'ai-operation-auth',
   'ai_usage_stats',
   'ai_energy_detail',
+  'ai-access-request',
+  'ai-mcp-service',
 ]
 
 /**
@@ -1260,6 +1274,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/translation-manage': 'translation-manage',
   '/rule-config': 'rule-config',
   '/workflow-config': 'workflow-config',
+'/version-history': 'version-history',
   // AI 智能中心（拆分后）
   '/ai-model-provider': 'ai-model-provider',
   '/ai-model-list': 'ai-model-list',
@@ -1271,9 +1286,11 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/ai-dept-quota-edit': 'ai-dept-quota',
   '/ai-dept-quota-detail': 'ai-dept-quota',
   '/ai-emp-quota': 'ai-emp-quota',
-  '/ai-tool-registry': 'ai_tool_registry',
+  '/ai-operation-auth': 'ai-operation-auth',
   '/ai-usage-stats': 'ai_usage_stats',
   '/ai-energy-detail': 'ai_energy_detail',
+  '/ai-access-apply': 'ai-access-request',
+  '/ai-mcp-service': 'ai-mcp-service',
 }
 
 /**

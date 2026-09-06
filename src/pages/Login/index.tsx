@@ -189,7 +189,7 @@ export default function Login() {
       setLoading(false)
       if (result.success) {
         message.success(t('login.success'))
-        navigate(result.redirectPath || '/', { replace: true })
+        navigate('/', { replace: true })
       } else if (result.accountDisabled) {
         // 账号被停用: 弹窗提醒（不显示 toast）
         setAccountDisabledVisible(true)

@@ -190,7 +190,7 @@ async function resolvePrincipal(token: string): Promise<PrincipalOutcome> {
   const denied: string[] = []
   for (const { configKey, channel } of MODEL_ACCOUNT_KEYS) {
     const accounts = await fetchAccountWhitelist(configKey, authHeaders)
-    if (accounts && accounts.length > 0 && !accounts.includes(username)) denied.push(channel)
+    if (accounts && !accounts.includes(username)) denied.push(channel)
   }
 
   if (principalCache.size > 200) principalCache.clear()

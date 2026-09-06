@@ -504,14 +504,14 @@ export default function MenuConfig() {
       render: (_: unknown, record) => {
         if (isEditing(record)) {
           return (
-            <Space size={4}>
+            <Space size={0} split={<span className="action-split">|</span>}>
               <Button type="link" size="small" onClick={() => handleSave(record.id)}>{t('menuConfig.btnSave')}</Button>
               <Button type="link" size="small" onClick={handleCancel}>{t('menuConfig.btnCancel')}</Button>
             </Space>
           )
         }
         return (
-          <Space size={4}>
+          <Space size={0} split={<span className="action-split">|</span>}>
             <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('menuConfig.btnEdit')}</Button>
             <Button type="link" size="small" onClick={() => handleOpenModalEdit(record)}>{t('menuConfig.btnSettings')}</Button>
             <Tooltip title={t('menuConfig.tooltipMoveUp')}>

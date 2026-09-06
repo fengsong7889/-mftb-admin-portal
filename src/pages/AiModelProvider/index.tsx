@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Modal, Form, Input, Select, Table, Switch, message } from 'antd'
+import { Button, Modal, Form, Input, Select, Space, Table, Switch, message } from 'antd'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -213,10 +213,10 @@ export default function AiModelProvider() {
       width: 140, 
       align: 'center',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleProviderEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handleProviderDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]

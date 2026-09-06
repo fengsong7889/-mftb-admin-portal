@@ -2,7 +2,7 @@
  * 智能中心(AI) 一期 Mock 数据层
  *
  * 覆盖：模型接入（供应商/模型/参数/价格/健康）、授权与配额（部门授权/员工覆盖/
- * 额度策略/路由策略/账号白名单）、工具注册中心（L0-L4 分级）、我的用量。
+ * 额度策略/路由策略/账号白名单）、AI 操作授权（L0-L4 分级）、我的用量。
  * 一期纯前端演示用，界面确认后二期由后端统一网关提供真实接口替换。
  */
 
@@ -189,6 +189,8 @@ export interface QuotaPolicy {
   overLimitAction: OverLimitAction
   /** 超額動作爲降級時的目標模型 */
   downgradeModelId: string | null
+  /** 降級豁免額度（主額度用完後降級模型可獨立使用的額外額度） */
+  downgradeExemptQuota: number | null
   status: EnabledStatus
   /** 最後更新人 */
   updatedBy?: string
@@ -209,7 +211,7 @@ export interface RouteStrategy {
   isDefault: boolean
 }
 
-/* ────────────────── 工具註冊中心 ────────────────── */
+/* ────────────────── AI 操作授權（可調用工具） ────────────────── */
 
 /** 工具權限等級 */
 export type ToolLevel = 'L0' | 'L1' | 'L2' | 'L3' | 'L4'
@@ -545,6 +547,7 @@ const quotaPolicies: QuotaPolicy[] = [
     softThreshold: 80,
     overLimitAction: 'reject',
     downgradeModelId: null,
+    downgradeExemptQuota: null,
     status: ENABLED,
     updatedBy: 'admin',
     updatedAt: '2026-08-28 10:00:00',
@@ -562,6 +565,7 @@ const quotaPolicies: QuotaPolicy[] = [
     softThreshold: 80,
     overLimitAction: 'approve',
     downgradeModelId: null,
+    downgradeExemptQuota: null,
     status: ENABLED,
     updatedBy: 'admin',
     updatedAt: '2026-08-26 14:20:00',
@@ -578,6 +582,7 @@ const quotaPolicies: QuotaPolicy[] = [
     softThreshold: 90,
     overLimitAction: 'downgrade',
     downgradeModelId: 'qwen3.7-flash',
+    downgradeExemptQuota: 50000,
     status: ENABLED,
     updatedBy: 'chenwei',
     updatedAt: '2026-08-25 09:30:00',
@@ -595,6 +600,7 @@ const quotaPolicies: QuotaPolicy[] = [
     softThreshold: 80,
     overLimitAction: 'reject',
     downgradeModelId: null,
+    downgradeExemptQuota: null,
     status: DISABLED,
     updatedBy: 'admin',
     updatedAt: '2026-08-20 16:00:00',
@@ -927,7 +933,7 @@ export async function fetchMockRouteStrategies(): Promise<RouteStrategy[]> {
   return routeStrategies.map((r) => ({ ...r, modelPool: [...r.modelPool] }))
 }
 
-/** 工具註冊中心 */
+/** AI 操作授權 - 可調用工具列表 */
 export async function fetchMockToolRegistry(): Promise<ToolDefinition[]> {
   await delay()
   return toolRegistry.map((t) => ({ ...t, params: t.params.map((p) => ({ ...p, whitelist: [...p.whitelist] })) }))

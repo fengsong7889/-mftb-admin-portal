@@ -56,6 +56,11 @@ public class AiProviderController {
             wrapper.eq(AiProvider::getStatus, status);
         }
         
+        // 只展示真正接入的供应商：API Key 非空、非测试占位符
+        wrapper.isNotNull(AiProvider::getApiKey);
+        wrapper.apply("LENGTH(api_key) > 15");
+        wrapper.apply("api_key NOT LIKE '%test%'");
+
         wrapper.orderByDesc(AiProvider::getSortOrder, AiProvider::getId);
         List<AiProvider> providers = providerMapper.selectList(wrapper);
         

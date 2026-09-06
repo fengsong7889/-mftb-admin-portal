@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import { Button, Modal, Form, Input, Select, Table, Tag, message, Switch, Tooltip, Space, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, ToolOutlined, CodeOutlined, ThunderboltOutlined, BulbOutlined, CheckCircleFilled, RobotOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, ToolOutlined, CodeOutlined, ThunderboltOutlined, BulbOutlined, RobotOutlined } from '@ant-design/icons'
 import {
   fetchModels,
   fetchProviders,
@@ -182,7 +182,6 @@ export default function AiModelList() {
   const [queryName, setQueryName] = useState('')
   const [queryProvider, setQueryProvider] = useState<string | undefined>(undefined)
   const [queryType, setQueryType] = useState<string | undefined>(undefined)
-  const [queryStatus, setQueryStatus] = useState<string | undefined>(undefined)
   const [queryModality, setQueryModality] = useState<string | undefined>(undefined)
   const [queryUpdatedBy, setQueryUpdatedBy] = useState('')
   const [queryUpdateDate, setQueryUpdateDate] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
@@ -192,7 +191,6 @@ export default function AiModelList() {
     name: '',
     provider: undefined as string | undefined,
     type: undefined as string | undefined,
-    status: undefined as number | undefined,
     modality: undefined as string | undefined,
     updatedBy: '',
     updateDateStart: null as dayjs.Dayjs | null,
@@ -204,7 +202,6 @@ export default function AiModelList() {
       name: queryName.trim(),
       provider: queryProvider,
       type: queryType,
-      status: queryStatus ? Number(queryStatus) : undefined,
       modality: queryModality,
       updatedBy: queryUpdatedBy.trim(),
       updateDateStart: queryUpdateDate?.[0] || null,
@@ -212,10 +209,9 @@ export default function AiModelList() {
     }
     setApplied(nextApplied)
     setTick((prev) => prev + 1)
-    // 從後端按名稱/狀態/模態/類型篩選（供應商/更新人/更新時間在客戶端篩選）
+    // 從後端按名稱/模態/類型篩選（供應商/更新人/更新時間在客戶端篩選）
     const params: ModelQueryParams = {}
     if (nextApplied.name) params.name = nextApplied.name
-    if (nextApplied.status !== undefined) params.status = nextApplied.status
     if (nextApplied.modality) params.modality = nextApplied.modality
     if (nextApplied.type) params.type = nextApplied.type
     loadModels(params)
@@ -225,11 +221,10 @@ export default function AiModelList() {
     setQueryName('')
     setQueryProvider(undefined)
     setQueryType(undefined)
-    setQueryStatus(undefined)
     setQueryModality(undefined)
     setQueryUpdatedBy('')
     setQueryUpdateDate(null)
-    setApplied({ name: '', provider: undefined, type: undefined, status: undefined, modality: undefined, updatedBy: '', updateDateStart: null, updateDateEnd: null })
+    setApplied({ name: '', provider: undefined, type: undefined, modality: undefined, updatedBy: '', updateDateStart: null, updateDateEnd: null })
     setTick((prev) => prev + 1)
     loadModels()
   }
@@ -321,9 +316,9 @@ export default function AiModelList() {
   /* ── 統計卡 ── */
   const stats = [
     { label: '接入模型', value: <AnimatedNumber value={models.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
-    { label: '啟用中模型', value: <AnimatedNumber value={models.filter((m) => m.status === 1).length} />, icon: <CheckCircleFilled style={{ color: '#52C41A' }} />, color: '#52C41A', bg: '#F6FFED' },
-    { label: '視覺模型', value: <AnimatedNumber value={models.filter((m) => m.visionSupport === 1).length} />, icon: <EyeOutlined />, color: '#1890FF', bg: '#E6F7FF' },
     { label: '供應商數', value: <AnimatedNumber value={providers.length} />, icon: <span>🏢</span>, color: '#E8720C', bg: '#FFF7E6' },
+    { label: '視覺模型', value: <AnimatedNumber value={models.filter((m) => m.visionSupport === 1).length} />, icon: <EyeOutlined />, color: '#1890FF', bg: '#E6F7FF' },
+    { label: '支持工具調用', value: <AnimatedNumber value={models.filter((m) => m.functionCalling === 1).length} />, icon: <ToolOutlined />, color: '#52C41A', bg: '#F6FFED' },
   ]
 
   /* ── 列字段配置 ── */
@@ -425,11 +420,11 @@ export default function AiModelList() {
     {
       title: '操作', key: 'action', width: 180, align: 'center', fixed: 'right',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => navigate(`/ai-model-detail?id=${row.id}`)}>詳情</Button>
           <Button type="link" onClick={() => navigate(`/ai-model-edit?id=${row.id}`)}>編輯</Button>
           <Button type="link" danger onClick={() => handleDeleteModel(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -471,15 +466,7 @@ export default function AiModelList() {
               onChange={(v) => setQueryModality(v)}
             />
           </Form.Item>
-          <Form.Item label="狀態">
-            <Select
-              value={queryStatus}
-              placeholder="全部"
-              allowClear
-              options={[{ value: '1', label: '啟用' }, { value: '0', label: '停用' }]}
-              onChange={(v) => setQueryStatus(v)}
-            />
-          </Form.Item>
+
           <Form.Item label="最後更新人">
             <Input value={queryUpdatedBy} placeholder="請輸入更新人" allowClear onChange={(e) => setQueryUpdatedBy(e.target.value)} />
           </Form.Item>

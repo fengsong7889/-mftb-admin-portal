@@ -540,7 +540,7 @@ export default function Waterfall() {
       width: 140,
       fixed: 'right' as const,
       render: (_, record) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button 
             type="link" 
             size="small" 

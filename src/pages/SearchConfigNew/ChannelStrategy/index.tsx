@@ -493,7 +493,7 @@ export default function DimensionStrategy() {
       { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
       { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string) => <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v}</Text> },
       { title: t('common.colAction'), key: 'action', width: 120, fixed: 'right', render: (_: unknown, r: ActivityRecord) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleActEdit(r) }}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleActDelete(r) }}>{t('common.delete')}</Button>
         </Space>
@@ -508,7 +508,7 @@ export default function DimensionStrategy() {
       { title: t('channelStrategy.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
       { title: t('channelStrategy.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string) => <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{v}</Text> },
       { title: t('common.colAction'), key: 'action', width: 120, fixed: 'right', render: (_: unknown, r: AdRecord) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleAdEdit(r) }}>{t('common.edit')}</Button>
           {r.deletable !== false && (
             <Button type="link" size="small" danger onClick={e => { e.preventDefault(); handleAdDelete(r) }}>{t('common.delete')}</Button>
@@ -565,7 +565,7 @@ export default function DimensionStrategy() {
       { title: t('channelStrategy.colDesc'), dataIndex: 'description', render: (v: string) => <Text type="secondary">{v}</Text> },
       { title: t('common.colStatus'), dataIndex: 'enabled', width: 80, render: (_: unknown, r: StoreFactor) => <Switch checked={r.enabled} checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} onChange={() => handleStoreToggle(r)} /> },
       { title: t('common.colAction'), key: 'action', width: 80, fixed: 'right', render: (_: unknown, r: StoreFactor) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={e => { e.preventDefault(); handleStoreEdit(r) }}>{t('common.edit')}</Button>
         </Space>
       )},

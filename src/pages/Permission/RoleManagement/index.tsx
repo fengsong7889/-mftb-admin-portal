@@ -286,7 +286,7 @@ export default function RoleManagement() {
       key: 'action',
       width: 180,
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           {hasPermission('role-management:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
               {t('common.edit')}

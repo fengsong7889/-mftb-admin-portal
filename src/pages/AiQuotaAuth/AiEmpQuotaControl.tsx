@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Divider, Form, Input, InputNumber, Modal, Radio, Select, Switch, Table, Tabs, Tag, Transfer, message } from 'antd'
+import { Alert, Button, Divider, Form, Input, InputNumber, Modal, Radio, Select, Space, Switch, Table, Tabs, Tag, Transfer, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons'
 import {
@@ -229,11 +229,11 @@ export default function AiEmpQuotaControl() {
     {
       title: '操作', key: 'action', width: 160, align: 'center',
       render: (_, row) => (
-        <>
-          <Button type="link" icon={<EyeOutlined />} onClick={() => setPreviewRule(row)}>预览</Button>
+        <Space size={0} split={<span className="action-split">|</span>}>
+          <Button type="link" onClick={() => setPreviewRule(row)}>预览</Button>
           <Button type="link" onClick={() => openStrategyForm(row)}>编辑</Button>
           <Button type="link" danger onClick={() => handleStrategyDelete(row)}>删除</Button>
-        </>
+        </Space>
       ),
     },
   ]

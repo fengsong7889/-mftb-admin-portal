@@ -359,7 +359,7 @@ export default function Algorithm() {
     {
       title: t('common.colAction'), key: 'action', width: 220,
       render: (_, record) => (
-        <Space size={0} split={<span style={{ color: '#d9d9d9' }}>|</span>}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>{t('common.detail')}</Button>
           <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>

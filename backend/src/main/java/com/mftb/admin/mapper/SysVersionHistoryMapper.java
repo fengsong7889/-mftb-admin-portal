@@ -1,9 +1,9 @@
 package com.mftb.admin.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.mftb.admin.entity.AiToolRegistry;
+import com.mftb.admin.entity.SysVersionHistory;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
-public interface AiToolRegistryMapper extends BaseMapper<AiToolRegistry> {
+public interface SysVersionHistoryMapper extends BaseMapper<SysVersionHistory> {
 }

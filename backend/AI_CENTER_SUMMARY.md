@@ -380,3 +380,25 @@ curl -X POST http://localhost:8080/api/ai/auth/positions/batch \
 有任何问题都可以问我！我会持续提供技术支持！
 
 祝您开发顺利！🎈
+
+---
+
+## 📋 命名与规划预留（2026-09）
+
+### 菜单更名记录：工具注册中心 → AI 操作授权
+
+原「工具註冊中心」菜單（`ai_tool_registry`）實際管控的是 **AI 助手可調用的業務操作**（對應菜單、L0-L4 風險分級、人工介入策略、參數白名單、啟停、調用審計），屬於 AI 操作風控治理，而非業界所指的「工具註冊」（Dify/Coze 工具面板、百煉插件等技術接入層）。已更名：
+
+- menu_key：`ai_tool_registry` → `ai-operation-auth`
+- 菜單名稱：工具註冊中心 → **AI 操作授權**（英文 AI Operation Authorization）
+- 路由：`/ai-tool-registry` → `/ai-operation-auth`，頁面組件 `AiToolRegistry` → `AiOperationAuth`
+- 後端種子隨 `V_MENU_SEED v11` 自動重建（舊 key 菜單行與授權關聯自動清理）
+
+### 規劃預留：MCP 服務管理（真正的工具註冊地）
+
+主流模型已廣泛支持 MCP（Model Context Protocol）調用。未來接入 MCP 時，應新增獨立的「MCP 服務管理」菜單（暫不實施），承擔技術接入層職責：
+
+1. **MCP Server 註冊**：登記服務地址、傳輸方式（SSE/Streamable HTTP）、鑑權憑據
+2. **工具發現**：拉取 MCP Server 暴露的 tools 列表與 JSON Schema
+3. **健康檢查**：連通性探測、調用延遲監控
+4. **與 AI 操作授權的分工**：MCP 服務管理負責「接入」，AI 操作授權負責「放行」——MCP 工具接入後，仍需在 AI 操作授權中配置 L0-L4 等級、參數白名單與人工介入策略方可對 AI 開放

@@ -389,6 +389,7 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'transfer', label: '轉賬流程編號', type: 'table', value: 'ZZ', defaultValue: 'ZZ', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'ZZ202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
       { key: 'merge', label: '合併流程編號', type: 'table', value: 'HB', defaultValue: 'HB', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'HB202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
       { key: 'gift_approval', label: '贈送流程編號', type: 'table', value: 'ZS', defaultValue: 'ZS', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'ZS202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
+      { key: 'ai_access', label: 'AI申請流程編號', type: 'table', value: 'AI', defaultValue: 'AI', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'AI202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
       /* ── 員工管理 ── */
       { key: 'employee_no', label: '工號', type: 'table', value: 'MF', defaultValue: 'MF', dateFormat: '', min: 5, max: 5, unit: 'MF00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '員工管理' },
       /* ── 組織管理 ── */
@@ -403,6 +404,8 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'ai_dept_quota', label: '部門額度', type: 'table', value: 'BMED', defaultValue: 'BMED', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'BMED20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '配額管理' },
       { key: 'ai_emp_pos_quota', label: '員工額度-按職位', type: 'table', value: 'ZWED', defaultValue: 'ZWED', dateFormat: 'YYYYMM', min: 3, max: 3, unit: 'ZWED202608000', remark: '{prefix} + YYYYMM + {n}位自增序號', menu: '配額管理' },
       { key: 'ai_emp_role_quota', label: '員工額度-按角色', type: 'table', value: 'JSED', defaultValue: 'JSED', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'JSED20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '配額管理' },
+      /* ── AI智能中心 ── */
+      { key: 'ai_conversation', label: '對話編號', type: 'table', value: 'DH', defaultValue: 'DH', dateFormat: 'YYYYMMDD', min: 5, max: 5, unit: 'DH2026090700001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: 'AI智能中心' },
     ],
   },
 ]

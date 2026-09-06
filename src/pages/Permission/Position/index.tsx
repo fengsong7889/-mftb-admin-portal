@@ -236,7 +236,7 @@ export default function PositionManagement() {
       key: 'action',
       width: 140,
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           {hasPermission('position-management:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
               {t('common.edit')}

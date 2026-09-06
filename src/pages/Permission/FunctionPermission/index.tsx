@@ -302,7 +302,7 @@ export default function FunctionPermission() {
 
   /** 操作列（角色/部门通用） */
   const renderActions = (record: RoleItem | DepartmentItem) => (
-    <Space size={4}>
+    <Space size={0} split={<span className="action-split">|</span>}>
       <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
         {t('common.detail')}
       </Button>

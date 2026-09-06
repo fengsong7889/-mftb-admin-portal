@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Table, Tag, Button, Input, Select, DatePicker, Modal, Form, message, Switch } from 'antd'
+import { Table, Tag, Button, Input, Select, DatePicker, Modal, Form, message, Switch, Space } from 'antd'
 import dayjs from 'dayjs'
 import {
   SearchOutlined,
@@ -101,6 +101,7 @@ export default function WorkflowConfig() {
     deduct: { label: '扣款', color: '#FF4D4F' },
     merge: { label: '合併', color: '#FA8C16' },
     gift: { label: '贈送', color: '#722ED1' },
+    ai_access: { label: 'AI申請', color: '#1677FF' },
   }
 
   const columns: ColumnsType<WorkflowDefinition> = [
@@ -182,7 +183,7 @@ export default function WorkflowConfig() {
       width: 150,
       fixed: 'right',
       render: (_: unknown, record: WorkflowDefinition) => (
-        <div style={{ display: 'flex', gap: 4 }}>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small"
             onClick={() => navigate(`/workflow-config/detail/${record.id}`)}>
             詳情
@@ -195,7 +196,7 @@ export default function WorkflowConfig() {
             onClick={() => handleDelete(record)}>
             刪除
           </Button>
-        </div>
+        </Space>
       ),
     },
   ]

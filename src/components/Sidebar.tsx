@@ -53,6 +53,7 @@ import {
   ScheduleOutlined,
   MenuOutlined,
   BranchesOutlined,
+  HistoryOutlined,
   ExperimentOutlined,
   NodeIndexOutlined,
   DeploymentUnitOutlined,
@@ -61,6 +62,8 @@ import {
   CloudServerOutlined,
   ToolOutlined,
   DesktopOutlined, // AI 模型相关
+  KeyOutlined, // AI 使用申請
+  BlockOutlined, // MCP 服務
   BankOutlined, // 权限管理相关
   DollarOutlined, // 额度策略
 } from '@ant-design/icons'
@@ -189,10 +192,14 @@ const keyToPath: Record<string, string> = {
   'translation-manage': '/translation-manage',
   'rule-config': '/rule-config',
   'workflow-config': '/workflow-config',
+    'version-history': '/version-history',
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
   'ai_quota_auth': '/ai-quota-auth',
-  'ai_tool_registry': '/ai-tool-registry',
+  'ai-operation-auth': '/ai-operation-auth',
+  'ai-access-request': '/ai-access-apply',
+  'ai-mcp-service': '/ai-mcp-service',
+  'ai-conversation-audit': '/ai-conversation-audit',
   'ai_usage_stats': '/ai-usage-stats',
   'ai_energy_detail': '/ai-energy-detail',
   // 智能中心(AI) - 拆分后的新菜单 key
@@ -225,7 +232,6 @@ const keyToPath: Record<string, string> = {
   'ai-role-auth-detail': '/ai-role-auth-detail',
   'ai-dept-quota-edit': '/ai-dept-quota-edit',
   'ai-dept-quota-detail': '/ai-dept-quota-detail',
-  'ai-tool-registry': '/ai-tool-registry',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -667,6 +673,11 @@ const menuItems: MenuItem[] = [
         icon: <BranchesOutlined />,
         label: '流程配置',
       },
+      {
+        key: 'version-history',
+        icon: <HistoryOutlined />,
+        label: '版本管理',
+      },
     ],
   },
 
@@ -757,12 +768,15 @@ const keyToIcon: Record<string, ReactNode> = {
   'translation-manage': <GlobalOutlined />,
   'rule-config': <SwapOutlined />,
   'workflow-config': <ApartmentOutlined />,
+  'version-history': <HistoryOutlined />,
   // 智能中心 (AI)
   'ai-assistant': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
   'ai_quota_auth': <SafetyCertificateOutlined />,
-  'ai-tool-registry': <ToolOutlined />,
-  'ai_tool_registry': <ToolOutlined />,
+  'ai-operation-auth': <ToolOutlined />,   // AI 操作授权
+  'ai-access-request': <KeyOutlined />,    // AI 使用申請
+  'ai-mcp-service': <BlockOutlined />,     // MCP 服務
+  'ai-conversation-audit': <AuditOutlined />, // 对话审计
   'ai-usage-stats': <LineChartOutlined />,
   'ai_usage_stats': <LineChartOutlined />,
   'ai-energy-detail': <FileSearchOutlined />,
@@ -773,7 +787,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-auth-quota': <SafetyCertificateOutlined />, // 授权与配额 - 安全证书
   'ai-model-provider': <CloudServerOutlined />,  // 供应商管理 - 云服务器
   'model-provider': <CloudServerOutlined />,
-  'ai-model-list': <AppstoreOutlined />,   // 模型信息 - 应用商店
+  'ai-model-list': <AppstoreOutlined />,   // 模型接入 - 应用商店
   'model-list': <AppstoreOutlined />,
   'ai-auth': <BankOutlined />,             // 权限管理 - 银行/金融机构
   'ai-quota': <DollarOutlined />,          // 额度策略 - 金额符号（与授权与配额去重）
@@ -788,10 +802,15 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-emp-quota': <MoneyCollectOutlined />,    // 员工额度 - 收款
 }
 
+/** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
+const HIDDEN_MENU_KEYS = new Set([
+  'ai-access-request', // AI 使用申請：功能入口已整合至智能中心其他菜單
+])
+
 /** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */
 const buildMenuItemsFromVO = (menus: MenuVO[]): MenuItem[] => {
   return menus
-    .filter((m) => m.status === 1)
+    .filter((m) => m.status === 1 && !HIDDEN_MENU_KEYS.has(m.menuKey))
     .map((m) => {
       const children = m.children?.length ? buildMenuItemsFromVO(m.children) : undefined
       return {
@@ -889,6 +908,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     : location.pathname === '/recharge-add' ? 'account-balance'
     // 審批流程編輯頁：高亮「審批流程」
     : location.pathname.startsWith('/workflow-config/') ? 'workflow-config'
+    : location.pathname.startsWith('/version-history-detail') ? 'version-history'
     // 訂單列表 / 訂單詳情：按來源高亮（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）
     : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
       ? (new URLSearchParams(location.search).get('from') === 'ad-sales' ? 'ad-sales' : 'promotion-sales-config')

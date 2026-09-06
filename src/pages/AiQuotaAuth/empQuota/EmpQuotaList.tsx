@@ -214,11 +214,11 @@ export default function EmpQuotaList() {
     {
       key: 'action', title: '操作', width: 160, align: 'center', fixed: 'right',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handlePosDetail(row)}>詳情</Button>
           <Button type="link" onClick={() => handlePosEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handlePosDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -231,6 +231,7 @@ export default function EmpQuotaList() {
           <span>
             按職位額度以規則維度根據職級序列和職級批量配置訪問限額，系統根據每位員工的職位自動匹配序列與職級，自動生效對應額度。
             <span style={{ color: '#8C8C8C' }}>同一員工符合多條職位規則時，取限額值最大的規則生效。</span>
+            <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 4 }}>「超額動作」與「降級目標模型」配置需網關側配合才能實際生效，當前僅作策略記錄與展示。</div>
           </span>
         }
       />
@@ -390,11 +391,11 @@ export default function EmpQuotaList() {
     {
       key: 'action', title: '操作', width: 160, align: 'center', fixed: 'right',
       render: (_, row) => (
-        <>
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" onClick={() => handleRoleDetail(row)}>詳情</Button>
           <Button type="link" onClick={() => handleRoleEdit(row)}>編輯</Button>
           <Button type="link" danger onClick={() => handleRoleDelete(row)}>刪除</Button>
-        </>
+        </Space>
       ),
     },
   ]
@@ -403,7 +404,7 @@ export default function EmpQuotaList() {
     <>
       <Alert
         type="info" showIcon style={{ marginBottom: 16 }}
-        message="角色額度為特定角色綁定員工並批量配置訪問限額，適合為相似崗位的員工統一設定額度標準。角色額度與職位額度同時生效，取兩者中較大的值。"
+        message={<>角色額度為特定角色綁定員工並批量配置訪問限額，適合為相似崗位的員工統一設定額度標準。角色額度與職位額度同時生效，取兩者中較大的值。<span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>「超額動作」與「降級目標模型」配置需網關側配合才能實際生效，當前僅作策略記錄與展示。</span></>}
       />
       {/* 查詢區域 */}
       <div className="search-section">

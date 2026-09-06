@@ -30,6 +30,7 @@ public class AiDeptQuotaDTO {
         private Integer softThreshold;
         private String overLimitAction;
         private Long downgradeModelId;
+        private BigDecimal downgradeExemptQuota;
         private BigDecimal usedValue;
         private Integer status;
         private String createdBy;
@@ -62,6 +63,7 @@ public class AiDeptQuotaDTO {
         @NotBlank(message = "超額動作不能為空")
         private String overLimitAction;
         private Long downgradeModelId;
+        private BigDecimal downgradeExemptQuota;
         private Integer status;
     }
 

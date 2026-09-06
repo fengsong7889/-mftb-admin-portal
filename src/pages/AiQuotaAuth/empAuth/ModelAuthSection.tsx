@@ -90,7 +90,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
         </div>
         <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型授權配置</span>
         <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>能力顆粒度</Tag>
-        <Tooltip title="模型來自「模型信息」中已啟用的真實模型；按需添加，授權細化到模型能力維度">
+        <Tooltip title="模型來自「模型接入」中已啟用的真實模型；按需添加，授權細化到模型能力維度">
           <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>按需添加模型</span>
         </Tooltip>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />

@@ -15,7 +15,7 @@ export interface ApprovalRecord {
   groupName: string
   brand: string
   flowNo: string
-  approvalType: string // recharge | deduct | transfer | merge | gift
+  approvalType: string // recharge | deduct | transfer | merge | gift | ai_access
   applicant: string
   applyTime: string
   // 業務主管
@@ -181,6 +181,11 @@ export function approveCurrentNode(flowNo: string): ApproveNodeResult | null {
     updateApprovalRecord(flowNo, {
       opsApprover: approver, opsApproveTime: now, opsApproveStatus: 'approved',
     })
+    // AI 申請只有兩個節點（業務 + 運營），運營通過即流程結束
+    if (record.approvalType === 'ai_access') {
+      updateApprovalRecord(flowNo, { flowStatus: 'approved' })
+      return { nodeName: '運營主管審批', finished: true }
+    }
     return { nodeName: '運營主管審批', finished: false, nextNode: '財務主管審批' }
   }
   if (record.finApproveStatus === 'pending') {
@@ -970,6 +975,7 @@ export function generateFlowNo(type: string): string {
     transfer: 'ZZ',
     merge: 'HB',
     gift: 'ZS',
+    ai_access: 'AI',
   }
   const prefix = prefixMap[type] || 'SP'
   const now = new Date()

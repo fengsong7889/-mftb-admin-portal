@@ -491,7 +491,7 @@ export default function DeptAuthGroupEdit() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型授權配置</span>
             <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
-            <Tooltip title="模型來自「模型信息」中已啟用的真實模型；按需添加，添加一個展示一個，避免模型過多佔用空間">
+            <Tooltip title="模型來自「模型接入」中已啟用的真實模型；按需添加，添加一個展示一個，避免模型過多佔用空間">
               <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>按需添加模型</span>
             </Tooltip>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
@@ -522,7 +522,7 @@ export default function DeptAuthGroupEdit() {
               onChange={handleAddModel}
               optionFilterProp="label"
               options={availableModelOptions}
-              notFoundContent={residencyOn ? '暫無私有化部署模型可添加（請到「模型信息」將模型部署類型標記為私有化）' : '所有已啟用模型均已添加'}
+              notFoundContent={residencyOn ? '暫無私有化部署模型可添加（請到「模型接入」將模型部署類型標記為私有化）' : '所有已啟用模型均已添加'}
               style={{ width: '100%' }}
               suffixIcon={<PlusOutlined />}
             />

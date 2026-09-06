@@ -294,7 +294,7 @@ export default function DataPermission() {
 
   /** 操作列 */
   const renderActions = (record: GroupedAuthRow) => (
-    <Space size={4}>
+    <Space size={0} split={<span className="action-split">|</span>}>
       <Button type="link" size="small" onClick={() => setDetailGroup(record)}>
         {t('common.detail')}
       </Button>

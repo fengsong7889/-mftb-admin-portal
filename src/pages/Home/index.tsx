@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin } from 'antd'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin, Tooltip, Popover } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -10,10 +10,13 @@ import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
 import { pinyin } from 'pinyin-pro'
 import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
-import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode } from '../../api/agent'
-import type { ChatMessage, LlmEngineStatus, LlmEngineMode } from '../../api/agent'
+import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '../../api/agent'
+import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth } from '../../api/agent'
 import { fetchMyQuotaUsage, fetchMyModels, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
 import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource } from '../../api/aiMyCenter'
+import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation } from '../../api/aiConversation'
+import type { AiConversation } from '../../api/aiConversation'
+import type { Conversation } from '../../api/aiConversation'
 import aiLogo from '../../assets/ai-logo.png'
 import {
   SearchOutlined,
@@ -35,6 +38,16 @@ import {
   ThunderboltOutlined,
   DownOutlined,
   LockOutlined,
+  InfoCircleOutlined,
+  PaperClipOutlined,
+  CloseCircleOutlined,
+  PictureOutlined,
+  FileTextOutlined,
+  HistoryOutlined,
+  MessageOutlined,
+  SettingOutlined,
+  CheckOutlined,
+  UndoOutlined,
 } from '@ant-design/icons'
 import './index.css'
 
@@ -107,13 +120,8 @@ const loadFavorites = (username: string): string[] => {
   return defaultFavorites
 }
 
-/** 快捷提问 */
-const quickQuestions = [
-  { icon: <SearchOutlined />, text: '查詢推廣金充值批次' },
-  { icon: <AuditOutlined />, text: '最近有什麼待審批的單子？' },
-  { icon: <ThunderboltOutlined />, text: '今天充值了多少推廣金？' },
-  { icon: <LineChartOutlined />, text: '查詢推廣金消費最多集團' },
-]
+/** 快捷提问（模块级常量已废弃，组件内有翻译后的版本） */
+// const quickQuestions = [...]  // 已移至组件内
 
 /** 中文姓名转英文拼音格式：名在前、姓在后，首字母大写 */
 const chineseNameToPinyinEnglish = (name: string): string => {
@@ -195,10 +203,6 @@ const ENGINE_PANEL_DESC_KEY: Record<AiBlockReason, string> = {
   'no-both': 'home.enginePanelNoBothDesc',
 }
 
-/** 性能優先本地標記：後端網關支持後正式生效，當前請求仍按省錢優先路由，僅膠囊展示 */
-const PERF_MODE_KEY = 'llm_engine_perf'
-const getPerfMode = () => localStorage.getItem(PERF_MODE_KEY) === 'performance'
-
 /** 將 AI 回覆中的字面 \n 轉為真正換行（CSS white-space: pre-wrap 負責渲染） */
 const formatAiText = (text: string) => text.replace(/\\n/g, '\n')
 
@@ -209,6 +213,10 @@ const collectMenuNames = (menus: MenuVO[], map: Record<string, string>) => {
     if (m.children?.length) collectMenuNames(m.children, map)
   })
 }
+
+/** 文件大小限制（模块级常量） */
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024  // 10MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024    // 5MB
 
 export default function Home() {
   const navigate = useNavigate()
@@ -222,17 +230,215 @@ export default function Home() {
   const [quoteIndex, setQuoteIndex] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  /* ── 对话状态 ── */
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  /* ── 多会话状态 ── */
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConvId, setActiveConvId] = useState<number | null>(null)
+  const [deletedConversations, setDeletedConversations] = useState<AiConversation[]>([])
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  /* ── 附件状态 ── */
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  /** 当前活跃会话 */
+  const activeConversation = conversations.find((c) => c.id === activeConvId)
+  const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation])
+
+  /** 加载会话列表 */
+  useEffect(() => {
+    let cancelled = false
+    fetchConversations().then((list) => {
+      if (cancelled) return
+      const parsed = list.map((c) => {
+        // 复用 parseConversation 逻辑
+        let msgs: ChatMessage[] = []
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const raw: any[] = JSON.parse(c.messages)
+          if (Array.isArray(raw)) {
+            msgs = raw.map((m) => ({
+              id: m.id as string,
+              role: m.role as 'user' | 'assistant',
+              content: m.content as string,
+              attachments: m.attachments as ChatAttachment[] | undefined,
+              timestamp: m.timestamp ? new Date(m.timestamp as string) : new Date(),
+            }))
+          }
+        } catch { /* 损坏数据回退空 */ }
+        return { id: c.id, title: c.title, messages: msgs, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
+      })
+      setConversations(parsed)
+      // 默认激活最新会话，若无则自动创建一个
+      if (parsed.length > 0) {
+        setActiveConvId(parsed[0].id)
+      } else {
+        handleCreateConversation()
+      }
+    }).catch(() => {
+      // 后端不可用，创建一个本地会话
+      if (!cancelled) {
+        const localConv: Conversation = { id: Date.now(), title: '新對話', messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        setConversations([localConv])
+        setActiveConvId(localConv.id)
+      }
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  /** 新建会话 */
+  const handleCreateConversation = async () => {
+    try {
+      const conv = await createConversation()
+      const newConv: Conversation = { id: conv.id, title: conv.title, messages: [], createdAt: conv.createdAt, updatedAt: conv.updatedAt }
+      setConversations((prev) => [newConv, ...prev])
+      setActiveConvId(newConv.id)
+    } catch {
+      // 后端不可用，本地创建
+      const localConv: Conversation = { id: Date.now(), title: '新對話', messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      setConversations((prev) => [localConv, ...prev])
+      setActiveConvId(localConv.id)
+    }
+  }
+
+  /** 删除会话 */
+  const handleDeleteConversation = async (convId: number, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (conversations.length <= 1) {
+      message.warning(t('home.convDeleteLast'))
+      return
+    }
+    Modal.confirm({
+      title: t('home.convDeleteConfirm'),
+      centered: true,
+      className: 'custom-confirm-modal',
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await deleteConversation(convId)
+        } catch { /* 后端不可用静默 */ }
+        setConversations((prev) => {
+          const next = prev.filter((c) => c.id !== convId)
+          if (activeConvId === convId && next.length > 0) {
+            setActiveConvId(next[0].id)
+          }
+          return next
+        })
+        // 刷新回收站列表
+        loadDeletedConversations()
+      },
+    })
+  }
+
+  /** 加载回收站列表 */
+  const loadDeletedConversations = async () => {
+    try {
+      const list = await fetchDeletedConversations()
+      setDeletedConversations(list)
+    } catch { /* 后端不可用静默 */ }
+  }
+
+  /** 恢复已删除的会话 */
+  const handleRestoreConversation = async (convId: number) => {
+    try {
+      await restoreConversation(convId)
+      message.success(t('home.convRestored'))
+      // 重新加载活跃会话列表和回收站
+      const [activeList, deletedList] = await Promise.all([
+        fetchConversations(),
+        fetchDeletedConversations(),
+      ])
+      const parsed = activeList.map((c) => {
+        let msgs: ChatMessage[] = []
+        try {
+          const raw: any[] = JSON.parse(c.messages) // eslint-disable-line @typescript-eslint/no-explicit-any
+          if (Array.isArray(raw)) {
+            msgs = raw.map((m) => ({
+              id: m.id as string,
+              role: m.role as 'user' | 'assistant',
+              content: m.content as string,
+              attachments: m.attachments as ChatAttachment[] | undefined,
+              timestamp: m.timestamp ? new Date(m.timestamp as string) : new Date(),
+            }))
+          }
+        } catch { /* 损坏数据回退空 */ }
+        return { id: c.id, title: c.title, messages: msgs, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
+      })
+      setConversations(parsed)
+      setDeletedConversations(deletedList)
+      // 切换到恢复的会话
+      setActiveConvId(convId)
+    } catch {
+      message.error(t('common.error'))
+    }
+  }
+
+  /** 永久删除会话 */
+  const handlePermanentDelete = (convId: number) => {
+    Modal.confirm({
+      title: t('home.convPermanentDeleteConfirm'),
+      centered: true,
+      className: 'custom-confirm-modal',
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await permanentDeleteConversation(convId)
+          message.success(t('home.convPermanentDeleted'))
+          setDeletedConversations((prev) => prev.filter((c) => c.id !== convId))
+        } catch {
+          message.error(t('common.error'))
+        }
+      },
+    })
+  }
+
+  /** 更新活跃会话的消息（debounce 保存到后端） */
+  const updateActiveMessages = useCallback((updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === activeConvId)
+      if (idx === -1) return prev
+      const updated = [...prev]
+      const conv = { ...updated[idx], messages: updater(updated[idx].messages), updatedAt: new Date().toISOString() }
+      // 自动更新标题：取第一条用户消息的前 20 个字符
+      if (conv.messages.length > 0 && conv.title === '新對話') {
+        const firstUser = conv.messages.find((m) => m.role === 'user')
+        if (firstUser) conv.title = firstUser.content.slice(0, 20) + (firstUser.content.length > 20 ? '...' : '')
+      }
+      updated[idx] = conv
+      // debounce 保存到后端
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => {
+        updateConversation(conv.id, {
+          title: conv.title,
+          messages: JSON.stringify(conv.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            attachments: m.attachments,
+            timestamp: m.timestamp.toISOString(),
+          }))),
+        }).catch(() => { /* 静默失败 */ })
+      }, 2000)
+      return updated
+    })
+  }, [activeConvId])
+
   /* ── 當前引擎（模型通道 / 使用權限）── */
   const [engine, setEngine] = useState<LlmEngineStatus | null>(null)
 
-  /* ── 性能優先（本地標記）與我的用量 ── */
-  const [perfMode, setPerfMode] = useState(getPerfMode)
+  /* ── 上下文窗口 & 思考模式設定 ── */
+  const [contextWindow, setContextWindow] = useState<number | null>(null)
+  const [thinkingEnabled, setThinkingEnabled] = useState(false)
+  const [thinkingDepth, setThinkingDepth] = useState<ThinkingDepth>('xhigh')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  /* ── 我的用量 ── */
   const [usageOpen, setUsageOpen] = useState(false)
   const [usageLoading, setUsageLoading] = useState(false)
   const [myUsage, setMyUsage] = useState<MyQuotaUsage | null>(null)
@@ -293,8 +499,10 @@ export default function Home() {
     Promise.all([probeEngineStatus('primary'), probeEngineStatus('off-peak')]).then(([primary, offPeak]) => {
       if (cancelled) return
       const map: Record<string, LlmEngineMode> = {}
-      if (primary?.model) map[primary.model] = 'primary'
-      if (offPeak?.model) map[offPeak.model] = 'off-peak'
+      // 僅記錄通道真實匹配的模型：off-peak 未配置時代理會回落到 primary，
+      // 若不校驗 channel 會把 primary 的模型誤標為 off-peak，導致點擊時觸發無權限彈窗
+      if (primary?.model && primary.channel === 'primary') map[primary.model] = 'primary'
+      if (offPeak?.model && offPeak.channel === 'off-peak') map[offPeak.model] = 'off-peak'
       setConnectedModels(map)
     })
     return () => { cancelled = true }
@@ -328,7 +536,7 @@ export default function Home() {
     return () => { cancelled = true }
   }, [])
 
-  /** 初始加載我的用量數據（用於首頁按鈕顯示剩餘百分比與開通態判定） */
+  /** 初始加載我的用量數據（用於資訊條與開通態判定） */
   useEffect(() => {
     let cancelled = false
     fetchMyQuotaUsage().then((data) => {
@@ -358,7 +566,7 @@ export default function Home() {
 
   /** 引擎模式 → 展示文案（手動模式顯示真實模型名） */
   const engineModeLabel = (mode: LlmEngineMode): string => {
-    if (mode === 'auto') return t(perfMode ? 'home.enginePerfPriority' : 'home.engineCostSaving')
+    if (mode === 'auto') return t('home.engineCostSaving')
     return modelDisplayName(modeModelKey(mode)) ?? mode
   }
 
@@ -432,33 +640,44 @@ export default function Home() {
   const handleSend = async (preset?: string) => {
     const text = (preset ?? inputText).trim()
     if (!text || sending) return
-    // 未開通兜底：輸入區已禁用，這裡防快捷提問等入口繞過
+    // 未開通兗底：輸入區已禁用，這裡防快捷提問等入口繞過
     if (aiBlocked) {
       message.warning(t('home.aiBlockedSendMsg'))
       return
     }
-
+  
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: text,
+      attachments: attachments.length > 0 ? [...attachments] : undefined,
       timestamp: new Date(),
     }
     const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
+    updateActiveMessages(() => newMessages)
     setInputText('')
+    setAttachments([])
     setSending(true)
-
+  
     try {
-      const reply = await sendAgentMessage(newMessages)
-      setMessages((prev) => [...prev, {
+      const reply = await sendAgentMessage(newMessages, llmRequestOptions)
+      updateActiveMessages((prev) => [...prev, {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: reply,
+        content: reply.text,
         timestamp: new Date(),
       }])
+      // 更新会话的模型和 tokens 信息（用于审计）
+      if (activeConvId && reply.model) {
+        updateConversation(activeConvId, {
+          title: undefined,
+          messages: undefined,
+        }).catch(() => {})
+        // 通过自定义 header 传递 modelKey 和 tokens 到后端
+        // 注意：这里需要在 updateConversation API 中支持传递这些字段
+      }
     } catch {
-      setMessages((prev) => [...prev, {
+      updateActiveMessages((prev) => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: t('home.aiServiceError'),
@@ -478,14 +697,163 @@ export default function Home() {
 
   const isEmpty = messages.length === 0
 
+  /* ── 引擎模式（提前声明，供能力计算使用） ── */
+  const engineMode = engine?.mode ?? getEngineMode()
+
+  /* ── 当前模型能力计算 ── */
+  const currentCapabilities = useMemo(() => {
+    if (engineMode === 'auto') {
+      // AUTO 模式：取所有授权模型能力的并集
+      const caps = { text: true, image: false, audio: false, video: false, file: false, toolCalling: false, thinking: false }
+      myModels.forEach((m) => {
+        if (m.modalities) {
+          const mods = m.modalities.split(',').map((s) => s.trim())
+          if (mods.includes('image')) caps.image = true
+          if (mods.includes('audio')) caps.audio = true
+          if (mods.includes('video')) caps.video = true
+        }
+        if (m.visionSupport) caps.image = true
+        if (m.functionCalling) caps.toolCalling = true
+        if (m.thinkingMode) caps.thinking = true
+      })
+      // 有图片支持即表示支持文件上传
+      caps.file = caps.image
+      return caps
+    }
+    // 指定模型：找当前引擎对应的模型
+    const currentModelKey = engine?.model
+    const model = myModels.find((m) => m.modelKey === currentModelKey)
+    if (!model) return { text: true, image: false, audio: false, video: false, file: false, toolCalling: false, thinking: false }
+    const mods = model.modalities?.split(',').map((s) => s.trim()) ?? []
+    return {
+      text: true,
+      image: mods.includes('image') || model.visionSupport,
+      audio: mods.includes('audio'),
+      video: mods.includes('video'),
+      file: mods.includes('image') || model.visionSupport,
+      toolCalling: model.functionCalling,
+      thinking: model.thinkingMode,
+    }
+  }, [engineMode, myModels, engine?.model])
+
+  /* ── 上下文窗口選項 & 思考模式可用性 ── */
+  const contextWindowOptions = useMemo(() => {
+    if (engineMode === 'auto') {
+      // AUTO 模式：取所有授權模型的最小上下文窗口
+      const mins = myModels
+        .map((m) => m.contextWindow)
+        .filter((v): v is number => v != null && v > 0)
+      if (mins.length === 0) return [128_000]
+      const minMax = Math.min(...mins)
+      return getContextWindowOptions(minMax)
+    }
+    // 指定模型：用當前引擎對應的模型
+    const currentModelKey = engine?.model
+    const model = myModels.find((m) => m.modelKey === currentModelKey)
+    return getContextWindowOptions(model?.contextWindow ?? null)
+  }, [engineMode, myModels, engine?.model])
+
+  /** 思考模式是否可用（AUTO 模式下需所有模型都支持） */
+  const thinkingAvailable = useMemo(() => {
+    if (engineMode === 'auto') {
+      return myModels.length > 0 && myModels.every((m) => m.thinkingMode)
+    }
+    const currentModelKey = engine?.model
+    const model = myModels.find((m) => m.modelKey === currentModelKey)
+    return model?.thinkingMode ?? false
+  }, [engineMode, myModels, engine?.model])
+
+  /** 初始化上下文窗口默認值（選項變化時自動調整） */
+  useEffect(() => {
+    if (contextWindowOptions.length > 0) {
+      // 如果當前選擇不在選項中，默認選最後一個（最大）
+      if (!contextWindow || !contextWindowOptions.includes(contextWindow)) {
+        setContextWindow(contextWindowOptions[contextWindowOptions.length - 1])
+      }
+    }
+  }, [contextWindowOptions]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 構建 LLM 請求選項 */
+  const llmRequestOptions = useMemo((): LlmRequestOptions => {
+    const opts: LlmRequestOptions = {}
+    if (contextWindow) opts.contextWindow = contextWindow
+    if (thinkingEnabled && thinkingAvailable) opts.thinkingDepth = thinkingDepth
+    return opts
+  }, [contextWindow, thinkingEnabled, thinkingAvailable, thinkingDepth])
+
+  /* ── 文件处理 ── */
+
+  const handleFileSelect = useCallback((files: FileList | null) => {
+    if (!files) return
+    Array.from(files).forEach((file) => {
+      const isImage = file.type.startsWith('image/')
+      const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_FILE_SIZE
+      if (file.size > maxSize) {
+        message.warning(t('home.fileTooLarge'))
+        return
+      }
+      if (isImage) {
+        // 图片 → base64 data URL
+        const reader = new FileReader()
+        reader.onload = () => {
+          setAttachments((prev) => [...prev, {
+            type: 'image',
+            name: file.name,
+            data: reader.result as string,
+            mimeType: file.type,
+          }])
+        }
+        reader.readAsDataURL(file)
+      } else {
+        // 其他文件 → 读取文本内容
+        const reader = new FileReader()
+        reader.onload = () => {
+          setAttachments((prev) => [...prev, {
+            type: 'file',
+            name: file.name,
+            data: reader.result as string,
+            mimeType: file.type,
+          }])
+        }
+        reader.readAsText(file)
+      }
+    })
+  }, [t])
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
+  /** 拖拽处理 */
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isDragging) setIsDragging(true)
+  }, [isDragging])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (currentCapabilities.image || currentCapabilities.file) {
+      handleFileSelect(e.dataTransfer.files)
+    }
+  }, [currentCapabilities, handleFileSelect])
+
   /** 賬號所選頭像：支持 pikachu / DiceBear URL / base64 三種 */
   const avatarKey = user?.avatar ?? ''
   const isPikachuAvatar = !avatarKey || avatarKey.startsWith('pikachu-')
   const avatarExpression = isPikachuAvatar ? (avatarKey.replace('pikachu-', '') || 'default') : ''
   const isCustomOrPresetAvatar = avatarKey.startsWith('https://') || avatarKey.startsWith('data:')
 
-  /** 頭部按鈕剩餘百分比提示：取日维度中最緊的一個，無日维度時回退月维度 */
-  const chipRemainingPercent = useMemo(() => {
+  /** 頭部資訊條剩餘百分比：取日维度中最緊的一個，無日维度時回退月维度 */
+  const infoBarRemainingPercent = useMemo(() => {
     if (!myUsage || myUsage.dimensions.length === 0) return null
     const remainingOf = (dim: QuotaDimension): number | null => {
       const quota = Number(dim.quotaValue) || 0
@@ -501,20 +869,21 @@ export default function Home() {
     return pool.length > 0 ? Math.min(...pool) : null
   }, [myUsage])
 
-  /** 當前引擎：模型展示名 + 策略（綠色=省錢優先，橙色=性能優先，藍色=手動固定）；
-   *  未開通時直接說明缺什麼（無可用模型 / 無可用額度），不用「未開通」模糊詞 */
+  /** 當前引擎：auto 模式只顯示策略名（模型多時拼接會溢位）；手動模式顯示指定模型名稱 */
   const engineName = engine?.model ? (modelDisplayName(engine.model) ?? engine.model) : null
-  const engineMode = engine?.mode ?? getEngineMode()
   const engineChipText = blockReason
     ? t(blockReason === 'no-quota' ? 'home.engineChipNoQuota' : 'home.engineChipNoModels')
     : engine
-      ? `${engineName}·${engineMode === 'auto' ? t(perfMode ? 'home.enginePerfPriority' : 'home.engineCostSaving') : t('home.engineManualFixed')}`
+      ? engineMode === 'auto' ? t('home.engineCostSaving') : (engineName ?? t('home.aiEngineNotDetected'))
       : t('home.aiEngineNotDetected')
 
-  /** 高亮項：智能路由下區分省錢/性能優先（兩者請求層面都是 auto） */
-  const selectedEngineKey = engineMode === 'auto' && perfMode ? 'performance' : engineMode
+  /** 高亮項 */
+  const selectedEngineKey = engineMode
 
-  /** 引擎模式下拉：智能路由 + 指定模型兩組；指定模型來自後端真實授權清單，已接入網關者方可選用 */
+  /** 已接入網關的授權模型（未接入者不展示） */
+  const availableModels = myModels.filter((m) => connectedModels[m.modelKey])
+
+  /** 引擎模式下拉：智能路由 + 指定模型兩組；只展示已接入網關的授權模型 */
   const engineMenuItems: MenuProps['items'] = [
     {
       type: 'group',
@@ -529,21 +898,12 @@ export default function Home() {
             </div>
           ),
         },
-        {
-          key: 'performance',
-          label: (
-            <div className="home-ai-engine-opt">
-              <strong>{t('home.enginePerfPriority')}</strong>
-              <span>{t('home.enginePerfPriorityDesc')}</span>
-            </div>
-          ),
-        },
       ],
     },
     {
       type: 'group',
       label: t('home.engineSpecifiedModel'),
-      children: myModels.length === 0
+      children: availableModels.length === 0
         ? [{
             key: 'no-models',
             disabled: true,
@@ -553,29 +913,15 @@ export default function Home() {
               </div>
             ),
           }]
-        : myModels.map((model) => {
-            const mode = connectedModels[model.modelKey]
-            if (!mode) {
-              return {
-                key: `pending:${model.modelKey}`,
-                label: (
-                  <div className="home-ai-engine-opt" style={{ opacity: 0.55 }}>
-                    <strong>{model.modelName}</strong>
-                    <span>{model.providerName ? `${model.providerName} · ` : ''}{t('home.enginePendingNote')}</span>
-                  </div>
-                ),
-              }
-            }
-            return {
-              key: mode,
-              label: (
-                <div className="home-ai-engine-opt">
-                  <strong>{model.modelName}</strong>
-                  <span>{model.providerName ? `${model.providerName} · ` : ''}{model.modelKey}</span>
-                </div>
-              ),
-            }
-          }),
+        : availableModels.map((model) => ({
+            key: connectedModels[model.modelKey],
+            label: (
+              <div className="home-ai-engine-opt">
+                <strong>{model.modelName}</strong>
+                <span>{model.providerName ? `${model.providerName} · ` : ''}{model.modelKey}</span>
+              </div>
+            ),
+          })),
     },
   ]
 
@@ -610,23 +956,11 @@ export default function Home() {
     })
   }
 
-  /** 選擇引擎模式：未接入模型僅提示；性能優先本地標記；固定模式被權限攔截只彈窗 */
+  /** 選擇引擎模式 */
   const handleEngineModeSelect: MenuProps['onClick'] = ({ key }) => {
-    if (key.startsWith('pending:') || key === 'no-models') {
+    if (key === 'no-models') {
       message.info(t('home.enginePendingMsg'))
       return
-    }
-    if (key === 'performance') {
-      setPerfMode(true)
-      localStorage.setItem(PERF_MODE_KEY, 'performance')
-      setEngineMode('auto')
-      fetchEngineStatus().then(setEngine)
-      message.info(t('home.enginePerfMsg'))
-      return
-    }
-    if (key === 'auto') {
-      setPerfMode(false)
-      localStorage.removeItem(PERF_MODE_KEY)
     }
     const next = key as LlmEngineMode
     if ((next === 'primary' || next === 'off-peak') && deniedChannels.includes(next)) {
@@ -683,35 +1017,6 @@ export default function Home() {
             </span>
           </div>
           <div className="home-ai-badges">
-            <button
-              type="button"
-              className={`home-ai-engine${aiBlocked ? ' home-ai-engine--blocked' : ''}`}
-              onClick={handleOpenUsage}
-              title={t('home.aiMyUsage')}
-            >
-              <i />
-              {t('home.aiMyUsage')}
-              {chipRemainingPercent !== null && (
-                (() => {
-                  // 顏色狀態：60-100% 綠色 (安全)，20-59% 橙色 (警示)，<20% 紅色 (緊急)
-                  const getColor = (percent: number) => {
-                    if (percent >= 60) return '#52C41A'  // 綠色
-                    if (percent >= 20) return '#FAAD14'  // 橙色
-                    return '#FF4D4F'  // 紅色
-                  }
-                  const getStatusText = (percent: number) => {
-                    if (percent >= 60) return t('home.aiQuotaSufficient')
-                    if (percent >= 20) return t('home.aiQuotaTight')
-                    return t('home.aiQuotaInsufficient')
-                  }
-                  return (
-                    <span style={{ marginLeft: 8, fontSize: 12, color: getColor(chipRemainingPercent), fontWeight: 600 }}>
-                      ·{chipRemainingPercent}% ({getStatusText(chipRemainingPercent)})
-                    </span>
-                  )
-                })()
-              )}
-            </button>
             <Dropdown
               menu={aiBlocked
                 ? { items: [] }
@@ -732,14 +1037,223 @@ export default function Home() {
             >
               <button
                 type="button"
-                className={`home-ai-engine${aiBlocked ? ' home-ai-engine--blocked' : engineMode !== 'auto' ? ' home-ai-engine--manual' : perfMode ? ' home-ai-engine--perf' : ''}`}
+                className={`home-ai-engine${aiBlocked ? ' home-ai-engine--blocked' : engineMode !== 'auto' ? ' home-ai-engine--manual' : ''}`}
               >
                 <i />
                 {engineChipText}
                 <DownOutlined className="home-ai-engine-caret" />
               </button>
             </Dropdown>
+            {/* 上下文窗口 & 思考模式設定 */}
+            {!aiBlocked && (
+              <Popover
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+                trigger="click"
+                placement="bottomRight"
+                title={null}
+                content={
+                  <div className="home-ai-settings-panel">
+                    {/* 上下文窗口 */}
+                    <div className="home-ai-settings-section">
+                      <div className="home-ai-settings-label">{t('home.settingsContextWindow')}</div>
+                      <div className="home-ai-settings-options">
+                        {contextWindowOptions.map((cw) => (
+                          <div
+                            key={cw}
+                            className={`home-ai-settings-option${contextWindow === cw ? ' active' : ''}`}
+                            onClick={() => setContextWindow(cw)}
+                          >
+                            {formatContextWindow(cw)}
+                            {contextWindow === cw && <CheckOutlined className="home-ai-settings-check" />}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 思考模式 */}
+                    {thinkingAvailable && (
+                      <div className="home-ai-settings-section">
+                        <div className="home-ai-settings-label-row">
+                          <span className="home-ai-settings-label">{t('home.settingsThinkingMode')}</span>
+                          <button
+                            type="button"
+                            className={`home-ai-thinking-toggle${thinkingEnabled ? ' on' : ' off'}`}
+                            onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                          >
+                            <span className="home-ai-thinking-toggle-dot" />
+                          </button>
+                        </div>
+                        {thinkingEnabled && (
+                          <div className="home-ai-settings-options">
+                            {(['low', 'medium', 'high', 'xhigh'] as ThinkingDepth[]).map((d) => (
+                              <div
+                                key={d}
+                                className={`home-ai-settings-option${thinkingDepth === d ? ' active' : ''}`}
+                                onClick={() => setThinkingDepth(d)}
+                              >
+                                {d}
+                                {thinkingDepth === d && <CheckOutlined className="home-ai-settings-check" />}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                }
+              >
+                <button
+                  type="button"
+                  className="home-ai-settings-btn"
+                  title={t('home.settingsTitle')}
+                >
+                  <SettingOutlined />
+                </button>
+              </Popover>
+            )}
           </div>
+        </div>
+
+        {/* 額度管理資訊條（獨立行，與模型選擇分行展示） */}
+        <div className={`home-ai-infobar${aiBlocked ? ' home-ai-infobar--blocked' : ''}`}>
+          {aiBlocked ? (
+            <div className="home-ai-infobar-warn">
+              <LockOutlined style={{ fontSize: 13 }} />
+              <span>{aiBlocked ? t('home.aiBlockedBadge') : ''} — {t(blockReason === 'no-models' ? 'home.aiBlockedNoModelsDesc' : blockReason === 'no-quota' ? 'home.aiBlockedNoQuotaDesc' : 'home.aiBlockedNoBothDesc')}</span>
+            </div>
+          ) : (
+            <>
+              <div className="home-ai-infobar-left" onClick={handleOpenUsage} role="button" tabIndex={0}>
+                <DatabaseOutlined style={{ fontSize: 13, color: '#8C8C8C' }} />
+                <span className="home-ai-infobar-label">{t('home.aiMyUsage')}</span>
+                {infoBarRemainingPercent !== null && (
+                  <>
+                    <span style={{
+                      fontSize: 12, fontWeight: 600,
+                      color: infoBarRemainingPercent >= 60 ? '#52C41A' : infoBarRemainingPercent >= 20 ? '#FAAD14' : '#FF4D4F',
+                    }}>
+                      {infoBarRemainingPercent}%
+                    </span>
+                    <Progress
+                      percent={infoBarRemainingPercent}
+                      size="small"
+                      showInfo={false}
+                      strokeColor={infoBarRemainingPercent >= 60 ? '#52C41A' : infoBarRemainingPercent >= 20 ? '#FAAD14' : '#FF4D4F'}
+                      style={{ width: 60, margin: '0 2px' }}
+                    />
+                  </>
+                )}
+                {infoBarRemainingPercent === null && (
+                  <span style={{ fontSize: 11, color: '#BFBFBF' }}>—</span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="home-ai-infobar-apply"
+                onClick={() => navigate('/ai-access-apply?reason=topup')}
+              >
+                <PlusOutlined style={{ fontSize: 10 }} />
+                {t('home.aiApplyMore')}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* 会话标签栏 */}
+        <div className="home-ai-tabs">
+          {conversations.map((conv) => (
+            <div
+              key={conv.id}
+              className={`home-ai-tab${conv.id === activeConvId ? ' home-ai-tab--active' : ''}`}
+              onClick={() => setActiveConvId(conv.id)}
+            >
+              <MessageOutlined className="home-ai-tab-icon" />
+              <span className="home-ai-tab-title">{conv.title}</span>
+              {conversations.length > 1 && (
+                <button
+                  type="button"
+                  className="home-ai-tab-close"
+                  onClick={(e) => handleDeleteConversation(conv.id, e)}
+                >
+                  <CloseCircleOutlined />
+                </button>
+              )}
+            </div>
+          ))}
+          <button type="button" className="home-ai-tab-add" onClick={() => handleCreateConversation()} title={t('home.convNew')}>
+            <PlusOutlined />
+          </button>
+          {conversations.length > 3 && (
+            <Popover
+              trigger="click"
+              title={t('home.convHistory')}
+              content={
+                <div className="home-ai-history-list">
+                  {conversations.map((conv) => (
+                    <div
+                      key={conv.id}
+                      className={`home-ai-history-item${conv.id === activeConvId ? ' active' : ''}`}
+                      onClick={() => { setActiveConvId(conv.id) }}
+                    >
+                      <MessageOutlined />
+                      <span>{conv.title}</span>
+                      <span className="home-ai-history-time">{new Date(conv.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              }
+              placement="bottomRight"
+            >
+              <button type="button" className="home-ai-tab-history" title={t('home.convHistory')}>
+                <HistoryOutlined />
+              </button>
+            </Popover>
+          )}
+          {/* 回收站 */}
+          <Popover
+            trigger="click"
+            title={t('home.convTrash')}
+            onOpenChange={(open) => { if (open) loadDeletedConversations() }}
+            content={
+              <div className="home-ai-trash-list">
+                {deletedConversations.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('home.convTrashEmpty')} style={{ margin: '12px 0' }} />
+                ) : (
+                  deletedConversations.map((conv) => (
+                    <div key={conv.id} className="home-ai-trash-item">
+                      <div className="home-ai-trash-item-info" onClick={() => handleRestoreConversation(conv.id)}>
+                        <MessageOutlined />
+                        <div className="home-ai-trash-item-text">
+                          <span className="home-ai-trash-item-title">{conv.title}</span>
+                          <span className="home-ai-trash-item-time">{conv.deletedAt ? new Date(conv.deletedAt).toLocaleDateString() : ''}</span>
+                        </div>
+                      </div>
+                      <div className="home-ai-trash-item-actions">
+                        <Tooltip title={t('home.convRestore')}>
+                          <button type="button" className="home-ai-trash-restore-btn" onClick={() => handleRestoreConversation(conv.id)}>
+                            <UndoOutlined />
+                          </button>
+                        </Tooltip>
+                        <Tooltip title={t('home.convPermanentDelete')}>
+                          <button type="button" className="home-ai-trash-delete-btn" onClick={() => handlePermanentDelete(conv.id)}>
+                            <DeleteOutlined />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            }
+            placement="bottomRight"
+          >
+            <button type="button" className="home-ai-tab-trash" title={t('home.convTrash')}>
+              <DeleteOutlined />
+              {deletedConversations.length > 0 && (
+                <span className="home-ai-tab-trash-badge">{deletedConversations.length}</span>
+              )}
+            </button>
+          </Popover>
         </div>
 
         <div className="home-ai-body">
@@ -753,7 +1267,7 @@ export default function Home() {
                   </div>
                   <h4>{t(BLOCKED_TITLE_KEY[blockReason])}</h4>
                   <p>{t(BLOCKED_DESC_KEY[blockReason])}</p>
-                  <button type="button" className="home-ai-blocked-action" onClick={handleOpenUsage}>
+                  <button type="button" className="home-ai-blocked-action" onClick={() => navigate(`/ai-access-apply?reason=${blockReason}`)}>
                     <WalletOutlined />
                     {t('home.aiBlockedViewUsage')}
                   </button>
@@ -817,7 +1331,91 @@ export default function Home() {
           )
         )}
 
-        <div className="home-ai-input">
+        {/* 能力展示条 */}
+        {!aiBlocked && (
+          <div className="home-ai-capabilities">
+            {currentCapabilities.text && (
+              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                <FileTextOutlined /> {t('home.capText')}
+              </Tag>
+            )}
+            {currentCapabilities.image && (
+              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                <PictureOutlined /> {t('home.capImage')}
+              </Tag>
+            )}
+            {currentCapabilities.audio && (
+              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                🎤 {t('home.capAudio')}
+              </Tag>
+            )}
+            {currentCapabilities.video && (
+              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                🎤 {t('home.capVideo')}
+              </Tag>
+            )}
+            {currentCapabilities.toolCalling && (
+              <Tag className="home-ai-cap-tag home-ai-cap-tag--tool" bordered={false}>
+                <ThunderboltOutlined /> {t('home.capToolCalling')}
+              </Tag>
+            )}
+            {currentCapabilities.thinking && (
+              <Tag className="home-ai-cap-tag home-ai-cap-tag--think" bordered={false}>
+                💭 {t('home.capThinking')}
+              </Tag>
+            )}
+          </div>
+        )}
+
+        {/* 附件预览区 */}
+        {attachments.length > 0 && (
+          <div className="home-ai-attachments">
+            {attachments.map((att, idx) => (
+              <div key={idx} className={`home-ai-attachment home-ai-attachment--${att.type}`}>
+                {att.type === 'image' ? (
+                  <img src={att.data} alt={att.name} className="home-ai-attachment-preview" />
+                ) : (
+                  <div className="home-ai-attachment-file">
+                    <FileTextOutlined />
+                    <span>{att.name}</span>
+                  </div>
+                )}
+                <button type="button" className="home-ai-attachment-remove" onClick={() => removeAttachment(idx)}>
+                  <CloseCircleOutlined />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 输入区（含拖拽、附件按钮） */}
+        <div
+          className={`home-ai-input${isDragging ? ' home-ai-input--dragging' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragging && <div className="home-ai-drag-overlay">{t('home.dragHint')}</div>}
+          {(currentCapabilities.file || currentCapabilities.image) && !aiBlocked && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: 'none' }}
+                accept={currentCapabilities.image ? 'image/*,.pdf,.txt,.csv,.json,.md' : '.pdf,.txt,.csv,.json,.md'}
+                multiple
+                onChange={(e) => { handleFileSelect(e.target.files); e.target.value = '' }}
+              />
+              <button
+                type="button"
+                className="home-ai-attach-btn"
+                onClick={() => fileInputRef.current?.click()}
+                title={t('home.attachFile')}
+              >
+                <PaperClipOutlined />
+              </button>
+            </>
+          )}
           <Input
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -829,7 +1427,7 @@ export default function Home() {
           <button
             className="home-ai-send"
             onClick={() => handleSend()}
-            disabled={!inputText.trim() || sending || aiBlocked}
+            disabled={(!inputText.trim() && attachments.length === 0) || sending || aiBlocked}
           >
             <SendOutlined />
           </button>
@@ -945,7 +1543,6 @@ export default function Home() {
             {/* 我的額度维度（員工/部門/職位/角色，已用按請求明細實時聚合） */}
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{t('home.usageQuotaDimsTitle')}</div>
             {myUsage.dimensions.length === 0 ? (
-              /* 無額度 = 無可用額度（不可用）：鎖定圖標卡 + 開通指引，避免「放心使用」式誤導 */
               <div style={{ border: '1px dashed #FFD591', background: '#FFFBF5', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
                 <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: '#FFF7E6', border: '1px solid #FFE7BA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D46B08', fontSize: 18 }}>
                   <LockOutlined />
@@ -972,6 +1569,13 @@ export default function Home() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                         <Tag color={DIM_SOURCE_COLOR[dim.source]} style={{ marginRight: 0 }}>{t(DIM_SOURCE_LABEL_KEY[dim.source])}</Tag>
                         <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dim.sourceName}</span>
+                        {dim.source !== 'employee' && (
+                          <Tooltip title={t('home.usageDimSharedTeamTooltip')}>
+                            <span style={{ fontSize: 11, color: '#1890FF', cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                              <InfoCircleOutlined />{t('home.usageDimSharedTeamHint')}
+                            </span>
+                          </Tooltip>
+                        )}
                       </div>
                       <Tag style={{ marginRight: 0, color: '#8C8C8C' }}>{dim.modelName ?? t('home.usageDimAllModels')}</Tag>
                     </div>

@@ -97,6 +97,20 @@ export interface MyModel {
   /** 部署类型：cloud=公有云 private=私有化 */
   deployType: string | null
   sources: ModelAuthSource[]
+  /** 支持模态：text,image,audio,video（逗号分隔） */
+  modalities: string | null
+  /** 视觉理解（图像识别） */
+  visionSupport: boolean
+  /** 工具调用（Function Calling） */
+  functionCalling: boolean
+  /** JSON 结构化输出 */
+  jsonMode: boolean
+  /** 流式响应 */
+  streaming: boolean
+  /** 深度思考模式 */
+  thinkingMode: boolean
+  /** 最大上下文窗口（tokens） */
+  contextWindow: number | null
 }
 
 /** 查询当前账号被授权的启用模型列表 */

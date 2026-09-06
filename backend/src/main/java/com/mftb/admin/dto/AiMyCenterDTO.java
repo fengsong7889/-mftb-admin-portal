@@ -90,6 +90,46 @@ public class AiMyCenterDTO {
         private String currency;
     }
 
+    /* ══════════ 配额校验（调用前闸门） ══════════ */
+
+    /**
+     * 单次模型调用的配额校验结果：网关/前端在发起请求前调用，消费各维度的
+     * over_limit_action（reject/approve/downgrade）与 downgrade_model_id，形成配额闭环。
+     * 命中多个维度时取最严格动作（reject &gt; approve &gt; downgrade）。
+     */
+    @Data
+    public static class QuotaCheckVO {
+        /** 目标模型 ID */
+        private Long modelId;
+        /** 目标模型标识 */
+        private String modelKey;
+        /** 是否放行（true=可调用） */
+        private boolean allowed;
+        /** 是否已超额（命中硬限额） */
+        private boolean overLimit;
+        /** 是否触发软限额提醒（接近但未超额） */
+        private boolean softWarning;
+        /** 生效动作：allow/reject/approve/downgrade */
+        private String action;
+        /** 是否需要人工审批（action=approve） */
+        private boolean requiresApproval;
+        /** 降级目标模型（action=downgrade 时有值） */
+        private Long downgradeModelId;
+        private String downgradeModelKey;
+        private String downgradeModelName;
+        /** 命中（使用率最高）维度的信息 */
+        private String hitSource;
+        private String hitSourceName;
+        private String hitQuotaType;
+        private String hitPeriod;
+        private BigDecimal hitQuotaValue;
+        private BigDecimal hitUsedValue;
+        /** 命中维度使用百分比（可能 &gt;100） */
+        private Integer hitUsagePercent;
+        /** 人类可读提示 */
+        private String message;
+    }
+
     /* ══════════ 我的授權模型 ══════════ */
 
     @Data
@@ -103,5 +143,22 @@ public class AiMyCenterDTO {
         private String deployType;
         /** 授權來源：dept/position/role/employee */
         private List<String> sources = new ArrayList<>();
+
+        /* ── 模型能力字段（前端展示能力标签 & 输入方式提示） ── */
+
+        /** 支持模態：text,image,audio,video（逗號分隔） */
+        private String modalities;
+        /** 視覺理解（圖像識別） */
+        private Boolean visionSupport;
+        /** 工具調用（Function Calling） */
+        private Boolean functionCalling;
+        /** JSON 結構化輸出 */
+        private Boolean jsonMode;
+        /** 流式響應 */
+        private Boolean streaming;
+        /** 深度思考模式 */
+        private Boolean thinkingMode;
+        /** 最大上下文窗口（tokens） */
+        private Integer contextWindow;
     }
 }

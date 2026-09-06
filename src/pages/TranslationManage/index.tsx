@@ -912,7 +912,7 @@ export default function TranslationManage() {
     width: 170,
     fixed: 'right' as const,
     render: (_: unknown, record: TranslationField) => (
-      <Space size={4}>
+      <Space size={0} split={<span className="action-split">|</span>}>
         <Button type="link" size="small" onClick={() => openEditField(record)}>{t('translationManage:btnEdit')}</Button>
         <Button type="link" size="small" onClick={() => machineTranslateRow(record)}>{t('translationManage:btnMachineTranslate')}</Button>
         <Popconfirm

@@ -61,7 +61,7 @@ export default function StopWords() {
       width: 140,
       fixed: 'right' as const,
       render: (_: unknown, record: StopWord) => (
-        <Space size="small">
+        <Space size={0} split={<span className="action-split">|</span>}>
           <Button
             type="link"
             size="small"

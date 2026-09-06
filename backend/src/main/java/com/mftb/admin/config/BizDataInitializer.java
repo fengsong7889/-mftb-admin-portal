@@ -24,11 +24,11 @@ public class BizDataInitializer implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
 
-    /** 建表版本: 新增建表步骤时递增版本号 */
+    /** 建表版本: 新增建表步骤时递增 minor 版本号 (格式: v{major}.{minor}) */
     private static final String V_TABLES = "biz:tables-v1";
-    /** 存量迁移版本: 编号/频道等一次性存量迁移, 新增迁移时递增版本号 */
+    /** 存量迁移版本: 编号/频道等一次性存量迁移, 新增迁移时递增 minor 版本号 */
     private static final String V_LEGACY = "biz:legacy-migrate-v1";
-    /** 种子数据版本: 新增/调整种子数据时递增版本号 */
+    /** 种子数据版本: 新增/调整种子数据时递增 minor 版本号 */
     private static final String V_SEED = "biz:seed-v1";
 
     @Override
@@ -686,6 +686,7 @@ public class BizDataInitializer implements CommandLineRunner {
                 {"transfer", "推廣金轉賬", "1", "推廣金轉賬操作，啟用後需經過三級審批"},
                 {"merge", "推廣金合併", "1", "集團合併操作，啟用後需經過三級審批"},
                 {"gift", "贈送廣告天數", "1", "推廣贈送廣告天數操作，啟用後需經過三級審批"},
+                {"ai_access", "AI申請審批", "1", "員工AI助手使用權限與額度申請審批流程"},
         };
         int inserted = 0;
         for (String[] c : configs) {

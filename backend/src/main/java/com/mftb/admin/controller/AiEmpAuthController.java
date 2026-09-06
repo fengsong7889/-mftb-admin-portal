@@ -37,10 +37,11 @@ public class AiEmpAuthController {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /** 按职位授权菜单标识 */
-    private static final String MENU_POS = "ai-pos-auth";
-    /** 角色授权菜单标识 */
-    private static final String MENU_ROLE = "ai-role-auth";
+    /** 员工模型权控页菜单标识（sys_menu.menu_key）；按职位授权/角色授权均为该页内 Tab，
+     *  其独立菜单 ai-pos-auth/ai-role-auth 已由 sql/93 软删除，故统一绑定到宿主页面 */
+    private static final String MENU_POS = "ai-emp-model-auth";
+    /** 角色授权菜单标识（同属员工模型权控页内 Tab） */
+    private static final String MENU_ROLE = "ai-emp-model-auth";
 
     private final AiEmpPosAuthStrategyMapper posStrategyMapper;
     private final AiEmpRoleAuthMapper roleAuthMapper;

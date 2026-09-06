@@ -11,10 +11,8 @@ import com.mftb.admin.entity.AiEmpQuotaPolicy;
 import com.mftb.admin.entity.AiEmpRoleAuth;
 import com.mftb.admin.entity.AiEmployeeAuth;
 import com.mftb.admin.entity.AiModel;
-import com.mftb.admin.entity.AiPositionModelMapping;
 import com.mftb.admin.entity.AiProvider;
 import com.mftb.admin.entity.AiQuotaConfig;
-import com.mftb.admin.entity.AiRoleModelMapping;
 import com.mftb.admin.entity.AiRoleQuotaPolicy;
 import com.mftb.admin.entity.LlmUsage;
 import com.mftb.admin.entity.SysUser;
@@ -26,12 +24,11 @@ import com.mftb.admin.mapper.AiEmpQuotaPolicyMapper;
 import com.mftb.admin.mapper.AiEmpRoleAuthMapper;
 import com.mftb.admin.mapper.AiEmployeeAuthMapper;
 import com.mftb.admin.mapper.AiModelMapper;
-import com.mftb.admin.mapper.AiPositionModelMapper;
 import com.mftb.admin.mapper.AiProviderMapper;
 import com.mftb.admin.mapper.AiQuotaConfigMapper;
-import com.mftb.admin.mapper.AiRoleModelMapper;
 import com.mftb.admin.mapper.AiRoleQuotaPolicyMapper;
 import com.mftb.admin.mapper.LlmUsageMapper;
+import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AiMyCenterService;
 import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
@@ -84,17 +81,18 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
     private final AiDeptAuthGroupMapper deptGroupMapper;
     private final AiDeptAuthGroupDeptMapper deptGroupDeptMapper;
     private final AiDeptAuthGroupModelMapper deptGroupModelMapper;
-    private final AiPositionModelMapper positionModelMapper;
-    private final AiRoleModelMapper roleModelMapper;
     private final AiEmployeeAuthMapper employeeAuthMapper;
+    /** 共享额度（部门/职位/角色）按团队成员聚合已用，需解析成员账号 */
+    private final SysUserMapper sysUserMapper;
     /** 员工模型权控（96_emp_pos_role_auth）：职位授权策略 + 自定义角色授权 */
     private final AiEmpPosAuthStrategyMapper empPosAuthStrategyMapper;
     private final AiEmpRoleAuthMapper empRoleAuthMapper;
 
-    /** 额度维度内部载体：配置信息 + 本期统计窗口 */
+    /** 额度维度内部载体：配置信息 + 本期统计窗口 + 共享成员账号 + 超额处置 */
     private record Dim(String source, String sourceName, Long modelId, String period, String quotaType,
                        BigDecimal quotaValue, String currency, Integer softThreshold,
-                       LocalDateTime windowStart, LocalDate resetDate) {
+                       LocalDateTime windowStart, LocalDate resetDate,
+                       Set<String> members, String overLimitAction, Long downgradeModelId) {
     }
 
     /* ══════════════════════ 我的用量 ══════════════════════ */
@@ -111,25 +109,26 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         vo.setName(user.getName());
         vo.setEmpId(user.getEmpId());
 
-        List<Dim> dims = new ArrayList<>();
-        dims.addAll(collectConfigDimensions(user));
-        dims.addAll(collectPositionDimensions(user));
-        dims.addAll(collectRoleDimensions(user));
+        List<Dim> dims = collectAllDims(user);
 
         // 模型限制展示与用量过滤需要 modelKey，批量加载维度引用的模型
         Map<Long, AiModel> modelMap = loadModels(dims.stream().map(Dim::modelId).toList());
 
-        // 用量明细一次性取回（起点 = 各维度窗口/自然月的最早者），内存聚合
+        // 用量明细一次性取回：共享额度（部门/职位/角色）需按团队成员聚合，
+        // 故取回所有相关成员账号的明细（起点 = 各维度窗口/自然月的最早者），内存聚合
         LocalDate today = LocalDate.now();
         LocalDateTime earliest = today.withDayOfMonth(1).atStartOfDay();
+        Set<String> allMembers = new LinkedHashSet<>();
+        allMembers.add(user.getUsername());
         for (Dim dim : dims) {
             if (dim.windowStart().isBefore(earliest)) {
                 earliest = dim.windowStart();
             }
+            allMembers.addAll(dim.members());
         }
         List<LlmUsage> rows = llmUsageMapper.selectList(
                 new LambdaQueryWrapper<LlmUsage>()
-                        .eq(LlmUsage::getUsername, user.getUsername())
+                        .in(LlmUsage::getUsername, allMembers)
                         .ge(LlmUsage::getCreatedAt, earliest));
 
         for (Dim dim : dims) {
@@ -153,9 +152,22 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
             vo.getDimensions().add(dvo);
         }
 
-        fillUsageSummary(vo.getUsage(), rows, today);
+        // 顶部用量概览与最近记录仅统计本人（rows 含团队成员，仅用于共享额度维度聚合）
+        List<LlmUsage> selfRows = rows.stream()
+                .filter(r -> user.getUsername().equals(r.getUsername()))
+                .toList();
+        fillUsageSummary(vo.getUsage(), selfRows, today);
         fillRecentRecords(vo, user.getUsername());
         return vo;
+    }
+
+    /** 汇总当前账号生效的全部额度维度（员工/部门配置 + 职位策略 + 角色策略） */
+    private List<Dim> collectAllDims(SysUser user) {
+        List<Dim> dims = new ArrayList<>();
+        dims.addAll(collectConfigDimensions(user));
+        dims.addAll(collectPositionDimensions(user));
+        dims.addAll(collectRoleDimensions(user));
+        return dims;
     }
 
     /** 员工/部门额度配置（ai_quota_config，token 口径，日/月双限额拆成两个维度） */
@@ -173,21 +185,26 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         List<AiQuotaConfig> configs = quotaConfigMapper.selectList(wrapper);
 
         LocalDate today = LocalDate.now();
+        // 员工额度=本人专属；部门额度=全部门成员共享，已用需按团队成员聚合
+        Set<String> selfMembers = Set.of(user.getUsername());
+        Set<String> deptMembers = deptMemberUsernames(user.getDepartmentId(), user.getUsername());
         List<Dim> dims = new ArrayList<>();
         for (AiQuotaConfig config : configs) {
             boolean employee = "employee".equals(config.getQuotaType());
             String source = employee ? "employee" : "department";
             String sourceName = employee ? "員工專屬" : (user.getDepartment() != null ? user.getDepartment() : "部門額度");
+            Set<String> members = employee ? selfMembers : deptMembers;
             int resetDay = config.getResetDayOfMonth() != null ? config.getResetDayOfMonth() : 1;
             if (config.getDailyQuota() != null && config.getDailyQuota() > 0) {
                 dims.add(new Dim(source, sourceName, config.getModelId(), "daily", "token",
                         BigDecimal.valueOf(config.getDailyQuota()), null, DEFAULT_SOFT_THRESHOLD,
-                        today.atStartOfDay(), today.plusDays(1)));
+                        today.atStartOfDay(), today.plusDays(1), members, null, null));
             }
             if (config.getMonthlyQuota() != null && config.getMonthlyQuota() > 0) {
                 dims.add(new Dim(source, sourceName, config.getModelId(), "monthly", "token",
                         BigDecimal.valueOf(config.getMonthlyQuota()), null, DEFAULT_SOFT_THRESHOLD,
-                        periodStart(today, resetDay).atStartOfDay(), nextResetDate(today, resetDay)));
+                        periodStart(today, resetDay).atStartOfDay(), nextResetDate(today, resetDay),
+                        members, null, null));
             }
         }
         return dims;
@@ -207,8 +224,10 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
             if (!sequences.contains(user.getSequence()) || !jobLevels.contains(user.getJobLevel())) {
                 continue;
             }
+            Set<String> members = positionMemberUsernames(sequences, jobLevels, user.getUsername());
             dims.add(toPolicyDim("position", policy.getName(), policy.getPeriod(), policy.getQuotaType(),
-                    policy.getQuotaValue(), policy.getCurrency(), policy.getSoftThreshold()));
+                    policy.getQuotaValue(), policy.getCurrency(), policy.getSoftThreshold(),
+                    members, policy.getOverLimitAction(), policy.getDowngradeModelId()));
         }
         return dims;
     }
@@ -219,46 +238,107 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
                 new LambdaQueryWrapper<AiRoleQuotaPolicy>().eq(AiRoleQuotaPolicy::getStatus, 1));
         List<Dim> dims = new ArrayList<>();
         for (AiRoleQuotaPolicy policy : policies) {
-            if (!JsonUtils.parseLongList(policy.getUserIds()).contains(user.getId())) {
+            List<Long> userIds = JsonUtils.parseLongList(policy.getUserIds());
+            if (!userIds.contains(user.getId())) {
                 continue;
             }
+            Set<String> members = roleMemberUsernames(userIds, user.getUsername());
             dims.add(toPolicyDim("role", policy.getRoleName(), policy.getPeriod(), policy.getQuotaType(),
-                    policy.getQuotaValue(), policy.getCurrency(), policy.getSoftThreshold()));
+                    policy.getQuotaValue(), policy.getCurrency(), policy.getSoftThreshold(),
+                    members, policy.getOverLimitAction(), policy.getDowngradeModelId()));
         }
         return dims;
     }
 
-    /** 策略类维度（职位/角色）转内部载体：周期窗口按自然月/自然日 */
+    /** 策略类维度（职位/角色）转内部载体：周期窗口按自然月/自然日，携带共享成员与超额处置 */
     private Dim toPolicyDim(String source, String sourceName, String period, String quotaType,
-                            BigDecimal quotaValue, String currency, Integer softThreshold) {
+                            BigDecimal quotaValue, String currency, Integer softThreshold,
+                            Set<String> members, String overLimitAction, Long downgradeModelId) {
         LocalDate today = LocalDate.now();
         boolean daily = "daily".equals(period);
         int resetDay = 1;
         return new Dim(source, sourceName, null, daily ? "daily" : "monthly", quotaType,
                 quotaValue, currency, softThreshold != null ? softThreshold : DEFAULT_SOFT_THRESHOLD,
                 daily ? today.atStartOfDay() : periodStart(today, resetDay).atStartOfDay(),
-                daily ? today.plusDays(1) : nextResetDate(today, resetDay));
+                daily ? today.plusDays(1) : nextResetDate(today, resetDay),
+                members, overLimitAction, downgradeModelId);
+    }
+
+    /** 部门共享额度成员：同部门全部账号（含本人） */
+    private Set<String> deptMemberUsernames(Long departmentId, String selfUsername) {
+        Set<String> members = new LinkedHashSet<>();
+        members.add(selfUsername);
+        if (departmentId != null) {
+            sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                            .select(SysUser::getUsername)
+                            .eq(SysUser::getDepartmentId, departmentId))
+                    .forEach(u -> {
+                        if (u.getUsername() != null) {
+                            members.add(u.getUsername());
+                        }
+                    });
+        }
+        return members;
+    }
+
+    /** 职位共享额度成员：职级序列与职级同时命中策略范围的全部账号（含本人） */
+    private Set<String> positionMemberUsernames(List<String> sequences, List<String> jobLevels, String selfUsername) {
+        Set<String> members = new LinkedHashSet<>();
+        members.add(selfUsername);
+        if (!sequences.isEmpty() && !jobLevels.isEmpty()) {
+            sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                            .select(SysUser::getUsername)
+                            .in(SysUser::getSequence, sequences)
+                            .in(SysUser::getJobLevel, jobLevels))
+                    .forEach(u -> {
+                        if (u.getUsername() != null) {
+                            members.add(u.getUsername());
+                        }
+                    });
+        }
+        return members;
+    }
+
+    /** 角色共享额度成员：策略绑定员工 ID 对应的全部账号（含本人） */
+    private Set<String> roleMemberUsernames(List<Long> userIds, String selfUsername) {
+        Set<String> members = new LinkedHashSet<>();
+        members.add(selfUsername);
+        if (!userIds.isEmpty()) {
+            sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                            .select(SysUser::getUsername)
+                            .in(SysUser::getId, userIds))
+                    .forEach(u -> {
+                        if (u.getUsername() != null) {
+                            members.add(u.getUsername());
+                        }
+                    });
+        }
+        return members;
     }
 
     /** 按维度口径聚合本期已用：token=输入+输出、request=请求次数、cost=指定币种费用合计 */
     private BigDecimal aggregateUsed(List<LlmUsage> rows, Dim dim, String modelKey) {
+        Set<String> members = dim.members();
+        Predicate<LlmUsage> inMembers = row -> members == null || members.isEmpty()
+                || members.contains(row.getUsername());
         Predicate<LlmUsage> inWindow = row -> row.getCreatedAt() != null
                 && !row.getCreatedAt().isBefore(dim.windowStart());
         Predicate<LlmUsage> inModel = row -> modelKey == null || modelKey.equals(row.getModel());
+        Predicate<LlmUsage> scope = inWindow.and(inModel).and(inMembers);
 
         switch (dim.quotaType()) {
             case "request":
-                return BigDecimal.valueOf(rows.stream().filter(inWindow.and(inModel)).count());
+                return BigDecimal.valueOf(rows.stream().filter(scope).count());
             case "cost":
                 BigDecimal cost = rows.stream()
-                        .filter(inWindow.and(inModel))
+                        .filter(scope)
                         .filter(row -> dim.currency() != null && dim.currency().equals(row.getCurrency()))
                         .map(row -> row.getCost() != null ? row.getCost() : BigDecimal.ZERO)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
                 return cost.setScale(4, RoundingMode.HALF_UP);
             default:
                 long tokens = rows.stream()
-                        .filter(inWindow.and(inModel))
+                        .filter(scope)
                         .mapToLong(row -> nz(row.getPromptTokens()) + nz(row.getCompletionTokens()))
                         .sum();
                 return BigDecimal.valueOf(tokens);
@@ -318,6 +398,167 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         }
     }
 
+    /* ══════════════════════ 配额校验闭环 ══════════════════════ */
+
+    @Override
+    public AiMyCenterDTO.QuotaCheckVO checkQuota(Long modelId, String modelKey) {
+        AiMyCenterDTO.QuotaCheckVO vo = new AiMyCenterDTO.QuotaCheckVO();
+        SysUser user = currentUser();
+        if (user == null) {
+            vo.setAllowed(false);
+            vo.setAction("reject");
+            vo.setMessage("未登入，無法校驗配額");
+            return vo;
+        }
+
+        AiModel target = resolveModel(modelId, modelKey);
+        Long targetId = target != null ? target.getId() : modelId;
+        String targetKey = target != null ? target.getModelKey() : modelKey;
+        vo.setModelId(targetId);
+        vo.setModelKey(targetKey);
+
+        // 仅保留作用于目标模型的维度：modelId==null（全部模型）或与目标模型一致
+        List<Dim> applicable = collectAllDims(user).stream()
+                .filter(d -> d.modelId() == null || (targetId != null && d.modelId().equals(targetId)))
+                .toList();
+        if (applicable.isEmpty()) {
+            vo.setAllowed(true);
+            vo.setAction("allow");
+            vo.setMessage("無額度限制，放行");
+            return vo;
+        }
+
+        // 加载维度引用模型的 modelKey（用于按模型过滤用量）
+        Map<Long, AiModel> modelMap = loadModels(applicable.stream().map(Dim::modelId).toList());
+
+        // 取回相关成员明细（共享额度按团队聚合）
+        LocalDate today = LocalDate.now();
+        LocalDateTime earliest = today.withDayOfMonth(1).atStartOfDay();
+        Set<String> allMembers = new LinkedHashSet<>();
+        allMembers.add(user.getUsername());
+        for (Dim d : applicable) {
+            if (d.windowStart().isBefore(earliest)) {
+                earliest = d.windowStart();
+            }
+            allMembers.addAll(d.members());
+        }
+        List<LlmUsage> rows = llmUsageMapper.selectList(
+                new LambdaQueryWrapper<LlmUsage>()
+                        .in(LlmUsage::getUsername, allMembers)
+                        .ge(LlmUsage::getCreatedAt, earliest));
+
+        // 逐维度计算使用率，记录最严格（使用率最高）维度与超额处置
+        Dim worst = null;
+        BigDecimal worstUsed = BigDecimal.ZERO;
+        double worstRatio = -1d;
+        boolean anyOver = false;
+        boolean anySoft = false;
+        int chosenRank = 0;            // reject=3 approve=2 downgrade=1
+        String chosenAction = null;
+        Long chosenDowngrade = null;
+        for (Dim d : applicable) {
+            BigDecimal quota = d.quotaValue();
+            if (quota == null || quota.signum() <= 0) {
+                continue;   // 未设有效限额
+            }
+            AiModel m = d.modelId() != null ? modelMap.get(d.modelId()) : null;
+            BigDecimal used = aggregateUsed(rows, d, m != null ? m.getModelKey() : null);
+            double ratio = used.doubleValue() / quota.doubleValue();
+            if (ratio > worstRatio) {
+                worstRatio = ratio;
+                worst = d;
+                worstUsed = used;
+            }
+            int softThreshold = d.softThreshold() != null ? d.softThreshold() : DEFAULT_SOFT_THRESHOLD;
+            if (ratio >= 1.0d) {
+                anyOver = true;
+                // 未配置动作的硬限额（ai_quota_config）默认按 reject 处理
+                String action = (d.overLimitAction() == null || d.overLimitAction().isBlank())
+                        ? "reject" : d.overLimitAction();
+                int rank = rankAction(action);
+                if (rank > chosenRank) {
+                    chosenRank = rank;
+                    chosenAction = action;
+                }
+                if ("downgrade".equals(action) && d.downgradeModelId() != null && chosenDowngrade == null) {
+                    chosenDowngrade = d.downgradeModelId();
+                }
+            } else if (ratio * 100 >= softThreshold) {
+                anySoft = true;
+            }
+        }
+
+        if (worst != null) {
+            vo.setHitSource(worst.source());
+            vo.setHitSourceName(worst.sourceName());
+            vo.setHitQuotaType(worst.quotaType());
+            vo.setHitPeriod(worst.period());
+            vo.setHitQuotaValue(worst.quotaValue());
+            vo.setHitUsedValue(worstUsed);
+            vo.setHitUsagePercent((int) Math.floor(worstRatio * 100));
+        }
+
+        if (anyOver) {
+            vo.setOverLimit(true);
+            vo.setAction(chosenAction);
+            switch (chosenAction) {
+                case "downgrade" -> {
+                    vo.setAllowed(true);
+                    if (chosenDowngrade != null) {
+                        AiModel dg = modelMapper.selectById(chosenDowngrade);
+                        vo.setDowngradeModelId(chosenDowngrade);
+                        vo.setDowngradeModelKey(dg != null ? dg.getModelKey() : null);
+                        vo.setDowngradeModelName(dg != null ? dg.getName() : null);
+                    }
+                    vo.setMessage("已超額，降級至指定模型後放行");
+                }
+                case "approve" -> {
+                    vo.setAllowed(false);
+                    vo.setRequiresApproval(true);
+                    vo.setMessage("已超額，需人工審批後方可繼續");
+                }
+                default -> {
+                    vo.setAllowed(false);
+                    vo.setMessage("已超出額度限制，請求被拒絕");
+                }
+            }
+            return vo;
+        }
+
+        vo.setAllowed(true);
+        vo.setAction("allow");
+        if (anySoft) {
+            vo.setSoftWarning(true);
+            vo.setMessage("額度即將用盡，請留意用量");
+        } else {
+            vo.setMessage("額度充足，放行");
+        }
+        return vo;
+    }
+
+    /** 超额动作严格度排序：reject 最严格，其次 approve，最后 downgrade */
+    private static int rankAction(String action) {
+        return switch (action) {
+            case "reject" -> 3;
+            case "approve" -> 2;
+            case "downgrade" -> 1;
+            default -> 3;
+        };
+    }
+
+    /** 解析目标模型：modelId 优先，其次 modelKey */
+    private AiModel resolveModel(Long modelId, String modelKey) {
+        if (modelId != null) {
+            return modelMapper.selectById(modelId);
+        }
+        if (modelKey != null && !modelKey.isBlank()) {
+            return modelMapper.selectOne(new LambdaQueryWrapper<AiModel>()
+                    .eq(AiModel::getModelKey, modelKey)
+                    .last("LIMIT 1"));
+        }
+        return null;
+    }
+
     /* ══════════════════════ 我的授权模型 ══════════════════════ */
 
     @Override
@@ -364,6 +605,14 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
                     mvo.setProviderName(providerNames.get(model.getProviderId()));
                     mvo.setDeployType(model.getDeployType());
                     mvo.setSources(new ArrayList<>(sources.getOrDefault(model.getId(), Set.of())));
+                    // 模型能力字段
+                    mvo.setModalities(model.getModalities());
+                    mvo.setVisionSupport(model.getVisionSupport() != null && model.getVisionSupport() == 1);
+                    mvo.setFunctionCalling(model.getFunctionCalling() != null && model.getFunctionCalling() == 1);
+                    mvo.setJsonMode(model.getJsonMode() != null && model.getJsonMode() == 1);
+                    mvo.setStreaming(model.getStreaming() != null && model.getStreaming() == 1);
+                    mvo.setThinkingMode(model.getThinkingMode() != null && model.getThinkingMode() == 1);
+                    mvo.setContextWindow(model.getContextWindow());
                     result.add(mvo);
                 });
         return result;
@@ -398,18 +647,8 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
                 .forEach(row -> addSource(sources, row.getModelId(), "dept"));
     }
 
-    /** 职位维度：当前职位的启用映射（permission_level != none）+ 员工模型权控的职位授权策略（职级序列+职级范围命中） */
+    /** 职位维度（二代权威源）：员工模型权控的职位授权策略（职级序列+职级范围命中） */
     private void collectPositionModels(SysUser user, Map<Long, Set<String>> sources) {
-        if (user.getPositionId() != null) {
-            positionModelMapper.selectList(
-                            new LambdaQueryWrapper<AiPositionModelMapping>()
-                                    .select(AiPositionModelMapping::getModelId, AiPositionModelMapping::getPermissionLevel)
-                                    .eq(AiPositionModelMapping::getPositionId, user.getPositionId())
-                                    .eq(AiPositionModelMapping::getStatus, 1))
-                    .stream()
-                    .filter(row -> !"none".equals(row.getPermissionLevel()))
-                    .forEach(row -> addSource(sources, row.getModelId(), "position"));
-        }
         // 职位授权策略：启用且当前账号的职级序列与职级同时命中，则策略内模型均授权
         if (user.getSequence() == null || user.getJobLevel() == null) {
             return;
@@ -425,19 +664,8 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
                 .forEach(strategy -> collectModelIds(strategy.getModelConfigs(), "position", sources));
     }
 
-    /** 角色维度：当前账号绑定功能角色的启用映射（permission_level != none）+ 员工模型权控的自定义角色授权（绑定员工命中） */
+    /** 角色维度（二代权威源）：员工模型权控的自定义角色授权（绑定员工命中） */
     private void collectRoleModels(SysUser user, Map<Long, Set<String>> sources) {
-        List<Long> roleIds = JsonUtils.parseLongList(user.getFunctionRoles());
-        if (!roleIds.isEmpty()) {
-            roleModelMapper.selectList(
-                            new LambdaQueryWrapper<AiRoleModelMapping>()
-                                    .select(AiRoleModelMapping::getModelId, AiRoleModelMapping::getPermissionLevel)
-                                    .in(AiRoleModelMapping::getRoleId, roleIds)
-                                    .eq(AiRoleModelMapping::getStatus, 1))
-                    .stream()
-                    .filter(row -> !"none".equals(row.getPermissionLevel()))
-                    .forEach(row -> addSource(sources, row.getModelId(), "role"));
-        }
         // 自定义角色授权：启用且绑定员工包含当前账号，则角色内模型均授权
         empRoleAuthMapper.selectList(
                         new LambdaQueryWrapper<AiEmpRoleAuth>()
