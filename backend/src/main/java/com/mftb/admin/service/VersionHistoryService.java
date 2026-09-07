@@ -14,7 +14,9 @@ public interface VersionHistoryService {
      * 分页查询版本记录
      */
     PageResult<VersionHistoryVO> list(long page, long size, String keyword, String releaseType,
-                                      LocalDate startDate, LocalDate endDate, Integer status);
+                                      LocalDate startDate, LocalDate endDate, Integer status,
+                                      String createdBy, String updatedBy,
+                                      LocalDate updatedStartDate, LocalDate updatedEndDate);
 
     /**
      * 按 ID 获取版本详情

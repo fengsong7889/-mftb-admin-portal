@@ -32,7 +32,9 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     @Override
     public PageResult<VersionHistoryVO> list(long page, long size, String keyword, String releaseType,
-                                              java.time.LocalDate startDate, java.time.LocalDate endDate, Integer status) {
+                                              java.time.LocalDate startDate, java.time.LocalDate endDate, Integer status,
+                                              String createdBy, String updatedBy,
+                                              java.time.LocalDate updatedStartDate, java.time.LocalDate updatedEndDate) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
 
@@ -52,6 +54,18 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         }
         if (status != null) {
             wrapper.eq(SysVersionHistory::getStatus, status);
+        }
+        if (StringUtils.hasText(createdBy)) {
+            wrapper.like(SysVersionHistory::getCreatedBy, createdBy);
+        }
+        if (StringUtils.hasText(updatedBy)) {
+            wrapper.like(SysVersionHistory::getUpdatedBy, updatedBy);
+        }
+        if (updatedStartDate != null) {
+            wrapper.ge(SysVersionHistory::getUpdatedAt, updatedStartDate.atStartOfDay());
+        }
+        if (updatedEndDate != null) {
+            wrapper.le(SysVersionHistory::getUpdatedAt, updatedEndDate.plusDays(1).atStartOfDay());
         }
         wrapper.orderByDesc(SysVersionHistory::getReleaseDate);
 

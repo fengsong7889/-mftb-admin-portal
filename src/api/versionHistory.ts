@@ -33,6 +33,10 @@ export function fetchVersionHistory(params: {
   startDate?: string
   endDate?: string
   status?: number
+  createdBy?: string
+  updatedBy?: string
+  updatedStartDate?: string
+  updatedEndDate?: string
 }): Promise<PageResult<VersionHistoryRecord>> {
   return request.get('/version-history', { params })
 }

@@ -45,6 +45,10 @@ export default function VersionHistory() {
         startDate: dateRange?.[0]?.format('YYYY-MM-DD'),
         endDate: dateRange?.[1]?.format('YYYY-MM-DD'),
         status: values.status,
+        createdBy: values.createdBy || undefined,
+        updatedBy: values.updatedBy || undefined,
+        updatedStartDate: values.updatedDateRange?.[0]?.format('YYYY-MM-DD'),
+        updatedEndDate: values.updatedDateRange?.[1]?.format('YYYY-MM-DD'),
       })
       setDataSource(res.records || [])
       setTotal(res.total || 0)
@@ -132,13 +136,28 @@ export default function VersionHistory() {
       key: 'createdBy',
       title: t('versionHistory.createdBy'),
       dataIndex: 'createdBy',
-      width: 110,
+      width: 140,
       ellipsis: true,
     },
     {
       key: 'createdAt',
       title: t('versionHistory.createdAt'),
       dataIndex: 'createdAt',
+      width: 155,
+      render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-',
+    },
+    {
+      key: 'updatedBy',
+      title: t('versionHistory.updatedBy'),
+      dataIndex: 'updatedBy',
+      width: 140,
+      ellipsis: true,
+      render: (v: string) => v || '-',
+    },
+    {
+      key: 'updatedAt',
+      title: t('versionHistory.updatedAt'),
+      dataIndex: 'updatedAt',
       width: 155,
       render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-',
     },
@@ -184,6 +203,8 @@ export default function VersionHistory() {
     { key: 'status', title: t('versionHistory.status') },
     { key: 'createdBy', title: t('versionHistory.createdBy') },
     { key: 'createdAt', title: t('versionHistory.createdAt') },
+    { key: 'updatedBy', title: t('versionHistory.updatedBy') },
+    { key: 'updatedAt', title: t('versionHistory.updatedAt') },
     { key: 'summary', title: t('versionHistory.summary') },
     { key: 'action', title: t('common.action') },
   ]
@@ -220,6 +241,15 @@ export default function VersionHistory() {
                 { value: 1, label: t('versionHistory.statusPublished') },
                 { value: 2, label: t('versionHistory.statusDraft') },
               ]} />
+          </Form.Item>
+          <Form.Item label={t('versionHistory.createdBy')} name="createdBy">
+            <Input placeholder={t('versionHistory.createdByPlaceholder')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('versionHistory.updatedBy')} name="updatedBy">
+            <Input placeholder={t('versionHistory.updatedByPlaceholder')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('versionHistory.updatedAt')} name="updatedDateRange">
+            <RangePicker />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

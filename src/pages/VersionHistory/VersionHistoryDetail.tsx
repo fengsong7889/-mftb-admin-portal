@@ -82,7 +82,7 @@ export default function VersionHistoryDetail() {
           <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('versionHistory.basicInfo')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           <div>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('versionHistory.versionNo')}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#1890ff' }}>v{data.versionNo}</div>
@@ -108,6 +108,14 @@ export default function VersionHistoryDetail() {
           <div>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('versionHistory.createdAt')}</div>
             <div style={{ fontSize: 14 }}>{data.createdAt ? dayjs(data.createdAt).format('YYYY-MM-DD HH:mm') : '-'}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('versionHistory.updatedBy')}</div>
+            <div style={{ fontSize: 14 }}>{data.updatedBy || '-'}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('versionHistory.updatedAt')}</div>
+            <div style={{ fontSize: 14 }}>{data.updatedAt ? dayjs(data.updatedAt).format('YYYY-MM-DD HH:mm') : '-'}</div>
           </div>
         </div>
         {data.summary && (

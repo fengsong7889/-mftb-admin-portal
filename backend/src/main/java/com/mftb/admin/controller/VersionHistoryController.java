@@ -5,10 +5,9 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.VersionHistoryVO;
 import com.mftb.admin.service.VersionHistoryService;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -22,6 +21,7 @@ import java.time.LocalDate;
 public class VersionHistoryController {
 
     private final VersionHistoryService versionHistoryService;
+    private final OperatorResolver operatorResolver;
 
     /** 分页查询版本记录 */
     @GetMapping
@@ -33,8 +33,12 @@ public class VersionHistoryController {
             @RequestParam(required = false) String releaseType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(versionHistoryService.list(page, size, keyword, releaseType, startDate, endDate, status));
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String createdBy,
+            @RequestParam(required = false) String updatedBy,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate updatedStartDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate updatedEndDate) {
+        return Result.success(versionHistoryService.list(page, size, keyword, releaseType, startDate, endDate, status, createdBy, updatedBy, updatedStartDate, updatedEndDate));
     }
 
     /** 获取版本详情 */
@@ -83,11 +87,6 @@ public class VersionHistoryController {
     }
 
     private String currentOperator() {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            return auth != null ? auth.getName() : null;
-        } catch (Exception e) {
-            return null;
-        }
+        return operatorResolver.operatorSignature(operatorResolver.currentUser());
     }
 }
