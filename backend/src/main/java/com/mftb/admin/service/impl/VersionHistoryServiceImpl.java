@@ -160,10 +160,18 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             return "無法定位項目根目錄，請確認應用部署在 Git 倉庫中";
         }
 
-        // 获取最大发布日期作为同步 cutoff（release_date 取自 commit 日期，比 created_at 可靠）
-        LocalDate lastReleaseDate = getLastVersionReleaseDate();
+        // 优先使用已同步的最新 commit hash 做增量同步（精确到提交级别）
+        String lastCommitHash = getLastSyncedCommitHash();
+        LocalDate fallbackDate = null;
+        if (lastCommitHash == null) {
+            // 旧记录没有 commitHash 字段，回退到日期方式（减 1 天避免遗漏同日提交）
+            fallbackDate = getLastVersionReleaseDate();
+            if (fallbackDate != null) {
+                fallbackDate = fallbackDate.minusDays(1);
+            }
+        }
 
-        List<GitCommit> commits = readGitLog(projectDir, lastReleaseDate);
+        List<GitCommit> commits = readGitLog(projectDir, lastCommitHash, fallbackDate);
         if (commits.isEmpty()) {
             return "沒有新的 Git 提交需要同步";
         }
@@ -205,6 +213,9 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
             String releaseType = determineReleaseType(dayCommits);
 
+            // 取该日期分组的第一个提交 hash（git log 按时间倒序，即最新 commit）
+            String latestHash = dayCommits.get(0).getHash();
+
             SysVersionHistory entity = new SysVersionHistory();
             entity.setVersionNo(nextVersion);
             entity.setReleaseDate(date);
@@ -213,6 +224,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             entity.setFrontendChanges(frontendChanges.isEmpty() ? null : frontendChanges);
             entity.setBackendChanges(backendChanges.isEmpty() ? null : backendChanges);
             entity.setDatabaseChanges(databaseChanges.isEmpty() ? null : databaseChanges);
+            entity.setCommitHash(latestHash);
             entity.setStatus(1);
             entity.setCreatedBy(operator != null ? operator : "Git Sync");
             entity.setUpdatedBy(operator != null ? operator : "Git Sync");
@@ -256,7 +268,18 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return null;
     }
 
-    /** 获取最大发布日期，用于 Git 同步 cutoff（release_date 取自 commit 日期，不会被手动录入干扰） */
+    /** 获取最新同步的 commit hash（优先按 createdAt 倒序取有 commitHash 的记录） */
+    private String getLastSyncedCommitHash() {
+        LambdaQueryWrapper<SysVersionHistory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.isNotNull(SysVersionHistory::getCommitHash);
+        wrapper.ne(SysVersionHistory::getCommitHash, "");
+        wrapper.orderByDesc(SysVersionHistory::getCreatedAt);
+        wrapper.last("LIMIT 1");
+        SysVersionHistory latest = mapper.selectOne(wrapper);
+        return latest != null ? latest.getCommitHash() : null;
+    }
+
+    /** 获取最大发布日期，用于 Git 同步 fallback */
     private LocalDate getLastVersionReleaseDate() {
         LambdaQueryWrapper<SysVersionHistory> wrapper = new LambdaQueryWrapper<>();
         wrapper.select(SysVersionHistory::getReleaseDate);
@@ -318,13 +341,22 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return new int[]{safeInt(parts, 0), safeInt(parts, 1), safeInt(parts, 2), safeInt(parts, 3)};
     }
 
-    private List<GitCommit> readGitLog(String projectDir, LocalDate sinceDate) {
+    /**
+     * 读取 Git 提交日志（增量同步）
+     * @param projectDir     项目根目录
+     * @param sinceHash      上次同步到的最新 commit hash（非空时使用 hash 范围精确查询）
+     * @param fallbackDate   回退日期（sinceHash 为空时使用，取该日期之前的所有提交）
+     */
+    private List<GitCommit> readGitLog(String projectDir, String sinceHash, LocalDate fallbackDate) {
         try {
             List<String> cmd = new ArrayList<>();
             cmd.addAll(Arrays.asList("git", "log", "--pretty=format:%H|%ad|%an|%s", "--date=short"));
-            if (sinceDate != null) {
-                // 使用 --after 筛选指定日期之后的提交（不含当天，当天提交已在已有版本记录中）
-                cmd.add("--after=" + sinceDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+            if (sinceHash != null && !sinceHash.isEmpty()) {
+                // 精确增量：只取 lastHash 之后的提交（不含 lastHash 本身）
+                cmd.add(sinceHash + "..HEAD");
+            } else if (fallbackDate != null) {
+                // 回退模式：取 fallbackDate 当天及之后的提交
+                cmd.add("--since=" + fallbackDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
             }
 
             ProcessBuilder pb = new ProcessBuilder(cmd);

@@ -1,17 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, InputNumber, Progress, Space, Spin, Switch, Table, Tag, message } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
+import { Button, Input, InputNumber, Modal, Progress, Space, Spin, Switch, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ArrowLeftOutlined, TeamOutlined, SafetyOutlined, WalletOutlined } from '@ant-design/icons'
+import { SafetyOutlined, WalletOutlined, HistoryOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '../../components/DetailPageHeader'
 import {
-  fetchMockEmpPermissions,
   SOURCE_LABEL,
   SOURCE_TAG_COLOR,
+  QUOTA_STATUS_LABEL,
+  QUOTA_STATUS_COLOR,
+  calcQuotaStatus,
   type EmpPermissionSummary,
   type EmpModelPermission,
   type EmpQuotaGrant,
 } from '../../api/mock/aiEmpPermissionMock'
+import { fetchEmpPermissionDetail, saveEmpPermission, fetchAdjustLogs } from '../../api/empPermission'
 
 /* ══════════ 展示常量 ══════════ */
 
@@ -31,14 +34,15 @@ const CAPABILITY_FIELDS: { key: keyof Pick<EmpModelPermission, 'visionSupport' |
 /* ══════════ 組件 ══════════ */
 
 /**
- * 員工AI權限 — 詳情/編輯頁
- * 分區：基本信息 → 模型權限列表 → 額度明細
- * 管理員可直接禁用模型、調整額度
+ * 員工AI權額管理 — 詳情/編輯頁
+ * mode=view（默認）：只讀查看
+ * mode=edit：可編輯（切換模型啟停、調整額度）
  */
 export default function AiEmpPermissionDetail() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const empId = searchParams.get('empId')
+  const isEdit = searchParams.get('mode') === 'edit'
 
   const [loading, setLoading] = useState(true)
   const [emp, setEmp] = useState<EmpPermissionSummary | null>(null)
@@ -52,12 +56,12 @@ export default function AiEmpPermissionDetail() {
     }
     let cancelled = false
     setLoading(true)
-    fetchMockEmpPermissions()
-      .then((list) => {
+    fetchEmpPermissionDetail(Number(empId))
+      .then(({ summary, models, quotas }) => {
         if (cancelled) return
-        const found = list.find((r) => r.employeeId === Number(empId))
-        setEmp(found ?? null)
-        if (!found) message.error('員工權限數據不存在')
+        setEmp(summary)
+        setModelPerms(models)
+        setQuotaGrants(quotas)
       })
       .catch(() => { if (!cancelled) message.error('加載失敗') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -99,13 +103,75 @@ export default function AiEmpPermissionDetail() {
     message.success(checked ? '已啟用' : '已停用')
   }, [])
 
-  /* ── 統計 ── */
-  const stats = useMemo(() => {
-    const activeModels = modelPerms.filter((m) => m.status === 1)
-    const activeQuotas = quotaGrants.filter((q) => q.status === 1)
-    const sources = new Set(modelPerms.map((m) => m.source))
-    return { activeModels: activeModels.length, totalModels: modelPerms.length, activeQuotas: activeQuotas.length, sources }
-  }, [modelPerms, quotaGrants])
+  /* ── 編輯暫存（保存前不生效） ── */
+  const [pendingQuotaValues, setPendingQuotaValues] = useState<Record<number, number>>({})
+  const [adjustReason, setAdjustReason] = useState('')
+  const [adjustRecords, setAdjustRecords] = useState<{
+    quotaId: number; sourceDesc: string; oldValue: number; newValue: number; reason: string; operator: string; time: string
+  }[]>([])
+
+  /** 切換模型能力開關（編輯模式） */
+  const handleToggleCapability = useCallback((modelId: number, field: keyof Pick<EmpModelPermission, 'visionSupport' | 'functionCalling' | 'jsonMode' | 'streaming' | 'thinkingMode'>) => {
+    setModelPerms((prev) => prev.map((m) =>
+      m.modelId === modelId ? { ...m, [field]: !m[field] } : m
+    ))
+  }, [])
+
+  /** 暫存額度值變更 */
+  const handlePendingQuota = useCallback((id: number, value: number) => {
+    setPendingQuotaValues((prev) => ({ ...prev, [id]: value }))
+  }, [])
+
+  /** 保存所有修改（二次確認） */
+  const handleSave = useCallback(() => {
+    if (!emp) return
+    Modal.confirm({
+      title: '確認保存',
+      content: '確定要保存所有修改嗎？保存後將返回列錶。',
+      okText: '確認保存',
+      cancelText: '繼續編輯',
+      onOk: async () => {
+        // 構建額度調整請求
+        const quotaAdjusts = Object.entries(pendingQuotaValues).map(([idStr, newVal]) => {
+          const id = Number(idStr)
+          const original = quotaGrants.find((q) => q.id === id)
+          return {
+            quotaId: id,
+            source: original?.source ?? 'employee',
+            sourceDesc: original?.sourceDesc ?? '',
+            quotaType: original?.quotaType ?? 'token',
+            quotaPeriod: original?.quotaPeriod ?? 'monthly',
+            oldValue: original?.quotaValue ?? 0,
+            newValue: newVal,
+          }
+        })
+        try {
+          await saveEmpPermission(emp.employeeId, {
+            employeeId: emp.employeeId,
+            modelToggles: [],
+            quotaAdjusts,
+            reason: adjustReason || '',
+          })
+          message.success('保存成功')
+          navigate('/ai-emp-permission')
+        } catch {
+          message.error('保存失敗，請重試')
+        }
+      },
+    })
+  }, [pendingQuotaValues, adjustReason, quotaGrants, emp, navigate])
+
+  /** 取消編輯 */
+  const handleCancelEdit = useCallback(() => {
+    if (emp) {
+      setModelPerms(emp.modelPermissions)
+      setQuotaGrants(emp.quotaGrants)
+    }
+    setPendingQuotaValues({})
+    setAdjustRecords([])
+    setAdjustReason('')
+    navigate(`/ai-emp-permission-detail?empId=${emp?.employeeId}`)
+  }, [emp, navigate])
 
   if (loading) {
     return (
@@ -145,16 +211,22 @@ export default function AiEmpPermissionDetail() {
       ),
     },
     {
-      title: '能力', key: 'capabilities', width: 260,
+      title: '模型能力', key: 'capabilities', width: 280,
       render: (_, r) => (
         <Space size={4} wrap>
           {CAPABILITY_FIELDS.map((f) => (
             <Tag
               key={f.key}
               color={r[f.key] ? f.color : undefined}
-              style={{ margin: 0, fontSize: 11, opacity: r[f.key] ? 1 : 0.35 }}
+              style={{
+                margin: 0, fontSize: 11,
+                opacity: r[f.key] ? 1 : 0.35,
+                ...(isEdit ? { cursor: 'pointer', userSelect: 'none' as const } : {}),
+              }}
+              onClick={isEdit ? () => handleToggleCapability(r.modelId, f.key) : undefined}
             >
-              {f.label}
+              {r[f.key] ? f.label : <span style={{ textDecoration: 'line-through' }}>{f.label}</span>}
+              {!r[f.key] && isEdit && <span style={{ fontSize: 10, marginLeft: 2, color: '#FF4D4F' }}>已廢除</span>}
             </Tag>
           ))}
         </Space>
@@ -170,9 +242,9 @@ export default function AiEmpPermissionDetail() {
       title: '授權時間', dataIndex: 'grantedAt', width: 120,
       render: (v: string) => v ? v.slice(0, 10) : '--',
     },
-    {
-      title: '操作', key: 'action', width: 80, align: 'center', fixed: 'right',
-      render: (_, r) => (
+    ...(isEdit ? [{
+      title: '操作', key: 'action', width: 80, align: 'center' as const, fixed: 'right' as const,
+      render: (_: unknown, r: EmpModelPermission) => (
         <Switch
           size="small"
           checked={r.status === 1}
@@ -181,7 +253,7 @@ export default function AiEmpPermissionDetail() {
           unCheckedChildren="禁用"
         />
       ),
-    },
+    }] : []),
   ]
 
   /* ── 額度明細列定義 ── */
@@ -203,19 +275,26 @@ export default function AiEmpPermissionDetail() {
     },
     {
       title: '額度值', key: 'quotaValue', width: 180,
-      render: (_, r) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <InputNumber
-            size="small"
-            value={r.quotaValue}
-            min={0}
-            step={100}
-            onChange={(v) => v != null && handleAdjustQuota(r.id, v)}
-            style={{ width: 100 }}
-          />
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{QUOTA_TYPE_LABEL[r.quotaType]}</span>
-        </div>
-      ),
+      render: (_, r) => {
+        const displayValue = pendingQuotaValues[r.id] ?? r.quotaValue
+        const isPending = pendingQuotaValues[r.id] != null
+        return isEdit ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <InputNumber
+              size="small"
+              value={displayValue}
+              min={0}
+              step={100}
+              onChange={(v) => v != null && handlePendingQuota(r.id, v)}
+              style={{ width: 100, borderColor: isPending ? '#E8720C' : undefined }}
+            />
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{QUOTA_TYPE_LABEL[r.quotaType]}</span>
+            {isPending && <Tag color="orange" style={{ margin: 0, fontSize: 10 }}>待保存</Tag>}
+          </div>
+        ) : (
+          <span>{r.quotaValue.toLocaleString()} {QUOTA_TYPE_LABEL[r.quotaType]}</span>
+        )
+      },
     },
     {
       title: '使用情況', key: 'usage', width: 180,
@@ -254,9 +333,9 @@ export default function AiEmpPermissionDetail() {
         <Tag color={r.status === 1 ? 'success' : 'default'}>{r.status === 1 ? '啟用' : '已停用'}</Tag>
       ),
     },
-    {
-      title: '操作', key: 'action', width: 80, align: 'center', fixed: 'right',
-      render: (_, r) => (
+    ...(isEdit ? [{
+      title: '操作', key: 'action', width: 80, align: 'center' as const, fixed: 'right' as const,
+      render: (_: unknown, r: EmpQuotaGrant) => (
         <Switch
           size="small"
           checked={r.status === 1}
@@ -265,71 +344,30 @@ export default function AiEmpPermissionDetail() {
           unCheckedChildren="停用"
         />
       ),
-    },
+    }] : []),
   ]
+
+  const quotaStatus = calcQuotaStatus(emp.quotaGrants)
 
   return (
     <>
       {/* ====== 頭部 ====== */}
       <DetailPageHeader
-        title={
-          <>
-            <TeamOutlined style={{ marginRight: 8, color: '#E8720C' }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: '#262626' }}>員工AI權限</span>
-          </>
-        }
+        title={isEdit ? '編輯員工AI權額' : '員工AI權額詳情'}
         onBack={() => navigate('/ai-emp-permission')}
-        tags={
-          <>
-            <span style={{ fontSize: 13, color: '#8C8C8C' }}>{emp.empId}</span>
-            <span style={{ fontSize: 13, color: '#595959', fontWeight: 500, marginLeft: 8 }}>{emp.employeeName}</span>
-            <Tag color="blue" style={{ marginLeft: 8 }}>{emp.department}</Tag>
-            <span style={{ fontSize: 13, color: '#8C8C8C', marginLeft: 4 }}>{emp.position}</span>
-          </>
-        }
+        meta={`${emp.empId} · ${emp.employeeName} · ${emp.department} · ${emp.position}（${emp.jobLevel}）`}
+        tags={<Tag color={QUOTA_STATUS_COLOR[quotaStatus]}>{QUOTA_STATUS_LABEL[quotaStatus]}</Tag>}
+        onEdit={!isEdit ? () => navigate(`/ai-emp-permission-detail?empId=${emp.employeeId}&mode=edit`) : undefined}
       />
-
-      {/* ====== 統計概覽 ====== */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
-        {[
-          { icon: <SafetyOutlined />, label: '可用模型', value: stats.activeModels, sub: `共 ${stats.totalModels} 個授權`, color: '#1890FF', bg: '#E6F7FF' },
-          { icon: <WalletOutlined />, label: '有效額度', value: stats.activeQuotas, sub: '條額度記錄', color: '#52C41A', bg: '#F6FFED' },
-          { icon: <TeamOutlined />, label: '授權來源', value: stats.sources.size, sub: '種配置來源', color: '#722ED1', bg: '#F9F0FF' },
-          { icon: <ArrowLeftOutlined />, label: '最近授予', value: null, sub: emp.lastGrantedAt?.slice(0, 10) ?? '--', color: '#E8720C', bg: '#FFF7E6' },
-        ].map((card, i) => (
-          <div
-            key={i}
-            style={{
-              borderRadius: 12, padding: 16, background: card.bg,
-              border: `1px solid ${card.color}22`, textAlign: 'center',
-              position: 'relative', overflow: 'hidden',
-              transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-              cursor: 'default',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-4px)'
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = ''
-              e.currentTarget.style.boxShadow = ''
-            }}
-          >
-            <div style={{ fontSize: 20, color: card.color, marginBottom: 4 }}>{card.icon}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>
-              {card.value != null ? card.value : ''}
-            </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{card.label}</div>
-            <div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 2 }}>{card.sub}</div>
-          </div>
-        ))}
-      </div>
 
       {/* ====== 模型權限 ====== */}
       <div className="content-area" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: '#262626', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <SafetyOutlined style={{ color: '#1890FF' }} />
-          模型權限（{modelPerms.filter((m) => m.status === 1).length}/{modelPerms.length}）
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafetyOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型權限（{modelPerms.filter((m) => m.status === 1).length}/{modelPerms.length}）</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <Table<EmpModelPermission>
           rowKey="modelId"
@@ -337,15 +375,18 @@ export default function AiEmpPermissionDetail() {
           dataSource={modelPerms}
           pagination={false}
           size="small"
-          scroll={{ x: 900 }}
+          scroll={{ x: isEdit ? 900 : 820 }}
         />
       </div>
 
       {/* ====== 額度明細 ====== */}
-      <div className="content-area">
-        <div style={{ fontSize: 15, fontWeight: 600, color: '#262626', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <WalletOutlined style={{ color: '#52C41A' }} />
-          額度明細（{quotaGrants.filter((q) => q.status === 1).length} 條有效）
+      <div className="content-area" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <WalletOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>額度明細（{quotaGrants.filter((q) => q.status === 1).length} 條有效）</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <Table<EmpQuotaGrant>
           rowKey="id"
@@ -353,9 +394,55 @@ export default function AiEmpPermissionDetail() {
           dataSource={quotaGrants}
           pagination={false}
           size="small"
-          scroll={{ x: 1000 }}
+          scroll={{ x: isEdit ? 1000 : 920 }}
         />
+        {/* 額度調整原因（編輯模式） */}
+        {isEdit && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>調整原因：</div>
+            <Input.TextArea
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              placeholder="請填寫調整原因"
+              maxLength={300}
+              showCount
+              rows={3}
+              style={{ width: '100%' }}
+            />
+          </div>
+        )}
       </div>
+
+      {/* ====== 額度調整記錄（查看模式） ====== */}
+      {!isEdit && adjustRecords.length > 0 && (
+        <div className="content-area" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <HistoryOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>額度調整記錄（{adjustRecords.length}）</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          {[...adjustRecords].reverse().map((rec, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: idx < adjustRecords.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', width: 140, flexShrink: 0 }}>{rec.time}</span>
+              <span style={{ fontSize: 13, color: '#262626' }}>{rec.sourceDesc}</span>
+              <span style={{ fontSize: 13, color: '#FF4D4F' }}>{rec.oldValue.toLocaleString()}</span>
+              <span style={{ color: '#8C8C8C' }}>→</span>
+              <span style={{ fontSize: 13, color: '#52C41A', fontWeight: 600 }}>{rec.newValue.toLocaleString()}</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>{rec.operator} · {rec.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ====== 底部操作按鈕（編輯模式） ====== */}
+      {isEdit && (
+        <div className="form-footer">
+          <Button onClick={handleCancelEdit}>取消</Button>
+          <Button type="primary" onClick={handleSave}>保存</Button>
+        </div>
+      )}
     </>
   )
 }

@@ -10,22 +10,14 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import {
-  fetchMyAiAccessRequests,
-  fetchAiAccessRequests,
-  type AiAccessRequestVO,
-  type AiRequestStatus,
-} from '../../../api/aiAccessRequest'
-import { WORKFLOW_STORAGE_KEY } from '../../WorkflowConfig/types'
-import type { WorkflowDefinition } from '../../WorkflowConfig/types'
+  fetchOaRequests,
+  type OaRequestVO,
+  type OaFlowStatus,
+  type OaApprovalTaskVO,
+} from '../../../api/oaRequest'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const { RangePicker } = DatePicker
-
-/** 申請類型 i18n key */
-const REQUEST_TYPE_I18N: Record<string, string> = {
-  model_only: 'oaRequests.typeModelOnly',
-  model_and_quota: 'oaRequests.typeModelQuota',
-  quota_only: 'oaRequests.typeQuotaOnly',
-}
 
 /** 狀態標籤顏色 */
 const STATUS_COLOR: Record<string, string> = {
@@ -43,146 +35,85 @@ const STATUS_I18N: Record<string, string> = {
   cancelled: 'oaRequests.statusCancelled',
 }
 
-/** 狀態選項 */
-const STATUS_OPTIONS = [
-  { label: '全部', value: 'all' },
-  { label: '待審批', value: 'pending' },
-  { label: '已審批', value: 'approved' },
-  { label: '已駁回', value: 'rejected' },
-  { label: '已撤銷', value: 'cancelled' },
-]
-
-/** 流程類型選項 */
-const TYPE_OPTIONS = [
-  { label: '全部', value: 'all' },
-  { label: '模型權限申請', value: 'model_only' },
-  { label: '模型+額度申請', value: 'model_and_quota' },
-  { label: '額度申請', value: 'quota_only' },
-]
-
-/** 生成流程編號：AI + YYYYMMDD + 4位自增序號 */
-function formatFlowNo(id: number, createdAt?: string | null) {
-  const datePart = createdAt
-    ? createdAt.slice(0, 10).replace(/-/g, '')
-    : new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const seq = String(id % 10000).padStart(4, '0')
-  return `AI${datePart}${seq}`
+/** 狀態選項（使用 i18n） */
+function useStatusOptions() {
+  const { t } = useTranslation()
+  return [
+    { label: t('common.all'), value: 'all' },
+    { label: t('oaRequests.statusPending'), value: 'pending' },
+    { label: t('oaRequests.statusApproved'), value: 'approved' },
+    { label: t('oaRequests.statusRejected'), value: 'rejected' },
+    { label: t('oaRequests.statusCancelled'), value: 'cancelled' },
+  ]
 }
 
-/** 生成工號（前端 mock，待後端提供） */
-function formatEmpId(id: number) {
-  return `MF${String(id).padStart(5, '0')}`
+/** 流程類型選項（對應 biz_oa_process.process_code） */
+function useTypeOptions() {
+  const { t } = useTranslation()
+  return [
+    { label: t('common.all'), value: 'all' },
+    { label: t('oaRequests.typeLeave'), value: 'oa_leave' },
+    { label: t('oaRequests.typeReimburse'), value: 'oa_reimburse' },
+    { label: t('oaRequests.typePurchase'), value: 'oa_purchase' },
+    { label: t('oaRequests.typeSeal'), value: 'oa_seal' },
+    { label: t('oaRequests.typeGeneral'), value: 'oa_general' },
+  ]
 }
 
-/** 前端分頁 */
-function paginate<T>(list: T[], page: number, size: number) {
-  const start = (page - 1) * size
-  return list.slice(start, start + size)
-}
-
-/** 讀取流程配置中 AI 申請的審批節點名稱列表 */
-function getAiWorkflowNodeNames(): string[] {
-  try {
-    const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY)
-    if (!raw) return ['業務主管審批', '運營主管審批']
-    const workflows: WorkflowDefinition[] = JSON.parse(raw)
-    const aiWf = workflows.find((wf) => wf.workflowKey === 'ai_access' || wf.approvalType === 'ai_access')
-    if (!aiWf || aiWf.nodes.length === 0) return ['業務主管審批', '運營主管審批']
-    return aiWf.nodes.sort((a, b) => a.sortOrder - b.sortOrder).map((n) => n.name)
-  } catch {
-    return ['業務主管審批', '運營主管審批']
-  }
-}
-
-/** 根據流程配置推算當前審批節點（待後端接入） */
-function getCurrentNode(record: AiAccessRequestVO): string {
-  if (record.status === 'approved') return '已完成'
-  if (record.status === 'rejected') return '已駁回'
-  if (record.status === 'cancelled') return '已撤銷'
-  // pending：根據 id 模擬停在第幾個節點
-  const nodeNames = getAiWorkflowNodeNames()
-  const nodeIndex = record.id % nodeNames.length
-  return nodeNames[nodeIndex] || nodeNames[0]
-}
-
-/** 擴展記錄：附加模擬審批節點、當前審批人、流程名稱 */
-type EnrichedVO = AiAccessRequestVO & {
-  currentNode: string
-  currentApproverName: string
-  flowName: string
-}
-
-/** 流程名稱：取自流程配置（AI申請審批） */
-const FLOW_NAME = 'AI申請審批'
-
-function enrichRecord(r: AiAccessRequestVO): EnrichedVO {
-  return {
-    ...r,
-    currentNode: getCurrentNode(r),
-    currentApproverName: r.status === 'pending'
-      ? (r.approverName || (r.id % 2 === 0 ? '張經理' : '李主管'))
-      : (r.approverName || '--'),
-    flowName: FLOW_NAME,
-  }
+/** 從審批任務列表中提取當前待審節點的審批人 */
+function getCurrentApprover(tasks: OaApprovalTaskVO[] | undefined): string {
+  if (!tasks || tasks.length === 0) return '--'
+  const pendingTask = tasks.find((t) => t.taskStatus === 'pending')
+  if (!pendingTask || !pendingTask.approver) return '--'
+  return pendingTask.approver
 }
 
 export default function OaRequests() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { user } = useAuth()
+  const statusOptions = useStatusOptions()
+  const typeOptions = useTypeOptions()
 
   const initialTab = searchParams.get('tab') === 'pending' ? 'pending' : 'my'
   const [activeTab, setActiveTab] = useState(initialTab)
 
   /* ====== Tab 1：我的申請 ====== */
   const [myForm] = Form.useForm()
-  const [myData, setMyData] = useState<EnrichedVO[]>([])
+  const [myData, setMyData] = useState<OaRequestVO[]>([])
+  const [myTotal, setMyTotal] = useState(0)
   const [myLoading, setMyLoading] = useState(false)
   const [myFilters, setMyFilters] = useState<{
-    flowNo?: string; requestType?: string; dateRange?: [Dayjs, Dayjs]; status?: string; approver?: string
+    flowNo?: string; processCode?: string; dateRange?: [Dayjs, Dayjs]; status?: string
   }>({})
   const [myPage, setMyPage] = useState({ page: 1, size: 10 })
 
   const loadMyRequests = useCallback(async () => {
     setMyLoading(true)
     try {
-      const params: { status?: AiRequestStatus } = {}
-      if (myFilters.status && myFilters.status !== 'all') {
-        params.status = myFilters.status as AiRequestStatus
+      const params: Record<string, unknown> = {
+        page: myPage.page,
+        size: myPage.size,
+        applicant: user?.name || '',
       }
-      const data = await fetchMyAiAccessRequests(params)
-      let filtered: EnrichedVO[] = data.map(enrichRecord)
-      // 流程編號
-      if (myFilters.flowNo) {
-        filtered = filtered.filter((r) => formatFlowNo(r.id, r.createdAt).includes(myFilters.flowNo!))
-      }
-      // 流程類型
-      if (myFilters.requestType && myFilters.requestType !== 'all') {
-        filtered = filtered.filter((r) => r.requestType === myFilters.requestType)
-      }
-      // 申請時間
+      if (myFilters.flowNo) params.flowNo = myFilters.flowNo
+      if (myFilters.processCode && myFilters.processCode !== 'all') params.processCode = myFilters.processCode
+      if (myFilters.status && myFilters.status !== 'all') params.flowStatus = myFilters.status
       if (myFilters.dateRange) {
-        const from = myFilters.dateRange[0].format('YYYY-MM-DD')
-        const to = myFilters.dateRange[1].format('YYYY-MM-DD')
-        filtered = filtered.filter((r) => {
-          const d = (r.createdAt || '').slice(0, 10)
-          return d >= from && d <= to
-        })
+        params.applyFrom = myFilters.dateRange[0].format('YYYY-MM-DD')
+        params.applyTo = myFilters.dateRange[1].format('YYYY-MM-DD')
       }
-      // 審批人
-      if (myFilters.approver) {
-        filtered = filtered.filter((r) =>
-          r.currentApproverName?.includes(myFilters.approver!)
-        )
-      }
-      filtered.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-      setMyData(filtered)
+      const result = await fetchOaRequests(params as never)
+      setMyData(result.records)
+      setMyTotal(result.total)
     } catch {
       setMyData([])
+      setMyTotal(0)
     } finally {
       setMyLoading(false)
     }
-  }, [myFilters])
+  }, [myPage, myFilters, user])
 
   useEffect(() => { loadMyRequests() }, [loadMyRequests])
 
@@ -190,12 +121,11 @@ export default function OaRequests() {
     const values = myForm.getFieldsValue()
     setMyFilters({
       flowNo: values.flowNo,
-      requestType: values.requestType,
+      processCode: values.processCode,
       dateRange: values.dateRange,
       status: values.status,
-      approver: values.approver,
     })
-    setMyPage({ page: 1, size: 10 })
+    setMyPage({ page: 1, size: myPage.size })
   }
   const handleMyReset = () => {
     myForm.resetFields()
@@ -205,55 +135,39 @@ export default function OaRequests() {
 
   /* ====== Tab 2：待我審批 ====== */
   const [pendingForm] = Form.useForm()
-  const [pendingData, setPendingData] = useState<EnrichedVO[]>([])
+  const [pendingData, setPendingData] = useState<OaRequestVO[]>([])
+  const [pendingTotal, setPendingTotal] = useState(0)
   const [pendingLoading, setPendingLoading] = useState(false)
   const [pendingFilters, setPendingFilters] = useState<{
-    flowNo?: string; requestType?: string; applicantName?: string; dateRange?: [Dayjs, Dayjs]; status?: string; approver?: string
+    flowNo?: string; processCode?: string; applicant?: string; dateRange?: [Dayjs, Dayjs]; status?: string
   }>({})
   const [pendingPage, setPendingPage] = useState({ page: 1, size: 10 })
 
   const loadPendingRequests = useCallback(async () => {
     setPendingLoading(true)
     try {
-      const data = await fetchAiAccessRequests({ status: 'pending' })
-      let filtered: EnrichedVO[] = data.map(enrichRecord)
-      // 流程編號
-      if (pendingFilters.flowNo) {
-        filtered = filtered.filter((r) => formatFlowNo(r.id, r.createdAt).includes(pendingFilters.flowNo!))
+      const params: Record<string, unknown> = {
+        page: pendingPage.page,
+        size: pendingPage.size,
+        flowStatus: 'pending' as OaFlowStatus,
       }
-      // 流程類型
-      if (pendingFilters.requestType && pendingFilters.requestType !== 'all') {
-        filtered = filtered.filter((r) => r.requestType === pendingFilters.requestType)
-      }
-      // 申請人
-      if (pendingFilters.applicantName) {
-        filtered = filtered.filter((r) =>
-          r.applicantName?.includes(pendingFilters.applicantName!)
-        )
-      }
-      // 申請時間
+      if (pendingFilters.flowNo) params.flowNo = pendingFilters.flowNo
+      if (pendingFilters.processCode && pendingFilters.processCode !== 'all') params.processCode = pendingFilters.processCode
+      if (pendingFilters.applicant) params.applicant = pendingFilters.applicant
       if (pendingFilters.dateRange) {
-        const from = pendingFilters.dateRange[0].format('YYYY-MM-DD')
-        const to = pendingFilters.dateRange[1].format('YYYY-MM-DD')
-        filtered = filtered.filter((r) => {
-          const d = (r.createdAt || '').slice(0, 10)
-          return d >= from && d <= to
-        })
+        params.applyFrom = pendingFilters.dateRange[0].format('YYYY-MM-DD')
+        params.applyTo = pendingFilters.dateRange[1].format('YYYY-MM-DD')
       }
-      // 審批人
-      if (pendingFilters.approver) {
-        filtered = filtered.filter((r) =>
-          r.currentApproverName?.includes(pendingFilters.approver!)
-        )
-      }
-      filtered.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-      setPendingData(filtered)
+      const result = await fetchOaRequests(params as never)
+      setPendingData(result.records)
+      setPendingTotal(result.total)
     } catch {
       setPendingData([])
+      setPendingTotal(0)
     } finally {
       setPendingLoading(false)
     }
-  }, [pendingFilters])
+  }, [pendingPage, pendingFilters])
 
   useEffect(() => { loadPendingRequests() }, [loadPendingRequests])
 
@@ -261,13 +175,12 @@ export default function OaRequests() {
     const values = pendingForm.getFieldsValue()
     setPendingFilters({
       flowNo: values.flowNo,
-      requestType: values.requestType,
-      applicantName: values.applicantName,
+      processCode: values.processCode,
+      applicant: values.applicant,
       dateRange: values.dateRange,
       status: values.status,
-      approver: values.approver,
     })
-    setPendingPage({ page: 1, size: 10 })
+    setPendingPage({ page: 1, size: pendingPage.size })
   }
   const handlePendingReset = () => {
     pendingForm.resetFields()
@@ -276,11 +189,11 @@ export default function OaRequests() {
   }
 
   /* ====== 導航 ====== */
-  const handleDetail = (record: EnrichedVO) => {
-    navigate(`/approval-detail?flowNo=${formatFlowNo(record.id, record.createdAt)}&type=ai_access&requestId=${record.id}`)
+  const handleDetail = (record: OaRequestVO) => {
+    navigate(`/approval-detail?flowNo=${record.flowNo}&type=${record.processCode}`)
   }
-  const handleApprove = (record: EnrichedVO) => {
-    navigate(`/approval-detail?flowNo=${formatFlowNo(record.id, record.createdAt)}&type=ai_access&requestId=${record.id}`)
+  const handleApprove = (record: OaRequestVO) => {
+    navigate(`/approval-detail?flowNo=${record.flowNo}&type=${record.processCode}`)
   }
 
   /* ====== Tab 切換 ====== */
@@ -295,61 +208,51 @@ export default function OaRequests() {
       {STATUS_I18N[status] ? t(STATUS_I18N[status]) : status}
     </Tag>
   )
-  const renderRequestType = (type: string) => (
-    <Tag>{REQUEST_TYPE_I18N[type] ? t(REQUEST_TYPE_I18N[type]) : type}</Tag>
-  )
 
   /* ====== 共用列定義 ====== */
-  const sharedColumns: TableColumnsType<EnrichedVO> = [
+  const sharedColumns: TableColumnsType<OaRequestVO> = [
     {
-      title: t('common.colFlowNo'), key: 'flowNo', width: 170,
-      render: (_: unknown, r: EnrichedVO) => <span style={{ whiteSpace: 'nowrap' }}>{formatFlowNo(r.id, r.createdAt)}</span>,
+      title: t('common.colFlowNo'), dataIndex: 'flowNo', key: 'flowNo', width: 170,
+      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v}</span>,
     },
     {
-      title: t('oaRequests.colFlowName'), dataIndex: 'flowName', key: 'flowName', width: 200, ellipsis: true,
+      title: t('oaRequests.colFlowName'), dataIndex: 'title', key: 'title', width: 200, ellipsis: true,
     },
     {
-      title: t('oaRequests.colRequestType'), dataIndex: 'requestType', key: 'requestType', width: 150,
-      render: renderRequestType,
+      title: t('oaRequests.colRequestType'), dataIndex: 'processName', key: 'processName', width: 140,
+      render: (v: string | null) => v || '--',
     },
     {
-      title: t('oaRequests.colApplicant'), key: 'applicant', width: 160,
-      render: (_: unknown, r: EnrichedVO) => (
-        <span style={{ whiteSpace: 'nowrap' }}>
-          {r.applicantName}({formatEmpId(r.applicantId)})
-        </span>
-      ),
+      title: t('oaRequests.colApplicant'), dataIndex: 'applicant', key: 'applicant', width: 160,
+      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '--'}</span>,
     },
     {
-      title: t('oaRequests.colApplyTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170,
-      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '-',
+      title: t('oaRequests.colApplyTime'), dataIndex: 'applyTime', key: 'applyTime', width: 170,
+      render: (v: string | null) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '--',
     },
     {
-      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
-      render: renderStatus,
+      title: t('common.colStatus'), dataIndex: 'flowStatus', key: 'flowStatus', width: 100,
+      render: (v: string) => renderStatus(v),
     },
     {
-      title: t('oaRequests.colCurrentNode'), dataIndex: 'currentNode', key: 'currentNode', width: 140,
-      render: (v: string) => v || '--',
+      title: t('oaRequests.colCurrentNode'), dataIndex: 'currentNodeName', key: 'currentNodeName', width: 140,
+      render: (v: string | null) => v || '--',
     },
     {
       title: t('oaRequests.colCurrentApprover'), key: 'currentApprover', width: 160,
-      render: (_: unknown, r: EnrichedVO) => (
-        <span style={{ whiteSpace: 'nowrap' }}>
-          {r.currentApproverName && r.currentApproverName !== '--'
-            ? `${r.currentApproverName}(${formatEmpId(r.approverId || r.id)})`
-            : '--'}
-        </span>
-      ),
+      render: (_: unknown, r: OaRequestVO) => {
+        const approver = getCurrentApprover(r.approvalTasks)
+        return <span style={{ whiteSpace: 'nowrap' }}>{approver}</span>
+      },
     },
   ]
 
   /* ====== Tab 1 列定義 ====== */
-  const myColumns: TableColumnsType<EnrichedVO> = [
+  const myColumns: TableColumnsType<OaRequestVO> = [
     ...sharedColumns,
     {
       title: t('common.colAction'), key: 'action', width: 80, fixed: 'right',
-      render: (_: unknown, record: EnrichedVO) => (
+      render: (_: unknown, record: OaRequestVO) => (
         <Button type="link" size="small" onClick={() => handleDetail(record)}>
           {t('common.detail')}
         </Button>
@@ -358,11 +261,11 @@ export default function OaRequests() {
   ]
 
   /* ====== Tab 2 列定義 ====== */
-  const pendingColumns: TableColumnsType<EnrichedVO> = [
+  const pendingColumns: TableColumnsType<OaRequestVO> = [
     ...sharedColumns,
     {
       title: t('common.colAction'), key: 'action', width: 130, fixed: 'right',
-      render: (_: unknown, record: EnrichedVO) => (
+      render: (_: unknown, record: OaRequestVO) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleApprove(record)}>
             {t('approvalCenter.approve')}
@@ -379,24 +282,24 @@ export default function OaRequests() {
   const myPagination = useMemo(() => ({
     current: myPage.page,
     pageSize: myPage.size,
-    total: myData.length,
+    total: myTotal,
     showTotal: (total: number) => t('common.total', { count: total }),
     showSizeChanger: true,
     pageSizeOptions: ['10', '20', '50'],
     showQuickJumper: true,
     onChange: (page: number, size: number) => setMyPage({ page, size: size || 10 }),
-  }), [myPage, myData.length, t])
+  }), [myPage, myTotal, t])
 
   const pendingPagination = useMemo(() => ({
     current: pendingPage.page,
     pageSize: pendingPage.size,
-    total: pendingData.length,
+    total: pendingTotal,
     showTotal: (total: number) => t('common.total', { count: total }),
     showSizeChanger: true,
     pageSizeOptions: ['10', '20', '50'],
     showQuickJumper: true,
     onChange: (page: number, size: number) => setPendingPage({ page, size: size || 10 }),
-  }), [pendingPage, pendingData.length, t])
+  }), [pendingPage, pendingTotal, t])
 
   /* ====== 共用搜索表單 ====== */
   const renderSearchForm = (
@@ -407,11 +310,11 @@ export default function OaRequests() {
       <Form.Item label={t('common.colFlowNo')} name="flowNo">
         <Input placeholder={t('common.flowNoPlaceholder')} allowClear />
       </Form.Item>
-      <Form.Item label={t('oaRequests.colRequestType')} name="requestType" initialValue="all">
-        <Select placeholder={t('common.all')} allowClear options={TYPE_OPTIONS} />
+      <Form.Item label={t('oaRequests.colRequestType')} name="processCode" initialValue="all">
+        <Select placeholder={t('common.all')} allowClear options={typeOptions} />
       </Form.Item>
       {showApplicant && (
-        <Form.Item label={t('oaRequests.colApplicant')} name="applicantName">
+        <Form.Item label={t('oaRequests.colApplicant')} name="applicant">
           <Input placeholder={t('oaRequests.applicantPlaceholder')} allowClear />
         </Form.Item>
       )}
@@ -419,10 +322,7 @@ export default function OaRequests() {
         <RangePicker placeholder={[t('common.startTime'), t('common.endTime')]} />
       </Form.Item>
       <Form.Item label={t('common.colStatus')} name="status" initialValue="all">
-        <Select placeholder={t('common.all')} allowClear options={STATUS_OPTIONS} />
-      </Form.Item>
-      <Form.Item label={t('oaRequests.colApprover')} name="approver">
-        <Input placeholder={t('oaRequests.approverPlaceholder')} allowClear />
+        <Select placeholder={t('common.all')} allowClear options={statusOptions} />
       </Form.Item>
       <Form.Item>
         <div className="search-actions">
@@ -445,14 +345,14 @@ export default function OaRequests() {
           </div>
           <div className="action-section">
             <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/ai-access-apply')}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/process-center')}>
                 {t('oaRequests.btnFlowApply')}
               </Button>
             </div>
           </div>
-          <Table<EnrichedVO>
+          <Table<OaRequestVO>
             columns={myColumns}
-            dataSource={paginate(myData, myPage.page, myPage.size)}
+            dataSource={myData}
             rowKey="id"
             loading={myLoading}
             pagination={myPagination}
@@ -470,9 +370,9 @@ export default function OaRequests() {
           <div className="search-section">
             {renderSearchForm(pendingForm, true)}
           </div>
-          <Table<EnrichedVO>
+          <Table<OaRequestVO>
             columns={pendingColumns}
-            dataSource={paginate(pendingData, pendingPage.page, pendingPage.size)}
+            dataSource={pendingData}
             rowKey="id"
             loading={pendingLoading}
             pagination={pendingPagination}

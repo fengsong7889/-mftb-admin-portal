@@ -20,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 public class VersionHistoryDataInitializer implements CommandLineRunner {
 
     private static final String INIT_SCRIPT = "98_version_history.sql";
+    private static final String MIGRATION_SCRIPT = "109_version_history_commit_hash.sql";
+    private static final String MIGRATION_SCRIPT_2 = "110_version_history_summary_len.sql";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -32,6 +34,22 @@ public class VersionHistoryDataInitializer implements CommandLineRunner {
                     executeSqlScript(INIT_SCRIPT);
                 } catch (java.io.IOException e) {
                     throw new IllegalStateException("读取初始化脚本失败: " + INIT_SCRIPT, e);
+                }
+            });
+            // 增量迁移：添加 commit_hash 字段
+            versionTracker.applyOnce("version_history:" + MIGRATION_SCRIPT + ":v1", () -> {
+                try {
+                    executeSqlScript(MIGRATION_SCRIPT);
+                } catch (java.io.IOException e) {
+                    throw new IllegalStateException("读取迁移脚本失败: " + MIGRATION_SCRIPT, e);
+                }
+            });
+            // 增量迁移：扩大 summary 字段长度
+            versionTracker.applyOnce("version_history:" + MIGRATION_SCRIPT_2 + ":v1", () -> {
+                try {
+                    executeSqlScript(MIGRATION_SCRIPT_2);
+                } catch (java.io.IOException e) {
+                    throw new IllegalStateException("读取迁移脚本失败: " + MIGRATION_SCRIPT_2, e);
                 }
             });
         } catch (Exception e) {

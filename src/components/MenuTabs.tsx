@@ -113,6 +113,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/ai-emp-quota-detail': { fixed: '額度詳情-職位' },
   '/ai-role-quota-edit': { add: '新增模型額度-角色', edit: '編輯模型額度-角色' },
   '/ai-role-quota-detail': { fixed: '額度詳情-角色' },
+  '/ai-operation-auth-edit': { add: '新增工具', edit: '編輯工具' },
+  '/ai-operation-auth-log': { fixed: '調用日誌' },
   '/ai-access-apply': { fixed: 'i18n:aiApply.pageTitle' },
   '/ai-mcp-service': { fixed: 'i18n:mcpService.pageTitle' },
   // 审批流程（动态路由 /workflow-config/detail/:id）
@@ -188,6 +190,7 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/translation-manage': '多語言配置',
   '/rule-config': '規則配置',
   '/workflow-config': '審批流程',
+  '/process-center': '流程中心',
     '/version-history': '版本管理',
   '/ai-model-provider': '模型通道',
   '/ai-model-list': '模型接入',
@@ -196,7 +199,9 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/ai-pos-auth': '職位授權',
   '/ai-dept-quota': '部門額度',
   '/ai-emp-quota': '員工額度',
-  '/ai-operation-auth': 'AI 操作授權',
+  '/ai-operation-auth': 'AI 权控管理',
+  '/ai-operation-auth-edit': 'AI 权控管理',
+  '/ai-operation-auth-log': 'AI 权控管理',
   '/ai-usage-stats': '使用統計',
   '/ai-energy-detail': '能耗明細',
   '/waterfall-simulation': '瀑布流沙盤',
@@ -272,6 +277,7 @@ const TAB_PATHS_WITH_QUERY = new Set([
   '/ai-emp-quota-detail',
   '/ai-role-quota-edit',
   '/ai-role-quota-detail',
+  '/ai-operation-auth-edit',
 ])
 
 /** Tab 路径：特定路径保留 query string 以区分新增/编辑 */

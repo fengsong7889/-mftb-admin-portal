@@ -66,7 +66,7 @@ import {
   BlockOutlined, // MCP 服務
   BankOutlined, // 权限管理相关
   DollarOutlined, // 额度策略
-  UnlockOutlined, // 員工AI權限
+  UnlockOutlined, // 員工AI權額管理
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -215,6 +215,7 @@ const keyToPath: Record<string, string> = {
   'ai-emp-quota': '/ai-emp-quota',
   // OA中心
   'oa-requests': '/oa-requests',
+  'process-center': '/process-center',
   // 门店数据配置
   'store-data-config': '/store-data-config',
   // 地图規劃
@@ -233,7 +234,7 @@ const keyToPath: Record<string, string> = {
   'ai-role-auth-detail': '/ai-role-auth-detail',
   'ai-dept-quota-edit': '/ai-dept-quota-edit',
   'ai-dept-quota-detail': '/ai-dept-quota-detail',
-  // 員工AI權限
+  // 員工AI權額管理
   'ai-emp-permission': '/ai-emp-permission',
   'ai-emp-permission-detail': '/ai-emp-permission-detail',
 }
@@ -636,6 +637,11 @@ const menuItems: MenuItem[] = [
     label: 'OA中心',
     children: [
       {
+        key: 'process-center',
+        icon: <AppstoreOutlined />,
+        label: '流程中心',
+      },
+      {
         key: 'oa-requests',
         icon: <FileTextOutlined />,
         label: '流程事項',
@@ -772,6 +778,7 @@ const keyToIcon: Record<string, ReactNode> = {
   // OA中心
   'oa-center': <SolutionOutlined />,
   'oa-requests': <FileTextOutlined />,
+  'process-center': <AppstoreOutlined />,
   // 團購管理
   'group-purchase': <ShoppingFilled />,
   'group-purchase-dashboard': <DashboardOutlined />,
@@ -792,7 +799,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-assistant': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
   'ai_quota_auth': <SafetyCertificateOutlined />,
-  'ai-operation-auth': <ToolOutlined />,   // AI 操作授权
+  'ai-operation-auth': <ToolOutlined />,   // AI 权控管理
   'ai-access-request': <KeyOutlined />,    // AI 使用申請
   'ai-mcp-service': <BlockOutlined />,     // MCP 服務
   'ai-conversation-audit': <AuditOutlined />, // 对话审计
@@ -819,7 +826,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-quota-manage': <DollarOutlined />,       // 配额管理 - 金额符号
   'ai-dept-quota': <AccountBookOutlined />,    // 部门额度 - 账本
   'ai-emp-quota': <MoneyCollectOutlined />,    // 员工额度 - 收款
-  'ai-emp-permission': <UnlockOutlined />,     // 員工AI權限 - 解鎖/權限管理
+  'ai-emp-permission': <UnlockOutlined />,     // 員工AI權額管理 - 解鎖/權限管理
 }
 
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */

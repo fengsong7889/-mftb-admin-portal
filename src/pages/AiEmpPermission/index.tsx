@@ -1,47 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Pagination, Select, Table, Tag, message } from 'antd'
+import { Button, DatePicker, Form, Input, Pagination, Popover, Select, Table, Tag, TreeSelect, message } from 'antd'
+import type { Dayjs } from 'dayjs'
+import type { DataNode } from 'antd/es/tree'
 import type { ColumnsType } from 'antd/es/table'
-import { SearchOutlined, ReloadOutlined, ExportOutlined, TeamOutlined, SafetyCertificateOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
-  fetchMockEmpPermissions,
+  flattenDepts,
+  MOCK_DEPT_TREE,
   SOURCE_TAG_COLOR,
+  QUOTA_STATUS_LABEL,
+  QUOTA_STATUS_COLOR,
+  calcQuotaStatus,
   type EmpPermissionSummary,
   type EmpQuotaGrant,
   type PermissionSource,
+  type QuotaStatus,
 } from '../../api/mock/aiEmpPermissionMock'
+import { fetchEmpPermissionList } from '../../api/empPermission'
 
 /* ══════════ 展示常量 ══════════ */
 
-const QUOTA_TYPE_LABEL: Record<string, string> = { token: 'tokens', request: 'requests' }
+const QUOTA_TYPE_LABEL: Record<string, string> = { token: 'tokens', request: 'requests', currency: '元' }
 const QUOTA_PERIOD_LABEL: Record<string, string> = { daily: '日', monthly: '月' }
 
-/** 額度概况文本 */
-function quotaSummaryText(grants: EmpQuotaGrant[]): string {
-  if (!grants.length) return '--'
-  return grants
-    .filter((g) => g.status === 1)
-    .map((g) => {
-      const val = g.quotaValue.toLocaleString()
-      const unit = QUOTA_TYPE_LABEL[g.quotaType]
-      const period = QUOTA_PERIOD_LABEL[g.quotaPeriod]
-      const eff = g.effectiveType === 'temporary' ? ` · 至${g.expireAt?.slice(0, 10) ?? '--'}` : ' · 永久'
-      return `${val} ${unit}/${period}${eff}`
-    })
-    .join('；') || '--'
-}
-
-/** 額度狀態 */
-function quotaStatusTag(grants: EmpQuotaGrant[]): { text: string; color: string } | null {
-  const active = grants.filter((g) => g.status === 1)
-  if (!active.length) return { text: '無額度', color: 'default' }
-  const hasExpired = active.some((g) => g.effectiveType === 'temporary' && g.expireAt && new Date(g.expireAt) < new Date())
-  if (hasExpired) return { text: '已過期', color: 'error' }
-  const nearLimit = active.some((g) => g.quotaValue > 0 && (g.usedValue / g.quotaValue) >= 0.9)
-  if (nearLimit) return { text: '即將用盡', color: 'warning' }
-  return { text: '正常', color: 'success' }
-}
+/** 額度狀態篩選選項 */
+const QUOTA_STATUS_OPTIONS: { label: string; value: QuotaStatus }[] = [
+  { label: '正常', value: 'normal' },
+  { label: '已用完', value: 'exhausted' },
+  { label: '凍結', value: 'frozen' },
+]
 
 /** 來源篩選選項 */
 const SOURCE_OPTIONS: { label: string; value: PermissionSource }[] = [
@@ -51,11 +40,50 @@ const SOURCE_OPTIONS: { label: string; value: PermissionSource }[] = [
   { label: '審批授予', value: 'approval' },
 ]
 
+/** 額度分組：按 quotaType + quotaPeriod 分組合併同類額度 */
+interface QuotaGroup { key: string; unit: string; period: string; total: number; used: number }
+
+function groupQuotas(grants: EmpQuotaGrant[]): QuotaGroup[] {
+  const active = grants.filter((g) => g.status === 1)
+  if (!active.length) return []
+  const map = new Map<string, QuotaGroup>()
+  active.forEach((g) => {
+    const key = `${g.quotaType}_${g.quotaPeriod}`
+    if (!map.has(key)) {
+      map.set(key, { key, unit: QUOTA_TYPE_LABEL[g.quotaType], period: QUOTA_PERIOD_LABEL[g.quotaPeriod], total: 0, used: 0 })
+    }
+    const group = map.get(key)!
+    group.total += g.quotaValue
+    group.used += Math.min(g.usedValue, g.quotaValue)
+  })
+  return [...map.values()]
+}
+
+/* ══════════ 部門樹 ══════════ */
+
+/** 構建 TreeSelect 用的樹形數據 */
+function buildDeptTreeData(): DataNode[] {
+  const flat = flattenDepts(MOCK_DEPT_TREE)
+  const nodeMap = new Map<number, DataNode>()
+  flat.forEach((f) => nodeMap.set(f.id, { key: f.id, title: f.name, children: [] }))
+  const roots: DataNode[] = []
+  flat.forEach((f) => {
+    const node = nodeMap.get(f.id)!
+    if (f.parentId != null) {
+      const parent = nodeMap.get(f.parentId)
+      if (parent) parent.children!.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
+
 /* ══════════ 組件 ══════════ */
 
 /**
- * 員工AI權限 — 列表頁
- * 一行一個員工，聚合展示模型數量與額度概況；點擊詳情進入完整權限管理頁
+ * 員工AI權額管理 — 列表頁
+ * 一行一個員工，聚合展示模型數量與額度概況；點擊詳情/編輯進入對應模式
  */
 export default function AiEmpPermission() {
   const navigate = useNavigate()
@@ -64,44 +92,67 @@ export default function AiEmpPermission() {
   const [data, setData] = useState<EmpPermissionSummary[]>([])
   const [loading, setLoading] = useState(false)
 
+  /* ── 搜索 ── */
+  const [queryName, setQueryName] = useState('')
+  const [queryDept, setQueryDept] = useState<number | undefined>(undefined)
+  const [querySource, setQuerySource] = useState<PermissionSource | undefined>(undefined)
+  const [queryQuotaStatus, setQueryQuotaStatus] = useState<QuotaStatus | undefined>(undefined)
+  const [queryUpdatedBy, setQueryUpdatedBy] = useState('')
+  const [queryUpdateTime, setQueryUpdateTime] = useState<[Dayjs, Dayjs] | null>(null)
+  const [applied, setApplied] = useState({
+    name: '', dept: undefined as number | undefined,
+    source: undefined as PermissionSource | undefined,
+    quotaStatus: undefined as QuotaStatus | undefined,
+    updatedBy: '', updateTime: null as [Dayjs, Dayjs] | null,
+  })
+
   const reload = useCallback(() => {
     setLoading(true)
-    fetchMockEmpPermissions()
+    fetchEmpPermissionList({
+      queryName: applied.name || undefined,
+      queryDept: applied.dept != null ? String(applied.dept) : undefined,
+      queryUpdatedBy: applied.updatedBy || undefined,
+      queryUpdateTimeStart: applied.updateTime?.[0]?.format('YYYY-MM-DD') ?? undefined,
+      queryUpdateTimeEnd: applied.updateTime?.[1]?.format('YYYY-MM-DD') ?? undefined,
+    })
       .then(setData)
       .catch(() => { message.error('加載數據失敗'); setData([]) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [applied])
 
   useEffect(() => { reload() }, [reload])
 
-  /* ── 搜索 ── */
-  const [queryName, setQueryName] = useState('')
-  const [queryDept, setQueryDept] = useState<string | undefined>(undefined)
-  const [querySource, setQuerySource] = useState<PermissionSource | undefined>(undefined)
-  const [applied, setApplied] = useState({ name: '', dept: undefined as string | undefined, source: undefined as PermissionSource | undefined })
-
-  const handleSearch = () => setApplied({ name: queryName.trim(), dept: queryDept, source: querySource })
+  const handleSearch = () => setApplied({
+    name: queryName.trim(), dept: queryDept,
+    source: querySource, quotaStatus: queryQuotaStatus,
+    updatedBy: queryUpdatedBy.trim(), updateTime: queryUpdateTime,
+  })
   const handleReset = () => {
-    setQueryName(''); setQueryDept(undefined); setQuerySource(undefined)
-    setApplied({ name: '', dept: undefined, source: undefined })
+    setQueryName(''); setQueryDept(undefined); setQuerySource(undefined); setQueryQuotaStatus(undefined)
+    setQueryUpdatedBy(''); setQueryUpdateTime(null)
+    setApplied({ name: '', dept: undefined, source: undefined, quotaStatus: undefined, updatedBy: '', updateTime: null })
   }
 
-  /** 部門選項（從數據中提取） */
-  const deptOptions = useMemo(() => {
-    const set = new Set<string>()
-    data.forEach((d) => set.add(d.department))
-    return [...set].map((n) => ({ value: n, label: n }))
-  }, [data])
+  /** 部門樹形選項 */
+  const deptTreeData = useMemo(() => buildDeptTreeData(), [])
 
   /** 過濾邏輯 */
   const filtered = useMemo(() => data.filter((row) => {
     if (applied.name && !row.employeeName.toLowerCase().includes(applied.name.toLowerCase())
         && !row.empId.toLowerCase().includes(applied.name.toLowerCase())) return false
-    if (applied.dept && row.department !== applied.dept) return false
+    if (applied.dept && row.deptId !== applied.dept) return false
     if (applied.source) {
       const hasSource = row.modelPermissions.some((m) => m.source === applied.source)
         || row.quotaGrants.some((q) => q.source === applied.source)
       if (!hasSource) return false
+    }
+    if (applied.quotaStatus) {
+      if (calcQuotaStatus(row.quotaGrants) !== applied.quotaStatus) return false
+    }
+    if (applied.updatedBy && !row.lastUpdatedBy.includes(applied.updatedBy)) return false
+    if (applied.updateTime) {
+      const rowDate = row.lastUpdatedAt.slice(0, 10)
+      if (rowDate < applied.updateTime[0].format('YYYY-MM-DD') || rowDate > applied.updateTime[1].format('YYYY-MM-DD')) return false
     }
     return true
   }), [data, applied])
@@ -109,57 +160,118 @@ export default function AiEmpPermission() {
   /* ── 列定義 ── */
   const columns: ColumnsType<EmpPermissionSummary> = [
     {
-      title: '員工', key: 'employee', width: 180,
+      title: '員工', key: 'employee', width: 140,
       render: (_, r) => (
         <div>
           <div style={{ fontWeight: 600 }}>{r.employeeName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.empId} · {r.department}</div>
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.empId}</div>
         </div>
       ),
     },
-    { title: '職位', dataIndex: 'position', width: 130, ellipsis: true },
+    { title: '所屬部門', dataIndex: 'department', width: 120, ellipsis: true },
     {
-      title: '可用模型', key: 'models', width: 260,
+      title: '職位', key: 'position', width: 150,
+      render: (_, r) => (
+        <span>{r.position}<span style={{ color: '#8C8C8C', marginLeft: 4 }}>({r.jobLevel})</span></span>
+      ),
+    },
+    {
+      title: '授權模型', key: 'models', width: 240,
       render: (_, r) => {
         const active = r.modelPermissions.filter((m) => m.status === 1)
         if (!active.length) return <span style={{ color: '#BFBFBF' }}>--</span>
+        const show = active.slice(0, 3)
+        const rest = active.slice(3)
         return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {active.slice(0, 3).map((m) => (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+            {show.map((m) => (
               <Tag key={m.modelId} color={SOURCE_TAG_COLOR[m.source]} style={{ margin: 0, fontSize: 12 }}>
                 {m.modelName}
               </Tag>
             ))}
-            {active.length > 3 && (
-              <Tag style={{ margin: 0, fontSize: 12, color: '#8C8C8C' }}>+{active.length - 3}</Tag>
+            {rest.length > 0 && (
+              <Popover
+                trigger="click"
+                title="全部授權模型"
+                content={
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: 320 }}>
+                    {active.map((m) => (
+                      <Tag key={m.modelId} color={SOURCE_TAG_COLOR[m.source]} style={{ margin: 0, fontSize: 12 }}>
+                        {m.modelName}
+                      </Tag>
+                    ))}
+                  </div>
+                }
+              >
+                <Tag style={{ margin: 0, fontSize: 12, color: '#1890FF', cursor: 'pointer', borderColor: '#91CAFF' }}>
+                  +{rest.length}
+                </Tag>
+              </Popover>
             )}
           </div>
         )
       },
     },
     {
-      title: '額度概況', key: 'quota', width: 260, ellipsis: true,
-      render: (_, r) => (
-        <span style={{ fontSize: 13, color: '#595959' }}>{quotaSummaryText(r.quotaGrants)}</span>
-      ),
+      title: '授予額度', key: 'quota', width: 220,
+      render: (_, r) => {
+        const groups = groupQuotas(r.quotaGrants)
+        if (!groups.length) return <span style={{ color: '#BFBFBF' }}>--</span>
+        const show = groups.slice(0, 2)
+        const rest = groups.slice(2)
+        const fmtLine = (g: QuotaGroup) => {
+          const pct = g.total > 0 ? Math.floor((g.used / g.total) * 100) : 0
+          const color = pct >= 90 ? '#FF4D4F' : pct >= 70 ? '#FAAD14' : '#52C41A'
+          return (
+            <div key={g.key} style={{ fontSize: 12, lineHeight: '20px' }}>
+              <span style={{ fontWeight: 600, color }}>{g.used.toLocaleString()}</span>
+              <span style={{ color: '#BFBFBF', margin: '0 2px' }}>/</span>
+              <span>{g.total.toLocaleString()}</span>
+              <span style={{ color: '#8C8C8C', marginLeft: 3, fontSize: 11 }}>{g.unit}/{g.period}</span>
+            </div>
+          )
+        }
+        return (
+          <div>
+            {show.map(fmtLine)}
+            {rest.length > 0 && (
+              <Popover
+                trigger="click"
+                title="全部授予額度"
+                content={<div style={{ maxWidth: 260 }}>{groups.map(fmtLine)}</div>}
+              >
+                <span style={{ fontSize: 12, color: '#E8720C', cursor: 'pointer' }}>+{rest.length} 更多</span>
+              </Popover>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: '額度狀態', key: 'quotaStatus', width: 100, align: 'center',
       render: (_, r) => {
-        const s = quotaStatusTag(r.quotaGrants)
-        return s ? <Tag color={s.color}>{s.text}</Tag> : <span style={{ color: '#BFBFBF' }}>--</span>
+        const status = calcQuotaStatus(r.quotaGrants)
+        return <Tag color={QUOTA_STATUS_COLOR[status]}>{QUOTA_STATUS_LABEL[status]}</Tag>
       },
     },
     {
-      title: '最近授予', dataIndex: 'lastGrantedAt', width: 120,
-      render: (v: string) => v ? v.slice(0, 10) : '--',
+      title: '最後更新人', dataIndex: 'lastUpdatedBy', width: 100, ellipsis: true,
     },
     {
-      title: '操作', key: 'action', width: 100, align: 'center', fixed: 'right',
+      title: '最後更新時間', dataIndex: 'lastUpdatedAt', width: 150,
+      render: (v: string) => v ? v.slice(0, 16) : '--',
+    },
+    {
+      title: '操作', key: 'action', width: 110, align: 'center', fixed: 'right',
       render: (_, r) => (
-        <Button type="link" onClick={() => navigate(`/ai-emp-permission-detail?empId=${r.employeeId}`)}>
-          詳情
-        </Button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <Button type="link" size="small" onClick={() => navigate(`/ai-emp-permission-detail?empId=${r.employeeId}`)}>
+            詳情
+          </Button>
+          <Button type="link" size="small" onClick={() => navigate(`/ai-emp-permission-detail?empId=${r.employeeId}&mode=edit`)}>
+            編輯
+          </Button>
+        </div>
       ),
     },
   ]
@@ -167,24 +279,19 @@ export default function AiEmpPermission() {
   /* ── 列字段配置 ── */
   const columnMeta = [
     { key: 'employee', title: '員工' },
+    { key: 'department', title: '所屬部門' },
     { key: 'position', title: '職位' },
-    { key: 'models', title: '可用模型' },
-    { key: 'quota', title: '額度概況' },
+    { key: 'models', title: '授權模型' },
+    { key: 'quota', title: '授予額度' },
     { key: 'quotaStatus', title: '額度狀態' },
-    { key: 'lastGrantedAt', title: '最近授予' },
+    { key: 'lastUpdatedBy', title: '最後更新人' },
+    { key: 'lastUpdatedAt', title: '最後更新時間' },
     { key: 'action', title: '操作' },
   ]
 
   const { configComponent } = useColumnConfig('ai-emp-permission', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
-
-  /* ── 統計 ── */
-  const stats = useMemo(() => ({
-    totalEmployees: filtered.length,
-    totalModels: new Set(filtered.flatMap((r) => r.modelPermissions.filter((m) => m.status === 1).map((m) => m.modelId))).size,
-    withQuota: filtered.filter((r) => r.quotaGrants.some((q) => q.status === 1)).length,
-  }), [filtered])
 
   /* ── 分頁 ── */
   const [page, setPage] = useState(1)
@@ -206,13 +313,26 @@ export default function AiEmpPermission() {
             />
           </Form.Item>
           <Form.Item label="部門">
-            <Select
+            <TreeSelect
               value={queryDept}
               placeholder="全部"
               allowClear
-              options={deptOptions}
+              treeData={deptTreeData}
+              treeDefaultExpandAll
+              showSearch
+              treeNodeFilterProp="title"
               onChange={(v) => setQueryDept(v)}
-              style={{ width: '100%' }}
+              style={{ width: 200 }}
+            />
+          </Form.Item>
+          <Form.Item label="額度狀態">
+            <Select
+              value={queryQuotaStatus}
+              placeholder="全部"
+              allowClear
+              options={QUOTA_STATUS_OPTIONS}
+              onChange={(v) => setQueryQuotaStatus(v)}
+              style={{ width: 120 }}
             />
           </Form.Item>
           <Form.Item label="授權來源">
@@ -222,6 +342,23 @@ export default function AiEmpPermission() {
               allowClear
               options={SOURCE_OPTIONS}
               onChange={(v) => setQuerySource(v)}
+              style={{ width: 120 }}
+            />
+          </Form.Item>
+          <Form.Item label="最後更新人">
+            <Input
+              value={queryUpdatedBy}
+              placeholder="操作人姓名"
+              allowClear
+              onChange={(e) => setQueryUpdatedBy(e.target.value)}
+              onPressEnter={handleSearch}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item label="最後更新時間">
+            <DatePicker.RangePicker
+              value={queryUpdateTime}
+              onChange={(v) => setQueryUpdateTime(v as [Dayjs, Dayjs] | null)}
               style={{ width: '100%' }}
             />
           </Form.Item>
@@ -232,64 +369,6 @@ export default function AiEmpPermission() {
             </div>
           </Form.Item>
         </Form>
-      </div>
-
-      {/* ====== 統計摘要 ====== */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-        <div style={{
-          flex: 1, padding: '16px 20px', borderRadius: 10,
-          background: '#E6F7FF', border: '1px solid rgba(24,144,255,0.12)',
-          display: 'flex', alignItems: 'center', gap: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: 'rgba(24,144,255,0.12)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            <TeamOutlined style={{ color: '#1890FF', fontSize: 20 }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>員工總數</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}>{stats.totalEmployees}</div>
-          </div>
-        </div>
-        <div style={{
-          flex: 1, padding: '16px 20px', borderRadius: 10,
-          background: '#F6FFED', border: '1px solid rgba(82,196,26,0.12)',
-          display: 'flex', alignItems: 'center', gap: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: 'rgba(82,196,26,0.12)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            <AppstoreOutlined style={{ color: '#52C41A', fontSize: 20 }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>已授權模型</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>{stats.totalModels}</div>
-          </div>
-        </div>
-        <div style={{
-          flex: 1, padding: '16px 20px', borderRadius: 10,
-          background: '#FFF7E6', border: '1px solid rgba(232,114,12,0.12)',
-          display: 'flex', alignItems: 'center', gap: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: 'rgba(232,114,12,0.12)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            <SafetyCertificateOutlined style={{ color: '#E8720C', fontSize: 20 }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>有額度員工</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>{stats.withQuota}</div>
-          </div>
-        </div>
       </div>
 
       {/* ====== 操作按鈕區 ====== */}
@@ -310,7 +389,7 @@ export default function AiEmpPermission() {
           dataSource={filtered}
           loading={loading}
           pagination={false}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1500 }}
           size="middle"
         />
       </div>

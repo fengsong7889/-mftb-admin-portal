@@ -44,7 +44,8 @@ public class DataInitializer implements CommandLineRunner {
 
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增 minor 版本号 */
     // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
-    private static final String V_SCHEMA = "core:schema-v5";
+    // v6.0: OA 中心表自动创建（biz_oa_process / biz_oa_request / biz_oa_approval_task + 种子数据）
+    private static final String V_SCHEMA = "core:schema-v6";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增 minor 版本号，无需全量重跑其他迁移 */
     // v11: 「工具註冊中心」更名為「AI 操作授權」，menu_key 由 ai_tool_registry 迁移为 ai-operation-auth
     //      （seedSystemMenus 會先刪除所有含 ai 的舊菜單及授權關聯再重建，舊 key 自動清理）
@@ -54,7 +55,9 @@ public class DataInitializer implements CommandLineRunner {
     // v14: 新增「对话审计」菜單
     // v15: 新增「OA中心」一级菜单，「流程配置」从「系统配置」迁移至「OA中心」
     // v16: 设置 OA 中心图标，修正 permission/system-config 排序
-    private static final String V_MENU_SEED = "core:menu-seed-v16";
+    // v17: OA中心新增「流程中心」二级菜单
+    // v19: 「员工AI权额总览」更名为「员工AI权额管理」
+    private static final String V_MENU_SEED = "core:menu-seed-v19";
 
     @Override
     public void run(String... args) {
@@ -200,6 +203,8 @@ public class DataInitializer implements CommandLineRunner {
         migrateAvatarMediumText();
         // AI 中心表自动创建 (85/88/68 脚本等效, 幂等)
         migrateAiCenterTables();
+        // OA 中心表自动创建 (108 脚本等效, 幂等)
+        migrateOaTables();
         // ai_dept_auth_group 新增 description 字段
         addColumnIfAbsent("ai_dept_auth_group", "description",
                 "ALTER TABLE ai_dept_auth_group ADD COLUMN description VARCHAR(500) NULL COMMENT '策略描述' AFTER name");
@@ -390,7 +395,7 @@ public class DataInitializer implements CommandLineRunner {
             + " status, sort_order)"
             + " SELECT p.id, 'qwen3.7-flash', '通义千问 3.7 Flash', NULL, '阿里云百炼 qwen3.7-flash 轻量模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
-            + " 200_000, 8192, 0.200000, 0.800000, 0.040000, 'CNY', 1, 1"
+            + " 200000, 8192, 0.200000, 0.800000, 0.040000, 'CNY', 1, 1"
             + " FROM ai_provider p WHERE p.provider_key = 'dashscope' LIMIT 1");
 
         jdbcTemplate.execute(
@@ -400,7 +405,7 @@ public class DataInitializer implements CommandLineRunner {
             + " status, sort_order)"
             + " SELECT p.id, 'deepseek-chat', 'DeepSeek Chat', NULL, 'DeepSeek-V3 对话模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 1,"
-            + " 128_000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 2"
+            + " 128000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 2"
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
 
         jdbcTemplate.execute(
@@ -410,7 +415,7 @@ public class DataInitializer implements CommandLineRunner {
             + " status, sort_order)"
             + " SELECT p.id, 'deepseek-v4-flash', 'DeepSeek V4 Flash', NULL, 'DeepSeek V4 Flash 轻量模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
-            + " 128_000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 3"
+            + " 128000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 3"
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
 
         log.info("AI 供应商与模型种子数据插入完成 (幂等)");
@@ -702,6 +707,7 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("data-permission", "Data Authorization"),
                 Map.entry("oa-center", "OA Center"),
                 Map.entry("oa-requests", "Workflow Items"),
+                Map.entry("process-center", "Process Center"),
                 Map.entry("system-config", "System Config"),
                 Map.entry("menu-config", "Menu Config"),
                 Map.entry("translation-manage", "Translation Config"),
@@ -719,7 +725,8 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("ai-energy-billing", "Energy & Billing"),
                 Map.entry("ai-mcp-service", "MCP Services"),
                 Map.entry("ai-access-request", "AI Access Application"),
-                Map.entry("ai-conversation-audit", "Conversation Audit"));
+                Map.entry("ai-conversation-audit", "Conversation Audit"),
+                Map.entry("ai-emp-permission", "Employee AI Quota Overview"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
                     "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
@@ -758,9 +765,10 @@ public class DataInitializer implements CommandLineRunner {
             jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", controlId);
             log.info("已删除无用的能耗管控菜单 (id={})", controlId);
         }
-        // v15: OA中心 — 设置图标 & 修正顶级菜单排序
+        // v16: 设置 OA 中心图标，修正 permission/system-config 排序
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'SolutionOutlined' WHERE menu_key = 'oa-center' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'FileTextOutlined' WHERE menu_key = 'oa-requests' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'AppstoreOutlined' WHERE menu_key = 'process-center' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'permission' AND sort_order = 10");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'system-config' AND sort_order = 11");
     }
@@ -994,15 +1002,15 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("ai-quota-manage",      new String[]{"配额管理",           "ai-assistant",    "3"});
         menus.put("ai-dept-quota",        new String[]{"部门额度",           "ai-quota-manage",   "1"});
         menus.put("ai-emp-quota",         new String[]{"员工额度",           "ai-quota-manage",   "2"});
-        menus.put("ai-operation-auth",   new String[]{"AI 操作授權",     "ai-assistant",       "4"});
-        menus.put("ai-energy-billing",   new String[]{"能耗與賬單",     "ai-assistant",       "5"});
+        menus.put("ai-operation-auth",   new String[]{"AI 操作授權",     "ai-assistant",       "5"});
+        menus.put("ai-energy-billing",   new String[]{"能耗與賬單",     "ai-assistant",       "6"});
         menus.put("ai_usage_stats",      new String[]{"能耗統計",       "ai-energy-billing",  "1"});
         menus.put("ai_energy_detail",    new String[]{"能耗明細",       "ai-energy-billing",  "2"});
-        menus.put("ai-mcp-service",      new String[]{"MCP 服務",       "ai-assistant",       "6"});
-        menus.put("ai-emp-permission",    new String[]{"員工AI權限",     "ai-assistant",       "8"});
+        menus.put("ai-mcp-service",      new String[]{"MCP 服務",       "ai-assistant",       "7"});
+        menus.put("ai-emp-permission",   new String[]{"員工AI權額管理",     "ai-assistant",       "4"});
         // 與 102_ai_access_request_menu.sql 同源：併入主種子，防止 '%ai%' 清理後獨立初始化器不重跑導致菜單丟失
         menus.put("ai-access-request",   new String[]{"AI 使用申請",    "ai-assistant",      "10"});
-        menus.put("ai-conversation-audit", new String[]{"对话审计",     "ai-assistant",       "7"});
+        menus.put("ai-conversation-audit", new String[]{"对话审计",     "ai-assistant",       "8"});
         // ── 團購管理 ──
         menus.put("group-purchase-dashboard", new String[]{"秒殺數據總覽",     "group-purchase",      "1"});
         menus.put("flash-sale-register", new String[]{"秒殺商品登記",     "group-purchase",      "2"});
@@ -1014,8 +1022,9 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("position-management", new String[]{"職位管理",         "hr",                 "3"});
         menus.put("login-log",           new String[]{"員工動態",         "hr",                 "4"});
         // ── OA中心 ──
-        menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "1"});
-        menus.put("workflow-config",     new String[]{"流程配置",         "oa-center",         "2"});
+        menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
+        menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
+        menus.put("workflow-config",     new String[]{"流程配置",         "oa-center",         "3"});
         // ── 權限管理 ──
         menus.put("role-management",     new String[]{"角色管理",         "permission",         "1"});
         menus.put("function-permission", new String[]{"功能授權",         "permission",         "2"});
@@ -1177,6 +1186,95 @@ public class DataInitializer implements CommandLineRunner {
         if (inserted > 0) {
             log.info("已补充 {} 条部门-商家集团数据授权记录", inserted);
         }
+    }
+
+    /**
+     * OA 中心表自动创建 (108_oa_process.sql 等效, 幂等)
+     * 包含 biz_oa_process, biz_oa_request, biz_oa_approval_task 共 3 张表
+     * 以及流程类型种子数据和编号规则
+     */
+    private void migrateOaTables() {
+        // 1. 流程定义表
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS biz_oa_process ("
+            + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',"
+            + "process_code VARCHAR(32) NOT NULL COMMENT '流程编码',"
+            + "process_name VARCHAR(64) NOT NULL COMMENT '流程名称',"
+            + "category VARCHAR(32) NOT NULL DEFAULT 'general' COMMENT '分类: office/finance/hr/general',"
+            + "icon VARCHAR(64) DEFAULT NULL COMMENT '图标标识',"
+            + "description VARCHAR(200) DEFAULT NULL COMMENT '流程说明',"
+            + "workflow_type VARCHAR(32) DEFAULT NULL COMMENT '关联 biz_workflow_config.flow_type',"
+            + "form_schema TEXT DEFAULT NULL COMMENT '表单字段定义JSON',"
+            + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',"
+            + "status TINYINT NOT NULL DEFAULT 1 COMMENT '1=启用 0=停用',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',"
+            + "UNIQUE KEY uk_oa_process_code (process_code)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OA流程定义表'");
+
+        // 2. 流程实例表
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS biz_oa_request ("
+            + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',"
+            + "flow_no VARCHAR(32) NOT NULL COMMENT '流程编号',"
+            + "process_code VARCHAR(32) NOT NULL COMMENT '关联流程定义编码',"
+            + "title VARCHAR(200) NOT NULL COMMENT '流程标题',"
+            + "form_data TEXT DEFAULT NULL COMMENT '表单数据JSON',"
+            + "applicant VARCHAR(64) NOT NULL COMMENT '申请人',"
+            + "flow_status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected/cancelled',"
+            + "current_node_name VARCHAR(64) DEFAULT NULL COMMENT '当前待审节点名称',"
+            + "reject_reason VARCHAR(500) DEFAULT NULL COMMENT '驳回理由',"
+            + "apply_time DATETIME DEFAULT NULL COMMENT '申请时间',"
+            + "complete_time DATETIME DEFAULT NULL COMMENT '完成时间',"
+            + "cancel_time DATETIME DEFAULT NULL COMMENT '撤销时间',"
+            + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',"
+            + "UNIQUE KEY uk_oa_request_flow_no (flow_no),"
+            + "KEY idx_oa_request_applicant (applicant),"
+            + "KEY idx_oa_request_status (flow_status),"
+            + "KEY idx_oa_request_process (process_code)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OA流程实例表'");
+
+        // 3. 审批任务表
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS biz_oa_approval_task ("
+            + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',"
+            + "request_id BIGINT NOT NULL COMMENT '关联流程实例ID',"
+            + "node_name VARCHAR(64) NOT NULL COMMENT '审批节点名称',"
+            + "sort_order INT NOT NULL DEFAULT 0 COMMENT '节点顺序',"
+            + "approval_rule VARCHAR(16) NOT NULL DEFAULT 'any' COMMENT 'any=或签 / all=会签',"
+            + "approver VARCHAR(64) DEFAULT NULL COMMENT '审批人',"
+            + "task_status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected',"
+            + "approve_time DATETIME DEFAULT NULL COMMENT '审批时间',"
+            + "comment VARCHAR(500) DEFAULT NULL COMMENT '审批意见',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',"
+            + "KEY idx_oa_task_request (request_id),"
+            + "KEY idx_oa_task_approver (approver),"
+            + "KEY idx_oa_task_status (task_status)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OA审批任务表'");
+
+        // 4. 种子数据：流程类型
+        jdbcTemplate.update(
+            "INSERT IGNORE INTO biz_oa_process (process_code, process_name, category, icon, description, workflow_type, sort_order, status) VALUES "
+            + "('oa_leave', '請假申請', 'hr', 'CalendarOutlined', '員工請假申請流程', 'oa_general', 1, 1), "
+            + "('oa_reimburse', '報銷申請', 'finance', 'DollarOutlined', '費用報銷申請流程', 'oa_general', 2, 1), "
+            + "('oa_purchase', '採購申請', 'finance', 'ShoppingCartOutlined', '辦公物資採購申請流程', 'oa_general', 3, 1), "
+            + "('oa_seal', '用章申請', 'office', 'AuditOutlined', '公章使用申請流程', 'oa_general', 4, 1), "
+            + "('oa_general', '通用審批', 'general', 'FormOutlined', '通用審批流程，適用於一般事項', 'oa_general', 5, 1)");
+
+        // 5. 流程配置：OA通用审批流程
+        jdbcTemplate.update(
+            "INSERT IGNORE INTO biz_workflow_config (flow_type, flow_name, approval_enabled, description) "
+            + "VALUES ('oa_general', 'OA通用審批', 1, 'OA中心通用審批流程，默認一級審批')");
+
+        // 6. 编号规则：OA流程编号
+        jdbcTemplate.update(
+            "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, remark) "
+            + "VALUES ('oa_request', 'OA流程編號', 'OA中心', 'OA', 'YYYYMMDD', 4, 1, '{prefix} + YYYYMMDD + {n}位自增序號')");
+
+        log.info("OA中心表及种子数据已就绪");
     }
 
     /** 若密码非合法 BCrypt 值(如 SQL 占位符), 则重置为默认密码的加密值 */

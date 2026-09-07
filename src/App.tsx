@@ -132,6 +132,8 @@ const EmpQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaD
 const RoleQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaEdit'))
 const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaDetail'))
 const AiOperationAuth = lazy(() => import('./pages/AiOperationAuth'))
+const AiOperationAuthEdit = lazy(() => import('./pages/AiOperationAuth/AiOperationAuthEdit'))
+const AiOperationAuthLog = lazy(() => import('./pages/AiOperationAuth/AiOperationAuthLog'))
 const AiUsageStats = lazy(() => import('./pages/AiUsageStats'))
 const AiEnergyDetail = lazy(() => import('./pages/AiEnergyDetail'))
 const AiConversationAudit = lazy(() => import('./pages/AiConversationAudit'))
@@ -139,11 +141,12 @@ const AiConversationAuditDetail = lazy(() => import('./pages/AiConversationAudit
 // AI 使用申請
 const AiAccessApply = lazy(() => import('./pages/AiAccessApply'))
 const McpService = lazy(() => import('./pages/McpService'))
-// 員工AI權限
+// 員工AI權額管理
 const AiEmpPermission = lazy(() => import('./pages/AiEmpPermission'))
 const AiEmpPermissionDetail = lazy(() => import('./pages/AiEmpPermission/AiEmpPermissionDetail'))
 // OA中心
 const OaRequests = lazy(() => import('./pages/OACenter/OaRequests'))
+const ProcessCenter = lazy(() => import('./pages/OACenter/ProcessCenter'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -299,6 +302,8 @@ function AuthenticatedLayout() {
                             <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
 
               <Route path="/ai-operation-auth" element={<AiOperationAuth />} />
+              <Route path="/ai-operation-auth-edit" element={<AiOperationAuthEdit />} />
+              <Route path="/ai-operation-auth-log" element={<AiOperationAuthLog />} />
               <Route path="/ai-usage-stats" element={<AiUsageStats />} />
               <Route path="/ai-energy-detail" element={<AiEnergyDetail />} />
               {/* AI 使用申請 */}
@@ -306,11 +311,12 @@ function AuthenticatedLayout() {
               <Route path="/ai-mcp-service" element={<McpService />} />
               <Route path="/ai-conversation-audit" element={<AiConversationAudit />} />
               <Route path="/ai-conversation-audit/:id" element={<AiConversationAuditDetail />} />
-              {/* 員工AI權限 */}
+              {/* 員工AI權額管理 */}
               <Route path="/ai-emp-permission" element={<AiEmpPermission />} />
               <Route path="/ai-emp-permission-detail" element={<AiEmpPermissionDetail />} />
               {/* OA中心 */}
               <Route path="/oa-requests" element={<OaRequests />} />
+              <Route path="/process-center" element={<ProcessCenter />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />

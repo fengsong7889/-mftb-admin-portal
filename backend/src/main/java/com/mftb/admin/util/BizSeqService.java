@@ -91,6 +91,8 @@ public class BizSeqService {
     public static final String RULE_AI_EMP_ROLE_QUOTA = "ai_emp_role_quota";
     /** 对话编号 */
     public static final String RULE_AI_CONVERSATION = "ai_conversation";
+    /** OA流程编号 */
+    public static final String RULE_OA_REQUEST = "oa_request";
 
     /** 无日期维度规则在序号表中的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";

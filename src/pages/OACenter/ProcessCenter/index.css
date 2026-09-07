@@ -1,0 +1,260 @@
+/* ========================================================================
+   ProcessCenter 流程中心
+   ======================================================================== */
+
+.process-center {
+  min-height: calc(100vh - 140px);
+}
+
+/* 顶部区域 */
+.process-center-header {
+  margin-bottom: 28px;
+}
+
+.process-center-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 4px;
+}
+
+.process-center-subtitle {
+  font-size: 13px;
+  color: #8c8c8c;
+  margin-bottom: 16px;
+}
+
+.process-center-search .ant-input-affix-wrapper {
+  border-radius: 8px;
+  height: 38px;
+  border-color: #e8eaed;
+}
+
+.process-center-search .ant-input-affix-wrapper:hover,
+.process-center-search .ant-input-affix-wrapper-focused {
+  border-color: #E8720C;
+  box-shadow: 0 0 0 2px rgba(232, 114, 12, 0.1);
+}
+
+/* 分类区块 */
+.process-category {
+  margin-bottom: 28px;
+}
+
+.process-category-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.process-category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.process-category-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.process-category-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #f0f0f0;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 流程卡片网格 */
+.process-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .process-category-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .process-category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 流程卡片 */
+.process-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  background: #fff;
+}
+
+.process-card:hover {
+  border-color: #E8720C;
+  box-shadow: 0 4px 12px rgba(232, 114, 12, 0.12);
+  transform: translateY(-2px);
+}
+
+.process-card-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #fafafa;
+}
+
+.process-card-disabled:hover {
+  border-color: #e8eaed;
+  box-shadow: none;
+  transform: none;
+}
+
+.process-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.process-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.process-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.process-card-desc {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 敬请期待标签 */
+.process-card-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  color: #bfbfbf;
+  background: #f5f5f5;
+  padding: 1px 8px;
+  border-radius: 4px;
+}
+
+/* ========================================================================
+   常用审批流程
+   ======================================================================== */
+
+.process-favorites {
+  margin-bottom: 28px;
+}
+
+.process-favorites-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.process-favorites-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #faad14;
+  color: #fff;
+  font-size: 14px;
+}
+
+.process-favorites-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.process-favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .process-favorites-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .process-favorites-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 收藏卡片 */
+.process-card-favorite {
+  border-color: #fff7e6;
+  background: #fffdf8;
+}
+
+.process-card-favorite:hover {
+  border-color: #faad14;
+  box-shadow: 0 4px 12px rgba(250, 173, 20, 0.12);
+}
+
+/* 星标按钮 */
+.process-card-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  font-size: 16px;
+}
+
+.process-card-star:hover {
+  background: rgba(0, 0, 0, 0.04);
+}

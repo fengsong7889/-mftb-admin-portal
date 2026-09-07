@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Popover, Modal, type UploadFile } from 'antd'
 import {
@@ -19,6 +19,7 @@ import BrandTag from '../../components/BrandTag'
 import { fetchFinAccounts, fetchFinBatches, submitDeductApply, fetchFinRiskConfig } from '../../api/finance'
 import type { DeductApplyPayload, FinRiskRow } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
+import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import type { OptionItem } from '../../api/types'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
@@ -136,6 +137,14 @@ export default function DeductAdd() {
   const groupIdParam = searchParams.get('groupId') || ''
   const groupNameParam = searchParams.get('groupName') || ''
   const brandParam = searchParams.get('brand') || 'mFood'
+  const fromParam = searchParams.get('from') || ''
+
+  /** 返回地址：从流程中心进入则返回流程中心，否则返回账户余额 */
+  const backTarget = fromParam === 'process-center' ? '/process-center' : '/account-balance'
+  const goBack = useCallback(() => navigate(backTarget), [navigate, backTarget])
+
+  /** 从流程中心进入时，集团字段可编辑 */
+  const isFromProcessCenter = fromParam === 'process-center'
 
   const [form] = Form.useForm()
   const [deductMethod, setDeductMethod] = useState('consume')
@@ -144,6 +153,10 @@ export default function DeductAdd() {
   const [sourceVirtualBalance, setSourceVirtualBalance] = useState(0)
   /** 門店選項：該集團下且品牌相同的門店 */
   const [storeOptions, setStoreOptions] = useState<OptionItem[]>([])
+
+  /** 集团搜索选项（从流程中心进入时使用） */
+  const [groupSearchOptions, setGroupSearchOptions] = useState<OptionItem[]>([])
+  const [groupSearchLoading, setGroupSearchLoading] = useState(false)
   /** 歸屬BD選項：所選門店綁定的BD */
   const [bdOptions, setBdOptions] = useState<OptionItem[]>([])
   /** 充值批次選項：該集團的充值批次 */
@@ -188,6 +201,25 @@ export default function DeductAdd() {
       .catch(() => setStoreOptions([]))
   }, [groupIdParam, brandParam])
 
+  /** 集团搜索回调（从流程中心进入时启用） */
+  const handleGroupSearch = useCallback(async (keyword: string) => {
+    if (!keyword.trim()) { setGroupSearchOptions([]); return }
+    setGroupSearchLoading(true)
+    try {
+      const opts = await fetchMerchantGroupOptions(keyword.trim())
+      setGroupSearchOptions(opts || [])
+    } catch { setGroupSearchOptions([]) }
+    finally { setGroupSearchLoading(false) }
+  }, [])
+
+  /** 集团选择变更（从流程中心进入时启用） */
+  const handleGroupChange = useCallback((value: string) => {
+    const opt = groupSearchOptions.find(o => o.value === value)
+    if (opt) {
+      form.setFieldsValue({ groupId: value, groupName: opt.label })
+    }
+  }, [groupSearchOptions, form])
+
   // 加載充值批次選項（數據庫充值批次，可扣金額=虛擬充值金額）
   useEffect(() => {
     if (!groupIdParam) return
@@ -222,7 +254,7 @@ export default function DeductAdd() {
     if (!successVisible) return
     if (countdown <= 0) {
       setSuccessVisible(false)
-      navigate('/account-balance')
+      navigate(backTarget)
       return
     }
     const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
@@ -419,7 +451,7 @@ export default function DeductAdd() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/account-balance')}
+              onClick={goBack}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 16px',
@@ -455,7 +487,21 @@ export default function DeductAdd() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
             <Form.Item label={t('common:colGroupId')} name="groupId" rules={[{ required: true, message: t('accountBalance.selectGroup') }]}>
-              <Input disabled addonAfter={groupNameParam} />
+              {isFromProcessCenter ? (
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder={t('accountBalance.selectGroup')}
+                  filterOption={false}
+                  onSearch={handleGroupSearch}
+                  onChange={handleGroupChange}
+                  loading={groupSearchLoading}
+                  notFoundContent={t('common.noData')}
+                  options={groupSearchOptions}
+                />
+              ) : (
+                <Input disabled addonAfter={groupNameParam} />
+              )}
             </Form.Item>
             <Form.Item label={t('common:colBrand')}>
               <BrandTag value={brandParam} />
@@ -734,7 +780,7 @@ export default function DeductAdd() {
 
       {/* 底部操作按鈕 */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
+        <Button onClick={goBack}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
           {t('accountBalance.submitApply')}
         </Button>
@@ -777,7 +823,7 @@ export default function DeductAdd() {
             <Button
               type="primary"
               size="large"
-              onClick={() => navigate('/account-balance')}
+              onClick={goBack}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
               {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}

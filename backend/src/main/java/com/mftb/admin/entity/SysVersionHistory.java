@@ -38,6 +38,9 @@ public class SysVersionHistory {
     /** 数据库变更内容 (每行一条) */
     private String databaseChanges;
 
+    /** 同步覆盖的最新 Git commit SHA（用于增量同步） */
+    private String commitHash;
+
     /** 状态: 1=已发布 2=草稿 */
     private Integer status;
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Modal, type UploadFile } from 'antd'
 import {
@@ -18,6 +18,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../../components/BrandTag'
 import { fetchFinAccounts, submitTransferApply, fetchFinRiskConfig, checkFinTransferBatches } from '../../api/finance'
 import type { FinAccount, TransferApplyPayload, FinRiskRow, FinTransferBlock } from '../../api/finance'
+import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
+import type { OptionItem } from '../../api/types'
 import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
 
 /* ---- 數字動畫 Hook（遵循數據指標統計卡標準） ---- */
@@ -93,6 +95,14 @@ export default function TransferAdd() {
   const groupIdParam = searchParams.get('groupId') || ''
   const groupNameParam = searchParams.get('groupName') || ''
   const brandParam = searchParams.get('brand') || 'mFood'
+  const fromParam = searchParams.get('from') || ''
+
+  /** 返回地址：从流程中心进入则返回流程中心，否则返回账户余额 */
+  const backTarget = fromParam === 'process-center' ? '/process-center' : '/account-balance'
+  const goBack = useCallback(() => navigate(backTarget), [navigate, backTarget])
+
+  /** 从流程中心进入时，集团字段可编辑 */
+  const isFromProcessCenter = fromParam === 'process-center'
 
   const [form] = Form.useForm()
   const [transferAmount, setTransferAmount] = useState<number>(0)
@@ -106,6 +116,10 @@ export default function TransferAdd() {
   /** 同品牌推廣金賬戶列表（轉出餘額與轉入集團选项均由此派生） */
   const [accounts, setAccounts] = useState<FinAccount[]>([])
 
+  /** 集团搜索选项（从流程中心进入时使用） */
+  const [groupSearchOptions, setGroupSearchOptions] = useState<OptionItem[]>([])
+  const [groupSearchLoading, setGroupSearchLoading] = useState(false)
+
   /** 轉出集團風控信息（未結清欠款提示） */
   const [riskInfo, setRiskInfo] = useState<FinRiskRow | null>(null)
   /** 當前轉賬金額會觸碰的欠款批次（非空=提交將被攔截） */
@@ -116,6 +130,25 @@ export default function TransferAdd() {
       .then(res => setAccounts(res.records || []))
       .catch(() => setAccounts([]))
   }, [brandParam])
+
+  /** 集团搜索回调（从流程中心进入时启用） */
+  const handleGroupSearch = useCallback(async (keyword: string) => {
+    if (!keyword.trim()) { setGroupSearchOptions([]); return }
+    setGroupSearchLoading(true)
+    try {
+      const opts = await fetchMerchantGroupOptions(keyword.trim())
+      setGroupSearchOptions(opts || [])
+    } catch { setGroupSearchOptions([]) }
+    finally { setGroupSearchLoading(false) }
+  }, [])
+
+  /** 集团选择变更（从流程中心进入时启用） */
+  const handleGroupChange = useCallback((value: string) => {
+    const opt = groupSearchOptions.find(o => o.value === value)
+    if (opt) {
+      form.setFieldsValue({ sourceGroupId: value, sourceGroupName: opt.label })
+    }
+  }, [groupSearchOptions, form])
 
   /** 加載轉出集團風控信息（有未結清欠款時展示提示） */
   useEffect(() => {
@@ -160,7 +193,7 @@ export default function TransferAdd() {
     if (!successVisible) return
     if (countdown <= 0) {
       setSuccessVisible(false)
-      navigate('/account-balance')
+      navigate(backTarget)
       return
     }
     const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
@@ -343,7 +376,7 @@ export default function TransferAdd() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/account-balance')}
+              onClick={goBack}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 16px',
@@ -378,7 +411,21 @@ export default function TransferAdd() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
             <Form.Item label={t('accountBalance.sourceGroup')} name="sourceGroupId">
-              <Input disabled addonAfter={groupNameParam} />
+              {isFromProcessCenter ? (
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder={t('accountBalance.selectGroup')}
+                  filterOption={false}
+                  onSearch={handleGroupSearch}
+                  onChange={handleGroupChange}
+                  loading={groupSearchLoading}
+                  notFoundContent={t('common.noData')}
+                  options={groupSearchOptions}
+                />
+              ) : (
+                <Input disabled addonAfter={groupNameParam} />
+              )}
             </Form.Item>
             <Form.Item label={t('accountBalance.colBrand')}>
               <BrandTag value={brandParam} />
@@ -550,7 +597,7 @@ export default function TransferAdd() {
 
       {/* 底部操作按鈕（取消/提交申請） */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
+        <Button onClick={goBack}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
           {t('accountBalance.submitApply')}
         </Button>
@@ -593,7 +640,7 @@ export default function TransferAdd() {
             <Button
               type="primary"
               size="large"
-              onClick={() => navigate('/account-balance')}
+              onClick={goBack}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
               {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}

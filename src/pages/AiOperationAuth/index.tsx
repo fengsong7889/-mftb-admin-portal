@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
-  Checkbox,
-  Drawer,
-  Form,
-  Input,
   Modal,
-  Radio,
   Select,
   Switch,
   Table,
   Tag,
   Space,
+  Form,
+  Input,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -20,14 +18,12 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
-  FileSearchOutlined,
-  ToolOutlined,
 } from '@ant-design/icons'
 import {
   fetchMockToolRegistry,
   TOOL_LEVEL_META,
 } from '../../api/mock/aiPlatformMock'
-import type { ToolDefinition, ToolLevel, ToolParam } from '../../api/mock/aiPlatformMock'
+import type { ToolDefinition, ToolLevel } from '../../api/mock/aiPlatformMock'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 
 /* ────────────────── 展示常量 ────────────────── */
@@ -35,10 +31,8 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 /** 全部權限等級（有序） */
 const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 
-/** 參數白名單示意（新增行模板） */
-const EMPTY_PARAM: ToolParam = { name: '', type: 'string', required: false, whitelist: [], desc: '' }
-
 export default function AiOperationAuth() {
+  const navigate = useNavigate()
   /* ── 數據 ── */
   const [tools, setTools] = useState<ToolDefinition[]>([])
   const [loading, setLoading] = useState(false)
@@ -90,39 +84,6 @@ export default function AiOperationAuth() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  /* ── 編輯抽屜 ── */
-  const [editingTool, setEditingTool] = useState<ToolDefinition | 'new' | null>(null)
-  const [toolForm] = Form.useForm()
-  const [draftParams, setDraftParams] = useState<ToolParam[]>([])
-
-  const openToolForm = (tool: ToolDefinition | 'new') => {
-    setEditingTool(tool)
-    if (tool === 'new') {
-      toolForm.resetFields()
-      setDraftParams([])
-    } else {
-      toolForm.setFieldsValue({ name: tool.name, code: tool.code, menuName: tool.menuName, level: tool.level, description: tool.description })
-      setDraftParams(tool.params.map((p) => ({ ...p })))
-    }
-  }
-
-  const handleToolSave = () => {
-    toolForm.validateFields().then((values) => {
-      const params = draftParams.filter((p) => p.name.trim() !== '')
-      if (editingTool === 'new') {
-        setTools((prev) => [...prev, { id: `t${Date.now()}`, status: 1, callCount30d: 0, lastCalledAt: null, ...values, params, updatedBy: 'admin', updatedAt: new Date().toISOString() } as ToolDefinition])
-      } else if (editingTool) {
-        setTools((prev) => prev.map((t) => (t.id === editingTool.id ? { ...t, ...values, params, updatedBy: 'admin', updatedAt: new Date().toISOString() } : t)))
-      }
-      setEditingTool(null)
-      message.success('工具已保存，權限等級即時生效')
-    })
-  }
-
-  const handleParamChange = (index: number, patch: Partial<ToolParam>) => {
-    setDraftParams((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))
-  }
-
   /* ── 工具啟停（二次確認） ── */
   const handleToggleStatus = (row: ToolDefinition) => {
     const toDisable = row.status === 1
@@ -138,9 +99,6 @@ export default function AiOperationAuth() {
       },
     })
   }
-
-  /* ── 調用日誌抽屜 ── */
-  const [logTool, setLogTool] = useState<ToolDefinition | null>(null)
 
   /* ── 表格列 ── */
   const toolColumns: ColumnsType<ToolDefinition> = [
@@ -185,43 +143,12 @@ export default function AiOperationAuth() {
       title: '操作', key: 'action', width: 140, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => openToolForm(row)}>編輯</Button>
-          <Button type="link" onClick={() => setLogTool(row)}>調用日誌</Button>
+          <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?id=${row.id}`)}>編輯</Button>
+          <Button type="link" onClick={() => navigate(`/ai-operation-auth-log?id=${row.id}`)}>調用日誌</Button>
         </Space>
       ),
     },
   ]
-
-  /* ── 調用日誌列（mock 明細） ── */
-  const logColumns: ColumnsType<Record<string, string>> = [
-    { title: '時間', dataIndex: 'time', width: 160 },
-    { title: '操作人', dataIndex: 'operator', width: 100 },
-    { title: '等級動作', dataIndex: 'action', width: 130 },
-    { title: '結果', key: 'result', render: (_, row) => <span style={{ color: row.result === '成功' ? '#52C41A' : '#FF4D4F' }}>{row.result}</span> },
-  ]
-
-  const mockLogs = (tool: ToolDefinition): Array<Record<string, string>> => {
-    if (tool.level === 'L0') {
-      return [
-        { time: '2026-09-01 15:32:08', operator: 'chenwei', action: 'AI 請求調用（攔截）', result: '已攔截並提示人工處理' },
-      ]
-    }
-    if (tool.level === 'L1') {
-      return [
-        { time: '2026-09-02 10:24:18', operator: 'liuyang', action: 'AI 直接調用', result: '成功' },
-        { time: '2026-09-02 09:11:52', operator: 'zhaomin', action: 'AI 直接調用', result: '成功' },
-      ]
-    }
-    if (tool.level === 'L2') {
-      return [
-        { time: '2026-08-31 09:12:44', operator: 'zhaomin', action: 'AI 生成草稿 → 用戶確認', result: '成功' },
-        { time: '2026-08-30 16:05:31', operator: 'chenwei', action: 'AI 生成草稿 → 用戶確認', result: '成功' },
-      ]
-    }
-    return [
-      { time: '2026-08-30 11:05:56', operator: 'zhaomin', action: 'AI 發起 → 主管審批通過', result: '成功' },
-    ]
-  }
 
   return (
     <div className="content-area">
@@ -296,7 +223,7 @@ export default function AiOperationAuth() {
       {/* 操作區：右側新增 + 列配置 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openToolForm('new')}>新增</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/ai-operation-auth-edit')}>新增</Button>
           {configComponent}
         </div>
       </div>
@@ -310,127 +237,6 @@ export default function AiOperationAuth() {
         pagination={false}
       />
 
-      {/* 新增/編輯工具抽屜 */}
-      <Drawer
-        title={editingTool === 'new' ? '新增工具' : `編輯工具 - ${editingTool?.name ?? ''}`}
-        open={editingTool !== null}
-        onClose={() => setEditingTool(null)}
-        width={640}
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <Button onClick={() => setEditingTool(null)}>取消</Button>
-            <Button type="primary" onClick={handleToolSave}>保存</Button>
-          </div>
-        }
-      >
-        <Form form={toolForm} layout="vertical">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="name" label="工具名稱" rules={[{ required: true, message: '請輸入工具名稱' }]}>
-              <Input placeholder="如：訂單查詢" />
-            </Form.Item>
-            <Form.Item name="code" label="工具編碼" rules={[{ required: true, message: '請輸入工具編碼' }, { pattern: /^[a-z][a-z0-9_]*$/, message: '小寫字母開頭，僅含小寫字母/數字/下劃線' }]}>
-              <Input placeholder="如：order_query" disabled={editingTool !== 'new'} />
-            </Form.Item>
-          </div>
-          <Form.Item name="menuName" label="對應業務菜單" rules={[{ required: true, message: '請輸入對應業務菜單' }]}>
-            <Input placeholder="如：推廣訂單管理" />
-          </Form.Item>
-          <Form.Item name="level" label="權限等級" rules={[{ required: true, message: '請選擇權限等級' }]}>
-            <Radio.Group>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {TOOL_LEVELS.map((level) => {
-                  const meta = TOOL_LEVEL_META[level]
-                  return (
-                    <Radio key={level} value={level}>
-                      <span style={{ color: meta.color, fontWeight: 600 }}>{level} · {meta.name}</span>
-                      <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>{meta.desc}（{meta.human}）</span>
-                    </Radio>
-                  )
-                })}
-              </div>
-            </Radio.Group>
-          </Form.Item>
-          <Form.Item name="description" label="工具描述（供 AI 理解何時調用）">
-            <Input.TextArea rows={2} placeholder="描述該工具的能力與適用場景，將作為 Function Calling 的 description 下發給模型" />
-          </Form.Item>
-
-          {/* 參數白名單 */}
-          <div style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 8px' }}>
-            <ToolOutlined style={{ marginRight: 6, color: '#E8720C' }} />參數白名單
-          </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
-            AI 只能使用預定義的參數；「白名單取值」留空表示允許自由輸入，填寫後僅可從列舉值中選擇，防止構造越權參數。
-          </div>
-          <Table
-            rowKey={(row) => row.name || `new-${draftParams.indexOf(row)}`}
-            size="small"
-            columns={[
-              { title: '參數名', dataIndex: 'name', width: 120, render: (_, row) => <Input size="small" value={row.name} onChange={(e) => handleParamChange(draftParams.indexOf(row), { name: e.target.value })} placeholder="參數名" /> },
-              {
-                title: '類型', dataIndex: 'type', width: 100, render: (_, row) => (
-                  <Select
-                    size="small"
-                    style={{ width: '100%' }}
-                    value={row.type}
-                    onChange={(v) => handleParamChange(draftParams.indexOf(row), { type: v })}
-                    options={[{ value: 'string', label: 'string' }, { value: 'number', label: 'number' }, { value: 'boolean', label: 'boolean' }]}
-                  />
-                ),
-              },
-              {
-                title: '必填', dataIndex: 'required', width: 60, align: 'center', render: (_, row) => (
-                  <Checkbox checked={row.required} onChange={(e) => handleParamChange(draftParams.indexOf(row), { required: e.target.checked })} />
-                ),
-              },
-              {
-                title: '白名單取值（逗號分隔，留空=自由輸入）', dataIndex: 'whitelist', render: (_, row) => (
-                  <Input size="small" value={row.whitelist.join(', ')} onChange={(e) => handleParamChange(draftParams.indexOf(row), { whitelist: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} placeholder="如：pending, paid, refunded" />
-                ),
-              },
-              {
-                title: '操作', key: 'op', width: 60, align: 'center', render: (_, row) => (
-                  <Button type="link" danger size="small" onClick={() => setDraftParams((prev) => prev.filter((p) => p !== row))}>刪除</Button>
-                ),
-              },
-            ]}
-            dataSource={draftParams}
-            pagination={false}
-            footer={() => (
-              <Button size="small" type="dashed" block icon={<PlusOutlined />} onClick={() => setDraftParams((prev) => [...prev, { ...EMPTY_PARAM }])}>添加參數</Button>
-            )}
-          />
-        </Form>
-      </Drawer>
-
-      {/* 調用日誌抽屜 */}
-      <Drawer
-        title={`調用日誌 - ${logTool?.name ?? ''}`}
-        open={logTool !== null}
-        onClose={() => setLogTool(null)}
-        width={620}
-      >
-        {logTool && (
-          <>
-            <Alert
-              type={logTool.level === 'L0' ? 'warning' : 'success'}
-              showIcon
-              style={{ marginBottom: 16 }}
-              message={`${logTool.level} 等級工具`}
-              description={`當前等級：${TOOL_LEVEL_META[logTool.level].name}（${TOOL_LEVEL_META[logTool.level].desc}）。所有 AI 調用、人工確認、審批記錄均留痕，供審計追溯。`}
-            />
-            <Table
-              rowKey={(row) => row.time}
-              size="small"
-              columns={logColumns}
-              dataSource={mockLogs(logTool)}
-              pagination={false}
-            />
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileSearchOutlined />演示數據；後端網關落地後將記錄完整調用鏈（請求 ID、參數摘要、執行結果、耗時）。
-            </div>
-          </>
-        )}
-      </Drawer>
     </div>
   )
 }

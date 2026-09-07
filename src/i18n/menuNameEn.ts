@@ -98,7 +98,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai-assistant': 'AI Center (AI)',
   'ai_model_hub': 'Model Access',
   'ai_quota_auth': 'Authorization & Quota',
-  'ai-operation-auth': 'AI Operation Authorization',
+  'ai-operation-auth': 'AI Access Control',
   'ai_usage_stats': 'Energy Statistics',
   'ai_energy_detail': 'Energy Detail',
   // 智能中心 (AI) - 拆分后的新菜单 key
@@ -117,6 +117,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai-role-auth': 'Role-Based Authorization',       // 角色授权
   'ai-dept-quota': 'Department Quota',
   'ai-emp-quota': 'Employee Quota',
+  'ai-emp-permission': 'Employee AI Quota Management',
   // 能耗與賬單
   'ai-energy-billing': 'Energy & Billing',
   // AI 使用申請（與 en.json aiApply.pageTitle 保持一致）
@@ -126,6 +127,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   // OA中心
   'oa-center': 'OA Center',
   'oa-requests': 'Workflow Items',
+  'process-center': 'Process Center',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
 }
