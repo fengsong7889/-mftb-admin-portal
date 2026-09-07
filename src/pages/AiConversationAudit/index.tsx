@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, DatePicker, Form, Pagination, Select, Table, Tag } from 'antd'
+import { Button, DatePicker, Form, Input, Pagination, Select, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
@@ -15,7 +15,6 @@ import {
 import {
   fetchAuditConversations,
   fetchAuditModelKeys,
-  fetchAuditUsernames,
 } from '../../api/aiConversation'
 import type { AiConversation, AuditPageResult } from '../../api/aiConversation'
 
@@ -51,7 +50,7 @@ export default function AiConversationAudit() {
   const [searchForm] = Form.useForm()
 
   /* ── 查询条件 ── */
-  const [username, setUsername] = useState<string | undefined>(undefined)
+  const [keyword, setKeyword] = useState<string | undefined>(undefined)
   const [modelKey, setModelKey] = useState<string | undefined>(undefined)
   const [status, setStatus] = useState<number | undefined>(undefined)
   const [createDates, setCreateDates] = useState<[Dayjs, Dayjs] | null>(null)
@@ -62,14 +61,11 @@ export default function AiConversationAudit() {
   /* ─ 数据 ── */
   const [result, setResult] = useState<AuditPageResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [userOptions, setUserOptions] = useState<{ value: string; label: string }[]>([])
+  const [employeeCount, setEmployeeCount] = useState(0)
   const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([])
 
   /** 加载筛选选项 */
   useEffect(() => {
-    fetchAuditUsernames().then((list) => {
-      setUserOptions(list.map((u) => ({ value: u, label: u })))
-    }).catch(() => {})
     fetchAuditModelKeys().then((list) => {
       setModelOptions(list.map((m) => ({ value: m, label: m })))
     }).catch(() => {})
@@ -79,21 +75,28 @@ export default function AiConversationAudit() {
   const queryParams = useCallback(() => ({
     page,
     size: pageSize,
-    username,
+    keyword,
     modelKey,
     status,
     createStartDate: createDates?.[0]?.format('YYYY-MM-DD'),
     createEndDate: createDates?.[1]?.format('YYYY-MM-DD'),
     updateStartDate: updateDates?.[0]?.format('YYYY-MM-DD'),
     updateEndDate: updateDates?.[1]?.format('YYYY-MM-DD'),
-  }), [page, pageSize, username, modelKey, status, createDates, updateDates])
+  }), [page, pageSize, keyword, modelKey, status, createDates, updateDates])
 
   /** 加载数据 */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     fetchAuditConversations(queryParams()).then((data) => {
-      if (!cancelled) setResult(data)
+      if (!cancelled) {
+        setResult(data)
+        /* 首页时统计涉及员工数（去重） */
+        if (data.current === 1) {
+          const uniqueUsernames = new Set(data.records.map((r) => r.username))
+          setEmployeeCount(uniqueUsernames.size)
+        }
+      }
     }).catch(() => {}).finally(() => {
       if (!cancelled) setLoading(false)
     })
@@ -106,7 +109,7 @@ export default function AiConversationAudit() {
 
   const handleReset = () => {
     searchForm.resetFields()
-    setUsername(undefined)
+    setKeyword(undefined)
     setModelKey(undefined)
     setStatus(undefined)
     setCreateDates(null)
@@ -124,10 +127,16 @@ export default function AiConversationAudit() {
       render: (v: string | null) => <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#8c8c8c' }}>{v || '--'}</span>,
     },
     {
-      title: t('conversationAudit.colUsername'),
+      title: t('conversationAudit.colEmpId'),
       dataIndex: 'username',
       width: 120,
       render: (v: string) => <Tag color="blue">{v}</Tag>,
+    },
+    {
+      title: t('conversationAudit.colEmpName'),
+      dataIndex: 'empName',
+      width: 120,
+      render: (v: string | null) => v || <span style={{ color: '#BFBFBF' }}>--</span>,
     },
     {
       title: t('conversationAudit.colTitle'),
@@ -213,15 +222,13 @@ export default function AiConversationAudit() {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label={t('conversationAudit.filterUsername')} name="username">
-            <Select
-              value={username}
-              placeholder={t('conversationAudit.filterUsername')}
+          <Form.Item label={t('conversationAudit.filterKeyword')} name="keyword">
+            <Input
+              value={keyword}
+              placeholder={t('conversationAudit.filterKeyword')}
               allowClear
-              showSearch
-              optionFilterProp="label"
-              options={userOptions}
-              onChange={(value) => setUsername(value)}
+              onChange={(e) => setKeyword(e.target.value)}
+              onPressEnter={handleSearch}
               style={{ width: '100%' }}
             />
           </Form.Item>
@@ -327,8 +334,8 @@ export default function AiConversationAudit() {
               <RobotOutlined style={{ color: '#52C41A', fontSize: 20 }} />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t('conversationAudit.totalUsers')}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>{userOptions.length}</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t('conversationAudit.totalEmployees')}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>{employeeCount}</div>
             </div>
           </div>
           <div style={{
@@ -361,7 +368,7 @@ export default function AiConversationAudit() {
           columns={columns}
           dataSource={result?.records ?? []}
           pagination={false}
-          scroll={{ x: 1550 }}
+          scroll={{ x: 1650 }}
         />
       </div>
 

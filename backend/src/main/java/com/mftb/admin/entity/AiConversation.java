@@ -41,6 +41,10 @@ public class AiConversation {
     /** 本次会话累计请求次数 */
     private Integer requestCount;
 
+    /** 员工姓名（非持久化，审计查询时通过 JOIN sys_user 填充） */
+    @TableField(exist = false)
+    private String empName;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

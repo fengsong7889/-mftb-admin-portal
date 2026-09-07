@@ -10,7 +10,10 @@ export interface AiConversation {
   id: number
   /** 对话编号（DH+YYYYMMDD+7位自增） */
   conversationId: string | null
+  /** 员工工号 */
   username: string
+  /** 员工姓名（审计查询时通过 JOIN sys_user 填充） */
+  empName: string | null
   title: string
   /** JSON 序列化后的 ChatMessage[] */
   messages: string
@@ -18,7 +21,7 @@ export interface AiConversation {
   modelKey: string | null
   /** 本次会话累计消耗 tokens */
   totalTokens: number
-  /** 本次会话累计请求次数 */
+  /** 本次会话累计请求次数（请求模型的次数） */
   requestCount: number
   /** 逻辑删除标记：0=正常 1=已删除 */
   deleted: number
@@ -110,7 +113,8 @@ export function permanentDeleteConversation(id: number): Promise<void> {
 export interface AuditParams {
   page: number
   size: number
-  username?: string
+  /** 员工工号或姓名模糊搜索 */
+  keyword?: string
   modelKey?: string
   status?: number
   createStartDate?: string
@@ -136,11 +140,6 @@ export function fetchAuditConversations(params: AuditParams): Promise<AuditPageR
 /** 获取所有已使用过的模型标识列表 */
 export function fetchAuditModelKeys(): Promise<string[]> {
   return request.get<unknown, string[]>('/ai/conversations/audit/model-keys')
-}
-
-/** 获取所有有会话的用户账号列表 */
-export function fetchAuditUsernames(): Promise<string[]> {
-  return request.get<unknown, string[]>('/ai/conversations/audit/usernames')
 }
 
 /** 管理员查看单个会话详情 */

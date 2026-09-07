@@ -6,7 +6,6 @@ import dayjs from 'dayjs'
 import {
   UserOutlined,
   RobotOutlined,
-  ClockCircleOutlined,
   FileTextOutlined,
   PaperClipOutlined,
   MessageOutlined,
@@ -107,6 +106,11 @@ export default function AiConversationAuditDetail() {
 
   const parsed = parseConversation(conversation)
 
+  /** 员工显示名：姓名(工号) */
+  const empDisplayName = conversation.empName
+    ? `${conversation.empName}(${conversation.username})`
+    : conversation.username
+
   /** 状态标签 */
   const statusTag = conversation.deleted === 1
     ? <Tag color="orange">{t('conversationAudit.statusTrashed')}</Tag>
@@ -120,7 +124,7 @@ export default function AiConversationAuditDetail() {
       <DetailPageHeader
         title={conversation.title || t('conversationAudit.untitled')}
         tags={statusTag}
-        meta={`${conversation.username} · ${dayjs(conversation.createdAt).format('YYYY-MM-DD HH:mm')}`}
+        meta={`${empDisplayName} · ${dayjs(conversation.createdAt).format('YYYY-MM-DD HH:mm')}`}
         onBack={() => navigate('/ai-conversation-audit')}
       />
 
@@ -133,14 +137,17 @@ export default function AiConversationAuditDetail() {
           icon={<UserOutlined />}
           iconBg="#e6f7ff"
           iconColor="#1890ff"
-          title={t('conversationAudit.basicInfo')}
+          title="基础信息"
         />
         <Descriptions column={4} size="small" labelStyle={{ color: '#8c8c8c', fontSize: 13 }}>
           <Descriptions.Item label={t('conversationAudit.colId')}>
             <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{conversation.conversationId || '--'}</span>
           </Descriptions.Item>
-          <Descriptions.Item label={t('conversationAudit.colUsername')}>
+          <Descriptions.Item label={t('conversationAudit.colEmpId')}>
             <Tag color="blue">{conversation.username}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label={t('conversationAudit.colEmpName')}>
+            {conversation.empName || <Text type="secondary">--</Text>}
           </Descriptions.Item>
           <Descriptions.Item label={t('conversationAudit.colModel')}>
             {conversation.modelKey ? <Tag color="green">{conversation.modelKey}</Tag> : <Text type="secondary">--</Text>}
@@ -154,7 +161,7 @@ export default function AiConversationAuditDetail() {
           <Descriptions.Item label={t('conversationAudit.colRequests')}>
             <Text strong>{conversation.requestCount > 0 ? conversation.requestCount : '--'}</Text>
           </Descriptions.Item>
-          <Descriptions.Item label={<><ClockCircleOutlined /> {t('conversationAudit.colCreatedAt')}</>}>
+          <Descriptions.Item label={t('conversationAudit.colCreatedAt')}>
             {dayjs(conversation.createdAt).format('YYYY-MM-DD HH:mm:ss')}
           </Descriptions.Item>
           <Descriptions.Item label={t('conversationAudit.colUpdatedAt')}>
@@ -213,7 +220,7 @@ export default function AiConversationAuditDetail() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Text strong style={{ color: msg.role === 'user' ? '#e8720c' : '#52c41a' }}>
-                      {msg.role === 'user' ? t('conversationAudit.roleUser') : t('conversationAudit.roleAssistant')}
+                      {msg.role === 'user' ? empDisplayName : t('conversationAudit.roleAssistant')}
                     </Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {dayjs(msg.timestamp).format('YYYY-MM-DD HH:mm:ss')}

@@ -118,6 +118,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   // 版本管理
   '/version-history-detail': { fixed: 'i18n:versionHistory.detailTitle' },
   '/version-history-add': { fixed: 'i18n:versionHistory.addVersion' },
+  // 对话审计（动态路由 /ai-conversation-audit/:id）
+  '/ai-conversation-audit': { fixed: '對話詳情' },
   '/version-history-edit': { fixed: 'i18n:versionHistory.editVersion' },
   // 页面说明（页面标题含动态页面名，取静态主体）
   '/page-description-editor': { fixed: '編輯界面說明' },

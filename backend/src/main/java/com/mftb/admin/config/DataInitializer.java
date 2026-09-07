@@ -648,7 +648,6 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("promotion-tool", "Promotion Pass"),
                 Map.entry("promotion_tool", "Promotion Pass"),
                 Map.entry("promotion-sales-config", "Store Promotion"),
-                Map.entry("promotion-order-manage", "Order Management"),
                 Map.entry("promotion-report-group", "Report Analysis"),
                 Map.entry("promotion-report-overview", "Overview"),
                 Map.entry("promotion-report-order", "Order Report"),
@@ -939,7 +938,6 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
         // ── 推廣通 ──
         menus.put("promotion-sales-config", new String[]{"店鋪推廣",     "promotion_tool",     "1"});
-        menus.put("promotion-order-manage", new String[]{"訂單管理",     "promotion_tool",     "3"});
         menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "2"});
         menus.put("promotion-report-overview", new String[]{"數據概覽",  "promotion-report-group", "1"});
         menus.put("promotion-report-order", new String[]{"訂單效果報表", "promotion-report-group", "2"});

@@ -95,14 +95,14 @@ public class AiConversationController {
     public Result<Page<AiConversation>> audit(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String modelKey,
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String createStartDate,
             @RequestParam(required = false) String createEndDate,
             @RequestParam(required = false) String updateStartDate,
             @RequestParam(required = false) String updateEndDate) {
-        return Result.success(conversationService.listAllConversations(page, size, username, modelKey,
+        return Result.success(conversationService.listAllConversations(page, size, keyword, modelKey,
                 status, createStartDate, createEndDate, updateStartDate, updateEndDate));
     }
 
@@ -113,14 +113,7 @@ public class AiConversationController {
         return Result.success(conversationService.listDistinctModelKeys());
     }
 
-    /** 获取所有有会话的用户账号列表 */
-    @GetMapping("/audit/usernames")
-    @Operation(summary = "获取所有有会话的用户账号")
-    public Result<List<String>> usernames() {
-        return Result.success(conversationService.listDistinctUsernames());
-    }
-
-    /** 管理员查看单个会话详情（含所有状态） */
+    /** 管理员查看单个会话详情（含所有状态，含员工姓名） */
     @GetMapping("/audit/{id}")
     @Operation(summary = "管理员查看单个会话详情")
     public Result<AiConversation> auditDetail(@PathVariable Long id) {

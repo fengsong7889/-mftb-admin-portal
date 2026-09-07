@@ -193,12 +193,12 @@ public class AiConversationServiceImpl implements AiConversationService {
     /* ── 管理员审计接口实现 ── */
 
     @Override
-    public Page<AiConversation> listAllConversations(int page, int size, String username, String modelKey,
+    public Page<AiConversation> listAllConversations(int page, int size, String keyword, String modelKey,
                                                      Integer status,
                                                      String createStartDate, String createEndDate,
                                                      String updateStartDate, String updateEndDate) {
         // 使用审计专用 Mapper 方法，绕过 @TableLogic 过滤，包含已软删除的记录
-        return conversationMapper.selectPageForAudit(new Page<>(page, size), username, modelKey,
+        return conversationMapper.selectPageForAudit(new Page<>(page, size), keyword, modelKey,
                 status, createStartDate, createEndDate, updateStartDate, updateEndDate);
     }
 
@@ -206,12 +206,6 @@ public class AiConversationServiceImpl implements AiConversationService {
     public List<String> listDistinctModelKeys() {
         // 使用审计专用 Mapper 方法，绕过 @TableLogic 过滤，包含已软删除记录中的模型
         return conversationMapper.selectModelKeysForAudit();
-    }
-
-    @Override
-    public List<String> listDistinctUsernames() {
-        // 使用审计专用 Mapper 方法，绕过 @TableLogic 过滤，包含已软删除记录中的用户
-        return conversationMapper.selectUsernamesForAudit();
     }
 
     @Override

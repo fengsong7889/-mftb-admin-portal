@@ -212,8 +212,6 @@ const keyToPath: Record<string, string> = {
   'ai-pos-auth': '/ai-pos-auth',
   'ai-dept-quota': '/ai-dept-quota',
   'ai-emp-quota': '/ai-emp-quota',
-  // 订单管理
-  'promotion-order-manage': '/promotion-order-manage',
   // 门店数据配置
   'store-data-config': '/store-data-config',
   // 地图規劃

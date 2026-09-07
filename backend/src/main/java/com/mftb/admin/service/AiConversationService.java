@@ -39,9 +39,9 @@ public interface AiConversationService {
     /* ── 管理员审计接口 ── */
 
     /**
-     * 管理员分页查询所有会话（支持按 username / modelKey / status / 创建时间 / 更新时间筛选）
+     * 管理员分页查询所有会话（支持按 keyword(工号或姓名) / modelKey / status / 创建时间 / 更新时间筛选）
      */
-    Page<AiConversation> listAllConversations(int page, int size, String username, String modelKey,
+    Page<AiConversation> listAllConversations(int page, int size, String keyword, String modelKey,
                                               Integer status,
                                               String createStartDate, String createEndDate,
                                               String updateStartDate, String updateEndDate);
@@ -49,9 +49,6 @@ public interface AiConversationService {
     /** 获取所有已使用过的模型标识列表（用于筛选下拉） */
     List<String> listDistinctModelKeys();
 
-    /** 获取所有有会话的用户账号列表（用于筛选下拉） */
-    List<String> listDistinctUsernames();
-
-    /** 审计专用：按 ID 查询单条会话详情（含所有状态） */
+    /** 审计专用：按 ID 查询单条会话详情（含所有状态，含员工姓名） */
     AiConversation getConversationForAudit(Long id);
 }

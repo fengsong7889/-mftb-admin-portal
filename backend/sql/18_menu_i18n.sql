@@ -76,4 +76,3 @@ UPDATE sys_menu SET name_en = 'Data Authorization'      WHERE menu_key = 'data-p
 UPDATE sys_menu SET name_en = 'System Config'           WHERE menu_key = 'system-config' AND (name_en IS NULL OR name_en = '');
 UPDATE sys_menu SET name_en = 'Menu Config'             WHERE menu_key = 'menu-config' AND (name_en IS NULL OR name_en = '');
 UPDATE sys_menu SET name_en = 'Order Management'        WHERE menu_key = 'merchant-order-manage' AND (name_en IS NULL OR name_en = '');
-UPDATE sys_menu SET name_en = 'Order Management'        WHERE menu_key = 'promotion-order-manage' AND (name_en IS NULL OR name_en = '');
