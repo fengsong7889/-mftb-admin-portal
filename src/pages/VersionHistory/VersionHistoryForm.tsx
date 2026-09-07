@@ -8,6 +8,7 @@ import {
   fetchVersionDetail,
   createVersion,
   updateVersion,
+  suggestNextVersion,
 } from '../../api/versionHistory'
 
 const { TextArea } = Input
@@ -20,6 +21,7 @@ export default function VersionHistoryForm() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
 
   useEffect(() => {
     if (!isEdit) return
@@ -68,6 +70,23 @@ export default function VersionHistoryForm() {
   }
 
   const handleBack = () => navigate('/version-history')
+
+  const handleSuggestVersion = async () => {
+    const releaseType = form.getFieldValue('releaseType')
+    if (!releaseType) {
+      message.warning('請先選擇發布類型')
+      return
+    }
+    try {
+      setSuggesting(true)
+      const nextVersion = await suggestNextVersion(releaseType)
+      form.setFieldsValue({ versionNo: nextVersion })
+    } catch {
+      message.error('獲取建議版本號失敗')
+    } finally {
+      setSuggesting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -120,10 +139,24 @@ export default function VersionHistoryForm() {
           name="versionNo"
           rules={[
             { required: true, message: t('common.required') },
-            { pattern: /^\d+\.\d+\.\d+$/, message: '請使用語義化版本格式，如 1.0.0' },
+            { pattern: /^\d+\.\d+\.\d+(\.\d{1,2})?$/, message: '請使用版本格式，如 1.0.0 或 1.0.01' },
           ]}
+          extra="重大更新→第二位增长(1.0.0→1.1.0)；功能新增→第三位增长(1.0.0→1.0.1)；問題修復→第四位增长(1.0.0→1.0.01)"
         >
-          <Input placeholder="例：1.2.0" style={{ maxWidth: 200 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Input placeholder="例：1.0.1 或 1.0.01" style={{ maxWidth: 200 }} />
+            {!isEdit && (
+              <Button
+                type="link"
+                size="small"
+                loading={suggesting}
+                onClick={handleSuggestVersion}
+                style={{ padding: '0 4px', fontSize: 12 }}
+              >
+                自動建議
+              </Button>
+            )}
+          </div>
         </Form.Item>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -133,6 +166,7 @@ export default function VersionHistoryForm() {
             rules={[{ required: true, message: t('common.required') }]}
           >
             <Select
+              onChange={() => { form.setFieldsValue({ versionNo: undefined }) }}
               options={[
                 { value: 'major', label: t('versionHistory.type_major') },
                 { value: 'minor', label: t('versionHistory.type_minor') },

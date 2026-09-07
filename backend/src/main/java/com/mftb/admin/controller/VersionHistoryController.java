@@ -75,6 +75,13 @@ public class VersionHistoryController {
         return Result.success(result);
     }
 
+    /** 根据发布类型建议下一个版本号 */
+    @GetMapping("/suggest-next-version")
+    @RequirePermission(menu = "version-history")
+    public Result<String> suggestNextVersion(@RequestParam String releaseType) {
+        return Result.success(versionHistoryService.suggestNextVersion(releaseType));
+    }
+
     private String currentOperator() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();

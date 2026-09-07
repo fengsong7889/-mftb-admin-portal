@@ -61,3 +61,8 @@ export function deleteVersion(id: number): Promise<void> {
 export function syncVersionFromGit(): Promise<string> {
   return request.post('/version-history/sync-from-git')
 }
+
+/** 根据发布类型建议下一个版本号 */
+export function suggestNextVersion(releaseType: string): Promise<string> {
+  return request.get('/version-history/suggest-next-version', { params: { releaseType } })
+}

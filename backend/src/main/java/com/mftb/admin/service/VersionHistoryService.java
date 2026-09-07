@@ -41,4 +41,11 @@ public interface VersionHistoryService {
      * @return 同步结果摘要
      */
     String syncFromGit(String operator);
+
+    /**
+     * 根据发布类型建议下一个版本号
+     * @param releaseType major / minor / patch
+     * @return 建议的版本号字符串
+     */
+    String suggestNextVersion(String releaseType);
 }

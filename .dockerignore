@@ -1,0 +1,19 @@
+# 排除大目录，加速 Docker 构建上下文传输
+node_modules/
+dist/
+backend/target/
+
+# IDE / 日志
+.idea/
+*.iml
+*.log
+
+# Qoder 临时文件
+.qoder/
+
+# 前端测试 / 文档
+src/test/
+docs/
+
+# 保留 .git/（版本同步功能需要读取提交历史）
+# 保留 backend/src、backend/pom.xml（构建需要）

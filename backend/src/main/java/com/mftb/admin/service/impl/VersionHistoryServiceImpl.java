@@ -332,6 +332,13 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return sb.toString();
     }
 
+    /**
+     * 根据提交记录计算下一个版本号
+     * 版本规则：
+     *   重大更新 → 第二位数增长  1.0.0 → 1.1.0
+     *   功能新增 → 第三位数增长  1.0.0 → 1.0.1
+     *   问题修复 → 第四位(子补丁) 1.0.0 → 1.0.01
+     */
     private String bumpVersion(String currentVersion, List<GitCommit> commits) {
         String[] parts = currentVersion.split("\\.");
         int major = parts.length > 0 ? Integer.parseInt(parts[0]) : 1;
@@ -344,11 +351,38 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
                 .anyMatch(c -> c.getSubject().startsWith("feat") || c.getSubject().startsWith("feat("));
 
         if (hasBreaking) {
-            return (major + 1) + ".0.0";
-        } else if (hasFeature) {
+            // 重大更新：第二位数增长
             return major + "." + (minor + 1) + ".0";
-        } else {
+        } else if (hasFeature) {
+            // 功能新增：第三位数增长
             return major + "." + minor + "." + (patch + 1);
+        } else {
+            // 问题修复：第四位(子补丁)增长
+            int subPatch = parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
+            return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
+        }
+    }
+
+    @Override
+    public String suggestNextVersion(String releaseType) {
+        String lastVersionNo = getLastVersionNo();
+        String base = lastVersionNo != null ? lastVersionNo : "1.0.0";
+
+        String[] parts = base.split("\\.");
+        int major = parts.length > 0 ? Integer.parseInt(parts[0]) : 1;
+        int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+        int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+
+        if ("major".equals(releaseType)) {
+            // 重大更新：第二位数增长
+            return major + "." + (minor + 1) + ".0";
+        } else if ("minor".equals(releaseType)) {
+            // 功能新增：第三位数增长
+            return major + "." + minor + "." + (patch + 1);
+        } else {
+            // 问题修复：第四位(子补丁)增长
+            int subPatch = parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
+            return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
 
