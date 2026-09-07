@@ -7,8 +7,8 @@ import request from './request'
 
 /* ══════════ 我的用量 ══════════ */
 
-/** 额度维度来源 */
-export type QuotaSource = 'employee' | 'department' | 'position' | 'role'
+/** 额度维度来源（grant=审批下发的个人独立额度，优先生效） */
+export type QuotaSource = 'employee' | 'department' | 'position' | 'role' | 'grant'
 
 /** 限额周期 */
 export type QuotaPeriod = 'daily' | 'monthly'
@@ -25,7 +25,7 @@ export interface MyCostEntry {
 /** 单个额度维度：一条「来源 + 周期 + 类型」的限额规则及本期已用 */
 export interface QuotaDimension {
   source: QuotaSource
-  /** 来源名称（员工专属 / 部门名 / 策略名 / 角色名） */
+  /** 来源名称（员工专属 / 部门名 / 策略名 / 角色名 / 审批授予） */
   sourceName: string
   /** 限定模型 ID；null = 全部模型 */
   modelId: number | null

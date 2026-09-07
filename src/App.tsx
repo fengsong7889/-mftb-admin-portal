@@ -139,6 +139,11 @@ const AiConversationAuditDetail = lazy(() => import('./pages/AiConversationAudit
 // AI 使用申請
 const AiAccessApply = lazy(() => import('./pages/AiAccessApply'))
 const McpService = lazy(() => import('./pages/McpService'))
+// 員工AI權限
+const AiEmpPermission = lazy(() => import('./pages/AiEmpPermission'))
+const AiEmpPermissionDetail = lazy(() => import('./pages/AiEmpPermission/AiEmpPermissionDetail'))
+// OA中心
+const OaRequests = lazy(() => import('./pages/OACenter/OaRequests'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -301,6 +306,11 @@ function AuthenticatedLayout() {
               <Route path="/ai-mcp-service" element={<McpService />} />
               <Route path="/ai-conversation-audit" element={<AiConversationAudit />} />
               <Route path="/ai-conversation-audit/:id" element={<AiConversationAuditDetail />} />
+              {/* 員工AI權限 */}
+              <Route path="/ai-emp-permission" element={<AiEmpPermission />} />
+              <Route path="/ai-emp-permission-detail" element={<AiEmpPermissionDetail />} />
+              {/* OA中心 */}
+              <Route path="/oa-requests" element={<OaRequests />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />

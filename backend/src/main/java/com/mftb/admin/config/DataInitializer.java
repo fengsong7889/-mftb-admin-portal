@@ -52,7 +52,9 @@ public class DataInitializer implements CommandLineRunner {
     //      （獨立初始化器種的 AI 菜單會被本類的 '%ai%' 清理誤刪且 applyOnce 不會重跑，必須併入主種子）
     // v13: 「模型信息」更名為「模型接入」
     // v14: 新增「对话审计」菜單
-    private static final String V_MENU_SEED = "core:menu-seed-v14";
+    // v15: 新增「OA中心」一级菜单，「流程配置」从「系统配置」迁移至「OA中心」
+    // v16: 设置 OA 中心图标，修正 permission/system-config 排序
+    private static final String V_MENU_SEED = "core:menu-seed-v16";
 
     @Override
     public void run(String... args) {
@@ -698,6 +700,8 @@ public class DataInitializer implements CommandLineRunner {
                 Map.entry("role-management", "Role Management"),
                 Map.entry("function-permission", "Function Authorization"),
                 Map.entry("data-permission", "Data Authorization"),
+                Map.entry("oa-center", "OA Center"),
+                Map.entry("oa-requests", "Workflow Items"),
                 Map.entry("system-config", "System Config"),
                 Map.entry("menu-config", "Menu Config"),
                 Map.entry("translation-manage", "Translation Config"),
@@ -754,6 +758,11 @@ public class DataInitializer implements CommandLineRunner {
             jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", controlId);
             log.info("已删除无用的能耗管控菜单 (id={})", controlId);
         }
+        // v15: OA中心 — 设置图标 & 修正顶级菜单排序
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'SolutionOutlined' WHERE menu_key = 'oa-center' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'FileTextOutlined' WHERE menu_key = 'oa-requests' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'permission' AND sort_order = 10");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'system-config' AND sort_order = 11");
     }
 
     /** 角色-菜单权限关联表: 不存在则创建, 存在则补充 actions 列, 并迁移旧 JSON 权限 */
@@ -914,8 +923,9 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
         menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
         menus.put("hr",                  new String[]{"集團人事",          null,  "9"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "10"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "11"});
+        menus.put("oa-center",           new String[]{"OA中心",            null,  "10"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "11"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "12"});
         // ── 商戶集團管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
@@ -989,6 +999,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("ai_usage_stats",      new String[]{"能耗統計",       "ai-energy-billing",  "1"});
         menus.put("ai_energy_detail",    new String[]{"能耗明細",       "ai-energy-billing",  "2"});
         menus.put("ai-mcp-service",      new String[]{"MCP 服務",       "ai-assistant",       "6"});
+        menus.put("ai-emp-permission",    new String[]{"員工AI權限",     "ai-assistant",       "8"});
         // 與 102_ai_access_request_menu.sql 同源：併入主種子，防止 '%ai%' 清理後獨立初始化器不重跑導致菜單丟失
         menus.put("ai-access-request",   new String[]{"AI 使用申請",    "ai-assistant",      "10"});
         menus.put("ai-conversation-audit", new String[]{"对话审计",     "ai-assistant",       "7"});
@@ -1002,6 +1013,9 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("organization-management", new String[]{"組織管理",     "hr",                 "2"});
         menus.put("position-management", new String[]{"職位管理",         "hr",                 "3"});
         menus.put("login-log",           new String[]{"員工動態",         "hr",                 "4"});
+        // ── OA中心 ──
+        menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "1"});
+        menus.put("workflow-config",     new String[]{"流程配置",         "oa-center",         "2"});
         // ── 權限管理 ──
         menus.put("role-management",     new String[]{"角色管理",         "permission",         "1"});
         menus.put("function-permission", new String[]{"功能授權",         "permission",         "2"});
@@ -1010,8 +1024,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
         menus.put("translation-manage",  new String[]{"多語言配置",         "system-config",      "2"});
         menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "3"});
-        menus.put("workflow-config",     new String[]{"流程配置",         "system-config",      "4"});
-        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "5"});
+        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "4"});
 
         int created = 0;
         int updated = 0;

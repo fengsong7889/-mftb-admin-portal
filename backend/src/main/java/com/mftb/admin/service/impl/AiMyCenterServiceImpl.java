@@ -13,6 +13,7 @@ import com.mftb.admin.entity.AiEmployeeAuth;
 import com.mftb.admin.entity.AiModel;
 import com.mftb.admin.entity.AiProvider;
 import com.mftb.admin.entity.AiQuotaConfig;
+import com.mftb.admin.entity.AiQuotaOverride;
 import com.mftb.admin.entity.AiRoleQuotaPolicy;
 import com.mftb.admin.entity.LlmUsage;
 import com.mftb.admin.entity.SysUser;
@@ -26,6 +27,7 @@ import com.mftb.admin.mapper.AiEmployeeAuthMapper;
 import com.mftb.admin.mapper.AiModelMapper;
 import com.mftb.admin.mapper.AiProviderMapper;
 import com.mftb.admin.mapper.AiQuotaConfigMapper;
+import com.mftb.admin.mapper.AiQuotaOverrideMapper;
 import com.mftb.admin.mapper.AiRoleQuotaPolicyMapper;
 import com.mftb.admin.mapper.LlmUsageMapper;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -73,6 +75,8 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
     private static final int RECENT_RECORD_LIMIT = 8;
 
     private final AiQuotaConfigMapper quotaConfigMapper;
+    /** 個人審批授予額度（ai_quota_override，審批下發的獨立/額外額度） */
+    private final AiQuotaOverrideMapper quotaOverrideMapper;
     private final AiEmpQuotaPolicyMapper empQuotaPolicyMapper;
     private final AiRoleQuotaPolicyMapper roleQuotaPolicyMapper;
     private final LlmUsageMapper llmUsageMapper;
@@ -161,13 +165,61 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         return vo;
     }
 
-    /** 汇总当前账号生效的全部额度维度（员工/部门配置 + 职位策略 + 角色策略） */
+    /**
+     * 汇总当前账号生效的全部额度维度（含优先级）：
+     * 存在有效审批授予（ai_quota_override）时进入个人层模式——grants 与管理员
+     * 员工专属配置并列生效（两者均只对本人），覆盖部门/职位/角色继承维度，
+     * 避免个人获批额度被组织维度共享额度稀释；无 grant 时回退原有
+     * 四维度逻辑（员工/部门配置 + 职位策略 + 角色策略），行为零回归。
+     */
     private List<Dim> collectAllDims(SysUser user) {
+        List<Dim> overrides = collectOverrideDims(user);
+        if (!overrides.isEmpty()) {
+            List<Dim> dims = new ArrayList<>(overrides);
+            dims.addAll(collectConfigDimensions(user).stream()
+                    .filter(d -> "employee".equals(d.source()))
+                    .toList());
+            return dims;
+        }
         List<Dim> dims = new ArrayList<>();
         dims.addAll(collectConfigDimensions(user));
         dims.addAll(collectPositionDimensions(user));
         dims.addAll(collectRoleDimensions(user));
         return dims;
+    }
+
+    /**
+     * 审批下发的个人独立额度（ai_quota_override）：
+     * 临时额度按 expire_at 在查询时动态过滤（无需定时任务），未生效（effective_at 未到）的跳过。
+     */
+    private List<Dim> collectOverrideDims(SysUser user) {
+        LocalDateTime now = LocalDateTime.now();
+        List<AiQuotaOverride> grants = quotaOverrideMapper.selectList(
+                new LambdaQueryWrapper<AiQuotaOverride>()
+                        .eq(AiQuotaOverride::getUserId, user.getId())
+                        .eq(AiQuotaOverride::getStatus, 1)
+                        .and(w -> w.isNull(AiQuotaOverride::getEffectiveAt)
+                                .or().le(AiQuotaOverride::getEffectiveAt, now))
+                        .and(w -> w.isNull(AiQuotaOverride::getExpireAt)
+                                .or().gt(AiQuotaOverride::getExpireAt, now)));
+        List<Dim> dims = new ArrayList<>();
+        for (AiQuotaOverride grant : grants) {
+            dims.add(toOverrideDim(grant, user.getUsername()));
+        }
+        return dims;
+    }
+
+    /** 审批授予维度转内部载体：本人独立额度（members 仅本人），周期窗口按自然日/自然月 */
+    private Dim toOverrideDim(AiQuotaOverride grant, String username) {
+        LocalDate today = LocalDate.now();
+        boolean daily = "daily".equals(grant.getQuotaPeriod());
+        boolean temporary = "temporary".equals(grant.getEffectiveType());
+        return new Dim("grant", temporary ? "審批授予（臨時）" : "審批授予", grant.getModelId(),
+                daily ? "daily" : "monthly", grant.getQuotaType(),
+                grant.getQuotaValue(), null, DEFAULT_SOFT_THRESHOLD,
+                daily ? today.atStartOfDay() : periodStart(today, 1).atStartOfDay(),
+                daily ? today.plusDays(1) : nextResetDate(today, 1),
+                Set.of(username), grant.getOverLimitAction(), null);
     }
 
     /** 员工/部门额度配置（ai_quota_config，token 口径，日/月双限额拆成两个维度） */

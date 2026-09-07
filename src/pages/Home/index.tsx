@@ -151,12 +151,13 @@ const ENGINE_LABELS: Record<string, string> = {
   'deepseek-v4-pro': 'DS Pro',
 }
 
-/** 額度維度來源 → Tag 顏色（員工/部門/職位/角色四維度視覺區分） */
+/** 額度維度來源 → Tag 顏色（員工/部門/職位/角色四維度 + 審批授予視覺區分） */
 const DIM_SOURCE_COLOR: Record<QuotaSource, string> = {
   employee: '#722ED1',
   department: '#1890FF',
   position: '#E8720C',
   role: '#13C2C2',
+  grant: '#52C41A',
 }
 
 /** 額度維度來源 → i18n key */
@@ -165,6 +166,7 @@ const DIM_SOURCE_LABEL_KEY: Record<QuotaSource, string> = {
   department: 'home.usageDimSourceDepartment',
   position: 'home.usageDimSourcePosition',
   role: 'home.usageDimSourceRole',
+  grant: 'home.usageDimSourceGrant',
 }
 
 /** 上下文窗口使用率：醒目的胶囊按钮 + Popover 面板 */

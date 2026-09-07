@@ -27,7 +27,6 @@ const approvalTypeMapKeys: Record<string, string> = {
   transfer: 'approvalCenter.typeTransfer',
   merge: 'approvalCenter.typeMerge',
   gift: 'approvalCenter.typeGift',
-  ai_access: 'approvalCenter.typeAiAccess',
 }
 
 /** 流程狀態映射（i18n key） */
@@ -110,10 +109,10 @@ function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boole
   return true
 }
 
-/** 前端流程審批（贈送、AI 申請）：後端查詢結果需合併本地審批記錄 */
+/** 前端流程審批（贈送）：後端查詢結果需合併本地審批記錄 */
 function localFrontendApprovals(query: FinApprovalQuery): ApprovalRecord[] {
   return (getApprovalRecords() as ApprovalRecord[])
-    .filter(r => (r.approvalType === 'gift' || r.approvalType === 'ai_access') && matchesApprovalQuery(r, query))
+    .filter(r => r.approvalType === 'gift' && matchesApprovalQuery(r, query))
 }
 
 export default function ApprovalCenter() {
@@ -130,7 +129,6 @@ export default function ApprovalCenter() {
     { label: t('approvalCenter.typeTransfer'), value: 'transfer' },
     { label: t('approvalCenter.typeMerge'), value: 'merge' },
     { label: t('approvalCenter.typeGift'), value: 'gift' },
-    { label: t('approvalCenter.typeAiAccess'), value: 'ai_access' },
   ]
 
   /** 流程狀態選項 */
@@ -201,15 +199,26 @@ export default function ApprovalCenter() {
     const query = buildQuery()
     setLoading(true)
     try {
-      const res = await fetchFinApprovals(query)
-      const records = (res.records ?? []) as ApprovalRecord[]
+      // 財務審批列表：無權限或後端不可用時降級為空（仍展示本地記錄）
+      const res = await fetchFinApprovals(query).catch(() => null)
+      // 後端 FinApproval 無 key 字段，需以 flowNo 補齊，避免 Table 渲染時 record.key.startsWith 報錯
+      const records = ((res?.records ?? []) as ApprovalRecord[]).map(r => ({
+        ...r,
+        key: r.key || r.flowNo,
+      }))
+      // 本地前端流程記錄（贈送），按流程編號去重
       const extraLocal = localFrontendApprovals(query)
         .filter(g => !records.some(r => r.flowNo === g.flowNo))
       const merged = [...extraLocal, ...records]
       // 合并后按申请时间倒序排列
       merged.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
       setData(merged)
-      setTotal((res.total ?? 0) + extraLocal.length)
+      setTotal((res?.total ?? 0) + extraLocal.length)
+    } catch {
+      // 所有 API 均失敗時仍展示本地記錄，避免頁面崩潰
+      const localOnly = localFrontendApprovals(buildQuery())
+      setData(localOnly)
+      setTotal(localOnly.length)
     } finally {
       setLoading(false)
     }
@@ -230,6 +239,7 @@ export default function ApprovalCenter() {
     setPagination({ page: 1, size: 10 })
   }
 
+  /** 詳情跳轉 */
   const handleDetail = (record: ApprovalRecord) => {
     navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
   }
@@ -244,7 +254,7 @@ export default function ApprovalCenter() {
     )
   }, [user])
 
-  /** 審批按鈕：需持有編輯功能權限，且僅當前待審節點的審批人可見 */
+  /** 審批按鈕：需持有編輯功能權限，且為當前待審節點審批人 */
   const canApprove = useCallback((record: ApprovalRecord) => {
     if (!hasPermission('approval-center:edit')) return false
     if (record.flowStatus !== 'pending') return false
@@ -260,7 +270,7 @@ export default function ApprovalCenter() {
   }, [isCurrentUser, hasPermission])
 
   const handleApprove = (record: ApprovalRecord) => {
-    navigate(`/approval-detail?type=${record.approvalType}&flowNo=${record.flowNo}`)
+    handleDetail(record)
   }
 
   const handleCancel = (record: ApprovalRecord) => {
@@ -270,8 +280,7 @@ export default function ApprovalCenter() {
       okText: t('approvalCenter.cancelOk'),
       cancelText: t('common.cancel'),
       onOk: async () => {
-        // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷，不調後端
-        if (record.approvalType === 'gift' || record.approvalType === 'ai_access') {
+        if (record.approvalType === 'gift') {
           updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' })
         } else {
           await cancelFinApproval(record.flowNo)

@@ -1020,6 +1020,14 @@ export const menuPermissionTree: PermissionModule[] = [
     ],
   },
   {
+    key: 'oa-center',
+    name: 'OA中心',
+    children: [
+      { key: 'oa-requests', name: '流程事項' },
+      { key: 'workflow-config', name: '流程配置' },
+    ],
+  },
+  {
     key: 'permission',
     name: '權限管理',
     children: [
@@ -1035,7 +1043,6 @@ export const menuPermissionTree: PermissionModule[] = [
       { key: 'menu-config', name: '菜單配置' },
       { key: 'translation-manage', name: '多語言配置' },
       { key: 'rule-config', name: '規則配置' },
-      { key: 'workflow-config', name: '流程配置' },
       { key: 'version-history', name: '版本管理' },
     ],
   },
@@ -1163,6 +1170,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'menu-config',
   'translation-manage',
   'rule-config',
+  // OA中心
+  'oa-requests',
   'workflow-config',
   // 智能中心 (AI)
   'ai-model-provider',
@@ -1273,8 +1282,10 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/menu-config': 'menu-config',
   '/translation-manage': 'translation-manage',
   '/rule-config': 'rule-config',
+  '/version-history': 'version-history',
+  // OA中心
+  '/oa-requests': 'oa-requests',
   '/workflow-config': 'workflow-config',
-'/version-history': 'version-history',
   // AI 智能中心（拆分后）
   '/ai-model-provider': 'ai-model-provider',
   '/ai-model-list': 'ai-model-list',

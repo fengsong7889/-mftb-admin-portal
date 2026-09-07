@@ -123,6 +123,9 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai-access-request': 'AI Access Application',
   // MCP 服務
   'ai-mcp-service': 'MCP Services',
+  // OA中心
+  'oa-center': 'OA Center',
+  'oa-requests': 'Workflow Items',
   // 訂單管理（複用頁面）
   'merchant-order-manage': 'Order Management',
 }

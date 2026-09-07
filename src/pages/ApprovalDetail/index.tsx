@@ -26,7 +26,24 @@ import {
   cancelFinApproval,
 } from '../../api/finance'
 import type { FinApproval } from '../../api/finance'
+import {
+  fetchAiAccessRequestDetail,
+  approveAiAccessRequest,
+  rejectAiAccessRequest,
+  cancelAiAccessRequest,
+  type AiAccessRequestVO,
+} from '../../api/aiAccessRequest'
+import AiApprovalActionPanel from './AiApprovalActionPanel'
+import {
+  type AiGrantDraft,
+  emptyGrantDraft,
+  validateGrantDraft,
+  buildApprovePayload,
+} from './aiGrantDraft'
+import { fetchModels } from '../../api/aiModel'
 import { useTranslation } from 'react-i18next'
+import { WORKFLOW_STORAGE_KEY } from '../WorkflowConfig/types'
+import type { WorkflowDefinition } from '../WorkflowConfig/types'
 
 /** 審批历史记录 */
 interface ApprovalTimelineItem {
@@ -106,6 +123,11 @@ interface ApprovalDetailData {
   giftDays?: number
   giftValidDays?: number
   // AI 申請
+  aiRequestId?: number
+  aiApplyReason?: string
+  aiRequestedModels?: number[]
+  /** 第一節點（業務主管）保存的授權草稿，供最終節點繼續調整後提交 */
+  aiDraftGrant?: AiGrantDraft
   aiRequestType?: string
   aiUsageDescription?: string
   aiUsageScenarios?: string[]
@@ -361,6 +383,7 @@ const typeTitleMapKeys: Record<string, string> = {
   transfer: 'approvalDetail.typeTitleTransfer',
   merge: 'approvalDetail.typeTitleMerge',
   gift: 'approvalDetail.typeTitleGift',
+  ai_access: 'approvalDetail.typeTitleAiAccess',
 }
 
 const brandLabelMap: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFood' }
@@ -436,6 +459,51 @@ function nodeItem(node: string, approver: string, time: string, status: string, 
     comment: '',
     rejectReason: normalized === 'rejected' ? rejectReason : undefined,
   }
+}
+
+/** 從流程配置 + 本地審批記錄構建 AI 申請時間軸 */
+function buildAiAccessTimeline(
+  local: { bizApprover?: string; bizApproveTime?: string; bizApproveStatus?: string; opsApprover?: string; opsApproveTime?: string; opsApproveStatus?: string; applyTime?: string; applicant?: string; rejectReason?: string } | null,
+): ApprovalTimelineItem[] {
+  // 讀取流程配置獲取節點名稱
+  let nodeNames = ['業務主管審批', '運營主管審批']
+  try {
+    const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY)
+    if (raw) {
+      const workflows: WorkflowDefinition[] = JSON.parse(raw)
+      const aiWf = workflows.find((wf) => wf.workflowKey === 'ai_access' || wf.approvalType === 'ai_access')
+      if (aiWf && aiWf.nodes.length > 0) {
+        nodeNames = aiWf.nodes.sort((a, b) => a.sortOrder - b.sortOrder).map((n) => n.name)
+      }
+    }
+  } catch { /* ignore */ }
+
+  const timeline: ApprovalTimelineItem[] = []
+  // 按流程配置節點順序添加
+  nodeNames.forEach((nodeName) => {
+    let approver = '--'
+    let time = '--'
+    let status: ApprovalTimelineItem['status'] = 'pending'
+    if (nodeName.includes('業務')) {
+      approver = local?.bizApprover || '--'
+      time = local?.bizApproveTime || '--'
+      status = nodeItem('', '', '', local?.bizApproveStatus || '').status
+    } else if (nodeName.includes('運營')) {
+      approver = local?.opsApprover || '--'
+      time = local?.opsApproveTime || '--'
+      status = nodeItem('', '', '', local?.opsApproveStatus || '').status
+    }
+    timeline.push(nodeItem(nodeName, approver, time, status, local?.rejectReason))
+  })
+  // 提交節點
+  timeline.push({
+    node: 'created',
+    time: local?.applyTime || '--',
+    approver: local?.applicant || '--',
+    status: 'submitted',
+    comment: '',
+  })
+  return timeline
 }
 
 /**
@@ -570,8 +638,16 @@ function toDetailData(record: FinApproval, t?: (key: string) => string): Approva
   }
   if (record.approvalType === 'ai_access') {
     const scenarios = Array.isArray(extra.usageScenarios) ? (extra.usageScenarios as string[]) : []
+    const requestedModels = Array.isArray(extra.requestedModels)
+      ? (extra.requestedModels as number[])
+      : []
+    const draftGrant = (extra.draftGrant || null) as AiGrantDraft | null
     return {
       ...base,
+      aiRequestId: num(extra.requestId) || undefined,
+      aiApplyReason: str(extra.applyReason),
+      aiRequestedModels: requestedModels,
+      aiDraftGrant: draftGrant ?? undefined,
       aiRequestType: str(extra.requestType),
       aiUsageDescription: str(extra.usageDescription),
       aiUsageScenarios: scenarios,
@@ -588,13 +664,44 @@ export default function ApprovalDetail() {
   const [searchParams] = useSearchParams()
   const urlType = searchParams.get('type') || 'recharge'
   const flowNo = searchParams.get('flowNo') || ''
+  /** 審批中心合併的後端 AI 申請攜帶 requestId（跨設備：本地無記錄，後端為唯一權威） */
+  const urlRequestId = Number(searchParams.get('requestId')) || 0
 
   /** 後端不可用時的降級詳情：本地審批記錄優先，其次靜態演示數據 */
   const fallbackDetail = useCallback((): ApprovalDetailData => {
     const local = getApprovalRecordByFlowNo(flowNo)
+    // AI 申請：使用流程配置構建時間軸
+    if (urlType === 'ai_access' || (local && local.approvalType === 'ai_access')) {
+      const aiLocal = local || undefined
+      return {
+        approvalType: 'ai_access',
+        applicant: aiLocal?.applicant || '--',
+        applyDate: aiLocal?.applyTime || '',
+        flowNo,
+        flowStatus: aiLocal?.flowStatus || 'pending',
+        brand: '--',
+        timeline: buildAiAccessTimeline(aiLocal || null),
+        hasRevoke: (aiLocal?.flowStatus || 'pending') === 'pending',
+        aiRequestId: urlRequestId || undefined,
+      }
+    }
     if (local) return toDetailData(local as unknown as FinApproval, t)
+    // 後端 AI 申請（跨設備）：URL 攜帶 requestId，詳情數據由後端接口拉取補齊
+    if (urlType === 'ai_access' && urlRequestId) {
+      return {
+        approvalType: 'ai_access',
+        applicant: '--',
+        applyDate: '',
+        flowNo,
+        flowStatus: 'pending',
+        brand: '--',
+        timeline: buildAiAccessTimeline(null),
+        hasRevoke: true,
+        aiRequestId: urlRequestId,
+      }
+    }
     return mockDetails[flowNo] || mockDetails[urlType] || mockDetails['CZ202601160000']
-  }, [flowNo, urlType, t])
+  }, [flowNo, urlType, urlRequestId, t])
 
   const [data, setData] = useState<ApprovalDetailData>(fallbackDetail)
   const [submitting, setSubmitting] = useState(false)
@@ -603,16 +710,27 @@ export default function ApprovalDetail() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
 
+  /* ---- AI 申請：審批操作區狀態 ---- */
+  /** 後端申請詳情（憑證、審批結果、跨設備狀態同步） */
+  const [aiRequest, setAiRequest] = useState<AiAccessRequestVO | null>(null)
+  /** 授權草稿：第二節點優先讀取第一節點保存的 draftGrant */
+  const [grantDraft, setGrantDraft] = useState<AiGrantDraft | null>(null)
+
   /** 審批類型以記錄為準（未加載到時回退 URL 參數） */
   const type = data.approvalType || urlType
   /** 僅審批中的流程可通過/駁回 */
   const isPending = data.flowStatus === 'pending'
 
-  /** 加載審批詳情 */
+  /** 加載審批詳情（AI 申請不走 biz_fin_approval，直接取本地記錄 + 後續 effect 拉後端 AI 詳情） */
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       if (!flowNo) return
+      // AI 申請存在於 ai_access_request 獨立表，不在 biz_fin_approval 中，跳過財務審批查詢避免「審批流程不存在」報錯
+      if (type === 'ai_access') {
+        if (!cancelled) setData(fallbackDetail())
+        return
+      }
       try {
         const record = await fetchFinApprovalDetail(flowNo).catch(() => null)
         if (!cancelled) setData(record ? toDetailData(record, t) : fallbackDetail())
@@ -623,7 +741,82 @@ export default function ApprovalDetail() {
     }
     void load()
     return () => { cancelled = true }
-  }, [flowNo, fallbackDetail])
+    // type 在初次渲染後即穩定，不需加入依賴
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowNo, fallbackDetail, t])
+
+  /**
+   * AI 申請：拉取後端申請詳情（憑證 + 審批結果）。
+   * 跨設備場景後端為唯一權威：無本地記錄時補齊基礎信息；後端已終態時同步本地流程狀態，避免重複操作。
+   */
+  useEffect(() => {
+    if (type !== 'ai_access' || !data.aiRequestId) return
+    let cancelled = false
+    fetchAiAccessRequestDetail(data.aiRequestId)
+      .then((vo) => {
+        if (cancelled) return
+        setAiRequest(vo)
+        // 跨設備：本地無記錄（applicant 為佔位），以後端詳情補齊展示信息
+        if (data.applicant === '--') {
+          setData((prev) => ({
+            ...prev,
+            applicant: `${vo.applicantName}(MF${String(vo.applicantId).padStart(5, '0')})`,
+            applyDate: vo.createdAt || prev.applyDate,
+            flowStatus: vo.status,
+            aiRequestType: vo.requestType,
+            aiApplyReason: vo.applyReason ?? undefined,
+            aiRequestedModels: vo.requestedModels ?? undefined,
+            aiUsageDescription: vo.usageDescription,
+            aiUsageScenarios: vo.usageScenarios ?? [],
+            aiUsageFrequency: vo.usageFrequency ?? undefined,
+            notes: vo.usageDescription,
+          }))
+        } else if (vo.status === 'approved' || vo.status === 'rejected' || vo.status === 'cancelled') {
+          // 後端已終態且本地仍為待審 → 同步本地流程，防止另一端已審批後本地重複審批
+          const local = getApprovalRecordByFlowNo(flowNo)
+          if (local && local.flowStatus === 'pending') {
+            updateApprovalRecord(flowNo, {
+              flowStatus: vo.status,
+              rejectReason: vo.status === 'rejected' ? (vo.approveRemark || '') : local.rejectReason,
+            })
+          }
+          setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: vo.status } : prev))
+        } else {
+          // 本地有記錄且後端仍 pending → 同步申請模型列表（確保審批操作區能展示所選模型）
+          setData((prev) => {
+            const nextModels = vo.requestedModels ?? prev.aiRequestedModels
+            if (nextModels && JSON.stringify(nextModels) !== JSON.stringify(prev.aiRequestedModels)) {
+              return { ...prev, aiRequestedModels: nextModels }
+            }
+            return prev
+          })
+        }
+      })
+      .catch(() => { /* 後端不可用時保留 extra 展示 */ })
+    return () => { cancelled = true }
+  }, [type, data.aiRequestId, flowNo, data.applicant])
+
+  /** AI 申請審批操作區草稿初始化：第二節點讀取第一節點保存的 draftGrant，否則按申請內容初始化 */
+  useEffect(() => {
+    if (type !== 'ai_access' || !isPending || grantDraft) return
+    setGrantDraft(data.aiDraftGrant ?? emptyGrantDraft(data.aiRequestedModels))
+  }, [type, isPending, grantDraft, data.aiDraftGrant, data.aiRequestedModels])
+
+  /** 模型名稱映射（審批結果展示用） */
+  const [modelNames, setModelNames] = useState<Record<number, string>>({})
+  useEffect(() => {
+    if (type !== 'ai_access') return
+    let cancelled = false
+    fetchModels({ status: 1 })
+      .then((list) => {
+        if (cancelled) return
+        const map: Record<number, string> = {}
+        list.forEach((m) => { map[m.id] = m.name || m.modelKey })
+        setModelNames(map)
+      })
+      .catch(() => { /* 後端不可用時展示模型 ID */ })
+    return () => { cancelled = true }
+  }, [type])
 
   const handleApprove = () => {
     // 前端流程（贈送、AI 申請）需校驗當前人是否具備當前節點角色權限
@@ -637,14 +830,47 @@ export default function ApprovalDetail() {
         }
       }
     }
+    // AI 申請：審批操作區（授權範圍 + 額度設置）提交前校驗
+    if (type === 'ai_access') {
+      if (!grantDraft) return
+      const grantError = validateGrantDraft(grantDraft, data.aiRequestType || 'model_and_quota', t)
+      if (grantError) {
+        message.warning(grantError)
+        return
+      }
+    }
     Modal.confirm({
       title: t('approvalDetail.approveConfirm'),
-      content: t('approvalDetail.approveContent'),
+      content: type === 'ai_access'
+        ? t('approvalDetail.aiApproveContent')
+        : t('approvalDetail.approveContent'),
       okText: t('approvalDetail.approveOk'),
       cancelText: t('common.cancel'),
       onOk: async () => {
         setSubmitting(true)
         try {
+          /**
+           * AI 申請（審批即授權）：
+           * - 最終節點（本地第二節點，或跨設備無本地記錄時後端為唯一權威）：調後端 approve API，
+           *   單事務寫入審批結果 + 下發模型權限（ai_employee_auth）+ 個人額度（ai_quota_override）；
+           * - 第一節點（業務主管）：將審批操作區配置保存為 draftGrant，供第二節點繼續調整。
+           * 後端調用失敗時中止（保持 pending 可重試），不推進本地，避免兩端狀態不一致。
+           */
+          if (type === 'ai_access' && grantDraft) {
+            const localRecord = getApprovalRecordByFlowNo(flowNo)
+            const isFinalNode = !localRecord
+              || (localRecord.bizApproveStatus === 'approved' && localRecord.opsApproveStatus === 'pending')
+            if (isFinalNode) {
+              if (data.aiRequestId) {
+                await approveAiAccessRequest(data.aiRequestId, buildApprovePayload(grantDraft, approvalComment))
+              }
+              message.success(t('approvalDetail.aiGrantDone'))
+            } else if (localRecord) {
+              updateApprovalRecord(flowNo, {
+                extra: { ...(localRecord.extra || {}), draftGrant: grantDraft },
+              })
+            }
+          }
           // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批
           const isFrontendFlow = type === 'gift' || type === 'ai_access'
           const result = isFrontendFlow
@@ -657,12 +883,10 @@ export default function ApprovalDetail() {
                   writtenDesc: type === 'gift' ? t('approvalDetail.giftWritten') : t('approvalDetail.dataWritten'),
                 })
               : t('approvalDetail.approveNext', { nodeName: result.nodeName, nextNode: result.nextNode }))
-          } else {
-            message.success(t('approvalCenter.approveSuccess'))
           }
           navigate('/approval-center')
         } catch (err) {
-          // 無審批權限（403）或餘額不足等業務校驗失敗，展示後端給出的具體原因
+          // 無審批權限（403）或審批即授權事務失敗等業務校驗失敗，展示後端給出的具體原因
           message.error((err as Error)?.message || t('approvalDetail.approveFailed'))
         } finally {
           setSubmitting(false)
@@ -692,7 +916,13 @@ export default function ApprovalDetail() {
     }
     setSubmitting(true)
     try {
-      // 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回
+      /**
+       * AI 申請駁回：同步寫後端（審批人可跨設備操作），失敗時中止保持 pending 可重試；
+       * 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回
+       */
+      if (type === 'ai_access' && data.aiRequestId) {
+        await rejectAiAccessRequest(data.aiRequestId, rejectReason)
+      }
       const isFrontendFlow = type === 'gift' || type === 'ai_access'
       const rejectedNode = isFrontendFlow
         ? rejectCurrentNode(flowNo, rejectReason)
@@ -716,8 +946,11 @@ export default function ApprovalDetail() {
   const handleRevokeConfirm = async () => {
     setSubmitting(true)
     try {
-      // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷，不調後端
-      if (type === 'gift' || type === 'ai_access') {
+      // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷；AI 申請同步撤銷後端申請
+      if (type === 'ai_access' && data.aiRequestId) {
+        await cancelAiAccessRequest(data.aiRequestId)
+        updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
+      } else if (type === 'gift') {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
       } else {
         await cancelFinApproval(flowNo)
@@ -780,12 +1013,12 @@ export default function ApprovalDetail() {
         title={typeTitleMapKeys[type] ? t(typeTitleMapKeys[type]) : type}
         tags={
           <>
-            <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>
+            {type !== 'ai_access' && <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>}
             <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
             <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
           </>
         }
-        onBack={() => navigate('/approval-center')}
+        onBack={() => navigate(type === 'ai_access' ? '/oa-requests' : '/approval-center')}
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             {data.hasRevoke && (
@@ -1292,10 +1525,89 @@ export default function ApprovalDetail() {
                     </span>
                   </div>
                 )}
-                <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
-                  <span className="approval-info-label">{t('aiApply.usageDescription')}</span>
-                  <span className="approval-info-value">{data.aiUsageDescription}</span>
-                </div>
+              </div>
+            </div>
+          )}
+
+          {/* AI 申請：審批操作區（授權範圍 + 額度設置，審批即授權） */}
+          {type === 'ai_access' && isPending && grantDraft && (
+            <AiApprovalActionPanel
+              requestType={data.aiRequestType || 'model_and_quota'}
+              requestedModels={data.aiRequestedModels}
+              draft={grantDraft}
+              onChange={setGrantDraft}
+            />
+          )}
+
+          {/* AI 申請：審批結果（審批即授權下發明細，供申請人與審批人回看） */}
+          {type === 'ai_access' && !isPending && aiRequest && (
+            <div className="approval-section">
+              <div className="approval-section-title approval-section-title--green">{t('approvalDetail.aiResultTitle')}</div>
+              <div className="approval-info-grid">
+                {aiRequest.approvedModelConfigs && aiRequest.approvedModelConfigs.length > 0 && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('approvalDetail.aiResultModels')}</span>
+                    <span className="approval-info-value">
+                      {aiRequest.approvedModelConfigs.map((c) => (
+                        <Tag key={c.modelId} color="green" style={{ marginRight: 4, marginBottom: 4 }}>
+                          {modelNames[c.modelId] ?? c.modelId}
+                        </Tag>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                {aiRequest.approvedQuotaValue != null && (
+                  <>
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalDetail.aiGrantQuotaValue')}</span>
+                      <span className="approval-info-value approval-amount--orange">
+                        {aiRequest.approvedQuotaValue.toLocaleString()}{aiRequest.approvedQuotaType === 'requests' ? ` ${t('approvalDetail.aiGrantQuotaTypeRequests')}` : ` ${t('approvalDetail.aiGrantQuotaTypeTokens')}`}
+                      </span>
+                    </div>
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalDetail.aiGrantQuotaPeriod')}</span>
+                      <span className="approval-info-value">
+                        {aiRequest.approvedQuotaPeriod === 'daily'
+                          ? t('approvalDetail.aiGrantQuotaPeriodDaily')
+                          : t('approvalDetail.aiGrantQuotaPeriodMonthly')}
+                      </span>
+                    </div>
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalDetail.aiGrantEffectiveType')}</span>
+                      <span className="approval-info-value">
+                        <Tag color={aiRequest.quotaEffectiveType === 'temporary' ? 'orange' : 'green'}>
+                          {aiRequest.quotaEffectiveType === 'temporary'
+                            ? t('approvalDetail.aiGrantEffectiveTemporary')
+                            : t('approvalDetail.aiGrantEffectivePermanent')}
+                        </Tag>
+                      </span>
+                    </div>
+                    {aiRequest.quotaExpireAt && (
+                      <div className="approval-info-item">
+                        <span className="approval-info-label">{t('approvalDetail.aiGrantExpireAt')}</span>
+                        <span className="approval-info-value">{aiRequest.quotaExpireAt}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {aiRequest.approverName && (
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">{t('approvalCenter.colApprover')}</span>
+                    <span className="approval-info-value">{aiRequest.approverName}</span>
+                  </div>
+                )}
+                {aiRequest.approvedAt && (
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">{t('approvalDetail.applyDate')}</span>
+                    <span className="approval-info-value">{aiRequest.approvedAt}</span>
+                  </div>
+                )}
+                {aiRequest.approveRemark && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('approvalDetail.commentTitle')}</span>
+                    <span className="approval-info-value">{aiRequest.approveRemark}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1384,7 +1696,7 @@ export default function ApprovalDetail() {
 
       {/* 底部操作栏 */}
       <div className="approval-detail-footer">
-        <Button onClick={() => navigate('/approval-center')}>{t('common.back')}</Button>
+        <Button onClick={() => navigate(type === 'ai_access' ? '/oa-requests' : '/approval-center')}>{t('common.back')}</Button>
         {data.hasRevoke && (
           <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
         )}

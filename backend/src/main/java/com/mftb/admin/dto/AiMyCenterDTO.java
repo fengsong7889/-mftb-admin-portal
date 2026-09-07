@@ -34,9 +34,9 @@ public class AiMyCenterDTO {
      */
     @Data
     public static class QuotaDimensionVO {
-        /** 維度來源：employee=員工 department=部門 position=職位 role=角色 */
+        /** 維度來源：employee=員工 department=部門 position=職位 role=角色 grant=審批授予（個人獨立額度，優先生效） */
         private String source;
-        /** 來源名稱（員工專屬 / 部門名 / 策略名 / 角色名） */
+        /** 來源名稱（員工專屬 / 部門名 / 策略名 / 角色名 / 審批授予） */
         private String sourceName;
         /** 限定模型 ID；null = 全部模型 */
         private Long modelId;

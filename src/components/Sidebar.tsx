@@ -66,6 +66,7 @@ import {
   BlockOutlined, // MCP 服務
   BankOutlined, // 权限管理相关
   DollarOutlined, // 额度策略
+  UnlockOutlined, // 員工AI權限
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -212,6 +213,8 @@ const keyToPath: Record<string, string> = {
   'ai-pos-auth': '/ai-pos-auth',
   'ai-dept-quota': '/ai-dept-quota',
   'ai-emp-quota': '/ai-emp-quota',
+  // OA中心
+  'oa-requests': '/oa-requests',
   // 门店数据配置
   'store-data-config': '/store-data-config',
   // 地图規劃
@@ -230,6 +233,9 @@ const keyToPath: Record<string, string> = {
   'ai-role-auth-detail': '/ai-role-auth-detail',
   'ai-dept-quota-edit': '/ai-dept-quota-edit',
   'ai-dept-quota-detail': '/ai-dept-quota-detail',
+  // 員工AI權限
+  'ai-emp-permission': '/ai-emp-permission',
+  'ai-emp-permission-detail': '/ai-emp-permission-detail',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -625,6 +631,23 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    key: 'oa-center',
+    icon: <SolutionOutlined />,
+    label: 'OA中心',
+    children: [
+      {
+        key: 'oa-requests',
+        icon: <FileTextOutlined />,
+        label: '流程事項',
+      },
+      {
+        key: 'workflow-config',
+        icon: <BranchesOutlined />,
+        label: '流程配置',
+      },
+    ],
+  },
+  {
     key: 'permission',
     icon: <LockOutlined />,
     label: '權限管理',
@@ -665,11 +688,6 @@ const menuItems: MenuItem[] = [
         key: 'rule-config',
         icon: <SwapOutlined />,
         label: '規則配置',
-      },
-      {
-        key: 'workflow-config',
-        icon: <BranchesOutlined />,
-        label: '流程配置',
       },
       {
         key: 'version-history',
@@ -751,6 +769,9 @@ const keyToIcon: Record<string, ReactNode> = {
   'organization-management': <ApartmentOutlined />,
   'position-management': <IdcardOutlined />,
   'login-log': <ScheduleOutlined />,
+  // OA中心
+  'oa-center': <SolutionOutlined />,
+  'oa-requests': <FileTextOutlined />,
   // 團購管理
   'group-purchase': <ShoppingFilled />,
   'group-purchase-dashboard': <DashboardOutlined />,
@@ -798,6 +819,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-quota-manage': <DollarOutlined />,       // 配额管理 - 金额符号
   'ai-dept-quota': <AccountBookOutlined />,    // 部门额度 - 账本
   'ai-emp-quota': <MoneyCollectOutlined />,    // 员工额度 - 收款
+  'ai-emp-permission': <UnlockOutlined />,     // 員工AI權限 - 解鎖/權限管理
 }
 
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
