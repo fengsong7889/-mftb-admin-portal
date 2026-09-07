@@ -32,11 +32,13 @@ const REASON_TO_TYPE: Record<string, AiRequestType> = {
   'no-both': 'model_and_quota',
   'topup': 'quota_only',
   'add-model': 'model_only',
+  'quota-exhausted': 'quota_only',
+  'needs-approval': 'quota_only',
 }
 
 /** 是否有模型權限 */
 function hasModelPermission(reason: string): boolean {
-  return reason === 'no-quota' || reason === 'topup' || reason === 'add-model'
+  return reason === 'no-quota' || reason === 'topup' || reason === 'add-model' || reason === 'quota-exhausted' || reason === 'needs-approval'
 }
 
 /** 是否有額度 */

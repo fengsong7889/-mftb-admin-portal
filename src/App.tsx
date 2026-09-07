@@ -104,6 +104,7 @@ const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
 const VersionHistoryPage = lazy(() => import('./pages/VersionHistory'))
 const VersionHistoryDetailPage = lazy(() => import('./pages/VersionHistory/VersionHistoryDetail'))
+const VersionHistoryFormPage = lazy(() => import('./pages/VersionHistory/VersionHistoryForm'))
 // AI 智能中心（拆分后）
 const AiModelProvider = lazy(() => import('./pages/AiModelProvider'))
 const AiModelList = lazy(() => import('./pages/AiModelList'))
@@ -265,6 +266,8 @@ function AuthenticatedLayout() {
               <Route path="/translation-manage" element={<TranslationManage />} />
               <Route path="/rule-config" element={<RuleConfig />} />
               <Route path="/version-history" element={<VersionHistoryPage />} />
+              <Route path="/version-history-add" element={<VersionHistoryFormPage />} />
+              <Route path="/version-history-edit/:id" element={<VersionHistoryFormPage />} />
               <Route path="/version-history-detail/:id" element={<VersionHistoryDetailPage />} />
               // AI 智能中心（拆分后）
               <Route path="/ai-model-provider" element={<AiModelProvider />} />

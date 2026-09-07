@@ -97,9 +97,13 @@ public class AiConversationController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String modelKey,
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
-        return Result.success(conversationService.listAllConversations(page, size, username, modelKey, startDate, endDate));
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String createStartDate,
+            @RequestParam(required = false) String createEndDate,
+            @RequestParam(required = false) String updateStartDate,
+            @RequestParam(required = false) String updateEndDate) {
+        return Result.success(conversationService.listAllConversations(page, size, username, modelKey,
+                status, createStartDate, createEndDate, updateStartDate, updateEndDate));
     }
 
     /** 获取所有已使用过的模型标识列表 */

@@ -1369,6 +1369,196 @@
 .home-ai-attachment:hover .home-ai-attachment-remove { opacity: 1; }
 
 /* ─────────────────────────────────────────
+   降级模式标识条
+   ───────────────────────────────────────── */
+.home-ai-downgrade-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  background: linear-gradient(135deg, #FFF7E6, #FFFBF0);
+  border-top: 1px solid #FFE7BA;
+  border-bottom: 1px solid #FFE7BA;
+  font-size: 12px;
+  color: #D46B08;
+  font-weight: 500;
+}
+
+.home-ai-downgrade-bar .anticon {
+  font-size: 14px;
+  color: #E8720C;
+  animation: downgradeSwap 2s ease-in-out infinite;
+}
+
+@keyframes downgradeSwap {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+}
+
+.home-ai-downgrade-bar-model {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(232, 114, 12, 0.1);
+  color: #E8720C;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* ─────────────────────────────────────────
+   历史对话阻塞提醒条
+   ───────────────────────────────────────── */
+.home-ai-blocked-reminder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #FFF7E6;
+  border-top: 1px solid #FFE7BA;
+  border-bottom: 1px solid #FFE7BA;
+  font-size: 13px;
+  color: #D46B08;
+}
+
+.home-ai-blocked-reminder .anticon {
+  font-size: 14px;
+  color: #E8720C;
+  flex-shrink: 0;
+}
+
+.home-ai-blocked-reminder-text {
+  flex: 1;
+  line-height: 1.5;
+}
+
+.home-ai-blocked-reminder-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  border: 1px solid #E8720C;
+  border-radius: 6px;
+  background: #fff;
+  color: #E8720C;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-ai-blocked-reminder-btn:hover {
+  background: #E8720C;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
+}
+
+/* ─────────────────────────────────────────
+   排队状态提示 & 排队列表
+   ───────────────────────────────────────── */
+.home-ai-queue-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px 0;
+  font-size: 12px;
+  color: #E8720C;
+  font-weight: 500;
+}
+
+.home-ai-queue-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #E8720C;
+  animation: queuePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes queuePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.home-ai-queue-list {
+  padding: 8px 24px 0;
+}
+
+.home-ai-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.home-ai-queue-header-text {
+  font-size: 12px;
+  color: #8C8C8C;
+  font-weight: 500;
+}
+
+.home-ai-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: #FAFAFA;
+  border: 1px solid #F0F0F0;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.home-ai-queue-item:hover {
+  background: #F5F5F5;
+  border-color: #D9D9D9;
+}
+
+.home-ai-queue-item-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #E8720C;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.home-ai-queue-item-text {
+  flex: 1;
+  font-size: 13px;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-ai-queue-item-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: #BFBFBF;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.home-ai-queue-item-remove:hover {
+  color: #FF4D4F;
+  background: #FFF1F0;
+}
+
+/* ─────────────────────────────────────────
    输入区（拖拽 + 附件按钮）
    ───────────────────────────────────────── */
 .home-ai-input {

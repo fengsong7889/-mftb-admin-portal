@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, Modal, Form, Input, Select, Space, Table, Switch, message } from 'antd'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, KeyOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import {
   fetchProviders,
   createProvider,
@@ -61,6 +61,7 @@ export default function AiModelProvider() {
       providerKey: row.providerKey,
       description: row.description,
       apiUrlBase: row.apiUrlBase,
+      apiKey: '', // 留空表示不修改，輸入新值則覆蓋
       remark: row.configJson // 复用 configJson 字段存放 remark
     })
   }
@@ -75,7 +76,8 @@ export default function AiModelProvider() {
           providerKey: values.providerKey,
           name: values.name,
           description: values.description,
-          apiUrlBase: values.apiUrlBase
+          apiUrlBase: values.apiUrlBase,
+          apiKey: values.apiKey || undefined, // 空值不传，后端保留旧 Key
         })
         message.success('供應商信息已保存')
       } else {
@@ -125,9 +127,12 @@ export default function AiModelProvider() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          // TODO: 实现更新状态的 API
-          // await updateProvider(row.id, { status: newStatus })
-          message.warning(`${actionText}操作暂不支持，请在数据库中手动修改`)
+          await updateProvider(row.id, {
+            providerKey: row.providerKey,
+            name: row.name,
+            status: newStatus,
+          })
+          message.success(`${row.name} 已${actionText}`)
           loadProviders()
         } catch (error: any) {
           console.error('Toggle failed:', error)
@@ -164,6 +169,7 @@ export default function AiModelProvider() {
     { key: 'name', title: '供應商' },
     { key: 'providerKey', title: '供应商标识' },
     { key: 'apiUrlBase', title: '接入地址' },
+    { key: 'apiKeyStatus', title: 'API Key' },
     { key: 'status', title: '状态' },
     { key: 'updatedAt', title: '最后更新时间' },
     { key: 'action', title: '操作' },
@@ -181,9 +187,29 @@ export default function AiModelProvider() {
       title: '接入地址', 
       key: 'apiUrlBase',
       dataIndex: 'apiUrlBase', 
-      width: 300, 
+      width: 280, 
       ellipsis: true,
       render: (text: string) => text || '-'
+    },
+    {
+      title: 'API Key',
+      key: 'apiKeyStatus',
+      width: 160,
+      align: 'center',
+      render: (_: unknown, row: AiProvider) => {
+        const hasKey = row.apiKeyMasked && row.apiKeyMasked.length > 0
+        return hasKey ? (
+          <span style={{ color: '#52C41A', fontSize: 12 }}>
+            <CheckCircleOutlined style={{ marginRight: 4 }} />
+            <span style={{ fontFamily: 'monospace' }}>{row.apiKeyMasked}</span>
+          </span>
+        ) : (
+          <span style={{ color: '#FF4D4F', fontSize: 12 }}>
+            <CloseCircleOutlined style={{ marginRight: 4 }} />
+            未配置
+          </span>
+        )
+      },
     },
     {
       title: '状态', 
@@ -297,6 +323,25 @@ export default function AiModelProvider() {
           </Form.Item>
           <Form.Item name="apiUrlBase" label="API Base URL">
             <Input placeholder="https://..." />
+          </Form.Item>
+          <Form.Item 
+            name="apiKey" 
+            label={
+              <span>
+                <KeyOutlined style={{ marginRight: 4 }} />
+                API Key
+                {editingProvider?.apiKeyMasked && (
+                  <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 8 }}>
+                    當前：{editingProvider.apiKeyMasked}
+                  </span>
+                )}
+              </span>
+            }
+          >
+            <Input.Password 
+              placeholder={editingProvider ? '留空保留原 Key，輸入新值則覆蓋' : '請輸入 API Key'} 
+              visibilityToggle
+            />
           </Form.Item>
         </Form>
       </Modal>

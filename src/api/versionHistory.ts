@@ -56,3 +56,8 @@ export function updateVersion(id: number, data: Partial<VersionHistoryRecord>): 
 export function deleteVersion(id: number): Promise<void> {
   return request.delete(`/version-history/${id}`)
 }
+
+/** 从 Git 提交历史同步版本记录 */
+export function syncVersionFromGit(): Promise<string> {
+  return request.post('/version-history/sync-from-git')
+}

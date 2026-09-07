@@ -193,9 +193,13 @@ public class AiConversationServiceImpl implements AiConversationService {
     /* ── 管理员审计接口实现 ── */
 
     @Override
-    public Page<AiConversation> listAllConversations(int page, int size, String username, String modelKey, String startDate, String endDate) {
+    public Page<AiConversation> listAllConversations(int page, int size, String username, String modelKey,
+                                                     Integer status,
+                                                     String createStartDate, String createEndDate,
+                                                     String updateStartDate, String updateEndDate) {
         // 使用审计专用 Mapper 方法，绕过 @TableLogic 过滤，包含已软删除的记录
-        return conversationMapper.selectPageForAudit(new Page<>(page, size), username, modelKey, startDate, endDate);
+        return conversationMapper.selectPageForAudit(new Page<>(page, size), username, modelKey,
+                status, createStartDate, createEndDate, updateStartDate, updateEndDate);
     }
 
     @Override

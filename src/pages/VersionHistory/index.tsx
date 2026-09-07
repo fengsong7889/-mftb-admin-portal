@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchVersionHistory, deleteVersion } from '../../api/versionHistory'
+import { fetchVersionHistory, deleteVersion, syncVersionFromGit } from '../../api/versionHistory'
 import type { VersionHistoryRecord } from '../../api/versionHistory'
 
 const { RangePicker } = DatePicker
@@ -71,6 +71,24 @@ export default function VersionHistory() {
         await deleteVersion(record.id)
         message.success(t('common.deleteSuccess'))
         loadData()
+      },
+    })
+  }
+
+  const handleSyncFromGit = () => {
+    Modal.confirm({
+      title: t('versionHistory.syncConfirmTitle'),
+      content: t('versionHistory.syncConfirmContent'),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          const res = await syncVersionFromGit()
+          message.success(res || t('versionHistory.syncSuccess'))
+          loadData()
+        } catch {
+          /* error handled by interceptor */
+        }
       },
     })
   }
@@ -214,7 +232,11 @@ export default function VersionHistory() {
 
       {/* 功能区域 */}
       <div className="action-section">
-        <div className="action-section-left" />
+        <div className="action-section-left">
+          <Button icon={<SyncOutlined />} onClick={handleSyncFromGit}>
+            {t('versionHistory.syncFromGit')}
+          </Button>
+        </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />}
             onClick={() => navigate('/version-history-add')}>

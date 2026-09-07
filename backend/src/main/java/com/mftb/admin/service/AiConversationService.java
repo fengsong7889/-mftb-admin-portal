@@ -39,16 +39,12 @@ public interface AiConversationService {
     /* ── 管理员审计接口 ── */
 
     /**
-     * 管理员分页查询所有会话（支持按 username / modelKey / 日期范围筛选）
-     *
-     * @param page     页码（从 1 开始）
-     * @param size     每页条数
-     * @param username 筛选账号（可选）
-     * @param modelKey 筛选模型（可选）
-     * @param startDate 开始日期（可选，格式 yyyy-MM-dd）
-     * @param endDate   结束日期（可选，格式 yyyy-MM-dd）
+     * 管理员分页查询所有会话（支持按 username / modelKey / status / 创建时间 / 更新时间筛选）
      */
-    Page<AiConversation> listAllConversations(int page, int size, String username, String modelKey, String startDate, String endDate);
+    Page<AiConversation> listAllConversations(int page, int size, String username, String modelKey,
+                                              Integer status,
+                                              String createStartDate, String createEndDate,
+                                              String updateStartDate, String updateEndDate);
 
     /** 获取所有已使用过的模型标识列表（用于筛选下拉） */
     List<String> listDistinctModelKeys();

@@ -35,4 +35,10 @@ public interface VersionHistoryService {
      * 删除版本记录
      */
     void delete(Long id);
+
+    /**
+     * 从 Git 提交历史同步版本记录
+     * @return 同步结果摘要
+     */
+    String syncFromGit(String operator);
 }

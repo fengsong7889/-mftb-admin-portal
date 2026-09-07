@@ -67,6 +67,14 @@ public class VersionHistoryController {
         return Result.success();
     }
 
+    /** 从 Git 提交历史同步版本记录 */
+    @PostMapping("/sync-from-git")
+    @RequirePermission(menu = "version-history", action = "edit")
+    public Result<String> syncFromGit() {
+        String result = versionHistoryService.syncFromGit(currentOperator());
+        return Result.success(result);
+    }
+
     private String currentOperator() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();

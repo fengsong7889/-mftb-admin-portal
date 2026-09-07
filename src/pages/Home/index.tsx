@@ -12,8 +12,8 @@ import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
 import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '../../api/agent'
 import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth } from '../../api/agent'
-import { fetchMyQuotaUsage, fetchMyModels, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
-import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource } from '../../api/aiMyCenter'
+import { fetchMyQuotaUsage, fetchMyModels, fetchQuotaCheck, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
+import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource, QuotaCheckResult } from '../../api/aiMyCenter'
 import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation } from '../../api/aiConversation'
 import type { AiConversation } from '../../api/aiConversation'
 import type { Conversation } from '../../api/aiConversation'
@@ -167,14 +167,16 @@ const DIM_SOURCE_LABEL_KEY: Record<QuotaSource, string> = {
   role: 'home.usageDimSourceRole',
 }
 
-/** AI 助手未開通原因：無模型權限 / 無額度 / 兩者皆無 */
-type AiBlockReason = 'no-models' | 'no-quota' | 'no-both'
+/** AI 助手未開通原因：無模型權限 / 無額度 / 兩者皆無 / 額度已用完(拒絕) / 需審批 */
+type AiBlockReason = 'no-models' | 'no-quota' | 'no-both' | 'quota-exhausted' | 'needs-approval'
 
 /** 未開通原因 → Hero 引導卡標題 i18n key（標題直接突出缺失項） */
 const BLOCKED_TITLE_KEY: Record<AiBlockReason, string> = {
   'no-models': 'home.aiBlockedNoModelsTitle',
   'no-quota': 'home.aiBlockedNoQuotaTitle',
   'no-both': 'home.aiBlockedNoBothTitle',
+  'quota-exhausted': 'home.aiQuotaExhaustedTitle',
+  'needs-approval': 'home.aiNeedsApprovalTitle',
 }
 
 /** 未開通原因 → Hero 引導卡描述 i18n key */
@@ -182,13 +184,8 @@ const BLOCKED_DESC_KEY: Record<AiBlockReason, string> = {
   'no-models': 'home.aiBlockedNoModelsDesc',
   'no-quota': 'home.aiBlockedNoQuotaDesc',
   'no-both': 'home.aiBlockedNoBothDesc',
-}
-
-/** 未開通原因 → 對話中警示橫幅 i18n key */
-const BLOCKED_BANNER_KEY: Record<AiBlockReason, string> = {
-  'no-models': 'home.aiBlockedBannerNoModels',
-  'no-quota': 'home.aiBlockedBannerNoQuota',
-  'no-both': 'home.aiBlockedBannerNoBoth',
+  'quota-exhausted': 'home.aiQuotaExhaustedDesc',
+  'needs-approval': 'home.aiNeedsApprovalDesc',
 }
 
 /** 未開通原因 → 模型選擇下拉面板標題/描述 i18n key */
@@ -196,11 +193,15 @@ const ENGINE_PANEL_TITLE_KEY: Record<AiBlockReason, string> = {
   'no-models': 'home.enginePanelNoModelsTitle',
   'no-quota': 'home.enginePanelNoQuotaTitle',
   'no-both': 'home.enginePanelNoBothTitle',
+  'quota-exhausted': 'home.aiQuotaExhaustedTitle',
+  'needs-approval': 'home.aiNeedsApprovalTitle',
 }
 const ENGINE_PANEL_DESC_KEY: Record<AiBlockReason, string> = {
   'no-models': 'home.enginePanelNoModelsDesc',
   'no-quota': 'home.enginePanelNoQuotaDesc',
   'no-both': 'home.enginePanelNoBothDesc',
+  'quota-exhausted': 'home.aiQuotaExhaustedDesc',
+  'needs-approval': 'home.aiNeedsApprovalDesc',
 }
 
 /** 將 AI 回覆中的字面 \n 轉為真正換行（CSS white-space: pre-wrap 負責渲染） */
@@ -236,6 +237,8 @@ export default function Home() {
   const [deletedConversations, setDeletedConversations] = useState<AiConversation[]>([])
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
+  /** 消息排队队列（最多 3 条） */
+  const [messageQueue, setMessageQueue] = useState<{ id: string; text: string; attachments: ChatAttachment[] }[]>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   /* ── 附件状态 ── */
@@ -451,6 +454,10 @@ export default function Home() {
   const [modelsLoaded, setModelsLoaded] = useState(false)
   const [usageLoaded, setUsageLoaded] = useState(false)
 
+  /* ── 配額校驗結果（後端綜合所有維度給出處置動作） ── */
+  const [quotaCheck, setQuotaCheck] = useState<QuotaCheckResult | null>(null)
+  const [quotaCheckLoaded, setQuotaCheckLoaded] = useState(false)
+
   /** 打開「我的用量」抽屜（每次打開重新拉取，與能耗統計同源） */
   const handleOpenUsage = () => {
     setUsageOpen(true)
@@ -472,13 +479,42 @@ export default function Home() {
    * 未開通判定（僅在接口成功返回後下結論，網絡故障不誤傷正常用戶）：
    * - 無授權模型 = 無模型權限（模型權限是使用前提）
    * - 無任何額度配置 = 無可用額度，同樣不可用
-   * - 兩者皆缺 = no-both，提示同時說明權限與額度
-   * 三種原因分開提示，引導用戶聯繫管理員開通對應權限
+   * - 後端配額校驗結果優先：reject → quota-exhausted，approve → needs-approval
+   * - 前端兆底：所有维度 100% → quota-exhausted
+   * 多種原因分開提示，引導用戶聯繫管理員開通對應權限
    */
   const noModels = modelsLoaded && myModels.length === 0
   const noQuota = usageLoaded && (myUsage?.dimensions.length ?? 0) === 0
-  const blockReason: AiBlockReason | null =
-    noModels && noQuota ? 'no-both' : noModels ? 'no-models' : noQuota ? 'no-quota' : null
+  
+  // 前端兆底：所有维度都已达到或超过 100%（当后端校验未加载时使用）
+  const quotaExhaustedFallback = useMemo(() => {
+    if (!usageLoaded || !myUsage || myUsage.dimensions.length === 0) return false
+    return myUsage.dimensions.every((dim) => {
+      const quota = Number(dim.quotaValue) || 0
+      const used = Number(dim.usedValue) || 0
+      if (quota <= 0) return false
+      return used >= quota
+    })
+  }, [usageLoaded, myUsage])
+  
+  // 降级模式：后端返回 action=downgrade 时启用，允许发送但显示标识
+  const downgradeMode = quotaCheckLoaded && quotaCheck?.action === 'downgrade'
+  
+  // 综合判定 blockReason：后端配额校验优先，前端兆底兜底
+  const blockReason: AiBlockReason | null = useMemo(() => {
+    // 后端配额校验结果优先（已加载时以服务端结论为准）
+    if (quotaCheckLoaded && quotaCheck) {
+      if (quotaCheck.action === 'reject') return 'quota-exhausted'
+      if (quotaCheck.action === 'approve') return 'needs-approval'
+      // downgrade / allow → 不阻塞
+      return null
+    }
+    // 后端未返回时，前端兆底判定
+    if (noModels && noQuota) return 'no-both'
+    if (noModels) return 'no-models'
+    if (noQuota) return 'no-quota'
+    return quotaExhaustedFallback ? 'quota-exhausted' : null
+  }, [noModels, noQuota, quotaCheckLoaded, quotaCheck, quotaExhaustedFallback])
   const aiBlocked = blockReason !== null
 
   /** 定時刷新引擎路由結果（手動切換 / 代理重啟後同步到膠囊） */
@@ -543,6 +579,19 @@ export default function Home() {
       if (!cancelled) { setMyUsage(data); setUsageLoaded(true) }
     }).catch(() => { /* 靜默失敗，不影響首頁加載，不參與開通態判定 */ })
     return () => { cancelled = true }
+  }, [])
+
+  /** 初始加載配額校驗（綜合所有維度給出處置動作） + 定時刷新 */
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      fetchQuotaCheck().then((result) => {
+        if (!cancelled) { setQuotaCheck(result); setQuotaCheckLoaded(true) }
+      }).catch(() => { /* 靜默失敗，前端兆底兜底 */ })
+    }
+    load()
+    const timer = setInterval(load, 60000)
+    return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
   const menuList = useMemo(() => (
@@ -636,13 +685,30 @@ export default function Home() {
 
   const getMenuInfo = (key: string) => menuList.find((m) => m.key === key)
 
-  /** 发送消息 */
+  /** 发送消息（sending 时进入排队队列） */
   const handleSend = async (preset?: string) => {
     const text = (preset ?? inputText).trim()
-    if (!text || sending) return
+    if (!text) return
     // 未開通兗底：輸入區已禁用，這裡防快捷提問等入口繞過
     if (aiBlocked) {
       message.warning(t('home.aiBlockedSendMsg'))
+      return
+    }
+
+    // 正在发送中 → 进入排队队列（最多 3 条）
+    if (sending) {
+      if (messageQueue.length >= 3) {
+        message.warning(t('home.aiQueueFull'))
+        return
+      }
+      const queueItem = {
+        id: `queue-${Date.now()}`,
+        text,
+        attachments: attachments.length > 0 ? [...attachments] : [],
+      }
+      setMessageQueue((prev) => [...prev, queueItem])
+      setInputText('')
+      setAttachments([])
       return
     }
   
@@ -673,8 +739,6 @@ export default function Home() {
           title: undefined,
           messages: undefined,
         }).catch(() => {})
-        // 通过自定义 header 传递 modelKey 和 tokens 到后端
-        // 注意：这里需要在 updateConversation API 中支持传递这些字段
       }
     } catch {
       updateActiveMessages((prev) => [...prev, {
@@ -686,6 +750,20 @@ export default function Home() {
     } finally {
       setSending(false)
     }
+  }
+
+  /** 当 sending 变为 false 且有排队消息时，自动处理下一条（定义在 llmRequestOptions 之后） */
+  const processNextInQueueRef = useRef<(() => Promise<void>) | null>(null)
+
+  useEffect(() => {
+    if (!sending && messageQueue.length > 0 && processNextInQueueRef.current) {
+      processNextInQueueRef.current()
+    }
+  }, [sending, messageQueue.length])
+
+  /** 删除排队中的消息 */
+  const handleRemoveQueueItem = (id: string) => {
+    setMessageQueue((prev) => prev.filter((item) => item.id !== id))
   }
 
   const dateStr = currentTime.toLocaleDateString(dateLocale, {
@@ -781,6 +859,48 @@ export default function Home() {
     return opts
   }, [contextWindow, thinkingEnabled, thinkingAvailable, thinkingDepth])
 
+  /** 处理排队中的下一条消息 */
+  const processNextInQueue = useCallback(async () => {
+    if (messageQueue.length === 0) return
+    const next = messageQueue[0]
+    setMessageQueue((prev) => prev.slice(1))
+
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: next.text,
+      attachments: next.attachments.length > 0 ? next.attachments : undefined,
+      timestamp: new Date(),
+    }
+    const newMessages = [...messages, userMsg]
+    updateActiveMessages(() => newMessages)
+    setSending(true)
+
+    try {
+      const reply = await sendAgentMessage(newMessages, llmRequestOptions)
+      updateActiveMessages((prev) => [...prev, {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: reply.text,
+        timestamp: new Date(),
+      }])
+    } catch {
+      updateActiveMessages((prev) => [...prev, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: t('home.aiServiceError'),
+        timestamp: new Date(),
+      }])
+    } finally {
+      setSending(false)
+    }
+  }, [messageQueue, messages, updateActiveMessages, llmRequestOptions, t])
+
+  // 将 processNextInQueue 赋值给 ref，供 useEffect 调用
+  useEffect(() => {
+    processNextInQueueRef.current = processNextInQueue
+  }, [processNextInQueue])
+
   /* ── 文件处理 ── */
 
   const handleFileSelect = useCallback((files: FileList | null) => {
@@ -852,27 +972,31 @@ export default function Home() {
   const avatarExpression = isPikachuAvatar ? (avatarKey.replace('pikachu-', '') || 'default') : ''
   const isCustomOrPresetAvatar = avatarKey.startsWith('https://') || avatarKey.startsWith('data:')
 
-  /** 頭部資訊條剩餘百分比：取日维度中最緊的一個，無日维度時回退月维度 */
-  const infoBarRemainingPercent = useMemo(() => {
+  /** 頭部資訊條已用百分比：取日维度中最緊的一個，無日维度時回退月维度 */
+  const infoBarUsedPercent = useMemo(() => {
     if (!myUsage || myUsage.dimensions.length === 0) return null
-    const remainingOf = (dim: QuotaDimension): number | null => {
+    const usedOf = (dim: QuotaDimension): number | null => {
       const quota = Number(dim.quotaValue) || 0
       if (quota <= 0) return null
-      return Math.max(0, 100 - Math.round((Number(dim.usedValue) / quota) * 100))
+      return Math.min(100, Math.round((Number(dim.usedValue) / quota) * 100))
     }
     const pick = (period: 'daily' | 'monthly') => myUsage!.dimensions
       .filter((d) => d.period === period)
-      .map(remainingOf)
+      .map(usedOf)
       .filter((v): v is number => v !== null)
     const daily = pick('daily')
     const pool = daily.length > 0 ? daily : pick('monthly')
-    return pool.length > 0 ? Math.min(...pool) : null
+    return pool.length > 0 ? Math.max(...pool) : null
   }, [myUsage])
 
   /** 當前引擎：auto 模式只顯示策略名（模型多時拼接會溢位）；手動模式顯示指定模型名稱 */
   const engineName = engine?.model ? (modelDisplayName(engine.model) ?? engine.model) : null
   const engineChipText = blockReason
-    ? t(blockReason === 'no-quota' ? 'home.engineChipNoQuota' : 'home.engineChipNoModels')
+    ? (blockReason === 'quota-exhausted' || blockReason === 'no-quota'
+        ? t('home.engineChipNoQuota')
+        : blockReason === 'needs-approval'
+          ? t('home.engineChipNeedsApproval')
+          : t('home.engineChipNoModels'))
     : engine
       ? engineMode === 'auto' ? t('home.engineCostSaving') : (engineName ?? t('home.aiEngineNotDetected'))
       : t('home.aiEngineNotDetected')
@@ -882,6 +1006,11 @@ export default function Home() {
 
   /** 已接入網關的授權模型（未接入者不展示） */
   const availableModels = myModels.filter((m) => connectedModels[m.modelKey])
+
+  /** 模型選擇器展示列表：有模型權限但額度阻塞時，展示全部授權模型（不受 connectedModels 限制） */
+  const selectorModels = (myModels.length > 0 && blockReason && blockReason !== 'no-models' && blockReason !== 'no-both')
+    ? myModels
+    : availableModels
 
   /** 引擎模式下拉：智能路由 + 指定模型兩組；只展示已接入網關的授權模型 */
   const engineMenuItems: MenuProps['items'] = [
@@ -903,7 +1032,7 @@ export default function Home() {
     {
       type: 'group',
       label: t('home.engineSpecifiedModel'),
-      children: availableModels.length === 0
+      children: selectorModels.length === 0
         ? [{
             key: 'no-models',
             disabled: true,
@@ -913,8 +1042,8 @@ export default function Home() {
               </div>
             ),
           }]
-        : availableModels.map((model) => ({
-            key: connectedModels[model.modelKey],
+        : selectorModels.map((model) => ({
+            key: connectedModels[model.modelKey] ?? model.modelKey,
             label: (
               <div className="home-ai-engine-opt">
                 <strong>{model.modelName}</strong>
@@ -1119,31 +1248,32 @@ export default function Home() {
           {aiBlocked ? (
             <div className="home-ai-infobar-warn">
               <LockOutlined style={{ fontSize: 13 }} />
-              <span>{aiBlocked ? t('home.aiBlockedBadge') : ''} — {t(blockReason === 'no-models' ? 'home.aiBlockedNoModelsDesc' : blockReason === 'no-quota' ? 'home.aiBlockedNoQuotaDesc' : 'home.aiBlockedNoBothDesc')}</span>
+              <span>{t('home.aiBlockedBadge')} — {t(BLOCKED_DESC_KEY[blockReason])}</span>
             </div>
           ) : (
             <>
               <div className="home-ai-infobar-left" onClick={handleOpenUsage} role="button" tabIndex={0}>
                 <DatabaseOutlined style={{ fontSize: 13, color: '#8C8C8C' }} />
                 <span className="home-ai-infobar-label">{t('home.aiMyUsage')}</span>
-                {infoBarRemainingPercent !== null && (
+                {infoBarUsedPercent !== null && (
                   <>
-                    <span style={{
-                      fontSize: 12, fontWeight: 600,
-                      color: infoBarRemainingPercent >= 60 ? '#52C41A' : infoBarRemainingPercent >= 20 ? '#FAAD14' : '#FF4D4F',
-                    }}>
-                      {infoBarRemainingPercent}%
-                    </span>
                     <Progress
-                      percent={infoBarRemainingPercent}
+                      percent={infoBarUsedPercent}
                       size="small"
                       showInfo={false}
-                      strokeColor={infoBarRemainingPercent >= 60 ? '#52C41A' : infoBarRemainingPercent >= 20 ? '#FAAD14' : '#FF4D4F'}
+                      strokeColor={infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F'}
                       style={{ width: 60, margin: '0 2px' }}
                     />
+                    <span style={{
+                      fontSize: 11, fontWeight: 500,
+                      color: infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      ({infoBarUsedPercent === 0 ? `可用100%` : infoBarUsedPercent === 100 ? `已用100%` : `已使用${infoBarUsedPercent}%`})
+                    </span>
                   </>
                 )}
-                {infoBarRemainingPercent === null && (
+                {infoBarUsedPercent === null && (
                   <span style={{ fontSize: 11, color: '#BFBFBF' }}>—</span>
                 )}
               </div>
@@ -1257,23 +1387,30 @@ export default function Home() {
         </div>
 
         <div className="home-ai-body">
-          {isEmpty ? (
-            blockReason ? (
-              /* 未開通引導卡：卡片式背景 + 品牌橙頂條，標題突出缺失項，描述給出開通路徑 */
-              <div className="home-ai-hero">
-                <div className="home-ai-hero-card">
-                  <div className="home-ai-hero-icon home-ai-hero-icon--blocked">
-                    <LockOutlined />
-                  </div>
-                  <h4>{t(BLOCKED_TITLE_KEY[blockReason])}</h4>
-                  <p>{t(BLOCKED_DESC_KEY[blockReason])}</p>
+          {/* 新對話 + 阻塞：顯示引導卡片 */}
+          {isEmpty && blockReason ? (
+            <div className="home-ai-hero">
+              <div className="home-ai-hero-card">
+                <div className="home-ai-hero-icon home-ai-hero-icon--blocked">
+                  <LockOutlined />
+                </div>
+                <h4>{t(BLOCKED_TITLE_KEY[blockReason])}</h4>
+                <p>{t(BLOCKED_DESC_KEY[blockReason])}</p>
+                {blockReason === 'needs-approval' ? (
+                  <button type="button" className="home-ai-blocked-action" onClick={() => navigate(`/ai-access-apply?reason=needs-approval`)}>
+                    <SendOutlined />
+                    {t('home.aiBlockedApplyBtn')}
+                  </button>
+                ) : (
                   <button type="button" className="home-ai-blocked-action" onClick={() => navigate(`/ai-access-apply?reason=${blockReason}`)}>
                     <WalletOutlined />
                     {t('home.aiBlockedViewUsage')}
                   </button>
-                </div>
+                )}
               </div>
-            ) : (
+            </div>
+          ) : isEmpty ? (
+            /* 新對話 + 未阻塞：正常 Hero */
             <div className="home-ai-hero">
               <div className="home-ai-hero-icon"><AiLogo size={64} /></div>
               <h4>{t('home.aiHeroTitle')}</h4>
@@ -1287,8 +1424,8 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            )
           ) : (
+            /* 歷史對話：無論是否阻塞都顯示消息列表（不遮罩） */
             <>
               {messages.map((msg) => (
                 <div key={msg.id} className={`home-chat-bubble ${msg.role}`}>
@@ -1313,14 +1450,8 @@ export default function Home() {
           )}
         </div>
 
-        {!isEmpty && (
-          blockReason ? (
-            /* 對話中權限/額度被回收：警示橫幅替代快捷提問條，告知無法繼續（三態文案） */
-            <div className="home-ai-blocked-banner">
-              <LockOutlined />
-              <span>{t(BLOCKED_BANNER_KEY[blockReason])}</span>
-            </div>
-          ) : (
+        {/* 歷史對話有阻塞卡片時，底部不重複顯示橫幅；無阻塞時顯示快捷提問 */}
+        {!isEmpty && !blockReason && (
           <div className="home-ai-quick">
             {quickQuestions.map((q) => (
               <button key={q.text} className="home-ai-quick-btn" onClick={() => handleSend(q.text)}>
@@ -1328,7 +1459,6 @@ export default function Home() {
               </button>
             ))}
           </div>
-          )
         )}
 
         {/* 能力展示条 */}
@@ -1388,6 +1518,69 @@ export default function Home() {
           </div>
         )}
 
+        {/* 排队状态提示 */}
+        {sending && !isEmpty && !blockReason && (
+          <div className="home-ai-queue-status">
+            <span className="home-ai-queue-status-dot" />
+            <span>{t('home.aiThinking')}</span>
+          </div>
+        )}
+
+        {/* 排队消息列表 */}
+        {messageQueue.length > 0 && (
+          <div className="home-ai-queue-list">
+            <div className="home-ai-queue-header">
+              <span className="home-ai-queue-header-text">{t('home.aiQueueWaiting', { count: messageQueue.length })}</span>
+            </div>
+            {messageQueue.map((item, idx) => (
+              <div key={item.id} className="home-ai-queue-item">
+                <span className="home-ai-queue-item-index">{idx + 1}</span>
+                <span className="home-ai-queue-item-text">{item.text}</span>
+                <button
+                  type="button"
+                  className="home-ai-queue-item-remove"
+                  onClick={() => handleRemoveQueueItem(item.id)}
+                  title={t('home.aiQueueRemove')}
+                >
+                  <CloseCircleOutlined />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 降级模式标识 */}
+        {downgradeMode && (
+          <div className="home-ai-downgrade-bar">
+            <SwapOutlined />
+            <span>{t('home.aiDowngradeModeLabel')}</span>
+            {quotaCheck?.downgradeModelName && (
+              <span className="home-ai-downgrade-bar-model">{quotaCheck.downgradeModelName}</span>
+            )}
+          </div>
+        )}
+
+        {/* 历史对话阻塞提醒条：输入框上方显示，含申请按钮或不可申请提示 */}
+        {!isEmpty && blockReason && (
+          <div className="home-ai-blocked-reminder">
+            <LockOutlined />
+            <span className="home-ai-blocked-reminder-text">
+              {blockReason === 'quota-exhausted'
+                ? t('home.aiQuotaExhaustedReminder')
+                : blockReason === 'needs-approval'
+                  ? t('home.aiNeedsApprovalReminder')
+                  : t('home.aiBlockedReminder')}
+            </span>
+            {/* 仅 needs-approval 或前端兆底非 quota-exhausted 时显示申请按钮 */}
+            {(blockReason === 'needs-approval' || (blockReason !== 'quota-exhausted' && !quotaCheckLoaded)) && (
+              <button type="button" className="home-ai-blocked-reminder-btn" onClick={() => navigate(`/ai-access-apply?reason=${blockReason}`)}>
+                <SendOutlined />
+                {t('home.aiBlockedApplyBtn')}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* 输入区（含拖拽、附件按钮） */}
         <div
           className={`home-ai-input${isDragging ? ' home-ai-input--dragging' : ''}`}
@@ -1420,14 +1613,14 @@ export default function Home() {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onPressEnter={() => handleSend()}
-            placeholder={aiBlocked ? t('home.aiInputBlocked') : t('home.aiInputPlaceholder')}
+            placeholder={aiBlocked ? t('home.aiInputBlocked') : downgradeMode ? t('home.aiInputDowngradePlaceholder') : sending ? t('home.aiInputQueuePlaceholder') : t('home.aiInputPlaceholder')}
             className="home-ai-field"
-            disabled={sending || aiBlocked}
+            disabled={aiBlocked}
           />
           <button
             className="home-ai-send"
             onClick={() => handleSend()}
-            disabled={(!inputText.trim() && attachments.length === 0) || sending || aiBlocked}
+            disabled={(!inputText.trim() && attachments.length === 0) || aiBlocked}
           >
             <SendOutlined />
           </button>

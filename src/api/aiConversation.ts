@@ -112,8 +112,11 @@ export interface AuditParams {
   size: number
   username?: string
   modelKey?: string
-  startDate?: string
-  endDate?: string
+  status?: number
+  createStartDate?: string
+  createEndDate?: string
+  updateStartDate?: string
+  updateEndDate?: string
 }
 
 /** 分页查询结果 */

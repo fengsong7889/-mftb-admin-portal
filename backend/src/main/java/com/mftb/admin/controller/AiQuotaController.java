@@ -55,12 +55,9 @@ public class AiQuotaController {
      * 网关/前端在发起请求前调用，消费 over_limit_action/downgrade_model_id 给出处置。
      */
     @GetMapping("/check")
-    @Operation(summary = "校验当前账号调用指定模型的配额处置")
+    @Operation(summary = "校验当前账号配额處置（不传模型则综合所有维度）")
     public Result<AiMyCenterDTO.QuotaCheckVO> checkQuota(@RequestParam(required = false) Long modelId,
                                                          @RequestParam(required = false) String modelKey) {
-        if (modelId == null && (modelKey == null || modelKey.isBlank())) {
-            return Result.error("modelId 与 modelKey 至少传一个");
-        }
         return Result.success(myCenterService.checkQuota(modelId, modelKey));
     }
 

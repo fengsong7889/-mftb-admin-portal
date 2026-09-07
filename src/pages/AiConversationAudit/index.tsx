@@ -51,9 +51,11 @@ export default function AiConversationAudit() {
   const [searchForm] = Form.useForm()
 
   /* ── 查询条件 ── */
-  const [dates, setDates] = useState<[Dayjs, Dayjs] | null>(null)
   const [username, setUsername] = useState<string | undefined>(undefined)
   const [modelKey, setModelKey] = useState<string | undefined>(undefined)
+  const [status, setStatus] = useState<number | undefined>(undefined)
+  const [createDates, setCreateDates] = useState<[Dayjs, Dayjs] | null>(null)
+  const [updateDates, setUpdateDates] = useState<[Dayjs, Dayjs] | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
@@ -79,9 +81,12 @@ export default function AiConversationAudit() {
     size: pageSize,
     username,
     modelKey,
-    startDate: dates?.[0]?.format('YYYY-MM-DD'),
-    endDate: dates?.[1]?.format('YYYY-MM-DD'),
-  }), [page, pageSize, username, modelKey, dates])
+    status,
+    createStartDate: createDates?.[0]?.format('YYYY-MM-DD'),
+    createEndDate: createDates?.[1]?.format('YYYY-MM-DD'),
+    updateStartDate: updateDates?.[0]?.format('YYYY-MM-DD'),
+    updateEndDate: updateDates?.[1]?.format('YYYY-MM-DD'),
+  }), [page, pageSize, username, modelKey, status, createDates, updateDates])
 
   /** 加载数据 */
   useEffect(() => {
@@ -101,9 +106,11 @@ export default function AiConversationAudit() {
 
   const handleReset = () => {
     searchForm.resetFields()
-    setDates(null)
     setUsername(undefined)
     setModelKey(undefined)
+    setStatus(undefined)
+    setCreateDates(null)
+    setUpdateDates(null)
     setPage(1)
   }
 
@@ -230,15 +237,43 @@ export default function AiConversationAudit() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item label={t('conversationAudit.filterDate')} name="dateRange">
+          <Form.Item label={t('conversationAudit.filterStatus')} name="status">
+            <Select
+              value={status}
+              placeholder={t('conversationAudit.filterStatus')}
+              allowClear
+              options={[
+                { value: 0, label: t('conversationAudit.statusActive') },
+                { value: 1, label: t('conversationAudit.statusTrashed') },
+                { value: 2, label: t('conversationAudit.statusPurged') },
+              ]}
+              onChange={(value) => setStatus(value)}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item label={t('conversationAudit.filterCreatedAt')} name="createDateRange">
             <RangePicker
-              value={dates}
+              value={createDates}
               allowClear
               onChange={(values) => {
                 if (values && values[0] && values[1]) {
-                  setDates([values[0], values[1]])
+                  setCreateDates([values[0], values[1]])
                 } else {
-                  setDates(null)
+                  setCreateDates(null)
+                }
+              }}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item label={t('conversationAudit.filterUpdatedAt')} name="updateDateRange">
+            <RangePicker
+              value={updateDates}
+              allowClear
+              onChange={(values) => {
+                if (values && values[0] && values[1]) {
+                  setUpdateDates([values[0], values[1]])
+                } else {
+                  setUpdateDates(null)
                 }
               }}
               style={{ width: '100%' }}

@@ -84,6 +84,51 @@ export function fetchMyQuotaUsage(): Promise<MyQuotaUsage> {
   })
 }
 
+/* ══════════ 配额校验闭环 ══════════ */
+
+/** 配额校验结果（对应后端 QuotaCheckVO） */
+export interface QuotaCheckResult {
+  modelId: number | null
+  modelKey: string | null
+  /** 是否放行（true=可调用） */
+  allowed: boolean
+  /** 是否已超额（命中硬限额） */
+  overLimit: boolean
+  /** 是否触发软限额提醒（接近但未超额） */
+  softWarning: boolean
+  /** 生效动作：allow/reject/approve/downgrade */
+  action: 'allow' | 'reject' | 'approve' | 'downgrade'
+  /** 是否需要人工审批（action=approve） */
+  requiresApproval: boolean
+  /** 降级目标模型（action=downgrade 时有值） */
+  downgradeModelId: number | null
+  downgradeModelKey: string | null
+  downgradeModelName: string | null
+  /** 命中（使用率最高）维度的信息 */
+  hitSource: string | null
+  hitSourceName: string | null
+  hitQuotaType: string | null
+  hitPeriod: string | null
+  hitQuotaValue: number | null
+  hitUsedValue: number | null
+  hitUsagePercent: number | null
+  /** 提示消息 */
+  message: string
+}
+
+/**
+ * 配额校验：综合所有维度（员工/部门/职位/角色）返回最终处置动作。
+ * 不传 modelId/modelKey 时综合所有维度判定。
+ */
+export function fetchQuotaCheck(modelKey?: string): Promise<QuotaCheckResult> {
+  const params: Record<string, string> = {}
+  if (modelKey) params.modelKey = modelKey
+  return request.get<unknown, QuotaCheckResult>('/ai/quota/check', {
+    params,
+    headers: { 'X-Request-Silent': '1' },
+  })
+}
+
 /* ══════════ 我的授权模型 ══════════ */
 
 /** 授权来源：部门策略组/职位/角色/员工 */
