@@ -160,10 +160,10 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             return "無法定位項目根目錄，請確認應用部署在 Git 倉庫中";
         }
 
-        // 获取最后版本记录的创建时间，用于筛选新提交
-        java.time.LocalDateTime lastSyncTime = getLastVersionCreatedAt();
+        // 获取最大发布日期作为同步 cutoff（release_date 取自 commit 日期，比 created_at 可靠）
+        LocalDate lastReleaseDate = getLastVersionReleaseDate();
 
-        List<GitCommit> commits = readGitLog(projectDir, lastSyncTime);
+        List<GitCommit> commits = readGitLog(projectDir, lastReleaseDate);
         if (commits.isEmpty()) {
             return "沒有新的 Git 提交需要同步";
         }
@@ -256,32 +256,75 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return null;
     }
 
-    /** 获取最后版本记录的创建时间 */
-    private java.time.LocalDateTime getLastVersionCreatedAt() {
+    /** 获取最大发布日期，用于 Git 同步 cutoff（release_date 取自 commit 日期，不会被手动录入干扰） */
+    private LocalDate getLastVersionReleaseDate() {
         LambdaQueryWrapper<SysVersionHistory> wrapper = new LambdaQueryWrapper<>();
-        wrapper.orderByDesc(SysVersionHistory::getCreatedAt);
+        wrapper.select(SysVersionHistory::getReleaseDate);
+        wrapper.orderByDesc(SysVersionHistory::getReleaseDate);
         wrapper.last("LIMIT 1");
         SysVersionHistory latest = mapper.selectOne(wrapper);
-        return latest != null ? latest.getCreatedAt() : null;
+        return latest != null ? latest.getReleaseDate() : null;
     }
 
-    /** 获取最后版本记录的版本号 */
+    /** 获取最后版本记录的版本号（按数值排序，非字符串排序） */
     private String getLastVersionNo() {
-        LambdaQueryWrapper<SysVersionHistory> wrapper = new LambdaQueryWrapper<>();
-        wrapper.orderByDesc(SysVersionHistory::getVersionNo);
-        wrapper.last("LIMIT 1");
-        SysVersionHistory latest = mapper.selectOne(wrapper);
-        return latest != null ? latest.getVersionNo() : null;
+        List<SysVersionHistory> all = mapper.selectList(
+                new LambdaQueryWrapper<SysVersionHistory>().orderByDesc(SysVersionHistory::getCreatedAt));
+        if (all.isEmpty()) return null;
+
+        // 按数值比较找最大版本号
+        SysVersionHistory latest = all.get(0);
+        for (int i = 1; i < all.size(); i++) {
+            if (compareVersion(all.get(i).getVersionNo(), latest.getVersionNo()) > 0) {
+                latest = all.get(i);
+            }
+        }
+        return latest.getVersionNo();
     }
 
-    private List<GitCommit> readGitLog(String projectDir, java.time.LocalDateTime sinceTime) {
+    /**
+     * 语义化版本号数值比较
+     * 支持 3 段式 (X.Y.Z) 和 4 段式 (X.Y.Z.SS)
+     * 返回: >0 表示 v1>v2, =0 表示相等, <0 表示 v1<v2
+     */
+    private int compareVersion(String v1, String v2) {
+        if (v1 == null && v2 == null) return 0;
+        if (v1 == null) return -1;
+        if (v2 == null) return 1;
+
+        String[] p1 = v1.split("\\.");
+        String[] p2 = v2.split("\\.");
+
+        int major1 = safeInt(p1, 0), minor1 = safeInt(p1, 1), patch1 = safeInt(p1, 2), sub1 = safeInt(p1, 3);
+        int major2 = safeInt(p2, 0), minor2 = safeInt(p2, 1), patch2 = safeInt(p2, 2), sub2 = safeInt(p2, 3);
+
+        if (major1 != major2) return Integer.compare(major1, major2);
+        if (minor1 != minor2) return Integer.compare(minor1, minor2);
+        if (patch1 != patch2) return Integer.compare(patch1, patch2);
+        return Integer.compare(sub1, sub2);
+    }
+
+    private int safeInt(String[] parts, int index) {
+        if (index >= parts.length) return 0;
+        try { return Integer.parseInt(parts[index]); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /**
+     * 解析版本号字符串为 [major, minor, patch, subPatch]
+     * 支持 3 段式 (X.Y.Z) 和 4 段式 (X.Y.Z.SS)
+     */
+    private int[] parseVersion(String version) {
+        String[] parts = version.split("\\.");
+        return new int[]{safeInt(parts, 0), safeInt(parts, 1), safeInt(parts, 2), safeInt(parts, 3)};
+    }
+
+    private List<GitCommit> readGitLog(String projectDir, LocalDate sinceDate) {
         try {
             List<String> cmd = new ArrayList<>();
             cmd.addAll(Arrays.asList("git", "log", "--pretty=format:%H|%ad|%an|%s", "--date=short"));
-            if (sinceTime != null) {
-                // 使用 --after 筛选指定时间之后的提交
-                String afterDate = sinceTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                cmd.add("--after=" + afterDate);
+            if (sinceDate != null) {
+                // 使用 --after 筛选指定日期之后的提交（不含当天，当天提交已在已有版本记录中）
+                cmd.add("--after=" + sinceDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
             }
 
             ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -354,10 +397,8 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
      *   问题修复 → 第四位(子补丁) 1.0.0 → 1.0.01
      */
     private String bumpVersion(String currentVersion, List<GitCommit> commits) {
-        String[] parts = currentVersion.split("\\.");
-        int major = parts.length > 0 ? Integer.parseInt(parts[0]) : 1;
-        int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
-        int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+        int[] v = parseVersion(currentVersion);
+        int major = v[0], minor = v[1], patch = v[2], subPatch = v[3];
 
         boolean hasBreaking = commits.stream()
                 .anyMatch(c -> c.getSubject().contains("!") || c.getSubject().toLowerCase().contains("breaking"));
@@ -372,7 +413,6 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             return major + "." + minor + "." + (patch + 1);
         } else {
             // 问题修复：第四位(子补丁)增长
-            int subPatch = parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
@@ -382,10 +422,8 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         String lastVersionNo = getLastVersionNo();
         String base = lastVersionNo != null ? lastVersionNo : "1.0.0";
 
-        String[] parts = base.split("\\.");
-        int major = parts.length > 0 ? Integer.parseInt(parts[0]) : 1;
-        int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
-        int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+        int[] v = parseVersion(base);
+        int major = v[0], minor = v[1], patch = v[2], subPatch = v[3];
 
         if ("major".equals(releaseType)) {
             // 重大更新：第二位数增长
@@ -395,7 +433,6 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             return major + "." + minor + "." + (patch + 1);
         } else {
             // 问题修复：第四位(子补丁)增长
-            int subPatch = parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
