@@ -388,7 +388,7 @@ public class DataInitializer implements CommandLineRunner {
             + " status, sort_order)"
             + " SELECT p.id, 'qwen3.7-flash', '通义千问 3.7 Flash', NULL, '阿里云百炼 qwen3.7-flash 轻量模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
-            + " 131072, 8192, 0.200000, 0.800000, 0.040000, 'CNY', 1, 1"
+            + " 200_000, 8192, 0.200000, 0.800000, 0.040000, 'CNY', 1, 1"
             + " FROM ai_provider p WHERE p.provider_key = 'dashscope' LIMIT 1");
 
         jdbcTemplate.execute(
@@ -398,7 +398,7 @@ public class DataInitializer implements CommandLineRunner {
             + " status, sort_order)"
             + " SELECT p.id, 'deepseek-chat', 'DeepSeek Chat', NULL, 'DeepSeek-V3 对话模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 1,"
-            + " 65536, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 2"
+            + " 128_000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 2"
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
 
         jdbcTemplate.execute(
@@ -408,7 +408,7 @@ public class DataInitializer implements CommandLineRunner {
             + " status, sort_order)"
             + " SELECT p.id, 'deepseek-v4-flash', 'DeepSeek V4 Flash', NULL, 'DeepSeek V4 Flash 轻量模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
-            + " 65536, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 3"
+            + " 128_000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 3"
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
 
         log.info("AI 供应商与模型种子数据插入完成 (幂等)");

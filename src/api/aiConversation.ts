@@ -36,6 +36,8 @@ export interface Conversation {
   id: number
   title: string
   messages: ChatMessage[]
+  /** 本次会话累计消耗 tokens（用于上下文窗口使用率计算） */
+  totalTokens: number
   createdAt: string
   updatedAt: string
 }
@@ -60,6 +62,7 @@ export function parseConversation(conv: AiConversation): Conversation {
     id: conv.id,
     title: conv.title,
     messages,
+    totalTokens: conv.totalTokens ?? 0,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
   }

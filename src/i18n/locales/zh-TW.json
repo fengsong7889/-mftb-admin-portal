@@ -1372,7 +1372,17 @@
     "unsupportedFormat": "不支持的文件格式",
     "settingsTitle": "模型設定",
     "settingsContextWindow": "上下文窗口",
-    "settingsThinkingMode": "思考模式"
+    "settingsThinkingMode": "思考模式",
+    "thinkingDepthLow": "低",
+    "thinkingDepthMedium": "中",
+    "thinkingDepthHigh": "高",
+    "thinkingDepthXhigh": "超高",
+    "thinkingDepthMax": "最高",
+    "ctxUsageLabel": "已用上下文",
+    "ctxPopoverTitle": "上下文窗口使用情况",
+    "convCompress": "压缩当前会话",
+    "convCompressed": "会话已压缩，上下文已释放",
+    "convCompressNoNeed": "消息较少，无需压缩"
   },
   "conversationAudit": {
     "pageTitle": "对话审计",

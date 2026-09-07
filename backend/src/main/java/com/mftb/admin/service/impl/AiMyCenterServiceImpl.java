@@ -715,7 +715,11 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         Map<Long, AiModel> map = new LinkedHashMap<>();
         modelMapper.selectList(new LambdaQueryWrapper<AiModel>()
                         .select(AiModel::getId, AiModel::getModelKey, AiModel::getName,
-                                AiModel::getProviderId, AiModel::getDeployType, AiModel::getSortOrder)
+                                AiModel::getProviderId, AiModel::getDeployType, AiModel::getSortOrder,
+                                AiModel::getModalities, AiModel::getVisionSupport,
+                                AiModel::getFunctionCalling, AiModel::getJsonMode,
+                                AiModel::getStreaming, AiModel::getThinkingMode,
+                                AiModel::getContextWindow)
                         .in(AiModel::getId, ids))
                 .forEach(model -> map.put(model.getId(), model));
         return map;

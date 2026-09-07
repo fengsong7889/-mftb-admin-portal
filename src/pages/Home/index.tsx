@@ -48,6 +48,7 @@ import {
   SettingOutlined,
   CheckOutlined,
   UndoOutlined,
+  CompressOutlined,
 } from '@ant-design/icons'
 import './index.css'
 
@@ -166,6 +167,73 @@ const DIM_SOURCE_LABEL_KEY: Record<QuotaSource, string> = {
   role: 'home.usageDimSourceRole',
 }
 
+/** 上下文窗口使用率：醒目的胶囊按钮 + Popover 面板 */
+const ContextUsageIndicator = ({
+  usedTokens,
+  contextWindow,
+  onCompress,
+  onNewChat,
+  t,
+}: {
+  usedTokens: number
+  contextWindow: number | undefined
+  onCompress: () => void
+  onNewChat: () => void
+  t: (key: string) => string
+}) => {
+  if (!contextWindow || contextWindow <= 0) return null
+  const ratio = Math.min(1, usedTokens / contextWindow)
+  const percent = Math.round(ratio * 100)
+  const usedLabel = usedTokens >= 1_000_000
+    ? `${(usedTokens / 1_000_000).toFixed(1)}M`
+    : `${Math.round(usedTokens / 1_000)}k`
+  const limitLabel = contextWindow >= 1_000_000
+    ? `${Math.round(contextWindow / 1_000_000)}M`
+    : `${Math.round(contextWindow / 1_000)}k`
+  const color = ratio < 0.5 ? '#52C41A' : ratio < 0.8 ? '#FAAD14' : '#FF4D4F'
+  const bg = ratio < 0.5 ? '#F6FFED' : ratio < 0.8 ? '#FFFBE6' : '#FFF1F0'
+  const border = ratio < 0.5 ? '#B7EB8F' : ratio < 0.8 ? '#FFE58F' : '#FFA39E'
+
+  return (
+    <Popover
+      trigger="click"
+      placement="topRight"
+      arrow={false}
+      overlayInnerStyle={{ padding: 0 }}
+      content={
+        <div className="home-ctx-popover">
+          <div className="home-ctx-popover-header">
+            <CompressOutlined className="home-ctx-popover-icon" />
+            <span>{t('home.ctxPopoverTitle')}</span>
+          </div>
+          <div className="home-ctx-popover-stats">
+            <span className="home-ctx-popover-pct" style={{ color }}>{percent}%</span>
+            <span className="home-ctx-popover-tokens">{usedLabel} / {limitLabel}</span>
+            <span className="home-ctx-popover-label">{t('home.ctxUsageLabel')}</span>
+          </div>
+          <div className="home-ctx-popover-bar-track">
+            <div className="home-ctx-popover-bar-fill" style={{ width: `${percent}%`, background: color }} />
+          </div>
+          <div className="home-ctx-popover-actions">
+            <button type="button" className="home-ctx-popover-btn home-ctx-popover-btn--compress" onClick={() => { onCompress() }}>
+              <CompressOutlined /> {t('home.convCompress')}
+            </button>
+            <button type="button" className="home-ctx-popover-btn home-ctx-popover-btn--new" onClick={() => { onNewChat() }}>
+              <PlusOutlined /> {t('home.convNew')}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <button type="button" className="home-ctx-capsule" style={{ background: bg, borderColor: border }} title={`${percent}% ${t('home.ctxUsageLabel')}`}>
+        <span className="home-ctx-capsule-dot" style={{ background: color }} />
+        <span className="home-ctx-capsule-pct" style={{ color }}>{percent}%</span>
+        <span className="home-ctx-capsule-tokens">{usedLabel}/{limitLabel}</span>
+      </button>
+    </Popover>
+  )
+}
+
 /** AI 助手未開通原因：無模型權限 / 無額度 / 兩者皆無 / 額度已用完(拒絕) / 需審批 */
 type AiBlockReason = 'no-models' | 'no-quota' | 'no-both' | 'quota-exhausted' | 'needs-approval'
 
@@ -271,7 +339,7 @@ export default function Home() {
             }))
           }
         } catch { /* 损坏数据回退空 */ }
-        return { id: c.id, title: c.title, messages: msgs, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
+        return { id: c.id, title: c.title, messages: msgs, totalTokens: c.totalTokens ?? 0, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
       })
       setConversations(parsed)
       // 默认激活最新会话，若无则自动创建一个
@@ -283,7 +351,7 @@ export default function Home() {
     }).catch(() => {
       // 后端不可用，创建一个本地会话
       if (!cancelled) {
-        const localConv: Conversation = { id: Date.now(), title: '新對話', messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        const localConv: Conversation = { id: Date.now(), title: '新對話', messages: [], totalTokens: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
         setConversations([localConv])
         setActiveConvId(localConv.id)
       }
@@ -295,12 +363,12 @@ export default function Home() {
   const handleCreateConversation = async () => {
     try {
       const conv = await createConversation()
-      const newConv: Conversation = { id: conv.id, title: conv.title, messages: [], createdAt: conv.createdAt, updatedAt: conv.updatedAt }
+      const newConv: Conversation = { id: conv.id, title: conv.title, messages: [], totalTokens: conv.totalTokens ?? 0, createdAt: conv.createdAt, updatedAt: conv.updatedAt }
       setConversations((prev) => [newConv, ...prev])
       setActiveConvId(newConv.id)
     } catch {
       // 后端不可用，本地创建
-      const localConv: Conversation = { id: Date.now(), title: '新對話', messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      const localConv: Conversation = { id: Date.now(), title: '新對話', messages: [], totalTokens: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
       setConversations((prev) => [localConv, ...prev])
       setActiveConvId(localConv.id)
     }
@@ -368,7 +436,7 @@ export default function Home() {
             }))
           }
         } catch { /* 损坏数据回退空 */ }
-        return { id: c.id, title: c.title, messages: msgs, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
+        return { id: c.id, title: c.title, messages: msgs, totalTokens: c.totalTokens ?? 0, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
       })
       setConversations(parsed)
       setDeletedConversations(deletedList)
@@ -501,6 +569,10 @@ export default function Home() {
   
   // 综合判定 blockReason：后端配额校验优先，前端兆底兜底
   const blockReason: AiBlockReason | null = useMemo(() => {
+    // 模型权限是使用前提：无授权模型时无论配额校验结果如何都必须阻塞
+    if (noModels) {
+      return noQuota ? 'no-both' : 'no-models'
+    }
     // 后端配额校验结果优先（已加载时以服务端结论为准）
     if (quotaCheckLoaded && quotaCheck) {
       if (quotaCheck.action === 'reject') return 'quota-exhausted'
@@ -509,8 +581,6 @@ export default function Home() {
       return null
     }
     // 后端未返回时，前端兆底判定
-    if (noModels && noQuota) return 'no-both'
-    if (noModels) return 'no-models'
     if (noQuota) return 'no-quota'
     return quotaExhaustedFallback ? 'quota-exhausted' : null
   }, [noModels, noQuota, quotaCheckLoaded, quotaCheck, quotaExhaustedFallback])
@@ -732,11 +802,15 @@ export default function Home() {
         content: reply.text,
         timestamp: new Date(),
       }])
-      // 更新会话的模型和 tokens 信息（用于审计）
-      if (activeConvId && reply.model) {
+      // 累积 tokens 并更新会话
+      if (activeConvId) {
+        setConversations((prev) => prev.map((c) =>
+          c.id === activeConvId ? { ...c, totalTokens: (c.totalTokens ?? 0) + reply.tokens } : c
+        ))
         updateConversation(activeConvId, {
           title: undefined,
           messages: undefined,
+          totalTokens: (activeConversation?.totalTokens ?? 0) + reply.tokens,
         }).catch(() => {})
       }
     } catch {
@@ -763,6 +837,40 @@ export default function Home() {
   /** 删除排队中的消息 */
   const handleRemoveQueueItem = (id: string) => {
     setMessageQueue((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  /** 压缩当前会话：保留最近 4 条消息，旧消息替换为摘要标记 */
+  const handleCompressConversation = () => {
+    if (!activeConvId || messages.length <= 4) {
+      message.info(t('home.convCompressNoNeed'))
+      return
+    }
+    const keepCount = 4
+    const compressed: ChatMessage[] = [
+      {
+        id: `compress-${Date.now()}`,
+        role: 'assistant',
+        content: `[已压缩：${messages.length - keepCount} 条旧消息已归纳为上下文摘要，保留最近 ${keepCount} 条消息继续对话]`,
+        timestamp: new Date(),
+      },
+      ...messages.slice(-keepCount),
+    ]
+    // 估算压缩后的 tokens（约 4 字符/token）
+    const estimatedTokens = Math.round(
+      compressed.reduce((sum, m) => sum + m.content.length, 0) / 4
+    )
+    updateActiveMessages(() => compressed)
+    setConversations((prev) => prev.map((c) =>
+      c.id === activeConvId ? { ...c, totalTokens: estimatedTokens, messages: compressed } : c
+    ))
+    updateConversation(activeConvId, {
+      messages: JSON.stringify(compressed.map((m) => ({
+        ...m,
+        timestamp: m.timestamp.toISOString(),
+      }))),
+      totalTokens: estimatedTokens,
+    }).catch(() => {})
+    message.success(t('home.convCompressed'))
   }
 
   const dateStr = currentTime.toLocaleDateString(dateLocale, {
@@ -813,7 +921,7 @@ export default function Home() {
     }
   }, [engineMode, myModels, engine?.model])
 
-  /* ── 上下文窗口選項 & 思考模式可用性 ── */
+  /* ── 上下文窗口選項（按模型實際上限過濾） & 思考模式可用性 ── */
   const contextWindowOptions = useMemo(() => {
     if (engineMode === 'auto') {
       // AUTO 模式：取所有授權模型的最小上下文窗口
@@ -883,6 +991,15 @@ export default function Home() {
         content: reply.text,
         timestamp: new Date(),
       }])
+      // 累积 tokens
+      if (activeConvId) {
+        setConversations((prev) => prev.map((c) =>
+          c.id === activeConvId ? { ...c, totalTokens: (c.totalTokens ?? 0) + reply.tokens } : c
+        ))
+        updateConversation(activeConvId, {
+          totalTokens: (activeConversation?.totalTokens ?? 0) + reply.tokens,
+        }).catch(() => {})
+      }
     } catch {
       updateActiveMessages((prev) => [...prev, {
         id: `error-${Date.now()}`,
@@ -893,7 +1010,7 @@ export default function Home() {
     } finally {
       setSending(false)
     }
-  }, [messageQueue, messages, updateActiveMessages, llmRequestOptions, t])
+  }, [messageQueue, messages, updateActiveMessages, llmRequestOptions, t, activeConvId, activeConversation?.totalTokens])
 
   // 将 processNextInQueue 赋值给 ref，供 useEffect 调用
   useEffect(() => {
@@ -1213,13 +1330,13 @@ export default function Home() {
                         </div>
                         {thinkingEnabled && (
                           <div className="home-ai-settings-options">
-                            {(['low', 'medium', 'high', 'xhigh'] as ThinkingDepth[]).map((d) => (
+                            {(['low', 'medium', 'high', 'xhigh', 'max'] as ThinkingDepth[]).map((d) => (
                               <div
                                 key={d}
                                 className={`home-ai-settings-option${thinkingDepth === d ? ' active' : ''}`}
                                 onClick={() => setThinkingDepth(d)}
                               >
-                                {d}
+                                {t(`home.thinkingDepth${d.charAt(0).toUpperCase() + d.slice(1)}`)}
                                 {thinkingDepth === d && <CheckOutlined className="home-ai-settings-check" />}
                               </div>
                             ))}
@@ -1623,6 +1740,16 @@ export default function Home() {
           >
             <SendOutlined />
           </button>
+          {/* 上下文窗口使用率图标 */}
+          {!isEmpty && !aiBlocked && (
+            <ContextUsageIndicator
+              usedTokens={activeConversation?.totalTokens ?? 0}
+              contextWindow={contextWindow || undefined}
+              onCompress={handleCompressConversation}
+              onNewChat={handleCreateConversation}
+              t={t}
+            />
+          )}
         </div>
       </div>
 

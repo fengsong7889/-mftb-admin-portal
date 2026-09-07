@@ -55,6 +55,8 @@ function buildKeyNameMap(menus: MenuVO[], result: Record<string, string> = {}) {
  */
 interface SubPageTitle {
   fixed?: string
+  /** 详情页标题（前缀匹配到列表条目且有额外路径段时使用） */
+  detailFixed?: string
   add?: string
   edit?: string
   editParam?: string
@@ -119,7 +121,7 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/version-history-detail': { fixed: 'i18n:versionHistory.detailTitle' },
   '/version-history-add': { fixed: 'i18n:versionHistory.addVersion' },
   // 对话审计（动态路由 /ai-conversation-audit/:id）
-  '/ai-conversation-audit': { fixed: '對話詳情' },
+  '/ai-conversation-audit': { fixed: '對話審計', detailFixed: '對話詳情' },
   '/version-history-edit': { fixed: 'i18n:versionHistory.editVersion' },
   // 页面说明（页面标题含动态页面名，取静态主体）
   '/page-description-editor': { fixed: '編輯界面說明' },
@@ -220,7 +222,14 @@ function matchFullTitle(pathname: string, t: TFunction): string | null {
   if (!entry) {
     // 动态路由前缀匹配（如 /search-verify-detail/:id、/workflow-config/detail/:id）
     for (const [prefix, e] of Object.entries(SUB_PAGE_FULL_TITLE)) {
-      if (normalized.startsWith(prefix + '/')) { entry = e; break }
+      if (normalized.startsWith(prefix + '/')) {
+        entry = e
+        // 对话审计详情页：前缀匹配到列表条目时，若有额外路径段则使用详情标题
+        if (e.detailFixed && normalized !== prefix) {
+          return resolveTitle(e.detailFixed, t)
+        }
+        break
+      }
     }
   }
   if (!entry) return null

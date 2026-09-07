@@ -1741,8 +1741,182 @@
 }
 
 /* ─────────────────────────────────────────
+   上下文窗口使用率：醒目胶囊按钮 + Popover
+   ──────────────────────────────────────── */
+
+/* 胶囊按钮（输入区右侧，醒目可见） */
+.home-ctx-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1.5px solid;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  line-height: 1;
+}
+
+.home-ctx-capsule:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.home-ctx-capsule:active {
+  transform: translateY(0);
+}
+
+.home-ctx-capsule-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: ctx-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ctx-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.home-ctx-capsule-pct {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+}
+
+.home-ctx-capsule-tokens {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8C8C8C;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Popover 面板 */
+.home-ctx-popover {
+  width: 260px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.home-ctx-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.home-ctx-popover-icon {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.home-ctx-popover-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.home-ctx-popover-pct {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+}
+
+.home-ctx-popover-tokens {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-ctx-popover-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: auto;
+}
+
+.home-ctx-popover-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.home-ctx-popover-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+}
+
+.home-ctx-popover-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.home-ctx-popover-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-ctx-popover-btn--compress {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.home-ctx-popover-btn--compress:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.home-ctx-popover-btn--compress:active {
+  transform: translateY(0);
+}
+
+.home-ctx-popover-btn--new {
+  background: linear-gradient(135deg, #E8720C, #F39C12);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.3);
+}
+
+.home-ctx-popover-btn--new:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(232, 114, 12, 0.4);
+}
+
+.home-ctx-popover-btn--new:active {
+  transform: translateY(0);
+}
+
+/* ─────────────────────────────────────────
    响应式
-   ───────────────────────────────────────── */
+   ──────────────────────────────────────── */
 @media (max-width: 992px) {
   .home-main-grid { grid-template-columns: 1fr; }
   .home-greeting { flex-direction: column; align-items: flex-start; gap: 12px; }

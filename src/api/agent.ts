@@ -65,7 +65,7 @@ export function setEngineMode(mode: LlmEngineMode): void {
 }
 
 /** 思考深度枚举 */
-export type ThinkingDepth = 'low' | 'medium' | 'high' | 'xhigh'
+export type ThinkingDepth = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 /** LLM 请求附加选项（上下文窗口 / 思考深度） */
 export interface LlmRequestOptions {
@@ -94,7 +94,7 @@ export interface AgentReply {
  *
  * 附加選項：
  * - x-llm-context-window: 上下文窗口大小（tokens）
- * - x-llm-thinking-depth: 思考深度（low/medium/high/xhigh）
+ * - x-llm-thinking-depth: 思考深度（low/medium/high/xhigh/max）
  */
 function engineModeHeaders(opts?: LlmRequestOptions): Record<string, string> {
   const headers: Record<string, string> = { 'x-llm-mode': getEngineMode() }
@@ -574,8 +574,11 @@ export async function probeEngineStatus(mode: LlmEngineMode): Promise<LlmEngineS
 
 /* ────────────────── 上下文窗口選項生成 ────────────────── */
 
-/** 標準上下文窗口檔位（tokens） */
-const CONTEXT_WINDOW_TIERS = [32_000, 64_000, 128_000, 200_000, 400_000, 500_000, 1_000_000, 2_000_000]
+/** 標準上下文窗口檔位（tokens）
+ * 依據主流模型上下文上限設計，覆蓋 64K ~ 2M 區間
+ * Claude: 200K · Gemini/OpenAI: 1M~2M · 通用: 128K/400K/800K
+ */
+const CONTEXT_WINDOW_TIERS = [64_000, 128_000, 200_000, 400_000, 800_000, 1_000_000, 2_000_000]
 
 /** 將 tokens 數格式化為人類可讀標籤（如 200000 → "200K"） */
 export function formatContextWindow(tokens: number): string {

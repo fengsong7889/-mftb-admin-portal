@@ -1372,7 +1372,17 @@
     "unsupportedFormat": "Unsupported file format",
     "settingsTitle": "Model Settings",
     "settingsContextWindow": "Context Window",
-    "settingsThinkingMode": "Thinking Mode"
+    "settingsThinkingMode": "Thinking Mode",
+    "thinkingDepthLow": "Low",
+    "thinkingDepthMedium": "Medium",
+    "thinkingDepthHigh": "High",
+    "thinkingDepthXhigh": "Extra High",
+    "thinkingDepthMax": "Max",
+    "ctxUsageLabel": "Context Used",
+    "ctxPopoverTitle": "Context Window Usage",
+    "convCompress": "Compress Chat",
+    "convCompressed": "Chat compressed, context freed",
+    "convCompressNoNeed": "Not enough messages to compress"
   },
   "conversationAudit": {
     "pageTitle": "Conversation Audit",
