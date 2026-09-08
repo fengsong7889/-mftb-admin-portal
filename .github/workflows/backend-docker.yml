@@ -20,7 +20,10 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.sha }}
     steps:
+      # fetch-depth: 0 拉取完整 git 历史，镜像内 .git 供「從 Git 同步版本記錄」读取全部 commit
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
