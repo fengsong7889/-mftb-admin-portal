@@ -57,7 +57,8 @@ public class DataInitializer implements CommandLineRunner {
     // v16: 设置 OA 中心图标，修正 permission/system-config 排序
     // v17: OA中心新增「流程中心」二级菜单
     // v19: 「员工AI权额总览」更名为「员工AI权额管理」
-    private static final String V_MENU_SEED = "core:menu-seed-v19";
+    // v20: 修正顶级菜单排序（團購管理=7, 智能中心AI=8, OA中心=12）及图标
+    private static final String V_MENU_SEED = "core:menu-seed-v20";
 
     @Override
     public void run(String... args) {
@@ -769,8 +770,14 @@ public class DataInitializer implements CommandLineRunner {
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'SolutionOutlined' WHERE menu_key = 'oa-center' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'FileTextOutlined' WHERE menu_key = 'oa-requests' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'AppstoreOutlined' WHERE menu_key = 'process-center' AND (icon IS NULL OR icon = '')");
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'permission' AND sort_order = 10");
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'system-config' AND sort_order = 11");
+        // v20: 修正顶级菜单排序（團購管理=7, 智能中心AI=8, OA中心=12）及图标
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 7 WHERE menu_key = 'group-purchase' AND sort_order != 7");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 8 WHERE menu_key = 'ai-assistant' AND sort_order != 8");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'oa-center' AND sort_order != 12");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 10 WHERE menu_key = 'permission' AND sort_order != 10");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'system-config' AND sort_order != 11");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingFilled' WHERE menu_key = 'group-purchase' AND (icon IS NULL OR icon = '' OR icon = 'ShoppingCartOutlined')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'RobotOutlined' WHERE menu_key = 'ai-assistant' AND (icon IS NULL OR icon = '' OR icon = 'ApiOutlined')");
     }
 
     /** 角色-菜单权限关联表: 不存在则创建, 存在则补充 actions 列, 并迁移旧 JSON 权限 */
@@ -928,12 +935,12 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("promotion_tool",      new String[]{"推廣通",           null,  "4"});
         menus.put("search",              new String[]{"搜索管理",          null,  "5"});
         menus.put("finance",             new String[]{"財務管理",          null,  "6"});
-        menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
-        menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
+        menus.put("group-purchase",      new String[]{"團購管理",          null,  "7"});
+        menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "8"});
         menus.put("hr",                  new String[]{"集團人事",          null,  "9"});
-        menus.put("oa-center",           new String[]{"OA中心",            null,  "10"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "11"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "12"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "10"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "11"});
+        menus.put("oa-center",           new String[]{"OA中心",            null,  "12"});
         // ── 商戶集團管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
