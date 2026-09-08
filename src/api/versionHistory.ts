@@ -7,7 +7,7 @@ export interface VersionHistoryRecord {
   id: number
   versionNo: string
   releaseDate: string
-  releaseType: 'major' | 'minor' | 'patch'
+  releaseType: 'major' | 'minor' | 'patch' | 'frontend'
   summary: string
   frontendChanges: string
   backendChanges: string
@@ -69,4 +69,9 @@ export function syncVersionFromGit(): Promise<string> {
 /** 根据发布类型建议下一个版本号 */
 export function suggestNextVersion(releaseType: string): Promise<string> {
   return request.get('/version-history/suggest-next-version', { params: { releaseType } })
+}
+
+/** 按创建时间倒序重新编排所有版本编号 */
+export function renumberAllVersions(): Promise<string> {
+  return request.post('/version-history/renumber-all')
 }

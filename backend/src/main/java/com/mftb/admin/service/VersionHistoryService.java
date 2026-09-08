@@ -46,8 +46,14 @@ public interface VersionHistoryService {
 
     /**
      * 根据发布类型建议下一个版本号
-     * @param releaseType major / minor / patch
+     * @param releaseType major / minor / patch / frontend
      * @return 建议的版本号字符串
      */
     String suggestNextVersion(String releaseType);
+
+    /**
+     * 按创建时间倒序重新编排所有版本编号（起始 1.0.0）
+     * @return 重新编号结果摘要
+     */
+    String renumberAll();
 }

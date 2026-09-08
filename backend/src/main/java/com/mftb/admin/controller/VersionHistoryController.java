@@ -86,6 +86,13 @@ public class VersionHistoryController {
         return Result.success(versionHistoryService.suggestNextVersion(releaseType));
     }
 
+    /** 按创建时间倒序重新编排所有版本编号（起始 1.0.0） */
+    @PostMapping("/renumber-all")
+    @RequirePermission(menu = "version-history", action = "edit")
+    public Result<String> renumberAll() {
+        return Result.success(versionHistoryService.renumberAll());
+    }
+
     private String currentOperator() {
         return operatorResolver.operatorSignature(operatorResolver.currentUser());
     }

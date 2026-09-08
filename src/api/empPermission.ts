@@ -207,7 +207,9 @@ export async function fetchEmpPermissionDetail(empId: number): Promise<{
       if (found) {
         return { summary: found, models: found.modelPermissions, quotas: found.quotaGrants }
       }
-      throw new Error('員工不存在')
+      const err = new Error('員工不存在')
+      ;(err as Error & { cause?: unknown }).cause = error
+      throw err
     }
     throw error
   }

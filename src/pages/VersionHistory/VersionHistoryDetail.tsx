@@ -7,7 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { fetchVersionDetail } from '../../api/versionHistory'
 import type { VersionHistoryRecord } from '../../api/versionHistory'
 
-const TYPE_COLOR: Record<string, string> = { major: 'red', minor: 'blue', patch: 'green' }
+const TYPE_COLOR: Record<string, string> = { major: 'red', minor: 'blue', patch: 'green', frontend: 'purple' }
 
 /** 将换行分隔的文本渲染为列表 */
 function ChangeList({ text, emptyText }: { text: string; emptyText: string }) {

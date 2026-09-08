@@ -6,7 +6,7 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from '@ant
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchVersionHistory, deleteVersion, syncVersionFromGit } from '../../api/versionHistory'
+import { fetchVersionHistory, deleteVersion, syncVersionFromGit, renumberAllVersions } from '../../api/versionHistory'
 import type { VersionHistoryRecord } from '../../api/versionHistory'
 
 const { RangePicker } = DatePicker
@@ -15,6 +15,7 @@ const RELEASE_TYPE_TAG: Record<string, { color: string }> = {
   major: { color: 'red' },
   minor: { color: 'blue' },
   patch: { color: 'green' },
+  frontend: { color: 'purple' },
 }
 
 const STATUS_TAG: Record<number, { color: string }> = {
@@ -97,6 +98,25 @@ export default function VersionHistory() {
     })
   }
 
+  const handleRenumberAll = () => {
+    Modal.confirm({
+      title: '確認重新編號',
+      content: '將按創建時間倒序重新編排所有版本編號（起始 1.0.0），確定要繼續嗎？',
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          const res = await renumberAllVersions()
+          message.success(res || '重新編號成功')
+          loadData()
+        } catch {
+          /* error handled by interceptor */
+        }
+      },
+    })
+  }
+
   const columns: TableColumnsType<VersionHistoryRecord> = [
     {
       key: 'versionNo',
@@ -144,7 +164,11 @@ export default function VersionHistory() {
       title: t('versionHistory.createdAt'),
       dataIndex: 'createdAt',
       width: 155,
-      render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-',
+      render: (v: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>
+          {v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-'}
+        </span>
+      ),
     },
     {
       key: 'updatedBy',
@@ -159,12 +183,17 @@ export default function VersionHistory() {
       title: t('versionHistory.updatedAt'),
       dataIndex: 'updatedAt',
       width: 155,
-      render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-',
+      render: (v: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>
+          {v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-'}
+        </span>
+      ),
     },
     {
       key: 'summary',
       title: t('versionHistory.summary'),
       dataIndex: 'summary',
+      width: 300,
       ellipsis: { showTitle: false },
       render: (v: string) => (
         <Tooltip placement="topLeft" title={v}>
@@ -230,6 +259,7 @@ export default function VersionHistory() {
                 { value: 'major', label: t('versionHistory.type_major') },
                 { value: 'minor', label: t('versionHistory.type_minor') },
                 { value: 'patch', label: t('versionHistory.type_patch') },
+                { value: 'frontend', label: t('versionHistory.type_frontend') },
               ]} />
           </Form.Item>
           <Form.Item label={t('versionHistory.releaseDate')} name="dateRange">
@@ -265,6 +295,9 @@ export default function VersionHistory() {
         <div className="action-section-left">
           <Button icon={<SyncOutlined />} onClick={handleSyncFromGit}>
             {t('versionHistory.syncFromGit')}
+          </Button>
+          <Button onClick={handleRenumberAll}>
+            重新編號
           </Button>
         </div>
         <div className="action-section-right">

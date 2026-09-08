@@ -67,7 +67,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         if (updatedEndDate != null) {
             wrapper.le(SysVersionHistory::getUpdatedAt, updatedEndDate.plusDays(1).atStartOfDay());
         }
-        wrapper.orderByDesc(SysVersionHistory::getReleaseDate);
+        wrapper.orderByDesc(SysVersionHistory::getCreatedAt);
 
         long total = mapper.selectCount(wrapper);
         List<SysVersionHistory> records = mapper.selectList(
@@ -436,15 +436,20 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
                 .anyMatch(c -> c.getSubject().contains("!") || c.getSubject().toLowerCase().contains("breaking"));
         boolean hasFeature = commits.stream()
                 .anyMatch(c -> c.getSubject().startsWith("feat") || c.getSubject().startsWith("feat("));
+        boolean hasFix = commits.stream()
+                .anyMatch(c -> c.getSubject().startsWith("fix") || c.getSubject().startsWith("fix("));
 
         if (hasBreaking) {
             // 重大更新：第二位数增长
-            return major + "." + (minor + 1) + ".0";
+            return major + "." + (minor + 1) + ".0.00";
         } else if (hasFeature) {
             // 功能新增：第三位数增长
-            return major + "." + minor + "." + (patch + 1);
+            return major + "." + minor + "." + (patch + 1) + ".00";
+        } else if (hasFix) {
+            // bug修復：第四位(子补丁)增长
+            return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         } else {
-            // 问题修复：第四位(子补丁)增长
+            // 前端交互優化：第四位(子补丁)增长
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
@@ -459,12 +464,12 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
         if ("major".equals(releaseType)) {
             // 重大更新：第二位数增长
-            return major + "." + (minor + 1) + ".0";
+            return major + "." + (minor + 1) + ".0.00";
         } else if ("minor".equals(releaseType)) {
             // 功能新增：第三位数增长
-            return major + "." + minor + "." + (patch + 1);
+            return major + "." + minor + "." + (patch + 1) + ".00";
         } else {
-            // 问题修复：第四位(子补丁)增长
+            // bug修復 / 前端交互優化：第四位(子补丁)增长
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
@@ -474,10 +479,13 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
                 .anyMatch(c -> c.getSubject().contains("!") || c.getSubject().toLowerCase().contains("breaking"));
         boolean hasFeature = commits.stream()
                 .anyMatch(c -> c.getSubject().startsWith("feat") || c.getSubject().startsWith("feat("));
+        boolean hasFix = commits.stream()
+                .anyMatch(c -> c.getSubject().startsWith("fix") || c.getSubject().startsWith("fix("));
 
         if (hasBreaking) return "major";
         if (hasFeature) return "minor";
-        return "patch";
+        if (hasFix) return "patch";
+        return "frontend";
     }
 
     /**
@@ -519,5 +527,51 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             return changedFiles.stream().anyMatch(f ->
                     f.endsWith(".sql") || f.startsWith("backend/sql/"));
         }
+    }
+
+    @Override
+    public String renumberAll() {
+        // 按创建时间正序查询所有记录（最早的在前）
+        List<SysVersionHistory> all = mapper.selectList(
+                new LambdaQueryWrapper<SysVersionHistory>().orderByAsc(SysVersionHistory::getCreatedAt));
+        if (all.isEmpty()) {
+            return "沒有版本記錄需要重新編號";
+        }
+
+        // 第一步：先将所有版本号清空（避免唯一键冲突）
+        for (SysVersionHistory record : all) {
+            record.setVersionNo("_tmp_" + record.getId());
+            mapper.updateById(record);
+        }
+
+        // 第二步：从起始版本 1.0.0.00 开始，按创建时间正序递增
+        int major = 1, minor = 0, patch = 0, subPatch = 0;
+        int updated = 0;
+
+        for (SysVersionHistory record : all) {
+            String releaseType = record.getReleaseType();
+
+            if (updated > 0) {
+                // 从第二条开始递增
+                if ("major".equals(releaseType)) {
+                    minor++;
+                    patch = 0;
+                    subPatch = 0;
+                } else if ("minor".equals(releaseType)) {
+                    patch++;
+                    subPatch = 0;
+                } else {
+                    // patch / frontend：第四位递增
+                    subPatch++;
+                }
+            }
+
+            String newVersion = major + "." + minor + "." + patch + "." + String.format("%02d", subPatch);
+            record.setVersionNo(newVersion);
+            mapper.updateById(record);
+            updated++;
+        }
+
+        return String.format("成功重新編號 %d 條版本記錄", updated);
     }
 }

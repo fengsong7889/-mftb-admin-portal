@@ -141,7 +141,7 @@ export default function VersionHistoryForm() {
             { required: true, message: t('common.required') },
             { pattern: /^\d+\.\d+\.\d+(\.\d{1,2})?$/, message: '請使用版本格式，如 1.0.0 或 1.0.01' },
           ]}
-          extra="重大更新→第二位增长(1.0.0→1.1.0)；功能新增→第三位增长(1.0.0→1.0.1)；問題修復→第四位增长(1.0.0→1.0.01)"
+          extra="重大更新→第二位增长(1.0.0→1.1.0)；功能新增→第三位增长(1.0.0→1.0.1)；bug修復→第四位增长(1.0.0→1.0.01)；前端交互優化→第四位增长(1.0.0→1.0.01)"
         >
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Input placeholder="例：1.0.1 或 1.0.01" style={{ maxWidth: 200 }} />
@@ -171,6 +171,7 @@ export default function VersionHistoryForm() {
                 { value: 'major', label: t('versionHistory.type_major') },
                 { value: 'minor', label: t('versionHistory.type_minor') },
                 { value: 'patch', label: t('versionHistory.type_patch') },
+                { value: 'frontend', label: t('versionHistory.type_frontend') },
               ]}
             />
           </Form.Item>
