@@ -23,10 +23,11 @@ COPY --from=builder /app/app.jar .
 # 复制 .git 目录，供「从 Git 同步版本记录」功能读取提交历史
 COPY .git .git
 
-# 时区设置
+# 时区设置 + git（safe.directory 修复：.git 归 root、运行用户为 app，Git 2.35.2+ 会拒绝执行仓库命令）
 RUN apk add --no-cache tzdata git && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone && \
+    git config --system --add safe.directory /app && \
     apk del tzdata
 
 USER app

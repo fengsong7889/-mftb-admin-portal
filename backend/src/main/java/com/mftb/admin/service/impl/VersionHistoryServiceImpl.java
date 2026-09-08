@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -248,7 +249,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     private String getProjectRootDir() {
         try {
-            Process p = new ProcessBuilder("git", "rev-parse", "--show-toplevel")
+            Process p = new ProcessBuilder(gitCmd("rev-parse", "--show-toplevel"))
                     .redirectErrorStream(true)
                     .start();
             String output = readProcessOutput(p).trim();
@@ -349,8 +350,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
      */
     private List<GitCommit> readGitLog(String projectDir, String sinceHash, LocalDate fallbackDate) {
         try {
-            List<String> cmd = new ArrayList<>();
-            cmd.addAll(Arrays.asList("git", "log", "--pretty=format:%H|%ad|%an|%s", "--date=short"));
+            List<String> cmd = gitCmd("log", "--pretty=format:%H|%ad|%an|%s", "--date=short");
             if (sinceHash != null && !sinceHash.isEmpty()) {
                 // 精确增量：只取 lastHash 之后的提交（不含 lastHash 本身）
                 cmd.add(sinceHash + "..HEAD");
@@ -367,6 +367,11 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             p.waitFor();
 
             if (output.trim().isEmpty()) {
+                return Collections.emptyList();
+            }
+            // git 执行失败时 stderr 会混入输出（redirectErrorStream），识别 fatal/error 行避免静默失败误报「沒有新提交」
+            if (output.contains("fatal:") || output.contains("error:")) {
+                log.warn("git log 執行失敗（輸出前 500 字符）: {}", output.length() > 500 ? output.substring(0, 500) : output);
                 return Collections.emptyList();
             }
 
@@ -394,7 +399,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     private List<String> getChangedFiles(String projectDir, String commitHash) {
         try {
-            ProcessBuilder pb = new ProcessBuilder("git", "diff-tree", "--no-commit-id", "--name-only", "-r", commitHash);
+            ProcessBuilder pb = new ProcessBuilder(gitCmd("diff-tree", "--no-commit-id", "--name-only", "-r", commitHash));
             pb.directory(new File(projectDir));
             pb.redirectErrorStream(true);
             Process p = pb.start();
@@ -412,13 +417,24 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     private String readProcessOutput(Process p) throws Exception {
         StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        // git 輸出始終為 UTF-8；Alpine 容器 JVM 默認 charset 非 UTF-8，需顯式指定避免中文亂碼
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 sb.append(line).append("\n");
             }
         }
         return sb.toString();
+    }
+
+    /** 構建帶 safe.directory 的 git 命令（容器内 .git 歸 root、運行用戶為 app 時，Git 2.35.2+ 會拒絕執行） */
+    private List<String> gitCmd(String... args) {
+        List<String> cmd = new ArrayList<>();
+        cmd.add("git");
+        cmd.add("-c");
+        cmd.add("safe.directory=*");
+        cmd.addAll(Arrays.asList(args));
+        return cmd;
     }
 
     /**
