@@ -239,7 +239,11 @@ export default function ProcessCenter() {
   const toggleCollapse = (catKey: string) => {
     setCollapsedKeys((prev) => {
       const next = new Set(prev)
-      next.has(catKey) ? next.delete(catKey) : next.add(catKey)
+      if (next.has(catKey)) {
+        next.delete(catKey)
+      } else {
+        next.add(catKey)
+      }
       localStorage.setItem('process_center_collapsed', JSON.stringify([...next]))
       return next
     })
