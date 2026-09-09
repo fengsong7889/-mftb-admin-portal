@@ -51,6 +51,7 @@ const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStra
 
 // 集團人事
 const EmployeeManagement = lazy(() => import('./pages/Permission/Employee'))
+const EmployeeDetail = lazy(() => import('./pages/Permission/Employee/EmployeeDetail'))
 const OrganizationManagement = lazy(() => import('./pages/Permission/Organization'))
 const PositionManagement = lazy(() => import('./pages/Permission/Position'))
 const LoginLog = lazy(() => import('./pages/LoginLog'))
@@ -249,6 +250,7 @@ function AuthenticatedLayout() {
 
               {/* 集團人事 */}
               <Route path="/employee-management" element={<EmployeeManagement />} />
+              <Route path="/employee-detail" element={<EmployeeDetail />} />
               <Route path="/organization-management" element={<OrganizationManagement />} />
               <Route path="/position-management" element={<PositionManagement />} />
               <Route path="/login-log" element={<LoginLog />} />

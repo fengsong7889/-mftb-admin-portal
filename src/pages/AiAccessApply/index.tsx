@@ -11,11 +11,12 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Input, message, Modal, Radio, Select, Tag, Tooltip, Upload } from 'antd'
+import { Button, Input, message, Modal, Radio, Row, Col, Select, Tag, Tooltip, Upload } from 'antd'
 import {
   ArrowLeftOutlined, SendOutlined, CheckCircleOutlined,
   LockOutlined, WalletOutlined, QuestionCircleOutlined,
   UploadOutlined, FileImageOutlined, FilePdfOutlined, PaperClipOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
@@ -26,6 +27,7 @@ import { fetchModels, type AiModel } from '../../api/aiModel'
 import { fetchMyModels, type MyModel } from '../../api/aiMyCenter'
 import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
 import { useAuth } from '../../contexts/AuthContext'
+import dayjs from 'dayjs'
 
 const { TextArea } = Input
 
@@ -212,6 +214,9 @@ export default function AiAccessApply() {
 
   const { user } = useAuth()
 
+  /** 申請日期 */
+  const applyDate = dayjs().format('YYYY-MM-DD')
+
   /* ---- 憑證上傳 ---- */
   const handleUploadCredential = useCallback((file: File) => {
     if (credentials.length >= CREDENTIAL_MAX_COUNT) {
@@ -397,7 +402,7 @@ export default function AiAccessApply() {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}
+            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 16px',
@@ -412,6 +417,57 @@ export default function AiAccessApply() {
             </h2>
           </div>
         </div>
+      </div>
+
+      {/* ====== 基本信息（自動填充） ====== */}
+      <div style={{
+        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 6, background: '#fff7e6',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.basicInfo')}</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+
+        {/* 申請人信息行 */}
+        <Row gutter={24} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.applicant')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
+              {user ? `${user.name}(${user.empId})` : '-'}
+            </div>
+          </Col>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.applyDate')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{applyDate}</div>
+          </Col>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.flowNo')}</div>
+            <div style={{ fontSize: 13, color: '#BFBFBF' }}>{t('aiApply.flowNoAuto')}</div>
+          </Col>
+        </Row>
+
+        {/* 部門 / 職位 / 公司 */}
+        <Row gutter={24}>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.department')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.department || '-'}</div>
+          </Col>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.position')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.position || '-'}</div>
+          </Col>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.company')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{t('aiApply.companyName')}</div>
+          </Col>
+        </Row>
       </div>
 
       {/* ====== 當前狀態摘要 ====== */}
@@ -711,7 +767,7 @@ export default function AiAccessApply() {
 
       {/* ====== 底部操作按鈕 ====== */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/')}>{t('aiApply.cancel')}</Button>
+        <Button onClick={() => navigate(-1)}>{t('aiApply.cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit} loading={submitting}>
           {t('aiApply.submit')}
         </Button>

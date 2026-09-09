@@ -1301,6 +1301,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/approval-detail': 'approval-center',
   // 集團人事
   '/employee-management': 'employee-management',
+  '/employee-detail': 'employee-management',
   '/organization-management': 'organization-management',
   '/position-management': 'position-management',
   '/login-log': 'login-log',

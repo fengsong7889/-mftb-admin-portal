@@ -29,6 +29,8 @@ export const POSITION_RANK_OPTIONS = Array.from({ length: 5 }, (_, i) => ({
 /** 职位信息 */
 export interface PositionItem {
   id: number
+  /** 职位ID（按编号生成规则 position_id 生成，如 ZW00001） */
+  code: string
   name: string
   nameEn?: string
   sequence: string

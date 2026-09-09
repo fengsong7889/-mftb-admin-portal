@@ -34,14 +34,14 @@ const SEED_DEPARTMENTS: DepartmentItem[] = [
 ]
 
 const SEED_POSITIONS: PositionItem[] = [
-  { id: 1, name: '高級工程師', sequence: 'T', jobLevel: 'T7' },
-  { id: 2, name: '中級工程師', sequence: 'T', jobLevel: 'T5' },
-  { id: 3, name: '初級工程師', sequence: 'T', jobLevel: 'T3' },
-  { id: 4, name: '高級產品經理', sequence: 'P', jobLevel: 'P7' },
-  { id: 5, name: '產品經理', sequence: 'P', jobLevel: 'P5' },
-  { id: 6, name: '運營專員', sequence: 'P', jobLevel: 'P3' },
-  { id: 7, name: '部門經理', sequence: 'M', jobLevel: 'M5' },
-  { id: 8, name: '總監', sequence: 'M', jobLevel: 'M7' },
+  { id: 1, code: 'ZW00001', name: '高級工程師', sequence: 'T', jobLevel: 'T7' },
+  { id: 2, code: 'ZW00002', name: '中級工程師', sequence: 'T', jobLevel: 'T5' },
+  { id: 3, code: 'ZW00003', name: '初級工程師', sequence: 'T', jobLevel: 'T3' },
+  { id: 4, code: 'ZW00004', name: '高級產品經理', sequence: 'P', jobLevel: 'P7' },
+  { id: 5, code: 'ZW00005', name: '產品經理', sequence: 'P', jobLevel: 'P5' },
+  { id: 6, code: 'ZW00006', name: '運營專員', sequence: 'P', jobLevel: 'P3' },
+  { id: 7, code: 'ZW00007', name: '部門經理', sequence: 'M', jobLevel: 'M5' },
+  { id: 8, code: 'ZW00008', name: '總監', sequence: 'M', jobLevel: 'M7' },
 ]
 
 const SEED_EMPLOYEES: EmployeeItem[] = [

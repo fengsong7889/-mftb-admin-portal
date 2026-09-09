@@ -130,29 +130,46 @@ export interface PurchaseOrderItem {
   modelId: number
   modelName: string
   qty: number
-  /** 成交單價 */
+  /** 預估單價（來自採購申請） */
   price: number
+  /** 實際成交單價（採購人員回填） */
+  confirmedPrice?: number
   /** 已驗收入庫數量 */
   receivedQty: number
 }
 
-/** 採購訂單 */
+/** 採購執行狀態 */
+export type ExecStatus = 'pending' | 'purchasing' | 'completed'
+
+/** 採購執行單（原採購訂單） */
 export interface PurchaseOrder {
   id: number
   poNo: string
   /** 關聯採購申請 ID（0 表示直接下單） */
   reqId: number
   supplier: string
-  /** 訂單金額 */
+  /** 訂單金額（預估） */
   amount: number
+  /** 實際成交金額（採購人員回填） */
+  confirmedAmount?: number
   /** 預計交貨日期 */
   deliveryDate: string
   items: PurchaseOrderItem[]
-  /** pending=待收貨 / partial=部分入庫 / received=全部入庫 */
+  /** 驗收入庫狀態：pending=待驗收 / partial=部分入庫 / received=全部入庫 */
   status: 'pending' | 'partial' | 'received'
+  /** 採購執行狀態：pending=待處理 / purchasing=採購中 / completed=採購完成 */
+  execStatus: ExecStatus
+  /** 快遞/物流單號 */
+  trackingNo?: string
+  /** 採購經辦人 */
+  purchaser?: string
+  /** 實際下單日期 */
+  orderDate?: string
   contact?: string
   remark?: string
   createdAt: string
+  updatedBy?: string
+  updatedAt?: string
 }
 
 /** 入庫批次明細行 */
@@ -303,6 +320,18 @@ export interface EamPageQuery {
   keyword?: string
   status?: string
   department?: string
+}
+
+export interface PurchaseOrderQuery extends EamPageQuery {
+  poNo?: string
+  processNo?: string
+  supplier?: string
+  execStatus?: string
+  purchaser?: string
+  createdAtStart?: string
+  createdAtEnd?: string
+  updatedAtStart?: string
+  updatedAtEnd?: string
 }
 
 export interface ModelQuery extends EamPageQuery {
@@ -578,20 +607,46 @@ let mockPurchaseRequests: PurchaseRequest[] = [
 let mockPurchaseOrders: PurchaseOrder[] = [
   {
     id: 1, poNo: 'PO-2024-001', reqId: 1, supplier: '聯想澳門授權經銷商', amount: 60000,
-    deliveryDate: shiftDay(D, -5),
+    confirmedAmount: 58500, deliveryDate: shiftDay(D, -5),
     items: [
-      { modelId: 1, modelName: 'ThinkPad X1 Carbon 筆記本', qty: 3, price: 15800, receivedQty: 3 },
-      { modelId: 3, modelName: 'Dell 27 吋 4K 顯示器', qty: 3, price: 4200, receivedQty: 3 },
+      { modelId: 1, modelName: 'ThinkPad X1 Carbon 筆記本', qty: 3, price: 15800, confirmedPrice: 15500, receivedQty: 3 },
+      { modelId: 3, modelName: 'Dell 27 吋 4K 顯示器', qty: 3, price: 4200, confirmedPrice: 4000, receivedQty: 3 },
     ],
-    status: 'received', contact: '陳先生 6233-0000', remark: '含三年上門保固',
-    createdAt: '2024-09-05 10:00:00',
+    status: 'received', execStatus: 'completed',
+    trackingNo: 'SF1234567890', purchaser: '李四(M002)', orderDate: '2024-09-06',
+    contact: '陳先生 6233-0000', remark: '含三年上門保固',
+    createdAt: '2024-09-05 10:00:00', updatedBy: '李四(M002)', updatedAt: '2024-09-06 14:30:00',
   },
   {
-    id: 2, poNo: 'PO-2024-002', reqId: 0, supplier: '三菱電機澳門', amount: 17200,
+    id: 2, poNo: 'PO-2024-002', reqId: 0, supplier: '待定供應商', amount: 17200,
     deliveryDate: shiftDay(D, 10),
     items: [{ modelId: 8, modelName: '變頻分體空調 2 匹', qty: 2, price: 8600, receivedQty: 0 }],
-    status: 'pending', contact: '林小姐 6688-1234',
+    status: 'pending', execStatus: 'pending',
     createdAt: '2024-09-20 16:30:00',
+  },
+  {
+    id: 3, poNo: 'PO-2024-003', reqId: 2, supplier: 'Dell 澳門', amount: 42000,
+    deliveryDate: shiftDay(D, 7),
+    items: [
+      { modelId: 3, modelName: 'Dell 27 吋 4K 顯示器', qty: 5, price: 4200, confirmedPrice: 4000, receivedQty: 0 },
+      { modelId: 5, modelName: '羅技 MX Keys 鍵盤', qty: 5, price: 800, receivedQty: 0 },
+    ],
+    status: 'pending', execStatus: 'purchasing',
+    trackingNo: 'SF9876543210', purchaser: '王五(M003)',
+    contact: '林小姐 6688-1234',
+    createdAt: '2024-09-22 09:00:00', updatedBy: '王五(M003)', updatedAt: '2024-09-23 11:20:00',
+  },
+  {
+    id: 4, poNo: 'PO-2024-004', reqId: 3, supplier: 'Apple 企業採購', amount: 89800,
+    confirmedAmount: 87500, deliveryDate: shiftDay(D, 3),
+    items: [
+      { modelId: 2, modelName: 'iPhone 15 Pro', qty: 5, price: 9800, confirmedPrice: 9500, receivedQty: 0 },
+      { modelId: 4, modelName: 'MacBook Air M3', qty: 3, price: 12800, confirmedPrice: 12500, receivedQty: 0 },
+    ],
+    status: 'pending', execStatus: 'completed',
+    trackingNo: 'SF5555666677', purchaser: '李四(M002)', orderDate: '2024-09-25',
+    contact: '張先生 6288-8888',
+    createdAt: '2024-09-24 14:00:00', updatedBy: '李四(M002)', updatedAt: '2024-09-25 16:45:00',
   },
 ]
 
@@ -898,6 +953,7 @@ export async function approvePurchaseRequest(
       modelId: it.modelId, modelName: it.modelName, qty: it.qty, price: it.estPrice, receivedQty: 0,
     })),
     status: 'pending',
+    execStatus: 'pending',
     remark: `由採購申請 ${req.reqNo} 審批通過自動生成`,
     createdAt: now(),
   }
@@ -906,13 +962,79 @@ export async function approvePurchaseRequest(
   return orderId
 }
 
-/* ==================== API：採購訂單 ==================== */
+/* ==================== API：採購執行 ==================== */
 
-export function fetchPurchaseOrderList(params?: EamPageQuery): Promise<PageResult<PurchaseOrder>> {
+export interface PurchaseOrderExecUpdate {
+  execStatus?: ExecStatus
+  supplier?: string
+  trackingNo?: string
+  purchaser?: string
+  orderDate?: string
+  contact?: string
+  remark?: string
+  /** 各型號實際成交單價 */
+  confirmedPrices?: Record<number, number>
+}
+
+/** 更新採購執行信息（回填供應商/價格/快遞/狀態推進） */
+export function updatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdate): Promise<void> {
+  const idx = mockPurchaseOrders.findIndex((o) => o.id === id)
+  if (idx === -1) return Promise.reject(new Error('採購執行單不存在'))
+  const o = mockPurchaseOrders[idx]
+  if (data.supplier !== undefined) o.supplier = data.supplier
+  if (data.trackingNo !== undefined) o.trackingNo = data.trackingNo
+  if (data.purchaser !== undefined) o.purchaser = data.purchaser
+  if (data.orderDate !== undefined) o.orderDate = data.orderDate
+  if (data.contact !== undefined) o.contact = data.contact
+  if (data.remark !== undefined) o.remark = data.remark
+  if (data.execStatus !== undefined) o.execStatus = data.execStatus
+  if (data.confirmedPrices) {
+    o.items.forEach((it) => {
+      if (data.confirmedPrices && data.confirmedPrices[it.modelId] !== undefined) {
+        it.confirmedPrice = data.confirmedPrices[it.modelId]
+      }
+    })
+    o.confirmedAmount = o.items.reduce((s, it) => s + (it.confirmedPrice || it.price) * it.qty, 0)
+  }
+  mockPurchaseOrders[idx] = o
+  o.updatedBy = 'current_user'
+  o.updatedAt = now()
+  return delay(undefined as unknown as void)
+}
+
+export function fetchPurchaseOrderList(params?: PurchaseOrderQuery): Promise<PageResult<PurchaseOrder>> {
   let list = [...mockPurchaseOrders].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   if (params?.status && params.status !== 'all') list = list.filter((o) => o.status === params.status)
+  if (params?.execStatus && params.execStatus !== 'all') list = list.filter((o) => o.execStatus === params.execStatus)
   if (params?.keyword) {
     list = list.filter((o) => matchKeyword(o, ['poNo', 'supplier', 'contact'], params.keyword))
+  }
+  if (params?.poNo) {
+    list = list.filter((o) => o.poNo.toLowerCase().includes(params.poNo!.toLowerCase()))
+  }
+  if (params?.supplier) {
+    list = list.filter((o) => o.supplier.toLowerCase().includes(params.supplier!.toLowerCase()))
+  }
+  if (params?.processNo) {
+    const matchedReqIds = mockPurchaseRequests
+      .filter((r) => r.reqNo.toLowerCase().includes(params.processNo!.toLowerCase()))
+      .map((r) => r.id)
+    list = list.filter((o) => o.reqId && matchedReqIds.includes(o.reqId))
+  }
+  if (params?.purchaser) {
+    list = list.filter((o) => o.purchaser && o.purchaser.toLowerCase().includes(params.purchaser!.toLowerCase()))
+  }
+  if (params?.createdAtStart) {
+    list = list.filter((o) => o.createdAt >= params.createdAtStart!)
+  }
+  if (params?.createdAtEnd) {
+    list = list.filter((o) => o.createdAt <= params.createdAtEnd! + ' 23:59:59')
+  }
+  if (params?.updatedAtStart) {
+    list = list.filter((o) => o.updatedAt && o.updatedAt >= params.updatedAtStart!)
+  }
+  if (params?.updatedAtEnd) {
+    list = list.filter((o) => o.updatedAt && o.updatedAt <= params.updatedAtEnd! + ' 23:59:59')
   }
   return delay(paginate(list, params?.page, params?.size))
 }
@@ -923,10 +1045,10 @@ export function fetchPurchaseOrderDetail(id: number): Promise<PurchaseOrder> {
   return delay(item)
 }
 
-export function createPurchaseOrder(data: Omit<PurchaseOrder, 'id' | 'poNo' | 'status' | 'createdAt'>): Promise<number> {
+export function createPurchaseOrder(data: Omit<PurchaseOrder, 'id' | 'poNo' | 'status' | 'execStatus' | 'createdAt'>): Promise<number> {
   const id = Math.max(0, ...mockPurchaseOrders.map((o) => o.id)) + 1
   mockPurchaseOrders = [
-    { ...data, id, poNo: genNo('PO', id), status: 'pending', createdAt: now() },
+    { ...data, id, poNo: genNo('PO', id), status: 'pending', execStatus: 'pending', createdAt: now() },
     ...mockPurchaseOrders,
   ]
   return delay(id)
@@ -959,7 +1081,7 @@ export function fetchInboundList(params?: EamPageQuery): Promise<PageResult<Inbo
 
 /** 待入庫訂單（仍有未驗收數量的訂單） */
 export function fetchPendingInboundOrders(): Promise<PurchaseOrder[]> {
-  const list = mockPurchaseOrders.filter((o) => o.status !== 'received')
+  const list = mockPurchaseOrders.filter((o) => o.execStatus === 'completed' && o.status !== 'received')
   return delay(list)
 }
 

@@ -43,8 +43,9 @@
 /* 工具栏 */
 .tcc-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 16px;
   padding: 8px 0 12px;
   border-bottom: 1px solid #f0f0f0;
   margin-bottom: 16px;

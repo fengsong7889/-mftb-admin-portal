@@ -179,6 +179,14 @@ body {
   white-space: nowrap;
 }
 
+/* 展开列为空时不占空间（expandIcon 返回 null 的场景） */
+.ant-table-expand-icon-col,
+.ant-table-row-expand-icon-cell {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+}
+
 /* 表格数据单元格禁止换行（配合 Table scroll={{ x: 'max-content' }} 使用，列宽随内容自适应） */
 .nowrap-table .ant-table-tbody > tr > td {
   white-space: nowrap;

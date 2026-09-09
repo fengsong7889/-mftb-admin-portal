@@ -146,7 +146,7 @@ export default function GiftAdd() {
   }, [successVisible, countdown, navigate])
 
   const handleBack = () => {
-    navigate('/gift-detail')
+    navigate(-1)
   }
 
   const handleSubmit = async () => {

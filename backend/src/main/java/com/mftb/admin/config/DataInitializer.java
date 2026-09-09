@@ -1200,6 +1200,9 @@ public class DataInitializer implements CommandLineRunner {
                 continue;
             }
 
+            // 清理同 menu_key 的软删除残留记录，避免唯一键 uk_menu_key 冲突
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1", menuKey);
+
             if (parentId != null) {
                 jdbcTemplate.update(
                         "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, status, deleted) "

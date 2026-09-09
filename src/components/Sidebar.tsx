@@ -265,6 +265,9 @@ const keyToPath: Record<string, string> = {
   'asset-scrap':         '/asset-scrap',
   'asset-flow':          '/asset-flow',
   'asset-inventory':     '/asset-inventory',
+  // EAM 採購
+  'purchase-order':      '/purchase-order',
+  'purchase-request':    '/purchase-request',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -670,7 +673,7 @@ const menuItems: MenuItem[] = [
         icon: <ShoppingCartOutlined />,
         label: '採購入庫',
         children: [
-          { key: 'purchase-order', icon: <FileDoneOutlined />, label: '採購訂單' },
+          { key: 'purchase-order', icon: <FileDoneOutlined />, label: '採購執行' },
           { key: 'asset-inbound', icon: <ImportOutlined />, label: '驗收入庫' },
         ],
       },
@@ -926,6 +929,9 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-scrap':      <DeleteOutlined />,
   'asset-repair':     <ToolOutlined />,
   'asset-inventory':  <AuditOutlined />,
+  // 採購
+  'purchase-order':   <FileDoneOutlined />,
+  'purchase-request': <ShoppingCartOutlined />,
 }
 
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */

@@ -196,7 +196,7 @@ export default function PositionManagement() {
       return
     }
     const exportColumns = [
-      { title: t('position.colId'), dataIndex: 'id' },
+      { title: t('position.colId'), dataIndex: 'code' },
       { title: t('position.colNameZh'), dataIndex: 'name' },
       { title: t('position.colNameEn'), dataIndex: 'nameEn' },
       { title: t('position.colSequence'), dataIndex: 'sequence', render: (v: string) => SEQ_LABEL[v] || v || '' },
@@ -209,7 +209,7 @@ export default function PositionManagement() {
   }
 
   const columns: TableColumnsType<PositionItem> = [
-    { title: t('position.colId'), dataIndex: 'id', key: 'id', width: 90 },
+    { title: t('position.colId'), dataIndex: 'code', key: 'code', width: 120 },
     { title: t('position.colNameZh'), dataIndex: 'name', key: 'name', width: 160 },
     { title: t('position.colNameEn'), dataIndex: 'nameEn', key: 'nameEn', width: 160, render: (v: string) => v || '-' },
     {
@@ -312,7 +312,7 @@ export default function PositionManagement() {
       <Table
         columns={applyConfig(columns)}
         dataSource={tableData}
-        rowKey="id"
+        rowKey="code"
         loading={loading}
         rowSelection={{
           selectedRowKeys,

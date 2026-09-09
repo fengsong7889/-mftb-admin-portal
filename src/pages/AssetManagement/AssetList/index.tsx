@@ -32,6 +32,7 @@ import {
 } from '../../../api/asset'
 import { fetchCategoryList } from '../../../api/eam'
 import { exportToCSV } from '../../../utils/exportCSV'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 /* ==================== 枚举映射 ==================== */
 
@@ -251,8 +252,34 @@ export default function AssetList() {
     return <Tag color={meta.color}>{t(meta.key)}</Tag>
   }
 
+  /* ----- 字段配置 ----- */
+  const columnMeta = useMemo(() => [
+    { key: 'assetNo', title: t('asset.colAssetNo') },
+    { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'assetType', title: t('asset.colAssetType') },
+    { key: 'brand', title: t('asset.colBrand') },
+    { key: 'images', title: t('asset.colImage') },
+    { key: 'company', title: t('asset.colCompany') },
+    { key: 'location', title: t('asset.colLocationName') },
+    { key: 'holdType', title: t('asset.colHoldType') },
+    { key: 'department', title: t('asset.colDepartment') },
+    { key: 'userName', title: t('asset.colUserName') },
+    { key: 'source', title: t('asset.colSource') },
+    { key: 'quantity', title: t('asset.colQuantity') },
+    { key: 'purchaseValue', title: t('asset.colPurchaseValue') },
+    { key: 'purchaseDate', title: t('asset.colPurchaseDate') },
+    { key: 'status', title: t('asset.colStatus') },
+    { key: 'scrapTime', title: t('asset.colScrapTime') },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt') },
+    { key: 'remark', title: t('asset.colRemark') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const { configComponent, applyConfig } = useColumnConfig('asset-list', columnMeta)
+
   /* ----- 列定义 ----- */
-  const columns: TableColumnsType<AssetItem> = useMemo(() => [
+  const allColumns: TableColumnsType<AssetItem> = [
     {
       title: t('asset.colAssetNo'),
       dataIndex: 'assetNo', key: 'assetNo', width: 140, fixed: 'left',
@@ -384,7 +411,9 @@ export default function AssetList() {
         )
       },
     },
-  ], [t])
+  ]
+
+  const columns = applyConfig(allColumns)
 
   /* ----- 资产类型选项 ----- */
   const assetTypeOptions = [
@@ -472,6 +501,7 @@ export default function AssetList() {
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             {t('asset.btnAddAsset')}
           </Button>
+          {configComponent}
         </div>
       </div>
 
@@ -500,7 +530,6 @@ export default function AssetList() {
           selectedRowKeys,
           onChange: setSelectedRowKeys,
           columnWidth: 40,
-          fixed: true,
         }}
         expandable={{
           expandedRowRender: (record) => (
@@ -518,6 +547,15 @@ export default function AssetList() {
             </div>
           ),
           rowExpandable: (record) => !!(record.params && Object.keys(record.params).length),
+          expandIcon: ({ expanded, onExpand, record }) =>
+            (record.params && Object.keys(record.params).length > 0) ? (
+              <span
+                onClick={(e) => onExpand(record, e)}
+                style={{ cursor: 'pointer', marginRight: 8 }}
+              >
+                {expanded ? '−' : '+'}
+              </span>
+            ) : null,
         }}
         pagination={{
           current: page, pageSize: size, total, showSizeChanger: true, showTotal: (t2) => `${t('common.total', { count: t2 })}`,

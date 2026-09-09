@@ -3,6 +3,7 @@ import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Swi
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TranslationOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -376,6 +377,8 @@ export default function OrganizationManagement() {
       { title: t('organization.colLeader'), dataIndex: 'leader' },
       { title: t('organization.colParentDept'), dataIndex: 'parentName' },
       { title: t('organization.colUserCount'), dataIndex: 'userCount' },
+      { title: t('organization.colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('organization.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
     exportToCSV(t('organization.pageTitle'), exportColumns, tableData)
   }
@@ -406,6 +409,14 @@ export default function OrganizationManagement() {
       return isNonZh ? (parent.nameEn || parent.name) : parent.name
     } },
     { title: t('organization.colUserCount'), dataIndex: 'userCount', key: 'userCount', width: 100 },
+    { title: t('organization.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => v || '-' },
+    {
+      title: t('organization.colUpdatedAt'),
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 180,
+      render: (date: string) => (date ? <span style={{ whiteSpace: 'nowrap' }}>{dayjs(date).format('YYYY-MM-DD HH:mm:ss')}</span> : '-'),
+    },
     {
       title: t('common.colAction'),
       key: 'action',

@@ -116,6 +116,7 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/ai-role-quota-detail': { fixed: '額度詳情-角色' },
   '/ai-operation-auth-edit': { add: '新增工具', edit: '編輯工具' },
   '/ai-operation-auth-log': { fixed: '調用日誌' },
+  '/employee-detail': { fixed: '員工詳情' },
   '/ai-access-apply': { fixed: 'i18n:aiApply.pageTitle' },
   '/ai-mcp-service': { fixed: 'i18n:mcpService.pageTitle' },
   // 审批流程（动态路由 /workflow-config/detail/:id）
@@ -156,6 +157,7 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/hint-verify': '引導校驗',
   '/hot-search-verify': '熱搜校驗',
   '/employee-management': '員工管理',
+  '/employee-detail': '員工詳情',
   '/organization-management': '組織管理',
   '/position-management': '職位管理',
   '/login-log': '員工動態',

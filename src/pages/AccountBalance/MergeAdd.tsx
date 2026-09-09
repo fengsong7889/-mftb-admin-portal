@@ -445,7 +445,7 @@ export default function MergeAdd() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/account-balance')}
+              onClick={() => navigate(-1)}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -683,7 +683,7 @@ export default function MergeAdd() {
 
       {/* 底部操作按钮 */}
       <div className="form-footer">
-        <Button onClick={() => navigate('/account-balance')}>{t('common:cancel')}</Button>
+        <Button onClick={() => navigate(-1)}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>{t('accountBalance.submitApply')}</Button>
       </div>
 
