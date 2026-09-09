@@ -173,3 +173,13 @@ body {
 .ant-table-thead > tr > th {
   white-space: nowrap;
 }
+
+/* 表格数据单元格禁止换行（配合 Table scroll={{ x: 'max-content' }} 使用，列宽随内容自适应） */
+.nowrap-table .ant-table-tbody > tr > td {
+  white-space: nowrap;
+}
+
+/* 表格数据单元格禁止换行（配合 Table scroll={{ x: 'max-content' }} 使用，列宽随内容自适应） */
+.nowrap-table .ant-table-tbody > tr > td {
+  white-space: nowrap;
+}

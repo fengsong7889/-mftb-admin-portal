@@ -12,7 +12,7 @@ import RouteErrorBoundary from './components/RouteErrorBoundary'
 import MenuPermissionGuard from './components/MenuPermissionGuard'
 import './App.css'
 
-/* 懒加载所有页面组件，避免启动时一次性加载所有模块 */
+/* 懶加载所有页面组件，避免启动时一次性加载所有模块 */
 const Home = lazy(() => import('./pages/Home'))
 const AccountBalance = lazy(() => import('./pages/AccountBalance'))
 const RechargeAdd = lazy(() => import('./pages/AccountBalance/RechargeAdd'))
@@ -110,7 +110,7 @@ const AiModelProvider = lazy(() => import('./pages/AiModelProvider'))
 const AiModelList = lazy(() => import('./pages/AiModelList'))
 const AiModelEdit = lazy(() => import('./pages/AiModelList/AiModelEdit'))
 const AiModelDetail = lazy(() => import('./pages/AiModelList/AiModelDetail'))
-// AI 配额与策略管理 - 子菜单（独立页面）
+// AI 配額与策略管理 - 子菜单（独立页面）
 import AiDeptModelAuth from './pages/AiQuotaAuth/QuotaAndPolicy'
 import { AiDeptQuota } from './pages/AiQuotaAuth/QuotaAndPolicy'
 import AiEmployeeAuthControl from './pages/AiQuotaAuth/AiEmployeeAuthControl'
@@ -147,6 +147,34 @@ const AiEmpPermissionDetail = lazy(() => import('./pages/AiEmpPermission/AiEmpPe
 // OA中心
 const OaRequests = lazy(() => import('./pages/OACenter/OaRequests'))
 const ProcessCenter = lazy(() => import('./pages/OACenter/ProcessCenter'))
+const OaPurchaseRequest = lazy(() => import('./pages/OACenter/OaPurchaseRequest'))
+// 物資管理（EAM 完整子菜單）
+const AssetList = lazy(() => import('./pages/AssetManagement/AssetList'))
+const AssetAdd = lazy(() => import('./pages/AssetManagement/AssetAdd'))
+const AssetDetail = lazy(() => import('./pages/AssetManagement/AssetDetail'))
+const AssetScrap = lazy(() => import('./pages/AssetManagement/AssetScrap'))
+const AssetRepair = lazy(() => import('./pages/AssetManagement/AssetRepair'))
+const AssetTransfer = lazy(() => import('./pages/AssetManagement/AssetTransfer'))
+const AssetInventory = lazy(() => import('./pages/AssetManagement/AssetInventory'))
+const AssetCompensation = lazy(() => import('./pages/AssetManagement/AssetCompensation'))
+const AssetDashboard = lazy(() => import('./pages/AssetManagement/AssetDashboard'))
+// EAM 基礎數據
+const AssetCategory = lazy(() => import('./pages/AssetManagement/AssetCategory'))
+const AssetModel = lazy(() => import('./pages/AssetManagement/AssetModel'))
+const AssetLocation = lazy(() => import('./pages/AssetManagement/AssetLocation'))
+// EAM 採購入庫
+const PurchaseRequest = lazy(() => import('./pages/AssetManagement/PurchaseRequest'))
+const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
+const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
+// EAM 領用借用
+const AssetClaim = lazy(() => import('./pages/AssetManagement/AssetClaim'))
+const AssetBorrow = lazy(() => import('./pages/AssetManagement/AssetBorrow'))
+const AssetReturn = lazy(() => import('./pages/AssetManagement/AssetReturn'))
+// EAM 調撥交接
+const AssetTransferList = lazy(() => import('./pages/AssetManagement/AssetTransferList'))
+const AssetHandover = lazy(() => import('./pages/AssetManagement/AssetHandover'))
+// EAM 變更歷史
+const AssetFlow = lazy(() => import('./pages/AssetManagement/AssetFlow'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -282,7 +310,7 @@ function AuthenticatedLayout() {
               <Route path="/ai-model-list" element={<AiModelList />} />
                             <Route path="/ai-model-edit" element={<AiModelEdit />} />
                             <Route path="/ai-model-detail" element={<AiModelDetail />} />
-              {/* AI 配额与策略管理 - 子菜单 */}
+              {/* AI 配額与策略管理 - 子菜单 */}
               <Route path="/ai-dept-model-auth" element={<AiDeptModelAuth />} />
               <Route path="/ai-emp-model-auth" element={<AiEmployeeAuthControl />} />
               <Route path="/ai-pos-auth" element={<AiPositionAuth />} />
@@ -317,6 +345,34 @@ function AuthenticatedLayout() {
               {/* OA中心 */}
               <Route path="/oa-requests" element={<OaRequests />} />
               <Route path="/process-center" element={<ProcessCenter />} />
+              <Route path="/oa-purchase-request" element={<OaPurchaseRequest />} />
+              {/* 物資管理（EAM 完整路由）*/}
+              <Route path="/asset-list"       element={<AssetList />} />
+              <Route path="/asset-add"        element={<AssetAdd />} />
+              <Route path="/asset-detail"     element={<AssetDetail />} />
+              <Route path="/asset-scrap"      element={<AssetScrap />} />
+              <Route path="/asset-repair"     element={<AssetRepair />} />
+              <Route path="/asset-transfer"   element={<AssetTransfer />} />
+              <Route path="/asset-inventory"  element={<AssetInventory />} />
+              <Route path="/asset-compensation" element={<AssetCompensation />} />
+              <Route path="/asset-dashboard"  element={<AssetDashboard />} />
+              {/* EAM 基礎數據 */}
+              <Route path="/asset-category"   element={<AssetCategory />} />
+              <Route path="/asset-model"      element={<AssetModel />} />
+              <Route path="/asset-location"   element={<AssetLocation />} />
+              {/* EAM 採購入庫 */}
+              <Route path="/purchase-request"  element={<PurchaseRequest />} />
+              <Route path="/purchase-order"   element={<PurchaseOrder />} />
+              <Route path="/asset-inbound"    element={<AssetInbound />} />
+              {/* EAM 領用借用 */}
+              <Route path="/asset-claim"      element={<AssetClaim />} />
+              <Route path="/asset-borrow"     element={<AssetBorrow />} />
+              <Route path="/asset-return"     element={<AssetReturn />} />
+              {/* EAM 調撥交接 */}
+              <Route path="/asset-transfer-list" element={<AssetTransferList />} />
+              <Route path="/asset-handover"   element={<AssetHandover />} />
+              {/* EAM 變更歷史 */}
+              <Route path="/asset-flow"       element={<AssetFlow />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />

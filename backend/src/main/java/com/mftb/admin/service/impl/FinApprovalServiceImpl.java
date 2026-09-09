@@ -19,11 +19,13 @@ import com.mftb.admin.entity.BizGiftRecord;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.entity.FinApproval;
 import com.mftb.admin.entity.FinDebtBill;
+import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.entity.WorkflowConfig;
 import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.FinApprovalMapper;
 import com.mftb.admin.mapper.FinDebtBillMapper;
+import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.mapper.WorkflowConfigMapper;
 import com.mftb.admin.service.ApproverResolverService;
 import com.mftb.admin.service.FinAccountService;
@@ -80,6 +82,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private final FinDebtBillMapper debtBillMapper;
     private final BizGiftRecordMapper giftRecordMapper;
     private final WorkflowConfigMapper workflowConfigMapper;
+    private final OaRequestMapper oaRequestMapper;
     private final FinAccountService accountService;
     private final FinWriteChainService writeChainService;
     private final FinRiskService finRiskService;
@@ -397,6 +400,8 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         }
 
         approvalMapper.insert(approval);
+        // 双写：同步到 biz_oa_request（流程事项菜单数据源）
+        syncToOaRequest(approval);
         return approval.getFlowNo();
     }
 
@@ -671,6 +676,8 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private void saveNode(FinApproval approval) {
         approval.setUpdatedBy(operatorResolver.currentOperatorName());
         approvalMapper.updateById(approval);
+        // 双写：同步到 biz_oa_request（流程事项菜单数据源）
+        syncToOaRequest(approval);
     }
 
     /* ==================== 公共方法 ==================== */
@@ -736,5 +743,72 @@ public class FinApprovalServiceImpl implements FinApprovalService {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    /**
+     * 将财务审批记录同步到 biz_oa_request 表（双写）
+     * 用于流程事项菜单展示，确保审批中心操作自动同步到 OA 中心
+     */
+    private void syncToOaRequest(FinApproval approval) {
+        try {
+            OaRequest oa = oaRequestMapper.selectOne(
+                    new LambdaQueryWrapper<OaRequest>().eq(OaRequest::getFlowNo, approval.getFlowNo()));
+            if (oa == null) {
+                oa = new OaRequest();
+                oa.setFlowNo(approval.getFlowNo());
+                oa.setProcessCode(approval.getApprovalType());
+                oa.setTitle(approval.getApprovalType() + "申請 " + approval.getApplicant());
+                oa.setApplicant(approval.getApplicant());
+                oa.setGroupId(approval.getGroupCode());
+                oa.setGroupName(approval.getGroupName());
+                oa.setBrand(approval.getBrand());
+                oa.setApplyTime(approval.getApplyTime());
+                oa.setCurrentNodeName(resolveCurrentNodeName(approval));
+                oa.setCurrentApprover(resolveCurrentApprover(approval));
+            } else {
+                oa.setCurrentNodeName(resolveCurrentNodeName(approval));
+                oa.setCurrentApprover(resolveCurrentApprover(approval));
+            }
+            oa.setFlowStatus(approval.getFlowStatus());
+            oa.setBizApprover(approval.getBizApprover());
+            oa.setBizApproveTime(approval.getBizApproveTime());
+            oa.setBizApproveStatus(approval.getBizApproveStatus());
+            oa.setOpsApprover(approval.getOpsApprover());
+            oa.setOpsApproveTime(approval.getOpsApproveTime());
+            oa.setOpsApproveStatus(approval.getOpsApproveStatus());
+            oa.setFinApprover(approval.getFinApprover());
+            oa.setFinApproveTime(approval.getFinApproveTime());
+            oa.setFinApproveStatus(approval.getFinApproveStatus());
+            oa.setRejectReason(approval.getRejectReason());
+            if (FLOW_APPROVED.equals(approval.getFlowStatus()) || FLOW_REJECTED.equals(approval.getFlowStatus())) {
+                oa.setCompleteTime(LocalDateTime.now());
+            }
+            if (FLOW_CANCELLED.equals(approval.getFlowStatus())) {
+                oa.setCancelTime(LocalDateTime.now());
+            }
+            if (oa.getId() == null) {
+                oaRequestMapper.insert(oa);
+            } else {
+                oaRequestMapper.updateById(oa);
+            }
+        } catch (Exception e) {
+            log.warn("同步审批记录到 biz_oa_request 失败: flowNo={}, error={}", approval.getFlowNo(), e.getMessage());
+        }
+    }
+
+    /** 根据审批状态推导当前待审节点名称 */
+    private static String resolveCurrentNodeName(FinApproval approval) {
+        if (!FLOW_PENDING.equals(approval.getFlowStatus())) return "";
+        if (FLOW_PENDING.equals(approval.getBizApproveStatus())) return NODE_BIZ;
+        if (FLOW_PENDING.equals(approval.getOpsApproveStatus())) return NODE_OPS;
+        return NODE_FIN;
+    }
+
+    /** 根据当前待审节点推导当前审批人 */
+    private static String resolveCurrentApprover(FinApproval approval) {
+        if (!FLOW_PENDING.equals(approval.getFlowStatus())) return "";
+        if (FLOW_PENDING.equals(approval.getBizApproveStatus())) return approval.getBizApprover();
+        if (FLOW_PENDING.equals(approval.getOpsApproveStatus())) return approval.getOpsApprover();
+        return approval.getFinApprover();
     }
 }

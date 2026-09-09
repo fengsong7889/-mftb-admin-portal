@@ -43,6 +43,7 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
                 new LambdaQueryWrapper<WorkflowConfig>()
                         .select(WorkflowConfig::getId, WorkflowConfig::getFlowType, WorkflowConfig::getFlowName,
                                 WorkflowConfig::getApprovalEnabled, WorkflowConfig::getDescription,
+                                WorkflowConfig::getNodesConfig, WorkflowConfig::getRoutingRules,
                                 WorkflowConfig::getUpdatedBy, WorkflowConfig::getCreatedAt, WorkflowConfig::getUpdatedAt)
                         .orderByAsc(WorkflowConfig::getId));
         return configs.stream().map(WorkflowConfigVO::from).toList();

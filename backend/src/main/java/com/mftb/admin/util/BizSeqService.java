@@ -166,6 +166,7 @@ public class BizSeqService {
             case "transfer" -> "transfer";
             case "merge" -> "merge";
             case "gift" -> "gift_approval";
+            case "ai_access" -> "ai_access";
             default -> null;
         };
     }

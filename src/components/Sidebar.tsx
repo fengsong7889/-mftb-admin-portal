@@ -67,6 +67,17 @@ import {
   BankOutlined, // 权限管理相关
   DollarOutlined, // 额度策略
   UnlockOutlined, // 員工AI權額管理
+  InboxOutlined, // 物资管理一级菜单
+  AppstoreAddOutlined, // 资产入库
+  UserAddOutlined, // 资产领用
+  RollbackOutlined, // 资产转移/归还
+  DeleteOutlined, // 报废
+  TagsOutlined, // 资产分类
+  BarcodeOutlined, // 资产型号
+  EnvironmentOutlined, // 仓库维护
+  ShoppingCartOutlined, // 采购申请
+  FileDoneOutlined, // 采购订单
+  ImportOutlined, // 验收入库
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -237,6 +248,23 @@ const keyToPath: Record<string, string> = {
   // 員工AI權額管理
   'ai-emp-permission': '/ai-emp-permission',
   'ai-emp-permission-detail': '/ai-emp-permission-detail',
+  // 物資管理（EAM 完整 19 個子菜單）
+  'asset-dashboard':     '/asset-dashboard',
+  'asset-list':          '/asset-list',
+  'asset-category':      '/asset-category',
+  'asset-model':         '/asset-model',
+  'asset-location':      '/asset-location',
+  'asset-inbound':       '/asset-inbound',
+  'asset-claim':         '/asset-claim',
+  'asset-borrow':        '/asset-borrow',
+  'asset-return':        '/asset-return',
+  'asset-transfer-list': '/asset-transfer-list',
+  'asset-handover':      '/asset-handover',
+  'asset-repair':        '/asset-repair',
+  'asset-compensation':  '/asset-compensation',
+  'asset-scrap':         '/asset-scrap',
+  'asset-flow':          '/asset-flow',
+  'asset-inventory':     '/asset-inventory',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -632,6 +660,58 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    key: 'asset-management',
+    icon: <InboxOutlined />,
+    label: '物資管理',
+    children: [
+      { key: 'asset-dashboard', icon: <DashboardOutlined />, label: '資產看板' },
+      {
+        key: 'asset-purchase',
+        icon: <ShoppingCartOutlined />,
+        label: '採購入庫',
+        children: [
+          { key: 'purchase-order', icon: <FileDoneOutlined />, label: '採購訂單' },
+          { key: 'asset-inbound', icon: <ImportOutlined />, label: '驗收入庫' },
+        ],
+      },
+      {
+        key: 'asset-flow-ops',
+        icon: <SwapOutlined />,
+        label: '資產流轉',
+        children: [
+          { key: 'asset-list', icon: <AppstoreOutlined />, label: '資產台賬' },
+          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用管理' },
+          { key: 'asset-borrow', icon: <ScheduleOutlined />, label: '借用管理' },
+          { key: 'asset-return', icon: <RollbackOutlined />, label: '歸還管理' },
+          { key: 'asset-transfer-list', icon: <SwapOutlined />, label: '調撥管理' },
+          { key: 'asset-handover', icon: <TeamOutlined />, label: '交接管理' },
+        ],
+      },
+      {
+        key: 'asset-maintenance',
+        icon: <ToolOutlined />,
+        label: '維護與處置',
+        children: [
+          { key: 'asset-repair', icon: <ToolOutlined />, label: '維修管理' },
+          { key: 'asset-compensation', icon: <DollarOutlined />, label: '損壞賠付' },
+          { key: 'asset-scrap', icon: <DeleteOutlined />, label: '資產報廢' },
+          { key: 'asset-inventory', icon: <AuditOutlined />, label: '資產盤點' },
+          { key: 'asset-flow', icon: <HistoryOutlined />, label: '變更歷史' },
+        ],
+      },
+      {
+        key: 'asset-basic',
+        icon: <SettingOutlined />,
+        label: '基礎設置',
+        children: [
+          { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類' },
+          { key: 'asset-model', icon: <BarcodeOutlined />, label: '資產型號' },
+          { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
+        ],
+      },
+    ],
+  },
+  {
     key: 'oa-center',
     icon: <SolutionOutlined />,
     label: 'OA中心',
@@ -650,6 +730,11 @@ const menuItems: MenuItem[] = [
         key: 'workflow-config',
         icon: <BranchesOutlined />,
         label: '流程配置',
+      },
+      {
+        key: 'purchase-request',
+        icon: <ShoppingCartOutlined />,
+        label: '採購申請',
       },
     ],
   },
@@ -827,6 +912,20 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-dept-quota': <AccountBookOutlined />,    // 部门额度 - 账本
   'ai-emp-quota': <MoneyCollectOutlined />,    // 员工额度 - 收款
   'ai-emp-permission': <UnlockOutlined />,     // 員工AI權額管理 - 解鎖/權限管理
+  // 物資管理
+  'asset-management': <InboxOutlined />,
+  'asset-basic':      <SettingOutlined />,
+  'asset-flow-ops':   <SwapOutlined />,
+  'asset-maintenance': <ToolOutlined />,
+  'asset-purchase':   <ShoppingCartOutlined />,
+  'asset-list':       <AppstoreOutlined />,
+  'asset-add':        <AppstoreAddOutlined />,
+  'asset-claim':      <UserAddOutlined />,
+  'asset-transfer':   <SwapOutlined />,
+  'asset-return':     <RollbackOutlined />,
+  'asset-scrap':      <DeleteOutlined />,
+  'asset-repair':     <ToolOutlined />,
+  'asset-inventory':  <AuditOutlined />,
 }
 
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
@@ -1012,8 +1111,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         items={visibleMenuItems}
         onClick={handleMenuClick}
         selectedKeys={[selectedKey]}
-        openKeys={collapsed ? [] : openKeys}
+        openKeys={collapsed ? undefined : openKeys}
         onOpenChange={setOpenKeys}
+        inlineCollapsed={collapsed}
         className="sidebar-menu"
       />
       <Modal

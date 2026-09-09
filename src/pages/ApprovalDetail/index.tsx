@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Tag, Input, Modal, Table, message } from 'antd'
 import {
@@ -33,6 +33,7 @@ import {
   cancelAiAccessRequest,
   type AiAccessRequestVO,
 } from '../../api/aiAccessRequest'
+import { fetchOaRequestDetail } from '../../api/oaRequest'
 import AiApprovalActionPanel from './AiApprovalActionPanel'
 import {
   type AiGrantDraft,
@@ -42,8 +43,12 @@ import {
 } from './aiGrantDraft'
 import { fetchModels } from '../../api/aiModel'
 import { useTranslation } from 'react-i18next'
-import { WORKFLOW_STORAGE_KEY } from '../WorkflowConfig/types'
+import { WORKFLOW_STORAGE_KEY, getApproverSettingForBrand } from '../WorkflowConfig/types'
 import type { WorkflowDefinition } from '../WorkflowConfig/types'
+import type { EmployeeItem } from '../../api/employee'
+import type { DepartmentItem } from '../../api/department'
+import type { RoleItem } from '../../api/role'
+import { resolveCurrentApprovers } from '../../utils/resolveCurrentApprover'
 
 /** 審批历史记录 */
 interface ApprovalTimelineItem {
@@ -464,23 +469,32 @@ function nodeItem(node: string, approver: string, time: string, status: string, 
 /** 從流程配置 + 本地審批記錄構建 AI 申請時間軸 */
 function buildAiAccessTimeline(
   local: { bizApprover?: string; bizApproveTime?: string; bizApproveStatus?: string; opsApprover?: string; opsApproveTime?: string; opsApproveStatus?: string; applyTime?: string; applicant?: string; rejectReason?: string } | null,
+  employees?: EmployeeItem[],
+  departments?: DepartmentItem[],
+  roles?: RoleItem[],
 ): ApprovalTimelineItem[] {
-  // 讀取流程配置獲取節點名稱
-  let nodeNames = ['業務主管審批', '運營主管審批']
+  // 讀取流程配置獲取節點名稱與審批規則
+  let nodeMetas = [
+    { name: '業務主管審批', approvalRule: 'any' },
+    { name: '運營主管審批', approvalRule: 'any' },
+  ]
   try {
     const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY)
     if (raw) {
       const workflows: WorkflowDefinition[] = JSON.parse(raw)
       const aiWf = workflows.find((wf) => wf.workflowKey === 'ai_access' || wf.approvalType === 'ai_access')
       if (aiWf && aiWf.nodes.length > 0) {
-        nodeNames = aiWf.nodes.sort((a, b) => a.sortOrder - b.sortOrder).map((n) => n.name)
+        nodeMetas = aiWf.nodes.sort((a, b) => a.sortOrder - b.sortOrder).map((n) => ({
+          name: n.name,
+          approvalRule: getApproverSettingForBrand(n).approvalRule,
+        }))
       }
     }
   } catch { /* ignore */ }
 
   const timeline: ApprovalTimelineItem[] = []
   // 按流程配置節點順序添加
-  nodeNames.forEach((nodeName) => {
+  nodeMetas.forEach(({ name: nodeName, approvalRule }) => {
     let approver = '--'
     let time = '--'
     let status: ApprovalTimelineItem['status'] = 'pending'
@@ -493,7 +507,17 @@ function buildAiAccessTimeline(
       time = local?.opsApproveTime || '--'
       status = nodeItem('', '', '', local?.opsApproveStatus || '').status
     }
-    timeline.push(nodeItem(nodeName, approver, time, status, local?.rejectReason))
+    const item = nodeItem(nodeName, approver, time, status, local?.rejectReason)
+    item.approvalRule = approvalRule
+    // pending 節點且有參考數據時，從流程配置解析全部候選審批人
+    if (status === 'pending' && employees && departments && roles) {
+      const { selected, candidates } = resolveCurrentApprovers('ai_access', nodeName, employees, departments, roles)
+      if (selected) item.approver = selected
+      if (candidates.length > 0) {
+        item.approvers = candidates.map((c) => ({ name: `${c.name}(${c.empId})`, status: 'pending', time: null }))
+      }
+    }
+    timeline.push(item)
   })
   // 提交節點
   timeline.push({
@@ -664,8 +688,31 @@ export default function ApprovalDetail() {
   const [searchParams] = useSearchParams()
   const urlType = searchParams.get('type') || 'recharge'
   const flowNo = searchParams.get('flowNo') || ''
-  /** 審批中心合併的後端 AI 申請攜帶 requestId（跨設備：本地無記錄，後端為唯一權威） */
-  const urlRequestId = Number(searchParams.get('requestId')) || 0
+  /** 審批中心合併的後端 AI 申請攜帶 requestId（跨設備：本地無記錄，後端為唯一權威）；
+   *  同時兼容「我的申請」頁跳轉使用的 id 参數（雙参數同值，避免修改調用方） */
+  const urlRequestId = Number(searchParams.get('requestId') || searchParams.get('id')) || 0
+  /** 僅有 flowNo 時的降級：AI000009 → 9，用於拉取後端詳情補齊申請人等信息 */
+  const aiIdFromFlowNo = /^AI\d+$/.test(flowNo) ? Number(flowNo.slice(2)) || 0 : 0
+  const aiRequestId = urlRequestId || aiIdFromFlowNo || undefined
+
+  /* ====== 參考數據（員工、部門、角色）用於解析審批人 ====== */
+  const employeesRef = useRef<EmployeeItem[]>([])
+  const departmentsRef = useRef<DepartmentItem[]>([])
+  const rolesRef = useRef<RoleItem[]>([])
+  const [refReady, setRefReady] = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      import('../../api/employee').then(m => m.fetchEmployees({ page: 1, size: 200, status: 1 })).catch(() => ({ records: [], total: 0 })),
+      import('../../api/department').then(m => m.fetchDepartments()).catch(() => []),
+      import('../../api/role').then(m => m.fetchRoles()).catch(() => []),
+    ]).then(([empRes, depts, roles]) => {
+      employeesRef.current = (empRes as { records: EmployeeItem[] }).records || []
+      departmentsRef.current = (depts as DepartmentItem[]) || []
+      rolesRef.current = (roles as RoleItem[]) || []
+      setRefReady(true)
+    })
+  }, [])
 
   /** 後端不可用時的降級詳情：本地審批記錄優先，其次靜態演示數據 */
   const fallbackDetail = useCallback((): ApprovalDetailData => {
@@ -673,6 +720,10 @@ export default function ApprovalDetail() {
     // AI 申請：使用流程配置構建時間軸
     if (urlType === 'ai_access' || (local && local.approvalType === 'ai_access')) {
       const aiLocal = local || undefined
+      const localExtra = (aiLocal?.extra || {}) as Record<string, unknown>
+      const localRequested = Array.isArray(localExtra.requestedModels)
+        ? (localExtra.requestedModels as number[])
+        : []
       return {
         approvalType: 'ai_access',
         applicant: aiLocal?.applicant || '--',
@@ -680,14 +731,15 @@ export default function ApprovalDetail() {
         flowNo,
         flowStatus: aiLocal?.flowStatus || 'pending',
         brand: '--',
-        timeline: buildAiAccessTimeline(aiLocal || null),
+        aiRequestedModels: localRequested,
+        aiRequestId,
+        timeline: buildAiAccessTimeline(aiLocal || null, refReady ? employeesRef.current : undefined, refReady ? departmentsRef.current : undefined, refReady ? rolesRef.current : undefined),
         hasRevoke: (aiLocal?.flowStatus || 'pending') === 'pending',
-        aiRequestId: urlRequestId || undefined,
       }
     }
     if (local) return toDetailData(local as unknown as FinApproval, t)
     // 後端 AI 申請（跨設備）：URL 攜帶 requestId，詳情數據由後端接口拉取補齊
-    if (urlType === 'ai_access' && urlRequestId) {
+    if (urlType === 'ai_access' && aiRequestId) {
       return {
         approvalType: 'ai_access',
         applicant: '--',
@@ -695,13 +747,13 @@ export default function ApprovalDetail() {
         flowNo,
         flowStatus: 'pending',
         brand: '--',
-        timeline: buildAiAccessTimeline(null),
+        timeline: buildAiAccessTimeline(null, refReady ? employeesRef.current : undefined, refReady ? departmentsRef.current : undefined, refReady ? rolesRef.current : undefined),
         hasRevoke: true,
-        aiRequestId: urlRequestId,
+        aiRequestId,
       }
     }
     return mockDetails[flowNo] || mockDetails[urlType] || mockDetails['CZ202601160000']
-  }, [flowNo, urlType, urlRequestId, t])
+  }, [flowNo, urlType, aiRequestId, t, refReady])
 
   const [data, setData] = useState<ApprovalDetailData>(fallbackDetail)
   const [submitting, setSubmitting] = useState(false)
@@ -709,6 +761,8 @@ export default function ApprovalDetail() {
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  /** 查看節點全部審批人彈窗（多人審批時時間軸僅展示前 3 人） */
+  const [viewApprovers, setViewApprovers] = useState<{ nodeName: string; approvers: NonNullable<ApprovalTimelineItem['approvers']> } | null>(null)
 
   /* ---- AI 申請：審批操作區狀態 ---- */
   /** 後端申請詳情（憑證、審批結果、跨設備狀態同步） */
@@ -747,44 +801,61 @@ export default function ApprovalDetail() {
 
   /**
    * AI 申請：拉取後端申請詳情（憑證 + 審批結果）。
-   * 跨設備場景後端為唯一權威：無本地記錄時補齊基礎信息；後端已終態時同步本地流程狀態，避免重複操作。
+   * 優先使用 OA 統一接口（biz_oa_request），降級使用舊接口（ai_access_request）。
    */
   useEffect(() => {
-    if (type !== 'ai_access' || !data.aiRequestId) return
+    if (type !== 'ai_access' || !flowNo) return
     let cancelled = false
-    fetchAiAccessRequestDetail(data.aiRequestId)
-      .then((vo) => {
+    // 優先使用 OA 統一接口按 flowNo 查詢
+    fetchOaRequestDetail(flowNo)
+      .then((oaVo) => {
         if (cancelled) return
-        setAiRequest(vo)
+        // 從 formData 中提取 AI 申請字段
+        const fd = oaVo.formData || {}
+        const applicantText = oaVo.applicant || '--'
+        setAiRequest({
+          id: oaVo.id,
+          applicantName: oaVo.applicant,
+          applicantId: 0,
+          requestType: fd.request_type as string || '',
+          requestedModels: (fd.approved_models || fd.requested_models || []) as number[],
+          usageDescription: fd.usage_description as string || '',
+          usageScenarios: (fd.usage_scenarios || []) as string[],
+          usageFrequency: fd.usage_frequency as string || '',
+          status: oaVo.flowStatus as 'pending' | 'approved' | 'rejected' | 'cancelled',
+          approveRemark: oaVo.rejectReason || '',
+          createdAt: oaVo.applyTime || '',
+        } as unknown as AiAccessRequestVO)
         // 跨設備：本地無記錄（applicant 為佔位），以後端詳情補齊展示信息
         if (data.applicant === '--') {
           setData((prev) => ({
             ...prev,
-            applicant: `${vo.applicantName}(MF${String(vo.applicantId).padStart(5, '0')})`,
-            applyDate: vo.createdAt || prev.applyDate,
-            flowStatus: vo.status,
-            aiRequestType: vo.requestType,
-            aiApplyReason: vo.applyReason ?? undefined,
-            aiRequestedModels: vo.requestedModels ?? undefined,
-            aiUsageDescription: vo.usageDescription,
-            aiUsageScenarios: vo.usageScenarios ?? [],
-            aiUsageFrequency: vo.usageFrequency ?? undefined,
-            notes: vo.usageDescription,
+            applicant: applicantText,
+            applyDate: oaVo.applyTime || prev.applyDate,
+            flowStatus: oaVo.flowStatus,
+            aiRequestType: fd.request_type as string || '',
+            aiApplyReason: fd.usage_description as string || undefined,
+            aiRequestedModels: (fd.approved_models || fd.requested_models || prev.aiRequestedModels) as number[] | undefined,
+            aiUsageDescription: fd.usage_description as string || '',
+            aiUsageScenarios: (fd.usage_scenarios || []) as string[],
+            aiUsageFrequency: fd.usage_frequency as string || undefined,
+            notes: fd.usage_description as string || '',
+            timeline: prev.timeline.map((item) => item.node === 'created'
+              ? { ...item, approver: applicantText, time: oaVo.applyTime || item.time }
+              : item),
           }))
-        } else if (vo.status === 'approved' || vo.status === 'rejected' || vo.status === 'cancelled') {
-          // 後端已終態且本地仍為待審 → 同步本地流程，防止另一端已審批後本地重複審批
+        } else if (oaVo.flowStatus === 'approved' || oaVo.flowStatus === 'rejected' || oaVo.flowStatus === 'cancelled') {
           const local = getApprovalRecordByFlowNo(flowNo)
           if (local && local.flowStatus === 'pending') {
             updateApprovalRecord(flowNo, {
-              flowStatus: vo.status,
-              rejectReason: vo.status === 'rejected' ? (vo.approveRemark || '') : local.rejectReason,
+              flowStatus: oaVo.flowStatus,
+              rejectReason: oaVo.flowStatus === 'rejected' ? (oaVo.rejectReason || '') : local.rejectReason,
             })
           }
-          setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: vo.status } : prev))
+          setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: oaVo.flowStatus } : prev))
         } else {
-          // 本地有記錄且後端仍 pending → 同步申請模型列表（確保審批操作區能展示所選模型）
           setData((prev) => {
-            const nextModels = vo.requestedModels ?? prev.aiRequestedModels
+            const nextModels = (fd.approved_models || fd.requested_models) as number[] | undefined
             if (nextModels && JSON.stringify(nextModels) !== JSON.stringify(prev.aiRequestedModels)) {
               return { ...prev, aiRequestedModels: nextModels }
             }
@@ -792,9 +863,54 @@ export default function ApprovalDetail() {
           })
         }
       })
-      .catch(() => { /* 後端不可用時保留 extra 展示 */ })
+      .catch(() => {
+        // OA 接口不可用時，降級使用舊接口
+        if (!aiRequestId) return
+        fetchAiAccessRequestDetail(aiRequestId)
+          .then((vo) => {
+            if (cancelled) return
+            setAiRequest(vo)
+            if (data.applicant === '--') {
+              const applicantText2 = `${vo.applicantName}(MF${String(vo.applicantId).padStart(5, '0')})`
+              setData((prev) => ({
+                ...prev,
+                applicant: applicantText2,
+                applyDate: vo.createdAt || prev.applyDate,
+                flowStatus: vo.status,
+                aiRequestType: vo.requestType,
+                aiApplyReason: vo.applyReason ?? undefined,
+                aiRequestedModels: vo.requestedModels ?? undefined,
+                aiUsageDescription: vo.usageDescription,
+                aiUsageScenarios: vo.usageScenarios ?? [],
+                aiUsageFrequency: vo.usageFrequency ?? undefined,
+                notes: vo.usageDescription,
+                timeline: prev.timeline.map((item) => item.node === 'created'
+                  ? { ...item, approver: applicantText2, time: vo.createdAt || item.time }
+                  : item),
+              }))
+            } else if (vo.status === 'approved' || vo.status === 'rejected' || vo.status === 'cancelled') {
+              const local = getApprovalRecordByFlowNo(flowNo)
+              if (local && local.flowStatus === 'pending') {
+                updateApprovalRecord(flowNo, {
+                  flowStatus: vo.status,
+                  rejectReason: vo.status === 'rejected' ? (vo.approveRemark || '') : local.rejectReason,
+                })
+              }
+              setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: vo.status } : prev))
+            } else {
+              setData((prev) => {
+                const nextModels = vo.requestedModels ?? prev.aiRequestedModels
+                if (nextModels && JSON.stringify(nextModels) !== JSON.stringify(prev.aiRequestedModels)) {
+                  return { ...prev, aiRequestedModels: nextModels }
+                }
+                return prev
+              })
+            }
+          })
+          .catch(() => { /* 後端不可用時保留 extra 展示 */ })
+      })
     return () => { cancelled = true }
-  }, [type, data.aiRequestId, flowNo, data.applicant])
+  }, [type, flowNo, aiRequestId, data.applicant])
 
   /** AI 申請審批操作區草稿初始化：第二節點讀取第一節點保存的 draftGrant，否則按申請內容初始化 */
   useEffect(() => {
@@ -1018,7 +1134,7 @@ export default function ApprovalDetail() {
             <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
           </>
         }
-        onBack={() => navigate(type === 'ai_access' ? '/oa-requests' : '/approval-center')}
+        onBack={() => navigate(-1)}
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             {data.hasRevoke && (
@@ -1654,16 +1770,38 @@ export default function ApprovalDetail() {
                   </div>
                   {item.approvers?.length ? (
                     <div style={{ fontSize: 12, color: '#666', lineHeight: 2, marginTop: 4 }}>
-                      {item.approvers.map((a, i) => (
+                      {/* 多人審批：最多展示 3 人，超出顯示 +N 點擊查看 */}
+                      {item.approvers.slice(0, 3).map((a, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span>{a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}</span>
                           {renderStatusTag(a.status === 'skipped' ? 'pending' : a.status)}
                           <span style={{ color: '#999', fontSize: 11 }}>{a.time || '--'}</span>
                         </div>
                       ))}
-                      {item.approvalRule === 'all' && (
-                        <Tag color="orange" style={{ fontSize: 11, marginTop: 2 }}>{t('approvalCenter.countersign')}</Tag>
+                      {item.approvers.length > 3 && (
+                        <Button
+                          type="link"
+                          size="small"
+                          style={{ padding: 0, height: 22, fontSize: 12 }}
+                          onClick={() => setViewApprovers({
+                            nodeName: timelineNodeMapKeys[item.node] ? t(timelineNodeMapKeys[item.node]) : item.node,
+                            approvers: item.approvers!,
+                          })}
+                        >
+                          +{item.approvers.length - 3}
+                        </Button>
                       )}
+                      {/* 審批規則標識：會簽=需全部審批人通過 / 或簽=任一人通過即可 */}
+                      {item.approvers.length > 1 && item.approvalRule && (
+                        <div style={{ marginTop: 2 }}>
+                          <Tag color={item.approvalRule === 'all' ? 'orange' : 'blue'} style={{ fontSize: 11 }}>
+                            {item.approvalRule === 'all' ? t('approvalCenter.ruleAll') : t('approvalCenter.ruleAny')}
+                          </Tag>
+                        </div>
+                      )}
+                      <div className="approval-timeline-status" style={{ marginTop: 4 }}>
+                        {renderStatusTag(item.status)}
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -1696,7 +1834,7 @@ export default function ApprovalDetail() {
 
       {/* 底部操作栏 */}
       <div className="approval-detail-footer">
-        <Button onClick={() => navigate(type === 'ai_access' ? '/oa-requests' : '/approval-center')}>{t('common.back')}</Button>
+        <Button onClick={() => navigate(-1)}>{t('common.back')}</Button>
         {data.hasRevoke && (
           <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
         )}
@@ -1780,6 +1918,41 @@ export default function ApprovalDetail() {
             onChange={(e) => setRejectReason(e.target.value)}
           />
         </div>
+      </Modal>
+
+      {/* 查看全部審批人（多人審批時時間軸僅展示前 3 人） */}
+      <Modal
+        title={viewApprovers ? `${t('approvalCenter.approverListTitle')} - ${viewApprovers.nodeName}` : t('approvalCenter.approverListTitle')}
+        open={!!viewApprovers}
+        onCancel={() => setViewApprovers(null)}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button onClick={() => setViewApprovers(null)}>{t('common.cancel')}</Button>
+          </div>
+        }
+        width={520}
+        centered
+      >
+        {viewApprovers && (
+          <div style={{ padding: '8px 0' }}>
+            {viewApprovers.approvers.map((a, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '8px 0',
+                  borderBottom: i < viewApprovers.approvers.length - 1 ? '1px solid #F0F0F0' : 'none',
+                }}
+              >
+                <span style={{ flex: 1 }}>{a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}</span>
+                {renderStatusTag(a.status === 'skipped' ? 'pending' : a.status)}
+                <span style={{ color: '#999', fontSize: 12, minWidth: 130, textAlign: 'right' }}>{a.time || '--'}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
     </div>
   )

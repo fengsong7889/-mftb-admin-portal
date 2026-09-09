@@ -12,7 +12,7 @@ import {
   createDefaultApproverConfig,
 } from './types'
 import type { WorkflowNode, ApproverType, ApprovalRule, ApproverConfig } from './types'
-import { getApproverOptions } from './options'
+import { getApproverOptions, loadApproverOptions } from './options'
 
 interface Props {
   open: boolean
@@ -48,6 +48,7 @@ export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, o
   const [form] = Form.useForm()
   const [approverType, setApproverType] = useState<ApproverType>('role')
   const [activeTab, setActiveTab] = useState('default')
+  const [optionsLoading, setOptionsLoading] = useState(false)
   /** 各品牌的獨立配置（通用=default，閃蜂=1，mFood=2） */
   const [brandSettings, setBrandSettings] = useState<Record<string, { approverIds: string[]; approvalRule: ApprovalRule }>>({
     default: { approverIds: [], approvalRule: 'any' },
@@ -57,9 +58,13 @@ export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, o
 
   const isInitiatorLeader = approverType === 'initiator_leader'
 
-  /* 打開時初始化 */
+  /* 打開時初始化 + 加載選項 */
   useEffect(() => {
     if (!open) return
+    // 異步加載選項（冪等，已加載過則立即返回）
+    setOptionsLoading(true)
+    loadApproverOptions().finally(() => setOptionsLoading(false))
+
     if (node) {
       const cfg = node.approverConfig || createDefaultApproverConfig(
         node.approverType || 'role',

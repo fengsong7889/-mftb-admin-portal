@@ -80,6 +80,23 @@
   color: #8c8c8c;
 }
 
+.process-category-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: #8c8c8c;
+  transition: all 0.25s ease;
+}
+
+.process-category-header:hover .process-category-toggle {
+  color: #E8720C;
+  background: rgba(232, 114, 12, 0.06);
+}
+
 /* 流程卡片网格 */
 .process-category-grid {
   display: grid;

@@ -45,7 +45,7 @@ public class SecurityConfig {
     }
 
     /** CORS 允许的域名（逗号分隔），通过环境变量 CORS_ALLOWED_ORIGINS 注入 */
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://localhost:3005,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:5173,http://127.0.0.1:3005,https://fengsong7889.github.io}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,https://fengsong7889.github.io}")
     private String allowedOrigins;
 
     /** 白名单: 无需认证即可访问 */
@@ -99,8 +99,8 @@ public class SecurityConfig {
 
     /** CORS 默认白名单：环境变量未设置或解析后为空时回退使用（避免空名单拒绝所有跨域请求） */
     private static final String DEFAULT_CORS_ORIGINS =
-            "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://localhost:3005,"
-                    + "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:5173,http://127.0.0.1:3005,"
+            "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,"
+                    + "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,"
                     + "https://fengsong7889.github.io";
 
     /** CORS 跨域配置 */

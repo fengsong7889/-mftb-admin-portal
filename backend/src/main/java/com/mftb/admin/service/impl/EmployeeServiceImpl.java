@@ -188,7 +188,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     /**
      * 生成下一个工号: 按编号生成规则 employee_no（前缀 + n位自增序号，取表内最大序号+1）
-     * 原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号
+     * 原生 SQL 包含逻辑删除记录, 避免复用已删除员工的工号（每个工号终身唯一）
      */
     private String generateEmpId() {
         SysBizSeqRule rule = bizSeqService.getRule(BizSeqService.RULE_EMPLOYEE_NO);

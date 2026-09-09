@@ -36,3 +36,42 @@ export async function updateApprovalEnabled(
   })
   console.log('[workflowConfig] 后端同步成功')
 }
+
+/** 读取指定流程的节点配置和路由规则 */
+export async function fetchWorkflowConfig(flowType: string): Promise<WorkflowConfigVO | null> {
+  try {
+    return await request.get<unknown, WorkflowConfigVO>(`/workflow-config/${flowType}/config`, {
+      headers: { [SILENT_HEADER]: '1' },
+    })
+  } catch {
+    return null
+  }
+}
+
+/** 保存流程节点配置和路由规则 */
+export async function saveWorkflowConfig(
+  flowType: string,
+  nodesConfig: string,
+  routingRules: string,
+): Promise<void> {
+  await request.put(`/workflow-config/${flowType}/config`, { nodesConfig, routingRules }, {
+    headers: { [SILENT_HEADER]: '1' },
+  })
+}
+
+/** 角色下拉选项（流程配置专用） */
+export interface RoleOption {
+  id: number
+  name: string
+  code: string
+}
+
+export async function fetchWorkflowRoleOptions(): Promise<RoleOption[]> {
+  try {
+    return await request.get<unknown, RoleOption[]>('/workflow-config/role-options', {
+      headers: { [SILENT_HEADER]: '1' },
+    })
+  } catch {
+    return []
+  }
+}

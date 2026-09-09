@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import dayjs from 'dayjs'
+import dayjs, { Dayjs } from 'dayjs'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -47,7 +47,21 @@ interface EmployeeFormValues {
   functionRoleIds?: number[]
 }
 
-/** 平铺部门列表构建 TreeSelect 树数据（停用部门不可选） */
+/** 查询表单值 */
+interface EmployeeSearchValues {
+  keyword?: string
+  departmentId?: number
+  sequence?: string
+  jobLevel?: string
+  rank?: string
+  roleId?: number
+  updatedBy?: string
+  /** 最后更新时间范围 */
+  updatedAtRange?: [Dayjs, Dayjs] | null
+  status?: number
+}
+
+/** 平铺部门列表构建 TreeSelect 树数据（默认停用部门不可选，allowDisabled 用于查询区） */
 interface DeptTreeOption {
   value: number
   title: string
@@ -55,14 +69,14 @@ interface DeptTreeOption {
   children?: DeptTreeOption[]
 }
 
-function buildDeptTreeData(list: DepartmentItem[], getDeptName?: (dept: DepartmentItem) => string): DeptTreeOption[] {
+function buildDeptTreeData(list: DepartmentItem[], getDeptName?: (dept: DepartmentItem) => string, allowDisabled?: boolean): DeptTreeOption[] {
   const nameFn = getDeptName ?? ((d: DepartmentItem) => d.name)
   const nodeMap = new Map<number, DeptTreeOption>()
   list.forEach(dept => {
     nodeMap.set(dept.id, {
       value: dept.id,
       title: nameFn(dept),
-      disabled: dept.status !== DEPT_STATUS.ENABLED,
+      disabled: !allowDisabled && dept.status !== DEPT_STATUS.ENABLED,
       children: [],
     })
   })
@@ -113,6 +127,14 @@ export default function EmployeeManagement() {
   // 查询条件（点击查询后生效）
   const [keyword, setKeyword] = useState<string>()
   const [status, setStatus] = useState<number>()
+  // 扩展筛选条件（所属部门/职级序列/职级/职等/角色授权/最后更新人/最后更新时间）
+  const [deptFilter, setDeptFilter] = useState<number>()
+  const [sequenceFilter, setSequenceFilter] = useState<string>()
+  const [jobLevelFilter, setJobLevelFilter] = useState<string>()
+  const [rankFilter, setRankFilter] = useState<string>()
+  const [roleIdFilter, setRoleIdFilter] = useState<number>()
+  const [updatedByFilter, setUpdatedByFilter] = useState<string>()
+  const [updatedAtRange, setUpdatedAtRange] = useState<[string, string] | null>(null)
   const [searchForm] = Form.useForm()
 
   // 功能角色列表（新增/编辑时下拉选择）
@@ -204,6 +226,19 @@ export default function EmployeeManagement() {
 
   const deptTreeData = useMemo(() => buildDeptTreeData(departments, getDeptDisplayName), [departments, isNonZh]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** 查询区所属部门树（含停用部门，查询不应限制停用部门的员工） */
+  const searchDeptTreeData = useMemo(() => buildDeptTreeData(departments, getDeptDisplayName, true), [departments, isNonZh]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 搜索区所选职级序列（用于联动过滤职级选项） */
+  const searchSequence = Form.useWatch('sequence', searchForm)
+
+  /** 搜索区职级选项：跟随职级序列过滤，取职位管理中已配置的职级 */
+  const searchJobLevelOptions = useMemo(() => {
+    const pool = searchSequence ? positions.filter(p => p.sequence === searchSequence) : positions
+    return [...new Set(pool.map(p => p.jobLevel).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  }, [positions, searchSequence])
+
   /** 当前所选职位（带出职级与英文名称） */
   const selectedPosition = useMemo(
     () => positions.find(p => p.id === watchPositionId),
@@ -240,9 +275,20 @@ export default function EmployeeManagement() {
 
   /** 查询 */
   const handleSearch = () => {
-    const values = searchForm.getFieldsValue()
+    const values = searchForm.getFieldsValue() as EmployeeSearchValues
     setKeyword(values.keyword?.trim() || undefined)
     setStatus(values.status)
+    setDeptFilter(values.departmentId)
+    setSequenceFilter(values.sequence)
+    setJobLevelFilter(values.jobLevel)
+    setRankFilter(values.rank)
+    setRoleIdFilter(values.roleId)
+    setUpdatedByFilter(values.updatedBy?.trim() || undefined)
+    if (values.updatedAtRange && values.updatedAtRange.length === 2) {
+      setUpdatedAtRange([values.updatedAtRange[0].format('YYYY-MM-DD'), values.updatedAtRange[1].format('YYYY-MM-DD')])
+    } else {
+      setUpdatedAtRange(null)
+    }
     setPage(1)
   }
 
@@ -251,8 +297,63 @@ export default function EmployeeManagement() {
     searchForm.resetFields()
     setKeyword(undefined)
     setStatus(undefined)
+    setDeptFilter(undefined)
+    setSequenceFilter(undefined)
+    setJobLevelFilter(undefined)
+    setRankFilter(undefined)
+    setRoleIdFilter(undefined)
+    setUpdatedByFilter(undefined)
+    setUpdatedAtRange(null)
     setPage(1)
   }
+
+  /** 所属部门及其全部子孙部门 id（查询父部门时同时匹配下级部门员工） */
+  const deptDescendantIds = useMemo(() => {
+    if (deptFilter == null) return undefined
+    const childMap = new Map<number, number[]>()
+    departments.forEach(d => {
+      if (d.parentId != null) {
+        const arr = childMap.get(d.parentId) ?? []
+        arr.push(d.id)
+        childMap.set(d.parentId, arr)
+      }
+    })
+    const ids = new Set<number>([deptFilter])
+    const stack = [deptFilter]
+    while (stack.length > 0) {
+      const cur = stack.pop()!
+      for (const child of childMap.get(cur) ?? []) {
+        if (!ids.has(child)) {
+          ids.add(child)
+          stack.push(child)
+        }
+      }
+    }
+    return Array.from(ids)
+  }, [deptFilter, departments])
+
+  /** 扩展筛选条件的前端过滤（后端 /employees 接口扩展前先在当前页数据上过滤） */
+  const filteredData = useMemo(() => {
+    let data = dataSource
+    if (deptDescendantIds) data = data.filter(e => e.departmentId != null && deptDescendantIds.includes(e.departmentId))
+    if (sequenceFilter) data = data.filter(e => e.sequence === sequenceFilter)
+    if (jobLevelFilter) data = data.filter(e => e.jobLevel === jobLevelFilter)
+    if (rankFilter) data = data.filter(e => e.rank === rankFilter)
+    if (roleIdFilter != null) data = data.filter(e => e.functionRoleIds?.includes(roleIdFilter))
+    if (updatedByFilter) {
+      const kw = updatedByFilter.toLowerCase()
+      data = data.filter(e => (e.updatedBy ?? '').toLowerCase().includes(kw))
+    }
+    if (updatedAtRange) {
+      const [start, end] = updatedAtRange
+      data = data.filter(item => {
+        if (!item.updatedAt) return false
+        const d = dayjs(item.updatedAt)
+        return !d.isBefore(dayjs(start), 'day') && !d.isAfter(dayjs(end), 'day')
+      })
+    }
+    return data
+  }, [dataSource, deptDescendantIds, sequenceFilter, jobLevelFilter, rankFilter, roleIdFilter, updatedByFilter, updatedAtRange])
 
   /** 新增员工 */
   const handleCreate = () => {
@@ -361,7 +462,7 @@ export default function EmployeeManagement() {
 
   /** 导出当前搜索结果 */
   const handleExport = () => {
-    if (dataSource.length === 0) {
+    if (filteredData.length === 0) {
       message.warning(t('employee.noDataToExport'))
       return
     }
@@ -378,16 +479,16 @@ export default function EmployeeManagement() {
       { title: t('employee.colUpdatedBy'), dataIndex: 'updatedBy' },
       { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
-    exportToCSV(t('employee.pageTitle'), exportColumns, dataSource)
+    exportToCSV(t('employee.pageTitle'), exportColumns, filteredData)
   }
 
-  /** 根据角色ID渲染角色名称标签 */
+  /** 根据角色ID渲染角色名称标签（单行展示，禁止换行） */
   const renderRoleTags = (roleIds: number[]) => {
     if (!roleIds || roleIds.length === 0) {
       return <span style={{ color: '#8C8C8C' }}>{t('employee.notBound')}</span>
     }
     return (
-      <Space size={4} wrap>
+      <Space size={4} style={{ whiteSpace: 'nowrap' }}>
         {roleIds.map(id => {
           const role = roles.find(r => r.id === id)
           return <Tag key={id} color="blue">{role ? role.name : `角色#${id}`}</Tag>
@@ -513,8 +614,47 @@ export default function EmployeeManagement() {
           <Form.Item label={t('employee.searchKeyword')} name="keyword">
             <Input placeholder={t('employee.keywordPlaceholder')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
+          <Form.Item label={t('employee.deptLabel')} name="departmentId">
+            <TreeSelect
+              treeData={searchDeptTreeData}
+              placeholder={t('common.all')}
+              allowClear
+              treeDefaultExpandAll
+              showSearch
+              treeNodeFilterProp="title"
+            />
+          </Form.Item>
+          <Form.Item label={t('employee.colSequence')} name="sequence">
+            <Select
+              placeholder={t('common.all')}
+              allowClear
+              options={SEQ_OPTIONS}
+              onChange={() => searchForm.setFieldValue('jobLevel', undefined)}
+            />
+          </Form.Item>
+          <Form.Item label={t('employee.colJobLevel')} name="jobLevel">
+            <Select placeholder={t('common.all')} allowClear options={searchJobLevelOptions.map(v => ({ value: v, label: v }))} />
+          </Form.Item>
+          <Form.Item label={t('employee.colRank')} name="rank">
+            <Select placeholder={t('common.all')} allowClear options={availableRankOptions} />
+          </Form.Item>
+          <Form.Item label={t('employee.roleAuthLabel')} name="roleId">
+            <Select
+              placeholder={t('common.all')}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={roles.map(r => ({ value: r.id, label: r.name }))}
+            />
+          </Form.Item>
           <Form.Item label={t('common.colStatus')} name="status">
             <Select placeholder={t('common.all')} allowClear options={STATUS_OPTIONS} />
+          </Form.Item>
+          <Form.Item label={t('employee.colUpdatedBy')} name="updatedBy">
+            <Input placeholder={t('employee.searchUpdatedByPh')} allowClear onPressEnter={handleSearch} />
+          </Form.Item>
+          <Form.Item label={t('employee.colUpdatedAt')} name="updatedAtRange">
+            <DatePicker.RangePicker style={{ width: '100%' }} allowClear />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -545,10 +685,12 @@ export default function EmployeeManagement() {
       </div>
 
       <Table
+        className="nowrap-table"
         columns={applyConfig(columns)}
-        dataSource={dataSource}
+        dataSource={filteredData}
         rowKey="id"
         loading={loading}
+        scroll={{ x: 'max-content' }}
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys),

@@ -54,14 +54,14 @@ const defaultRoutingRule = (nodeIds: string[]): RoutingRule[] => [
 
 const now = new Date().toISOString()
 
-/** 5 種預置默認流程 + AI 申請流程 */
+/** 6 種預置默認流程 + AI 申請流程 + 採購申請流程 */
 const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
     workflowKey: 'recharge',
-    name: '充值審批',
+    name: '充值申請',
     approvalType: 'recharge',
-    description: '推廣金充值審批流程，含業務主管、運營主管、財務主管三級審批',
+    description: '推廣金充值申請流程，含業務主管、運營主管、財務主管三級審批',
     enabled: true,
     nodes: [bizNode(1), opsNode(2), finNode(3)],
     routingRules: defaultRoutingRule([
@@ -77,9 +77,9 @@ const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
     workflowKey: 'transfer',
-    name: '轉賬審批',
+    name: '轉賬申請',
     approvalType: 'transfer',
-    description: '推廣金轉賬審批流程，含業務主管、運營主管、財務主管三級審批',
+    description: '推廣金轉賬申請流程，含業務主管、運營主管、財務主管三級審批',
     enabled: true,
     nodes: [bizNode(1), opsNode(2), finNode(3)],
     routingRules: [],
@@ -92,9 +92,9 @@ const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
     workflowKey: 'deduct',
-    name: '扣款審批',
+    name: '扣款申請',
     approvalType: 'deduct',
-    description: '推廣金扣款審批流程，含業務主管、運營主管、財務主管三級審批',
+    description: '推廣金扣款申請流程，含業務主管、運營主管、財務主管三級審批',
     enabled: true,
     nodes: [bizNode(1), opsNode(2), finNode(3)],
     routingRules: [],
@@ -107,9 +107,9 @@ const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
     workflowKey: 'merge',
-    name: '合併審批',
+    name: '合併申請',
     approvalType: 'merge',
-    description: '商戶合併審批流程，含業務主管、運營主管、財務主管三級審批',
+    description: '商戶合併申請流程，含業務主管、運營主管、財務主管三級審批',
     enabled: true,
     nodes: [bizNode(1), opsNode(2), finNode(3)],
     routingRules: [],
@@ -122,9 +122,9 @@ const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
     workflowKey: 'gift',
-    name: '贈送審批',
+    name: '贈送申請',
     approvalType: 'gift',
-    description: '贈送審批流程，含業務主管、運營主管二級審批',
+    description: '贈送申請流程，含業務主管、運營主管二級審批',
     enabled: true,
     nodes: [bizNode(1), opsNode(2)],
     routingRules: [],
@@ -137,9 +137,24 @@ const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
     workflowKey: 'ai_access',
-    name: 'AI申請審批',
+    name: 'AI申請',
     approvalType: 'ai_access',
-    description: '員工 AI 助手使用權限與額度申請審批流程',
+    description: '員工 AI 助手使用權限與額度申請流程',
+    enabled: true,
+    nodes: [bizNode(1), opsNode(2)],
+    routingRules: [],
+    rejectBehavior: 'restart',
+    timeoutHours: 48,
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: '系統',
+  },
+  {
+    id: uid(),
+    workflowKey: 'oa_purchase',
+    name: '採購申請',
+    approvalType: 'oa_purchase',
+    description: '物資採購申請流程，含業務主管、運營主管二級審批',
     enabled: true,
     nodes: [bizNode(1), opsNode(2)],
     routingRules: [],

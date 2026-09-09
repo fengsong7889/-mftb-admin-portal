@@ -30,10 +30,24 @@ export interface OaRequestVO {
   applicant: string
   flowStatus: OaFlowStatus
   currentNodeName: string | null
+  currentApprover: string | null
   rejectReason: string | null
   applyTime: string | null
   completeTime: string | null
   cancelTime: string | null
+  // 审批中心专用字段
+  groupId: string | null
+  groupName: string | null
+  brand: string | null
+  bizApprover: string | null
+  bizApproveTime: string | null
+  bizApproveStatus: string | null
+  opsApprover: string | null
+  opsApproveTime: string | null
+  opsApproveStatus: string | null
+  finApprover: string | null
+  finApproveTime: string | null
+  finApproveStatus: string | null
   approvalTasks: OaApprovalTaskVO[]
 }
 

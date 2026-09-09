@@ -25,15 +25,15 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 export PATH="$HOME/apache-maven-3.9.6/bin:$JAVA_HOME/bin:$PATH"
 
 # 从环境变量读取配置（与 run-local.sh 一致）
-export DB_URL='jdbc:mysql://mysql6.sqlpub.com:3311/fengsong_test?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true'
-export DB_USERNAME='fengsong_mt'
-export DB_PASSWORD='re6NO4pZLL2pgqhp'
+export DB_URL='jdbc:mysql://mysql3.sqlpub.com:3308/fengsong?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true'
+export DB_USERNAME='fengsong_mftb'
+export DB_PASSWORD='bBMzwCsHPYDhi4my'
 export JWT_SECRET='mftb-local-dev-secret-key-2024-sha256-secure-enough-for-hs384'
 export LOG_LEVEL=info
 
 echo ""
 echo "数据库信息:"
-echo "  - 地址：mysql6.sqlpub.com:3311"
+echo "  - 地址：mysql3.sqlpub.com:3308"
 echo "  - 数据库：$DB_DATABASE (检查日志)"
 echo ""
 

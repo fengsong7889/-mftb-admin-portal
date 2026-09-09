@@ -52,9 +52,18 @@ function loadWorkflows(): WorkflowDefinition[] {
           }]
           migrated = true
         }
-        // 遷移 3：AI 申請流程名稱修正
-        if (wf.workflowKey === 'ai_access' && wf.name === 'AI申請') {
-          wf.name = 'AI申請審批'
+        // 遷移 3：流程名稱統一從「審批」改為「申請」
+        const nameMap: Record<string, string> = {
+          '充值審批': '充值申請',
+          '轉賬審批': '轉賬申請',
+          '扣款審批': '扣款申請',
+          '合併審批': '合併申請',
+          '贈送審批': '贈送申請',
+          'AI申請審批': 'AI申請',
+          '採購申請審批': '採購申請',
+        }
+        if (nameMap[wf.name]) {
+          wf.name = nameMap[wf.name]
           migrated = true
         }
       }

@@ -38,6 +38,8 @@ spring:
       minimum-idle: 5
       idle-timeout: 600000
       keepalive-timeout: 60000
+      # 连接最大存活时间，必须 < 数据库 wait_timeout，防止远端静默关闭连接导致连接池雪崩
+      max-lifetime: 1800000
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -90,7 +92,7 @@ translation:
 
 # CORS 跨域配置
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3005,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3005,http://127.0.0.1:5173,https://fengsong7889.github.io}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,https://fengsong7889.github.io}
 
 logging:
   level:

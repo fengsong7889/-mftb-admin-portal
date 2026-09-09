@@ -40,6 +40,9 @@ public class OaRequest {
     /** 当前待审节点名称 */
     private String currentNodeName;
 
+    /** 当前审批人 */
+    private String currentApprover;
+
     /** 驳回理由 */
     private String rejectReason;
 
@@ -51,6 +54,44 @@ public class OaRequest {
 
     /** 撤销时间 */
     private LocalDateTime cancelTime;
+
+    // ==================== 审批中心专用字段 ====================
+
+    /** 集团ID */
+    private String groupId;
+
+    /** 集团名称 */
+    private String groupName;
+
+    /** 品牌 */
+    private String brand;
+
+    /** 业务主管-审批人 */
+    private String bizApprover;
+
+    /** 业务主管-审批时间 */
+    private LocalDateTime bizApproveTime;
+
+    /** 业务主管-审批状态: pending/approved/rejected */
+    private String bizApproveStatus;
+
+    /** 运营主管-审批人 */
+    private String opsApprover;
+
+    /** 运营主管-审批时间 */
+    private LocalDateTime opsApproveTime;
+
+    /** 运营主管-审批状态: pending/approved/rejected */
+    private String opsApproveStatus;
+
+    /** 财务主管-审批人 */
+    private String finApprover;
+
+    /** 财务主管-审批时间 */
+    private LocalDateTime finApproveTime;
+
+    /** 财务主管-审批状态: pending/approved/rejected */
+    private String finApproveStatus;
 
     /** 逻辑删除 */
     @TableLogic

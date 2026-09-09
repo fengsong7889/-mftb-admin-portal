@@ -919,8 +919,10 @@ function WaterfallAddGeneral() {
       {isDetailMode ? (
         <DetailPageHeader
           title={t('recommend.pricingDetailTitle')}
-          meta={urlAlgorithmType != null && (
-            <>{TYPE_ICON[urlAlgorithmType]} {(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.labelKey ? t(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)!.labelKey) : '')}</>
+          tags={urlAlgorithmType != null && (
+            <span style={{ fontSize: 14, color: '#595959' }}>
+              {TYPE_ICON[urlAlgorithmType]} {(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.labelKey ? t(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)!.labelKey) : '')}
+            </span>
           )}
           onBack={handleBack}
           onEdit={() => {

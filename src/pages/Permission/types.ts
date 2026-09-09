@@ -596,6 +596,29 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
+  // 物資管理
+  'asset-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '入庫' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'asset-scrap': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '申請' },
+    { key: 'edit', label: '審核' },
+  ],
+  'asset-repair': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '送修' },
+    { key: 'edit', label: '完修' },
+  ],
+  'asset-inventory': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '發起' },
+    { key: 'export', label: '導出' },
+  ],
 }
 
 /** 获取菜单的功能操作（如果未定义则返回默认功能） */
@@ -1189,6 +1212,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ai_energy_detail',
   'ai-access-request',
   'ai-mcp-service',
+  // 物資管理
+  'asset-list',
+  'asset-scrap',
+  'asset-repair',
+  'asset-inventory',
 ]
 
 /**
@@ -1308,6 +1336,14 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/ai-energy-detail': 'ai_energy_detail',
   '/ai-access-apply': 'ai-access-request',
   '/ai-mcp-service': 'ai-mcp-service',
+  // 物資管理（入庫/轉移為獨立頁面；詳情、領用、歸還、編輯、刪除都歸屬 asset-list 菜單）
+  '/asset-list': 'asset-list',
+  '/asset-add': 'asset-list',
+  '/asset-detail': 'asset-list',
+  '/asset-scrap': 'asset-scrap',
+  '/asset-repair': 'asset-repair',
+  '/asset-transfer': 'asset-list',
+  '/asset-inventory': 'asset-inventory',
 }
 
 /**

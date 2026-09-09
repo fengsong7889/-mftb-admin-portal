@@ -253,6 +253,7 @@ public class RoleServiceImpl implements RoleService {
         RoleVO vo = new RoleVO();
         vo.setId(role.getId());
         vo.setName(role.getName());
+        vo.setCode(role.getCode());
         vo.setDescription(role.getDescription());
         vo.setStatus(role.getStatus());
         vo.setPermissions(permissions == null ? List.of() : permissions);

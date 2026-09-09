@@ -45,7 +45,8 @@ public class DataInitializer implements CommandLineRunner {
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增 minor 版本号 */
     // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
     // v6.0: OA 中心表自动创建（biz_oa_process / biz_oa_request / biz_oa_approval_task + 种子数据）
-    private static final String V_SCHEMA = "core:schema-v6";
+    // v7.0: biz_oa_request 扩展审批中心字段（集团/品牌/三级审批详情）
+    private static final String V_SCHEMA = "core:schema-v7";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增 minor 版本号，无需全量重跑其他迁移 */
     // v11: 「工具註冊中心」更名為「AI 操作授權」，menu_key 由 ai_tool_registry 迁移为 ai-operation-auth
     //      （seedSystemMenus 會先刪除所有含 ai 的舊菜單及授權關聯再重建，舊 key 自動清理）
@@ -59,13 +60,27 @@ public class DataInitializer implements CommandLineRunner {
     // v19: 「员工AI权额总览」更名为「员工AI权额管理」
     // v20: 修正顶级菜单排序（團購管理=7, 智能中心AI=8, OA中心=12）及图标
     // v21: 对齐开发环境顶级菜单顺序（智能中心AI=7, 團購管理=8, OA中心=10, 權限管理=11, 系統配置=12）
-    private static final String V_MENU_SEED = "core:menu-seed-v21";
+    // v22: OA中心子菜单排序修正：流程中心=1, 流程事項=2, 流程配置=3
+    // v23: 物資管理 4 個子菜單（asset-add/claim/transfer/return）合併到「資產台賬」作為其行/頂部操作；
+    //      自動清理已被合併的孤立菜單 + 對齊子菜單排序與圖標
+    // v24: EAM 完整菜單樹（19 個子菜單：看板/台賬/基礎數據/採購/領用/歸還/調撥/維修/賠付/報廢/歷史/盤點/報表）
+    // v25: 「存放位置」更名為「倉庫維護」
+    // v26: 採購申請/採購訂單菜單遷移至 OA 中心，移除物資管理下的採購菜單
+    private static final String V_MENU_SEED = "core:menu-seed-v26";
 
     @Override
     public void run(String... args) {
         // 一次性迁移按版本执行, 已执行的步骤重启时直接跳过 (启动提速);
         // 菜单种子独立版本: 菜单改动只需递增 V_MENU_SEED, 不影响其他迁移
         versionTracker.applyOnce(V_SCHEMA, this::migrateSchema);
+        // 迁移旧表数据到统一 OA 表
+        versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
+        // 迁移 AI 申请数据到统一 OA 表
+        versionTracker.applyOnce("core:oa-data-migrate-v2", this::migrateAiAccessData);
+        // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
+        versionTracker.applyOnce("core:oa-data-migrate-v3", this::fixMigratedOaData);
+        // 修复 AI 申请记录的节点名称和审批人（从 biz_workflow_config 读取）
+        versionTracker.applyOnce("core:oa-data-migrate-v5", this::fixAiAccessOaData);
         versionTracker.applyOnce(V_MENU_SEED, () -> {
             seedSystemMenus();
             seedMenuEnglishNames();
@@ -80,11 +95,17 @@ public class DataInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce("core:fin-batch-uk-v1", this::fixFinBatchUniqueKey);
         versionTracker.applyOnce("core:builtin-accounts-v1", this::migrateBuiltinAccounts);
+        // v24b: 恢復被 v23 清理邏輯誤刪的 asset-claim / asset-return 菜單
+        versionTracker.applyOnce("core:eam-restore-v1", this::restoreEamClaimReturnMenus);
+        // v24c: 移除「統計報表」菜單（已與「資產看板」合併）
+        versionTracker.applyOnce("core:eam-remove-report-v1", this::removeAssetReportMenu);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
         migrateDeptCodeToBM();
         resetPasswordIfNeeded("MF00001", "111222");
         ensureDeptAdSalesPermission();
+        ensureAssetManagementMenu();
+        fixAssetMenuGrouping();
         // 同步产品版本号到 sys_config (每次启动保持与代码一致)
         syncProductVersion();
     }
@@ -421,6 +442,13 @@ public class DataInitializer implements CommandLineRunner {
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
 
         log.info("AI 供应商与模型种子数据插入完成 (幂等)");
+
+        // 清理开发环境占位符 API Key（sk-test_* 等测试密钥不应被视为真实对接）
+        int cleaned = jdbcTemplate.update(
+            "UPDATE ai_provider SET api_key = NULL WHERE api_key LIKE 'sk-test_%' OR api_key LIKE '%placeholder%' OR api_key LIKE '%test_%key%'");
+        if (cleaned > 0) {
+            log.info("已清理 {} 个供应商的占位符 API Key", cleaned);
+        }
     }
 
     /** 消费风控登记制: biz_fin_risk_config 新增 status 列 (表存在时才迁移, 与 66_fin_risk_config_status.sql 等效) */
@@ -771,16 +799,56 @@ public class DataInitializer implements CommandLineRunner {
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'SolutionOutlined' WHERE menu_key = 'oa-center' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'FileTextOutlined' WHERE menu_key = 'oa-requests' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'AppstoreOutlined' WHERE menu_key = 'process-center' AND (icon IS NULL OR icon = '')");
-        // v21: 对齐开发环境顶级菜单顺序（智能中心AI=7, 團購管理=8, OA中心=10, 權限管理=11, 系統配置=12）
+        // v21: 对齐开发环境顶级菜单顺序（智能中心AI=7, 團購管理=8, 集團人事=9, 物資管理=10, OA中心=11, 權限管理=12, 系統配置=13）
         // 生产库曾由 71_fix_menu_tree_structure.sql 将 group-purchase 设为 7 且 seedSystemMenus 不覆盖已有排序，需强制纠正
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 7 WHERE menu_key = 'ai-assistant' AND sort_order != 7");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 8 WHERE menu_key = 'group-purchase' AND sort_order != 8");
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 10 WHERE menu_key = 'oa-center' AND sort_order != 10");
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'permission' AND sort_order != 11");
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'system-config' AND sort_order != 12");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 9 WHERE menu_key = 'hr' AND sort_order != 9");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 10 WHERE menu_key = 'asset-management' AND sort_order != 10");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'oa-center' AND sort_order != 11");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'permission' AND sort_order != 12");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 13 WHERE menu_key = 'system-config' AND sort_order != 13");
+        // v22: OA中心子菜单排序修正（107 SQL 曾将 process-center 插入为 sort=2，导致流程事項排在流程中心前面）
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 1 WHERE menu_key = 'process-center' AND sort_order != 1");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'oa-requests' AND sort_order != 2");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE menu_key = 'workflow-config' AND sort_order != 3");
         // 图标统一（无条件覆盖，前端 Sidebar 图标颜色由 CSS nth-child 按位置着色，顺序正确后颜色自然对齐）
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'RobotOutlined' WHERE menu_key = 'ai-assistant'");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingFilled' WHERE menu_key = 'group-purchase'");
+        // v23/v24: 物資管理菜單圖標（分組 + 子菜單）
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'InboxOutlined'     WHERE menu_key = 'asset-management' AND (icon IS NULL OR icon = '')");
+        // 分組圖標
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingCartOutlined' WHERE menu_key = 'asset-purchase' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'SwapOutlined'       WHERE menu_key = 'asset-flow-ops' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ToolOutlined'       WHERE menu_key = 'asset-maintenance' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'SettingOutlined'    WHERE menu_key = 'asset-basic' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'DashboardOutlined'  WHERE menu_key = 'asset-dashboard'  AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'AppstoreOutlined'  WHERE menu_key = 'asset-list'      AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'TagsOutlined'      WHERE menu_key = 'asset-category'  AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'BarcodeOutlined'   WHERE menu_key = 'asset-model'     AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'EnvironmentOutlined' WHERE menu_key = 'asset-location' AND (icon IS NULL OR icon = '')");
+
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ImportOutlined'    WHERE menu_key = 'asset-inbound'   AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'UserAddOutlined'    WHERE menu_key = 'asset-claim'     AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ScheduleOutlined'   WHERE menu_key = 'asset-borrow'    AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'RollbackOutlined'   WHERE menu_key = 'asset-return'    AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'SwapOutlined'      WHERE menu_key = 'asset-transfer-list' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'TeamOutlined'      WHERE menu_key = 'asset-handover'   AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ToolOutlined'      WHERE menu_key = 'asset-repair'    AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'DollarOutlined'    WHERE menu_key = 'asset-compensation' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'DeleteOutlined'    WHERE menu_key = 'asset-scrap'     AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'HistoryOutlined'   WHERE menu_key = 'asset-flow'      AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'AuditOutlined'     WHERE menu_key = 'asset-inventory' AND (icon IS NULL OR icon = '')");
+        // v24c: 移除「統計報表」菜單（已與「資產看板」合併）
+        jdbcTemplate.update("DELETE FROM sys_role_menu       WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key = 'asset-report')");
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key = 'asset-report')");
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key = 'asset-report' AND deleted = 0");
+        // v24: 清理已合併的孤立子菜單（僅 asset-add / asset-transfer，asset-claim / asset-return 為 v24 獨立頁面）
+        jdbcTemplate.update("DELETE FROM sys_role_menu       WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key IN ('asset-add','asset-transfer'))");
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key IN ('asset-add','asset-transfer'))");
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key IN ('asset-add','asset-transfer') AND deleted = 0");
+        // v24b: 恢復被 v23 清理邏輯誤刪的 asset-claim / asset-return
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 0, updated_by = 'system' WHERE menu_key IN ('asset-claim','asset-return') AND deleted = 1");
     }
 
     /** 角色-菜单权限关联表: 不存在则创建, 存在则补充 actions 列, 并迁移旧 JSON 权限 */
@@ -923,6 +991,19 @@ public class DataInitializer implements CommandLineRunner {
 
     /** 种子系统菜单：确保前端定义的所有菜单在 sys_menu 中存在 (幂等) */
     private void seedSystemMenus() {
+        // v26: 採購申請/採購訂單菜單已遷移至 OA 中心，清理物資管理下的採購菜單
+        log.info("开始清理采购申请/采购订单菜单...");
+        jdbcTemplate.update("DELETE FROM sys_role_menu       WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key IN ('purchase-request','purchase-order'))");
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key IN ('purchase-request','purchase-order'))");
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key IN ('purchase-request','purchase-order') AND deleted = 0");
+
+        // 清理 merchant-order-manage 占位菜单（前端 keyToPath 有定义但种子数据遗漏，
+        // resolveMenuId 会自动创建 parent_id=NULL 的占位记录，导致菜单树出现孤儿节点）
+        log.info("开始清理 merchant-order-manage 占位菜单...");
+        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key = 'merchant-order-manage')");
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key = 'merchant-order-manage')");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = 'merchant-order-manage'");
+
         // 清理旧的 AI 菜单占位数据（为新的层级结构做准备）
         log.info("开始清理旧的 AI 菜单占位数据...");
         jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE '%ai%')");
@@ -941,9 +1022,10 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
         menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
         menus.put("hr",                  new String[]{"集團人事",          null,  "9"});
-        menus.put("oa-center",           new String[]{"OA中心",            null,  "10"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "11"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "12"});
+        menus.put("asset-management",    new String[]{"物資管理",          null,  "10"});
+        menus.put("oa-center",           new String[]{"OA中心",            null,  "11"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "12"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "13"});
         // ── 商戶集團管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
@@ -955,8 +1037,9 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("gift-manage",         new String[]{"贈送管理",         "merchant_promotion", "5"});
         menus.put("ad-sales",            new String[]{"廣告銷售",         "merchant_promotion", "6"});
         menus.put("promotion-word-library", new String[]{"詞庫管理",     "merchant_promotion", "7"});
+        menus.put("merchant-order-manage",  new String[]{"訂單管理",     "merchant_promotion", "8"});
         // ── 商家推廣工具 > 流量沙盤 ──
-        menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "8"});
+        menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "9"});
         menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "1"});
         menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "2"});
         menus.put("merchant-score-insight",   new String[]{"商家評分透視", "traffic-sandbox",    "3"});
@@ -1031,9 +1114,37 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("organization-management", new String[]{"組織管理",     "hr",                 "2"});
         menus.put("position-management", new String[]{"職位管理",         "hr",                 "3"});
         menus.put("login-log",           new String[]{"員工動態",         "hr",                 "4"});
+        // ── 物資管理（EAM 分組子菜單）──
+        // 二級直達菜單（無分組）
+        menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
+        // 二級分組
+        menus.put("asset-purchase",    new String[]{"採購入庫",         "asset-management",   "2"});
+        menus.put("asset-flow-ops",    new String[]{"資產流轉",         "asset-management",   "3"});
+        menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "4"});
+        menus.put("asset-basic",       new String[]{"基礎設置",         "asset-management",   "5"});
+        // 三級菜單 → 採購入庫
+        menus.put("purchase-order",     new String[]{"採購訂單",         "asset-purchase",     "1"});
+        menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
+        // 三級菜單 → 資產流轉
+        menus.put("asset-list",         new String[]{"資產台賬",         "asset-flow-ops",     "1"});
+        menus.put("asset-claim",        new String[]{"領用管理",         "asset-flow-ops",     "2"});
+        menus.put("asset-borrow",       new String[]{"借用管理",         "asset-flow-ops",     "3"});
+        menus.put("asset-return",       new String[]{"歸還管理",         "asset-flow-ops",     "4"});
+        menus.put("asset-transfer-list",new String[]{"調撥管理",         "asset-flow-ops",     "5"});
+        menus.put("asset-handover",     new String[]{"交接管理",         "asset-flow-ops",     "6"});
+        // 三級菜單 → 維護與處置
+        menus.put("asset-repair",       new String[]{"維修管理",         "asset-maintenance",  "1"});
+        menus.put("asset-compensation", new String[]{"損壞賠付",         "asset-maintenance",  "2"});
+        menus.put("asset-scrap",        new String[]{"資產報廢",         "asset-maintenance",  "3"});
+        menus.put("asset-inventory",    new String[]{"資產盤點",         "asset-maintenance",  "4"});
+        menus.put("asset-flow",         new String[]{"變更歷史",         "asset-maintenance",  "5"});
+        // 三級菜單 → 基礎設置
+        menus.put("asset-category",     new String[]{"資產分類",         "asset-basic",        "1"});
+        menus.put("asset-model",        new String[]{"資產型號",         "asset-basic",        "2"});
+        menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
         // ── OA中心 ──
         menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
-        menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
+        menus.put("oa-requests",        new String[]{"流程中心",         "oa-center",         "2"});
         menus.put("workflow-config",     new String[]{"流程配置",         "oa-center",         "3"});
         // ── 權限管理 ──
         menus.put("role-management",     new String[]{"角色管理",         "permission",         "1"});
@@ -1134,6 +1245,127 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
+     * 确保「物資管理」一级菜单及其子菜单在数据库中存在（幂等）。
+     * 防止 seedSystemMenus 版本已固化但数据库被回滚/手动删除导致菜单丢失。
+     */
+    private void ensureAssetManagementMenu() {
+        if (queryMenuIdByKey("asset-management") != null) {
+            return;
+        }
+        log.info("检测到物资管理菜单缺失，开始重建...");
+        // 一级菜单：物資管理
+        jdbcTemplate.update(
+                "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, actions, status, updated_by, deleted) "
+                        + "VALUES (NULL, 'asset-management', '物資管理', 'InboxOutlined', 1, 10, '[\"view\"]', 1, 'system', 0)");
+        Long parentId = queryMenuIdByKey("asset-management");
+        if (parentId == null) return;
+        // 二级子菜单
+        String[][] children = {
+                {"asset-list",      "資產台賬",   "AppstoreOutlined",    "1"},
+                {"asset-add",       "資產入庫",   "AppstoreAddOutlined", "2"},
+                {"asset-claim",     "資產領用",   "UserAddOutlined",     "3"},
+                {"asset-transfer",  "資產轉移",   "SwapOutlined",        "4"},
+                {"asset-return",    "資產歸還",   "RollbackOutlined",    "5"},
+                {"asset-scrap",     "資產報廢",   "DeleteOutlined",      "6"},
+                {"asset-repair",    "資產維修",   "ToolOutlined",        "7"},
+                {"asset-inventory", "資產盤點",   "AuditOutlined",       "8"},
+        };
+        String actions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
+        for (String[] child : children) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, path, component, icon, type, sort_order, actions, status, updated_by, deleted) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, 2, ?, ?, 1, 'system', 0)",
+                    parentId, child[0], child[1], "/" + child[0], child[0], child[2],
+                    Integer.parseInt(child[3]), actions);
+        }
+        // 为 admin 角色补齐授权
+        Long adminRoleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
+        if (adminRoleId != null) {
+            String adminActions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
+            jdbcTemplate.update(
+                    "INSERT INTO sys_role_menu (role_id, menu_id, actions) "
+                            + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = 'asset-management' AND m.deleted = 0 "
+                            + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
+                    adminRoleId, adminActions);
+            for (String[] child : children) {
+                jdbcTemplate.update(
+                        "INSERT INTO sys_role_menu (role_id, menu_id, actions) "
+                                + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = ? AND m.deleted = 0 "
+                                + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
+                        adminRoleId, adminActions, child[0]);
+            }
+        }
+        log.info("物资管理菜单重建完成");
+    }
+
+    /**
+     * 物資管理菜單分組重構強制修正（幂等，每次启动确保结构正确）
+     * 1. 删除旧 asset-overview 分组
+     * 2. 资产看板改为直达二级菜单
+     * 3. 分组排序: 采购入库(2) → 资产流转(3) → 维护与处置(4) → 基础设置(5)
+     * 4. 确保采购订单存在并挂在采购入库下
+     */
+    private void fixAssetMenuGrouping() {
+        Long assetMgrId = queryMenuIdByKey("asset-management");
+        if (assetMgrId == null) return;
+
+        // 1. 软删除旧的 asset-overview 分组
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key = 'asset-overview' AND deleted = 0");
+
+        // 2. 資產看板改為直達二級菜單（parent 指向 asset-management，sort=1）
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET parent_id = ?, sort_order = 1 WHERE menu_key = 'asset-dashboard' AND deleted = 0",
+                assetMgrId);
+
+        // 3. 分組排序修正
+        Long purchaseId = queryMenuIdByKey("asset-purchase");
+        Long flowOpsId  = queryMenuIdByKey("asset-flow-ops");
+        Long maintId     = queryMenuIdByKey("asset-maintenance");
+        Long basicId     = queryMenuIdByKey("asset-basic");
+        if (purchaseId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE id = ?", purchaseId);
+        if (flowOpsId  != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE id = ?", flowOpsId);
+        if (maintId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE id = ?", maintId);
+        if (basicId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE id = ?", basicId);
+
+        // 4. 確保採購訂單存在並掛在採購入庫下
+        if (purchaseId != null) {
+            // 使用 ON DUPLICATE KEY UPDATE 兼容已存在但 deleted=1 的旧记录
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, icon, status, deleted, updated_by) "
+                            + "VALUES (?, 'purchase-order', '採購訂單', 2, 1, 'FileDoneOutlined', 1, 0, 'system') "
+                            + "ON DUPLICATE KEY UPDATE parent_id = VALUES(parent_id), deleted = 0, sort_order = 1, updated_by = 'system'",
+                    purchaseId);
+            // 给 admin 角色授权
+            Long adminRoleId2 = jdbcTemplate.queryForObject(
+                    "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
+            if (adminRoleId2 != null) {
+                Long poMenuId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM sys_menu WHERE menu_key = 'purchase-order' LIMIT 1", Long.class);
+                if (poMenuId != null) {
+                    jdbcTemplate.update(
+                            "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                            adminRoleId2, poMenuId, "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]");
+                }
+            }
+            // 验收入库排序=2
+            jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'asset-inbound' AND deleted = 0 AND parent_id = ?", purchaseId);
+        }
+
+        // 5. 确保 asset-dashboard 的 admin 授权
+        Long adminRoleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
+        if (adminRoleId != null) {
+            Long dashId = queryMenuIdByKey("asset-dashboard");
+            if (dashId != null) {
+                jdbcTemplate.update(
+                        "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                        adminRoleId, dashId, "[\"view\"]");
+            }
+        }
+    }
+
+    /**
      * 确保 admin 角色持有全部种子菜单权限（幂等）。
      * 使用 ON DUPLICATE KEY UPDATE + CASE 仅回填 actions 为空的旧授权，
      * 不覆盖已有的非空 actions（保留角色管理页面的自定义配置）。
@@ -1222,7 +1454,7 @@ public class DataInitializer implements CommandLineRunner {
             + "UNIQUE KEY uk_oa_process_code (process_code)"
             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OA流程定义表'");
 
-        // 2. 流程实例表
+        // 2. 流程实例表（统一存储所有审批数据：财务/赠送/AI/OA）
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS biz_oa_request ("
             + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',"
@@ -1233,18 +1465,48 @@ public class DataInitializer implements CommandLineRunner {
             + "applicant VARCHAR(64) NOT NULL COMMENT '申请人',"
             + "flow_status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected/cancelled',"
             + "current_node_name VARCHAR(64) DEFAULT NULL COMMENT '当前待审节点名称',"
+            + "current_approver VARCHAR(64) DEFAULT NULL COMMENT '当前审批人',"
             + "reject_reason VARCHAR(500) DEFAULT NULL COMMENT '驳回理由',"
             + "apply_time DATETIME DEFAULT NULL COMMENT '申请时间',"
             + "complete_time DATETIME DEFAULT NULL COMMENT '完成时间',"
             + "cancel_time DATETIME DEFAULT NULL COMMENT '撤销时间',"
+            // 审批中心专用字段
+            + "group_id VARCHAR(32) DEFAULT NULL COMMENT '集团ID',"
+            + "group_name VARCHAR(64) DEFAULT NULL COMMENT '集团名称',"
+            + "brand VARCHAR(16) DEFAULT NULL COMMENT '品牌: 1=闪蜂 2=mFood',"
+            + "biz_approver VARCHAR(64) DEFAULT NULL COMMENT '业务主管-审批人',"
+            + "biz_approve_time DATETIME DEFAULT NULL COMMENT '业务主管-审批时间',"
+            + "biz_approve_status VARCHAR(16) DEFAULT NULL COMMENT '业务主管-审批状态: pending/approved/rejected',"
+            + "ops_approver VARCHAR(64) DEFAULT NULL COMMENT '运营主管-审批人',"
+            + "ops_approve_time DATETIME DEFAULT NULL COMMENT '运营主管-审批时间',"
+            + "ops_approve_status VARCHAR(16) DEFAULT NULL COMMENT '运营主管-审批状态: pending/approved/rejected',"
+            + "fin_approver VARCHAR(64) DEFAULT NULL COMMENT '财务主管-审批人',"
+            + "fin_approve_time DATETIME DEFAULT NULL COMMENT '财务主管-审批时间',"
+            + "fin_approve_status VARCHAR(16) DEFAULT NULL COMMENT '财务主管-审批状态: pending/approved/rejected',"
             + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',"
             + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',"
             + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',"
             + "UNIQUE KEY uk_oa_request_flow_no (flow_no),"
             + "KEY idx_oa_request_applicant (applicant),"
             + "KEY idx_oa_request_status (flow_status),"
-            + "KEY idx_oa_request_process (process_code)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OA流程实例表'");
+            + "KEY idx_oa_request_process (process_code),"
+            + "KEY idx_oa_request_group (group_id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OA流程实例表（统一审批数据）'");
+
+        // 2.1 为已存在的 biz_oa_request 表补列（幂等：忽略已存在的列）
+        addColumnIfNotExists("biz_oa_request", "current_approver", "VARCHAR(64) DEFAULT NULL COMMENT '当前审批人' AFTER current_node_name");
+        addColumnIfNotExists("biz_oa_request", "group_id", "VARCHAR(32) DEFAULT NULL COMMENT '集团ID' AFTER cancel_time");
+        addColumnIfNotExists("biz_oa_request", "group_name", "VARCHAR(64) DEFAULT NULL COMMENT '集团名称' AFTER group_id");
+        addColumnIfNotExists("biz_oa_request", "brand", "VARCHAR(16) DEFAULT NULL COMMENT '品牌: 1=闪蜂 2=mFood' AFTER group_name");
+        addColumnIfNotExists("biz_oa_request", "biz_approver", "VARCHAR(64) DEFAULT NULL COMMENT '业务主管-审批人' AFTER brand");
+        addColumnIfNotExists("biz_oa_request", "biz_approve_time", "DATETIME DEFAULT NULL COMMENT '业务主管-审批时间' AFTER biz_approver");
+        addColumnIfNotExists("biz_oa_request", "biz_approve_status", "VARCHAR(16) DEFAULT NULL COMMENT '业务主管-审批状态' AFTER biz_approve_time");
+        addColumnIfNotExists("biz_oa_request", "ops_approver", "VARCHAR(64) DEFAULT NULL COMMENT '运营主管-审批人' AFTER biz_approve_status");
+        addColumnIfNotExists("biz_oa_request", "ops_approve_time", "DATETIME DEFAULT NULL COMMENT '运营主管-审批时间' AFTER ops_approver");
+        addColumnIfNotExists("biz_oa_request", "ops_approve_status", "VARCHAR(16) DEFAULT NULL COMMENT '运营主管-审批状态' AFTER ops_approve_time");
+        addColumnIfNotExists("biz_oa_request", "fin_approver", "VARCHAR(64) DEFAULT NULL COMMENT '财务主管-审批人' AFTER ops_approve_status");
+        addColumnIfNotExists("biz_oa_request", "fin_approve_time", "DATETIME DEFAULT NULL COMMENT '财务主管-审批时间' AFTER fin_approver");
+        addColumnIfNotExists("biz_oa_request", "fin_approve_status", "VARCHAR(16) DEFAULT NULL COMMENT '财务主管-审批状态' AFTER fin_approve_time");
 
         // 3. 审批任务表
         jdbcTemplate.execute(
@@ -1287,6 +1549,24 @@ public class DataInitializer implements CommandLineRunner {
         log.info("OA中心表及种子数据已就绪");
     }
 
+    /**
+     * 幂等补列：若表不存在该列则执行 ALTER TABLE ADD COLUMN
+     */
+    private void addColumnIfNotExists(String table, String column, String columnDef) {
+        try {
+            // 查询列是否存在
+            var rs = jdbcTemplate.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                table, column);
+            if (rs.isEmpty()) {
+                jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + columnDef);
+                log.info("已为表 {} 添加列 {}", table, column);
+            }
+        } catch (Exception e) {
+            log.warn("补列 {} 失败: {}", column, e.getMessage());
+        }
+    }
+
     /** 若密码非合法 BCrypt 值(如 SQL 占位符), 则重置为默认密码的加密值 */
     private void resetPasswordIfNeeded(String username, String rawPassword) {
         SysUser user = sysUserMapper.selectOne(
@@ -1302,4 +1582,401 @@ public class DataInitializer implements CommandLineRunner {
             log.info("已初始化用户 [{}] 的默认密码", username);
         }
     }
+
+    /**
+     * 迁移旧表数据到统一 OA 表
+     * 将 biz_fin_approval 数据复制到 biz_oa_request
+     */
+    private void migrateOaData() {
+        try {
+            // 检查 biz_fin_approval 表是否存在
+            var tableCheck = jdbcTemplate.queryForList(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_fin_approval'");
+            if (tableCheck.isEmpty()) {
+                log.info("biz_fin_approval 表不存在，跳过数据迁移");
+                return;
+            }
+
+            // 检查是否已有数据（幂等）
+            var count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_oa_request WHERE process_code IN ('recharge', 'transfer', 'deduct', 'merge')",
+                Long.class);
+            if (count != null && count > 0) {
+                log.info("biz_oa_request 已有财务审批数据，跳过迁移");
+                return;
+            }
+
+            // 迁移 biz_fin_approval 数据
+            String insertSql = "INSERT INTO biz_oa_request (" +
+                "flow_no, process_code, title, applicant, flow_status, " +
+                "current_node_name, current_approver, reject_reason, " +
+                "apply_time, complete_time, cancel_time, " +
+                "group_id, group_name, brand, " +
+                "biz_approver, biz_approve_time, biz_approve_status, " +
+                "ops_approver, ops_approve_time, ops_approve_status, " +
+                "fin_approver, fin_approve_time, fin_approve_status, " +
+                "form_data, created_at, updated_at) " +
+                "SELECT " +
+                "flow_no, approval_type, " +
+                "CONCAT(CASE approval_type " +
+                "  WHEN 'recharge' THEN '充值申請' " +
+                "  WHEN 'transfer' THEN '轉賬申請' " +
+                "  WHEN 'deduct' THEN '扣款申請' " +
+                "  WHEN 'merge' THEN '合併申請' " +
+                "  ELSE approval_type END, ' ', applicant, ' ', DATE_FORMAT(apply_time, '%Y-%m-%d')), " +
+                "applicant, flow_status, " +
+                "CASE WHEN flow_status = 'pending' THEN " +
+                "  CASE WHEN biz_approve_status = 'pending' THEN 'business' " +
+                "       WHEN ops_approve_status = 'pending' THEN 'operation' " +
+                "       ELSE 'finance' END " +
+                "ELSE NULL END, " +
+                "CASE WHEN flow_status = 'pending' THEN " +
+                "  CASE WHEN biz_approve_status = 'pending' THEN biz_approver " +
+                "       WHEN ops_approve_status = 'pending' THEN ops_approver " +
+                "       ELSE fin_approver END " +
+                "ELSE NULL END, " +
+                "reject_reason, " +
+                "apply_time, " +
+                "CASE WHEN flow_status = 'approved' THEN COALESCE(fin_approve_time, ops_approve_time, biz_approve_time) ELSE NULL END, " +
+                "CASE WHEN flow_status = 'cancelled' THEN NOW() ELSE NULL END, " +
+                "group_code, group_name, brand, " +
+                "biz_approver, biz_approve_time, biz_approve_status, " +
+                "ops_approver, ops_approve_time, ops_approve_status, " +
+                "fin_approver, fin_approve_time, fin_approve_status, " +
+                "extra, created_at, updated_at " +
+                "FROM biz_fin_approval WHERE deleted = 0";
+
+            int rows = jdbcTemplate.update(insertSql);
+            log.info("已从 biz_fin_approval 迁移 {} 条数据到 biz_oa_request", rows);
+
+            // 迁移 ai_access_request 数据
+            var aiTableCheck = jdbcTemplate.queryForList(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_access_request'");
+            if (!aiTableCheck.isEmpty()) {
+                var aiCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_oa_request WHERE process_code = 'ai_access'",
+                    Long.class);
+                if (aiCount == null || aiCount == 0) {
+                    String aiInsertSql = "INSERT INTO biz_oa_request (" +
+                        "flow_no, process_code, title, applicant, flow_status, " +
+                        "current_node_name, current_approver, reject_reason, " +
+                        "apply_time, complete_time, cancel_time, " +
+                        "group_id, group_name, brand, " +
+                        "biz_approver, biz_approve_time, biz_approve_status, " +
+                        "ops_approver, ops_approve_time, ops_approve_status, " +
+                        "fin_approver, fin_approve_time, fin_approve_status, " +
+                        "form_data, created_at, updated_at) " +
+                        "SELECT " +
+                        "CONCAT('AI', LPAD(CAST(id AS CHAR), 6, '0')), 'ai_access', " +
+                        "CONCAT('AI申請 ', COALESCE(applicant_name, ''), ' ', DATE_FORMAT(created_at, '%Y-%m-%d')), " +
+                        "COALESCE(applicant_name, ''), " +
+                        "CASE WHEN status = 'approved' THEN 'approved' WHEN status = 'rejected' THEN 'rejected' ELSE 'pending' END, " +
+                        "CASE WHEN status = 'pending' THEN 'business' ELSE NULL END, " +
+                        "NULL, " +
+                        "approve_remark, " +
+                        "created_at, " +
+                        "CASE WHEN status = 'approved' THEN approved_at ELSE NULL END, " +
+                        "NULL, " +
+                        "NULL, NULL, NULL, " +
+                        "NULL, NULL, NULL, " +
+                        "NULL, NULL, NULL, " +
+                        "NULL, NULL, NULL, " +
+                        "JSON_OBJECT('request_type', request_type, 'usage_description', usage_description, " +
+                        "  'approved_models', approved_models, 'approved_quota_type', approved_quota_type, " +
+                        "  'approved_quota_value', approved_quota_value, 'approved_quota_period', approved_quota_period), " +
+                        "created_at, updated_at " +
+                        "FROM ai_access_request WHERE deleted = 0";
+                    int aiRows = jdbcTemplate.update(aiInsertSql);
+                    log.info("已从 ai_access_request 迁移 {} 条数据到 biz_oa_request", aiRows);
+                } else {
+                    log.info("biz_oa_request 已有 AI 申请数据，跳过迁移");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("OA数据迁移失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 迁移 AI 申请数据到统一 OA 表
+     */
+    private void migrateAiAccessData() {
+        try {
+            var aiTableCheck = jdbcTemplate.queryForList(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_access_request'");
+            if (aiTableCheck.isEmpty()) {
+                log.info("ai_access_request 表不存在，跳过数据迁移");
+                return;
+            }
+
+            var aiCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_oa_request WHERE process_code = 'ai_access'",
+                Long.class);
+            if (aiCount != null && aiCount > 0) {
+                log.info("biz_oa_request 已有 AI 申请数据，跳过迁移");
+                return;
+            }
+
+            String aiInsertSql = "INSERT INTO biz_oa_request (" +
+                "flow_no, process_code, title, applicant, flow_status, " +
+                "current_node_name, current_approver, reject_reason, " +
+                "apply_time, complete_time, cancel_time, " +
+                "group_id, group_name, brand, " +
+                "biz_approver, biz_approve_time, biz_approve_status, " +
+                "ops_approver, ops_approve_time, ops_approve_status, " +
+                "fin_approver, fin_approve_time, fin_approve_status, " +
+                "form_data, created_at, updated_at) " +
+                "SELECT " +
+                "CONCAT('AI', LPAD(CAST(id AS CHAR), 6, '0')), 'ai_access', " +
+                "CONCAT('AI申請 ', COALESCE(applicant_name, ''), ' ', DATE_FORMAT(created_at, '%Y-%m-%d')), " +
+                "COALESCE(applicant_name, ''), " +
+                "CASE WHEN status = 'approved' THEN 'approved' WHEN status = 'rejected' THEN 'rejected' ELSE 'pending' END, " +
+                "CASE WHEN status = 'pending' THEN 'business' ELSE NULL END, " +
+                "NULL, " +
+                "approve_remark, " +
+                "created_at, " +
+                "CASE WHEN status = 'approved' THEN approved_at ELSE NULL END, " +
+                "NULL, " +
+                "NULL, NULL, NULL, " +
+                "NULL, NULL, NULL, " +
+                "NULL, NULL, NULL, " +
+                "NULL, NULL, NULL, " +
+                "JSON_OBJECT('request_type', request_type, 'usage_description', usage_description, " +
+                "  'approved_models', approved_models, 'approved_quota_type', approved_quota_type, " +
+                "  'approved_quota_value', approved_quota_value, 'approved_quota_period', approved_quota_period), " +
+                "created_at, updated_at " +
+                "FROM ai_access_request WHERE deleted = 0";
+            int aiRows = jdbcTemplate.update(aiInsertSql);
+            log.info("已从 ai_access_request 迁移 {} 条数据到 biz_oa_request", aiRows);
+        } catch (Exception e) {
+            log.warn("AI申请数据迁移失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 修复已迁移的 biz_oa_request 数据：从 biz_fin_approval 重新同步所有字段
+     * 解决因列不存在导致的部分字段为空的问题
+     */
+    private void fixMigratedOaData() {
+        try {
+            var tableCheck = jdbcTemplate.queryForList(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_fin_approval'");
+            if (tableCheck.isEmpty()) {
+                log.info("biz_fin_approval 表不存在，跳过修复迁移");
+                return;
+            }
+
+            String updateSql = "UPDATE biz_oa_request o " +
+                "INNER JOIN biz_fin_approval f ON o.flow_no = f.flow_no " +
+                "SET o.group_id = f.group_code, " +
+                "    o.group_name = f.group_name, " +
+                "    o.brand = f.brand, " +
+                "    o.biz_approver = f.biz_approver, " +
+                "    o.biz_approve_time = f.biz_approve_time, " +
+                "    o.biz_approve_status = f.biz_approve_status, " +
+                "    o.ops_approver = f.ops_approver, " +
+                "    o.ops_approve_time = f.ops_approve_time, " +
+                "    o.ops_approve_status = f.ops_approve_status, " +
+                "    o.fin_approver = f.fin_approver, " +
+                "    o.fin_approve_time = f.fin_approve_time, " +
+                "    o.fin_approve_status = f.fin_approve_status, " +
+                "    o.reject_reason = f.reject_reason, " +
+                "    o.current_node_name = CASE WHEN f.flow_status = 'pending' THEN " +
+                "        CASE WHEN f.biz_approve_status = 'pending' THEN '業務主管審批' " +
+                "             WHEN f.ops_approve_status = 'pending' THEN '運營主管審批' " +
+                "             ELSE '財務主管審批' END " +
+                "        ELSE NULL END, " +
+                "    o.current_approver = CASE WHEN f.flow_status = 'pending' THEN " +
+                "        CASE WHEN f.biz_approve_status = 'pending' THEN f.biz_approver " +
+                "             WHEN f.ops_approve_status = 'pending' THEN f.ops_approver " +
+                "             ELSE f.fin_approver END " +
+                "        ELSE NULL END " +
+                "WHERE o.process_code IN ('recharge', 'transfer', 'deduct', 'merge')";
+
+            int rows = jdbcTemplate.update(updateSql);
+            log.info("已修复 biz_oa_request 中 {} 条财务审批记录的字段", rows);
+        } catch (Exception e) {
+            log.warn("修复迁移数据失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 修复 AI 申请记录的 current_node_name 和 current_approver
+     * 从 biz_workflow_config 读取节点配置和路由规则，更新 biz_oa_request
+     */
+    private void fixAiAccessOaData() {
+        try {
+            // 先确保 biz_workflow_config 表有 nodes_config 和 routing_rules 列
+            addColumnIfNotExists("biz_workflow_config", "nodes_config", "TEXT DEFAULT NULL COMMENT '审批节点配置JSON' AFTER description");
+            addColumnIfNotExists("biz_workflow_config", "routing_rules", "TEXT DEFAULT NULL COMMENT '路由规则JSON' AFTER nodes_config");
+
+            // 读取 AI 申请的流程配置
+            var configList = jdbcTemplate.queryForList(
+                "SELECT nodes_config, routing_rules FROM biz_workflow_config WHERE flow_type = 'ai_access'");
+            if (configList.isEmpty()) {
+                log.info("biz_workflow_config 中无 ai_access 配置，跳过修复");
+                return;
+            }
+            var config = configList.get(0);
+            String nodesConfigJson = (String) config.get("nodes_config");
+            String routingRulesJson = (String) config.get("routing_rules");
+            if (nodesConfigJson == null || routingRulesJson == null) {
+                log.info("ai_access 流程配置缺少 nodes_config 或 routing_rules，跳过修复");
+                return;
+            }
+
+            // 解析节点配置和路由规则
+            List<Map<String, Object>> nodesConfig = JsonUtils.parseMapList(nodesConfigJson);
+            List<Map<String, Object>> routingRules = JsonUtils.parseMapList(routingRulesJson);
+            if (nodesConfig.isEmpty() || routingRules.isEmpty()) {
+                log.info("ai_access 流程配置解析为空，跳过修复");
+                return;
+            }
+
+            // 获取第一条路由规则（优先级最高）的激活节点
+            Map<String, Object> firstRule = routingRules.get(0);
+            @SuppressWarnings("unchecked")
+            List<String> activatedNodeIds = (List<String>) firstRule.get("activatedNodeIds");
+            if (activatedNodeIds == null || activatedNodeIds.isEmpty()) {
+                log.info("ai_access 路由规则无激活节点，跳过修复");
+                return;
+            }
+
+            // 找到第一个激活节点的名称和审批人
+            String firstNodeId = activatedNodeIds.get(0);
+            Map<String, Object> firstNode = nodesConfig.stream()
+                .filter(n -> firstNodeId.equals(n.get("id")))
+                .findFirst().orElse(null);
+            if (firstNode == null) {
+                log.info("ai_access 未找到节点配置 id={}, 跳过修复", firstNodeId);
+                return;
+            }
+
+            String nodeName = (String) firstNode.get("name");
+            // 解析审批人
+            @SuppressWarnings("unchecked")
+            Map<String, Object> approverConfig = (Map<String, Object>) firstNode.get("approverConfig");
+            String approverName = "";
+            if (approverConfig != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> defaultSetting = (Map<String, Object>) approverConfig.get("default");
+                if (defaultSetting != null) {
+                    @SuppressWarnings("unchecked")
+                    List<String> approverIds = (List<String>) defaultSetting.get("approverIds");
+                    if (approverIds != null && !approverIds.isEmpty()) {
+                        // 查询审批人姓名
+                        String placeholders = approverIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+                        var users = jdbcTemplate.queryForList(
+                            "SELECT name FROM sys_user WHERE id IN (" + placeholders + ") AND deleted = 0",
+                            approverIds.toArray());
+                        approverName = users.stream()
+                            .map(u -> (String) u.get("name"))
+                            .filter(java.util.Objects::nonNull)
+                            .collect(java.util.stream.Collectors.joining(","));
+                    }
+                }
+            }
+
+            // 更新 biz_oa_request 中 pending 状态的 AI 申请记录
+            String updateSql = "UPDATE biz_oa_request SET current_node_name = ?, current_approver = ? " +
+                "WHERE process_code = 'ai_access' AND flow_status = 'pending'";
+            int rows = jdbcTemplate.update(updateSql, nodeName, approverName);
+            log.info("已修复 biz_oa_request 中 {} 条 AI 申请记录的节点和审批人 (node={}, approver={})", rows, nodeName, approverName);
+        } catch (Exception e) {
+            log.warn("修复 AI 申请数据失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 恢復被 v23 清理邏輯誤刪的 asset-claim / asset-return 菜單
+     * v24 中這兩個菜單已重新定義為獨立頁面（領用管理 / 歸還管理）
+     */
+    private void restoreEamClaimReturnMenus() {
+        try {
+            Long assetMgmtId = queryMenuIdByKey("asset-management");
+            if (assetMgmtId == null) {
+                log.info("物資管理父菜單不存在，跳過恢復 asset-claim/asset-return");
+                return;
+            }
+            String[][] menusToRestore = {
+                {"asset-claim",  "領用管理", "UserAddOutlined",  "9"},
+                {"asset-return", "歸還管理", "RollbackOutlined", "11"},
+            };
+            int restored = 0;
+            for (String[] menu : menusToRestore) {
+                String menuKey = menu[0];
+                String name = menu[1];
+                String icon = menu[2];
+                int sort = Integer.parseInt(menu[3]);
+                // 先檢查是否已存在（deleted=0）
+                Long existing = queryMenuIdByKey(menuKey);
+                if (existing != null) {
+                    continue; // 已存在，跳過
+                }
+                // 檢查是否有軟刪除的記錄可以恢復
+                List<Long> deletedIds = jdbcTemplate.queryForList(
+                    "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 1 LIMIT 1",
+                    Long.class, menuKey);
+                if (!deletedIds.isEmpty()) {
+                    // 恢復軟刪除的記錄
+                    jdbcTemplate.update(
+                        "UPDATE sys_menu SET deleted = 0, parent_id = ?, name = ?, icon = ?, sort_order = ?, status = 1, updated_by = 'system' WHERE id = ?",
+                        assetMgmtId, name, icon, sort, deletedIds.get(0));
+                    restored++;
+                    log.info("恢復菜單: {} (id={})", menuKey, deletedIds.get(0));
+                } else {
+                    // 全新插入
+                    jdbcTemplate.update(
+                        "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, actions, status, deleted) "
+                            + "VALUES (?, ?, ?, ?, 2, ?, '[\"view\"]', 1, 0)",
+                        assetMgmtId, menuKey, name, icon, sort);
+                    restored++;
+                    log.info("新建菜單: {}", menuKey);
+                }
+            }
+            log.info("已恢復/新建 {} 個 EAM 菜單", restored);
+        } catch (Exception e) {
+            log.warn("恢復 EAM 菜單失敗: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 移除「統計報表」菜單（已與「資產看板」合併）
+     */
+    private void removeAssetReportMenu() {
+        try {
+            Long menuId = queryMenuIdByKey("asset-report");
+            if (menuId == null) {
+                log.info("asset-report 菜單不存在，跳過移除");
+                return;
+            }
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", menuId);
+            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", menuId);
+            jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE id = ?", menuId);
+            log.info("已移除「統計報表」菜單 (id={})", menuId);
+        } catch (Exception e) {
+            log.warn("移除統計報表菜單失敗: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 清理 merchant-order-manage 占位菜单（每次启动执行）。
+     * 前端 keyToPath 有定义但种子数据遗漏，resolveMenuId 会自动创建 parent_id=NULL 的占位记录，
+     * 导致菜单树出现孤儿节点。此方法确保占位记录被彻底清除。
+     */
+    private void cleanupMerchantOrderManagePlaceholder() {
+        try {
+            Long menuId = queryMenuIdByKey("merchant-order-manage");
+            if (menuId == null) {
+                return;
+            }
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", menuId);
+            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", menuId);
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", menuId);
+            log.info("已清理 merchant-order-manage 占位菜单 (id={})", menuId);
+        } catch (Exception e) {
+            log.warn("清理 merchant-order-manage 占位菜单失败: {}", e.getMessage());
+        }
+    }
+
 }

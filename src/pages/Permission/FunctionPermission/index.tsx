@@ -52,6 +52,23 @@ const getAllMenuKeys = (modules: typeof menuPermissionTree): string[] => {
 
 const ALL_MENU_KEYS = getAllMenuKeys(menuPermissionTree)
 
+/** 获取所有非叶子节点（父节点）的 key */
+const getParentKeys = (modules: typeof menuPermissionTree): Set<string> => {
+  const parentKeys = new Set<string>()
+  const traverse = (items: typeof menuPermissionTree) => {
+    items.forEach(item => {
+      if (item.children && item.children.length > 0) {
+        parentKeys.add(item.key)
+        traverse(item.children)
+      }
+    })
+  }
+  traverse(modules)
+  return parentKeys
+}
+
+const PARENT_KEYS = getParentKeys(menuPermissionTree)
+
 /** 获取叶子节点key */
 const getLeafKeys = (modules: typeof menuPermissionTree): string[] => {
   const keys: string[] = []
@@ -493,7 +510,12 @@ export default function FunctionPermission() {
             <Tree
               checkable
               checkedKeys={checkedKeys}
-              onCheck={(keys) => setCheckedKeys(keys as string[])}
+              onCheck={(keys) => {
+                // 過濾掉父節點 key，只保留葉子節點
+                const rawKeys = Array.isArray(keys) ? keys : keys.checked
+                const leafOnly = (rawKeys as string[]).filter(key => !PARENT_KEYS.has(key))
+                setCheckedKeys(leafOnly)
+              }}
               onSelect={(keys) => {
                 if (keys.length > 0 && LEAF_KEYS.includes(keys[0] as string)) {
                   setSelectedMenuKey(keys[0] as string)

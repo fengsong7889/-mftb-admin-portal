@@ -95,6 +95,15 @@ import {
   BankOutlined,
   DollarOutlined,
   ControlOutlined,
+  // 物资管理菜单图标
+  InboxOutlined,
+  UserAddOutlined,
+  RollbackOutlined,
+  TagsOutlined,
+  BarcodeOutlined,
+  ShoppingCartOutlined,
+  FileDoneOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 
 /** 菜单可用图标注册表：图标名称 → 组件（数据库 icon 字段存储名称字符串） */
@@ -190,6 +199,15 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'BankOutlined': BankOutlined,
   'DollarOutlined': DollarOutlined,
   'ControlOutlined': ControlOutlined,
+  // 物资管理菜单图标
+  'InboxOutlined': InboxOutlined,
+  'UserAddOutlined': UserAddOutlined,
+  'RollbackOutlined': RollbackOutlined,
+  'TagsOutlined': TagsOutlined,
+  'BarcodeOutlined': BarcodeOutlined,
+  'ShoppingCartOutlined': ShoppingCartOutlined,
+  'FileDoneOutlined': FileDoneOutlined,
+  'HistoryOutlined': HistoryOutlined,
 }
 
 /** 全部可用图标名称（用于图标选择器） */

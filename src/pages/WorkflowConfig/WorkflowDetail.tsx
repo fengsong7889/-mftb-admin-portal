@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Tag, Tabs, Modal, Descriptions, Empty } from 'antd'
 import {
@@ -16,9 +16,9 @@ import {
   BRAND_CONFIG_OPTIONS,
 } from './types'
 import type { WorkflowNode, WorkflowDefinition, ApproverConfig } from './types'
-import { getApproverOptions } from './options'
+import { getApproverOptions, loadApproverOptions } from './options'
 
-/** 流程類型標籤映射（複用 APPROVAL_TYPE_OPTIONS） */
+/** 流程標籤標籤映射（複用 APPROVAL_TYPE_OPTIONS） */
 const typeLabelMap = Object.fromEntries(APPROVAL_TYPE_OPTIONS.map(o => [o.value, o.label]))
 
 /** 從 approverConfig 獲取展示文本 */
@@ -63,6 +63,9 @@ export default function WorkflowDetail() {
   const { getWorkflow } = useWorkflowConfig()
   const workflow: WorkflowDefinition | undefined = getWorkflow(id || '')
 
+  /* 加載選項（用於解析審批人標籤） */
+  useEffect(() => { loadApproverOptions() }, [])
+
   const [activeTab, setActiveTab] = useState('config')
   const [viewNode, setViewNode] = useState<WorkflowNode | null>(null)
   if (!workflow) {
@@ -96,7 +99,7 @@ export default function WorkflowDetail() {
           <Descriptions.Item label="流程名稱">
             <span style={{ fontWeight: 600 }}>{workflow.name}</span>
           </Descriptions.Item>
-          <Descriptions.Item label="流程類型">
+          <Descriptions.Item label="流程標籤">
             <Tag color={typeLabelMap[workflow.approvalType] ? '#1890FF' : undefined}>
               {typeLabelMap[workflow.approvalType] || workflow.approvalType}
             </Tag>

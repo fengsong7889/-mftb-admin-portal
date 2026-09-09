@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Form, Input, Select, Radio, InputNumber, Button, Tag, message, Popconfirm } from 'antd'
 import {
@@ -23,7 +23,8 @@ import {
   BRAND_CONFIG_OPTIONS,
 } from './types'
 import type { WorkflowNode, WorkflowDefinition, ApproverConfig, RoutingRule } from './types'
-import { getApproverOptions } from './options'
+import { getApproverOptions, loadApproverOptions } from './options'
+import { saveWorkflowConfig } from '../../api/workflowConfig'
 import ApproverConfigModal from './ApproverConfigModal'
 import RoutingRuleConfigModal from './RoutingRuleConfigModal'
 
@@ -32,6 +33,9 @@ export default function WorkflowEditor() {
   const { id } = useParams<{ id: string }>()
   const isNew = id === 'new'
   const { getWorkflow, addWorkflow, updateWorkflow } = useWorkflowConfig()
+
+  /* 加載選項（用於審批人下拉） */
+  useEffect(() => { loadApproverOptions() }, [])
 
   const existing = isNew ? undefined : getWorkflow(id || '')
 
@@ -163,13 +167,13 @@ export default function WorkflowEditor() {
   }, [])
 
   /* 保存 */
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       message.warning('請輸入流程名稱')
       return
     }
     if (!approvalType) {
-      message.warning('請選擇流程類型')
+      message.warning('請選擇流程標籤')
       return
     }
     if (nodes.length === 0) {
@@ -210,11 +214,23 @@ export default function WorkflowEditor() {
     }
 
     if (isNew) {
-      addWorkflow({ ...base, workflowKey: `wf_${Date.now()}` } as WorkflowDefinition)
+      const wfId = addWorkflow({ ...base, workflowKey: `wf_${Date.now()}` } as WorkflowDefinition)
       message.success('流程已創建')
+      // 同步到後端
+      try {
+        await saveWorkflowConfig(approvalType, JSON.stringify(nodes), JSON.stringify(routingRules))
+      } catch (err) {
+        console.warn('[WorkflowEditor] 後端同步失敗:', err)
+      }
     } else {
       updateWorkflow(id || '', base)
       message.success('流程已保存')
+      // 同步到後端
+      try {
+        await saveWorkflowConfig(approvalType, JSON.stringify(nodes), JSON.stringify(routingRules))
+      } catch (err) {
+        console.warn('[WorkflowEditor] 後端同步失敗:', err)
+      }
     }
     navigate('/workflow-config')
   }
@@ -274,9 +290,9 @@ export default function WorkflowEditor() {
             <Form.Item label="流程名稱" required>
               <Input value={name} onChange={e => setName(e.target.value)} placeholder="如：充值審批" maxLength={30} />
             </Form.Item>
-            <Form.Item label="流程類型" required>
+            <Form.Item label="流程標籤" required>
               <Select value={approvalType} onChange={v => setApprovalType(v)}
-                placeholder="選擇流程類型" options={APPROVAL_TYPE_OPTIONS}
+                placeholder="選擇流程標籤" options={APPROVAL_TYPE_OPTIONS}
                 disabled={!isNew && !!existing} />
             </Form.Item>
           </div>

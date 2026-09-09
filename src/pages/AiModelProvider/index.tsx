@@ -20,6 +20,9 @@ export default function AiModelProvider() {
   const [queryName, setQueryName] = useState('')
   const [queryStatus, setQueryStatus] = useState<string | undefined>(undefined)
   const [tick, setTick] = useState(0)
+  
+  /* ─ 搜索表單實例 ── */
+  const [searchForm] = Form.useForm()
 
   /* ── 加載數據 ── */
   const loadProviders = async () => {
@@ -253,11 +256,11 @@ export default function AiModelProvider() {
 
       {/* 查詢區域 */}
       <div className="search-section">
-        <Form layout="inline">
-          <Form.Item label="供應商名稱">
+        <Form form={searchForm} layout="inline">
+          <Form.Item label="供應商名稱" name="name">
             <Input value={queryName} placeholder="請輸入供應商名稱" allowClear onChange={(e) => setQueryName(e.target.value)} />
           </Form.Item>
-          <Form.Item label="狀態">
+          <Form.Item label="狀態" name="status">
             <Select
               value={queryStatus}
               placeholder="全部"
@@ -275,8 +278,11 @@ export default function AiModelProvider() {
         </Form>
       </div>
 
-      {/* 操作區：右側新增 + 列配置 */}
+      {/* 操作區：左側無按鈕 + 右側新增 + 列配置 */}
       <div className="action-section">
+        <div className="action-section-left">
+          {/* 預留左側容器，保持標準結構 */}
+        </div>
         <div className="action-section-right">
           <Button 
             type="primary" 
@@ -296,6 +302,7 @@ export default function AiModelProvider() {
         columns={applyConfig(columns)}
         dataSource={filteredProviders}
         pagination={false}
+        scroll={{ x: 1200 }}
       />
 
       {/* 供應商編輯彈窗 */}

@@ -96,12 +96,13 @@ export default function WorkflowConfig() {
 
   /* 業務類型標籤映射 */
   const typeLabelMap: Record<string, { label: string; color: string }> = {
-    recharge: { label: '充值', color: '#1890FF' },
+    recharge: { label: '充值', color: '#52C41A' },
     transfer: { label: '轉賬', color: '#13C2C2' },
     deduct: { label: '扣款', color: '#FF4D4F' },
     merge: { label: '合併', color: '#FA8C16' },
     gift: { label: '贈送', color: '#722ED1' },
     ai_access: { label: 'AI申請', color: '#1677FF' },
+    oa_purchase: { label: '採購', color: '#FA8C16' },
   }
 
   const columns: ColumnsType<WorkflowDefinition> = [
@@ -115,7 +116,7 @@ export default function WorkflowConfig() {
       ),
     },
     {
-      title: '流程類型',
+      title: '流程標籤',
       dataIndex: 'approvalType',
       key: 'approvalType',
       width: 110,
@@ -213,7 +214,7 @@ export default function WorkflowConfig() {
               onPressEnter={handleSearch}
             />
           </Form.Item>
-          <Form.Item label="流程類型">
+          <Form.Item label="流程標籤">
             <Select
               placeholder="全部"
               allowClear

@@ -94,7 +94,7 @@ export interface WorkflowDefinition {
   id: string
   /** 唯一標識，如 'recharge', 'gift' */
   workflowKey: string
-  /** 顯示名稱，如 '充值審批' */
+  /** 顯示名稱，如 '充值申請' */
   name: string
   /** 關聯業務類型 */
   approvalType: string
@@ -195,7 +195,7 @@ export const CONDITION_AD_TYPE_OPTIONS = [
   { label: '人氣商家', value: 'popular' },
 ]
 
-/** 金額/天數字段按流程類型的顯示名稱 */
+/** 金額/天數字段按流程標籤的顯示名稱 */
 const AMOUNT_LABEL_MAP: Record<string, string> = {
   recharge: '虛擬賬戶充值金額',
   deduct: '扣款金額',
@@ -203,14 +203,14 @@ const AMOUNT_LABEL_MAP: Record<string, string> = {
   merge: '合併金額',
 }
 
-/** 根據流程類型返回動態的條件字段選項 */
+/** 根據流程標籤返回動態的條件字段選項 */
 export function getConditionFieldOptions(workflowType?: string) {
   if (workflowType === 'gift') return GIFT_CONDITION_FIELD_OPTIONS
   const amountLabel = (workflowType && AMOUNT_LABEL_MAP[workflowType]) || '審批金額'
   return CONDITION_FIELD_OPTIONS.map(o => o.value === 'amount' ? { ...o, label: amountLabel } : o)
 }
 
-/** 根據流程類型返回金額字段的顯示名稱 */
+/** 根據流程標籤返回金額字段的顯示名稱 */
 export function getAmountFieldLabel(workflowType?: string): string {
   if (workflowType === 'gift') return '贈送天數'
   return (workflowType && AMOUNT_LABEL_MAP[workflowType]) || '審批金額'
@@ -224,6 +224,7 @@ export const APPROVAL_TYPE_OPTIONS = [
   { label: '合併', value: 'merge' },
   { label: '贈送', value: 'gift' },
   { label: 'AI申請', value: 'ai_access' },
+  { label: '採購申請', value: 'oa_purchase' },
 ]
 
 /** 品牌選項（用於審批人按品牌配置） */

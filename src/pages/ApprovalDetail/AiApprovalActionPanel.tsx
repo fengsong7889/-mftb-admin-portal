@@ -49,19 +49,19 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
       .then((list) => {
         if (cancelled) return
         setModels(list)
-        // 申請人勾選的模型補齊默認能力配置（按模型自身能力全開）
+        // 申請人勾選的模型補齊默認能力配置（按模型自身能力全開）並加進 selectedModels
+        // （解決 fallback draft.selectedModels 為空而「授權範圍」不顯示所選模型）
         const configs = { ...draft.modelConfigs }
+        const selected = [...draft.selectedModels]
         let changed = false
         for (const id of requestedModels ?? []) {
+          if (!selected.includes(id)) { selected.push(id); changed = true }
           if (!configs[id]) {
             const m = list.find((x) => x.id === id)
-            if (m) {
-              configs[id] = modelToConfig(m)
-              changed = true
-            }
+            if (m) { configs[id] = modelToConfig(m); changed = true }
           }
         }
-        if (changed) onChange({ ...draft, modelConfigs: configs })
+        if (changed) onChange({ ...draft, selectedModels: selected, modelConfigs: configs })
       })
       .catch(() => { /* 後端不可用時保留空模型列表 */ })
     return () => { cancelled = true }

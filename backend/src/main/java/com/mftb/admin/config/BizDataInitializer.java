@@ -2,13 +2,17 @@ package com.mftb.admin.config;
 
 import com.mftb.admin.dto.StoreDataConfigDTO;
 import com.mftb.admin.service.StoreDataConfigService;
+import com.mftb.admin.util.BizSeqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 业务数据初始化器: 启动时自动创建商户集团/门店/赠送管理相关表并写入种子数据
@@ -23,13 +27,16 @@ public class BizDataInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
+    private final BizSeqService bizSeqService;
 
     /** 建表版本: 新增建表步骤时递增 minor 版本号 (格式: v{major}.{minor}) */
     private static final String V_TABLES = "biz:tables-v1";
     /** 存量迁移版本: 编号/频道等一次性存量迁移, 新增迁移时递增 minor 版本号 */
     private static final String V_LEGACY = "biz:legacy-migrate-v1";
     /** 种子数据版本: 新增/调整种子数据时递增 minor 版本号 */
-    private static final String V_SEED = "biz:seed-v1";
+    private static final String V_SEED = "biz:seed-v3";
+    /** AI 申请数据修复版本：修复 flow_no / current_node_name / current_approver */
+    private static final String V_FIX_AI = "biz:fix-ai-access-v6";
 
     @Override
     public void run(String... args) {
@@ -65,6 +72,8 @@ public class BizDataInitializer implements CommandLineRunner {
             seedOaWorkflowConfig();
             seedOaSeqRule();
         });
+        // 修复 AI 申请记录的节点名称和审批人（需在种子数据写入后执行）
+        versionTracker.applyOnce(V_FIX_AI, this::fixAiAccessOaData);
         // "活"逻辑: 新增门店需自动补齐金字招牌数据配置, 每次启动执行 (无缺失时仅 1 条查询)
         seedStoreDataConfigs();
         // 门店编码序号兜底同步, 每次启动执行 (成本极低)
@@ -816,13 +825,17 @@ public class BizDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** OA流程编号规则种子数据 */
+    /** OA/AI流程编号规则种子数据 */
     private void seedOaSeqRule() {
         int inserted = jdbcTemplate.update(
-                "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, prefix, date_format, seq_length, seq_start, status, description) "
-                        + "VALUES ('oa_request', 'OA', 'YYYYMMDD', 4, 1, 1, 'OA流程編號')");
-        if (inserted > 0) {
-            log.info("已写入OA流程编号规则");
+                "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES ('oa_request', 'OA流程編號', '審批中心', 'OA', 'YYYYMMDD', 4, 1, 1, 'OA流程編號')");
+        // AI 申请编号规则
+        int aiInserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES ('ai_access', 'AI申請流程編號', '審批中心', 'AI', 'YYYYMMDD', 4, 1, 1, 'AI申請流程編號')");
+        if (inserted > 0 || aiInserted > 0) {
+            log.info("已写入OA/AI流程编号规则");
         }
     }
 
@@ -840,6 +853,128 @@ public class BizDataInitializer implements CommandLineRunner {
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
                 Integer.class, table, column);
         return count != null && count > 0;
+    }
+
+    /**
+     * 修复 AI 申请记录的 flow_no / current_node_name / current_approver
+     * 1. 从 biz_workflow_config 读取节点配置和路由规则，更新审批节点和审批人
+     * 2. 使用 BizSeqService 按 ai_access 编号规则重新生成流程编号
+     */
+    private void fixAiAccessOaData() {
+        try {
+            // 先确保 biz_workflow_config 表有 nodes_config 和 routing_rules 列
+            if (!columnExists("biz_workflow_config", "nodes_config")) {
+                jdbcTemplate.execute("ALTER TABLE biz_workflow_config ADD COLUMN nodes_config TEXT DEFAULT NULL COMMENT '审批节点配置JSON' AFTER description");
+            }
+            if (!columnExists("biz_workflow_config", "routing_rules")) {
+                jdbcTemplate.execute("ALTER TABLE biz_workflow_config ADD COLUMN routing_rules TEXT DEFAULT NULL COMMENT '路由规则JSON' AFTER nodes_config");
+            }
+
+            // 读取 AI 申请的流程配置
+            var configList = jdbcTemplate.queryForList(
+                "SELECT nodes_config, routing_rules FROM biz_workflow_config WHERE flow_type = 'ai_access'");
+            if (configList.isEmpty()) {
+                log.info("biz_workflow_config 中无 ai_access 配置，跳过修复");
+                return;
+            }
+            var config = configList.get(0);
+            String nodesConfigJson = (String) config.get("nodes_config");
+            String routingRulesJson = (String) config.get("routing_rules");
+
+            String nodeName = null;
+            String approverName = null;
+
+            if (nodesConfigJson != null && routingRulesJson != null) {
+                // 解析节点配置和路由规则
+                List<Map<String, Object>> nodesConfig = com.mftb.admin.util.JsonUtils.parseMapList(nodesConfigJson);
+                List<Map<String, Object>> routingRules = com.mftb.admin.util.JsonUtils.parseMapList(routingRulesJson);
+
+                if (!nodesConfig.isEmpty() && !routingRules.isEmpty()) {
+                    // 获取第一条路由规则的激活节点
+                    Map<String, Object> firstRule = routingRules.get(0);
+                    @SuppressWarnings("unchecked")
+                    List<String> activatedNodeIds = (List<String>) firstRule.get("activatedNodeIds");
+
+                    if (activatedNodeIds != null && !activatedNodeIds.isEmpty()) {
+                        String firstNodeId = activatedNodeIds.get(0);
+                        Map<String, Object> firstNode = nodesConfig.stream()
+                            .filter(n -> firstNodeId.equals(n.get("id")))
+                            .findFirst().orElse(null);
+
+                        if (firstNode != null) {
+                            nodeName = (String) firstNode.get("name");
+                            // 解析审批人
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> approverConfig = (Map<String, Object>) firstNode.get("approverConfig");
+                            if (approverConfig != null) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> defaultSetting = (Map<String, Object>) approverConfig.get("default");
+                                if (defaultSetting != null) {
+                                    @SuppressWarnings("unchecked")
+                                    List<String> approverIds = (List<String>) defaultSetting.get("approverIds");
+                                    if (approverIds != null && !approverIds.isEmpty()) {
+                                        String placeholders = approverIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+                                        var users = jdbcTemplate.queryForList(
+                                            "SELECT name FROM sys_user WHERE id IN (" + placeholders + ") AND deleted = 0",
+                                            approverIds.toArray());
+                                        approverName = users.stream()
+                                            .map(u -> (String) u.get("name"))
+                                            .filter(java.util.Objects::nonNull)
+                                            .collect(java.util.stream.Collectors.joining(","));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (nodeName == null) {
+                log.info("ai_access 流程配置缺少节点信息，请先在流程配置页面配置节点和审批人");
+            }
+
+            // 查询所有 pending 的 AI 申请记录
+            var pendingRecords = jdbcTemplate.queryForList(
+                "SELECT id, flow_no, apply_time FROM biz_oa_request " +
+                "WHERE process_code = 'ai_access' AND flow_status = 'pending'");
+
+            if (pendingRecords.isEmpty()) {
+                log.info("无待修复的 AI 申请记录");
+                return;
+            }
+
+            int flowNoFixed = 0;
+            int nodeFixed = 0;
+
+            for (var record : pendingRecords) {
+                String currentFlowNo = (String) record.get("flow_no");
+                Long id = ((Number) record.get("id")).longValue();
+
+                // 用 BizSeqService 按 ai_access 规则重新生成流程编号
+                Object applyTimeObj = record.get("apply_time");
+                LocalDate applyDate = applyTimeObj != null
+                    ? ((java.time.LocalDateTime) applyTimeObj).toLocalDate()
+                    : LocalDate.now();
+                String newFlowNo = bizSeqService.next("ai_access", applyDate);
+
+                if (nodeName != null) {
+                    jdbcTemplate.update(
+                        "UPDATE biz_oa_request SET flow_no = ?, current_node_name = ?, current_approver = ? WHERE id = ?",
+                        newFlowNo, nodeName, approverName != null ? approverName : "", id);
+                    nodeFixed++;
+                } else {
+                    jdbcTemplate.update(
+                        "UPDATE biz_oa_request SET flow_no = ? WHERE id = ?",
+                        newFlowNo, id);
+                }
+                flowNoFixed++;
+            }
+
+            log.info("已修复 biz_oa_request 中 {} 条 AI 申请记录的流程编号, {} 条记录的节点和审批人 (node={}, approver={})",
+                flowNoFixed, nodeFixed, nodeName, approverName);
+        } catch (Exception e) {
+            log.warn("修复 AI 申请数据失败: {}", e.getMessage());
+        }
     }
 }
 

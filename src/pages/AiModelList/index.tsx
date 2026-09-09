@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
-import { Button, Modal, Form, Input, Select, Table, Tag, message, Switch, Tooltip, Space, DatePicker } from 'antd'
+import { Button, Modal, Form, Input, Select, Table, Tag, message, Switch, Tooltip, Space, DatePicker, Segmented } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, ToolOutlined, CodeOutlined, ThunderboltOutlined, BulbOutlined, RobotOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, ToolOutlined, CodeOutlined, ThunderboltOutlined, BulbOutlined, RobotOutlined, ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import {
   fetchModels,
   fetchProviders,
@@ -178,6 +178,18 @@ export default function AiModelList() {
     return map
   }, [providers])
 
+  /** 已配置 API Key 的供應商 ID 集合（真實對接） */
+  const connectedProviderIds = useMemo((): Set<number> => {
+    return new Set(
+      providers
+        .filter((p) => p.apiKeyMasked && p.apiKeyMasked.length > 0 && p.status === 1)
+        .map((p) => p.id),
+    )
+  }, [providers])
+
+  /** 視圖模式：已接入 / 全部 */
+  const [viewMode, setViewMode] = useState<'connected' | 'all'>('connected')
+
   /* ── 查詢條件 ── */
   const [queryName, setQueryName] = useState('')
   const [queryProvider, setQueryProvider] = useState<string | undefined>(undefined)
@@ -229,8 +241,10 @@ export default function AiModelList() {
     loadModels()
   }
 
-  /** 在已加載的模型上做客戶端過濾（供應商/更新人/更新時間） */
+  /** 在已加載的模型上做客戶端過濾（供應商/更新人/更新時間 + 接入狀態） */
   const filteredModels = useMemo(() => models.filter((m) => {
+    // 接入狀態過濾：已接入模式只展示供應商已配置 API Key 的模型
+    if (viewMode === 'connected' && m.providerId && !connectedProviderIds.has(m.providerId)) return false
     if (applied.provider && String(m.providerId) !== applied.provider) return false
     if (applied.updatedBy && !(m.updatedBy || '').includes(applied.updatedBy)) return false
     if (applied.updateDateStart && m.updatedAt) {
@@ -240,7 +254,13 @@ export default function AiModelList() {
       if (dayjs(m.updatedAt).isAfter(applied.updateDateEnd.endOf('day'))) return false
     }
     return true
-  }), [models, applied])
+  }), [models, applied, viewMode, connectedProviderIds])
+
+  /** 已接入模型數 */
+  const connectedModelCount = useMemo(
+    () => models.filter((m) => m.providerId && connectedProviderIds.has(m.providerId)).length,
+    [models, connectedProviderIds],
+  )
 
   /* ── 模型啟停（二次確認） ── */
   const handleToggleModel = async (row: AiModel) => {
@@ -315,10 +335,10 @@ export default function AiModelList() {
 
   /* ── 統計卡 ── */
   const stats = [
-    { label: '接入模型', value: <AnimatedNumber value={models.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+    { label: '已接入模型', value: <AnimatedNumber value={connectedModelCount} />, icon: <ApiOutlined />, color: '#52C41A', bg: '#F6FFED' },
+    { label: '全部模型', value: <AnimatedNumber value={models.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
     { label: '供應商數', value: <AnimatedNumber value={providers.length} />, icon: <span>🏢</span>, color: '#E8720C', bg: '#FFF7E6' },
     { label: '視覺模型', value: <AnimatedNumber value={models.filter((m) => m.visionSupport === 1).length} />, icon: <EyeOutlined />, color: '#1890FF', bg: '#E6F7FF' },
-    { label: '支持工具調用', value: <AnimatedNumber value={models.filter((m) => m.functionCalling === 1).length} />, icon: <ToolOutlined />, color: '#52C41A', bg: '#F6FFED' },
   ]
 
   /* ── 列字段配置 ── */
@@ -355,8 +375,21 @@ export default function AiModelList() {
       ),
     },
     {
-      title: '供應商', key: 'providerName', width: 140,
-      render: (_, row) => row.providerName || providerName[String(row.providerId)] || row.providerId || '-',
+      title: '供應商', key: 'providerName', width: 160,
+      render: (_, row) => {
+        const isConnected = row.providerId ? connectedProviderIds.has(row.providerId) : false
+        const name = row.providerName || providerName[String(row.providerId)] || row.providerId || '-'
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{name}</span>
+            {isConnected ? (
+              <Tooltip title="已對接"><CheckCircleOutlined style={{ color: '#52C41A', fontSize: 12 }} /></Tooltip>
+            ) : (
+              <Tooltip title="未對接"><CloseCircleOutlined style={{ color: '#D9D9D9', fontSize: 12 }} /></Tooltip>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: '類型', key: 'type', width: 110, align: 'center',
@@ -497,8 +530,18 @@ export default function AiModelList() {
         ))}
       </div>
 
-      {/* 操作區：右側新增 + 列配置 */}
+      {/* 操作區：左側接入切換 + 右側新增/列配置 */}
       <div className="action-section">
+        <div className="action-section-left">
+          <Segmented
+            value={viewMode}
+            onChange={(v) => setViewMode(v as 'connected' | 'all')}
+            options={[
+              { label: `已接入（${connectedModelCount}）`, value: 'connected' },
+              { label: `全部（${models.length}）`, value: 'all' },
+            ]}
+          />
+        </div>
         <div className="action-section-right">
           <Button
             type="primary"

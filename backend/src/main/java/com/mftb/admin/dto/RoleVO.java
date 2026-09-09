@@ -13,6 +13,8 @@ public class RoleVO {
 
     private Long id;
     private String name;
+    /** 角色编码（用于审批人解析匹配 sys_user.function_roles） */
+    private String code;
     private String description;
     private Integer status;
     private List<MenuPermissionDTO> permissions;

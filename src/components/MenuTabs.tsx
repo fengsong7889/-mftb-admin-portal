@@ -82,6 +82,7 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
       transfer: 'i18n:approvalDetail.typeTitleTransfer',
       merge: 'i18n:approvalDetail.typeTitleMerge',
       gift: 'i18n:approvalDetail.typeTitleGift',
+      ai_access: 'i18n:approvalDetail.typeTitleAiAccess',
     },
   },
   // 搜索校验（动态路由 /search-verify-detail/:id）

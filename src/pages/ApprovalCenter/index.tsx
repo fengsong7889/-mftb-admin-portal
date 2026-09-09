@@ -27,6 +27,7 @@ const approvalTypeMapKeys: Record<string, string> = {
   transfer: 'approvalCenter.typeTransfer',
   merge: 'approvalCenter.typeMerge',
   gift: 'approvalCenter.typeGift',
+  ai_access: 'approvalCenter.typeAiAccess',
 }
 
 /** 流程狀態映射（i18n key） */
@@ -46,9 +47,7 @@ interface ApprovalRecord {
   approvalType: string
   applicant: string
   applyTime: string
-  // 动态审批节点（新格式）
-  approvalNodes?: ApprovalNodeInstance[]
-  // 旧格式兼容字段（无 approvalNodes 时使用）
+  // 三级审批字段
   bizApprover?: string
   bizApproveTime?: string
   bizApproveStatus?: string
@@ -91,28 +90,36 @@ function resolveCurrentNode(r: ApprovalRecord): string {
 }
 
 /** 單條記錄是否命中當前篩選條件 */
-function matchesApprovalQuery(r: ApprovalRecord, query: FinApprovalQuery): boolean {
-  if (query.groupId && !r.groupId.includes(query.groupId)) return false
-  if (query.groupName && !r.groupName.includes(query.groupName)) return false
+function matchesApprovalQuery(r: ApprovalRecord, query: Record<string, unknown>): boolean {
+  if (query.groupId && !r.groupId.includes(query.groupId as string)) return false
+  if (query.groupName && !r.groupName.includes(query.groupName as string)) return false
   if (query.brand && r.brand !== query.brand) return false
-  if (query.approvalType && r.approvalType !== query.approvalType) return false
-  if (query.flowNo && !r.flowNo.includes(query.flowNo)) return false
+  if (query.processCode && r.approvalType !== query.processCode) return false
+  if (query.flowNo && !r.flowNo.includes(query.flowNo as string)) return false
   if (query.flowStatus && r.flowStatus !== query.flowStatus) return false
   if (query.currentNode && resolveCurrentNode(r) !== query.currentNode) return false
-  if (query.applicant && !r.applicant.includes(query.applicant)) return false
+  if (query.applicant && !r.applicant.includes(query.applicant as string)) return false
   if (query.approver) {
-    const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver!))
+    const hit = [r.bizApprover, r.opsApprover, r.finApprover].some(a => a?.includes(query.approver as string))
     if (!hit) return false
   }
-  if (query.applyFrom && r.applyTime.slice(0, 10) < query.applyFrom) return false
-  if (query.applyTo && r.applyTime.slice(0, 10) > query.applyTo) return false
+  if (query.applyFrom && r.applyTime.slice(0, 10) < (query.applyFrom as string)) return false
+  if (query.applyTo && r.applyTime.slice(0, 10) > (query.applyTo as string)) return false
   return true
 }
 
-/** 前端流程審批（贈送）：後端查詢結果需合併本地審批記錄 */
+/** 前端流程審批（贈送、AI 申請）：後端查詢結果需合併本地審批記錄 */
 function localFrontendApprovals(query: FinApprovalQuery): ApprovalRecord[] {
   return (getApprovalRecords() as ApprovalRecord[])
-    .filter(r => r.approvalType === 'gift' && matchesApprovalQuery(r, query))
+    .filter(r => (r.approvalType === 'gift' || r.approvalType === 'ai_access') && matchesApprovalQuery(r, query as unknown as Record<string, unknown>))
+}
+
+/** 流程狀態 → Tag 顏色 */
+const FLOW_STATUS_COLOR: Record<string, string> = {
+  pending: 'processing',
+  approved: 'success',
+  rejected: 'error',
+  cancelled: 'default',
 }
 
 export default function ApprovalCenter() {
@@ -129,6 +136,7 @@ export default function ApprovalCenter() {
     { label: t('approvalCenter.typeTransfer'), value: 'transfer' },
     { label: t('approvalCenter.typeMerge'), value: 'merge' },
     { label: t('approvalCenter.typeGift'), value: 'gift' },
+    { label: t('approvalCenter.typeAiAccess'), value: 'ai_access' },
   ]
 
   /** 流程狀態選項 */
@@ -199,26 +207,15 @@ export default function ApprovalCenter() {
     const query = buildQuery()
     setLoading(true)
     try {
-      // 財務審批列表：無權限或後端不可用時降級為空（仍展示本地記錄）
-      const res = await fetchFinApprovals(query).catch(() => null)
-      // 後端 FinApproval 無 key 字段，需以 flowNo 補齊，避免 Table 渲染時 record.key.startsWith 報錯
-      const records = ((res?.records ?? []) as ApprovalRecord[]).map(r => ({
-        ...r,
-        key: r.key || r.flowNo,
-      }))
-      // 本地前端流程記錄（贈送），按流程編號去重
+      const res = await fetchFinApprovals(query)
+      const records = (res.records ?? []) as ApprovalRecord[]
       const extraLocal = localFrontendApprovals(query)
         .filter(g => !records.some(r => r.flowNo === g.flowNo))
       const merged = [...extraLocal, ...records]
       // 合并后按申请时间倒序排列
       merged.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
       setData(merged)
-      setTotal((res?.total ?? 0) + extraLocal.length)
-    } catch {
-      // 所有 API 均失敗時仍展示本地記錄，避免頁面崩潰
-      const localOnly = localFrontendApprovals(buildQuery())
-      setData(localOnly)
-      setTotal(localOnly.length)
+      setTotal((res.total ?? 0) + extraLocal.length)
     } finally {
       setLoading(false)
     }
@@ -280,7 +277,8 @@ export default function ApprovalCenter() {
       okText: t('approvalCenter.cancelOk'),
       cancelText: t('common.cancel'),
       onOk: async () => {
-        if (record.approvalType === 'gift') {
+        // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷，不調後端
+        if (record.approvalType === 'gift' || record.approvalType === 'ai_access') {
           updateApprovalRecord(record.flowNo, { flowStatus: 'cancelled' })
         } else {
           await cancelFinApproval(record.flowNo)
@@ -577,33 +575,13 @@ export default function ApprovalCenter() {
             </div>
 
             <h4 style={{ marginTop: 20, marginBottom: 12, fontSize: 14, color: '#333', borderBottom: '1px solid #f0f0f0', paddingBottom: 8 }}>{t('approvalCenter.flowSection')}</h4>
-            {detailRecord.approvalNodes?.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${detailRecord.approvalNodes.length}, 1fr)`, gap: '16px' }}>
-                {detailRecord.approvalNodes.map((node, idx) => (
-                  <div key={node.nodeId || idx} style={{ padding: 12, background: '#f6f6f6', borderRadius: 8 }}>
-                    <div style={{ fontWeight: 600, color: '#333', marginBottom: 8 }}>
-                      {node.nodeName}
-                      {node.approvalRule === 'all' && <Tag color="orange" style={{ marginLeft: 6, fontSize: 11 }}>{t('approvalCenter.countersign')}</Tag>}
-                    </div>
-                    <div style={{ fontSize: 12, color: '#666', lineHeight: 2 }}>
-                      {node.approvers?.map((a, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>{a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}</span>
-                          {renderApprovalStatus(a.status)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
               {/* 業務主管 */}
               <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8 }}>
                 <div style={{ fontWeight: 600, color: '#1565C0', marginBottom: 8 }}>{t('approvalCenter.colBiz')}</div>
                 <div style={{ fontSize: 12, color: '#666', lineHeight: 2 }}>
-                  <div>{t('approvalCenter.approverColon')}{detailRecord.bizApprover}</div>
-                  <div>{t('approvalCenter.timeColon')}{detailRecord.bizApproveTime}</div>
+                  <div>{t('approvalCenter.approverColon')}{detailRecord.bizApprover || '--'}</div>
+                  <div>{t('approvalCenter.timeColon')}{detailRecord.bizApproveTime || '--'}</div>
                   <div>{t('approvalCenter.statusColon')}{renderApprovalStatus(detailRecord.bizApproveStatus)}</div>
                 </div>
               </div>
@@ -611,8 +589,8 @@ export default function ApprovalCenter() {
               <div style={{ padding: 12, background: '#FFF3E0', borderRadius: 8 }}>
                 <div style={{ fontWeight: 600, color: '#E65100', marginBottom: 8 }}>{t('approvalCenter.colOps')}</div>
                 <div style={{ fontSize: 12, color: '#666', lineHeight: 2 }}>
-                  <div>{t('approvalCenter.approverColon')}{detailRecord.opsApprover}</div>
-                  <div>{t('approvalCenter.timeColon')}{detailRecord.opsApproveTime}</div>
+                  <div>{t('approvalCenter.approverColon')}{detailRecord.opsApprover || '--'}</div>
+                  <div>{t('approvalCenter.timeColon')}{detailRecord.opsApproveTime || '--'}</div>
                   <div>{t('approvalCenter.statusColon')}{renderApprovalStatus(detailRecord.opsApproveStatus)}</div>
                 </div>
               </div>
@@ -620,13 +598,12 @@ export default function ApprovalCenter() {
               <div style={{ padding: 12, background: '#FFEBEE', borderRadius: 8 }}>
                 <div style={{ fontWeight: 600, color: '#C62828', marginBottom: 8 }}>{t('approvalCenter.colFin')}</div>
                 <div style={{ fontSize: 12, color: '#666', lineHeight: 2 }}>
-                  <div>{t('approvalCenter.approverColon')}{detailRecord.finApprover}</div>
-                  <div>{t('approvalCenter.timeColon')}{detailRecord.finApproveTime}</div>
+                  <div>{t('approvalCenter.approverColon')}{detailRecord.finApprover || '--'}</div>
+                  <div>{t('approvalCenter.timeColon')}{detailRecord.finApproveTime || '--'}</div>
                   <div>{t('approvalCenter.statusColon')}{renderApprovalStatus(detailRecord.finApproveStatus)}</div>
                 </div>
               </div>
             </div>
-            )}
 
             {detailRecord.rejectReason && (
               <>

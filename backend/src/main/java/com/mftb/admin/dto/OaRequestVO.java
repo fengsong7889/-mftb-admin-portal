@@ -41,6 +41,9 @@ public class OaRequestVO {
     /** 当前待审节点 */
     private String currentNodeName;
 
+    /** 当前审批人 */
+    private String currentApprover;
+
     /** 驳回理由 */
     private String rejectReason;
 
@@ -52,6 +55,44 @@ public class OaRequestVO {
 
     /** 撤销时间 */
     private String cancelTime;
+
+    // ==================== 审批中心专用字段 ====================
+
+    /** 集团ID */
+    private String groupId;
+
+    /** 集团名称 */
+    private String groupName;
+
+    /** 品牌 */
+    private String brand;
+
+    /** 业务主管-审批人 */
+    private String bizApprover;
+
+    /** 业务主管-审批时间 */
+    private String bizApproveTime;
+
+    /** 业务主管-审批状态 */
+    private String bizApproveStatus;
+
+    /** 运营主管-审批人 */
+    private String opsApprover;
+
+    /** 运营主管-审批时间 */
+    private String opsApproveTime;
+
+    /** 运营主管-审批状态 */
+    private String opsApproveStatus;
+
+    /** 财务主管-审批人 */
+    private String finApprover;
+
+    /** 财务主管-审批时间 */
+    private String finApproveTime;
+
+    /** 财务主管-审批状态 */
+    private String finApproveStatus;
 
     /** 审批任务节点列表 */
     private List<OaApprovalTaskVO> approvalTasks;
@@ -66,10 +107,24 @@ public class OaRequestVO {
         vo.setApplicant(request.getApplicant());
         vo.setFlowStatus(request.getFlowStatus());
         vo.setCurrentNodeName(request.getCurrentNodeName());
+        vo.setCurrentApprover(request.getCurrentApprover());
         vo.setRejectReason(request.getRejectReason());
         vo.setApplyTime(DateTimeUtils.format(request.getApplyTime()));
         vo.setCompleteTime(DateTimeUtils.format(request.getCompleteTime()));
         vo.setCancelTime(DateTimeUtils.format(request.getCancelTime()));
+        // 审批中心字段
+        vo.setGroupId(request.getGroupId());
+        vo.setGroupName(request.getGroupName());
+        vo.setBrand(request.getBrand());
+        vo.setBizApprover(request.getBizApprover());
+        vo.setBizApproveTime(DateTimeUtils.format(request.getBizApproveTime()));
+        vo.setBizApproveStatus(request.getBizApproveStatus());
+        vo.setOpsApprover(request.getOpsApprover());
+        vo.setOpsApproveTime(DateTimeUtils.format(request.getOpsApproveTime()));
+        vo.setOpsApproveStatus(request.getOpsApproveStatus());
+        vo.setFinApprover(request.getFinApprover());
+        vo.setFinApproveTime(DateTimeUtils.format(request.getFinApproveTime()));
+        vo.setFinApproveStatus(request.getFinApproveStatus());
         return vo;
     }
 

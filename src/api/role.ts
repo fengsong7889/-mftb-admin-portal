@@ -5,6 +5,8 @@ import type { MenuPermission } from '../pages/Permission/types'
 export interface RoleItem {
   id: number
   name: string
+  /** 角色编码（用于审批人解析匹配 sys_user.function_roles） */
+  code?: string
   description?: string
   status: number
   permissions: MenuPermission[]

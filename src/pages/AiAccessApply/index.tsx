@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Input, message, Radio, Select, Tag, Tooltip, Upload } from 'antd'
+import { Button, Input, message, Modal, Radio, Select, Tag, Tooltip, Upload } from 'antd'
 import {
   ArrowLeftOutlined, SendOutlined, CheckCircleOutlined,
   LockOutlined, WalletOutlined, QuestionCircleOutlined,
@@ -111,6 +111,10 @@ export default function AiAccessApply() {
   const [usageScenarios, setUsageScenarios] = useState<string[]>([])
   const [usageFrequency, setUsageFrequency] = useState<UsageFrequency | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  /** 提交成功彈窗（與充值/扣款/轉賬/合併/贈送等流程保持一致：全屏遮罩 + 綠色 ✓ + 5 秒倒計時） */
+  const [successVisible, setSuccessVisible] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
+  const [countdown, setCountdown] = useState(5)
 
   /* ---- 申請憑證（圖片/PDF，隨申請一併提交存入 ai_access_request.credentials） ---- */
   const [credentials, setCredentials] = useState<AiCredentialItem[]>([])
@@ -194,6 +198,18 @@ export default function AiAccessApply() {
     return opts
   }, [hasModels, hasQuotaFlag, t])
 
+  // 提交成功彈窗倒計時（與充值/扣款/轉賬/合併/贈送等流程保持一致）
+  useEffect(() => {
+    if (!successVisible) return
+    if (countdown <= 0) {
+      setSuccessVisible(false)
+      navigate('/')
+      return
+    }
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [successVisible, countdown, navigate])
+
   const { user } = useAuth()
 
   /* ---- 憑證上傳 ---- */
@@ -230,60 +246,117 @@ export default function AiAccessApply() {
       message.warning(t('aiApply.modelRequired'))
       return
     }
-    setSubmitting(true)
+
+    // ====== 二次確認彈窗（與充值/轉賬等流程統一規範） ======
+    const requestTypeLabel = requestType === 'model_only'
+      ? t('aiApply.typeModelOnly')
+      : requestType === 'model_and_quota'
+        ? t('aiApply.typeModelAndQuota')
+        : t('aiApply.typeQuotaOnly')
+    const selectedModelNames = showModelSection
+      ? allModels.filter(m => selectedModels.includes(m.id)).map(m => m.name || m.modelKey)
+      : []
+
     try {
-      // 后端申請 ID：審批人可跨設備透過該 ID 拉取詳情並執行審批即授權
-      const requestId = await submitAiAccessRequest({
-        requestType,
-        applyReason: validReason,
-        requestedModels: showModelSection && selectedModels.length > 0 ? selectedModels : undefined,
-        usageDescription: usageDesc.trim(),
-        usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
-        usageFrequency: usageFrequency ?? undefined,
-        credentials: credentials.length > 0 ? credentials : undefined,
-      })
-      // 寫入審批記錄，使申請出現在審批中心
-      const applicant = user ? `${user.name}(${user.empId})` : '未知'
-      const flowNo = generateFlowNo('ai_access')
-      addApprovalRecord({
-        key: `ai_${Date.now()}`,
-        groupId: '--',
-        groupName: user?.name || '--',
-        brand: '--',
-        flowNo,
-        approvalType: 'ai_access',
-        applicant,
-        applyTime: formatNow(),
-        bizApprover: '--',
-        bizApproveTime: '',
-        bizApproveStatus: 'pending',
-        opsApprover: '--',
-        opsApproveTime: '',
-        opsApproveStatus: 'pending',
-        finApprover: '--',
-        finApproveTime: '',
-        finApproveStatus: '--',
-        flowStatus: 'pending',
-        rejectReason: '',
-        extra: {
-          requestId,
-          applyReason: validReason,
-          requestType,
-          requestedModels: selectedModels.length > 0 ? selectedModels : undefined,
-          usageDescription: usageDesc.trim(),
-          usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
-          usageFrequency: usageFrequency ?? undefined,
-          credentialCount: credentials.length,
+      Modal.confirm({
+        title: t('aiApply.confirmSubmitTitle'),
+        icon: (
+          <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+        ),
+        centered: true,
+        className: 'custom-confirm-modal',
+        width: 520,
+        okText: t('common:confirmSubmit'),
+        cancelText: t('common:cancel'),
+        content: (
+          <div>
+            <div className="confirm-info-card">
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('aiApply.requestType')}</span>
+                <span className="confirm-info-value">{requestTypeLabel}</span>
+              </div>
+              {selectedModelNames.length > 0 && (
+                <div className="confirm-info-row">
+                  <span className="confirm-info-label">{t('aiApply.confirmModels')}</span>
+                  <span className="confirm-info-value">{selectedModelNames.join('、')}</span>
+                </div>
+              )}
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">{t('aiApply.usageDescription')}</span>
+                <span className="confirm-info-value">{usageDesc.trim().length > 50 ? usageDesc.trim().slice(0, 50) + '...' : usageDesc.trim()}</span>
+              </div>
+              {credentials.length > 0 && (
+                <div className="confirm-info-row">
+                  <span className="confirm-info-label">{t('aiApply.credentialSection')}</span>
+                  <span className="confirm-info-value">{credentials.length} {t('aiApply.confirmCredentialUnit')}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ),
+        onOk: async () => {
+          setSubmitting(true)
+          try {
+            // 后端申請 ID：審批人可跨設備透過該 ID 拉取詳情並執行審批即授權
+            const requestId = await submitAiAccessRequest({
+              requestType,
+              applyReason: validReason,
+              requestedModels: showModelSection && selectedModels.length > 0 ? selectedModels : undefined,
+              usageDescription: usageDesc.trim(),
+              usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
+              usageFrequency: usageFrequency ?? undefined,
+              credentials: credentials.length > 0 ? credentials : undefined,
+            })
+            // 寫入審批記錄，使申請出現在審批中心
+            const applicant = user ? `${user.name}(${user.empId})` : '未知'
+            const flowNo = generateFlowNo('ai_access')
+            addApprovalRecord({
+              key: `ai_${Date.now()}`,
+              groupId: '--',
+              groupName: user?.name || '--',
+              brand: '--',
+              flowNo,
+              approvalType: 'ai_access',
+              applicant,
+              applyTime: formatNow(),
+              bizApprover: '--',
+              bizApproveTime: '',
+              bizApproveStatus: 'pending',
+              opsApprover: '--',
+              opsApproveTime: '',
+              opsApproveStatus: 'pending',
+              finApprover: '--',
+              finApproveTime: '',
+              finApproveStatus: '--',
+              flowStatus: 'pending',
+              rejectReason: '',
+              extra: {
+                requestId,
+                applyReason: validReason,
+                requestType,
+                requestedModels: selectedModels.length > 0 ? selectedModels : undefined,
+                usageDescription: usageDesc.trim(),
+                usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
+                usageFrequency: usageFrequency ?? undefined,
+                credentialCount: credentials.length,
+              },
+            })
+            // 按充值/扣款/轉賬/合併/贈送等流程的統一標準：全屏彈窗 + 5 秒倒計時
+            setSubmittedFlowNo(flowNo)
+            setCountdown(5)
+            // 等待確認彈窗完全關閉後再顯示成功彈窗
+            setTimeout(() => setSuccessVisible(true), 350)
+          } catch {
+            message.error(t('aiApply.submitFailed'))
+          } finally {
+            setSubmitting(false)
+          }
         },
       })
-      message.success(t('aiApply.submitSuccess'))
-      navigate('/')
     } catch {
-      message.error(t('aiApply.submitFailed'))
-    } finally {
-      setSubmitting(false)
+      // antd Modal.confirm 取消時不處理
     }
-  }, [requestType, validReason, selectedModels, usageDesc, usageScenarios, usageFrequency, credentials, navigate, t, showModelSection, user])
+  }, [requestType, validReason, selectedModels, usageDesc, usageScenarios, usageFrequency, credentials, navigate, t, showModelSection, user, allModels])
 
   /* ---- 渲染能力標籤 ---- */
   const renderCapabilityTags = (model: AiModel) => {
@@ -643,6 +716,53 @@ export default function AiAccessApply() {
           {t('aiApply.submit')}
         </Button>
       </div>
+
+      {/* ====== 提交成功彈窗（與充值/扣款/轉賬/合併/贈送等流程統一規範） ====== */}
+      {successVisible && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 12, padding: '32px 28px',
+            width: 400, textAlign: 'center',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{
+              width: 64, height: 64, margin: '0 auto 20px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #52C41A, #73D13D)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(82,196,26,0.3)',
+            }}>
+              <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+              {t('aiApply.submitSuccessTitle')}
+            </h3>
+            <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              {submittedFlowNo && (
+                <>
+                  {t('aiApply.flowNoLabel')}
+                  <span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span>
+                  <br />
+                </>
+              )}
+              {t('aiApply.submitSuccessDesc')}
+            </p>
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => navigate('/')}
+              style={{ minWidth: 120, height: 40, borderRadius: 8 }}
+            >
+              {t('aiApply.backToHomeWithCountdown', { count: countdown })}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

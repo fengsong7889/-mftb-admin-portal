@@ -2,7 +2,9 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.RoleVO;
 import com.mftb.admin.dto.WorkflowConfigVO;
+import com.mftb.admin.service.RoleService;
 import com.mftb.admin.service.WorkflowConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +27,7 @@ import java.util.Map;
 public class WorkflowConfigController {
 
     private final WorkflowConfigService workflowConfigService;
+    private final RoleService roleService;
 
     /** 查询所有流程配置列表 */
     @GetMapping
@@ -71,5 +74,20 @@ public class WorkflowConfigController {
             return Result.error(404, "流程类型不存在: " + flowType);
         }
         return Result.success(config);
+    }
+
+    /** 角色下拉选项（流程配置页面专用，仅返回 id/name/code） */
+    @GetMapping("/role-options")
+    @RequirePermission(menu = "workflow-config")
+    public Result<List<Map<String, Object>>> roleOptions() {
+        List<RoleVO> roles = roleService.list();
+        List<Map<String, Object>> options = roles.stream()
+                .filter(r -> r.getStatus() != null && r.getStatus() == 1)
+                .map(r -> Map.<String, Object>of(
+                        "id", r.getId(),
+                        "name", r.getName(),
+                        "code", r.getCode() != null ? r.getCode() : ""))
+                .toList();
+        return Result.success(options);
     }
 }

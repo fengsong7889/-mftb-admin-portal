@@ -675,6 +675,57 @@
   border-radius: 8px;
   padding: 20px 24px;
 }
+
+/* ========================================================================
+   详情页头部（全局统一规范）
+   适用：所有详情页（如资产详情/订单详情等只读页）
+   规则：
+     - 头部区：白底/圆角 8px/padding 20px 24px/阴影 0 2px 8px rgba(0,0,0,0.06)
+     - 标题行：flex 对齐、space-between、标题 17px/600
+     - 详情页为只读模式，不在顶部放置操作按钮（需要时放Descriptions内或独立区块）
+   ======================================================================== */
+.detail-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.detail-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.detail-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail-header-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #262626;
+}
+.detail-header-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(0,0,0,0.08);
+  font-size: 13px;
+  color: #595959;
+}
+/* 详情页内容卡片（基本信息、参数模板等模块） */
+.detail-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
 /* 查询区域样式 */
 .search-section {
   display: block;

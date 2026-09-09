@@ -236,9 +236,9 @@ CREATE TABLE `ai_tool_registry` (
 BEGIN;
 
 INSERT INTO `ai_provider` (`provider_key`, `name`, `api_base_url`, `api_key`, `status`, `is_default`, `sort_order`) VALUES
-('openai', 'OpenAI', 'https://api.openai.com/v1', 'sk-test_openai_api_key_placeholder', 1, 1, 1),
-('azure-openai', 'Azure OpenAI', 'https://your-resource.openai.azure.com', 'sk-test_azure_api_key_placeholder', 1, 0, 2),
-('anthropic', 'Anthropic Claude', 'https://api.anthropic.com/v1', 'sk-test_anthropic_api_key_placeholder', 1, 0, 3);
+('openai', 'OpenAI', 'https://api.openai.com/v1', NULL, 1, 1, 1),
+('azure-openai', 'Azure OpenAI', 'https://your-resource.openai.azure.com', NULL, 1, 0, 2),
+('anthropic', 'Anthropic Claude', 'https://api.anthropic.com/v1', NULL, 1, 0, 3);
 
 INSERT INTO `ai_model` (`provider_id`, `model_key`, `name`, `description`, `type`, `context_window`, `max_output_tokens`, `input_price`, `output_price`, `status`, `sort_order`) VALUES
 (1, 'gpt-4o', 'GPT-4o', 'OpenAI GPT-4o 模型', 'chat', 128000, 4096, 5.000000, 15.000000, 1, 1),
