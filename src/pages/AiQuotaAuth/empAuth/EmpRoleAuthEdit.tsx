@@ -49,7 +49,7 @@ export default function EmpRoleAuthEdit() {
       try {
         const [modelList, empResult] = await Promise.all([
           fetchModels({ status: 1 }),
-          fetchEmployees({ page: 1, size: 200, status: 1 }),  // 真實員工 API
+          fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }),  // 真實員工 API
         ])
         if (cancelled) return
         setModels(modelList)

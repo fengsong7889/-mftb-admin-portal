@@ -11,7 +11,6 @@ import {
   deleteEmployee,
   fetchEmployees,
   resetEmployeePassword,
-  updateEmployeeStatus,
 } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
 import { fetchRoles } from '../../../api/role'
@@ -23,10 +22,10 @@ import type { PositionItem } from '../../../api/position'
 import { exportToCSV } from '../../../utils/exportCSV'
 
 
-/** 员工状态枚举 */
-const EMPLOYEE_STATUS = {
-  ENABLED: 1,
-  DISABLED: 0,
+/** 员工在职状态枚举 */
+const EMPLOYMENT_STATUS = {
+  ACTIVE: 'active',
+  RESIGNED: 'resigned',
 } as const
 
 /** 内置管理员登录账号（工号，禁止停用/删除） */
@@ -43,7 +42,7 @@ interface EmployeeSearchValues {
   updatedBy?: string
   /** 最后更新时间范围 */
   updatedAtRange?: [Dayjs, Dayjs] | null
-  status?: number
+  employmentStatus?: string
 }
 
 /** 平铺部门列表构建 TreeSelect 树数据（默认停用部门不可选，allowDisabled 用于查询区） */
@@ -89,10 +88,10 @@ export default function EmployeeManagement() {
   const getDeptDisplayName = (dept: DepartmentItem) =>
     isNonZh ? (dept.nameEn || dept.name) : dept.name
 
-  /** 狀態/序列選項（依賴 t，定義在組件內以便響應語言切換） */
-  const STATUS_OPTIONS = [
-    { value: EMPLOYEE_STATUS.ENABLED, label: t('employee.statusEnabled') },
-    { value: EMPLOYEE_STATUS.DISABLED, label: t('employee.statusDisabled') },
+  /** 在职状态/序列選項（依賴 t，定義在組件內以便響應語言切換） */
+  const EMPLOYMENT_STATUS_OPTIONS = [
+    { value: EMPLOYMENT_STATUS.ACTIVE, label: t('employee.statusActive') },
+    { value: EMPLOYMENT_STATUS.RESIGNED, label: t('employee.statusResigned') },
   ]
   const SEQ_LABEL: Record<string, string> = {
     M: 'M(\u7BA1\u7406)',
@@ -108,7 +107,7 @@ export default function EmployeeManagement() {
   const [pageSize, setPageSize] = useState(10)
   // 查询条件（点击查询后生效）
   const [keyword, setKeyword] = useState<string>()
-  const [status, setStatus] = useState<number>()
+  const [employmentStatus, setEmploymentStatus] = useState<string>()
   // 扩展筛选条件（所属部门/职级序列/职级/职等/角色授权/最后更新人/最后更新时间）
   const [deptFilter, setDeptFilter] = useState<number>()
   const [sequenceFilter, setSequenceFilter] = useState<string>()
@@ -143,13 +142,13 @@ export default function EmployeeManagement() {
   const fetchList = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchEmployees({ page, size: pageSize, keyword, status })
+      const result = await fetchEmployees({ page, size: pageSize, keyword, employmentStatus })
       setDataSource(result.records)
       setTotal(result.total)
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword, status])
+  }, [page, pageSize, keyword, employmentStatus])
 
   useEffect(() => {
     fetchList()
@@ -220,7 +219,7 @@ export default function EmployeeManagement() {
   const handleSearch = () => {
     const values = searchForm.getFieldsValue() as EmployeeSearchValues
     setKeyword(values.keyword?.trim() || undefined)
-    setStatus(values.status)
+    setEmploymentStatus(values.employmentStatus)
     setDeptFilter(values.departmentId)
     setSequenceFilter(values.sequence)
     setJobLevelFilter(values.jobLevel)
@@ -239,7 +238,7 @@ export default function EmployeeManagement() {
   const handleReset = () => {
     searchForm.resetFields()
     setKeyword(undefined)
-    setStatus(undefined)
+    setEmploymentStatus(undefined)
     setDeptFilter(undefined)
     setSequenceFilter(undefined)
     setJobLevelFilter(undefined)
@@ -329,27 +328,6 @@ export default function EmployeeManagement() {
     }
   }
 
-  /** 启用/停用（带确认弹窗） */
-  const handleToggleStatus = (record: EmployeeItem) => {
-    const isDisabling = record.status === EMPLOYEE_STATUS.ENABLED
-    const action = isDisabling ? t('common.disable') : t('common.enable')
-    Modal.confirm({
-      title: t('employee.confirmToggle', { action }),
-      content: isDisabling
-        ? t('employee.disableContent', { name: record.name })
-        : t('employee.enableContent', { name: record.name }),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-      okButtonProps: { danger: isDisabling },
-      onOk: async () => {
-        const next = isDisabling ? EMPLOYEE_STATUS.DISABLED : EMPLOYEE_STATUS.ENABLED
-        await updateEmployeeStatus(record.id, next)
-        message.success(isDisabling ? t('employee.disabled') : t('employee.enabled'))
-        fetchList()
-      },
-    })
-  }
-
   /** 删除 */
   const handleDelete = async (record: EmployeeItem) => {
     await deleteEmployee(record.id)
@@ -373,7 +351,7 @@ export default function EmployeeManagement() {
       { title: t('employee.colSequence'), dataIndex: 'sequence' },
       { title: t('employee.colJobLevel'), dataIndex: 'jobLevel' },
       { title: t('employee.colRank'), dataIndex: 'rank' },
-      { title: t('common.colStatus'), dataIndex: 'status', render: (v: number) => v === EMPLOYEE_STATUS.ENABLED ? t('employee.statusEnabled') : t('employee.statusDisabled') },
+      { title: t('employee.employmentStatus'), dataIndex: 'employmentStatus', render: (v: string) => v === 'resigned' ? t('employee.statusResigned') : t('employee.statusActive') },
       { title: t('employee.colUpdatedBy'), dataIndex: 'updatedBy' },
       { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
@@ -434,17 +412,14 @@ export default function EmployeeManagement() {
       },
     },
     {
-      title: t('common.colStatus'),
-      dataIndex: 'status',
-      key: 'status',
+      title: t('employee.employmentStatus'),
+      dataIndex: 'employmentStatus',
+      key: 'employmentStatus',
       width: 90,
-      render: (_: unknown, record: EmployeeItem) => (
-        <Switch
-          checked={record.status === EMPLOYEE_STATUS.ENABLED}
-          checkedChildren={t('employee.statusEnabled')}
-          unCheckedChildren={t('employee.statusDisabled')}
-          onChange={() => handleToggleStatus(record)}
-        />
+      render: (v: string) => (
+        <Tag color={v === 'resigned' ? 'default' : 'success'}>
+          {v === 'resigned' ? t('employee.statusResigned') : t('employee.statusActive')}
+        </Tag>
       ),
     },
     {
@@ -545,8 +520,8 @@ export default function EmployeeManagement() {
               options={roles.map(r => ({ value: r.id, label: r.name }))}
             />
           </Form.Item>
-          <Form.Item label={t('common.colStatus')} name="status">
-            <Select placeholder={t('common.all')} allowClear options={STATUS_OPTIONS} />
+          <Form.Item label={t('employee.employmentStatus')} name="employmentStatus">
+            <Select placeholder={t('common.all')} allowClear options={EMPLOYMENT_STATUS_OPTIONS} />
           </Form.Item>
           <Form.Item label={t('employee.colUpdatedBy')} name="updatedBy">
             <Input placeholder={t('employee.searchUpdatedByPh')} allowClear onPressEnter={handleSearch} />

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -94,6 +95,57 @@ public class SysUser {
 
     /** 用户选中的在线头像 URL（IconFont/DiceBear 等外部 URL） */
     private String avatarUrl;
+
+    // ── 个人信息 ──
+
+    /** 国籍 */
+    private String nationality;
+
+    /** 民族 */
+    private String ethnicity;
+
+    /** 出生日期 */
+    private LocalDate birthDate;
+
+    /** 婚姻状况 */
+    private String maritalStatus;
+
+    /** 政治面貌 */
+    private String politicalStatus;
+
+    /** 宗教信仰 */
+    private String religion;
+
+    // ── 证件信息 ──
+
+    /** 证件类型 */
+    private String idType;
+
+    /** 证件号码 */
+    private String idNumber;
+
+    /** 证件地址 */
+    private String idAddress;
+
+    /** 户籍类型 */
+    private String householdType;
+
+    /** 户籍所在地 */
+    private String householdLocation;
+
+    /** 籍贯 */
+    private String nativePlace;
+
+    // ── 通讯信息 ──
+
+    /** 住址-国家 */
+    private String addressCountry;
+
+    /** 住址-城市 */
+    private String addressCity;
+
+    /** 住址-详细地址 */
+    private String addressDetail;
 
     /** 最后更新人 */
     private String updatedBy;

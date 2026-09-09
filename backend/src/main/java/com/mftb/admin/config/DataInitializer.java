@@ -46,7 +46,7 @@ public class DataInitializer implements CommandLineRunner {
     // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
     // v6.0: OA 中心表自动创建（biz_oa_process / biz_oa_request / biz_oa_approval_task + 种子数据）
     // v7.0: biz_oa_request 扩展审批中心字段（集团/品牌/三级审批详情）
-    private static final String V_SCHEMA = "core:schema-v7";
+    private static final String V_SCHEMA = "core:schema-v8";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增 minor 版本号，无需全量重跑其他迁移 */
     // v11: 「工具註冊中心」更名為「AI 操作授權」，menu_key 由 ai_tool_registry 迁移为 ai-operation-auth
     //      （seedSystemMenus 會先刪除所有含 ai 的舊菜單及授權關聯再重建，舊 key 自動清理）
@@ -95,6 +95,8 @@ public class DataInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce("core:fin-batch-uk-v1", this::fixFinBatchUniqueKey);
         versionTracker.applyOnce("core:builtin-accounts-v1", this::migrateBuiltinAccounts);
+        // 为所有缺少职务记录的员工补一条默认「入职」记录
+        versionTracker.applyOnce("core:emp-position-backfill-v1", this::backfillInitialPositionRecords);
         // v24b: 恢復被 v23 清理邏輯誤刪的 asset-claim / asset-return 菜單
         versionTracker.applyOnce("core:eam-restore-v1", this::restoreEamClaimReturnMenus);
         // v24c: 移除「統計報表」菜單（已與「資產看板」合併）
@@ -231,7 +233,156 @@ public class DataInitializer implements CommandLineRunner {
         // ai_dept_auth_group 新增 description 字段
         addColumnIfAbsent("ai_dept_auth_group", "description",
                 "ALTER TABLE ai_dept_auth_group ADD COLUMN description VARCHAR(500) NULL COMMENT '策略描述' AFTER name");
+        // 员工详情页: sys_user 新增 18 个基础信息字段
+        migrateEmployeeDetailColumns();
+        // 员工详情页: 新建紧急联系人 + 职务记录表
+        migrateEmployeeDetailTables();
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
+    }
+
+    /** 员工详情页: sys_user 新增 18 个基础信息字段（个人信息/证件信息/通讯信息） */
+    private void migrateEmployeeDetailColumns() {
+        // 个人信息
+        addColumnIfAbsent("sys_user", "nationality",
+                "ALTER TABLE sys_user ADD COLUMN nationality VARCHAR(50) DEFAULT NULL COMMENT '国籍'");
+        addColumnIfAbsent("sys_user", "ethnicity",
+                "ALTER TABLE sys_user ADD COLUMN ethnicity VARCHAR(20) DEFAULT NULL COMMENT '民族'");
+        addColumnIfAbsent("sys_user", "birth_date",
+                "ALTER TABLE sys_user ADD COLUMN birth_date DATE DEFAULT NULL COMMENT '出生日期'");
+        addColumnIfAbsent("sys_user", "marital_status",
+                "ALTER TABLE sys_user ADD COLUMN marital_status VARCHAR(10) DEFAULT NULL COMMENT '婚姻状况'");
+        addColumnIfAbsent("sys_user", "political_status",
+                "ALTER TABLE sys_user ADD COLUMN political_status VARCHAR(20) DEFAULT NULL COMMENT '政治面貌'");
+        addColumnIfAbsent("sys_user", "religion",
+                "ALTER TABLE sys_user ADD COLUMN religion VARCHAR(20) DEFAULT NULL COMMENT '宗教信仰'");
+        // 证件信息
+        addColumnIfAbsent("sys_user", "id_type",
+                "ALTER TABLE sys_user ADD COLUMN id_type VARCHAR(30) DEFAULT NULL COMMENT '证件类型'");
+        addColumnIfAbsent("sys_user", "id_number",
+                "ALTER TABLE sys_user ADD COLUMN id_number VARCHAR(50) DEFAULT NULL COMMENT '证件号码'");
+        addColumnIfAbsent("sys_user", "id_address",
+                "ALTER TABLE sys_user ADD COLUMN id_address VARCHAR(200) DEFAULT NULL COMMENT '证件地址'");
+        addColumnIfAbsent("sys_user", "household_type",
+                "ALTER TABLE sys_user ADD COLUMN household_type VARCHAR(30) DEFAULT NULL COMMENT '户籍类型'");
+        addColumnIfAbsent("sys_user", "household_location",
+                "ALTER TABLE sys_user ADD COLUMN household_location VARCHAR(100) DEFAULT NULL COMMENT '户籍所在地'");
+        addColumnIfAbsent("sys_user", "native_place",
+                "ALTER TABLE sys_user ADD COLUMN native_place VARCHAR(100) DEFAULT NULL COMMENT '籍贯'");
+        // 通讯信息
+        addColumnIfAbsent("sys_user", "address_country",
+                "ALTER TABLE sys_user ADD COLUMN address_country VARCHAR(50) DEFAULT NULL COMMENT '住址-国家'");
+        addColumnIfAbsent("sys_user", "address_city",
+                "ALTER TABLE sys_user ADD COLUMN address_city VARCHAR(50) DEFAULT NULL COMMENT '住址-城市'");
+        addColumnIfAbsent("sys_user", "address_detail",
+                "ALTER TABLE sys_user ADD COLUMN address_detail VARCHAR(300) DEFAULT NULL COMMENT '住址-详细地址'");
+    }
+
+    /** 员工详情页: 新建 emp_emergency_contact + emp_position_record 表 */
+    private void migrateEmployeeDetailTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS emp_emergency_contact ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL COMMENT '关联 sys_user.id', "
+                        + "name VARCHAR(50) NOT NULL COMMENT '联系人姓名', "
+                        + "phone VARCHAR(30) NOT NULL COMMENT '联系电话', "
+                        + "relation VARCHAR(30) NOT NULL COMMENT '关系', "
+                        + "created_by VARCHAR(50) DEFAULT NULL COMMENT '创建人', "
+                        + "updated_by VARCHAR(50) DEFAULT NULL COMMENT '更新人', "
+                        + "deleted INT NOT NULL DEFAULT 0 COMMENT '逻辑删除', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "INDEX idx_user_id (user_id)"
+                        + ") COMMENT='员工紧急联系人'");
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS emp_position_record ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL COMMENT '关联 sys_user.id', "
+                        + "effective_date DATE NOT NULL COMMENT '生效日期', "
+                        + "effective_seq INT NOT NULL DEFAULT 0 COMMENT '生效序号', "
+                        + "operation VARCHAR(20) NOT NULL COMMENT '操作类型', "
+                        + "reason VARCHAR(200) DEFAULT NULL COMMENT '变动原因', "
+                        + "service_dept VARCHAR(100) DEFAULT NULL COMMENT '服务部门', "
+                        + "sequence_type VARCHAR(10) DEFAULT NULL COMMENT '职级序列', "
+                        + "position_level VARCHAR(10) DEFAULT NULL COMMENT '职级', "
+                        + "rank_code VARCHAR(10) DEFAULT NULL COMMENT '职等', "
+                        + "company VARCHAR(100) DEFAULT NULL COMMENT '任职公司', "
+                        + "employee_category VARCHAR(30) DEFAULT NULL COMMENT '员工类别', "
+                        + "work_system VARCHAR(20) DEFAULT NULL COMMENT '工时制', "
+                        + "position_name VARCHAR(100) DEFAULT NULL COMMENT '职位', "
+                        + "direct_superior VARCHAR(50) DEFAULT NULL COMMENT '直属上级', "
+                        + "mentor VARCHAR(50) DEFAULT NULL COMMENT '导师', "
+                        + "work_country VARCHAR(50) DEFAULT NULL COMMENT '工作国家', "
+                        + "work_city VARCHAR(50) DEFAULT NULL COMMENT '工作城市', "
+                        + "office_address VARCHAR(200) DEFAULT NULL COMMENT '办公地址', "
+                        + "contract_location VARCHAR(100) DEFAULT NULL COMMENT '合同签订地', "
+                        + "created_by VARCHAR(50) DEFAULT NULL, "
+                        + "updated_by VARCHAR(50) DEFAULT NULL, "
+                        + "deleted INT NOT NULL DEFAULT 0, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "INDEX idx_user_id (user_id), "
+                        + "INDEX idx_user_seq (user_id, effective_seq)"
+                        + ") COMMENT='员工职务记录'");
+        log.info("员工详情页表结构就绪: emp_emergency_contact + emp_position_record");
+    }
+
+    /**
+     * 为所有缺少职务记录的员工补一条默认「入职」记录:
+     * - 生效日期 = 员工账号创建日期
+     * - 服务部门 = 员工当前部门名称
+     * - 职位 = 员工当前职位名称
+     * - 职级序列/职级/职等 = 员工当前快照
+     * - 工作国家 = 中国
+     * - 其余字段为空
+     */
+    private void backfillInitialPositionRecords() {
+        // 查询所有未删除的员工
+        List<Map<String, Object>> users = jdbcTemplate.queryForList(
+                "SELECT id, department, position, position_en, sequence, job_level, `rank`, created_at "
+                        + "FROM sys_user WHERE deleted = 0");
+        if (users.isEmpty()) return;
+
+        // 查询已有职务记录的 user_id 集合
+        List<Long> usersWithRecords = jdbcTemplate.queryForList(
+                "SELECT DISTINCT user_id FROM emp_position_record WHERE deleted = 0",
+                Long.class);
+        java.util.Set<Long> hasRecord = new java.util.HashSet<>(usersWithRecords);
+
+        int count = 0;
+        for (Map<String, Object> user : users) {
+            Long userId = ((Number) user.get("id")).longValue();
+            if (hasRecord.contains(userId)) continue;
+
+            // 生效日期取账号创建日期，格式 yyyy-MM-dd
+            String effectiveDate = "1970-01-01";
+            Object createdAt = user.get("created_at");
+            if (createdAt != null) {
+                String dateStr = createdAt.toString();
+                // 兼容 java.sql.Timestamp / LocalDateTime / 字符串
+                effectiveDate = dateStr.length() >= 10 ? dateStr.substring(0, 10) : dateStr;
+            }
+
+            String serviceDept = user.get("department") != null ? user.get("department").toString() : null;
+            String positionName = user.get("position") != null ? user.get("position").toString() : null;
+            String sequenceType = user.get("sequence") != null ? user.get("sequence").toString() : null;
+            String positionLevel = user.get("job_level") != null ? user.get("job_level").toString() : null;
+            String rankCode = user.get("rank") != null ? user.get("rank").toString() : null;
+
+            jdbcTemplate.update(
+                    "INSERT INTO emp_position_record "
+                            + "(user_id, effective_date, effective_seq, operation, "
+                            + "service_dept, sequence_type, position_level, rank_code, "
+                            + "work_country, deleted, created_at, updated_at) "
+                            + "VALUES (?, ?, 0, '入职', ?, ?, ?, ?, '中国', 0, NOW(), NOW())",
+                    userId, effectiveDate,
+                    serviceDept, sequenceType, positionLevel, rankCode);
+            count++;
+        }
+        if (count > 0) {
+            log.info("已为 {} 名员工补录默认「入职」职务记录", count);
+        } else {
+            log.info("所有员工已有职务记录，无需补录");
+        }
     }
 
     /** avatar 字段扩容: VARCHAR(255) → MEDIUMTEXT, 支持 base64 Data URL / DiceBear URL 等长文本存储 (与 73_avatar_mediumtext.sql 等效) */

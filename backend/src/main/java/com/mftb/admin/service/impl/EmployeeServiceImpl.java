@@ -4,13 +4,16 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.BasicInfoRequest;
 import com.mftb.admin.dto.EmployeeRequest;
 import com.mftb.admin.dto.EmployeeVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.entity.EmpPositionRecord;
 import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysPosition;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.entity.SysBizSeqRule;
+import com.mftb.admin.mapper.EmpPositionRecordMapper;
 import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -29,7 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 集团员工服务实现
@@ -43,6 +49,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final SysDepartmentMapper sysDepartmentMapper;
     private final SysPositionMapper sysPositionMapper;
     private final SysLoginLogMapper sysLoginLogMapper;
+    private final EmpPositionRecordMapper empPositionRecordMapper;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
     private final OperatorResolver operatorResolver;
@@ -53,24 +60,69 @@ public class EmployeeServiceImpl implements EmployeeService {
     private static final String BUILTIN_ADMIN = "MF00001";
 
     @Override
-    public PageResult<EmployeeVO> list(long page, long size, String keyword, Integer status) {
+    public PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
-        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+
+        // 先查询符合关键字条件的全部用户（不分页），用于后续 employmentStatus 过滤
+        LambdaQueryWrapper<SysUser> baseWrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.and(w -> w.like(SysUser::getUsername, keyword)
+            baseWrapper.and(w -> w.like(SysUser::getUsername, keyword)
                     .or().like(SysUser::getName, keyword)
                     .or().like(SysUser::getEmpId, keyword));
         }
-        if (status != null) {
-            wrapper.eq(SysUser::getStatus, status);
+        baseWrapper.orderByDesc(SysUser::getCreatedAt);
+        List<SysUser> allUsers = sysUserMapper.selectList(baseWrapper);
+
+        // 批量获取最新职务记录，派生 employmentStatus
+        if (!allUsers.isEmpty()) {
+            List<Long> userIds = allUsers.stream().map(SysUser::getId).toList();
+            Map<Long, String> latestOps = getLatestOperations(userIds);
+
+            // 按 employmentStatus 过滤
+            if (StringUtils.hasText(employmentStatus)) {
+                allUsers = allUsers.stream().filter(u -> {
+                    String op = latestOps.get(u.getId());
+                    boolean isResigned = "离职".equals(op);
+                    return "resigned".equals(employmentStatus) ? isResigned : !isResigned;
+                }).toList();
+            }
+
+            // 手动分页
+            long total = allUsers.size();
+            int from = (int) ((page - 1) * size);
+            int to = (int) Math.min(from + size, total);
+            List<EmployeeVO> records = (from < total)
+                    ? allUsers.subList(from, to).stream()
+                        .map(u -> {
+                            EmployeeVO vo = EmployeeVO.from(u, JsonUtils.parseLongList(u.getFunctionRoles()));
+                            String op = latestOps.get(u.getId());
+                            vo.setEmploymentStatus("离职".equals(op) ? "resigned" : "active");
+                            return vo;
+                        })
+                        .toList()
+                    : List.of();
+            return new PageResult<>(records, total);
         }
-        wrapper.orderByDesc(SysUser::getCreatedAt);
-        Page<SysUser> result = sysUserMapper.selectPage(new Page<>(page, size), wrapper);
-        List<EmployeeVO> records = result.getRecords().stream()
-                .map(u -> EmployeeVO.from(u, JsonUtils.parseLongList(u.getFunctionRoles())))
-                .toList();
-        return new PageResult<>(records, result.getTotal());
+
+        return new PageResult<>(List.of(), 0L);
+    }
+
+    /** 批量查询多个用户的最新职务记录操作类型 */
+    private Map<Long, String> getLatestOperations(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Map.of();
+        LambdaQueryWrapper<EmpPositionRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(EmpPositionRecord::getUserId, userIds)
+                .orderByAsc(EmpPositionRecord::getEffectiveSeq);
+        List<EmpPositionRecord> records = empPositionRecordMapper.selectList(wrapper);
+        // 按 userId 分组，取每组 effectiveSeq 最大的记录的 operation
+        return records.stream()
+                .collect(Collectors.groupingBy(EmpPositionRecord::getUserId))
+                .entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().get(e.getValue().size() - 1).getOperation()
+                ));
     }
 
     @Override
@@ -263,6 +315,63 @@ public class EmployeeServiceImpl implements EmployeeService {
         sysLoginLogMapper.update(null, wrapper);
         log.info("同步登录日志快照: userId={}, nameChanged={}, deptChanged={}",
                 user.getId(), nameChanged, deptChanged);
+    }
+
+    @Override
+    public Map<String, Object> getBasicInfo(Long id) {
+        SysUser user = requireUser(id);
+        Map<String, Object> result = new HashMap<>();
+        // 个人信息
+        Map<String, Object> personal = new HashMap<>();
+        personal.put("nationality", user.getNationality());
+        personal.put("ethnicity", user.getEthnicity());
+        personal.put("birthDate", user.getBirthDate());
+        personal.put("maritalStatus", user.getMaritalStatus());
+        personal.put("politicalStatus", user.getPoliticalStatus());
+        personal.put("religion", user.getReligion());
+        result.put("personalInfo", personal);
+        // 证件信息
+        Map<String, Object> idInfo = new HashMap<>();
+        idInfo.put("idType", user.getIdType());
+        idInfo.put("idNumber", user.getIdNumber());
+        idInfo.put("idAddress", user.getIdAddress());
+        idInfo.put("householdType", user.getHouseholdType());
+        idInfo.put("householdLocation", user.getHouseholdLocation());
+        idInfo.put("nativePlace", user.getNativePlace());
+        result.put("idInfo", idInfo);
+        // 通讯信息
+        Map<String, Object> contact = new HashMap<>();
+        contact.put("addressCountry", user.getAddressCountry());
+        contact.put("addressCity", user.getAddressCity());
+        contact.put("addressDetail", user.getAddressDetail());
+        result.put("contactInfo", contact);
+        return result;
+    }
+
+    @Override
+    public void saveBasicInfo(Long id, BasicInfoRequest request) {
+        SysUser user = requireUser(id);
+        // 个人信息
+        if (request.getNationality() != null) user.setNationality(request.getNationality());
+        if (request.getEthnicity() != null) user.setEthnicity(request.getEthnicity());
+        if (request.getBirthDate() != null) user.setBirthDate(request.getBirthDate());
+        if (request.getMaritalStatus() != null) user.setMaritalStatus(request.getMaritalStatus());
+        if (request.getPoliticalStatus() != null) user.setPoliticalStatus(request.getPoliticalStatus());
+        if (request.getReligion() != null) user.setReligion(request.getReligion());
+        // 证件信息
+        if (request.getIdType() != null) user.setIdType(request.getIdType());
+        if (request.getIdNumber() != null) user.setIdNumber(request.getIdNumber());
+        if (request.getIdAddress() != null) user.setIdAddress(request.getIdAddress());
+        if (request.getHouseholdType() != null) user.setHouseholdType(request.getHouseholdType());
+        if (request.getHouseholdLocation() != null) user.setHouseholdLocation(request.getHouseholdLocation());
+        if (request.getNativePlace() != null) user.setNativePlace(request.getNativePlace());
+        // 通讯信息
+        if (request.getAddressCountry() != null) user.setAddressCountry(request.getAddressCountry());
+        if (request.getAddressCity() != null) user.setAddressCity(request.getAddressCity());
+        if (request.getAddressDetail() != null) user.setAddressDetail(request.getAddressDetail());
+
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
+        sysUserMapper.updateById(user);
     }
 
     private SysUser requireUser(Long id) {

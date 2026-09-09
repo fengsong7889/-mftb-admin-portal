@@ -4,7 +4,7 @@
  * - Tab 統計：全部 / 待處理 / 採購中 / 採購完成
  * - 操作：詳情 / 編輯（回填供應商、價格、快遞單號等）/ 狀態推進（開始採購 / 完成採購）
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, Progress, DatePicker } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
@@ -17,6 +17,7 @@ import {
   updatePurchaseOrderExec,
   type PurchaseOrder, type PurchaseRequest, type ExecStatus,
 } from '../../../api/eam'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const EXEC_STATUS_LIST: ExecStatus[] = ['pending', 'purchasing', 'completed']
 
@@ -158,7 +159,25 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     })
   }
 
-  const columns: TableColumnsType<PurchaseOrder> = [
+  /* ----- 字段配置 ----- */
+  const columnMeta = useMemo(() => [
+    { key: 'poNo', title: t('asset.colPoNo') },
+    { key: 'reqId', title: t('asset.colReqNo') },
+    { key: 'supplier', title: t('asset.colSupplier') },
+    { key: 'confirmedAmount', title: t('asset.colConfirmedAmount') },
+    { key: 'trackingNo', title: t('asset.colTrackingNo') },
+    { key: 'purchaser', title: t('asset.colPurchaser') },
+    { key: 'execStatus', title: t('asset.execStatus') },
+    { key: 'inboundProgress', title: t('asset.inboundTitle') },
+    { key: 'createdAt', title: t('asset.colCreatedAt') },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const { configComponent, applyConfig } = useColumnConfig('purchase-order', columnMeta)
+
+  const allColumns: TableColumnsType<PurchaseOrder> = [
     {
       title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 140, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
@@ -242,6 +261,8 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     },
   ]
 
+  const columns = useMemo(() => applyConfig(allColumns), [allColumns])
+
   return (
     <>
       {/* ====== 搜索區 ====== */}
@@ -283,9 +304,10 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
-          <Button icon={<PlusOutlined />} onClick={() => navigate('/purchase-request')}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/purchase-request')}>
             {t('asset.purchaseReqTitle')}
           </Button>
+          {configComponent}
         </div>
       </div>
 

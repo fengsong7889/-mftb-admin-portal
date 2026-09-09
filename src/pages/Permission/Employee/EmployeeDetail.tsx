@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tabs, TreeSelect, message } from 'antd'
+import { Button, DatePicker, Descriptions, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tabs, Timeline, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TabsProps } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import {
   ArrowLeftOutlined, PlusOutlined, EditOutlined, SaveOutlined,
-  UserOutlined, IdcardOutlined,
+  UserOutlined, IdcardOutlined, DeleteOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
-import { fetchEmployees, createEmployee, type EmployeeItem, type EmployeePayload } from '../../../api/employee'
+import { fetchEmployees, createEmployee, type EmployeeItem, type EmployeePayload,
+  fetchBasicInfo, savePersonalInfo, saveIdInfo, saveContactInfo,
+  fetchEmergencyContacts, createEmergencyContact, updateEmergencyContact, deleteEmergencyContact,
+  fetchPositionRecords, createPositionRecord, updatePositionRecord, deletePositionRecord,
+} from '../../../api/employee'
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
-import { fetchPositions, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
+import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
 import { fetchRoles, type RoleItem } from '../../../api/role'
+import { countryOptions as permCountryOptions, locationOptions, countryLocationMap } from '../../Permission/types'
 
 /* ═══════════════════════════════════════════
    类型定义
@@ -24,25 +29,20 @@ interface PositionRecord {
   effectiveSeq: number
   operation: string
   reason: string
-  reasonSub?: string
-  leaveDate?: string
   serviceDept?: string
   position?: string
   workCountry?: string
   workCity?: string
   officeAddress?: string
-  officeArea?: string
   company?: string
   contractLocation?: string
-  costCompany?: string
   employeeCategory?: string
   mentor?: string
   workSystem?: string
-  jobLevel?: string
-  rankEtc?: string
-  employmentType?: string
+  sequence?: string
+  positionLevel?: string
+  rank?: string
   directSuperior?: string
-  costSettlementType?: string
 }
 
 /** 费用信息 - 收入项 */
@@ -90,20 +90,26 @@ interface BasicInfo {
   nativePlace: string
   mobile: string
   email: string
-  address: string
-  emergencyContact: string
-  emergencyPhone: string
-  emergencyRelation: string
+  addressCountry?: string
+  addressCity?: string
+  addressDetail?: string
+  emergencyContacts: EmergencyContact[]
 }
 
-/** 统一账号 */
-interface UnifiedAccount {
+/** 紧急联系人 */
+interface EmergencyContact {
   id: number
-  platform: string
-  account: string
-  email?: string
-  status: number
-  bindDate: string
+  name: string
+  phone: string
+  relation: string
+}
+
+/** 账号管理 */
+interface LoginAccount {
+  id: number
+  loginAccount: string
+  loginPassword: string
+  status: 'normal' | 'frozen'
 }
 
 /** 合同信息 */
@@ -137,27 +143,25 @@ interface RewardPunishRecord {
 
 const MOCK_POSITION_RECORDS: PositionRecord[] = [
   {
-    id: 1, effectiveDate: '2024-03-27', effectiveSeq: 0,
-    operation: '重新进场', reason: '退场后重新进场',
+    id: 1, effectiveDate: '2024-03-27', effectiveSeq: 2,
+    operation: '重新入职', reason: '退场后重新进场',
     serviceDept: 'FTIC（履约与纺织品创新中心）/全球仓储营运部', position: '防损员',
-    workCountry: '中国', workCity: '惠州', officeAddress: '仲恺新宜园区安防组',
-    officeArea: '华南', company: '小米科技', contractLocation: '惠州',
-    costCompany: '小米科技', employeeCategory: '正式员工', mentor: '张三',
-    workSystem: '标准工时制', jobLevel: 'O2', rankEtc: 'R3',
-    employmentType: '长期', directSuperior: '李四', costSettlementType: '公司结算',
+    workCountry: 'china', workCity: 'huizhou', officeAddress: '仲恺新宜园区安防组',
+    company: '珠海闪蜂科技有限公司', contractLocation: 'huizhou',
+    employeeCategory: '正式员工', mentor: '张三',
+    workSystem: '标准工时制', sequence: 'P', positionLevel: 'P2', rank: 'R3',
+    directSuperior: '李四',
   },
   {
-    id: 2, effectiveDate: '2024-01-29', effectiveSeq: 0,
+    id: 2, effectiveDate: '2024-01-29', effectiveSeq: 1,
     operation: '离职', reason: '主动离职-交通原因',
-    leaveDate: '2024-01-29',
   },
   {
     id: 3, effectiveDate: '2022-02-02', effectiveSeq: 0,
-    operation: '重新雇佣', reason: '离职后入职',
+    operation: '重新入职', reason: '离职后入职',
     serviceDept: 'FTIC', position: '防损员',
-    workCountry: '中国', workCity: '惠州',
-    workSystem: '标准工时制', jobLevel: 'O2', rankEtc: 'R3',
-    employmentType: '长期',
+    workCountry: 'china', workCity: 'huizhou',
+    workSystem: '标准工时制', sequence: 'P', positionLevel: 'P2', rank: 'R3',
   },
 ]
 
@@ -171,6 +175,85 @@ const MOCK_SALARY_INCOME: SalaryIncomeItem[] = [
   { id: 7, name: '加班费', amount: 1500, type: 'variable' },
 ]
 
+/** 民族枚举（中国56个民族） */
+const ETHNICITY_OPTIONS = [
+  '汉', '蒙古', '回', '藏', '维吾尔', '苗', '彝', '壮', '布依', '朝鲜',
+  '满', '侗', '瑶', '白', '土家', '哈尼', '哈萨克', '傣', '黎', '傈僳',
+  '佤', '畲', '高山', '拉祜', '水', '东乡', '纳西', '景颇', '柯尔克孜', '土',
+  '达斡尔', '仫佬', '羌', '布朗', '撒拉', '毛南', '仡佬', '锡伯', '阿昌', '普米',
+  '塔吉克', '怒', '乌孜别克', '俄罗斯', '鄂温克', '德昂', '保安', '裕固', '京', '塔塔尔',
+  '独龙', '鄂伦春', '赫哲', '门巴', '珞巴', '基诺',
+].map(v => ({ value: v, label: v }))
+
+/** 婚姻状况枚举 */
+const MARITAL_STATUS_OPTIONS = [
+  { value: '未婚', label: '未婚' },
+  { value: '已婚', label: '已婚' },
+  { value: '离异', label: '离异' },
+  { value: '丧偶', label: '丧偶' },
+]
+
+/** 政治面貌枚举 */
+const POLITICAL_STATUS_OPTIONS = [
+  { value: '群众', label: '群众' },
+  { value: '中共党员', label: '中共党员' },
+  { value: '中共预备党员', label: '中共预备党员' },
+  { value: '共青团员', label: '共青团员' },
+  { value: '民革党员', label: '民革党员' },
+  { value: '民盟盟员', label: '民盟盟员' },
+  { value: '民建会员', label: '民建会员' },
+  { value: '民进会员', label: '民进会员' },
+  { value: '农工党党员', label: '农工党党员' },
+  { value: '致公党党员', label: '致公党党员' },
+  { value: '九三学社社员', label: '九三学社社员' },
+  { value: '台盟盟员', label: '台盟盟员' },
+  { value: '无党派人士', label: '无党派人士' },
+]
+
+/** 宗教信仰枚举 */
+const RELIGION_OPTIONS = [
+  { value: '无', label: '无' },
+  { value: '佛教', label: '佛教' },
+  { value: '道教', label: '道教' },
+  { value: '伊斯兰教', label: '伊斯兰教' },
+  { value: '天主教', label: '天主教' },
+  { value: '基督教', label: '基督教' },
+]
+
+/** 证件类型枚举 */
+const ID_TYPE_OPTIONS = [
+  { value: '身份证', label: '身份证' },
+  { value: '护照', label: '护照' },
+  { value: '港澳居民来往内地通行证', label: '港澳居民来往内地通行证' },
+  { value: '台湾居民来往大陆通行证', label: '台湾居民来往大陆通行证' },
+  { value: '外国人永久居留身份证', label: '外国人永久居留身份证' },
+  { value: '军官证', label: '军官证' },
+  { value: '士兵证', label: '士兵证' },
+  { value: '其他', label: '其他' },
+]
+
+/** 户籍类型枚举 */
+const HOUSEHOLD_TYPE_OPTIONS = [
+  { value: '本地农业户口', label: '本地农业户口' },
+  { value: '本地非农业户口', label: '本地非农业户口' },
+  { value: '外地农业户口', label: '外地农业户口' },
+  { value: '外地非农业户口', label: '外地非农业户口' },
+]
+
+/** 紧急联系人关系枚举 */
+const RELATIONSHIP_OPTIONS = [
+  '父母', '配偶', '子女', '兄弟姐妹', '祖父母', '外祖父母',
+  '孙子女', '外孙子女', '伯叔姑舅姨', '堂兄弟姐妹', '表兄弟姐妹',
+  '侄子侄女', '外甥外甥女', '公婆', '岳父母', '儿媳', '女婿',
+  '连襟', '妯娌', '朋友', '同事', '其他',
+].map(v => ({ value: v, label: v }))
+
+/** 收入项 - 项目名称枚举 */
+const INCOME_NAME_OPTIONS = [
+  '基本工资', '岗位津贴', '绩效奖金', '交通补贴',
+  '餐饮补贴', '通讯补贴', '加班费',
+]
+
 const MOCK_SALARY_DEDUCTION: SalaryDeductionItem[] = [
   { id: 1, name: '养老保险', rate: 8, amount: 640 },
   { id: 2, name: '医疗保险', rate: 2, amount: 160 },
@@ -179,6 +262,12 @@ const MOCK_SALARY_DEDUCTION: SalaryDeductionItem[] = [
   { id: 5, name: '生育保险', rate: 0, amount: 0 },
   { id: 6, name: '住房公积金', rate: 12, amount: 960 },
   { id: 7, name: '个人所得税', rate: 0, amount: 350 },
+]
+
+/** 扣除项 - 项目名称枚举 */
+const DEDUCTION_NAME_OPTIONS = [
+  '养老保险', '医疗保险', '失业保险', '工伤保险',
+  '生育保险', '住房公积金', '个人所得税',
 ]
 
 const MOCK_SALARY_CONFIG: SalaryConfig = {
@@ -196,28 +285,31 @@ const MOCK_BASIC_INFO: BasicInfo = {
   idNumber: '110121199611111210', idAddress: '中国',
   maritalStatus: '未婚', politicalStatus: '群众',
   religion: '佛教', householdType: '外地非农业户口',
-  householdLocation: '4505-北海市', nativePlace: '广西壮族自治区-北海市',
+  householdLocation: '惠州', nativePlace: '广州',
   mobile: '18899898912', email: 'xiaomi@qq.com',
-  address: '广东省肇庆市四会市碧桂园翡翠郡',
-  emergencyContact: '小红', emergencyPhone: '13989181423', emergencyRelation: '母亲',
+  addressCountry: '中国', addressCity: '惠州市', addressDetail: '广东省肇庆市四会市碧桂园翡翠郡',
+  emergencyContacts: [
+    { id: 1, name: '小红', phone: '13989181423', relation: '父母' },
+  ],
 }
 
-const MOCK_ACCOUNTS: UnifiedAccount[] = [
-  { id: 1, platform: '企业微信', account: '12345', email: 'Yolanda@qq.com', status: 1, bindDate: '2024-01-15' },
-  { id: 2, platform: '公司域账号', account: 'xiaomi', email: 'xiaomi@company.com', status: 1, bindDate: '2024-01-15' },
-  { id: 3, platform: 'OA系统', account: 'XM001', status: 1, bindDate: '2024-02-01' },
-]
+const MOCK_LOGIN_ACCOUNT: LoginAccount = {
+  id: 1,
+  loginAccount: 'MT00001',
+  loginPassword: '••••••••',
+  status: 'normal',
+}
 
 const MOCK_CONTRACTS: ContractRecord[] = [
   {
     id: 1, contractNo: 'HT-2024-001', contractType: '劳动合同',
     startDate: '2024-03-27', endDate: '2027-03-26', signDate: '2024-03-27',
-    company: '小米科技', status: '生效中',
+    company: '珠海闪蜂科技有限公司', status: '生效中',
   },
   {
     id: 2, contractNo: 'HT-2022-003', contractType: '劳动合同',
     startDate: '2022-02-02', endDate: '2024-01-29', signDate: '2022-02-02',
-    company: '小米科技', status: '已终止',
+    company: '珠海麦峰科技有限公司', status: '已终止',
   },
 ]
 
@@ -273,10 +365,87 @@ export default function EmployeeDetail() {
   const [activeTab, setActiveTab] = useState('position')
 
   /* ── 职务数据 ── */
-  const [positionRecords, setPositionRecords] = useState<PositionRecord[]>(MOCK_POSITION_RECORDS)
+  const [positionRecords, setPositionRecords] = useState<PositionRecord[]>([])
   const [posModalVisible, setPosModalVisible] = useState(false)
   const [editingPos, setEditingPos] = useState<PositionRecord | null>(null)
   const [posForm] = Form.useForm()
+  const [allEmployees, setAllEmployees] = useState<EmployeeItem[]>([])
+
+  /** 工龄：根据最早入职日期自动计算 */
+  const seniorityText = useMemo(() => {
+    if (!positionRecords.length) return null
+    const earliest = positionRecords.reduce((min, r) => r.effectiveSeq < min.effectiveSeq ? r : min)
+    const start = dayjs(earliest.effectiveDate)
+    if (!start.isValid()) return null
+    const now = dayjs()
+    const years = now.diff(start, 'year')
+    const months = now.diff(start.add(years, 'year'), 'month')
+    if (years > 0 && months > 0) return `${years}\u5e74${months}\u4e2a\u6708`
+    if (years > 0) return `${years}\u5e74`
+    return `${months}\u4e2a\u6708`
+  }, [positionRecords])
+  const watchPosCountry = Form.useWatch('workCountry', posForm)
+  const watchPosSequence = Form.useWatch('sequence', posForm)
+
+  /** 职务弹窗：部门树（value 用部门名称，方便详情展示） */
+  const posDeptTreeData = useMemo(() => {
+    interface Node { value: string; title: string; disabled?: boolean; children?: Node[] }
+    const nodeMap = new Map<number, Node>()
+    departments.forEach(dept => {
+      nodeMap.set(dept.id, {
+        value: isNonZh ? (dept.nameEn || dept.name) : dept.name,
+        title: isNonZh ? (dept.nameEn || dept.name) : dept.name,
+        disabled: dept.status !== DEPT_STATUS.ENABLED,
+        children: [],
+      })
+    })
+    const roots: Node[] = []
+    departments.forEach(dept => {
+      const node = nodeMap.get(dept.id)!
+      const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+      if (parent) parent.children!.push(node)
+      else roots.push(node)
+    })
+    return roots
+  }, [departments, isNonZh])
+
+  /** 职务弹窗：根据所选国家获取城市列表 */
+  const posCityOptions = useMemo(() => {
+    if (!watchPosCountry) return []
+    const cityKeys = countryLocationMap[watchPosCountry] || []
+    return locationOptions.filter(o => cityKeys.includes(o.key))
+  }, [watchPosCountry])
+
+  /** 职务弹窗：根据所选序列获取职级列表 */
+  const posLevelOptions = useMemo(() => {
+    if (!watchPosSequence) return []
+    const prefix = watchPosSequence
+    return Array.from({ length: 7 }, (_, i) => ({ value: `${prefix}${i + 1}`, label: `${prefix}${i + 1}` }))
+  }, [watchPosSequence])
+
+  /** 职务弹窗：选择服务部门后自动带出直属上级 */
+  const handlePosDeptChange = (deptName: string) => {
+    const dept = departments.find(d => (isNonZh ? (d.nameEn || d.name) : d.name) === deptName)
+    if (dept?.leader) {
+      posForm.setFieldValue('directSuperior', dept.leader)
+    } else {
+      posForm.setFieldValue('directSuperior', undefined)
+    }
+  }
+
+  /** 职务弹窗：打开时加载员工列表（导师用）+ 部门列表（服务部门用） */
+  useEffect(() => {
+    if (!posModalVisible) return
+    fetchEmployees({ page: 1, size: 500 })
+      .then(r => setAllEmployees(r.records))
+      .catch(() => { /* 静默 */ })
+    if (departments.length === 0) {
+      fetchDepartments().then(setDepartments).catch(() => { /* 静默 */ })
+    }
+    if (positions.length === 0) {
+      fetchPositions().then(setPositions).catch(() => { /* 静默 */ })
+    }
+  }, [posModalVisible])
 
   /* ─ 费用信息 ── */
   const [salaryIncome, setSalaryIncome] = useState<SalaryIncomeItem[]>(MOCK_SALARY_INCOME)
@@ -291,16 +460,39 @@ export default function EmployeeDetail() {
   const [deductionForm] = Form.useForm()
   const [configForm] = Form.useForm()
 
-  /* ── 基础信息 ── */
-  const [basicInfo, setBasicInfo] = useState<BasicInfo>(MOCK_BASIC_INFO)
-  const [basicModalVisible, setBasicModalVisible] = useState(false)
-  const [basicForm] = Form.useForm()
+  /* ── 基础信息（拆分为 4 个独立编辑模块）── */
+  const [basicInfo, setBasicInfo] = useState<BasicInfo>({
+    gender: '', nationality: '', ethnicity: '', birthDate: '',
+    idType: '', idNumber: '', idAddress: '', maritalStatus: '',
+    politicalStatus: '', religion: '', householdType: '',
+    householdLocation: '', nativePlace: '', mobile: '', email: '',
+    addressCountry: '', addressCity: '', addressDetail: '',
+    emergencyContacts: [],
+  })
+  const [personalModalVisible, setPersonalModalVisible] = useState(false)
+  const [idInfoModalVisible, setIdInfoModalVisible] = useState(false)
+  const [contactModalVisible, setContactModalVisible] = useState(false)
+  const [emergencyModalVisible, setEmergencyModalVisible] = useState(false)
+  const [personalForm] = Form.useForm()
+  const [idInfoForm] = Form.useForm()
+  const [contactForm] = Form.useForm()
+  const [emergencyForm] = Form.useForm()
+  const watchContactCountry = Form.useWatch('addressCountry', contactForm)
 
-  /* ── 统一账号 ── */
-  const [accounts, setAccounts] = useState<UnifiedAccount[]>(MOCK_ACCOUNTS)
-  const [accountModalVisible, setAccountModalVisible] = useState(false)
-  const [editingAccount, setEditingAccount] = useState<UnifiedAccount | null>(null)
-  const [accountForm] = Form.useForm()
+  /** 通讯弹窗：根据所选国家获取城市列表 */
+  const contactCityOptions = useMemo(() => {
+    if (!watchContactCountry) return []
+    const cityKeys = countryLocationMap[watchContactCountry] || []
+    return locationOptions.filter(o => cityKeys.includes(o.key))
+  }, [watchContactCountry])
+
+  /* ── 账号管理 ── */
+  const [loginAccount, setLoginAccount] = useState<LoginAccount>(MOCK_LOGIN_ACCOUNT)
+  const [resetPwdModalVisible, setResetPwdModalVisible] = useState(false)
+  const [resetPwdForm] = Form.useForm()
+
+  /* ── 角色展开/收起 ── */
+  const [showAllRoles, setShowAllRoles] = useState(false)
 
   /* ── 合同信息 ─ */
   const [contracts, setContracts] = useState<ContractRecord[]>(MOCK_CONTRACTS)
@@ -332,6 +524,64 @@ export default function EmployeeDetail() {
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- t 为翻译函数，语言切换无需重新拉取员工数据
   }, [empId])
+
+  /* ── 加载基础信息、紧急联系人、职务记录（编辑模式）── */
+  useEffect(() => {
+    if (!empId || !isEdit) return
+    const numId = Number(empId)
+    // 基础信息
+    fetchBasicInfo(numId).then(res => {
+      const p = res.personalInfo || {}
+      const idI = res.idInfo || {}
+      const c = res.contactInfo || {}
+      setBasicInfo(prev => ({
+        ...prev,
+        nationality: (p.nationality as string) ?? '',
+        ethnicity: (p.ethnicity as string) ?? '',
+        birthDate: (p.birthDate as string) ?? '',
+        maritalStatus: (p.maritalStatus as string) ?? '',
+        politicalStatus: (p.politicalStatus as string) ?? '',
+        religion: (p.religion as string) ?? '',
+        idType: (idI.idType as string) ?? '',
+        idNumber: (idI.idNumber as string) ?? '',
+        idAddress: (idI.idAddress as string) ?? '',
+        householdType: (idI.householdType as string) ?? '',
+        householdLocation: (idI.householdLocation as string) ?? '',
+        nativePlace: (idI.nativePlace as string) ?? '',
+        addressCountry: (c.addressCountry as string) ?? '',
+        addressCity: (c.addressCity as string) ?? '',
+        addressDetail: (c.addressDetail as string) ?? '',
+      }))
+    }).catch(() => { /* 静默 */ })
+    // 紧急联系人
+    fetchEmergencyContacts(numId).then(list => {
+      setBasicInfo(prev => ({ ...prev, emergencyContacts: list }))
+    }).catch(() => { /* 静默 */ })
+    // 职务记录
+    fetchPositionRecords(numId).then(list => {
+      setPositionRecords(list.map(r => ({
+        id: r.id,
+        effectiveDate: r.effectiveDate,
+        effectiveSeq: r.effectiveSeq,
+        operation: r.operation,
+        reason: r.reason ?? '',
+        serviceDept: r.serviceDept,
+        position: r.positionName,
+        workCountry: r.workCountry,
+        workCity: r.workCity,
+        officeAddress: r.officeAddress,
+        company: r.company,
+        contractLocation: r.contractLocation,
+        employeeCategory: r.employeeCategory,
+        mentor: r.mentor,
+        workSystem: r.workSystem,
+        sequence: r.sequenceType,
+        positionLevel: r.positionLevel,
+        rank: r.rankCode,
+        directSuperior: r.directSuperior,
+      })))
+    }).catch(() => { /* 静默 */ })
+  }, [empId, isEdit])
 
   /* ── 加载下拉数据（新增模式）── */
   useEffect(() => {
@@ -424,30 +674,51 @@ export default function EmployeeDetail() {
      3.1 職務數據 Tab
      ═══════════════════════════════════════════ */
 
-  const posColumns: TableColumnsType<PositionRecord> = [
-    { title: t('employeeDetail.colEffectiveDate'), dataIndex: 'effectiveDate', key: 'effectiveDate', width: 120 },
-    { title: t('employeeDetail.colEffectiveSeq'), dataIndex: 'effectiveSeq', key: 'effectiveSeq', width: 90 },
-    { title: t('employeeDetail.colOperation'), dataIndex: 'operation', key: 'operation', width: 120,
-      render: (v: string) => <Tag color="blue">{v}</Tag> },
-    { title: t('common.colReason'), dataIndex: 'reason', key: 'reason', width: 180 },
-    { title: t('employeeDetail.colServiceDept'), dataIndex: 'serviceDept', key: 'serviceDept', width: 200, render: (v: string) => v || '-' },
-    { title: t('employee.positionLabel'), dataIndex: 'position', key: 'position', width: 120, render: (v: string) => v || '-' },
-    { title: t('employeeDetail.colWorkSystem'), dataIndex: 'workSystem', key: 'workSystem', width: 120, render: (v: string) => v || '-' },
-    { title: t('employeeDetail.colJobLevel2'), dataIndex: 'jobLevel', key: 'jobLevel', width: 80, render: (v: string) => v || '-' },
-    { title: t('employeeDetail.colEmploymentType'), dataIndex: 'employmentType', key: 'employmentType', width: 100, render: (v: string) => v || '-' },
-    { title: t('employeeDetail.colCostSettlement'), dataIndex: 'costSettlementType', key: 'costSettlementType', width: 120, render: (v: string) => v || '-' },
-    {
-      title: t('common.colAction'), key: 'action', width: 120, fixed: 'right',
-      render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleEditPos(record)}>{t('common.edit')}</Button>
-          <Popconfirm title={t('common.confirmDelete')} description={t('employeeDetail.deletePosConfirm')} onConfirm={() => handleDeletePos(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
-            <Button type="link" size="small" danger>{t('common.delete')}</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]
+  /* ── 職務狀態軸：選中節點（默認最新一條），左側詳情聯動展示 ── */
+  const [selectedPosId, setSelectedPosId] = useState<number | null>(null)
+  const sortedPosRecords = useMemo(
+    () => [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || '')),
+    [positionRecords],
+  )
+  const selectedPos = useMemo(
+    () => sortedPosRecords.find(r => r.id === selectedPosId) ?? sortedPosRecords[0] ?? null,
+    [sortedPosRecords, selectedPosId],
+  )
+
+  /** 最新一條職務記錄的生效日期（新增時用於限制最早可填日期） */
+  const minEffectiveDate = useMemo(() => {
+    if (positionRecords.length === 0) return ''
+    return [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || ''))[0]?.effectiveDate || ''
+  }, [positionRecords])
+
+  /** 当前生效的职务记录：effectiveSeq 最大且生效日期 <= 今天的记录 */
+  const activePosRecord = useMemo(() => {
+    const today = dayjs().format('YYYY-MM-DD')
+    const eligible = positionRecords
+      .filter(r => r.effectiveDate <= today)
+      .sort((a, b) => (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))
+    return eligible[0] ?? null
+  }, [positionRecords])
+
+  /** 最新一条记录（effectiveSeq 最大）的操作类型，用于判断是否允许“重新入职” */
+  const latestPosOperation = useMemo(() => {
+    if (!positionRecords.length) return ''
+    const latest = [...positionRecords].sort((a, b) => (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))[0]
+    return latest?.operation ?? ''
+  }, [positionRecords])
+  const canRehire = !latestPosOperation || /离职/.test(latestPosOperation)
+
+  /** 職務操作類型 → 標籤顏色 */
+  const posOpColor = (op?: string) => {
+    if (!op) return 'default'
+    if (/離職|离职/.test(op)) return 'red'
+    if (/晉升|晋升/.test(op)) return 'gold'
+    if (/降職|降职/.test(op)) return 'orange'
+    if (/調動|调动/.test(op)) return 'blue'
+    if (/入職|入职/.test(op)) return 'green'
+    if (/重新/.test(op)) return 'cyan'
+    return 'blue'
+  }
 
   const handleAddPos = () => {
     setEditingPos(null)
@@ -457,23 +728,67 @@ export default function EmployeeDetail() {
 
   const handleEditPos = (record: PositionRecord) => {
     setEditingPos(record)
-    posForm.setFieldsValue(record)
+    posForm.setFieldsValue({
+      ...record,
+      effectiveDate: record.effectiveDate ? dayjs(record.effectiveDate) : undefined,
+    })
     setPosModalVisible(true)
   }
 
   const handleSavePos = async () => {
     const values = await posForm.validateFields()
-    if (editingPos) {
-      setPositionRecords(prev => prev.map(r => r.id === editingPos.id ? { ...r, ...values } : r))
-      message.success(t('employeeDetail.posUpdated'))
+    // DatePicker 返回 dayjs 对象，转为字符串
+    const normalized = {
+      ...values,
+      effectiveDate: values.effectiveDate?.format?.('YYYY-MM-DD') ?? values.effectiveDate,
+    }
+    if (empId) {
+      if (editingPos) {
+        const updated = await updatePositionRecord(Number(empId), editingPos.id, normalized)
+        setPositionRecords(prev => prev.map(r =>
+          r.id === editingPos.id ? {
+            ...r, ...normalized,
+            effectiveSeq: updated.effectiveSeq,
+          } : r
+        ))
+        message.success(t('employeeDetail.posUpdated'))
+      } else {
+        const created = await createPositionRecord(Number(empId), normalized)
+        const newRecord: PositionRecord = {
+          ...normalized,
+          id: created.id,
+          effectiveSeq: created.effectiveSeq,
+          position: normalized.positionName,
+          sequence: normalized.sequence,
+          positionLevel: normalized.positionLevel,
+          rank: normalized.rankCode,
+        }
+        setPositionRecords(prev => [newRecord, ...prev])
+        setSelectedPosId(created.id)
+        message.success(t('employeeDetail.posAdded'))
+      }
     } else {
-      setPositionRecords(prev => [{ ...values, id: Date.now(), effectiveSeq: 0 }, ...prev])
-      message.success(t('employeeDetail.posAdded'))
+      // 无 empId 时仅本地更新
+      if (editingPos) {
+        setPositionRecords(prev => prev.map(r =>
+          r.id === editingPos.id ? { ...r, ...normalized, effectiveSeq: (r.effectiveSeq ?? 0) + 1 } : r
+        ))
+        message.success(t('employeeDetail.posUpdated'))
+      } else {
+        const newId = Date.now()
+        const maxSeq = Math.max(...positionRecords.map(r => r.effectiveSeq ?? 0), -1)
+        setPositionRecords(prev => [{ ...normalized, id: newId, effectiveSeq: maxSeq + 1 }, ...prev])
+        setSelectedPosId(newId)
+        message.success(t('employeeDetail.posAdded'))
+      }
     }
     setPosModalVisible(false)
   }
 
-  const handleDeletePos = (id: number) => {
+  const handleDeletePos = async (id: number) => {
+    if (empId) {
+      await deletePositionRecord(Number(empId), id)
+    }
     setPositionRecords(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.posDeleted'))
   }
@@ -598,72 +913,216 @@ export default function EmployeeDetail() {
   }
 
   /* ═══════════════════════════════════════════
-     3.3 基礎信息 Tab
+     3.3 基礎信息 Tab（4 個模塊獨立編輯）
      ═══════════════════════════════════════════ */
 
-  const handleEditBasic = () => {
-    basicForm.setFieldsValue(basicInfo)
-    setBasicModalVisible(true)
+  const handleEditPersonal = () => {
+    personalForm.setFieldsValue({
+      gender: basicInfo.gender,
+      nationality: basicInfo.nationality,
+      ethnicity: basicInfo.ethnicity,
+      birthDate: basicInfo.birthDate ? dayjs(basicInfo.birthDate) : undefined,
+      maritalStatus: basicInfo.maritalStatus,
+      politicalStatus: basicInfo.politicalStatus,
+      religion: basicInfo.religion,
+    })
+    setPersonalModalVisible(true)
   }
 
-  const handleSaveBasic = async () => {
-    const values = await basicForm.validateFields()
-    setBasicInfo(values)
-    message.success(t('employeeDetail.basicUpdated'))
-    setBasicModalVisible(false)
+  const handleSavePersonal = async () => {
+    const values = await personalForm.validateFields()
+    const normalized = {
+      ...values,
+      birthDate: values.birthDate?.format?.('YYYY-MM-DD') ?? values.birthDate,
+    }
+    if (empId) {
+      await savePersonalInfo(Number(empId), normalized)
+    }
+    setBasicInfo(prev => ({ ...prev, ...normalized }))
+    message.success(t('employeeDetail.personalUpdated'))
+    setPersonalModalVisible(false)
+  }
+
+  const handleEditIdInfo = () => {
+    idInfoForm.setFieldsValue({
+      idType: basicInfo.idType,
+      idNumber: basicInfo.idNumber,
+      idAddress: basicInfo.idAddress,
+      householdType: basicInfo.householdType,
+      householdLocation: basicInfo.householdLocation,
+      nativePlace: basicInfo.nativePlace,
+    })
+    setIdInfoModalVisible(true)
+  }
+
+  const handleSaveIdInfo = async () => {
+    const values = await idInfoForm.validateFields()
+    if (empId) {
+      await saveIdInfo(Number(empId), values)
+    }
+    setBasicInfo(prev => ({ ...prev, ...values }))
+    message.success(t('employeeDetail.idInfoUpdated'))
+    setIdInfoModalVisible(false)
+  }
+
+  const handleEditContact = () => {
+    contactForm.setFieldsValue({
+      mobile: basicInfo.mobile,
+      email: basicInfo.email,
+      addressCountry: basicInfo.addressCountry,
+      addressCity: basicInfo.addressCity,
+      addressDetail: basicInfo.addressDetail,
+    })
+    setContactModalVisible(true)
+  }
+
+  const handleSaveContact = async () => {
+    const values = await contactForm.validateFields()
+    if (empId) {
+      await saveContactInfo(Number(empId), values)
+    }
+    setBasicInfo(prev => ({ ...prev, ...values }))
+    message.success(t('employeeDetail.contactUpdated'))
+    setContactModalVisible(false)
+  }
+
+  /* ── 紧急联系人 CRUD ── */
+  const [editingEmergency, setEditingEmergency] = useState<EmergencyContact | null>(null)
+
+  const handleAddEmergency = () => {
+    setEditingEmergency(null)
+    emergencyForm.resetFields()
+    setEmergencyModalVisible(true)
+  }
+
+  const handleEditEmergency = (record: EmergencyContact) => {
+    setEditingEmergency(record)
+    emergencyForm.setFieldsValue({
+      name: record.name,
+      phone: record.phone,
+      relation: record.relation,
+    })
+    setEmergencyModalVisible(true)
+  }
+
+  const handleSaveEmergency = async () => {
+    const values = await emergencyForm.validateFields()
+    if (empId) {
+      if (editingEmergency) {
+        await updateEmergencyContact(Number(empId), editingEmergency.id, values)
+        setBasicInfo(prev => ({
+          ...prev,
+          emergencyContacts: prev.emergencyContacts.map(c =>
+            c.id === editingEmergency.id ? { ...c, ...values } : c
+          ),
+        }))
+        message.success(t('employeeDetail.emergencyUpdated'))
+      } else {
+        const created = await createEmergencyContact(Number(empId), values)
+        setBasicInfo(prev => ({
+          ...prev,
+          emergencyContacts: [...prev.emergencyContacts, created],
+        }))
+        message.success(t('employeeDetail.emergencyAdded'))
+      }
+    } else {
+      // 无 empId 时仅本地更新
+      if (editingEmergency) {
+        setBasicInfo(prev => ({
+          ...prev,
+          emergencyContacts: prev.emergencyContacts.map(c =>
+            c.id === editingEmergency.id ? { ...c, ...values } : c
+          ),
+        }))
+        message.success(t('employeeDetail.emergencyUpdated'))
+      } else {
+        setBasicInfo(prev => ({
+          ...prev,
+          emergencyContacts: [...prev.emergencyContacts, { ...values, id: Date.now() }],
+        }))
+        message.success(t('employeeDetail.emergencyAdded'))
+      }
+    }
+    setEmergencyModalVisible(false)
+  }
+
+  const handleDeleteEmergency = async (id: number) => {
+    if (empId) {
+      await deleteEmergencyContact(Number(empId), id)
+    }
+    setBasicInfo(prev => ({
+      ...prev,
+      emergencyContacts: prev.emergencyContacts.filter(c => c.id !== id),
+    }))
+    message.success(t('employeeDetail.emergencyDeleted'))
   }
 
   /* ═══════════════════════════════════════════
-     3.4 統一賬號管理 Tab
+     3.4 賬號管理 Tab
      ═══════════════════════════════════════════ */
 
-  const accountColumns: TableColumnsType<UnifiedAccount> = [
-    { title: t('employeeDetail.colPlatform'), dataIndex: 'platform', key: 'platform', width: 140 },
-    { title: t('employeeDetail.colAccount'), dataIndex: 'account', key: 'account', width: 160 },
-    { title: t('employeeDetail.colEmail'), dataIndex: 'email', key: 'email', render: (v: string) => v || '-' },
-    { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 90, render: (v: number) => statusTag(v) },
-    { title: t('employeeDetail.colBindDate'), dataIndex: 'bindDate', key: 'bindDate', width: 120 },
+  const accountColumns: TableColumnsType<LoginAccount> = [
+    { title: t('employeeDetail.colLoginAccount'), dataIndex: 'loginAccount', key: 'loginAccount' },
+    { title: t('employeeDetail.colLoginPassword'), dataIndex: 'loginPassword', key: 'loginPassword' },
     {
-      title: t('common.colAction'), key: 'action', width: 120,
-      render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleEditAccount(record)}>{t('common.edit')}</Button>
-          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteAccount(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
-            <Button type="link" size="small" danger>{t('common.delete')}</Button>
-          </Popconfirm>
+      title: t('employeeDetail.colAccountStatus'), dataIndex: 'status', key: 'status', width: 100,
+      render: (status: LoginAccount['status']) => (
+        <Tag color={status === 'normal' ? 'green' : 'red'}>
+          {status === 'normal' ? t('employeeDetail.statusNormal') : t('employeeDetail.statusFrozen')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('common.colAction'), key: 'action', width: 200,
+      render: (_: unknown, record: LoginAccount) => (
+        <Space>
+          <Button type="link" size="small" onClick={() => setResetPwdModalVisible(true)}>{t('employeeDetail.resetPassword')}</Button>
+          {record.status === 'normal' ? (
+            <Popconfirm
+              title={t('employeeDetail.freezeConfirmTitle')}
+              description={t('employeeDetail.freezeConfirmDesc')}
+              onConfirm={() => handleToggleFreeze(record.id)}
+              okText={t('common.confirm')}
+              cancelText={t('common.cancel')}
+            >
+              <Button type="link" size="small" danger>{t('employeeDetail.freezeAccount')}</Button>
+            </Popconfirm>
+          ) : (
+            <Popconfirm
+              title={t('employeeDetail.unfreezeConfirmTitle')}
+              description={t('employeeDetail.unfreezeConfirmDesc')}
+              onConfirm={() => handleToggleFreeze(record.id)}
+              okText={t('common.confirm')}
+              cancelText={t('common.cancel')}
+            >
+              <Button type="link" size="small">{t('employeeDetail.unfreezeAccount')}</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
   ]
 
-  const handleAddAccount = () => {
-    setEditingAccount(null)
-    accountForm.resetFields()
-    accountForm.setFieldsValue({ status: 1 })
-    setAccountModalVisible(true)
-  }
-
-  const handleEditAccount = (record: UnifiedAccount) => {
-    setEditingAccount(record)
-    accountForm.setFieldsValue(record)
-    setAccountModalVisible(true)
-  }
-
-  const handleSaveAccount = async () => {
-    const values = await accountForm.validateFields()
-    if (editingAccount) {
-      setAccounts(prev => prev.map(r => r.id === editingAccount.id ? { ...r, ...values } : r))
-      message.success(t('employeeDetail.accountUpdated'))
-    } else {
-      setAccounts(prev => [...prev, { ...values, id: Date.now(), bindDate: dayjs().format('YYYY-MM-DD') }])
-      message.success(t('employeeDetail.accountAdded'))
+  const handleResetPassword = async () => {
+    const values = await resetPwdForm.validateFields()
+    if (values.newPassword !== values.confirmPassword) {
+      message.error(t('employeeDetail.passwordMismatch'))
+      return
     }
-    setAccountModalVisible(false)
+    setLoginAccount(prev => ({ ...prev, loginPassword: '••••••••' }))
+    message.success(t('employeeDetail.passwordResetSuccess'))
+    setResetPwdModalVisible(false)
+    resetPwdForm.resetFields()
   }
 
-  const handleDeleteAccount = (id: number) => {
-    setAccounts(prev => prev.filter(r => r.id !== id))
-    message.success(t('employeeDetail.accountDeleted'))
+  /** 冻结 / 解冻切换 */
+  const handleToggleFreeze = (accountId: number) => {
+    setLoginAccount(prev => {
+      if (prev.id !== accountId) return prev
+      const next = prev.status === 'normal' ? 'frozen' : 'normal'
+      message.success(next === 'frozen' ? t('employeeDetail.freezeSuccess') : t('employeeDetail.unfreezeSuccess'))
+      return { ...prev, status: next }
+    })
   }
 
   /* ═══════════════════════════════════════════
@@ -676,7 +1135,7 @@ export default function EmployeeDetail() {
     { title: t('employeeDetail.colStartDate'), dataIndex: 'startDate', key: 'startDate', width: 120 },
     { title: t('employeeDetail.colEndDate'), dataIndex: 'endDate', key: 'endDate', width: 120 },
     { title: t('employeeDetail.colSignDate'), dataIndex: 'signDate', key: 'signDate', width: 120 },
-    { title: t('employeeDetail.colCompany'), dataIndex: 'company', key: 'company', width: 140 },
+    { title: t('employeeDetail.colCompany'), dataIndex: 'company', key: 'company', width: 220, render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v}</span> },
     { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
       render: (v: string) => <Tag color={v === '生效中' ? 'green' : 'default'}>{v}</Tag> },
     { title: t('employeeDetail.colRemark'), dataIndex: 'remark', key: 'remark', render: (v: string) => v || '-' },
@@ -782,20 +1241,131 @@ export default function EmployeeDetail() {
      渲染 Tab 內容
      ═══════════════════════════════════════════ */
 
+  /** 職務詳情分組小節：橙色豎條標題 + 兩列 Descriptions */
+  function renderPosSection(title: string, items: Array<{ label: string; value?: string }>) {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <span style={{ width: 3, height: 12, borderRadius: 2, background: '#E8720C' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{title}</span>
+        </div>
+        <Descriptions
+          column={2}
+          size="small"
+          items={items.map(i => ({ key: i.label, label: i.label, children: i.value || '-' }))}
+        />
+      </div>
+    )
+  }
+
   function renderPositionTab() {
     return (
-      <div>
-        <Table
-          columns={posColumns}
-          dataSource={positionRecords}
-          rowKey="id"
-          pagination={false}
-          scroll={{ x: 'max-content' }}
-          size="middle"
-        />
-        {/* Tab 下方操作按鈕 */}
-        <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddPos}>{t('employeeDetail.addPos')}</Button>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        {/* 左側：當前選中節點的職務變動詳情（各節點部門/職位可能不同） */}
+        <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.posDetailTitle')}</span>
+            {selectedPos && <Tag color={posOpColor(selectedPos.operation)} style={{ marginLeft: 4 }}>{selectedPos.operation}</Tag>}
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <Space size={8}>
+              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddPos}>{t('employeeDetail.addPos')}</Button>
+              {selectedPos && (
+                <>
+                  <Button size="small" icon={<EditOutlined />} onClick={() => handleEditPos(selectedPos)}>{t('common.edit')}</Button>
+                  <Popconfirm title={t('common.confirmDelete')} description={t('employeeDetail.deletePosConfirm')} onConfirm={() => handleDeletePos(selectedPos.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
+                    <Button size="small" danger icon={<DeleteOutlined />}>{t('common.delete')}</Button>
+                  </Popconfirm>
+                </>
+              )}
+            </Space>
+          </div>
+          {selectedPos ? (
+            <>
+              {renderPosSection(t('employeeDetail.posGroupChange'), [
+                { label: t('employeeDetail.colEffectiveDate'), value: selectedPos.effectiveDate },
+                { label: t('employeeDetail.colEffectiveSeq'), value: String(selectedPos.effectiveSeq ?? '-') },
+                { label: t('employeeDetail.colOperation'), value: selectedPos.operation },
+                { label: t('common.colReason'), value: selectedPos.reason },
+              ])}
+              {renderPosSection(t('employeeDetail.posGroupAppointment'), [
+                { label: t('employeeDetail.colServiceDept'), value: selectedPos.serviceDept },
+                { label: t('employeeDetail.colSequence'), value: selectedPos.sequence },
+                { label: t('employeeDetail.colJobLevel2'), value: selectedPos.positionLevel },
+                { label: t('employeeDetail.colRank'), value: selectedPos.rank },
+                { label: t('employeeDetail.colPosCompany'), value: selectedPos.company },
+                { label: t('employeeDetail.colEmployeeCategory'), value: selectedPos.employeeCategory },
+                { label: t('employeeDetail.colWorkSystem'), value: selectedPos.workSystem },
+                { label: t('employee.positionLabel'), value: selectedPos.position },
+                { label: t('employeeDetail.colDirectSuperior'), value: selectedPos.directSuperior },
+                { label: t('employeeDetail.colMentor'), value: selectedPos.mentor },
+              ])}
+              {renderPosSection(t('employeeDetail.posGroupWork'), [
+                { label: t('employeeDetail.colWorkCountry'), value: selectedPos.workCountry },
+                { label: t('employeeDetail.colWorkCity'), value: selectedPos.workCity },
+                { label: t('employeeDetail.colOfficeAddress'), value: selectedPos.officeAddress },
+                { label: t('employeeDetail.colContractLocation'), value: selectedPos.contractLocation },
+              ])}
+            </>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('employeeDetail.posEmpty')} />
+          )}
+        </div>
+
+        {/* 右側：人事變動軌跡狀態軸（點擊節點聯動左側詳情） */}
+        <div style={{ width: 320, flexShrink: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ClockCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.posTimelineTitle')}</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          {sortedPosRecords.length > 0 ? (
+            <>
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>{t('employeeDetail.posTimelineHint')}</div>
+              <Timeline
+                items={sortedPosRecords.map(r => {
+                  const active = selectedPos?.id === r.id
+                  return {
+                    dot: (
+                      <span style={{
+                        display: 'inline-block', width: active ? 14 : 10, height: active ? 14 : 10,
+                        borderRadius: '50%', boxSizing: 'border-box',
+                        background: active ? '#E8720C' : '#fff',
+                        border: active ? '3px solid #F59432' : '2px solid #d9d9d9',
+                        boxShadow: active ? '0 0 0 4px rgba(232,114,12,0.12)' : 'none',
+                        transition: 'all 0.2s',
+                      }} />
+                    ),
+                    children: (
+                      <div
+                        onClick={() => setSelectedPosId(r.id)}
+                        style={{
+                          cursor: 'pointer', marginLeft: 4, padding: '8px 12px', borderRadius: 8,
+                          background: active ? '#FFF7E6' : 'transparent',
+                          border: active ? '1px solid #FFD591' : '1px solid transparent',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#E8720C' : '#262626' }}>{r.effectiveDate}</span>
+                          <Tag color={posOpColor(r.operation)} style={{ marginRight: 0, fontSize: 11, lineHeight: '18px' }}>{r.operation}</Tag>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                          {[r.serviceDept, r.position].filter(Boolean).join(' · ') || '-'}
+                        </div>
+                      </div>
+                    ),
+                  }
+                })}
+              />
+            </>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('employeeDetail.posEmpty')} />
+          )}
         </div>
       </div>
     )
@@ -886,6 +1456,7 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.personalInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <Button icon={<EditOutlined />} onClick={handleEditPersonal}>{t('common.edit')}</Button>
           </div>
           <Descriptions column={3} size="small" bordered>
             <Descriptions.Item label={t('employee.nameLabel')}>{employee?.name || '-'}</Descriptions.Item>
@@ -907,6 +1478,7 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.idInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <Button icon={<EditOutlined />} onClick={handleEditIdInfo}>{t('common.edit')}</Button>
           </div>
           <Descriptions column={3} size="small" bordered>
             <Descriptions.Item label={t('employeeDetail.labelIdType')}>{basicInfo.idType}</Descriptions.Item>
@@ -926,11 +1498,14 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.contactInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <Button icon={<EditOutlined />} onClick={handleEditContact}>{t('common.edit')}</Button>
           </div>
           <Descriptions column={3} size="small" bordered>
             <Descriptions.Item label={t('employeeDetail.labelMobile')}>{basicInfo.mobile}</Descriptions.Item>
             <Descriptions.Item label={t('employeeDetail.labelEmail')}>{basicInfo.email}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelAddress')} span={3}>{basicInfo.address}</Descriptions.Item>
+            <Descriptions.Item label={t('employeeDetail.labelAddressCountry')}>{basicInfo.addressCountry || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('employeeDetail.labelAddressCity')}>{basicInfo.addressCity || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('employeeDetail.labelAddressDetail')} span={2}>{basicInfo.addressDetail || '-'}</Descriptions.Item>
           </Descriptions>
         </div>
 
@@ -942,18 +1517,34 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.emergencyInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddEmergency}>{t('common.add')}</Button>
           </div>
-          <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label={t('employee.nameLabel')}>{basicInfo.emergencyContact}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelEmergencyPhone')}>{basicInfo.emergencyPhone}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelRelation')}>{basicInfo.emergencyRelation}</Descriptions.Item>
-          </Descriptions>
+          <Table
+            size="small"
+            dataSource={basicInfo.emergencyContacts}
+            rowKey="id"
+            pagination={false}
+            columns={[
+              { title: t('employee.nameLabel'), dataIndex: 'name', key: 'name' },
+              { title: t('employeeDetail.labelEmergencyPhone'), dataIndex: 'phone', key: 'phone' },
+              { title: t('employeeDetail.labelRelation'), dataIndex: 'relation', key: 'relation' },
+              {
+                title: t('common.action'),
+                key: 'action',
+                width: 120,
+                render: (_: unknown, record: EmergencyContact) => (
+                  <Space size="small">
+                    <a onClick={() => handleEditEmergency(record)}>{t('common.edit')}</a>
+                    <Popconfirm title={t('employeeDetail.confirmDeleteEmergency')} onConfirm={() => handleDeleteEmergency(record.id)}>
+                      <a style={{ color: '#ff4d4f' }}>{t('common.delete')}</a>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+          />
         </div>
 
-        {/* Tab 下方操作按鈕 */}
-        <div style={{ marginTop: 8 }}>
-          <Button icon={<EditOutlined />} onClick={handleEditBasic}>{t('employeeDetail.editBasic')}</Button>
-        </div>
       </div>
     )
   }
@@ -963,15 +1554,11 @@ export default function EmployeeDetail() {
       <div>
         <Table
           columns={accountColumns}
-          dataSource={accounts}
+          dataSource={[loginAccount]}
           rowKey="id"
           pagination={false}
           size="middle"
         />
-        {/* Tab 下方操作按鈕 */}
-        <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddAccount}>{t('employeeDetail.addAccount')}</Button>
-        </div>
       </div>
     )
   }
@@ -1067,7 +1654,9 @@ export default function EmployeeDetail() {
           {employee && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.empIdColon', { empId: employee.empId })}</span>
-              {statusTag(employee.status)}
+              {latestPosOperation === '离职'
+                ? <Tag color="default">{t('employee.statusResigned')}</Tag>
+                : <Tag color="success">{t('employee.statusActive')}</Tag>}
             </div>
           )}
         </div>
@@ -1091,15 +1680,41 @@ export default function EmployeeDetail() {
             <Descriptions column={4} size="small" bordered>
               <Descriptions.Item label={t('employee.nameLabel')}>{employee.name}</Descriptions.Item>
               <Descriptions.Item label={t('employee.empIdLabel')}>{employee.empId}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.deptLabel')}>{employee.department || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.positionLabel')}>{employee.position || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.sequenceLabel')}>{employee.sequence || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.colJobLevel')}>{employee.jobLevel || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.rankLabel')}>{employee.rank || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('common.colStatus')}>{statusTag(employee.status)}</Descriptions.Item>
+              <Descriptions.Item label={t('employee.deptLabel')}>{activePosRecord?.serviceDept || employee.department || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('employee.positionLabel')}>{activePosRecord?.position || employee.position || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('employee.sequenceLabel')}>{activePosRecord?.sequence || employee.sequence || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('employee.colJobLevel')}>{activePosRecord?.positionLevel || employee.jobLevel || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('employee.rankLabel')}>{activePosRecord?.rank || employee.rank || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('employee.employmentStatus')}>
+                {latestPosOperation === '离职'
+                  ? <Tag color="default">{t('employee.statusResigned')}</Tag>
+                  : <Tag color="success">{t('employee.statusActive')}</Tag>}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('employee.seniorityLabel')}>
+                {seniorityText || <span style={{ color: '#8C8C8C' }}>-</span>}
+              </Descriptions.Item>
               <Descriptions.Item label={t('employee.roleAuthLabel')} span={2}>
                 {employee.functionRoleIds?.length
-                  ? employee.functionRoleIds.map(id => <Tag key={id} color="blue">{t('employeeDetail.roleTag', { id })}</Tag>)
+                  ? (() => {
+                      const roles = employee.functionRoleIds
+                      const visible = showAllRoles ? roles : roles.slice(0, 2)
+                      const remaining = roles.length - 2
+                      return (
+                        <>
+                          {visible.map(id => <Tag key={id} color="blue">{t('employeeDetail.roleTag', { id })}</Tag>)}
+                          {!showAllRoles && remaining > 0 && (
+                            <a onClick={() => setShowAllRoles(true)} style={{ fontSize: 12, marginLeft: 4 }}>
+                              +{remaining}
+                            </a>
+                          )}
+                          {showAllRoles && roles.length > 2 && (
+                            <a onClick={() => setShowAllRoles(false)} style={{ fontSize: 12, marginLeft: 4 }}>
+                              {t('common.collapse')}
+                            </a>
+                          )}
+                        </>
+                      )
+                    })()
                   : <span style={{ color: '#8C8C8C' }}>{t('employee.notBound')}</span>}
               </Descriptions.Item>
               <Descriptions.Item label={t('employee.colUpdatedBy')}>{employee.updatedBy || '-'}</Descriptions.Item>
@@ -1217,55 +1832,172 @@ export default function EmployeeDetail() {
         destroyOnClose
       >
         <Form form={posForm} layout="vertical">
+          {/* 變動信息 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <span style={{ width: 3, height: 12, borderRadius: 2, background: '#E8720C' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupChange')}</span>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="effectiveDate" label={t('employeeDetail.colEffectiveDate')} rules={[{ required: true, message: t('employeeDetail.effectiveDateRequired') }]}>
-              <Input placeholder={t('employeeDetail.effectiveDatePh')} />
+            <Form.Item
+              name="effectiveDate"
+              label={t('employeeDetail.colEffectiveDate')}
+              rules={[
+                { required: true, message: t('employeeDetail.effectiveDateRequired') },
+                { validator: (_, v) => {
+                  if (!v || !minEffectiveDate) return Promise.resolve()
+                  const dateStr = v.format?.('YYYY-MM-DD') ?? v
+                  return dateStr >= minEffectiveDate
+                    ? Promise.resolve()
+                    : Promise.reject(new Error(t('employeeDetail.effectiveDateMin', { date: minEffectiveDate })))
+                }},
+              ]}
+            >
+              <DatePicker style={{ width: '100%' }} placeholder={t('employeeDetail.effectiveDatePh')} format="YYYY-MM-DD" />
             </Form.Item>
             <Form.Item name="operation" label={t('employeeDetail.colOperation')} rules={[{ required: true, message: t('employeeDetail.operationRequired') }]}>
               <Select options={[
-                { value: '雇佣', label: '雇佣' },
-                { value: '重新雇佣', label: '重新雇佣' },
-                { value: '重新进场', label: '重新进场' },
+                { value: '入职', label: '入职' },
+                { value: '调动', label: '调动' },
+                { value: '晋升', label: '晋升' },
+                { value: '降职', label: '降职' },
                 { value: '离职', label: '离职' },
-                { value: '调岗', label: '调岗' },
+                { value: '重新入职', label: '重新入职', disabled: !canRehire },
               ]} />
             </Form.Item>
           </div>
           <Form.Item name="reason" label={t('common.colReason')} rules={[{ required: true, message: t('employeeDetail.reasonRequired') }]}>
             <Input placeholder={t('employeeDetail.reasonRequired')} />
           </Form.Item>
+          <div style={{ height: 1, background: '#f0f0f0', margin: '8px 0 16px' }} />
+
+          {/* 任職信息 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <span style={{ width: 3, height: 12, borderRadius: 2, background: '#1890ff' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupAppointment')}</span>
+          </div>
+          {/* 1.1 服务部门 - TreeSelect 树状结构 */}
+          <Form.Item name="serviceDept" label={t('employeeDetail.colServiceDept')}>
+            <TreeSelect
+              treeData={posDeptTreeData}
+              treeDefaultExpandAll
+              placeholder={t('employeeDetail.colServiceDept')}
+              allowClear
+              showSearch
+              treeNodeFilterProp="title"
+              onChange={handlePosDeptChange}
+            />
+          </Form.Item>
+          {/* 1.2 职级序列 + 1.3 职级 + 1.4 职等 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="serviceDept" label={t('employeeDetail.colServiceDept')}>
-              <Input placeholder={t('employeeDetail.colServiceDept')} />
+            <Form.Item name="sequence" label={t('employeeDetail.colSequence')}>
+              <Select options={POSITION_SEQUENCE_OPTIONS} placeholder={t('employeeDetail.colSequence')} allowClear onChange={() => {
+                posForm.setFieldValue('positionLevel', undefined)
+                posForm.setFieldValue('rank', undefined)
+              }} />
             </Form.Item>
-            <Form.Item name="position" label={t('employee.positionLabel')}>
-              <Input placeholder={t('employee.positionLabel')} />
+            <Form.Item name="positionLevel" label={t('employeeDetail.colJobLevel2')}>
+              <Select options={posLevelOptions} placeholder={t('employeeDetail.colJobLevel2')} allowClear disabled={!watchPosSequence} />
+            </Form.Item>
+            <Form.Item name="rank" label={t('employeeDetail.colRank')}>
+              <Select options={POSITION_RANK_OPTIONS} placeholder={t('employeeDetail.colRank')} allowClear />
+            </Form.Item>
+          </div>
+          {/* 1.5 任职公司 + 1.6 员工类别 + 1.8 工时制 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+            <Form.Item name="company" label={t('employeeDetail.colPosCompany')}>
+              <Select placeholder={t('employeeDetail.colPosCompany')} allowClear options={[
+                { value: '珠海闪蜂科技有限公司', label: '珠海闪蜂科技有限公司' },
+                { value: '珠海麦峰科技有限公司', label: '珠海麦峰科技有限公司' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="employeeCategory" label={t('employeeDetail.colEmployeeCategory')}>
+              <Select placeholder={t('employeeDetail.colEmployeeCategory')} allowClear options={[
+                { value: '正式员工', label: '正式员工' },
+                { value: '实习生', label: '实习生' },
+                { value: '劳务派遣', label: '劳务派遣' },
+                { value: '外包', label: '外包' },
+              ]} />
             </Form.Item>
             <Form.Item name="workSystem" label={t('employeeDetail.colWorkSystem')}>
-              <Select options={[
+              <Select placeholder={t('employeeDetail.colWorkSystem')} allowClear options={[
                 { value: '标准工时制', label: '标准工时制' },
                 { value: '综合工时制', label: '综合工时制' },
                 { value: '不定时工时制', label: '不定时工时制' },
               ]} />
             </Form.Item>
           </div>
+          {/* 职位 + 1.9 直属上级 + 1.10 导师 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="jobLevel" label={t('employeeDetail.colJobLevel2')}>
-              <Input placeholder={t('employeeDetail.colJobLevel2')} />
+            <Form.Item name="position" label={t('employee.positionLabel')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employee.positionLabel')}
+                allowClear
+                options={positions
+                  .filter(p => !watchPosSequence || p.sequence === watchPosSequence)
+                  .map(p => ({ value: p.name, label: `${p.name}${p.jobLevel ? ` (${p.sequence}${p.jobLevel})` : ''}` }))}
+              />
             </Form.Item>
-            <Form.Item name="employmentType" label={t('employeeDetail.colEmploymentType')}>
-              <Select options={[
-                { value: '长期', label: '长期' },
-                { value: '临时', label: '临时' },
-              ]} />
+            <Form.Item name="directSuperior" label={t('employeeDetail.colDirectSuperior')}>
+              <Input placeholder={t('employeeDetail.colDirectSuperior')} readOnly />
             </Form.Item>
-            <Form.Item name="costSettlementType" label={t('employeeDetail.colCostSettlement')}>
-              <Select options={[
-                { value: '公司结算', label: '公司结算' },
-                { value: '部门结算', label: '部门结算' },
-              ]} />
+            <Form.Item name="mentor" label={t('employeeDetail.colMentor')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.colMentor')}
+                allowClear
+                options={allEmployees.map(e => ({ value: e.name, label: `${e.name}(${e.empId})` }))}
+              />
             </Form.Item>
           </div>
+
+          <div style={{ height: 1, background: '#f0f0f0', margin: '8px 0 16px' }} />
+
+          {/* 工作信息 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <span style={{ width: 3, height: 12, borderRadius: 2, background: '#52c41a' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupWork')}</span>
+          </div>
+          {/* 2.1 工作国家 + 2.2 工作城市 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+            <Form.Item name="workCountry" label={t('employeeDetail.colWorkCountry')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.colWorkCountry')}
+                allowClear
+                onChange={() => posForm.setFieldValue('workCity', undefined)}
+                options={permCountryOptions.map(c => ({ value: c.key, label: c.label }))}
+              />
+            </Form.Item>
+            <Form.Item name="workCity" label={t('employeeDetail.colWorkCity')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.colWorkCity')}
+                allowClear
+                disabled={!watchPosCountry}
+                options={posCityOptions.map(c => ({ value: c.key, label: c.label }))}
+              />
+            </Form.Item>
+          </div>
+          {/* 2.4 办公地址 */}
+          <Form.Item name="officeAddress" label={t('employeeDetail.colOfficeAddress')}>
+            <Input placeholder={t('employeeDetail.colOfficeAddress')} />
+          </Form.Item>
+          {/* 2.5 合同签订地 */}
+          <Form.Item name="contractLocation" label={t('employeeDetail.colContractLocation')}>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder={t('employeeDetail.colContractLocation')}
+              allowClear
+              disabled={!watchPosCountry}
+              options={posCityOptions.map(c => ({ value: c.key, label: c.label }))}
+            />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -1282,7 +2014,10 @@ export default function EmployeeDetail() {
       >
         <Form form={incomeForm} layout="vertical">
           <Form.Item name="name" label={t('employeeDetail.labelItemName')} rules={[{ required: true, message: t('employeeDetail.itemNameRequired') }]}>
-            <Input placeholder={t('employeeDetail.itemNameIncomePh')} />
+            <Select
+              placeholder={t('employeeDetail.itemNameIncomePh')}
+              options={INCOME_NAME_OPTIONS.map(v => ({ value: v, label: v }))}
+            />
           </Form.Item>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="type" label={t('common.colType')} rules={[{ required: true }]}>
@@ -1314,7 +2049,10 @@ export default function EmployeeDetail() {
       >
         <Form form={deductionForm} layout="vertical">
           <Form.Item name="name" label={t('employeeDetail.labelItemName')} rules={[{ required: true, message: t('employeeDetail.itemNameRequired') }]}>
-            <Input placeholder={t('employeeDetail.itemNameDeductionPh')} />
+            <Select
+              placeholder={t('employeeDetail.itemNameDeductionPh')}
+              options={DEDUCTION_NAME_OPTIONS.map(v => ({ value: v, label: v }))}
+            />
           </Form.Item>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="rate" label={t('employeeDetail.colRate')} rules={[{ required: true, message: t('employeeDetail.rateRequired') }]}>
@@ -1377,48 +2115,83 @@ export default function EmployeeDetail() {
       </Modal>
 
       {/* ═══════════════════════════════════════════
-         彈窗：基礎信息
+         彈窗：個人信息
          ═══════════════════════════════════════════ */}
       <Modal
-        title={t('employeeDetail.editBasic')}
-        open={basicModalVisible}
-        onOk={handleSaveBasic}
-        onCancel={() => setBasicModalVisible(false)}
+        title={t('employeeDetail.personalInfo')}
+        open={personalModalVisible}
+        onOk={handleSavePersonal}
+        onCancel={() => setPersonalModalVisible(false)}
         width={720}
         destroyOnClose
       >
-        <Form form={basicForm} layout="vertical" initialValues={basicInfo}>
+        <Form form={personalForm} layout="vertical">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+            {/* 1.1 性别 */}
             <Form.Item name="gender" label={t('employeeDetail.labelGender')}>
-              <Select options={[{ value: '男', label: '男' }, { value: '女', label: '女' }]} />
+              <Select options={[{ value: '男', label: '男' }, { value: '女', label: '女' }]} placeholder={t('employeeDetail.labelGender')} allowClear />
             </Form.Item>
+            {/* 1.2 国籍 */}
             <Form.Item name="nationality" label={t('employeeDetail.labelNationality')}>
-              <Input />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.labelNationality')}
+                allowClear
+                options={permCountryOptions.map(c => ({ value: c.label, label: c.label }))}
+              />
             </Form.Item>
+            {/* 1.3 民族 */}
             <Form.Item name="ethnicity" label={t('employeeDetail.labelEthnicity')}>
-              <Input />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.labelEthnicity')}
+                allowClear
+                options={ETHNICITY_OPTIONS}
+              />
             </Form.Item>
+            {/* 1.4 出生年月 */}
             <Form.Item name="birthDate" label={t('employeeDetail.labelBirthDate')}>
-              <Input placeholder={t('employeeDetail.datePh')} />
+              <DatePicker style={{ width: '100%' }} placeholder={t('employeeDetail.datePh')} format="YYYY-MM-DD" />
             </Form.Item>
+            {/* 1.5 婚姻状况 */}
             <Form.Item name="maritalStatus" label={t('employeeDetail.labelMaritalStatus')}>
-              <Select options={[
-                { value: '未婚', label: '未婚' },
-                { value: '已婚', label: '已婚' },
-                { value: '离异', label: '离异' },
-              ]} />
+              <Select options={MARITAL_STATUS_OPTIONS} placeholder={t('employeeDetail.labelMaritalStatus')} allowClear />
             </Form.Item>
+            {/* 1.6 政治面貌 */}
             <Form.Item name="politicalStatus" label={t('employeeDetail.labelPoliticalStatus')}>
-              <Select options={[
-                { value: '群众', label: '群众' },
-                { value: '党员', label: '党员' },
-                { value: '团员', label: '团员' },
-              ]} />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={POLITICAL_STATUS_OPTIONS}
+                placeholder={t('employeeDetail.labelPoliticalStatus')}
+                allowClear
+              />
+            </Form.Item>
+            {/* 1.7 宗教信仰 */}
+            <Form.Item name="religion" label={t('employeeDetail.labelReligion')}>
+              <Select options={RELIGION_OPTIONS} placeholder={t('employeeDetail.labelReligion')} allowClear />
             </Form.Item>
           </div>
+        </Form>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════
+         彈窗：證件信息
+         ═══════════════════════════════════════════ */}
+      <Modal
+        title={t('employeeDetail.idInfo')}
+        open={idInfoModalVisible}
+        onOk={handleSaveIdInfo}
+        onCancel={() => setIdInfoModalVisible(false)}
+        width={720}
+        destroyOnClose
+      >
+        <Form form={idInfoForm} layout="vertical">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="idType" label={t('employeeDetail.labelIdType')}>
-              <Select options={[{ value: '身份证', label: '身份证' }, { value: '护照', label: '护照' }]} />
+              <Select options={ID_TYPE_OPTIONS} placeholder={t('employeeDetail.labelIdType')} allowClear />
             </Form.Item>
             <Form.Item name="idNumber" label={t('employeeDetail.labelIdNumber')}>
               <Input />
@@ -1426,7 +2199,43 @@ export default function EmployeeDetail() {
             <Form.Item name="idAddress" label={t('employeeDetail.labelIdAddress')}>
               <Input />
             </Form.Item>
+            <Form.Item name="householdType" label={t('employeeDetail.labelHouseholdType')}>
+              <Select options={HOUSEHOLD_TYPE_OPTIONS} placeholder={t('employeeDetail.labelHouseholdType')} allowClear />
+            </Form.Item>
+            <Form.Item name="householdLocation" label={t('employeeDetail.labelHouseholdLocation')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.labelHouseholdLocation')}
+                allowClear
+                options={locationOptions.map(c => ({ value: c.label, label: c.label }))}
+              />
+            </Form.Item>
+            <Form.Item name="nativePlace" label={t('employeeDetail.labelNativePlace')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.labelNativePlace')}
+                allowClear
+                options={locationOptions.map(c => ({ value: c.label, label: c.label }))}
+              />
+            </Form.Item>
           </div>
+        </Form>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════
+         彈窗：通訊信息
+         ═══════════════════════════════════════════ */}
+      <Modal
+        title={t('employeeDetail.contactInfo')}
+        open={contactModalVisible}
+        onOk={handleSaveContact}
+        onCancel={() => setContactModalVisible(false)}
+        width={720}
+        destroyOnClose
+      >
+        <Form form={contactForm} layout="vertical">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="mobile" label={t('employeeDetail.labelMobile')}>
               <Input />
@@ -1434,49 +2243,84 @@ export default function EmployeeDetail() {
             <Form.Item name="email" label={t('employeeDetail.labelEmail')}>
               <Input />
             </Form.Item>
+            {/* 2.1 住址拆分：国家 */}
+            <Form.Item name="addressCountry" label={t('employeeDetail.labelAddressCountry')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.labelAddressCountry')}
+                allowClear
+                options={permCountryOptions.map(c => ({ value: c.label, label: c.label }))}
+              />
+            </Form.Item>
+            {/* 2.1 住址拆分：城市（联动国家） */}
+            <Form.Item name="addressCity" label={t('employeeDetail.labelAddressCity')}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder={t('employeeDetail.labelAddressCity')}
+                allowClear
+                disabled={!watchContactCountry}
+                options={contactCityOptions.map(c => ({ value: c.label, label: c.label }))}
+              />
+            </Form.Item>
           </div>
-          <Form.Item name="address" label={t('employeeDetail.labelAddress')}>
+          {/* 2.1 住址拆分：详细地址 */}
+          <Form.Item name="addressDetail" label={t('employeeDetail.labelAddressDetail')}>
             <Input.TextArea rows={2} />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════
+         彈窗：緊急聯繫人
+         ═══════════════════════════════════════════ */}
+      <Modal
+        title={t('employeeDetail.emergencyInfo')}
+        open={emergencyModalVisible}
+        onOk={handleSaveEmergency}
+        onCancel={() => setEmergencyModalVisible(false)}
+        width={720}
+        destroyOnClose
+      >
+        <Form form={emergencyForm} layout="vertical">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="emergencyContact" label={t('employeeDetail.labelEmergencyContact')}>
+            <Form.Item name="name" label={t('employee.nameLabel')} rules={[{ required: true, message: t('employeeDetail.nameRequired') }]}>
               <Input />
             </Form.Item>
-            <Form.Item name="emergencyPhone" label={t('employeeDetail.labelEmergencyPhone')}>
+            <Form.Item name="phone" label={t('employeeDetail.labelEmergencyPhone')} rules={[{ required: true, message: t('employeeDetail.phoneRequired') }]}>
               <Input />
             </Form.Item>
-            <Form.Item name="emergencyRelation" label={t('employeeDetail.labelRelation')}>
-              <Input />
+            <Form.Item name="relation" label={t('employeeDetail.labelRelation')} rules={[{ required: true, message: t('employeeDetail.relationRequired') }]}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={RELATIONSHIP_OPTIONS}
+                placeholder={t('employeeDetail.labelRelation')}
+                allowClear
+              />
             </Form.Item>
           </div>
         </Form>
       </Modal>
 
       {/* ═══════════════════════════════════════════
-         彈窗：統一賬號
+         彈窗：重置密碼
          ═══════════════════════════════════════════ */}
       <Modal
-        title={editingAccount ? t('employeeDetail.editAccountTitle') : t('employeeDetail.addAccountTitle')}
-        open={accountModalVisible}
-        onOk={handleSaveAccount}
-        onCancel={() => setAccountModalVisible(false)}
+        title={t('employeeDetail.resetPassword')}
+        open={resetPwdModalVisible}
+        onOk={handleResetPassword}
+        onCancel={() => { setResetPwdModalVisible(false); resetPwdForm.resetFields() }}
         width={480}
         destroyOnClose
       >
-        <Form form={accountForm} layout="vertical">
-          <Form.Item name="platform" label={t('employeeDetail.colPlatform')} rules={[{ required: true, message: t('employeeDetail.platformRequired') }]}>
-            <Input placeholder={t('employeeDetail.platformPh')} />
+        <Form form={resetPwdForm} layout="vertical">
+          <Form.Item name="newPassword" label={t('employeeDetail.newPassword')} rules={[{ required: true, message: t('employeeDetail.newPasswordRequired') }]}>
+            <Input.Password placeholder={t('employeeDetail.newPasswordPh')} />
           </Form.Item>
-          <Form.Item name="account" label={t('employeeDetail.colAccount')} rules={[{ required: true, message: t('employeeDetail.accountRequired') }]}>
-            <Input placeholder={t('employeeDetail.accountPh')} />
-          </Form.Item>
-          <Form.Item name="email" label={t('employeeDetail.colEmail')}>
-            <Input placeholder={t('employeeDetail.emailOptionalPh')} />
-          </Form.Item>
-          <Form.Item name="status" label={t('common.colStatus')} valuePropName="checked"
-            getValueFromEvent={(checked) => checked ? 1 : 0}
-            getValueProps={(value) => ({ checked: value === 1 })}>
-            <Switch checkedChildren={t('employee.statusEnabled')} unCheckedChildren={t('employee.statusDisabled')} />
+          <Form.Item name="confirmPassword" label={t('employeeDetail.confirmPassword')} rules={[{ required: true, message: t('employeeDetail.confirmPasswordRequired') }]}>
+            <Input.Password placeholder={t('employeeDetail.confirmPasswordPh')} />
           </Form.Item>
         </Form>
       </Modal>
@@ -1519,7 +2363,10 @@ export default function EmployeeDetail() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="company" label={t('employeeDetail.colCompany')} rules={[{ required: true }]}>
-              <Input placeholder={t('employeeDetail.colCompany')} />
+              <Select placeholder={t('employeeDetail.colCompany')} allowClear options={[
+                { value: '珠海闪蜂科技有限公司', label: '珠海闪蜂科技有限公司' },
+                { value: '珠海麦峰科技有限公司', label: '珠海麦峰科技有限公司' },
+              ]} />
             </Form.Item>
             <Form.Item name="status" label={t('common.colStatus')}>
               <Select options={[

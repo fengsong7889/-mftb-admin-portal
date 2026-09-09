@@ -34,7 +34,7 @@ export function loadApproverOptions(): Promise<ApproverCache> {
 
   loadPromise = (async () => {
     const [empRes, roles, depts] = await Promise.allSettled([
-      fetchEmployees({ page: 1, size: 200, status: 1 }),
+      fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }),
       fetchWorkflowRoleOptions(),
       fetchDepartments(),
     ])

@@ -5,11 +5,11 @@
  * - 適配 OA 流程：橙色標題欄 + 模塊化卡片佈局
  * - 前端先行：暫不對接後端 OA 審批 API，使用 mock 提交
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button, Form, Input, InputNumber, Select, Row, Col, Space, Spin, message,
-  Table, Tag, Modal, Upload,
+  Table, Tag, Modal, Upload, TreeSelect,
 } from 'antd'
 import type { TableColumnsType, UploadFile } from 'antd'
 import {
@@ -23,7 +23,39 @@ import dayjs from 'dayjs'
 import {
   fetchModelList, type AssetModel,
 } from '../../../api/eam'
-import { EAM_DEPARTMENTS } from '../../AssetManagement/eamUtils'
+import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
+
+/* ==================== 部門樹數據 ==================== */
+
+interface DeptTreeOption {
+  value: number
+  title: string
+  disabled?: boolean
+  children?: DeptTreeOption[]
+}
+
+function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
+  const nodeMap = new Map<number, DeptTreeOption>()
+  list.forEach(dept => {
+    nodeMap.set(dept.id, {
+      value: dept.id,
+      title: dept.name,
+      disabled: dept.status !== DEPT_STATUS.ENABLED,
+      children: [],
+    })
+  })
+  const roots: DeptTreeOption[] = []
+  list.forEach(dept => {
+    const node = nodeMap.get(dept.id)!
+    const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+    if (parent) {
+      parent.children!.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
 
 /* ==================== 類型定義 ==================== */
 
@@ -38,7 +70,7 @@ interface ItemRow {
 
 interface FormValues {
   title: string
-  department: string
+  department: number | undefined
   reason: string
   items: ItemRow[]
   remark?: string
@@ -151,6 +183,19 @@ export default function OaPurchaseRequest() {
   const [loading, setLoading] = useState(false)
   const [models, setModels] = useState<AssetModel[]>([])
 
+  // 部門樹數據
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const deptTreeData = useMemo(
+    () => buildDeptTreeData(departments),
+    [departments],
+  )
+  // 部門 ID → 名稱映射（提交時使用）
+  const deptNameMap = useMemo(() => {
+    const map = new Map<number, string>()
+    departments.forEach((d) => map.set(d.id, d.name))
+    return map
+  }, [departments])
+
   // 明細列表
   const [items, setItems] = useState<ItemRow[]>([])
   const [modalOpen, setModalOpen] = useState(false)
@@ -170,19 +215,29 @@ export default function OaPurchaseRequest() {
   useEffect(() => {
     let alive = true
     setLoading(true)
-    fetchModelList({ size: 9999 })
-      .then((res) => { if (alive) setModels(res.records || []) })
+    Promise.all([
+      fetchModelList({ size: 9999 }),
+      fetchDepartments(),
+    ])
+      .then(([modelRes, deptList]) => {
+        if (!alive) return
+        setModels(modelRes.records || [])
+        setDepartments(deptList)
+      })
       .catch((e: Error) => message.error(e.message))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [])
 
-  // 自動填充申請部門
+  // 自動填充申請部門（按部門名稱匹配 ID）
   useEffect(() => {
-    if (user?.department && !form.getFieldValue('department')) {
-      form.setFieldsValue({ department: user.department })
+    if (user?.department && departments.length && !form.getFieldValue('department')) {
+      const matched = departments.find((d) => d.name === user.department)
+      if (matched) {
+        form.setFieldsValue({ department: matched.id })
+      }
     }
-  }, [user, form])
+  }, [user, departments, form])
 
   /* ---- 明細操作 ---- */
   const handleAddItem = () => {
@@ -240,7 +295,8 @@ export default function OaPurchaseRequest() {
       }
       const payload = {
         title: v.title.trim(),
-        department: v.department,
+        department: v.department ? (deptNameMap.get(v.department) || '') : '',
+        departmentId: v.department,
         applicant: user?.name || '',
         applicantEmpId: user?.empId || '',
         reason: v.reason.trim(),
@@ -459,9 +515,13 @@ export default function OaPurchaseRequest() {
                 label="申請部門" name="department"
                 rules={[{ required: true, message: '請選擇申請部門' }]}
               >
-                <Select
-                  placeholder="請選擇部門" showSearch
-                  options={EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))}
+                <TreeSelect
+                  treeData={deptTreeData}
+                  placeholder="請選擇部門"
+                  allowClear
+                  treeDefaultExpandAll
+                  showSearch
+                  treeNodeFilterProp="title"
                 />
               </Form.Item>
             </Col>

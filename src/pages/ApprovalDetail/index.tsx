@@ -703,7 +703,7 @@ export default function ApprovalDetail() {
 
   useEffect(() => {
     Promise.all([
-      import('../../api/employee').then(m => m.fetchEmployees({ page: 1, size: 200, status: 1 })).catch(() => ({ records: [], total: 0 })),
+      import('../../api/employee').then(m => m.fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' })).catch(() => ({ records: [], total: 0 })),
       import('../../api/department').then(m => m.fetchDepartments()).catch(() => []),
       import('../../api/role').then(m => m.fetchRoles()).catch(() => []),
     ]).then(([empRes, depts, roles]) => {

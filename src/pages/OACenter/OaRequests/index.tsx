@@ -159,7 +159,7 @@ export default function OaRequests() {
 
   useEffect(() => {
     Promise.all([
-      fetchEmployees({ page: 1, size: 200, status: 1 }).catch(() => ({ records: [], total: 0 })),
+      fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).catch(() => ({ records: [], total: 0 })),
       fetchDepartments().catch(() => []),
       fetchRoles().catch(() => []),
     ]).then(([empRes, depts, roles]) => {

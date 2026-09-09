@@ -107,8 +107,9 @@ export function mockFetchEmployees(query: EmployeeQuery): PageResult<EmployeeIte
         || emp.empId.toLowerCase().includes(kw)
       if (!match) return false
     }
-    if (query.status !== undefined && query.status !== null) {
-      if (emp.status !== query.status) return false
+    if (query.employmentStatus !== undefined && query.employmentStatus !== null) {
+      const empStatus = emp.employmentStatus || 'active'
+      if (empStatus !== query.employmentStatus) return false
     }
     return true
   })
