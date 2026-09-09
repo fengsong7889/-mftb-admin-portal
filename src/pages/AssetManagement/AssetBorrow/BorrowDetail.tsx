@@ -5,7 +5,7 @@
  * - 未歸還時底部提供「續借」「歸還」入口（歸還跳轉歸還管理並帶入借用單）
  */
 import { useState, useEffect, useCallback } from 'react'
-import { Descriptions, Tag, Space, Spin, message, Alert } from 'antd'
+import { Button, Descriptions, Tag, Space, Spin, message, Alert } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { fetchBorrowDetail, type BorrowRecord } from '../../../api/eam'
 import { daysBetween, todayStr } from '../eamUtils'

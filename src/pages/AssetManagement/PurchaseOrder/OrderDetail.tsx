@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Descriptions, Table, Tag, Space, Spin, message, Progress,
+  Button, Descriptions, Table, Tag, Space, Spin, message, Progress,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'

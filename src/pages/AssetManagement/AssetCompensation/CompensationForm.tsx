@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react'
 import {
   Button, Form, Input, Select, Row, Col, Card, Spin, message, Descriptions, Tag,
 } from 'antd'
-import { SaveOutlined } from '@ant-design/icons'
+import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
   createCompensation, bindReturnCompensation,
