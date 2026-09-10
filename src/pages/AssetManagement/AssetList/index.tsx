@@ -210,13 +210,15 @@ export default function AssetList() {
       return
     }
     const cols = [
-      { title: '入库批次号',     dataIndex: 'assetNo' },
+      { title: '资产编号',     dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'),   dataIndex: 'assetName' },
       { title: t('asset.colAssetType'),   dataIndex: 'assetType' },
       { title: t('asset.colBrand'),       dataIndex: 'brand' },
       { title: t('asset.colCompany'),     dataIndex: 'company' },
       { title: t('asset.colLocation'),    dataIndex: 'location' },
-      { title: '归属部门',  dataIndex: 'department' },
+      { title: t('asset.colCurrentUserName'), dataIndex: 'userName' },
+      { title: '所在部门',  dataIndex: 'department' },
+      { title: t('asset.colClaimDate'), dataIndex: 'usageDate' },
       { title: t('asset.colSource'),      dataIndex: 'source' },
       { title: t('asset.colPurchaseValue'), dataIndex: 'purchaseValue' },
       { title: t('asset.colPurchaseDate'),  dataIndex: 'purchaseDate' },
@@ -249,14 +251,16 @@ export default function AssetList() {
 
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
-    { key: 'assetNo', title: '入库批次号' },
+    { key: 'assetNo', title: '资产编号' },
     { key: 'assetName', title: t('asset.colAssetName') },
     { key: 'assetType', title: t('asset.colAssetType') },
     { key: 'brand', title: t('asset.colBrand') },
     { key: 'company', title: t('asset.colCompany') },
     { key: 'location', title: t('asset.colLocationName') },
     { key: 'holdType', title: t('asset.colHoldType') },
-    { key: 'department', title: '归属部门' },
+    { key: 'userName', title: t('asset.colCurrentUserName') },
+    { key: 'department', title: '所在部门' },
+    { key: 'usageDate', title: t('asset.colClaimDate') },
     { key: 'source', title: t('asset.colSource') },
     { key: 'quantity', title: t('asset.colQuantity') },
     { key: 'purchaseValue', title: t('asset.colPurchaseValue') },
@@ -269,12 +273,12 @@ export default function AssetList() {
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
-  const { configComponent, applyConfig } = useColumnConfig('asset-list', columnMeta)
+  const { configComponent, applyConfig } = useColumnConfig('asset-list-v2', columnMeta)
 
   /* ----- 列定义 ----- */
   const allColumns: TableColumnsType<AssetItem> = [
     {
-      title: '入库批次号',
+      title: '资产编号',
       dataIndex: 'assetNo', key: 'assetNo', width: 140, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
@@ -299,8 +303,18 @@ export default function AssetList() {
       dataIndex: 'location', key: 'location', width: 180, ellipsis: true,
     },
     {
-      title: '归属部门',
+      title: t('asset.colCurrentUserName'),
+      dataIndex: 'userName', key: 'userName', width: 120,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '所在部门',
       dataIndex: 'department', key: 'department', width: 120,
+    },
+    {
+      title: t('asset.colClaimDate'),
+      dataIndex: 'usageDate', key: 'usageDate', width: 110,
+      render: (v: string | null) => v || '-',
     },
     {
       title: t('asset.colSource'),
@@ -417,8 +431,8 @@ export default function AssetList() {
       {/* ====== 搜索区 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label="入库批次号" name="assetNo">
-            <Input placeholder="请输入入库批次号" allowClear style={{ width: '100%' }} />
+          <Form.Item label="资产编号" name="assetNo">
+            <Input placeholder="请输入资产编号" allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colAssetType')} name="assetType">
             <Select placeholder={t('common.all')} allowClear options={assetTypeOptions} />
@@ -429,8 +443,8 @@ export default function AssetList() {
           <Form.Item label={t('asset.colCompany')} name="company">
             <Select placeholder={t('common.all')} allowClear options={companyOptions} />
           </Form.Item>
-          <Form.Item label="归属部门" name="department">
-            <Input placeholder="请输入归属部门" allowClear />
+          <Form.Item label="所在部门" name="department">
+            <Input placeholder="请输入所在部门" allowClear />
           </Form.Item>
           <Form.Item label={t('asset.colSource')} name="source">
             <Select placeholder={t('common.all')} allowClear options={sourceOptions} />
@@ -494,7 +508,7 @@ export default function AssetList() {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2020 }}
+        scroll={{ x: 2250 }}
         rowSelection={{
           selectedRowKeys,
           onChange: setSelectedRowKeys,

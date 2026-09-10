@@ -636,6 +636,8 @@
     "colPurchaseValue": "購買時價值",
     "colPurchaseDate": "購買日期",
     "colUsageDate": "使用日期",
+    "colCurrentUserName": "當前使用人",
+    "colClaimDate": "領用日期",
     "colScrapTime": "報廢時間",
     "colImages": "資產圖片",
     "colImage": "圖片",

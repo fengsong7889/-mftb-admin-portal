@@ -636,6 +636,8 @@
     "colPurchaseValue": "Purchase Value",
     "colPurchaseDate": "Purchase Date",
     "colUsageDate": "Usage Date",
+    "colCurrentUserName": "Current User",
+    "colClaimDate": "Claim Date",
     "colScrapTime": "Scrap Time",
     "colImages": "Images",
     "colImage": "Image",

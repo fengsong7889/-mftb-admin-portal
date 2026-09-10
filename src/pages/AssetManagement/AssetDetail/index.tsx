@@ -198,6 +198,8 @@ export default function AssetDetail() {
                       <Descriptions.Item label={t('asset.colAssetName')} span={2}>{asset.assetName}</Descriptions.Item>
                       <Descriptions.Item label={t('asset.colQuantity')}>{asset.quantity} {asset.unit}</Descriptions.Item>
                       <Descriptions.Item label="归属部门">{asset.department || <span style={{ color: '#BFBFBF' }}>—</span>}</Descriptions.Item>
+                      <Descriptions.Item label={t('asset.colCurrentUserName')}>{asset.userName || <span style={{ color: '#BFBFBF' }}>—</span>}</Descriptions.Item>
+                      <Descriptions.Item label={t('asset.colClaimDate')}>{asset.usageDate || <span style={{ color: '#BFBFBF' }}>—</span>}</Descriptions.Item>
                     </Descriptions>
                   </Card>
 
