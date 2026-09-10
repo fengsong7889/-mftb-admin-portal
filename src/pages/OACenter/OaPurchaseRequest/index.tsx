@@ -6,7 +6,7 @@
  * - 前端先行：暫不對接後端 OA 審批 API，使用 mock 提交
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Button, Form, Input, InputNumber, Select, Row, Col, Space, Spin, message,
   Table, Tag, Modal, Upload, TreeSelect,
@@ -102,7 +102,7 @@ function ItemEditModal({ open, editing, models, onOk, onCancel }: ItemEditModalP
   const handleModelChange = (modelId: number) => {
     const m = models.find((x) => x.id === modelId)
     if (m) {
-      form.setFieldsValue({ modelName: `${m.brand} ${m.modelNo} / ${m.name}`, estPrice: m.refPrice })
+      form.setFieldsValue({ modelName: `${m.brandZh} ${m.modelNo} / ${m.name}`, estPrice: m.refPrice })
     }
   }
 
@@ -134,7 +134,7 @@ function ItemEditModal({ open, editing, models, onOk, onCancel }: ItemEditModalP
             optionFilterProp="label"
             onChange={handleModelChange}
             options={models.map((m) => ({
-              label: `${m.brand} ${m.modelNo} / ${m.name}`,
+              label: `${m.brandZh} ${m.modelNo} / ${m.name}`,
               value: m.id,
             }))}
           />
@@ -177,6 +177,8 @@ function ItemEditModal({ open, editing, models, onOk, onCancel }: ItemEditModalP
 export default function OaPurchaseRequest() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fromPage = searchParams.get('from')
   const { user } = useAuth()
   const [form] = Form.useForm<FormValues>()
   const [submitting, setSubmitting] = useState(false)
@@ -329,7 +331,7 @@ export default function OaPurchaseRequest() {
       render: (_: unknown, row: ItemRow) => {
         if (row.modelName) return row.modelName
         const m = modelOf(row.modelId)
-        return m ? `${m.brand} ${m.modelNo} / ${m.name}` : '-'
+        return m ? `${m.brandZh} ${m.modelNo} / ${m.name}` : '-'
       },
     },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right' },
@@ -440,7 +442,7 @@ export default function OaPurchaseRequest() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/process-center')}
+              onClick={() => navigate(fromPage === 'purchase-order' ? '/purchase-order' : '/process-center')}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C',
                 borderRadius: 8, height: 36, padding: '0 16px',

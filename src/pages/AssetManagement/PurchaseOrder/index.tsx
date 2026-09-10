@@ -42,13 +42,13 @@ export default function PurchaseOrder() {
           onBack={goList}
           onEdit={(id) => setView({ mode: 'edit', id })}
           onInbound={(poId) => navigate(`/asset-inbound?poId=${poId}`)}
-          onViewRequest={(reqId) => navigate(`/purchase-request?id=${reqId}`)}
+          onViewRequest={(reqId) => navigate(`/oa-requests`)}
         />
       ) : (
         <OrderEdit
           key={view.id}
           id={view.id}
-          onBack={() => setView({ mode: 'detail', id: view.id })}
+          onBack={goList}
           onSaved={() => setView({ mode: 'detail', id: view.id })}
         />
       )}

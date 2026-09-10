@@ -144,6 +144,7 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/approval-center': '審批中心',
   '/hint-config': '搜索引導配置',
   '/hot-search-config': '熱搜配置',
+  '/param-library': '參數庫',
   '/search-weight-config': '搜索權重',
   '/word-segmentation': '分詞管理',
   '/synonym-config': '同義詞配置',

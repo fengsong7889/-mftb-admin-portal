@@ -1,0 +1,261 @@
+/* EmployeeDetail.css - 现代化员工详情页样式 */
+
+/* 现代卡片样式（无边框，使用阴影） */
+.emp-detail-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.25s ease;
+}
+
+.emp-detail-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* 信息网格布局（替代 Descriptions bordered） */
+.emp-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px 24px;
+  margin-top: 16px;
+}
+
+.emp-info-grid.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.emp-info-grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.emp-info-grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.emp-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emp-info-item.span-2 {
+  grid-column: span 2;
+}
+
+.emp-info-label {
+  font-size: 12px;
+  color: #8C8C8C;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.emp-info-value {
+  font-size: 14px;
+  color: #262626;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* 区块标题样式 */
+.emp-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #F0F0F0;
+}
+
+.emp-section-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.emp-section-icon.blue {
+  background: linear-gradient(135deg, #E6F7FF, #BAE7FF);
+  color: #1890FF;
+}
+
+.emp-section-icon.purple {
+  background: linear-gradient(135deg, #F9F0FF, #EFDBFF);
+  color: #722ED1;
+}
+
+.emp-section-icon.cyan {
+  background: linear-gradient(135deg, #E6FFFB, #B5F5EC);
+  color: #13C2C2;
+}
+
+.emp-section-icon.orange {
+  background: linear-gradient(135deg, #FFF7E6, #FFE7BA);
+  color: #FA8C16;
+}
+
+.emp-section-icon.green {
+  background: linear-gradient(135deg, #F6FFED, #D9F7BE);
+  color: #52C41A;
+}
+
+.emp-section-icon.red {
+  background: linear-gradient(135deg, #FFF2F0, #FFCCC7);
+  color: #FF4D4F;
+}
+
+.emp-section-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  flex: 1;
+}
+
+/* 薪资统计卡片 */
+.emp-salary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.emp-stat-card {
+  padding: 20px;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.emp-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.emp-stat-card.green {
+  background: linear-gradient(135deg, #F6FFED, #D9F7BE);
+  border: 1px solid #B7EB8F;
+}
+
+.emp-stat-card.red {
+  background: linear-gradient(135deg, #FFF2F0, #FFCCC7);
+  border: 1px solid #FFA39E;
+}
+
+.emp-stat-card.blue {
+  background: linear-gradient(135deg, #E6F7FF, #BAE7FF);
+  border: 1px solid #91D5FF;
+}
+
+.emp-stat-label {
+  font-size: 13px;
+  color: #8C8C8C;
+  margin-bottom: 8px;
+}
+
+.emp-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.emp-stat-value.green {
+  color: #52C41A;
+}
+
+.emp-stat-value.red {
+  color: #FF4D4F;
+}
+
+.emp-stat-value.blue {
+  color: #1890FF;
+}
+
+/* 职务详情面板 */
+.emp-position-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.emp-position-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.emp-position-timeline {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+/* 职务分组标题 */
+.emp-pos-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #595959;
+}
+
+.emp-pos-group-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: #E8720C;
+}
+
+/* 时间线面板优化 */
+.emp-timeline-panel {
+  background: #FAFAFA;
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.emp-timeline-hint {
+  font-size: 12px;
+  color: #8C8C8C;
+  margin-bottom: 12px;
+}
+
+/* 表格容器优化 */
+.emp-table-wrapper {
+  margin-top: 12px;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+  .emp-info-grid.cols-4 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .emp-position-layout {
+    flex-direction: column;
+  }
+  
+  .emp-position-timeline {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .emp-info-grid,
+  .emp-info-grid.cols-4,
+  .emp-info-grid.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .emp-info-item.span-2 {
+    grid-column: span 1;
+  }
+  
+  .emp-salary-stats {
+    grid-template-columns: 1fr;
+  }
+}

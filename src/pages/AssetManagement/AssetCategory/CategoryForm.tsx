@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Button, Form, Input, TreeSelect, Space, Spin, message,
+  Button, Form, Input, TreeSelect, Space, Spin, message, Select, InputNumber,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, FolderOutlined,
@@ -24,6 +24,7 @@ interface FormValues {
   code: string
   name: string
   parentId?: number
+  status: 'enabled' | 'disabled'
   remark?: string
 }
 
@@ -61,11 +62,12 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
               code: cur.code,
               name: cur.name,
               parentId: cur.parentId || undefined,
+              status: cur.status || 'enabled',
               remark: cur.remark,
             })
           }
         } else {
-          form.setFieldsValue({ parentId: parentId || undefined })
+          form.setFieldsValue({ parentId: parentId || undefined, status: 'enabled' })
         }
       })
       .catch((e: Error) => message.error(e.message))
@@ -80,6 +82,7 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
         code: v.code.trim(),
         name: v.name.trim(),
         parentId: v.parentId || 0,
+        status: v.status || 'enabled',
         sort: 1,
         remark: v.remark,
         paramTemplate: [],
@@ -156,28 +159,41 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
           {cardTitle(<FolderOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#E6F7FF', t('asset.sectionBasic'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item
-              label={t('asset.colCode')} name="code"
-              rules={[{ required: true, message: t('asset.codeRequired') }]}
+              label="分类编码" name="code"
+              rules={[{ required: true, message: '请输入分类编码' }]}
             >
-              <Input placeholder={t('asset.codePh')} allowClear />
+              <Input placeholder="如 010101" allowClear />
             </Form.Item>
             <Form.Item
-              label={t('asset.colName')} name="name"
-              rules={[{ required: true, message: t('asset.nameRequired') }]}
+              label="分类名称" name="name"
+              rules={[{ required: true, message: '请输入分类名称' }]}
             >
-              <Input placeholder={t('asset.nameRequired')} allowClear />
+              <Input placeholder="请输入分类名称" allowClear />
             </Form.Item>
-            <Form.Item label={t('asset.colParent')} name="parentId">
+            <Form.Item label="状态" name="status">
+              <Select>
+                <Select.Option value="enabled">启用</Select.Option>
+                <Select.Option value="disabled">禁用</Select.Option>
+              </Select>
+            </Form.Item>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <Form.Item label="上级分类" name="parentId" style={{ marginBottom: 0 }}>
               <TreeSelect
                 treeData={treeData}
-                placeholder={t('asset.parentPh')}
+                placeholder="请选择上级分类"
                 allowClear
                 treeDefaultExpandAll
               />
             </Form.Item>
           </div>
           <Form.Item label={t('asset.colRemark')} name="remark" style={{ marginBottom: 0 }}>
-            <Input placeholder={t('asset.remarkPh')} allowClear maxLength={100} />
+            <Input.TextArea
+              placeholder={t('asset.remarkPh')}
+              maxLength={300}
+              showCount
+              rows={4}
+            />
           </Form.Item>
         </div>
       </Form>

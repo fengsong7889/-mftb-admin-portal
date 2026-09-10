@@ -22,6 +22,7 @@ const TYPE_OPTIONS: { value: AssetLocation['type']; label: string }[] = [
 ]
 
 interface FormValues {
+  code?: string
   name: string
   parentId?: number
   type: AssetLocation['type']
@@ -56,6 +57,7 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
           if (cur) {
             setExistingCode(cur.code)
             form.setFieldsValue({
+              code: cur.code,
               name: cur.name,
               parentId: cur.parentId || undefined,
               type: cur.type,
@@ -76,7 +78,7 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
     try {
       const v = await form.validateFields()
       const payload = {
-        code: isEdit ? existingCode : '__auto__',
+        code: v.code?.trim() || existingCode,
         name: v.name.trim(),
         parentId: v.parentId || 0,
         type: v.type,
@@ -130,14 +132,17 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
         <Form<FormValues> form={form} layout="vertical">
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item label="編碼">
-                <div style={{
-                  padding: '4px 11px', background: '#f5f5f5', borderRadius: 6,
-                  border: '1px solid #d9d9d9', color: '#8C8C8C', fontSize: 13,
-                  fontFamily: 'monospace', lineHeight: '22px',
-                }}>
-                  {isEdit ? existingCode || '—' : '保存後自動生成'}
-                </div>
+              <Form.Item
+                label="編碼"
+                name="code"
+                rules={isEdit ? [] : [{ required: true, message: '請輸入編碼' }]}
+              >
+                <Input
+                  placeholder={isEdit ? undefined : '請輸入編碼'}
+                  allowClear
+                  disabled={isEdit}
+                  style={{ fontFamily: 'monospace' }}
+                />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -169,17 +174,21 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={16}>
               <Form.Item label="倉庫地址" name="address">
                 <Input placeholder="請輸入倉庫地址" allowClear />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item label="備註" name="remark">
-                <Input placeholder="請輸入備註" allowClear maxLength={100} />
-              </Form.Item>
-            </Col>
           </Row>
+
+          <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
+            <Input.TextArea
+              placeholder="請輸入備註"
+              maxLength={300}
+              showCount
+              rows={4}
+            />
+          </Form.Item>
         </Form>
       </div>
 

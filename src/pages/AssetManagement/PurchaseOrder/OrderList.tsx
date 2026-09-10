@@ -4,12 +4,12 @@
  * - Tab 統計：全部 / 待處理 / 採購中 / 採購完成
  * - 操作：詳情 / 編輯（回填供應商、價格、快遞單號等）/ 狀態推進（開始採購 / 完成採購）
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, Progress, DatePicker } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import dayjs from 'dayjs'
-import { SearchOutlined, ReloadOutlined, EditOutlined, PlayCircleOutlined, CheckCircleOutlined, PlusOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -17,6 +17,8 @@ import {
   updatePurchaseOrderExec,
   type PurchaseOrder, type PurchaseRequest, type ExecStatus,
 } from '../../../api/eam'
+import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { useAuth } from '../../../contexts/AuthContext'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const EXEC_STATUS_LIST: ExecStatus[] = ['pending', 'purchasing', 'completed']
@@ -42,6 +44,7 @@ interface Props {
 export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<PurchaseOrder[]>([])
@@ -131,18 +134,65 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     })
   }
 
+  /* ----- 開始採購彈窗 ----- */
+  const [purchaserModalVisible, setPurchaserModalVisible] = useState(false)
+  const [purchaserModalRecord, setPurchaserModalRecord] = useState<PurchaseOrder | null>(null)
+  const [purchaserModalConfirmLoading, setPurchaserModalConfirmLoading] = useState(false)
+  const [empOptions, setEmpOptions] = useState<{ value: string; label: string }[]>([])
+  const [empSearchLoading, setEmpSearchLoading] = useState(false)
+  const [selectedPurchaser, setSelectedPurchaser] = useState<string>('')
+  const empSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** 搜索員工（debounce 300ms） */
+  const handleEmpSearch = useCallback((keyword: string) => {
+    if (empSearchTimer.current) clearTimeout(empSearchTimer.current)
+    if (!keyword) {
+      setEmpOptions([])
+      return
+    }
+    setEmpSearchLoading(true)
+    empSearchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetchEmployees({ page: 1, size: 20, keyword })
+        setEmpOptions(
+          (res.records || []).map((e: EmployeeItem) => ({
+            value: e.name,
+            label: `${e.name}（${e.empId}）${e.department ? ' - ' + e.department : ''}`,
+          })),
+        )
+      } catch {
+        setEmpOptions([])
+      } finally {
+        setEmpSearchLoading(false)
+      }
+    }, 300)
+  }, [])
+
   const handleStartPurchase = (record: PurchaseOrder) => {
-    Modal.confirm({
-      title: t('common.confirm'),
-      content: t('asset.confirmStartPurchase'),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-      onOk: async () => {
-        await updatePurchaseOrderExec(record.id, { execStatus: 'purchasing' })
-        message.success(t('asset.startPurchaseSuccess'))
-        loadData()
-      },
-    })
+    setPurchaserModalRecord(record)
+    setSelectedPurchaser(user?.name || '')
+    setPurchaserModalVisible(true)
+  }
+
+  const handlePurchaserModalOk = async () => {
+    if (!selectedPurchaser || !purchaserModalRecord) {
+      message.warning('請選擇採購經辦人')
+      return
+    }
+    setPurchaserModalConfirmLoading(true)
+    try {
+      await updatePurchaseOrderExec(purchaserModalRecord.id, {
+        execStatus: 'purchasing',
+        purchaser: selectedPurchaser,
+      })
+      message.success(t('asset.startPurchaseSuccess'))
+      setPurchaserModalVisible(false)
+      loadData()
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
+    } finally {
+      setPurchaserModalConfirmLoading(false)
+    }
   }
 
   const handleCompletePurchase = (record: PurchaseOrder) => {
@@ -234,19 +284,19 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
             {t('common.detail')}
           </Button>
           {record.execStatus !== 'completed' && (
-            <Button type="link" size="small" icon={<EditOutlined />}
+            <Button type="link" size="small"
               onClick={() => onEdit(record.id)}>
               {t('common.edit')}
             </Button>
           )}
           {record.execStatus === 'pending' && (
-            <Button type="link" size="small" icon={<PlayCircleOutlined />}
+            <Button type="link" size="small"
               onClick={() => handleStartPurchase(record)}>
               {t('asset.btnStartPurchase')}
             </Button>
           )}
           {record.execStatus === 'purchasing' && (
-            <Button type="link" size="small" icon={<CheckCircleOutlined />}
+            <Button type="link" size="small"
               onClick={() => handleCompletePurchase(record)}>
               {t('asset.btnCompletePurchase')}
             </Button>
@@ -304,7 +354,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/purchase-request')}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/oa-purchase-request?from=purchase-order')}>
             {t('asset.purchaseReqTitle')}
           </Button>
           {configComponent}
@@ -337,6 +387,40 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         }}
         onChange={handleTableChange}
       />
+
+      {/* ====== 開始採購 - 選擇經辦人彈窗 ====== */}
+      <Modal
+        title="開始採購"
+        open={purchaserModalVisible}
+        onOk={handlePurchaserModalOk}
+        onCancel={() => setPurchaserModalVisible(false)}
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        confirmLoading={purchaserModalConfirmLoading}
+        destroyOnHidden
+      >
+        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+          採購單號：<span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{purchaserModalRecord?.poNo}</span>
+        </div>
+        <Form layout="vertical">
+          <Form.Item label="採購經辦人" required>
+            <Select
+              showSearch
+              placeholder="請輸入員工姓名或工號搜索"
+              value={selectedPurchaser || undefined}
+              onChange={(v) => setSelectedPurchaser(v)}
+              onSearch={handleEmpSearch}
+              loading={empSearchLoading}
+              filterOption={false}
+              notFoundContent={empSearchLoading ? '搜索中...' : '輸入關鍵字搜索員工'}
+              options={empOptions}
+              style={{ width: '100%' }}
+              allowClear
+              onClear={() => setSelectedPurchaser('')}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   )
 }

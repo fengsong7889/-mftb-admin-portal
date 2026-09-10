@@ -42,7 +42,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         // 脚本内容变更后递增脚本名后的版本号 (如 :v1 → :v1.1) 即可重跑
         for (String script : INIT_SCRIPTS) {
             try {
-                versionTracker.applyOnce("adpromo:" + script + ":v1", () -> {
+                versionTracker.applyOnce("adpromo:" + script + (script.equals("15_hot_merchant_ad.sql") ? ":v1.1" : ":v1"), () -> {
                     try {
                         executeSqlScript(script);
                     } catch (java.io.IOException e) {

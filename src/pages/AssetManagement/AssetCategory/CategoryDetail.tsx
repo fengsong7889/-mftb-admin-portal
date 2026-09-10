@@ -6,7 +6,7 @@
  * - 分類僅做層級歸類，參數配置由「品牌型號庫」負責
  */
 import { useState, useEffect, useCallback } from 'react'
-import { Spin, Descriptions } from 'antd'
+import { Spin, Descriptions, Tag } from 'antd'
 import { FolderOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
@@ -97,15 +97,19 @@ export default function CategoryDetail({ id, onBack, onEdit }: Props) {
           t('asset.sectionBasic'),
         )}
         <Descriptions column={3} size="middle" bordered>
-          <Descriptions.Item label={t('asset.colCode')}>
+          <Descriptions.Item label="分类编码">
             <span style={{ fontFamily: 'monospace' }}>{category.code}</span>
           </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colName')}>{category.name}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colParent')}>{parentName}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colSort')}>{category.sort}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colUpdatedBy')}>{category.updatedBy || '—'}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colUpdatedAt')}>{category.updatedAt || '—'}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colRemark')} span={3}>{category.remark || '—'}</Descriptions.Item>
+          <Descriptions.Item label="分类名称">{category.name}</Descriptions.Item>
+          <Descriptions.Item label="上级分类">{parentName}</Descriptions.Item>
+          <Descriptions.Item label="状态">
+            <Tag color={category.status === 'enabled' ? 'success' : 'default'}>
+              {category.status === 'enabled' ? '启用' : '禁用'}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="最后更新人">{category.updatedBy || '—'}</Descriptions.Item>
+          <Descriptions.Item label="最后更新时间">{category.updatedAt || '—'}</Descriptions.Item>
+          <Descriptions.Item label="备注" span={3}>{category.remark || '—'}</Descriptions.Item>
         </Descriptions>
       </div>
     </>

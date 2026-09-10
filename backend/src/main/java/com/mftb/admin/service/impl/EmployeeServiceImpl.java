@@ -113,15 +113,16 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (userIds == null || userIds.isEmpty()) return Map.of();
         LambdaQueryWrapper<EmpPositionRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(EmpPositionRecord::getUserId, userIds)
-                .orderByAsc(EmpPositionRecord::getEffectiveSeq);
+                .orderByDesc(EmpPositionRecord::getEffectiveDate)
+                .orderByDesc(EmpPositionRecord::getEffectiveSeq);
         List<EmpPositionRecord> records = empPositionRecordMapper.selectList(wrapper);
-        // 按 userId 分组，取每组 effectiveSeq 最大的记录的 operation
+        // 按 userId 分组，取每组日期最新、序号最大的记录的 operation
         return records.stream()
                 .collect(Collectors.groupingBy(EmpPositionRecord::getUserId))
                 .entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        e -> e.getValue().get(e.getValue().size() - 1).getOperation()
+                        e -> e.getValue().get(0).getOperation()
                 ));
     }
 

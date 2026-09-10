@@ -10,20 +10,19 @@
  *  - 操作列移除「领用」「归还」，统一入口改为领用管理 / 归还管理菜单
  *  - 支持 URL ?assetNo= 带入编号过滤（由验收入库页点击资产编号跳转）
  *
- * 保留的行操作：详情 / 转移 / 维修 / 查看维修 / 报废 / 编辑 / 删除
+ * 保留的行操作：详情 / 维修 / 查看维修 / 报废 / 编辑 / 删除
  *
- * 搜索条件（11 字段）：资产编号、资产类型、品牌、所属公司、所在部门、来源、
+ * 搜索条件（11 字段）：资产编号、资产类型、品牌、所属公司、归属部门、来源、
  *                      状态、购买日期、报废日期、最后更新人、最后更新时间
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, Image, DatePicker,
+  Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker,
 } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined,
-  CameraOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
@@ -169,7 +168,7 @@ export default function AssetList() {
     setPage(1)
   }
 
-  /* ----- 操作：详情 / 新增 / 编辑 / 转移 / 报废 / 维修 / 删除 ----- */
+  /* ----- 操作：详情 / 新增 / 编辑 / 报废 / 维修 / 删除 ----- */
   const handleDetail = (record: AssetItem) => {
     navigate(`/asset-detail?id=${record.id}`)
   }
@@ -178,9 +177,6 @@ export default function AssetList() {
   }
   const handleEdit = (record: AssetItem) => {
     navigate(`/asset-add?id=${record.id}`)
-  }
-  const handleTransfer = (record: AssetItem) => {
-    navigate(`/asset-transfer?id=${record.id}`)
   }
   const handleScrap = (record: AssetItem) => {
     navigate(`/asset-scrap?id=${record.id}`)
@@ -214,14 +210,13 @@ export default function AssetList() {
       return
     }
     const cols = [
-      { title: t('asset.colAssetNo'),     dataIndex: 'assetNo' },
+      { title: '入库批次号',     dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'),   dataIndex: 'assetName' },
       { title: t('asset.colAssetType'),   dataIndex: 'assetType' },
       { title: t('asset.colBrand'),       dataIndex: 'brand' },
       { title: t('asset.colCompany'),     dataIndex: 'company' },
       { title: t('asset.colLocation'),    dataIndex: 'location' },
-      { title: t('asset.colDepartment'),  dataIndex: 'department' },
-      { title: t('asset.colUserName'),    dataIndex: 'userName' },
+      { title: '归属部门',  dataIndex: 'department' },
       { title: t('asset.colSource'),      dataIndex: 'source' },
       { title: t('asset.colPurchaseValue'), dataIndex: 'purchaseValue' },
       { title: t('asset.colPurchaseDate'),  dataIndex: 'purchaseDate' },
@@ -254,16 +249,14 @@ export default function AssetList() {
 
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
-    { key: 'assetNo', title: t('asset.colAssetNo') },
+    { key: 'assetNo', title: '入库批次号' },
     { key: 'assetName', title: t('asset.colAssetName') },
     { key: 'assetType', title: t('asset.colAssetType') },
     { key: 'brand', title: t('asset.colBrand') },
-    { key: 'images', title: t('asset.colImage') },
     { key: 'company', title: t('asset.colCompany') },
     { key: 'location', title: t('asset.colLocationName') },
     { key: 'holdType', title: t('asset.colHoldType') },
-    { key: 'department', title: t('asset.colDepartment') },
-    { key: 'userName', title: t('asset.colUserName') },
+    { key: 'department', title: '归属部门' },
     { key: 'source', title: t('asset.colSource') },
     { key: 'quantity', title: t('asset.colQuantity') },
     { key: 'purchaseValue', title: t('asset.colPurchaseValue') },
@@ -281,7 +274,7 @@ export default function AssetList() {
   /* ----- 列定义 ----- */
   const allColumns: TableColumnsType<AssetItem> = [
     {
-      title: t('asset.colAssetNo'),
+      title: '入库批次号',
       dataIndex: 'assetNo', key: 'assetNo', width: 140, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
@@ -298,15 +291,6 @@ export default function AssetList() {
       dataIndex: 'brand', key: 'brand', width: 100,
     },
     {
-      title: t('asset.colImage'),
-      dataIndex: 'images', key: 'images', width: 80,
-      render: (v: string | null) => v ? (
-        <Image src={v.split(',')[0]} width={40} height={40} style={{ objectFit: 'cover', borderRadius: 4 }} />
-      ) : (
-        <CameraOutlined style={{ fontSize: 20, color: '#bfbfbf' }} />
-      ),
-    },
-    {
       title: t('asset.colCompany'),
       dataIndex: 'company', key: 'company', width: 100,
     },
@@ -315,17 +299,8 @@ export default function AssetList() {
       dataIndex: 'location', key: 'location', width: 180, ellipsis: true,
     },
     {
-      title: t('asset.colHoldType'),
-      dataIndex: 'holdType', key: 'holdType', width: 110,
-      render: (v?: AssetItem['holdType']) => renderHoldType(v),
-    },
-    {
-      title: t('asset.colDepartment'),
-      dataIndex: 'department', key: 'department', width: 100,
-    },
-    {
-      title: t('asset.colUserName'),
-      dataIndex: 'userName', key: 'userName', width: 140,
+      title: '归属部门',
+      dataIndex: 'department', key: 'department', width: 120,
     },
     {
       title: t('asset.colSource'),
@@ -369,9 +344,8 @@ export default function AssetList() {
     },
     {
       title: t('common.colAction'),
-      key: 'action', width: 340, fixed: 'right',
+      key: 'action', width: 280, fixed: 'right',
       render: (_: unknown, record: AssetItem) => {
-        const canTransfer = record.status === 'in_use'
         const canScrap = record.status !== 'scrapped'
         // in_use 可发起新维修；in_repair 已在维修中，引导进入维修菜单查看
         const canNewRepair = record.status === 'in_use'
@@ -381,11 +355,6 @@ export default function AssetList() {
             <Button type="link" size="small" onClick={() => handleDetail(record)}>
               {t('common.detail')}
             </Button>
-            {canTransfer && (
-              <Button type="link" size="small" onClick={() => handleTransfer(record)}>
-                {t('asset.btnTransfer')}
-              </Button>
-            )}
             {canNewRepair && (
               <Button type="link" size="small" onClick={() => handleRepair(record)}>
                 {t('asset.btnRepair')}
@@ -448,8 +417,8 @@ export default function AssetList() {
       {/* ====== 搜索区 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label={t('asset.searchAssetNo')} name="assetNo">
-            <Input placeholder={t('asset.searchAssetNoPh')} allowClear style={{ width: '100%' }} />
+          <Form.Item label="入库批次号" name="assetNo">
+            <Input placeholder="请输入入库批次号" allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colAssetType')} name="assetType">
             <Select placeholder={t('common.all')} allowClear options={assetTypeOptions} />
@@ -460,8 +429,8 @@ export default function AssetList() {
           <Form.Item label={t('asset.colCompany')} name="company">
             <Select placeholder={t('common.all')} allowClear options={companyOptions} />
           </Form.Item>
-          <Form.Item label={t('asset.colDepartment')} name="department">
-            <Input placeholder={t('asset.colDepartment')} allowClear />
+          <Form.Item label="归属部门" name="department">
+            <Input placeholder="请输入归属部门" allowClear />
           </Form.Item>
           <Form.Item label={t('asset.colSource')} name="source">
             <Select placeholder={t('common.all')} allowClear options={sourceOptions} />
@@ -525,7 +494,7 @@ export default function AssetList() {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2100 }}
+        scroll={{ x: 2020 }}
         rowSelection={{
           selectedRowKeys,
           onChange: setSelectedRowKeys,

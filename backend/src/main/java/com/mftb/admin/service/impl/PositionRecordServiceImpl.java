@@ -13,6 +13,7 @@ import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -31,6 +32,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         requireUser(userId);
         LambdaQueryWrapper<EmpPositionRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(EmpPositionRecord::getUserId, userId)
+                .orderByDesc(EmpPositionRecord::getEffectiveDate)
                 .orderByDesc(EmpPositionRecord::getEffectiveSeq);
         return positionRecordMapper.selectList(wrapper).stream()
                 .map(PositionRecordVO::from)
@@ -40,7 +42,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
     @Override
     public PositionRecordVO create(Long userId, PositionRecordRequest request) {
         requireUser(userId);
-        int nextSeq = getNextEffectiveSeq(userId);
+        int nextSeq = getNextEffectiveSeq(userId, request.getEffectiveDate());
 
         EmpPositionRecord entity = new EmpPositionRecord();
         entity.setUserId(userId);
@@ -76,8 +78,8 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         if (entity == null || !userId.equals(entity.getUserId())) {
             throw new BusinessException("职务记录不存在");
         }
-        // 编辑时 effectiveSeq +1，形成新的版本记录序号
-        int nextSeq = getNextEffectiveSeq(userId);
+        // 编辑时按新日期重新计算 effectiveSeq（同日期第 N 条 = N-1）
+        int nextSeq = getNextEffectiveSeq(userId, request.getEffectiveDate());
 
         entity.setEffectiveDate(request.getEffectiveDate());
         entity.setEffectiveSeq(nextSeq);
@@ -112,10 +114,11 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         positionRecordMapper.deleteById(recordId);
     }
 
-    /** 获取指定员工下一个 effectiveSeq（当前最大值 + 1） */
-    private int getNextEffectiveSeq(Long userId) {
+    /** 获取指定员工在指定日期的下一个 effectiveSeq（同日期当前最大值 + 1，无记录则返回 0） */
+    private int getNextEffectiveSeq(Long userId, LocalDate effectiveDate) {
         LambdaQueryWrapper<EmpPositionRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(EmpPositionRecord::getUserId, userId)
+                .eq(EmpPositionRecord::getEffectiveDate, effectiveDate)
                 .orderByDesc(EmpPositionRecord::getEffectiveSeq)
                 .last("LIMIT 1");
         EmpPositionRecord latest = positionRecordMapper.selectOne(wrapper);

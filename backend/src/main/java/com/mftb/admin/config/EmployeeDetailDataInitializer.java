@@ -56,7 +56,11 @@ public class EmployeeDetailDataInitializer implements CommandLineRunner {
                         jdbcTemplate.execute(trimmed);
                     } catch (Exception ex) {
                         // ALTER TABLE ADD COLUMN 可能因列已存在而報錯，忽略重複列錯誤
-                        if (ex.getMessage() != null && ex.getMessage().contains("Duplicate column")) {
+                        String msg = ex.getMessage();
+                        Throwable cause = ex.getCause();
+                        String causeMsg = cause != null ? cause.getMessage() : "";
+                        if ((msg != null && msg.contains("Duplicate column"))
+                                || (causeMsg != null && causeMsg.contains("Duplicate column"))) {
                             log.debug("列已存在，跳過: {}", ex.getMessage());
                         } else {
                             throw ex;

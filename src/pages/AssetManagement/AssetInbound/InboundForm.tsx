@@ -9,7 +9,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Button, Form, Input, InputNumber, Select, DatePicker, Row, Col, Space, Spin,
+  Button, Form, Input, InputNumber, Select, DatePicker, Row, Col, Spin,
   message, Alert, Table, Tag,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
@@ -174,7 +174,7 @@ export default function InboundForm({ poId, onBack }: Props) {
             style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('asset.inboundAddTitle')}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1890ff' }}>{t('asset.inboundAddTitle')}</h2>
         </div>
       </div>
 
@@ -325,18 +325,16 @@ export default function InboundForm({ poId, onBack }: Props) {
         />
       </div>
 
-      {/* ====== 底部操作欄 ====== */}
+      {/* ====== 底部操作欄（取消+保存，符合全局規範） ====== */}
       <div className="form-footer">
-        <Space>
-          <Button onClick={onBack}>{t('common.cancel')}</Button>
-          <Button
-            type="primary" icon={<SaveOutlined />} loading={submitting}
-            disabled={!order || totalQty <= 0}
-            onClick={handleSubmit}
-          >
-            {t('asset.btnInbound')}
-          </Button>
-        </Space>
+        <Button onClick={onBack}>{t('common.cancel')}</Button>
+        <Button
+          type="primary" icon={<SaveOutlined />} loading={submitting}
+          disabled={!order || totalQty <= 0}
+          onClick={handleSubmit}
+        >
+          {t('common.save')}
+        </Button>
       </div>
     </Spin>
   )

@@ -691,10 +691,20 @@ export default function PromotionSlotConfigAdd() {
                 }}>
                   {slotAlgorithms.filter(item => item.status === 1).length === 0 && (
                     <div style={{
-                      textAlign: 'center', color: '#bfbfbf', fontSize: 13,
-                      padding: '40px 16px', lineHeight: 1.8,
+                      textAlign: 'center', padding: '36px 14px', lineHeight: 1.7,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                     }}>
-                      {t('promotionSlotConfig:noConfiguredSlot')}
+                      <ExclamationCircleOutlined style={{ fontSize: 28, color: '#FAAD14' }} />
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>
+                        {t('promotionSlotConfig:noConfiguredSlot')}
+                      </div>
+                      <div style={{
+                        fontSize: 11, color: '#8c8c8c',
+                        background: '#FFFBE6', border: '1px solid #FFE58F',
+                        borderRadius: 8, padding: '8px 12px', lineHeight: 1.7,
+                      }}>
+                        未配置坑位时，系统默认读取自然流量算法展示数据
+                      </div>
                     </div>
                   )}
                   {slotAlgorithms.filter(item => item.status === 1).map((item, index) => (

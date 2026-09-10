@@ -1,0 +1,47 @@
+/* 参数库 - 左右布局（复用资产分类样式） */
+@import '../AssetCategory/index.css';
+
+/* 选中分类信息条 */
+.param-selected-info {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #FFF7E6, #FFF1D6);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #262626;
+}
+
+/* 参数值管理区域 */
+.param-values-section {
+  margin-top: 24px;
+  padding: 20px 24px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.param-values-title {
+  display: flex;
+  align-items: center;
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.param-values-search {
+  margin-bottom: 16px;
+}
+
+/* 参数类型选中行 */
+.param-type-selected {
+  background: #FFF7E6 !important;
+}
+
+.param-type-selected:hover td {
+  background: #FFF1D6 !important;
+}

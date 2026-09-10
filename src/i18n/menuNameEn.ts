@@ -131,7 +131,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   // 物資管理
   'asset-management': 'Asset Management',
   'asset-basic':      'Basic Setup',
-  'asset-flow-ops':   'Asset Operations',
+  'asset-flow-ops':   'Asset Management',
   'asset-maintenance': 'Maintenance & Disposal',
   'asset-purchase':   'Procurement & Inbound',
   'asset-dashboard':   'Asset Dashboard',
@@ -139,6 +139,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'asset-category':   'Asset Category',
   'asset-model':      'Asset Model',
   'asset-location':   'Asset Location',
+  'param-library':    'Parameter Library',
   'purchase-request':  'Purchase Request',
   'purchase-order':   'Purchase Order',
   'asset-inbound':    'Asset Inbound',

@@ -1,39 +1,49 @@
 /**
- * 品牌型號 新增/編輯獨立表單頁
+ * 品牌/产品 新增/编辑独立表单页
  *
- * - 選定資產分類後，按該分類的「參數模板」動態渲染參數表單
- * - 分模塊佈局：頂部標題欄 → 基本信息卡片 → 參數模板卡片 → 底部操作欄
- * - 底部「取消 + 保存」（全局表單規範）
+ * - type="brand"：品牌表单（所属分类 + 品牌中英文名 + LOGO）
+ * - type="product"：产品表单（所属品牌 + 产品名称 + 型号编码 + 单位 + 供应商）
+ * - 无参数配置（参数从参数库读取）
+ * - 底部「取消 + 保存」（全局表单规范）
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import {
-  Button, Form, Input, InputNumber, Select, Row, Col, Space, Spin, message, Alert,
+  Button, Form, Input, Select, Row, Col, Space, Spin, message,
 } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, FolderOutlined, SettingOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, ShopOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchCategoryList, fetchModelDetail, createModel, updateModel,
-  type AssetCategory, type ParamField,
+  fetchCategoryList, fetchBrandList, fetchModelDetail, createModel, updateModel,
+  createBrand, updateBrand,
+  type AssetCategory, type AssetBrand,
 } from '../../../api/eam'
 import { EAM_UNITS } from '../eamUtils'
 
-interface FormValues {
+interface BrandFormValues {
   categoryCode: string
-  brand: string
-  modelNo: string
+  brandZh: string
+  brandEn: string
+}
+
+interface ProductFormValues {
+  brandId: number
+  categoryCode: string
   name: string
+  modelNo?: string
   unit: string
-  refPrice: number
+  refPrice?: number
   supplier?: string
-  params?: Record<string, string>
 }
 
 interface Props {
   id?: number
+  categoryCode?: string
+  brandId?: number
+  type: 'brand' | 'product'
   onBack: () => void
 }
 
-/* ── 卡片統一樣式（對齊定價頁面規範） ── */
+/* ── 卡片统一样式 ── */
 const cardShellStyle: React.CSSProperties = {
   background: '#fff', border: '1px solid #e8eaed', borderRadius: 8,
   boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: 16,
@@ -44,88 +54,121 @@ const cardTitleStyle: React.CSSProperties = {
   fontSize: 15, fontWeight: 600, color: '#262626',
 }
 
-export default function ModelForm({ id, onBack }: Props) {
+export default function ModelForm({ id, categoryCode: initialCategoryCode, brandId: initialBrandId, type, onBack }: Props) {
   const { t } = useTranslation()
-  const [form] = Form.useForm<FormValues>()
+  const isBrand = type === 'brand'
+  const [brandForm] = Form.useForm<BrandFormValues>()
+  const [productForm] = Form.useForm<ProductFormValues>()
   const isEdit = id != null
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<AssetCategory[]>([])
-  const [categoryCode, setCategoryCode] = useState<string>('')
-
-  /** 當前分類的參數模板（含繼承上級分類的公共參數） */
-  const paramTemplate: ParamField[] = useMemo(() => {
-    const cur = categories.find((c) => c.code === categoryCode)
-    if (!cur) return []
-    const parent = categories.find((c) => c.id === cur.parentId)
-    const inherited = parent?.paramTemplate?.filter((p) => !cur.paramTemplate.some((x) => x.key === p.key)) || []
-    return [...cur.paramTemplate, ...inherited]
-  }, [categories, categoryCode])
+  const [brands, setBrands] = useState<AssetBrand[]>([])
 
   useEffect(() => {
     let alive = true
     setLoading(true)
-    fetchCategoryList()
-      .then(async (list) => {
+    Promise.all([fetchCategoryList(), fetchBrandList()])
+      .then(async ([cats, brs]) => {
         if (!alive) return
-        setCategories(list)
+        setCategories(cats)
+        setBrands(brs)
         if (isEdit && id) {
-          const model = await fetchModelDetail(id)
-          if (!alive) return
-          setCategoryCode(model.categoryCode)
-          form.setFieldsValue({
-            categoryCode: model.categoryCode,
-            brand: model.brand,
-            modelNo: model.modelNo,
-            name: model.name,
-            unit: model.unit,
-            refPrice: model.refPrice,
-            supplier: model.supplier,
-            params: model.params,
-          })
+          if (isBrand) {
+            const brand = brs.find(b => b.id === id)
+            if (brand) {
+              brandForm.setFieldsValue({
+                categoryCode: brand.categoryCode,
+                brandZh: brand.brandZh,
+                brandEn: brand.brandEn,
+              })
+            }
+          } else {
+            const model = await fetchModelDetail(id)
+            if (!alive) return
+            productForm.setFieldsValue({
+              brandId: model.brandId,
+              categoryCode: model.categoryCode,
+              name: model.name,
+              modelNo: model.modelNo,
+              unit: model.unit,
+              refPrice: model.refPrice,
+              supplier: model.supplier,
+            })
+          }
         } else {
-          form.setFieldsValue({ unit: '台' })
+          if (isBrand && initialCategoryCode) {
+            brandForm.setFieldsValue({ categoryCode: initialCategoryCode })
+          }
+          if (!isBrand && initialBrandId) {
+            const brand = brs.find(b => b.id === initialBrandId)
+            if (brand) {
+              productForm.setFieldsValue({ brandId: brand.id, categoryCode: brand.categoryCode })
+            }
+          }
+          if (!isBrand) {
+            productForm.setFieldsValue({ unit: '台' })
+          }
         }
       })
       .catch((e: Error) => message.error(e.message))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [form, id, isEdit])
+  }, [brandForm, productForm, id, isEdit, isBrand]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCategoryChange = (code: string) => {
-    setCategoryCode(code)
-    const cur = categories.find((c) => c.code === code)
-    const keys = cur?.paramTemplate.map((p) => p.key) || []
-    const params = form.getFieldValue('params') || {}
-    const next: Record<string, string> = {}
-    keys.forEach((k) => { if (params[k] != null) next[k] = params[k] })
-    form.setFieldsValue({ params: next })
+  const handleBrandCategoryChange = (code: string) => {
+    // 切换分类时清空品牌信息
+    brandForm.setFieldsValue({ brandZh: '', brandEn: '', brandLogo: '' })
+  }
+
+  const handleProductBrandChange = (brandId: number) => {
+    const brand = brands.find(b => b.id === brandId)
+    if (brand) {
+      productForm.setFieldsValue({ categoryCode: brand.categoryCode })
+    }
   }
 
   const handleSubmit = async () => {
     try {
-      const v = await form.validateFields()
-      const params: Record<string, string> = {}
-      Object.entries(v.params || {}).forEach(([k, val]) => {
-        if (val != null && val !== '') params[k] = String(val)
-      })
-      const payload = {
-        categoryCode: v.categoryCode,
-        brand: v.brand.trim(),
-        modelNo: v.modelNo.trim(),
-        name: v.name.trim(),
-        unit: v.unit,
-        refPrice: v.refPrice ?? 0,
-        supplier: v.supplier?.trim() || undefined,
-        params,
-      }
-      setSubmitting(true)
-      if (isEdit && id) {
-        await updateModel(id, payload)
-        message.success(t('asset.updateSuccess'))
+      if (isBrand) {
+        const v = await brandForm.validateFields()
+        const payload = {
+          categoryCode: v.categoryCode,
+          brandZh: v.brandZh.trim(),
+          brandEn: v.brandEn.trim(),
+          brandLogo: v.brandLogo?.trim(),
+        }
+        setSubmitting(true)
+        if (isEdit && id) {
+          await updateBrand(id, payload)
+          message.success('品牌更新成功')
+        } else {
+          await createBrand(payload)
+          message.success('品牌创建成功')
+        }
       } else {
-        await createModel(payload)
-        message.success(t('asset.createSuccess'))
+        const v = await productForm.validateFields()
+        const brand = brands.find(b => b.id === v.brandId)
+        const payload = {
+          categoryCode: v.categoryCode,
+          brandId: v.brandId,
+          brandZh: brand?.brandZh || '',
+          brandEn: brand?.brandEn,
+          brandLogo: brand?.brandLogo,
+          name: v.name.trim(),
+          modelNo: v.modelNo?.trim(),
+          unit: v.unit,
+          refPrice: v.refPrice,
+          supplier: v.supplier?.trim(),
+        }
+        setSubmitting(true)
+        if (isEdit && id) {
+          await updateModel(id, payload)
+          message.success(t('asset.updateSuccess'))
+        } else {
+          await createModel(payload)
+          message.success(t('asset.createSuccess'))
+        }
       }
       onBack()
     } catch (e: unknown) {
@@ -135,25 +178,18 @@ export default function ModelForm({ id, onBack }: Props) {
     }
   }
 
-  const renderParamField = (p: ParamField) => {
-    if (p.type === 'select') {
-      return (
-        <Select
-          placeholder="請選擇"
-          allowClear
-          options={(p.options || []).map((o) => ({ label: o, value: o }))}
-        />
-      )
-    }
-    if (p.type === 'number') {
-      return <InputNumber style={{ width: '100%' }} min={0} addonAfter={p.unit} />
-    }
-    return <Input placeholder={p.unit ? `${p.label}(${p.unit})` : p.label} allowClear />
-  }
+  const categoryName = (code: string) => categories.find(c => c.code === code)?.name || code
+  const categoryOptions = categories
+    .filter(c => c.parentId !== 0) // 只显示子分类
+    .map(c => ({ label: c.name, value: c.code }))
+  const brandOptions = brands.map(b => ({
+    label: `${b.brandZh}（${b.brandEn}）`,
+    value: b.id,
+  }))
 
   return (
     <Spin spinning={loading}>
-      {/* ====== 頂部標題欄（橙色漸變頂條，對齊定價頁規範） ====== */}
+      {/* ====== 顶部标题栏 ====== */}
       <div style={{
         position: 'relative', background: '#fff', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -181,7 +217,7 @@ export default function ModelForm({ id, onBack }: Props) {
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? t('asset.modelEditTitle') : t('asset.modelAddTitle')}
+              {isEdit ? (isBrand ? '编辑品牌' : '编辑产品') : (isBrand ? '新增品牌' : '新增产品')}
             </h2>
           </div>
         </div>
@@ -190,111 +226,113 @@ export default function ModelForm({ id, onBack }: Props) {
       {/* ====== 基本信息卡片 ====== */}
       <div style={cardShellStyle}>
         <div style={cardTitleStyle}>
-          <FolderOutlined style={{ color: '#1890ff', fontSize: 16 }} />
-          <span>基本信息</span>
+          {isBrand
+            ? <ShopOutlined style={{ color: '#E8720C', fontSize: 16 }} />
+            : <AppstoreOutlined style={{ color: '#E8720C', fontSize: 16 }} />
+          }
+          <span>{isBrand ? '品牌信息' : '产品信息'}</span>
         </div>
         <div style={{ padding: '20px 24px 4px' }}>
-          <Form<FormValues> form={form} layout="vertical">
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colCategoryCode')} name="categoryCode"
-                  rules={[{ required: true, message: t('asset.categoryRequired') }]}
-                >
-                  <Select
-                    placeholder="請選擇資產分類"
-                    showSearch
-                    optionFilterProp="label"
-                    onChange={handleCategoryChange}
-                    options={categories.map((c) => ({ label: c.name, value: c.code }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colBrand')} name="brand"
-                  rules={[{ required: true, message: t('asset.brandRequired') }]}
-                >
-                  <Input placeholder={t('asset.brandPh')} allowClear />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colModelNo')} name="modelNo"
-                  rules={[{ required: true, message: t('asset.modelNoRequired') }]}
-                >
-                  <Input placeholder="X1 Carbon Gen11" allowClear />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colModelName')} name="name"
-                  rules={[{ required: true, message: t('asset.modelNameRequired') }]}
-                >
-                  <Input placeholder={t('asset.assetNamePh')} allowClear />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colRefPrice')} name="refPrice"
-                  rules={[{ required: true, message: t('asset.refPriceRequired') }]}
-                >
-                  <InputNumber style={{ width: '100%' }} min={0} step={100} addonBefore="MOP" />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colUnit')} name="unit"
-                  rules={[{ required: true, message: t('asset.unitRequired') }]}
-                >
-                  <Select placeholder={t('asset.unitPh')} options={EAM_UNITS.map((u) => ({ label: u, value: u }))} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t('asset.colSupplier')} name="supplier">
-                  <Input placeholder="請輸入供應商" allowClear />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </div>
-      </div>
-
-      {/* ====== 型號參數卡片 ====== */}
-      <div style={cardShellStyle}>
-        <div style={cardTitleStyle}>
-          <SettingOutlined style={{ color: '#E8720C', fontSize: 16 }} />
-          <span>{t('asset.sectionParams')}</span>
-        </div>
-        <div style={{ padding: '20px 24px 4px' }}>
-          {paramTemplate.length ? (
-            <Form form={form} layout="vertical">
+          {isBrand ? (
+            <Form<BrandFormValues> form={brandForm} layout="vertical">
               <Row gutter={16}>
-                {paramTemplate.map((p) => (
-                  <Col span={8} key={p.key}>
-                    <Form.Item
-                      label={p.unit && p.type !== 'number' ? `${p.label}(${p.unit})` : p.label}
-                      name={['params', p.key]}
-                    >
-                      {renderParamField(p)}
-                    </Form.Item>
-                  </Col>
-                ))}
+                <Col span={8}>
+                  <Form.Item
+                    label="所属分类" name="categoryCode"
+                    rules={[{ required: true, message: '请选择所属分类' }]}
+                  >
+                    <Select
+                      placeholder="请选择资产分类"
+                      showSearch
+                      optionFilterProp="label"
+                      onChange={handleBrandCategoryChange}
+                      options={categoryOptions}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label="品牌（中文）" name="brandZh"
+                    rules={[{ required: true, message: '请输入品牌中文名称' }]}
+                  >
+                    <Input placeholder="例如：苹果" allowClear />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label="品牌（英文）" name="brandEn"
+                    rules={[{ required: true, message: '请输入品牌英文名称' }]}
+                  >
+                    <Input placeholder="例如：Apple" allowClear />
+                  </Form.Item>
+                </Col>
               </Row>
             </Form>
           ) : (
-            <Alert type="info" showIcon message="請先選擇資產分類，分類參數模板將自動渲染至此處" />
+            <Form<ProductFormValues> form={productForm} layout="vertical">
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item
+                    label="所属品牌" name="brandId"
+                    rules={[{ required: true, message: '请选择所属品牌' }]}
+                  >
+                    <Select
+                      placeholder="请选择品牌"
+                      showSearch
+                      optionFilterProp="label"
+                      onChange={handleProductBrandChange}
+                      options={brandOptions}
+                      disabled={!!initialBrandId}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="所属分类" name="categoryCode">
+                    <Select placeholder="自动带入" disabled options={categoryOptions} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label="产品名称" name="name"
+                    rules={[{ required: true, message: '请输入产品名称' }]}
+                  >
+                    <Input placeholder="例如：MacBook Pro 16 笔记本" allowClear />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item label="型号编码" name="modelNo">
+                    <Input placeholder="例如：MacBook Pro 16 M3" allowClear />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label={t('asset.colUnit')} name="unit"
+                    rules={[{ required: true, message: t('asset.unitRequired') }]}
+                  >
+                    <Select placeholder={t('asset.unitPh')} options={EAM_UNITS.map((u) => ({ label: u, value: u }))} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="参考单价（元）" name="refPrice">
+                    <Input type="number" placeholder="请输入参考单价" allowClear />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item label="供应商" name="supplier">
+                    <Input placeholder="请输入供应商" allowClear />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Form>
           )}
         </div>
       </div>
 
-      {/* ====== 底部操作欄 ====== */}
+      {/* ====== 底部操作栏 ====== */}
       <div className="form-footer">
         <Space>
           <Button onClick={onBack}>{t('common.cancel')}</Button>

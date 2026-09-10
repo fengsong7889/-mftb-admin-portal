@@ -66,7 +66,8 @@ public class DataInitializer implements CommandLineRunner {
     // v24: EAM 完整菜單樹（19 個子菜單：看板/台賬/基礎數據/採購/領用/歸還/調撥/維修/賠付/報廢/歷史/盤點/報表）
     // v25: 「存放位置」更名為「倉庫維護」
     // v26: 採購申請/採購訂單菜單遷移至 OA 中心，移除物資管理下的採購菜單
-    private static final String V_MENU_SEED = "core:menu-seed-v26";
+    // v27: 种子数据不再覆盖用户在「菜单配置」中自定义的菜单名称（仅修复占位数据名称）
+    private static final String V_MENU_SEED = "core:menu-seed-v27";
 
     @Override
     public void run(String... args) {
@@ -101,6 +102,10 @@ public class DataInitializer implements CommandLineRunner {
         versionTracker.applyOnce("core:eam-restore-v1", this::restoreEamClaimReturnMenus);
         // v24c: 移除「統計報表」菜單（已與「資產看板」合併）
         versionTracker.applyOnce("core:eam-remove-report-v1", this::removeAssetReportMenu);
+        // v25: 「資產流轉」改名為「資產管理」
+versionTracker.applyOnce("core:eam-rename-flow-ops-v1", this::renameAssetFlowOpsMenu);
+// v26: 「領用管理」改名為「領用歸還」
+versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
         migrateDeptCodeToBM();
@@ -978,6 +983,7 @@ public class DataInitializer implements CommandLineRunner {
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'TagsOutlined'      WHERE menu_key = 'asset-category'  AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'BarcodeOutlined'   WHERE menu_key = 'asset-model'     AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'EnvironmentOutlined' WHERE menu_key = 'asset-location' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND (icon IS NULL OR icon = '')");
 
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ImportOutlined'    WHERE menu_key = 'asset-inbound'   AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'UserAddOutlined'    WHERE menu_key = 'asset-claim'     AND (icon IS NULL OR icon = '')");
@@ -1270,15 +1276,15 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
         // 二級分組
         menus.put("asset-purchase",    new String[]{"採購入庫",         "asset-management",   "2"});
-        menus.put("asset-flow-ops",    new String[]{"資產流轉",         "asset-management",   "3"});
+        menus.put("asset-flow-ops",    new String[]{"資產管理",         "asset-management",   "3"});
         menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "4"});
         menus.put("asset-basic",       new String[]{"基礎設置",         "asset-management",   "5"});
         // 三級菜單 → 採購入庫
         menus.put("purchase-order",     new String[]{"採購訂單",         "asset-purchase",     "1"});
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
-        // 三級菜單 → 資產流轉
+        // 三級菜單 → 資產管理
         menus.put("asset-list",         new String[]{"資產台賬",         "asset-flow-ops",     "1"});
-        menus.put("asset-claim",        new String[]{"領用管理",         "asset-flow-ops",     "2"});
+        menus.put("asset-claim",        new String[]{"領用歸還",         "asset-flow-ops",     "2"});
         menus.put("asset-borrow",       new String[]{"借用管理",         "asset-flow-ops",     "3"});
         menus.put("asset-return",       new String[]{"歸還管理",         "asset-flow-ops",     "4"});
         menus.put("asset-transfer-list",new String[]{"調撥管理",         "asset-flow-ops",     "5"});
@@ -1293,6 +1299,7 @@ public class DataInitializer implements CommandLineRunner {
         menus.put("asset-category",     new String[]{"資產分類",         "asset-basic",        "1"});
         menus.put("asset-model",        new String[]{"資產型號",         "asset-basic",        "2"});
         menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
+        menus.put("param-library",      new String[]{"參數庫",           "asset-basic",        "4"});
         // ── OA中心 ──
         menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
         menus.put("oa-requests",        new String[]{"流程中心",         "oa-center",         "2"});
@@ -1328,7 +1335,9 @@ public class DataInitializer implements CommandLineRunner {
             }
 
             if (existing != null) {
-                // 更新名称/排序/parentId 与种子数据不一致的记录 (修复 resolveMenuId 占位数据)
+                // 修复占位数据（resolveMenuId 自动创建的记录）的 parent_id / sort_order；
+                // 名称仅在确为占位（空/null/等于 menu_key/menu_ 前缀）时才修正，
+                // 用户通过「菜单配置」自定义的名称不会被种子覆盖
                 Map<String, Object> row = jdbcTemplate.queryForList(
                         "SELECT name, parent_id, sort_order FROM sys_menu WHERE id = ?", existing)
                         .stream().findFirst().orElse(null);
@@ -1336,15 +1345,17 @@ public class DataInitializer implements CommandLineRunner {
                     String curName = (String) row.get("name");
                     Number curParentRaw = (Number) row.get("parent_id");
                     Long curParentId = curParentRaw != null ? curParentRaw.longValue() : null;
-                    // 僅當名稱/層級與種子不一致（占位數據）時才連同排序一起修正；
-                    // 名稱/層級已與種子一致時，視為用戶在「菜單配置」中自定義過排序，
-                    // 不覆蓋 sort_order，避免重啟後用戶調整的菜單順序被重置
-                    boolean placeholderLike = !name.equals(curName)
-                            || !java.util.Objects.equals(curParentId, parentId);
-                    if (placeholderLike) {
+                    // 判断当前名称是否为占位数据（由 resolveMenuId 自动创建）
+                    boolean nameIsPlaceholder = curName == null || curName.isEmpty()
+                            || curName.equals(menuKey)
+                            || curName.startsWith("menu_");
+                    boolean needsNameFix = nameIsPlaceholder && !name.equals(curName);
+                    boolean needsParentFix = !java.util.Objects.equals(curParentId, parentId);
+                    if (needsNameFix || needsParentFix) {
+                        String finalName = needsNameFix ? name : curName;
                         jdbcTemplate.update(
                                 "UPDATE sys_menu SET name = ?, parent_id = ?, sort_order = ? WHERE id = ?",
-                                name, parentId, sort, existing);
+                                finalName, parentId, sort, existing);
                         updated++;
                     }
                 }
@@ -1417,7 +1428,7 @@ public class DataInitializer implements CommandLineRunner {
         String[][] children = {
                 {"asset-list",      "資產台賬",   "AppstoreOutlined",    "1"},
                 {"asset-add",       "資產入庫",   "AppstoreAddOutlined", "2"},
-                {"asset-claim",     "資產領用",   "UserAddOutlined",     "3"},
+                {"asset-claim",     "領用歸還",   "UserAddOutlined",     "3"},
                 {"asset-transfer",  "資產轉移",   "SwapOutlined",        "4"},
                 {"asset-return",    "資產歸還",   "RollbackOutlined",    "5"},
                 {"asset-scrap",     "資產報廢",   "DeleteOutlined",      "6"},
@@ -1457,7 +1468,7 @@ public class DataInitializer implements CommandLineRunner {
      * 物資管理菜單分組重構強制修正（幂等，每次启动确保结构正确）
      * 1. 删除旧 asset-overview 分组
      * 2. 资产看板改为直达二级菜单
-     * 3. 分组排序: 采购入库(2) → 资产流转(3) → 维护与处置(4) → 基础设置(5)
+     * 3. 分组排序: 采购入库(2) → 资产管理(3) → 维护与处置(4) → 基础设置(5)
      * 4. 确保采购订单存在并挂在采购入库下
      */
     private void fixAssetMenuGrouping() {
@@ -1515,6 +1526,27 @@ public class DataInitializer implements CommandLineRunner {
                 jdbcTemplate.update(
                         "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
                         adminRoleId, dashId, "[\"view\"]");
+            }
+        }
+
+        // 6. 确保 param-library 菜单存在并挂在 asset-basic 下
+        if (basicId != null) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, icon, status, deleted, updated_by) "
+                            + "VALUES (?, 'param-library', '參數庫', 2, 4, 'DatabaseOutlined', 1, 0, 'system') "
+                            + "ON DUPLICATE KEY UPDATE parent_id = VALUES(parent_id), deleted = 0, sort_order = 4, updated_by = 'system'",
+                    basicId);
+            // 给 admin 角色授权
+            Long adminRoleId2 = jdbcTemplate.queryForObject(
+                    "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
+            if (adminRoleId2 != null) {
+                Long plMenuId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM sys_menu WHERE menu_key = 'param-library' LIMIT 1", Long.class);
+                if (plMenuId != null) {
+                    jdbcTemplate.update(
+                            "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                            adminRoleId2, plMenuId, "[\"view\",\"create\",\"edit\",\"delete\"]");
+                }
             }
         }
     }
@@ -2053,7 +2085,7 @@ public class DataInitializer implements CommandLineRunner {
                 return;
             }
             String[][] menusToRestore = {
-                {"asset-claim",  "領用管理", "UserAddOutlined",  "9"},
+                {"asset-claim",  "領用歸還", "UserAddOutlined",  "9"},
                 {"asset-return", "歸還管理", "RollbackOutlined", "11"},
             };
             int restored = 0;
@@ -2110,6 +2142,40 @@ public class DataInitializer implements CommandLineRunner {
             log.info("已移除「統計報表」菜單 (id={})", menuId);
         } catch (Exception e) {
             log.warn("移除統計報表菜單失敗: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 「資產流轉」分組菜單改名為「資產管理」
+     */
+    private void renameAssetFlowOpsMenu() {
+        try {
+            Long menuId = queryMenuIdByKey("asset-flow-ops");
+            if (menuId == null) {
+                log.info("asset-flow-ops 菜單不存在，跳過改名");
+                return;
+            }
+            jdbcTemplate.update("UPDATE sys_menu SET name = '資產管理', updated_by = 'system' WHERE id = ?", menuId);
+            log.info("已將「資產流轉」改名為「資產管理」 (id={})", menuId);
+        } catch (Exception e) {
+            log.warn("改名資產流轉菜單失敗: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * v26: 「領用管理」改名為「領用歸還」
+     */
+    private void renameAssetClaimMenu() {
+        try {
+            Long menuId = queryMenuIdByKey("asset-claim");
+            if (menuId == null) {
+                log.info("asset-claim 菜單不存在，跳過改名");
+                return;
+            }
+            jdbcTemplate.update("UPDATE sys_menu SET name = '領用歸還', updated_by = 'system' WHERE id = ?", menuId);
+            log.info("已將「領用管理」改名為「領用歸還」 (id={})", menuId);
+        } catch (Exception e) {
+            log.warn("改名領用管理菜單失敗: {}", e.getMessage());
         }
     }
 

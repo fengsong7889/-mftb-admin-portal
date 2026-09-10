@@ -69,7 +69,7 @@ import {
   UnlockOutlined, // 員工AI權額管理
   InboxOutlined, // 物资管理一级菜单
   AppstoreAddOutlined, // 资产入库
-  UserAddOutlined, // 资产领用
+  UserAddOutlined, // 资产领用/归还
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
   TagsOutlined, // 资产分类
@@ -254,6 +254,7 @@ const keyToPath: Record<string, string> = {
   'asset-category':      '/asset-category',
   'asset-model':         '/asset-model',
   'asset-location':      '/asset-location',
+  'param-library':       '/param-library',
   'asset-inbound':       '/asset-inbound',
   'asset-claim':         '/asset-claim',
   'asset-borrow':        '/asset-borrow',
@@ -267,7 +268,7 @@ const keyToPath: Record<string, string> = {
   'asset-inventory':     '/asset-inventory',
   // EAM 採購
   'purchase-order':      '/purchase-order',
-  'purchase-request':    '/purchase-request',
+  'purchase-request':    '/oa-purchase-request',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -680,10 +681,10 @@ const menuItems: MenuItem[] = [
       {
         key: 'asset-flow-ops',
         icon: <SwapOutlined />,
-        label: '資產流轉',
+        label: '資產管理',
         children: [
           { key: 'asset-list', icon: <AppstoreOutlined />, label: '資產台賬' },
-          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用管理' },
+          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用歸還' },
           { key: 'asset-borrow', icon: <ScheduleOutlined />, label: '借用管理' },
           { key: 'asset-return', icon: <RollbackOutlined />, label: '歸還管理' },
           { key: 'asset-transfer-list', icon: <SwapOutlined />, label: '調撥管理' },
@@ -710,6 +711,7 @@ const menuItems: MenuItem[] = [
           { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類' },
           { key: 'asset-model', icon: <BarcodeOutlined />, label: '資產型號' },
           { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
+          { key: 'param-library', icon: <DatabaseOutlined />, label: '參數庫' },
         ],
       },
     ],
@@ -929,6 +931,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-scrap':      <DeleteOutlined />,
   'asset-repair':     <ToolOutlined />,
   'asset-inventory':  <AuditOutlined />,
+  'param-library':    <DatabaseOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,
   'purchase-request': <ShoppingCartOutlined />,

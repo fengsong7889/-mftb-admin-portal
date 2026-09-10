@@ -163,8 +163,8 @@ const AssetDashboard = lazy(() => import('./pages/AssetManagement/AssetDashboard
 const AssetCategory = lazy(() => import('./pages/AssetManagement/AssetCategory'))
 const AssetModel = lazy(() => import('./pages/AssetManagement/AssetModel'))
 const AssetLocation = lazy(() => import('./pages/AssetManagement/AssetLocation'))
+const ParamLibrary = lazy(() => import('./pages/AssetManagement/ParamLibrary'))
 // EAM 採購入庫
-const PurchaseRequest = lazy(() => import('./pages/AssetManagement/PurchaseRequest'))
 const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
 const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
 // EAM 領用借用
@@ -362,8 +362,8 @@ function AuthenticatedLayout() {
               <Route path="/asset-category"   element={<AssetCategory />} />
               <Route path="/asset-model"      element={<AssetModel />} />
               <Route path="/asset-location"   element={<AssetLocation />} />
+              <Route path="/param-library"    element={<ParamLibrary />} />
               {/* EAM 採購入庫 */}
-              <Route path="/purchase-request"  element={<PurchaseRequest />} />
               <Route path="/purchase-order"   element={<PurchaseOrder />} />
               <Route path="/asset-inbound"    element={<AssetInbound />} />
               {/* EAM 領用借用 */}

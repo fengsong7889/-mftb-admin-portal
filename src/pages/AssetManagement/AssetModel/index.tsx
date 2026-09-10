@@ -1,7 +1,7 @@
 /**
- * 品牌型號庫（物資管理 - 基礎數據）
+ * 品牌产品维护（物资管理 - 基础数据）
  *
- * 同一路由內視圖切換：列表 ⇄ 詳情（只讀） ⇄ 新增/編輯表單頁
+ * 同一路由内视图切换：列表 ⇄ 品牌详情  产品详情 ⇄ 品牌表单  产品表单
  */
 import { useState } from 'react'
 import ModelList from './ModelList'
@@ -10,8 +10,10 @@ import ModelDetail from './ModelDetail'
 
 type View =
   | { mode: 'list' }
-  | { mode: 'detail'; id: number }
-  | { mode: 'form'; id?: number }
+  | { mode: 'brandDetail'; id: number }
+  | { mode: 'productDetail'; id: number }
+  | { mode: 'brandForm'; id?: number; categoryCode?: string }
+  | { mode: 'productForm'; id?: number; categoryCode?: string; brandId?: number }
 
 export default function AssetModel() {
   const [view, setView] = useState<View>({ mode: 'list' })
@@ -20,21 +22,44 @@ export default function AssetModel() {
     <div className="content-area">
       {view.mode === 'list' ? (
         <ModelList
-          onAdd={() => setView({ mode: 'form' })}
-          onEdit={(id) => setView({ mode: 'form', id })}
-          onDetail={(id) => setView({ mode: 'detail', id })}
+          onAddBrand={(categoryCode) => setView({ mode: 'brandForm', categoryCode })}
+          onAddProduct={(categoryCode, brandId) => setView({ mode: 'productForm', categoryCode, brandId })}
+          onEditBrand={(id) => setView({ mode: 'brandForm', id })}
+          onEditProduct={(id) => setView({ mode: 'productForm', id })}
+          onDetailBrand={(id) => setView({ mode: 'brandDetail', id })}
+          onDetailProduct={(id) => setView({ mode: 'productDetail', id })}
         />
-      ) : view.mode === 'detail' ? (
+      ) : view.mode === 'brandDetail' ? (
         <ModelDetail
-          key={`detail-${view.id}`}
+          key={`brand-detail-${view.id}`}
           id={view.id}
+          type="brand"
           onBack={() => setView({ mode: 'list' })}
-          onEdit={(id) => setView({ mode: 'form', id })}
+          onEdit={(id) => setView({ mode: 'brandForm', id })}
+        />
+      ) : view.mode === 'productDetail' ? (
+        <ModelDetail
+          key={`product-detail-${view.id}`}
+          id={view.id}
+          type="product"
+          onBack={() => setView({ mode: 'list' })}
+          onEdit={(id) => setView({ mode: 'productForm', id })}
+        />
+      ) : view.mode === 'brandForm' ? (
+        <ModelForm
+          key={view.id ?? 'new-brand'}
+          id={view.id}
+          categoryCode={view.categoryCode}
+          type="brand"
+          onBack={() => setView({ mode: 'list' })}
         />
       ) : (
         <ModelForm
-          key={view.id ?? 'new'}
+          key={view.id ?? 'new-product'}
           id={view.id}
+          categoryCode={view.categoryCode}
+          brandId={view.brandId}
+          type="product"
           onBack={() => setView({ mode: 'list' })}
         />
       )}

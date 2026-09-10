@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Descriptions, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tabs, Timeline, TreeSelect, message } from 'antd'
+import { Button, DatePicker, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tabs, Timeline, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TabsProps } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -1241,7 +1241,7 @@ export default function EmployeeDetail() {
      渲染 Tab 內容
      ═══════════════════════════════════════════ */
 
-  /** 職務詳情分組小節：橙色豎條標題 + 兩列 Descriptions */
+  /** 職務詳情分組小節：橙色豎條標題 + 兩列水平字段 */
   function renderPosSection(title: string, items: Array<{ label: string; value?: string }>) {
     return (
       <div style={{ marginBottom: 16 }}>
@@ -1249,11 +1249,14 @@ export default function EmployeeDetail() {
           <span style={{ width: 3, height: 12, borderRadius: 2, background: '#E8720C' }} />
           <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{title}</span>
         </div>
-        <Descriptions
-          column={2}
-          size="small"
-          items={items.map(i => ({ key: i.label, label: i.label, children: i.value || '-' }))}
-        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+          {items.map(i => (
+            <div key={i.label} style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{i.label}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{i.value || '-'}</span>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -1432,14 +1435,32 @@ export default function EmployeeDetail() {
             </div>
             <Button icon={<EditOutlined />} onClick={handleEditConfig}>{t('employeeDetail.editConfig')}</Button>
           </div>
-          <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label={t('employeeDetail.labelSalaryStructure')}>{salaryConfig.salaryStructure}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelPaymentMethod')}>{salaryConfig.paymentMethod}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelPayDay')}>{t('employeeDetail.payDayFormat', { day: salaryConfig.payDay })}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelBankName')}>{salaryConfig.bankName}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelBankAccount')}>{salaryConfig.bankAccount}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelTaxCity')}>{salaryConfig.taxCity}</Descriptions.Item>
-          </Descriptions>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelSalaryStructure')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.salaryStructure}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPaymentMethod')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.paymentMethod}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPayDay')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{t('employeeDetail.payDayFormat', { day: salaryConfig.payDay })}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBankName')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.bankName}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBankAccount')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.bankAccount}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelTaxCity')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.taxCity}</span>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -1458,16 +1479,40 @@ export default function EmployeeDetail() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             <Button icon={<EditOutlined />} onClick={handleEditPersonal}>{t('common.edit')}</Button>
           </div>
-          <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label={t('employee.nameLabel')}>{employee?.name || '-'}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelGender')}>{basicInfo.gender}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelNationality')}>{basicInfo.nationality}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelEthnicity')}>{basicInfo.ethnicity}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelBirthDate')}>{basicInfo.birthDate}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelMaritalStatus')}>{basicInfo.maritalStatus}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelPoliticalStatus')}>{basicInfo.politicalStatus}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelReligion')}>{basicInfo.religion || '-'}</Descriptions.Item>
-          </Descriptions>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.nameLabel')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{employee?.name || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelGender')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.gender}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelNationality')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.nationality}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelEthnicity')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.ethnicity}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBirthDate')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.birthDate}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelMaritalStatus')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.maritalStatus}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPoliticalStatus')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.politicalStatus}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelReligion')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.religion || '-'}</span>
+            </div>
+          </div>
         </div>
 
         {/* 證件信息 */}
@@ -1480,14 +1525,32 @@ export default function EmployeeDetail() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             <Button icon={<EditOutlined />} onClick={handleEditIdInfo}>{t('common.edit')}</Button>
           </div>
-          <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label={t('employeeDetail.labelIdType')}>{basicInfo.idType}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelIdNumber')}>{basicInfo.idNumber}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelIdAddress')}>{basicInfo.idAddress}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelHouseholdType')}>{basicInfo.householdType}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelHouseholdLocation')}>{basicInfo.householdLocation}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelNativePlace')}>{basicInfo.nativePlace}</Descriptions.Item>
-          </Descriptions>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdType')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.idType}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdNumber')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.idNumber}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdAddress')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.idAddress}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelHouseholdType')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.householdType}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelHouseholdLocation')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.householdLocation}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelNativePlace')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.nativePlace}</span>
+            </div>
+          </div>
         </div>
 
         {/* 通訊信息 */}
@@ -1500,13 +1563,28 @@ export default function EmployeeDetail() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             <Button icon={<EditOutlined />} onClick={handleEditContact}>{t('common.edit')}</Button>
           </div>
-          <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label={t('employeeDetail.labelMobile')}>{basicInfo.mobile}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelEmail')}>{basicInfo.email}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelAddressCountry')}>{basicInfo.addressCountry || '-'}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelAddressCity')}>{basicInfo.addressCity || '-'}</Descriptions.Item>
-            <Descriptions.Item label={t('employeeDetail.labelAddressDetail')} span={2}>{basicInfo.addressDetail || '-'}</Descriptions.Item>
-          </Descriptions>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelMobile')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.mobile}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelEmail')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.email}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCountry')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.addressCountry || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCity')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.addressCity || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gridColumn: 'span 2' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressDetail')}：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.addressDetail || '-'}</span>
+            </div>
+          </div>
         </div>
 
         {/* 緊急聯繫人 */}
@@ -1677,51 +1755,89 @@ export default function EmployeeDetail() {
         </div>
         {isEdit ? (
           employee ? (
-            <Descriptions column={4} size="small" bordered>
-              <Descriptions.Item label={t('employee.nameLabel')}>{employee.name}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.empIdLabel')}>{employee.empId}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.deptLabel')}>{activePosRecord?.serviceDept || employee.department || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.positionLabel')}>{activePosRecord?.position || employee.position || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.sequenceLabel')}>{activePosRecord?.sequence || employee.sequence || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.colJobLevel')}>{activePosRecord?.positionLevel || employee.jobLevel || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.rankLabel')}>{activePosRecord?.rank || employee.rank || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.employmentStatus')}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+              {/* 姓名 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.nameLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{employee.name}</span>
+              </div>
+              {/* 工號 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.empIdLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{employee.empId}</span>
+              </div>
+              {/* 所屬部門 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.deptLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.serviceDept || employee.department || '-'}</span>
+              </div>
+              {/* 職位 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.positionLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.position || employee.position || '-'}</span>
+              </div>
+              {/* 職級序列 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.sequenceLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.sequence || employee.sequence || '-'}</span>
+              </div>
+              {/* 職級 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colJobLevel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.positionLevel || employee.jobLevel || '-'}</span>
+              </div>
+              {/* 職等 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.rankLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.rank || employee.rank || '-'}</span>
+              </div>
+              {/* 在職狀態 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.employmentStatus')}：</span>
                 {latestPosOperation === '离职'
                   ? <Tag color="default">{t('employee.statusResigned')}</Tag>
                   : <Tag color="success">{t('employee.statusActive')}</Tag>}
-              </Descriptions.Item>
-              <Descriptions.Item label={t('employee.seniorityLabel')}>
-                {seniorityText || <span style={{ color: '#8C8C8C' }}>-</span>}
-              </Descriptions.Item>
-              <Descriptions.Item label={t('employee.roleAuthLabel')} span={2}>
-                {employee.functionRoleIds?.length
-                  ? (() => {
-                      const roles = employee.functionRoleIds
-                      const visible = showAllRoles ? roles : roles.slice(0, 2)
-                      const remaining = roles.length - 2
-                      return (
-                        <>
-                          {visible.map(id => <Tag key={id} color="blue">{t('employeeDetail.roleTag', { id })}</Tag>)}
-                          {!showAllRoles && remaining > 0 && (
-                            <a onClick={() => setShowAllRoles(true)} style={{ fontSize: 12, marginLeft: 4 }}>
-                              +{remaining}
-                            </a>
-                          )}
-                          {showAllRoles && roles.length > 2 && (
-                            <a onClick={() => setShowAllRoles(false)} style={{ fontSize: 12, marginLeft: 4 }}>
-                              {t('common.collapse')}
-                            </a>
-                          )}
-                        </>
-                      )
-                    })()
-                  : <span style={{ color: '#8C8C8C' }}>{t('employee.notBound')}</span>}
-              </Descriptions.Item>
-              <Descriptions.Item label={t('employee.colUpdatedBy')}>{employee.updatedBy || '-'}</Descriptions.Item>
-              <Descriptions.Item label={t('employee.colUpdatedAt')}>
-                {employee.updatedAt ? dayjs(employee.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}
-              </Descriptions.Item>
-            </Descriptions>
+              </div>
+              {/* 工齡 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.seniorityLabel')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{seniorityText || <span style={{ color: '#BFBFBF' }}>-</span>}</span>
+              </div>
+              {/* 角色授權 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.roleAuthLabel')}：</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                  {employee.functionRoleIds?.length
+                    ? (() => {
+                        const roles = employee.functionRoleIds
+                        const visible = showAllRoles ? roles : roles.slice(0, 2)
+                        const remaining = roles.length - 2
+                        return (
+                          <>
+                            {visible.map(id => <Tag key={id} color="blue">{t('employeeDetail.roleTag', { id })}</Tag>)}
+                            {!showAllRoles && remaining > 0 && (
+                              <a onClick={() => setShowAllRoles(true)} style={{ fontSize: 12, marginLeft: 4 }}>+{remaining}</a>
+                            )}
+                            {showAllRoles && roles.length > 2 && (
+                              <a onClick={() => setShowAllRoles(false)} style={{ fontSize: 12, marginLeft: 4 }}>{t('common.collapse')}</a>
+                            )}
+                          </>
+                        )
+                      })()
+                    : <span style={{ color: '#BFBFBF' }}>{t('employee.notBound')}</span>}
+                </div>
+              </div>
+              {/* 最後更新人 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colUpdatedBy')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{employee.updatedBy || '-'}</span>
+              </div>
+              {/* 最後更新時間 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colUpdatedAt')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{employee.updatedAt ? dayjs(employee.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
+              </div>
+            </div>
           ) : (
             <div style={{ textAlign: 'center', padding: 40, color: '#8C8C8C' }}>
               {t('employeeDetail.notFoundHint')}
