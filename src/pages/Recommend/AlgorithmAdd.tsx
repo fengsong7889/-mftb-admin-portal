@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch, Radio } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, EditOutlined } from '@ant-design/icons'
 import { AlgorithmType, APP_OPTIONS } from './constants'
+import dayjs from 'dayjs'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
@@ -102,6 +103,7 @@ export default function AlgorithmAdd() {
   const [regionLimit, _setRegionLimit] = useState(true) // false: 不限制, true: 限制
   const [selectedRegions, _setSelectedRegions] = useState<string[]>([])
   const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
+  const [algoDetailData, setAlgoDetailData] = useState<{ updatedBy?: string; updatedAt?: string } | null>(null) // 详情模式操作记录数据
 
   /** 金字招牌 - 資格條件（同一場景/統計類標籤內多條件以且/或組合） */
   interface QualificationCondition {
@@ -436,6 +438,7 @@ export default function AlgorithmAdd() {
     if (!algorithmIdParam) return
     fetchAdAlgorithmDetail(Number(algorithmIdParam))
       .then(detail => {
+        setAlgoDetailData({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
         form.setFieldsValue({
           name: detail.algoName,
           brand: brandToAppType(detail.brand),
@@ -3031,6 +3034,29 @@ export default function AlgorithmAdd() {
       )}
 
       </Form>
+
+      {/* 操作记录（仅详情模式） */}
+      {isDetailMode && (
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EditOutlined style={{ fontSize: 14, color: '#595959' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>操作记录</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{algoDetailData?.updatedBy || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{algoDetailData?.updatedAt ? dayjs(algoDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 底部操作按鈕（取消/保存） */}
       {selectedAlgorithmType && !isDetailMode && (

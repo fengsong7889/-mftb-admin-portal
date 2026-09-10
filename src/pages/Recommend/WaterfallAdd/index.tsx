@@ -180,6 +180,7 @@ function WaterfallAddGeneral() {
   const isEditMode = !!urlId && !isDetailMode // 有 id 且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [waterfallDetailData, setWaterfallDetailData] = useState<{ updatedBy?: string; updatedAt?: string } | null>(null) // 详情模式操作记录数据
 
   const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
@@ -315,6 +316,7 @@ function WaterfallAddGeneral() {
       ;(async () => {
         try {
           const detail = await fetchAdRevivePricingDetail(Number(urlId))
+          setWaterfallDetailData({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
           const app = (brandToAppType(detail.brand) ?? AppType.SHANFENG) as AppType
           form.setFieldsValue({
             algorithmId: detail.algoId,
@@ -371,6 +373,7 @@ function WaterfallAddGeneral() {
     ;(async () => {
       try {
         const detail = await fetchAdPricingDetail(Number(urlId))
+        setWaterfallDetailData({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
         const app = (brandToAppType(detail.brand) ?? AppType.SHANFENG) as AppType
         form.setFieldsValue({
           algorithmId: detail.algoId,
@@ -1874,6 +1877,29 @@ function WaterfallAddGeneral() {
           <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.disablePricingHint')}</span>
         </div>
       </div>
+
+      {/* 操作记录（仅详情模式） */}
+      {isDetailMode && (
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EditOutlined style={{ fontSize: 14, color: '#595959' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>操作记录</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{waterfallDetailData?.updatedBy || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{waterfallDetailData?.updatedAt ? dayjs(waterfallDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 底部操作按钮 - 固定（取消/保存） */}
       {!isDetailMode && (

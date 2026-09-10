@@ -1255,7 +1255,6 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 推廣通
   '/promotion-sales-config': 'promotion-sales-config',
   '/promotion-order-manage': 'promotion-sales-config',
-  '/merchant-order-manage': 'promotion-sales-config',
   '/order-detail': 'promotion-sales-config',
   '/promotion-report-overview': 'promotion-report-overview',
   '/promotion-report-order': 'promotion-report-order',

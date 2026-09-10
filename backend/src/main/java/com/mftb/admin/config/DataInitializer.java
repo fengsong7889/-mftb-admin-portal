@@ -67,7 +67,8 @@ public class DataInitializer implements CommandLineRunner {
     // v25: 「存放位置」更名為「倉庫維護」
     // v26: 採購申請/採購訂單菜單遷移至 OA 中心，移除物資管理下的採購菜單
     // v27: 种子数据不再覆盖用户在「菜单配置」中自定义的菜单名称（仅修复占位数据名称）
-    private static final String V_MENU_SEED = "core:menu-seed-v27";
+    // v28: 移除 merchant-order-manage（訂單管理）菜单——所有訂單入口統一至廣告類型卡片上的「查看訂單」按鈕
+    private static final String V_MENU_SEED = "core:menu-seed-v28";
 
     @Override
     public void run(String... args) {
@@ -900,7 +901,6 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("rule-config", "Rule Config"),
                 Map.entry("workflow-config", "Workflow Config"),
                 Map.entry("version-history", "Version History"),
-                Map.entry("merchant-order-manage", "Order Management"),
                 Map.entry("ai-assistant", "AI Center (AI)"),
                 Map.entry("ai_model_hub", "Model Access"),
                 Map.entry("ai_quota_auth", "Authorization & Quota"),
@@ -1194,9 +1194,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("gift-manage",         new String[]{"贈送管理",         "merchant_promotion", "5"});
         menus.put("ad-sales",            new String[]{"廣告銷售",         "merchant_promotion", "6"});
         menus.put("promotion-word-library", new String[]{"詞庫管理",     "merchant_promotion", "7"});
-        menus.put("merchant-order-manage",  new String[]{"訂單管理",     "merchant_promotion", "8"});
+        // v28: merchant-order-manage（訂單管理）已移除——所有訂單入口統一至廣告類型卡片上的「查看訂單」按鈕
         // ── 商家推廣工具 > 流量沙盤 ──
-        menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "9"});
+        menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "8"});
         menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "1"});
         menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "2"});
         menus.put("merchant-score-insight",   new String[]{"商家評分透視", "traffic-sandbox",    "3"});

@@ -180,8 +180,6 @@ const keyToPath: Record<string, string> = {
   'promotion-slot-config': '/promotion-slot-config',
   'promotion-waterfall': '/promotion-waterfall',
   'promotion-sales-config': '/promotion-sales-config',
-  // 商家推广工具 - 訂單管理（独立key，复用同一页面）
-  'merchant-order-manage': '/merchant-order-manage',
   // 广告销售（商家推广工具下，复用店铺推广页面）
   'ad-sales': '/ad-sales',
   // 推广赠送（一级菜单「赠送管理」下）

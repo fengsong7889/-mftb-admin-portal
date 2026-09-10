@@ -16,6 +16,7 @@ import { fetchEmployees, createEmployee, type EmployeeItem, type EmployeePayload
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
 import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
 import { fetchRoles, type RoleItem } from '../../../api/role'
+import { useAuth } from '../../../contexts/AuthContext'
 import { countryOptions as permCountryOptions, locationOptions, countryLocationMap } from '../../Permission/types'
 
 /* ═══════════════════════════════════════════
@@ -43,6 +44,8 @@ interface PositionRecord {
   positionLevel?: string
   rank?: string
   directSuperior?: string
+  updatedBy?: string
+  updatedAt?: string
 }
 
 /** 费用信息 - 收入项 */
@@ -364,6 +367,49 @@ export default function EmployeeDetail() {
   /* ── Tab 状态 ── */
   const [activeTab, setActiveTab] = useState('position')
 
+  /* ── 各 Tab 最後更新追蹤 ── */
+  const { user } = useAuth()
+  const [tabUpdateInfo, setTabUpdateInfo] = useState<Record<string, { updatedBy: string; updatedAt: string }>>({})
+
+  /** 標記某個 Tab 已更新（寫入 state + localStorage） */
+  const markTabUpdated = (tabKey: string, empIdStr: string) => {
+    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const by = user?.name || user?.username || '-'
+    const newInfo = { updatedBy: by, updatedAt: now }
+    setTabUpdateInfo(prev => ({ ...prev, [tabKey]: newInfo }))
+    // 同步寫入 localStorage，供列表頁讀取
+    const storageKey = `emp_tab_update_${empIdStr}`
+    try {
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '{}')
+      existing[tabKey] = newInfo
+      localStorage.setItem(storageKey, JSON.stringify(existing))
+    } catch { /* 靜默 */ }
+  }
+
+  /** 渲染 Tab 底部更新資訊條 */
+  const renderTabUpdateBar = (tabKey: string) => {
+    const info = tabUpdateInfo[tabKey]
+    return (
+      <div style={{
+        marginTop: 16, padding: '10px 16px', borderRadius: 8,
+        border: '1px solid #e8eaed', background: '#fafafa',
+        display: 'flex', alignItems: 'center', gap: 24,
+      }}>
+        <div style={{ width: 20, height: 20, borderRadius: 4, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ClockCircleOutlined style={{ fontSize: 11, color: '#1890ff' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+          <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.tabLastUpdatedBy')}：</span>
+          <span style={{ fontSize: 13, color: '#262626' }}>{info?.updatedBy || '-'}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+          <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.tabLastUpdatedAt')}：</span>
+          <span style={{ fontSize: 13, color: '#262626' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span>
+        </div>
+      </div>
+    )
+  }
+
   /* ── 职务数据 ── */
   const [positionRecords, setPositionRecords] = useState<PositionRecord[]>([])
   const [posModalVisible, setPosModalVisible] = useState(false)
@@ -579,6 +625,8 @@ export default function EmployeeDetail() {
         positionLevel: r.positionLevel,
         rank: r.rankCode,
         directSuperior: r.directSuperior,
+        updatedBy: r.updatedBy,
+        updatedAt: r.updatedAt,
       })))
     }).catch(() => { /* 静默 */ })
   }, [empId, isEdit])
@@ -742,6 +790,8 @@ export default function EmployeeDetail() {
       ...values,
       effectiveDate: values.effectiveDate?.format?.('YYYY-MM-DD') ?? values.effectiveDate,
     }
+    const nowStr = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const curUser = user?.name || user?.username || '-'
     if (empId) {
       if (editingPos) {
         const updated = await updatePositionRecord(Number(empId), editingPos.id, normalized)
@@ -749,6 +799,8 @@ export default function EmployeeDetail() {
           r.id === editingPos.id ? {
             ...r, ...normalized,
             effectiveSeq: updated.effectiveSeq,
+            updatedBy: updated.updatedBy || curUser,
+            updatedAt: updated.updatedAt || nowStr,
           } : r
         ))
         message.success(t('employeeDetail.posUpdated'))
@@ -762,6 +814,8 @@ export default function EmployeeDetail() {
           sequence: normalized.sequence,
           positionLevel: normalized.positionLevel,
           rank: normalized.rankCode,
+          updatedBy: created.updatedBy || curUser,
+          updatedAt: created.updatedAt || nowStr,
         }
         setPositionRecords(prev => [newRecord, ...prev])
         setSelectedPosId(created.id)
@@ -771,17 +825,18 @@ export default function EmployeeDetail() {
       // 无 empId 时仅本地更新
       if (editingPos) {
         setPositionRecords(prev => prev.map(r =>
-          r.id === editingPos.id ? { ...r, ...normalized, effectiveSeq: (r.effectiveSeq ?? 0) + 1 } : r
+          r.id === editingPos.id ? { ...r, ...normalized, effectiveSeq: (r.effectiveSeq ?? 0) + 1, updatedBy: curUser, updatedAt: nowStr } : r
         ))
         message.success(t('employeeDetail.posUpdated'))
       } else {
         const newId = Date.now()
         const maxSeq = Math.max(...positionRecords.map(r => r.effectiveSeq ?? 0), -1)
-        setPositionRecords(prev => [{ ...normalized, id: newId, effectiveSeq: maxSeq + 1 }, ...prev])
+        setPositionRecords(prev => [{ ...normalized, id: newId, effectiveSeq: maxSeq + 1, updatedBy: curUser, updatedAt: nowStr }, ...prev])
         setSelectedPosId(newId)
         message.success(t('employeeDetail.posAdded'))
       }
     }
+    if (empId) markTabUpdated('position', empId)
     setPosModalVisible(false)
   }
 
@@ -791,6 +846,7 @@ export default function EmployeeDetail() {
     }
     setPositionRecords(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.posDeleted'))
+    if (empId) markTabUpdated('position', empId)
   }
 
   /* ═══════════════════════════════════════════
@@ -863,12 +919,14 @@ export default function EmployeeDetail() {
       setSalaryIncome(prev => [...prev, { ...values, id: Date.now() }])
       message.success(t('employeeDetail.incomeAdded'))
     }
+    if (empId) markTabUpdated('salary', empId)
     setIncomeModalVisible(false)
   }
 
   const handleDeleteIncome = (id: number) => {
     setSalaryIncome(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.incomeDeleted'))
+    if (empId) markTabUpdated('salary', empId)
   }
 
   const handleAddDeduction = () => {
@@ -892,12 +950,14 @@ export default function EmployeeDetail() {
       setSalaryDeduction(prev => [...prev, { ...values, id: Date.now() }])
       message.success(t('employeeDetail.deductionAdded'))
     }
+    if (empId) markTabUpdated('salary', empId)
     setDeductionModalVisible(false)
   }
 
   const handleDeleteDeduction = (id: number) => {
     setSalaryDeduction(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.deductionDeleted'))
+    if (empId) markTabUpdated('salary', empId)
   }
 
   const handleEditConfig = () => {
@@ -909,6 +969,7 @@ export default function EmployeeDetail() {
     const values = await configForm.validateFields()
     setSalaryConfig(values)
     message.success(t('employeeDetail.configUpdated'))
+    if (empId) markTabUpdated('salary', empId)
     setConfigModalVisible(false)
   }
 
@@ -940,6 +1001,7 @@ export default function EmployeeDetail() {
     }
     setBasicInfo(prev => ({ ...prev, ...normalized }))
     message.success(t('employeeDetail.personalUpdated'))
+    if (empId) markTabUpdated('basic', empId)
     setPersonalModalVisible(false)
   }
 
@@ -962,6 +1024,7 @@ export default function EmployeeDetail() {
     }
     setBasicInfo(prev => ({ ...prev, ...values }))
     message.success(t('employeeDetail.idInfoUpdated'))
+    if (empId) markTabUpdated('basic', empId)
     setIdInfoModalVisible(false)
   }
 
@@ -983,6 +1046,7 @@ export default function EmployeeDetail() {
     }
     setBasicInfo(prev => ({ ...prev, ...values }))
     message.success(t('employeeDetail.contactUpdated'))
+    if (empId) markTabUpdated('basic', empId)
     setContactModalVisible(false)
   }
 
@@ -1043,6 +1107,7 @@ export default function EmployeeDetail() {
         message.success(t('employeeDetail.emergencyAdded'))
       }
     }
+    if (empId) markTabUpdated('basic', empId)
     setEmergencyModalVisible(false)
   }
 
@@ -1055,6 +1120,7 @@ export default function EmployeeDetail() {
       emergencyContacts: prev.emergencyContacts.filter(c => c.id !== id),
     }))
     message.success(t('employeeDetail.emergencyDeleted'))
+    if (empId) markTabUpdated('basic', empId)
   }
 
   /* ═══════════════════════════════════════════
@@ -1173,12 +1239,14 @@ export default function EmployeeDetail() {
       setContracts(prev => [...prev, { ...values, id: Date.now() }])
       message.success(t('employeeDetail.contractAdded'))
     }
+    if (empId) markTabUpdated('contract', empId)
     setContractModalVisible(false)
   }
 
   const handleDeleteContract = (id: number) => {
     setContracts(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.contractDeleted'))
+    if (empId) markTabUpdated('contract', empId)
   }
 
   /* ═══════════════════════════════════════════
@@ -1229,12 +1297,14 @@ export default function EmployeeDetail() {
       setRewardsPunish(prev => [...prev, { ...values, id: Date.now() }])
       message.success(t('employeeDetail.rpAdded'))
     }
+    if (empId) markTabUpdated('reward', empId)
     setRpModalVisible(false)
   }
 
   const handleDeleteRp = (id: number) => {
     setRewardsPunish(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.rpDeleted'))
+    if (empId) markTabUpdated('reward', empId)
   }
 
   /* ═══════════════════════════════════════════
@@ -1360,6 +1430,9 @@ export default function EmployeeDetail() {
                         <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
                           {[r.serviceDept, r.position].filter(Boolean).join(' · ') || '-'}
                         </div>
+                        <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>
+                          {r.updatedBy || '-'} · {r.updatedAt ? dayjs(r.updatedAt).format('YYYY-MM-DD HH:mm') : '-'}
+                        </div>
                       </div>
                     ),
                   }
@@ -1462,6 +1535,7 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
+        {renderTabUpdateBar('salary')}
       </div>
     )
   }
@@ -1622,7 +1696,7 @@ export default function EmployeeDetail() {
             ]}
           />
         </div>
-
+        {renderTabUpdateBar('basic')}
       </div>
     )
   }
@@ -1637,6 +1711,7 @@ export default function EmployeeDetail() {
           pagination={false}
           size="middle"
         />
+        {renderTabUpdateBar('account')}
       </div>
     )
   }
@@ -1656,6 +1731,7 @@ export default function EmployeeDetail() {
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAddContract}>{t('employeeDetail.addContract')}</Button>
         </div>
+        {renderTabUpdateBar('contract')}
       </div>
     )
   }
@@ -1675,6 +1751,7 @@ export default function EmployeeDetail() {
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRp}>{t('employeeDetail.addRp')}</Button>
         </div>
+        {renderTabUpdateBar('reward')}
       </div>
     )
   }
@@ -1826,16 +1903,6 @@ export default function EmployeeDetail() {
                       })()
                     : <span style={{ color: '#BFBFBF' }}>{t('employee.notBound')}</span>}
                 </div>
-              </div>
-              {/* 最後更新人 */}
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colUpdatedBy')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{employee.updatedBy || '-'}</span>
-              </div>
-              {/* 最後更新時間 */}
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colUpdatedAt')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{employee.updatedAt ? dayjs(employee.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
               </div>
             </div>
           ) : (

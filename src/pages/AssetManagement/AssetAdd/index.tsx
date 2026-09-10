@@ -1,16 +1,20 @@
 /**
- * 资产新增/编辑独立页（重构版）
+ * 资产新增/编辑独立页（简化版）
  *
- * 四大模块卡片布局：
- *  1. 入库信息 — 批次号/入库时间/入库数量/验收人
- *  2. 资产信息 — 共享模板(分类/品牌/名称) + 动态资产列表(每行独立编码+部门)
- *  3. 租/购信息 — 来源(自购/租用)/价值/日期/存放位置
+ * 五大模块卡片布局：
+ *  1. 资产信息 — 资产编码/资产分类/品牌/资产名称/资产照片/资产参数信息
+ *  2. 租/购信息 — 来源(自购/租用)/价值/日期/存放位置
+ *  3. 当前使用人 — 使用人/所在部门/领用日期
  *  4. 备注信息
+ *  5. 入库信息 — 批次号/入库时间/入库数量/验收人（验收入库跳转时自动带入）
  *
  * 级联逻辑：分类 → 品牌 → 产品型号 → 参数模板
  * 来源条件：自购显示购买公司，租用显示租用公司+租借公司
  * 位置级联：仓库 → 楼层 → 办公室
- * 动态列表：入库数量决定资产条目数，每行有独立资产编码
+ *
+ * URL 参数：
+ *  - ?id= 编辑模式
+ *  - ?inboundBatchNo=&inboundDate=&inboundQty=&inspector= 从验收入库带入
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -20,7 +24,7 @@ import {
 } from 'antd'
 import type { UploadFile } from 'antd'
 import {
-  ArrowLeftOutlined, SaveOutlined, UploadOutlined, PlusOutlined, MinusCircleOutlined,
+  ArrowLeftOutlined, SaveOutlined,
   PictureOutlined, FileImageOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -41,7 +45,7 @@ const { TextArea } = Input
 const COMPANY_OPTIONS = ['澳觅科技', '闪蜂', 'mFood']
 
 /* ==================== 树形部门数据构建 ==================== */
-function buildDeptTree(depts: DepartmentItem[]): { title: string; value: number; children?: { title: string; value: number }[] }[] {
+function buildDeptTree(depts: DepartmentItem[]): { title: string; value: string; children?: { title: string; value: string }[] }[] {
   const map = new Map<number, DepartmentItem>()
   depts.forEach((d) => map.set(d.id, d))
   const roots: DepartmentItem[] = []
@@ -56,8 +60,8 @@ function buildDeptTree(depts: DepartmentItem[]): { title: string; value: number;
   })
   return roots.map((r) => ({
     title: r.name,
-    value: r.id,
-    children: (childrenMap.get(r.id) || []).map((c) => ({ title: c.name, value: c.id })),
+    value: r.name,
+    children: (childrenMap.get(r.id) || []).map((c) => ({ title: c.name, value: c.name })),
   }))
 }
 
@@ -96,16 +100,13 @@ export default function AssetAdd() {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  /* ----- 动态资产列表 ----- */
-  const [assetRows, setAssetRows] = useState<{ assetNo: string; department: string | number }[]>([])
-
   /* ----- 基础数据 ----- */
   const [categories, setCategories] = useState<AssetCategory[]>([])
   const [categoryTree, setCategoryTree] = useState<{ title: string; value: string; children?: { title: string; value: string; children?: { title: string; value: string }[] }[] }[]>([])
   const [brands, setBrands] = useState<AssetBrand[]>([])
   const [models, setModels] = useState<AssetModel[]>([])
   const [locations, setLocations] = useState<AssetLocation[]>([])
-  const [deptTree, setDeptTree] = useState<{ title: string; value: number; children?: { title: string; value: number }[] }[]>([])
+  const [deptTree, setDeptTree] = useState<{ title: string; value: string; children?: { title: string; value: string }[] }[]>([])
 
   /* ----- 级联状态 ----- */
   const [selectedCategoryCode, setSelectedCategoryCode] = useState<string>('')
@@ -169,11 +170,40 @@ export default function AssetAdd() {
           department: data.department,
           userName: data.userName,
           remark: data.remark || undefined,
+          // 租用专属字段（如有）
+          rentalCost: (data as any).rentalCost || undefined,
+          rentalPeriod: (data as any).rentalPeriod && (data as any).rentalPeriod[0]
+            ? [dayjs((data as any).rentalPeriod[0]), dayjs((data as any).rentalPeriod[1])]
+            : undefined,
+          // 入库信息（如有）
+          inboundBatchNo: (data as any).inboundBatchNo || undefined,
+          inboundDate: (data as any).inboundDate ? dayjs((data as any).inboundDate) : undefined,
+          inboundQty: (data as any).inboundQty || undefined,
+          inspector: (data as any).inspector || undefined,
         })
+        // 回填图片
+        if (data.images) {
+          setImageFiles(data.images.split(',').filter(Boolean).map((url, i) => ({
+            uid: String(i), name: `image-${i}`, url,
+          })))
+        }
       })
       .catch((err: Error) => message.error(err.message))
       .finally(() => setLoading(false))
   }, [isEdit, editingId, form])
+
+  /* ----- 从验收入库带入入库信息（URL 参数） ----- */
+  useEffect(() => {
+    const batchNo = searchParams.get('inboundBatchNo')
+    if (batchNo && !isEdit) {
+      form.setFieldsValue({
+        inboundBatchNo: batchNo,
+        inboundDate: searchParams.get('inboundDate') ? dayjs(searchParams.get('inboundDate')!) : dayjs(),
+        inboundQty: searchParams.get('inboundQty') ? Number(searchParams.get('inboundQty')) : 1,
+        inspector: searchParams.get('inspector') || undefined,
+      })
+    }
+  }, [searchParams, isEdit, form])
 
   /* ----- 分类变更 → 加载品牌 ----- */
   const handleCategoryChange = useCallback((code: string) => {
@@ -223,28 +253,6 @@ export default function AssetAdd() {
     form.setFieldValue('locationRoom', undefined)
   }
 
-  /* ----- 生成资产条目 ----- */
-  const handleGenerateRows = () => {
-    const qty = form.getFieldValue('inboundQty') || 0
-    if (qty < 1) { message.warning('请先填写入库数量'); return }
-    if (qty > 100) { message.warning('单次入库数量不能超过 100'); return }
-    const newRows = Array.from({ length: qty }, (_, i) => ({
-      assetNo: '',
-      department: assetRows[0]?.department || '',
-    }))
-    setAssetRows(newRows)
-  }
-
-  /* ----- 更新资产条目 ----- */
-  const handleAssetRowChange = (index: number, field: 'assetNo' | 'department', value: string | number) => {
-    setAssetRows((prev) => prev.map((row, i) => i === index ? { ...row, [field]: value } : row))
-  }
-
-  /* ----- 删除资产条目 ----- */
-  const handleRemoveRow = (index: number) => {
-    setAssetRows((prev) => prev.filter((_, i) => i !== index))
-  }
-
   /* ----- 图片上传 ----- */
   const handleImageUpload = useCallback((file: File) => {
     if (file.size > 2 * 1024 * 1024) { message.warning('图片不能超过 2MB'); return false }
@@ -262,9 +270,8 @@ export default function AssetAdd() {
     try {
       const v = await form.validateFields()
 
-      // 校验资产条目
-      const emptyRows = assetRows.filter((r) => !r.assetNo.trim())
-      if (emptyRows.length > 0) { message.error(`第 ${emptyRows.map((r) => assetRows.indexOf(r) + 1).join(', ')} 行资产编码未填写`); return }
+      // 校验资产编码
+      if (!v.assetNo?.trim()) { message.error('请填写资产编码'); return }
 
       // 拼接位置信息
       const wh = warehouses.find((w) => w.id === selectedWarehouseId)
@@ -274,22 +281,20 @@ export default function AssetAdd() {
 
       setSubmitting(true)
       const payload = {
-        inboundBatchNo: v.inboundBatchNo || '',
-        inboundDate: v.inboundDate ? v.inboundDate.format('YYYY-MM-DD') : null,
-        inboundQty: v.inboundQty || assetRows.length,
-        inspector: v.inspector || '',
-        assets: assetRows.map((row) => ({
-          assetNo: row.assetNo,
-          assetName: v.assetName || '',
-          assetType: v.assetType || '',
-          brand: v.brand || '',
-          department: row.department || '',
-        })),
+        assetNo: v.assetNo.trim(),
+        assetName: v.assetName || '',
+        assetType: v.assetType || '',
+        brand: v.brand || '',
         purchaseValue: v.purchaseValue || 0,
         purchaseDate: v.purchaseDate ? v.purchaseDate.format('YYYY-MM-DD') : null,
         usageDate: v.usageDate ? v.usageDate.format('YYYY-MM-DD') : null,
         source: v.source || 'self' as AssetSource,
         company: v.company || '',
+        // 租用专属字段
+        rentalCost: v.rentalCost || null,
+        rentalPeriod: v.rentalPeriod
+          ? [v.rentalPeriod[0]?.format('YYYY-MM-DD'), v.rentalPeriod[1]?.format('YYYY-MM-DD')]
+          : null,
         location: locationParts,
         department: v.department || '',
         userName: v.userName || '',
@@ -299,6 +304,11 @@ export default function AssetAdd() {
         applicant: '当前用户',
         scrapTime: null,
         params: Object.keys(paramValues).length ? paramValues : undefined,
+        // 入库信息
+        inboundBatchNo: v.inboundBatchNo || '',
+        inboundDate: v.inboundDate ? v.inboundDate.format('YYYY-MM-DD') : null,
+        inboundQty: v.inboundQty || 1,
+        inspector: v.inspector || '',
       }
       if (isEdit && editingId) {
         await updateAsset(editingId, payload as any)
@@ -371,7 +381,7 @@ export default function AssetAdd() {
   const renderParamFields = () => {
     if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>请先选择资产分类</span>
     return (
-      <Row gutter={16}>
+      <Row gutter={[16, 16]}>
         {paramFields.map((field) => (
           <Col span={8} key={field.key}>
             <Form.Item label={field.label} style={{ marginBottom: 0 }}>
@@ -423,39 +433,7 @@ export default function AssetAdd() {
       <Spin spinning={loading}>
         <Form form={form} layout="vertical" disabled={loading}>
 
-          {/* ====== 模块1：入库信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            {renderCardTitle(
-              <PictureOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
-              '#e6f7ff',
-              '入库信息',
-            )}
-
-            <Row gutter={16}>
-              <Col span={6}>
-                <Form.Item label="入库批次号" name="inboundBatchNo" rules={[{ required: true, message: '请输入入库批次号' }]}>
-                  <Input placeholder="如 RK-2024-0001" allowClear disabled={isEdit} />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item label="入库时间" name="inboundDate" rules={[{ required: true, message: '请选择入库时间' }]}>
-                  <DatePicker style={{ width: '100%' }} placeholder="请选择入库时间" />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item label="入库数量" name="inboundQty" rules={[{ required: true, message: '请输入入库数量' }]} initialValue={1}>
-                  <InputNumber min={1} max={100} step={1} placeholder="请输入数量" style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item label="验收人" name="inspector" rules={[{ required: true, message: '请输入验收人' }]}>
-                  <Input placeholder="请输入验收人" allowClear />
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
-
-          {/* ====== 模块2：资产信息 ====== */}
+          {/* ====== 模块1：资产信息 ====== */}
           <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
               <PictureOutlined style={{ fontSize: 14, color: '#52C41A' }} />,
@@ -463,116 +441,65 @@ export default function AssetAdd() {
               '资产信息',
             )}
 
-            {/* 共享模板：分类/品牌/名称 */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>资产模板（所有条目共享）</div>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item label="资产分类" name="assetType" rules={[{ required: true, message: '请选择资产分类' }]}>
-                    <TreeSelect
-                      placeholder="请选择分类"
-                      allowClear
-                      showSearch
-                      treeDefaultExpandAll
-                      treeNodeFilterProp="title"
-                      treeData={categoryTree}
-                      onChange={(code) => handleCategoryChange(code || '')}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="品牌" name="brand">
-                    <Select
-                      placeholder="请先选择分类"
-                      allowClear
-                      showSearch
-                      optionFilterProp="label"
-                      disabled={!selectedCategoryCode}
-                      options={brands.map((b) => ({ label: b.brandZh, value: b.brandZh, id: b.id }))}
-                      onChange={(val, opt) => handleBrandChange((opt as { id?: number })?.id)}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="资产名称" name="assetName">
-                    <Select
-                      placeholder="请先选择品牌"
-                      allowClear
-                      showSearch
-                      optionFilterProp="label"
-                      disabled={!selectedBrandId}
-                      options={models.map((m) => ({ label: m.name, value: m.name, id: m.id }))}
-                      onChange={(val, opt) => handleModelChange((opt as { id?: number })?.id)}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </div>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="资产编码" name="assetNo" rules={[{ required: true, message: '请输入资产编码' }]}>
+                  <Input placeholder="如 ZC-2024-0001" allowClear style={{ fontFamily: 'monospace' }} />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="资产分类" name="assetType" rules={[{ required: true, message: '请选择资产分类' }]}>
+                  <TreeSelect
+                    placeholder="请选择分类"
+                    allowClear
+                    showSearch
+                    treeDefaultExpandAll
+                    treeNodeFilterProp="title"
+                    treeData={categoryTree}
+                    onChange={(code) => handleCategoryChange(code || '')}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="品牌" name="brand">
+                  <Select
+                    placeholder="请先选择分类"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    disabled={!selectedCategoryCode}
+                    options={brands.map((b) => ({ label: b.brandZh, value: b.brandZh, id: b.id }))}
+                    onChange={(val, opt) => handleBrandChange((opt as { id?: number })?.id)}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-            {/* 动态资产列表 */}
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>资产条目列表（共 {assetRows.length} 条）</div>
-                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleGenerateRows} style={{ height: 28, fontSize: 12 }}>
-                  根据数量生成
-                </Button>
-              </div>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="资产名称" name="assetName">
+                  <Select
+                    placeholder="请先选择品牌"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    disabled={!selectedBrandId}
+                    options={models.map((m) => ({ label: m.name, value: m.name, id: m.id }))}
+                    onChange={(val, opt) => handleModelChange((opt as { id?: number })?.id)}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-              {assetRows.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: '#bfbfbf', fontSize: 13, background: '#fafafa', borderRadius: 8 }}>
-                  请先填写入库数量，然后点击「根据数量生成」创建资产条目
-                </div>
-              ) : (
-                <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                  {assetRows.map((row, index) => (
-                    <div key={index} style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-                      background: index % 2 === 0 ? '#fafafa' : '#fff',
-                      borderRadius: 6, marginBottom: 6, border: '1px solid #f0f0f0',
-                    }}>
-                      <span style={{ fontSize: 12, color: '#8c8c8c', minWidth: 28, textAlign: 'center' }}>{index + 1}</span>
-                      <div style={{ flex: 1 }}>
-                        <Input
-                          placeholder="请输入资产编码"
-                          allowClear
-                          value={row.assetNo}
-                          onChange={(e) => handleAssetRowChange(index, 'assetNo', e.target.value)}
-                          style={{ fontFamily: 'monospace' }}
-                        />
-                      </div>
-                      <div style={{ width: 200 }}>
-                        <TreeSelect
-                          placeholder="请选择归属部门"
-                          allowClear
-                          showSearch
-                          treeDefaultExpandAll
-                          treeNodeFilterProp="title"
-                          treeData={deptTree}
-                          value={row.department || undefined}
-                          onChange={(val) => handleAssetRowChange(index, 'department', val || '')}
-                          style={{ width: '100%' }}
-                        />
-                      </div>
-                      <Button
-                        type="text" danger size="small" icon={<MinusCircleOutlined />}
-                        onClick={() => handleRemoveRow(index)}
-                        style={{ color: '#ff4d4f' }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 参数信息 */}
+            {/* 资产参数信息 */}
             <div style={{ marginTop: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>参数信息</div>
               {renderParamFields()}
             </div>
 
-            {/* 资产图片 */}
+            {/* 资产照片 */}
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>资产图片</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>资产照片</div>
               {renderImageUpload()}
               <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>支持 jpg/png，每张不超过 2MB，可上传多张</div>
             </div>
@@ -595,15 +522,22 @@ export default function AssetAdd() {
                   </Select>
                 </Form.Item>
               </Col>
-              {/* 自购 → 购买公司 */}
+              {/* 自购 → 购买公司 + 购买时价值 */}
               {source === 'self' && (
-                <Col span={8}>
-                  <Form.Item label="购买公司" name="company" rules={[{ required: true, message: '请选择购买公司' }]} initialValue="澳觅科技">
-                    <Select placeholder="请选择公司">
-                      {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
-                    </Select>
-                  </Form.Item>
-                </Col>
+                <>
+                  <Col span={8}>
+                    <Form.Item label="购买公司" name="company" rules={[{ required: true, message: '请选择购买公司' }]} initialValue="澳觅科技">
+                      <Select placeholder="请选择公司">
+                        {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="购买时价值" name="purchaseValue">
+                      <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
+                    </Form.Item>
+                  </Col>
+                </>
               )}
               {/* 租用 → 租用公司 + 租借公司 */}
               {source === 'lease' && (
@@ -622,30 +556,32 @@ export default function AssetAdd() {
                   </Col>
                 </>
               )}
-              <Col span={source === 'self' ? 8 : 8}>
-                <Form.Item label="购买时价值" name="purchaseValue">
-                  <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
-                </Form.Item>
-              </Col>
             </Row>
 
             <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item label="入库日期" name="inboundDate">
-                  <DatePicker style={{ width: '100%' }} placeholder="请选择入库日期" />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="购买日期" name="purchaseDate">
-                  <DatePicker style={{ width: '100%' }} placeholder="请选择购买日期" />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="使用日期" name="usageDate">
-                  <DatePicker style={{ width: '100%' }} placeholder="首次领用日期（自动获取）" />
-                </Form.Item>
-                <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: -12, marginBottom: 8 }}>系统自动校验，获取首次被人领用的日期</div>
-              </Col>
+              {/* 自购 → 购买日期 */}
+              {source === 'self' && (
+                <Col span={8}>
+                  <Form.Item label="购买日期" name="purchaseDate">
+                    <DatePicker style={{ width: '100%' }} placeholder="请选择购买日期" />
+                  </Form.Item>
+                </Col>
+              )}
+              {/* 租用 → 租金 + 租用周期 */}
+              {source === 'lease' && (
+                <>
+                  <Col span={8}>
+                    <Form.Item label="租金" name="rentalCost">
+                      <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="租用周期" name="rentalPeriod">
+                      <DatePicker.RangePicker style={{ width: '100%' }} placeholder={['开始日期', '结束日期']} />
+                    </Form.Item>
+                  </Col>
+                </>
+              )}
             </Row>
 
             {/* 存放位置 */}
@@ -695,7 +631,41 @@ export default function AssetAdd() {
             </div>
           </div>
 
-          {/* ====== 模块3：备注信息 ====== */}
+          {/* ====== 模块3：当前使用人 ====== */}
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            {renderCardTitle(
+              <PictureOutlined style={{ fontSize: 14, color: '#13C2C2' }} />,
+              '#E6FFFB',
+              '当前使用人',
+            )}
+
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="当前使用人" name="userName">
+                  <Input placeholder="请输入使用人" allowClear />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="所在部门" name="department">
+                  <TreeSelect
+                    placeholder="请选择部门"
+                    allowClear
+                    showSearch
+                    treeDefaultExpandAll
+                    treeNodeFilterProp="title"
+                    treeData={deptTree}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="领用日期" name="usageDate">
+                  <DatePicker style={{ width: '100%' }} placeholder="请选择领用日期" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
+
+          {/* ====== 模块4：备注信息 ====== */}
           <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
               <span style={{ fontSize: 14, color: '#722ED1' }}></span>,
@@ -706,6 +676,39 @@ export default function AssetAdd() {
             <Form.Item name="remark" style={{ marginBottom: 0 }}>
               <TextArea rows={4} maxLength={500} showCount placeholder="可填写备注信息" style={{ borderRadius: 8 }} />
             </Form.Item>
+          </div>
+
+          {/* ====== 模块5：入库信息（最底部，验收入库跳转时自动带入） ====== */}
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            {renderCardTitle(
+              <PictureOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+              '#e6f7ff',
+              '入库信息',
+              searchParams.get('inboundBatchNo') ? '来自验收入库' : undefined,
+            )}
+
+            <Row gutter={16}>
+              <Col span={6}>
+                <Form.Item label="入库批次号" name="inboundBatchNo">
+                  <Input placeholder="如 RK-2024-0001" allowClear disabled={isEdit || !!searchParams.get('inboundBatchNo')} />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="入库时间" name="inboundDate">
+                  <DatePicker style={{ width: '100%' }} placeholder="请选择入库时间" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="入库数量" name="inboundQty" initialValue={1}>
+                  <InputNumber min={1} max={100} step={1} placeholder="请输入数量" style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="验收人" name="inspector">
+                  <Input placeholder="请输入验收人" allowClear />
+                </Form.Item>
+              </Col>
+            </Row>
           </div>
 
         </Form>

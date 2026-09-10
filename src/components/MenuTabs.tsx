@@ -173,7 +173,6 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/ad-sales': '廣告銷售',
   '/promotion-word-library': '詞庫管理',
   '/promotion-order-manage': '訂單管理',
-  '/merchant-order-manage': '商戶訂單',
   '/order-detail': '訂單詳情',
   '/merchant-group-list': '集團管理',
   '/store-list': '門店管理',

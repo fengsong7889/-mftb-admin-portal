@@ -12,6 +12,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import dayjs from 'dayjs'
 import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
   APP_OPTIONS,
@@ -70,13 +71,15 @@ interface PricingRecord {
   discountTiers: string
   status: ServiceStatus
   districtPricings?: DistrictPricing[]
+  updatedBy?: string
+  updatedAt?: string
 }
 
 const mockData: PricingRecord[] = [
-  { id: 1, app: AppType.SHANFENG, channel: RecommendChannel.HOME, slotIndex: 1, algorithmType: AlgorithmType.INVINCIBLE_STAR, region: '澳門', dailyPrice: 2800, minDays: 7, discountTiers: '7天9折 / 30天8折', status: ServiceStatus.ENABLED },
-  { id: 2, app: AppType.SHANFENG, channel: RecommendChannel.DELIVERY, slotIndex: 1, algorithmType: AlgorithmType.GUESS_YOU_LIKE, region: '氹仔', dailyPrice: 1800, minDays: 3, discountTiers: '7天9折', status: ServiceStatus.ENABLED },
-  { id: 3, app: AppType.MFOOD, channel: RecommendChannel.SUPERMARKET, slotIndex: 2, algorithmType: AlgorithmType.TRAFFIC_AD, region: '珠海', dailyPrice: 1200, minDays: 1, discountTiers: '30天75折', status: ServiceStatus.ENABLED },
-  { id: 4, app: AppType.SHANFENG, channel: RecommendChannel.HOME, slotIndex: 2, algorithmType: AlgorithmType.NEW_STORE_AD, region: '澳門', dailyPrice: 2500, minDays: 7, discountTiers: '7天9折 / 30天85折', status: ServiceStatus.ENABLED },
+  { id: 1, app: AppType.SHANFENG, channel: RecommendChannel.HOME, slotIndex: 1, algorithmType: AlgorithmType.INVINCIBLE_STAR, region: '澳門', dailyPrice: 2800, minDays: 7, discountTiers: '7天9折 / 30天8折', status: ServiceStatus.ENABLED, updatedBy: '张三', updatedAt: '2024-08-15 14:30:00' },
+  { id: 2, app: AppType.SHANFENG, channel: RecommendChannel.DELIVERY, slotIndex: 1, algorithmType: AlgorithmType.GUESS_YOU_LIKE, region: '氹仔', dailyPrice: 1800, minDays: 3, discountTiers: '7天9折', status: ServiceStatus.ENABLED, updatedBy: '李四', updatedAt: '2024-08-12 10:20:00' },
+  { id: 3, app: AppType.MFOOD, channel: RecommendChannel.SUPERMARKET, slotIndex: 2, algorithmType: AlgorithmType.TRAFFIC_AD, region: '珠海', dailyPrice: 1200, minDays: 1, discountTiers: '30天75折', status: ServiceStatus.ENABLED, updatedBy: '王五', updatedAt: '2024-08-10 16:45:00' },
+  { id: 4, app: AppType.SHANFENG, channel: RecommendChannel.HOME, slotIndex: 2, algorithmType: AlgorithmType.NEW_STORE_AD, region: '澳門', dailyPrice: 2500, minDays: 7, discountTiers: '7天9折 / 30天85折', status: ServiceStatus.ENABLED, updatedBy: '张三', updatedAt: '2024-08-08 09:15:00' },
   {
     id: 5, app: AppType.MFOOD, channel: RecommendChannel.GROUP_BUY, slotIndex: 1, algorithmType: AlgorithmType.HOT_REVIVE_AD, region: '仔', dailyPrice: 1500, minDays: 5, discountTiers: '15天8折', status: ServiceStatus.ENABLED,
     districtPricings: [
@@ -122,6 +125,7 @@ export default function PricingAdd() {
 
   const [form] = Form.useForm()
   const [algorithmType, setAlgorithmType] = useState<AlgorithmType | undefined>(undefined)
+  const [pricingDetailData, setPricingDetailData] = useState<{ updatedBy?: string; updatedAt?: string } | null>(null) // 详情模式操作记录数据
 
   // 商圈配置（盘活复苏专用）
   const [districtPricings, setDistrictPricings] = useState<DistrictPricing[]>([])
@@ -149,6 +153,7 @@ export default function PricingAdd() {
     if (editId) {
       const record = mockData.find(item => item.id === Number(editId))
       if (record) {
+        setPricingDetailData({ updatedBy: record.updatedBy, updatedAt: record.updatedAt })
         form.setFieldsValue({
           app: record.app,
           channel: record.channel,
@@ -732,6 +737,29 @@ export default function PricingAdd() {
           )}
         </Card>
       </Form>
+
+      {/* 操作记录（仅详情模式） */}
+      {isDetailMode && (
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EditOutlined style={{ fontSize: 14, color: '#595959' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>操作记录</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{pricingDetailData?.updatedBy || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{pricingDetailData?.updatedAt ? dayjs(pricingDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 商圈选择弹窗 */}
       <Modal

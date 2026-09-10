@@ -4165,7 +4165,10 @@
     "rpAdded": "獎懲記錄已新增",
     "rpDeleted": "獎懲記錄已刪除",
     "titleRequired": "請輸入標題",
-    "titlePh": "如：年度優秀員工"
+    "titlePh": "如：年度優秀員工",
+    "tabLastUpdatedBy": "最後更新人",
+    "tabLastUpdatedAt": "最後更新時間",
+    "noUpdateRecord": "暫無更新記錄"
   },
   "organization": {
     "colDeptStatus": "部門狀態",

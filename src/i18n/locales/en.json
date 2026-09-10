@@ -4162,7 +4162,10 @@
     "rpAdded": "Record added",
     "rpDeleted": "Record deleted",
     "titleRequired": "Please enter title",
-    "titlePh": "e.g. Employee of the Year"
+    "titlePh": "e.g. Employee of the Year",
+    "tabLastUpdatedBy": "Last Updated By",
+    "tabLastUpdatedAt": "Last Updated At",
+    "noUpdateRecord": "No update record"
   },
   "organization": {
     "colDeptStatus": "Status",

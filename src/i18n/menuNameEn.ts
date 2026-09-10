@@ -153,8 +153,6 @@ export const MENU_NAME_EN: Record<string, string> = {
   'asset-scrap':      'Asset Scrap',
   'asset-flow':       'Asset Flow',
   'asset-inventory':     'Asset Inventory',
-  // 訂單管理（複用頁面）
-  'merchant-order-manage': 'Order Management',
 }
 
 /**

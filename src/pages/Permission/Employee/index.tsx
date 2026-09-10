@@ -274,9 +274,38 @@ export default function EmployeeManagement() {
     return Array.from(ids)
   }, [deptFilter, departments])
 
+  /** 从 localStorage 读取各员工各 Tab 的最新更新信息，取所有 Tab 中最新的一条 */
+  const getTabUpdateOverrides = useCallback((): Record<number, { updatedBy: string; updatedAt: string }> => {
+    const result: Record<number, { updatedBy: string; updatedAt: string }> = {}
+    const prefix = 'emp_tab_update_'
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(prefix)) continue
+      const empNumId = Number(key.slice(prefix.length))
+      if (isNaN(empNumId)) continue
+      try {
+        const tabData = JSON.parse(localStorage.getItem(key) || '{}')
+        let latestBy = ''
+        let latestAt = ''
+        for (const info of Object.values(tabData) as Array<{ updatedBy: string; updatedAt: string }>) {
+          if (info.updatedAt && info.updatedAt > latestAt) {
+            latestAt = info.updatedAt
+            latestBy = info.updatedBy
+          }
+        }
+        if (latestAt) result[empNumId] = { updatedBy: latestBy, updatedAt: latestAt }
+      } catch { /* 静默 */ }
+    }
+    return result
+  }, [])
+
   /** 扩展筛选条件的前端过滤（后端 /employees 接口扩展前先在当前页数据上过滤） */
   const filteredData = useMemo(() => {
-    let data = dataSource
+    const tabOverrides = getTabUpdateOverrides()
+    let data = dataSource.map(e => {
+      const override = tabOverrides[e.id]
+      return override ? { ...e, updatedBy: override.updatedBy, updatedAt: override.updatedAt } : e
+    })
     if (deptDescendantIds) data = data.filter(e => e.departmentId != null && deptDescendantIds.includes(e.departmentId))
     if (sequenceFilter) data = data.filter(e => e.sequence === sequenceFilter)
     if (jobLevelFilter) data = data.filter(e => e.jobLevel === jobLevelFilter)
@@ -295,7 +324,7 @@ export default function EmployeeManagement() {
       })
     }
     return data
-  }, [dataSource, deptDescendantIds, sequenceFilter, jobLevelFilter, rankFilter, roleIdFilter, updatedByFilter, updatedAtRange])
+  }, [dataSource, deptDescendantIds, sequenceFilter, jobLevelFilter, rankFilter, roleIdFilter, updatedByFilter, updatedAtRange, getTabUpdateOverrides])
 
   /** 新增员工 → 跳转独立详情页（新增模式） */
   const handleCreate = () => {

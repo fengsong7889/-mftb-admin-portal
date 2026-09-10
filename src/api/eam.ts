@@ -532,10 +532,12 @@ let mockCategories: AssetCategory[] = [
   { id: 40, code: '0110', name: '安防与通讯设备', parentId: 0, status: 'enabled', sort: 10, paramTemplate: [], remark: '', updatedBy: '冯松', updatedAt: '2026-09-01 10:00:00' },
   // ===== 0101 子分类 =====
   { id: 10, code: '010101', name: '笔记本电脑', parentId: 1, status: 'enabled', sort: 1, paramTemplate: [
-    { key: 'cpu', label: 'CPU', type: 'text' }, { key: 'memory', label: '内存', type: 'number', unit: 'GB' },
-    { key: 'disk', label: '硬盘', type: 'number', unit: 'GB' }, { key: 'screen', label: '屏幕', type: 'number', unit: '英寸' },
+    { key: 'cpu', label: 'CPU', type: 'select', options: ['Intel Core i5-1340P', 'Intel Core i7-1360P', 'Intel Core i9-13900H', 'Intel Core Ultra 7 155H', 'Intel Core Ultra 9 185H', 'AMD Ryzen 7 7840U', 'AMD Ryzen 9 7940HS', 'Apple M3', 'Apple M3 Pro', 'Apple M3 Max'] },
+    { key: 'memory', label: '内存', type: 'select', options: ['8GB', '16GB', '32GB', '64GB', '128GB'] },
+    { key: 'disk', label: '硬盘', type: 'select', options: ['256GB SSD', '512GB SSD', '1TB SSD', '2TB SSD', '4TB SSD'] },
+    { key: 'screen', label: '屏幕', type: 'select', options: ['13.3英寸', '14英寸', '15.6英寸', '16英寸', '16.2英寸'] },
     { key: 'os', label: '操作系统', type: 'select', options: ['Windows 11', 'macOS', 'Linux', 'ChromeOS'] },
-    { key: 'gpu', label: '显卡', type: 'text' },
+    { key: 'gpu', label: '显卡', type: 'select', options: ['Intel Iris Xe', 'Intel Arc Graphics', 'NVIDIA GeForce RTX 4050', 'NVIDIA GeForce RTX 4060', 'NVIDIA GeForce RTX 4070', 'AMD Radeon 780M', 'Apple M3 GPU', 'Apple M3 Pro GPU'] },
   ], remark: '', updatedBy: '冯松', updatedAt: '2026-09-01 10:00:00' },
   { id: 11, code: '010102', name: '台式机', parentId: 1, status: 'enabled', sort: 2, paramTemplate: [
     { key: 'cpu', label: 'CPU', type: 'text' }, { key: 'memory', label: '内存', type: 'number', unit: 'GB' },
