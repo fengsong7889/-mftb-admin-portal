@@ -596,7 +596,7 @@ let mockPurchaseRequests: PurchaseRequest[] = [
 
 let mockPurchaseOrders: PurchaseOrder[] = []
 
-let mockInboundBatches: InboundBatch[] = []
+const mockInboundBatches: InboundBatch[] = []
 
 /* ==================== Mock 數據：領用 / 借用 / 歸還 ==================== */
 
