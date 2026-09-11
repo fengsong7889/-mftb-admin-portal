@@ -838,7 +838,7 @@ let mockLocations: AssetLocation[] = [
 
 /* ==================== Mock 數據：參數庫 ==================== */
 
-let mockParamTypes: ParamType[] = [
+const mockParamTypes: ParamType[] = [
   { id: 1, categoryCode: '010101', code: 'cpu', name: 'CPU/處理器', unit: '', valueType: 'select', status: 'enabled', sort: 1, description: '中央處理器型號', updatedBy: '馮松', updatedAt: '2025-09-01 10:00:00' },
   { id: 2, categoryCode: '010101', code: 'memory', name: '內存', unit: 'GB', valueType: 'select', status: 'enabled', sort: 2, description: '運行內存容量', updatedBy: '馮松', updatedAt: '2025-09-01 10:00:00' },
   { id: 3, categoryCode: '010101', code: 'storage', name: '硬盤/存儲', unit: 'GB', valueType: 'select', status: 'enabled', sort: 3, description: '硬盤/存儲容量', updatedBy: '馮松', updatedAt: '2025-09-01 10:00:00' },
@@ -979,7 +979,7 @@ let mockParamTypes: ParamType[] = [
   { id: 138, categoryCode: '010406', code: 'vacuum_type', name: '類型', unit: '', valueType: 'select', status: 'enabled', sort: 3, description: '吸塵器類型', updatedBy: '馮松', updatedAt: '2025-09-01 10:00:00' },
 ]
 
-let mockParamValues: ParamValue[] = [
+const mockParamValues: ParamValue[] = [
   // chip 芯片/處理器
   { id: 1, paramTypeCode: 'chip', value: 'Apple A17 Pro', sort: 1, status: 'enabled', updatedBy: '馮松', updatedAt: '2025-09-01 10:00:00' },
   { id: 2, paramTypeCode: 'chip', value: 'Apple A18 Pro', sort: 2, status: 'enabled', updatedBy: '馮松', updatedAt: '2025-09-01 10:00:00' },
