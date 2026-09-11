@@ -387,7 +387,7 @@ export default function TransferAdd() {
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('accountBalance.transferTitle')}</h2>
-              <Tag color="blue" style={{ fontSize: 11 }}>{t('accountBalance.transferApplyTag')}</Tag>
+              <Tag style={{ fontSize: 11, color: '#13C2C2', borderColor: '#13C2C2' }}>{t('accountBalance.transferApplyTag')}</Tag>
             </div>
           </div>
         </div>

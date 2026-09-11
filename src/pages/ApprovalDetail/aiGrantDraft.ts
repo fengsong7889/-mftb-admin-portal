@@ -5,7 +5,29 @@
  * 供 AiApprovalActionPanel 與 ApprovalDetail 頁面複用。
  */
 import type { AiModel } from '../../api/aiModel'
-import type { ApproveAiRequest } from '../../api/aiAccessRequest'
+
+/** AI 審批授權請求體（與後端 OaRequestService.approve 的 formData 結構一致） */
+export interface ApproveAiRequest {
+  approvedModels: number[]
+  approvedModelConfigs: Array<{
+    modelId: number
+    visionSupport: number
+    functionCalling: number
+    jsonMode: number
+    streaming: number
+    thinkingMode: number
+    effectiveType: string
+    expireAt: string | null
+  }>
+  approvedQuotaType: string
+  approvedQuotaValue?: number
+  approvedQuotaPeriod: string
+  approvedOverLimitAction: string
+  quotaEffectiveType: string
+  quotaExpireAt?: string
+  approveRemark?: string
+}
+
 
 /** 單個模型的能力開關組合 + 生效類型 */
 export interface AiGrantModelConfig {
@@ -98,7 +120,7 @@ export function buildApprovePayload(draft: AiGrantDraft, approveRemark: string):
         streaming: cfg?.streaming ? 1 : 0,
         thinkingMode: cfg?.thinkingMode ? 1 : 0,
         effectiveType: cfg?.effectiveType ?? 'permanent',
-        expireAt: cfg?.effectiveType === 'temporary' ? cfg.expireAt ?? undefined : undefined,
+        expireAt: cfg?.effectiveType === 'temporary' ? cfg.expireAt ?? null : null,
       }
     }),
     approvedQuotaType: draft.quotaType,

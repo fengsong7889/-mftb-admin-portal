@@ -30,7 +30,7 @@ const TYPE_META: Record<AssetLocation['type'], { key: string; color: string }> =
 const TYPE_OPTIONS = [
   { value: 'warehouse', label: '倉庫' },
   { value: 'floor', label: '樓層' },
-  { value: 'room', label: '辦公室' },
+  { value: 'room', label: '房号' },
 ]
 
 interface Props {
@@ -51,7 +51,7 @@ interface SearchFormValues {
 function buildTreeData(list: LocationRow[]): LocationTreeNode[] {
   const nodeMap = new Map<number, LocationTreeNode>()
   list.forEach(loc => {
-    nodeMap.set(loc.id, { key: loc.id, title: loc.name, value: loc.id, children: [] } as LocationTreeNode)
+    nodeMap.set(loc.id, { key: loc.id, title: `${loc.code}-${loc.name}`, value: loc.id, children: [] } as LocationTreeNode)
   })
   const roots: LocationTreeNode[] = []
   list.forEach(loc => {
@@ -226,9 +226,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
-  const { configComponent, applyConfig } = useColumnConfig('asset-location', columnMeta, [
-    { key: 'action', visible: true, locked: 'tail' as const },
-  ])
+  const { configComponent, applyConfig } = useColumnConfig('asset-location', columnMeta)
 
   const columns: TableColumnsType<LocationRow> = [
     {
@@ -262,7 +260,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: t('common.colAction'), key: 'action', width: 130,
+      title: t('common.colAction'), key: 'action', width: 160,
       render: (_: unknown, record: LocationRow) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onView(record.id)}>
@@ -280,13 +278,13 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
   ]
 
   return (
-    <div className="content-area">
+    <>
       <div className="cat-container">
         {/* 左侧仓库树 */}
         <div className="cat-tree-panel">
           <h3 className="cat-tree-panel-title">
             <FolderOutlined className="cat-tree-panel-title-icon" />
-            仓库结构
+            倉庫層級
           </h3>
           <Tree
             treeData={treeData}
@@ -347,6 +345,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
             dataSource={tableData}
             rowKey="id"
             loading={loading}
+            scroll={{ x: 1160 }}
             pagination={{
               showSizeChanger: true,
               showQuickJumper: true,
@@ -355,6 +354,6 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
           />
         </div>
       </div>
-    </div>
+    </>
   )
 }

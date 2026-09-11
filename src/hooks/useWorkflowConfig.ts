@@ -12,6 +12,21 @@ import { updateApprovalEnabled } from '../api/workflowConfig'
 
 /* ==================== 工具函數 ==================== */
 
+/** 從現有流程列表中計算下一個 configId（LC + 5位自增序號） */
+function nextConfigId(workflows: WorkflowDefinition[]): string {
+  let maxSeq = 0
+  for (const wf of workflows) {
+    if (wf.configId) {
+      const match = wf.configId.match(/^LC(\d+)$/)
+      if (match) {
+        const seq = parseInt(match[1], 10)
+        if (seq > maxSeq) maxSeq = seq
+      }
+    }
+  }
+  return `LC${String(maxSeq + 1).padStart(5, '0')}`
+}
+
 /** 從 localStorage 加載流程配置（含數據遷移） */
 function loadWorkflows(): WorkflowDefinition[] {
   try {
@@ -66,6 +81,11 @@ function loadWorkflows(): WorkflowDefinition[] {
           wf.name = nameMap[wf.name]
           migrated = true
         }
+        // 遷移 4：添加 configId（若缺失）
+        if (!wf.configId) {
+          wf.configId = nextConfigId(data)
+          migrated = true
+        }
       }
       if (migrated) persistWorkflows(data)
       return data
@@ -108,6 +128,7 @@ export function useWorkflowConfig() {
     const newWf: WorkflowDefinition = {
       ...wf,
       id: `wf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      configId: wf.configId || nextConfigId(workflows),
       createdAt: now,
       updatedAt: now,
       updatedBy: '系統',

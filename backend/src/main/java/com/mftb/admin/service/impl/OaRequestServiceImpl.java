@@ -12,13 +12,16 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.OaProcess;
 import com.mftb.admin.entity.OaRequest;
+import com.mftb.admin.entity.EamPurchaseRequest;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.entity.WorkflowConfig;
+import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.OaProcessMapper;
 import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.mapper.WorkflowConfigMapper;
 import com.mftb.admin.service.ApproverResolverService;
+import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
@@ -43,6 +46,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OaRequestServiceImpl implements OaRequestService {
 
+    private static final String FLOW_DRAFT = "draft";
     private static final String FLOW_PENDING = "pending";
     private static final String FLOW_APPROVED = "approved";
     private static final String FLOW_REJECTED = "rejected";
@@ -55,6 +59,8 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final OperatorResolver operatorResolver;
     private final ApproverResolverService approverResolverService;
     private final BizSeqService bizSeqService;
+    private final EamPurchaseService eamPurchaseService;
+    private final EamPurchaseRequestMapper eamPurchaseRequestMapper;
 
     /* ==================== 查询 ==================== */
 
@@ -141,8 +147,11 @@ public class OaRequestServiceImpl implements OaRequestService {
         String applicant = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 生成流程编号
-        String flowNo = bizSeqService.next(BizSeqService.RULE_OA_REQUEST);
+        // 生成流程编号（采购申请使用专用 CG 编号规则）
+        String flowRuleKey = "oa_purchase".equals(request.getProcessCode())
+                ? BizSeqService.RULE_EAM_PURCHASE_REQUEST
+                : BizSeqService.RULE_OA_REQUEST;
+        String flowNo = bizSeqService.next(flowRuleKey);
 
         // 创建流程实例
         OaRequest oaRequest = new OaRequest();
@@ -152,13 +161,17 @@ public class OaRequestServiceImpl implements OaRequestService {
         oaRequest.setFormData(request.getFormData());
         oaRequest.setApplicant(applicant);
         oaRequest.setApplyTime(now);
-        oaRequest.setFlowStatus(FLOW_PENDING);
+        // 判断是否为草稿保存
+        boolean isDraft = FLOW_DRAFT.equals(request.getFlowStatus());
+        oaRequest.setFlowStatus(isDraft ? FLOW_DRAFT : FLOW_PENDING);
         oaRequest.setCreatedAt(now);
         oaRequest.setUpdatedAt(now);
         oaRequestMapper.insert(oaRequest);
 
-        // 解析审批节点并创建审批任务
-        resolveAndCreateTasks(oaRequest, process, current);
+        // 草稿状态不创建审批任务
+        if (!isDraft) {
+            resolveAndCreateTasks(oaRequest, process, current);
+        }
 
         log.info("OA流程已发起: flowNo={}, processCode={}, applicant={}", flowNo, request.getProcessCode(), applicant);
         return flowNo;
@@ -300,7 +313,7 @@ public class OaRequestServiceImpl implements OaRequestService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ApproveResultVO approve(String flowNo, String comment) {
+    public ApproveResultVO approve(String flowNo, String comment, String formData) {
         OaRequest request = requireRequest(flowNo);
         if (!FLOW_PENDING.equals(request.getFlowStatus())) {
             throw new BusinessException("该流程不在审批中");
@@ -323,6 +336,16 @@ public class OaRequestServiceImpl implements OaRequestService {
         currentTask.setComment(comment);
         oaApprovalTaskMapper.updateById(currentTask);
 
+        // AI 申请审批：更新 formData 并处理审批即授权
+        if ("ai_access".equals(request.getProcessCode()) && formData != null) {
+            oaRequestMapper.update(null,
+                    new LambdaUpdateWrapper<OaRequest>()
+                            .eq(OaRequest::getId, request.getId())
+                            .set(OaRequest::getFormData, formData));
+            // TODO: 处理审批即授权逻辑（下发放型权限和额度）
+            log.info("AI 申请审批数据已更新：flowNo={}", flowNo);
+        }
+
         // 查找下一个待审节点
         OaApprovalTask nextTask = findNextPendingTask(request.getId(), currentTask.getSortOrder());
 
@@ -334,6 +357,16 @@ public class OaRequestServiceImpl implements OaRequestService {
                             .set(OaRequest::getFlowStatus, FLOW_APPROVED)
                             .set(OaRequest::getCompleteTime, now)
                             .set(OaRequest::getCurrentNodeName, null));
+
+            // P0-2: 审批通过 → 自动创建采购订单
+            if ("oa_purchase".equals(request.getProcessCode())) {
+                try {
+                    handlePurchaseApprovalCallback(request);
+                } catch (Exception e) {
+                    log.error("采购申请审批回调失败: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
             return ApproveResultVO.of(currentTask.getNodeName(), true, null);
         } else {
             // 推进到下一节点
@@ -450,5 +483,59 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .gt(OaApprovalTask::getSortOrder, afterSortOrder)
                         .orderByAsc(OaApprovalTask::getSortOrder)
                         .last("LIMIT 1"));
+    }
+
+    /**
+     * P0-2 回調：採購申請審批通過 → 創建採購申請記錄 → 自動生成採購訂單
+     */
+    private void handlePurchaseApprovalCallback(OaRequest oaRequest) {
+        Map<String, Object> formData = JsonUtils.parseMap(oaRequest.getFormData());
+        if (formData.isEmpty()) {
+            log.warn("採購申請 formData 為空，跳過回調: flowNo={}", oaRequest.getFlowNo());
+            return;
+        }
+
+        // 創建採購申請記錄（flowNo 即 CG 編號，直接作為 reqNo）
+        EamPurchaseRequest pr = new EamPurchaseRequest();
+        pr.setFlowNo(oaRequest.getFlowNo());
+        pr.setReqNo(oaRequest.getFlowNo());
+        pr.setTitle(oaRequest.getTitle());
+        pr.setDepartment(str(formData, "department"));
+        pr.setDepartmentId(toLong(formData.get("departmentId"), null));
+        pr.setApplicant(str(formData, "applicant"));
+        pr.setApplicantEmpId(str(formData, "applicantEmpId"));
+        pr.setReason(str(formData, "reason"));
+        pr.setStatus("approved");
+
+        // 計算預算（items 合計）
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) formData.get("items");
+        java.math.BigDecimal budget = java.math.BigDecimal.ZERO;
+        if (items != null) {
+            for (Map<String, Object> it : items) {
+                int qty = it.get("qty") instanceof Number n ? n.intValue() : 0;
+                java.math.BigDecimal price = it.get("estPrice") instanceof Number n
+                        ? java.math.BigDecimal.valueOf(n.doubleValue()) : java.math.BigDecimal.ZERO;
+                budget = budget.add(price.multiply(java.math.BigDecimal.valueOf(qty)));
+            }
+        }
+        pr.setBudget(budget);
+        eamPurchaseRequestMapper.insert(pr);
+
+        // 自動創建採購訂單
+        long orderId = eamPurchaseService.createOrderFromRequest(pr.getId());
+        log.info("採購申請審批回調完成: flowNo={}, orderId={}",
+                oaRequest.getFlowNo(), orderId);
+    }
+
+    private static String str(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        return v != null ? v.toString() : "";
+    }
+
+    private static Long toLong(Object v, Long def) {
+        if (v == null) return def;
+        if (v instanceof Number n) return n.longValue();
+        try { return Long.parseLong(v.toString()); } catch (Exception e) { return def; }
     }
 }

@@ -26,14 +26,7 @@ import {
   cancelFinApproval,
 } from '../../api/finance'
 import type { FinApproval } from '../../api/finance'
-import {
-  fetchAiAccessRequestDetail,
-  approveAiAccessRequest,
-  rejectAiAccessRequest,
-  cancelAiAccessRequest,
-  type AiAccessRequestVO,
-} from '../../api/aiAccessRequest'
-import { fetchOaRequestDetail } from '../../api/oaRequest'
+import { fetchOaRequestDetail, approveOaRequest, rejectOaRequest, cancelOaRequest, type OaRequestVO } from '../../api/oaRequest'
 import AiApprovalActionPanel from './AiApprovalActionPanel'
 import {
   type AiGrantDraft,
@@ -49,6 +42,38 @@ import type { EmployeeItem } from '../../api/employee'
 import type { DepartmentItem } from '../../api/department'
 import type { RoleItem } from '../../api/role'
 import { resolveCurrentApprovers } from '../../utils/resolveCurrentApprover'
+
+/** AI 申請詳情（從 biz_oa_request.formData 解析） */
+interface AiRequestDetail {
+  id: number
+  applicantName: string
+  applicantId: number
+  requestType: string
+  requestedModels: number[]
+  usageDescription: string
+  usageScenarios: string[]
+  usageFrequency: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  approveRemark: string
+  createdAt: string
+  approvedModelConfigs?: Array<{
+    modelId: number
+    visionSupport: number
+    functionCalling: number
+    jsonMode: number
+    streaming: number
+    thinkingMode: number
+    effectiveType: string
+    expireAt: string | null
+  }>
+  approvedQuotaValue?: number | null
+  approvedQuotaType?: string
+  approvedQuotaPeriod?: string
+  quotaEffectiveType?: string
+  quotaExpireAt?: string
+  approverName?: string
+  approvedAt?: string
+}
 
 /** 審批历史记录 */
 interface ApprovalTimelineItem {
@@ -66,7 +91,7 @@ interface ApprovalTimelineItem {
 
 /** 审批详情数据 */
 interface ApprovalDetailData {
-  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift' | 'ai_access'
+  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift' | 'ai_access' | 'oa_purchase'
   applicant: string
   applyDate: string
   flowNo: string
@@ -137,6 +162,8 @@ interface ApprovalDetailData {
   aiUsageDescription?: string
   aiUsageScenarios?: string[]
   aiUsageFrequency?: string
+  // 採購申請
+  purchaseItems?: { modelName: string; qty: number; remark?: string }[]
   // 通用
   groupId?: string
   groupName?: string
@@ -389,6 +416,7 @@ const typeTitleMapKeys: Record<string, string> = {
   merge: 'approvalDetail.typeTitleMerge',
   gift: 'approvalDetail.typeTitleGift',
   ai_access: 'approvalDetail.typeTitleAiAccess',
+  oa_purchase: 'approvalDetail.typeTitlePurchase',
 }
 
 const brandLabelMap: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFood' }
@@ -679,6 +707,14 @@ function toDetailData(record: FinApproval, t?: (key: string) => string): Approva
       notes: str(extra.usageDescription),
     }
   }
+  if (record.approvalType === 'oa_purchase') {
+    const purchaseItems = Array.isArray(extra.items) ? (extra.items as Array<{ modelName: string; qty: number; remark?: string }>) : []
+    return {
+      ...base,
+      notes: str(extra.reason),
+      purchaseItems,
+    }
+  }
   return base
 }
 
@@ -737,6 +773,28 @@ export default function ApprovalDetail() {
         hasRevoke: (aiLocal?.flowStatus || 'pending') === 'pending',
       }
     }
+    // 採購申請：從本地記錄構建詳情，避免降级到充值 mock 數據
+    if (urlType === 'oa_purchase' || (local && local.approvalType === 'oa_purchase')) {
+      const purchaseLocal = local || undefined
+      const purchaseExtra = (purchaseLocal?.extra || {}) as Record<string, unknown>
+      const purchaseItems = Array.isArray(purchaseExtra.items)
+        ? (purchaseExtra.items as Array<{ modelName: string; qty: number; remark?: string }>)
+        : []
+      return {
+        approvalType: 'oa_purchase' as const,
+        applicant: purchaseLocal?.applicant || '--',
+        applyDate: purchaseLocal?.applyTime || '',
+        flowNo,
+        flowStatus: purchaseLocal?.flowStatus || 'draft',
+        brand: '--',
+        notes: (purchaseExtra.reason as string) || '',
+        purchaseItems,
+        hasRevoke: (purchaseLocal?.flowStatus || 'draft') === 'draft',
+        timeline: [
+          { node: 'created', time: purchaseLocal?.applyTime || '', approver: purchaseLocal?.applicant || '--', status: 'submitted' as const, comment: '' },
+        ],
+      }
+    }
     if (local) return toDetailData(local as unknown as FinApproval, t)
     // 後端 AI 申請（跨設備）：URL 攜帶 requestId，詳情數據由後端接口拉取補齊
     if (urlType === 'ai_access' && aiRequestId) {
@@ -766,7 +824,7 @@ export default function ApprovalDetail() {
 
   /* ---- AI 申請：審批操作區狀態 ---- */
   /** 後端申請詳情（憑證、審批結果、跨設備狀態同步） */
-  const [aiRequest, setAiRequest] = useState<AiAccessRequestVO | null>(null)
+  const [aiRequest, setAiRequest] = useState<AiRequestDetail | null>(null)
   /** 授權草稿：第二節點優先讀取第一節點保存的 draftGrant */
   const [grantDraft, setGrantDraft] = useState<AiGrantDraft | null>(null)
 
@@ -780,8 +838,9 @@ export default function ApprovalDetail() {
     let cancelled = false
     const load = async () => {
       if (!flowNo) return
-      // AI 申請存在於 ai_access_request 獨立表，不在 biz_fin_approval 中，跳過財務審批查詢避免「審批流程不存在」報錯
-      if (type === 'ai_access') {
+      // AI 申請存在於 biz_oa_request 表，不在 biz_fin_approval 中，跳過財務審批查詢避免「審批流程不存在」報錯
+      // 採購申請同樣不在 biz_fin_approval 中，跳過避免降级到充值 mock 數據
+      if (type === 'ai_access' || type === 'oa_purchase') {
         if (!cancelled) setData(fallbackDetail())
         return
       }
@@ -801,7 +860,7 @@ export default function ApprovalDetail() {
 
   /**
    * AI 申請：拉取後端申請詳情（憑證 + 審批結果）。
-   * 優先使用 OA 統一接口（biz_oa_request），降級使用舊接口（ai_access_request）。
+   * 使用 OA 統一接口（biz_oa_request）查詢 AI 申請詳情。
    */
   useEffect(() => {
     if (type !== 'ai_access' || !flowNo) return
@@ -825,7 +884,7 @@ export default function ApprovalDetail() {
           status: oaVo.flowStatus as 'pending' | 'approved' | 'rejected' | 'cancelled',
           approveRemark: oaVo.rejectReason || '',
           createdAt: oaVo.applyTime || '',
-        } as unknown as AiAccessRequestVO)
+        } as AiRequestDetail)
         // 跨設備：本地無記錄（applicant 為佔位），以後端詳情補齊展示信息
         if (data.applicant === '--') {
           setData((prev) => ({
@@ -866,40 +925,62 @@ export default function ApprovalDetail() {
       .catch(() => {
         // OA 接口不可用時，降級使用舊接口
         if (!aiRequestId) return
-        fetchAiAccessRequestDetail(aiRequestId)
-          .then((vo) => {
+        fetchOaRequestDetail(flowNo)
+          .then((oaVo) => {
             if (cancelled) return
-            setAiRequest(vo)
+            const fd = oaVo.formData || {}
+            const aiDetail: AiRequestDetail = {
+              id: oaVo.id,
+              applicantName: oaVo.applicant,
+              applicantId: 0,
+              requestType: (fd.requestType || fd.request_type || '') as string,
+              requestedModels: (fd.requestedModels || fd.requested_models || []) as number[],
+              usageDescription: (fd.usageDescription || fd.usage_description || '') as string,
+              usageScenarios: (fd.usageScenarios || fd.usage_scenarios || []) as string[],
+              usageFrequency: (fd.usageFrequency || fd.usage_frequency || '') as string,
+              status: oaVo.flowStatus as 'pending' | 'approved' | 'rejected' | 'cancelled',
+              approveRemark: oaVo.rejectReason || '',
+              createdAt: oaVo.applyTime || '',
+              approvedModelConfigs: fd.approvedModelConfigs as AiRequestDetail['approvedModelConfigs'],
+              approvedQuotaValue: fd.approvedQuotaValue as number | undefined,
+              approvedQuotaType: fd.approvedQuotaType as string | undefined,
+              approvedQuotaPeriod: fd.approvedQuotaPeriod as string | undefined,
+              quotaEffectiveType: fd.quotaEffectiveType as string | undefined,
+              quotaExpireAt: fd.quotaExpireAt as string | undefined,
+              approverName: fd.approverName as string | undefined,
+              approvedAt: fd.approvedAt as string | undefined,
+            }
+            setAiRequest(aiDetail)
             if (data.applicant === '--') {
-              const applicantText2 = `${vo.applicantName}(MF${String(vo.applicantId).padStart(5, '0')})`
+              const applicantText2 = `${aiDetail.applicantName || oaVo.applicant}(MF${String(aiDetail.applicantId).padStart(5, '0')})`
               setData((prev) => ({
                 ...prev,
                 applicant: applicantText2,
-                applyDate: vo.createdAt || prev.applyDate,
-                flowStatus: vo.status,
-                aiRequestType: vo.requestType,
-                aiApplyReason: vo.applyReason ?? undefined,
-                aiRequestedModels: vo.requestedModels ?? undefined,
-                aiUsageDescription: vo.usageDescription,
-                aiUsageScenarios: vo.usageScenarios ?? [],
-                aiUsageFrequency: vo.usageFrequency ?? undefined,
-                notes: vo.usageDescription,
+                applyDate: aiDetail.createdAt || prev.applyDate,
+                flowStatus: aiDetail.status,
+                aiRequestType: aiDetail.requestType,
+                aiApplyReason: fd.applyReason as string ?? undefined,
+                aiRequestedModels: aiDetail.requestedModels ?? undefined,
+                aiUsageDescription: aiDetail.usageDescription,
+                aiUsageScenarios: aiDetail.usageScenarios ?? [],
+                aiUsageFrequency: aiDetail.usageFrequency ?? undefined,
+                notes: aiDetail.usageDescription,
                 timeline: prev.timeline.map((item) => item.node === 'created'
-                  ? { ...item, approver: applicantText2, time: vo.createdAt || item.time }
+                  ? { ...item, approver: applicantText2, time: aiDetail.createdAt || item.time }
                   : item),
               }))
-            } else if (vo.status === 'approved' || vo.status === 'rejected' || vo.status === 'cancelled') {
+            } else if (aiDetail.status === 'approved' || aiDetail.status === 'rejected' || aiDetail.status === 'cancelled') {
               const local = getApprovalRecordByFlowNo(flowNo)
               if (local && local.flowStatus === 'pending') {
                 updateApprovalRecord(flowNo, {
-                  flowStatus: vo.status,
-                  rejectReason: vo.status === 'rejected' ? (vo.approveRemark || '') : local.rejectReason,
+                  flowStatus: aiDetail.status,
+                  rejectReason: aiDetail.status === 'rejected' ? (aiDetail.approveRemark || '') : local.rejectReason,
                 })
               }
-              setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: vo.status } : prev))
+              setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: aiDetail.status } : prev))
             } else {
               setData((prev) => {
-                const nextModels = vo.requestedModels ?? prev.aiRequestedModels
+                const nextModels = aiDetail.requestedModels ?? prev.aiRequestedModels
                 if (nextModels && JSON.stringify(nextModels) !== JSON.stringify(prev.aiRequestedModels)) {
                   return { ...prev, aiRequestedModels: nextModels }
                 }
@@ -911,6 +992,58 @@ export default function ApprovalDetail() {
       })
     return () => { cancelled = true }
   }, [type, flowNo, aiRequestId, data.applicant])
+
+  /** 採購申請：從後端拉取詳情數據（申請人、申請日期、採購明細等） */
+  useEffect(() => {
+    if (type !== 'oa_purchase' || !flowNo) return
+    let cancelled = false
+    fetchOaRequestDetail(flowNo)
+      .then((oaVo: OaRequestVO) => {
+        if (cancelled) return
+        const fd = oaVo.formData || {}
+        const applicantText = oaVo.applicant || '--'
+        const purchaseItems = Array.isArray(fd.items)
+          ? (fd.items as Array<{ modelName: string; qty: number; remark?: string }>)
+          : []
+        // 從審批任務構建時間軸
+        const timeline: ApprovalTimelineItem[] = []
+        // 流程創建節點
+        timeline.push({
+          node: 'created',
+          time: oaVo.applyTime || '',
+          approver: applicantText,
+          status: 'submitted',
+          comment: '',
+        })
+        // 審批任務節點
+        if (oaVo.approvalTasks?.length) {
+          oaVo.approvalTasks.forEach((task) => {
+            let status: ApprovalTimelineItem['status'] = 'pending'
+            if (task.taskStatus === 'approved') status = 'approved'
+            else if (task.taskStatus === 'rejected') status = 'rejected'
+            timeline.push({
+              node: task.nodeName || '',
+              time: task.approveTime || '',
+              approver: task.approver || '--',
+              status,
+              comment: task.comment || '',
+            })
+          })
+        }
+        setData((prev) => ({
+          ...prev,
+          applicant: applicantText,
+          applyDate: oaVo.applyTime || '',
+          flowStatus: oaVo.flowStatus,
+          notes: (fd.reason as string) || '',
+          purchaseItems,
+          hasRevoke: oaVo.flowStatus === 'draft' || oaVo.flowStatus === 'pending',
+          timeline,
+        }))
+      })
+      .catch(() => { /* 後端不可用時保留 fallback 展示 */ })
+    return () => { cancelled = true }
+  }, [type, flowNo])
 
   /** AI 申請審批操作區草稿初始化：第二節點讀取第一節點保存的 draftGrant，否則按申請內容初始化 */
   useEffect(() => {
@@ -977,9 +1110,8 @@ export default function ApprovalDetail() {
             const isFinalNode = !localRecord
               || (localRecord.bizApproveStatus === 'approved' && localRecord.opsApproveStatus === 'pending')
             if (isFinalNode) {
-              if (data.aiRequestId) {
-                await approveAiAccessRequest(data.aiRequestId, buildApprovePayload(grantDraft, approvalComment))
-              }
+              const payload = JSON.stringify(buildApprovePayload(grantDraft, approvalComment))
+              await approveOaRequest(flowNo, approvalComment, payload)
               message.success(t('approvalDetail.aiGrantDone'))
             } else if (localRecord) {
               updateApprovalRecord(flowNo, {
@@ -1037,7 +1169,7 @@ export default function ApprovalDetail() {
        * 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回
        */
       if (type === 'ai_access' && data.aiRequestId) {
-        await rejectAiAccessRequest(data.aiRequestId, rejectReason)
+        await rejectOaRequest(flowNo, rejectReason)
       }
       const isFrontendFlow = type === 'gift' || type === 'ai_access'
       const rejectedNode = isFrontendFlow
@@ -1064,7 +1196,7 @@ export default function ApprovalDetail() {
     try {
       // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷；AI 申請同步撤銷後端申請
       if (type === 'ai_access' && data.aiRequestId) {
-        await cancelAiAccessRequest(data.aiRequestId)
+        await cancelOaRequest(flowNo)
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
       } else if (type === 'gift') {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
@@ -1728,6 +1860,24 @@ export default function ApprovalDetail() {
             </div>
           )}
 
+          {/* 採購申請類型：採購明細表格 */}
+          {type === 'oa_purchase' && data.purchaseItems && data.purchaseItems.length > 0 && (
+            <div className="approval-section">
+              <div className="approval-section-title">採購明細</div>
+              <Table
+                size="small"
+                pagination={false}
+                dataSource={data.purchaseItems.map((item, i) => ({ ...item, key: i }))}
+                columns={[
+                  { title: '序號', width: 60, render: (_: unknown, __: unknown, i: number) => i + 1 },
+                  { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', render: (v: string) => v || '--' },
+                  { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right', render: (v: number) => v ?? '--' },
+                  { title: '備註', dataIndex: 'remark', key: 'remark', render: (v: string) => v || '--' },
+                ]}
+              />
+            </div>
+          )}
+
           {/* 相关凭证 */}
           <div className="approval-section">
             <div className="approval-section-title">{t('approvalDetail.documents')}</div>
@@ -1736,9 +1886,9 @@ export default function ApprovalDetail() {
             </div>
           </div>
 
-          {/* 备注信息 */}
+          {/* 备注信息 / 採購事由 */}
           <div className="approval-section">
-            <div className="approval-section-title">{t('approvalDetail.notesTitle')}</div>
+            <div className="approval-section-title">{type === 'oa_purchase' ? '採購事由' : t('approvalDetail.notesTitle')}</div>
             <div className="approval-notes">{data.notes}</div>
           </div>
 

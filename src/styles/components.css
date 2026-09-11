@@ -2461,3 +2461,13 @@
   background: #ffffff !important;
 }
 
+/* ========================================================================
+   验收入库 - 不通过行红色背景
+   ======================================================================== */
+.inbound-rejected-row > td {
+  background: #fff2f0 !important;
+}
+.inbound-rejected-row:hover > td {
+  background: #ffebe8 !important;
+}
+

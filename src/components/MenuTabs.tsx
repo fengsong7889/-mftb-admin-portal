@@ -63,6 +63,9 @@ interface SubPageTitle {
   typeParam?: string
   typeDefault?: string
   typeMap?: Record<string, string>
+  /** 标题按 mode query 参数值切换（如採購訂單 ?mode=add） */
+  modeParam?: string
+  modeMap?: Record<string, string>
 }
 
 const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
@@ -130,6 +133,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   // 页面说明（页面标题含动态页面名，取静态主体）
   '/page-description-editor': { fixed: '編輯界面說明' },
   '/page-prd-view': { fixed: '界面需求說明' },
+  // 采购订单（?mode=add → 錄入採購訂單；?mode=edit → 編輯採購訂單；?id=X → 採購訂單詳情）
+  '/purchase-order': { modeParam: 'mode', modeMap: { add: '錄入採購訂單', edit: '編輯採購訂單' }, detailFixed: '採購訂單詳情' },
 }
 
 /** 静态 fallback：path → 名称（后端菜单不可用时降级） */
@@ -194,6 +199,7 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/rule-config': '規則配置',
   '/workflow-config': '審批流程',
   '/process-center': '流程中心',
+  '/oa-purchase-request': '採購申請',
     '/version-history': '版本管理',
   '/ai-model-provider': '模型通道',
   '/ai-model-list': '模型接入',
@@ -251,6 +257,14 @@ function matchFullTitle(pathname: string, t: TFunction): string | null {
     if (entry.typeMap[typeValue]) return resolveTitle(entry.typeMap[typeValue], t)
   }
 
+  // 标题按 mode query 参数值切换（如採購訂單 ?mode=add/edit）
+  if (entry.modeParam && entry.modeMap) {
+    const modeValue = params?.get(entry.modeParam) ?? ''
+    if (entry.modeMap[modeValue]) return resolveTitle(entry.modeMap[modeValue], t)
+    // 有 id 但无 mode → 详情页标题
+    if (entry.detailFixed && params?.get('id')) return resolveTitle(entry.detailFixed, t)
+  }
+
   if (entry.fixed) return resolveTitle(entry.fixed, t)
   if (entry.add && entry.edit) {
     // 与页面 isEdit 判定一致：editParam（默认 id）非空且 mode≠detail 为編輯模式
@@ -281,6 +295,7 @@ const TAB_PATHS_WITH_QUERY = new Set([
   '/ai-role-quota-edit',
   '/ai-role-quota-detail',
   '/ai-operation-auth-edit',
+  '/purchase-order',
 ])
 
 /** Tab 路径：特定路径保留 query string 以区分新增/编辑 */
@@ -370,6 +385,17 @@ export default function MenuTabs() {
     setTabs((prev) => {
       const exists = prev.find(t => t.path === currentTabPath)
       if (exists) return prev
+      // 若當前路徑的基礎路徑已存在標籤（含 query），更新該標籤路徑與標題
+      const normalizedBase = normalizePath(currentTabPath)
+      if (normalizedBase !== currentTabPath) {
+        const baseIdx = prev.findIndex(t => t.path === normalizedBase)
+        if (baseIdx >= 0) {
+          const title = getMenuName(currentTabPath)
+          const updated = [...prev]
+          updated[baseIdx] = { path: currentTabPath, title }
+          return updated
+        }
+      }
       const title = getMenuName(currentTabPath)
       return [...prev, { path: currentTabPath, title }]
     })

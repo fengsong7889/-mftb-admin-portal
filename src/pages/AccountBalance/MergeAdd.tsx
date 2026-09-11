@@ -454,7 +454,7 @@ export default function MergeAdd() {
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#722ED1' }}>{t('accountBalance.mergePageTitle')}</h2>
-              <Tag color="purple" style={{ fontSize: 11 }}>{t('accountBalance.mergeApplyTag')}</Tag>
+              <Tag style={{ fontSize: 11, color: '#FA8C16', borderColor: '#FA8C16' }}>{t('accountBalance.mergeApplyTag')}</Tag>
             </div>
           </div>
         </div>

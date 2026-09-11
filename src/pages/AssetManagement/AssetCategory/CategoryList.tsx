@@ -3,8 +3,10 @@ import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Swit
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ExportOutlined, FolderOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { fetchCategoryList, deleteCategory, toggleCategoryStatus } from '../../../api/eam'
+import { fetchCategoryList, deleteCategory, toggleCategoryStatus, createCategory } from '../../../api/eam'
 import type { AssetCategory } from '../../../api/eam'
+import CategoryImportModal from './CategoryImportModal'
+import type { ParsedCategoryRow } from '../../../utils/categoryImport'
 import './index.css'
 
 /** 树节点 */
@@ -17,7 +19,7 @@ interface CatTreeNode extends TreeDataNode {
 function buildTreeData(list: AssetCategory[]): CatTreeNode[] {
   const nodeMap = new Map<number, CatTreeNode>()
   list.forEach(cat => {
-    nodeMap.set(cat.id, { key: cat.id, title: cat.name, value: cat.id, children: [] } as CatTreeNode)
+    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, children: [] } as CatTreeNode)
   })
   const roots: CatTreeNode[] = []
   list.forEach(cat => {
@@ -80,6 +82,9 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
 
   // 全选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  // 批量导入弹窗
+  const [importVisible, setImportVisible] = useState(false)
 
   /** 加载数据 */
   const fetchData = useCallback(async () => {
@@ -224,18 +229,42 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   }
 
   /** 批量导入 */
-  const handleImport = () => {
-    message.info('批量导入功能开发中')
+  const handleImportClick = () => {
+    setImportVisible(true)
+  }
+
+  /** 执行批量导入 */
+  const handleBatchImport = async (rows: ParsedCategoryRow[]) => {
+    // 构建 code -> id 映射，用于解析上级分类
+    const codeToId = new Map(categories.map(c => [c.code, c.id]))
+    let successCount = 0
+    for (const row of rows) {
+      const parentId = row.parentCode ? (codeToId.get(row.parentCode) ?? 0) : 0
+      await createCategory({
+        code: row.code,
+        name: row.name,
+        parentId,
+        status: row.status,
+        remark: row.remark || '',
+        paramTemplate: [],
+        sort: 0,
+      })
+      successCount++
+    }
+    if (successCount > 0) {
+      await fetchData()
+    }
   }
 
   const columns: TableColumnsType<AssetCategory> = [
-    { title: '分类编码', dataIndex: 'code', key: 'code', width: 120 },
-    { title: '分类名称', dataIndex: 'name', key: 'name', width: 160 },
+    { title: '分类编码', dataIndex: 'code', key: 'code', width: 120, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
+    { title: '分类名称', dataIndex: 'name', key: 'name', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     {
       title: '上级分类',
       dataIndex: 'parentId',
       key: 'parentId',
       width: 140,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (parentId: number) => {
         if (!parentId) return '-'
         const parent = categories.find(c => c.id === parentId)
@@ -247,6 +276,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (status: string, record: AssetCategory) => (
         <Switch
           checked={status === 'enabled'}
@@ -256,19 +286,21 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
         />
       ),
     },
-    { title: '备注', dataIndex: 'remark', key: 'remark', width: 140, render: (v: string) => v || '-' },
-    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 110, render: (v: string) => v || '-' },
+    { title: '备注', dataIndex: 'remark', key: 'remark', width: 140, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
+    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 110, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
     {
       title: '最后更新时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string) => v || '-',
     },
     {
       title: '操作',
       key: 'action',
-      width: 130,
+      width: 160,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onView(record.id)}>详情</Button>
@@ -289,9 +321,13 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
 
   /** 列字段配置 */
   const columnMeta = columns.map(col => ({ key: col.key as string, title: col.title as string }))
-  const { configComponent, applyConfig } = useColumnConfig('asset-category', columnMeta, [
-    { key: 'action', visible: true, locked: 'tail' },
-  ])
+  const { config, configComponent, applyConfig } = useColumnConfig('asset-category', columnMeta)
+
+  /** 根據可見列動態計算 scroll 寬度 */
+  const scrollX = useMemo(() => {
+    const visibleKeys = new Set(config.filter(c => c.visible).map(c => c.key))
+    return columns.reduce((sum, col) => sum + (visibleKeys.has(col.key as string) ? (col.width as number) : 0), 0)
+  }, [config, columns])
 
   return (
     <>
@@ -349,7 +385,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
           <div className="action-section">
             <div className="action-section-left">
               <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
-              <Button className="btn-import" icon={<ImportOutlined />} onClick={handleImport}>批量导入分类</Button>
+              <Button className="btn-import" icon={<ImportOutlined />} onClick={handleImportClick}>批量导入分类</Button>
             </div>
             <div className="action-section-right">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId)}>新增分類</Button>
@@ -362,6 +398,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
             dataSource={tableData}
             rowKey="id"
             loading={loading}
+            scroll={{ x: scrollX }}
             rowSelection={{
               selectedRowKeys,
               onChange: (keys) => setSelectedRowKeys(keys),
@@ -374,6 +411,14 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
           />
         </div>
       </div>
+
+      {/* 批量导入弹窗 */}
+      <CategoryImportModal
+        open={importVisible}
+        onClose={() => setImportVisible(false)}
+        onImport={handleBatchImport}
+        existingCategories={categories.map(c => ({ code: c.code, name: c.name }))}
+      />
     </>
   )
 }

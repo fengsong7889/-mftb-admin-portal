@@ -92,10 +92,16 @@ export interface RoutingRule {
 /** 審批流程定義 */
 export interface WorkflowDefinition {
   id: string
+  /** 配置ID（LC+5位自增序號） */
+  configId: string
   /** 唯一標識，如 'recharge', 'gift' */
   workflowKey: string
   /** 顯示名稱，如 '充值申請' */
   name: string
+  /** 流程標籤，如 '採購'、'充值' */
+  tag?: string
+  /** 流程標籤顏色 */
+  tagColor?: string
   /** 關聯業務類型 */
   approvalType: string
   /** 描述 */

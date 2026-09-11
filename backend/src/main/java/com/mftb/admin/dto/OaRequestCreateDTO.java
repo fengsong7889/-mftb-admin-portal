@@ -16,4 +16,7 @@ public class OaRequestCreateDTO {
 
     /** 表单数据JSON */
     private String formData;
+
+    /** 流程状态（可选，默认 pending；保存草稿时传 draft） */
+    private String flowStatus;
 }

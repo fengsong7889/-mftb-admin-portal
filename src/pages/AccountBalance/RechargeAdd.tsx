@@ -475,7 +475,7 @@ export default function RechargeAdd() {
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('accountBalance.rechargePageTitle')}</h2>
-              <Tag color="blue" style={{ fontSize: 11 }}>{t('accountBalance.rechargeApplyTag')}</Tag>
+              <Tag style={{ fontSize: 11, color: '#52C41A', borderColor: '#52C41A' }}>{t('accountBalance.rechargeApplyTag')}</Tag>
             </div>
           </div>
         </div>

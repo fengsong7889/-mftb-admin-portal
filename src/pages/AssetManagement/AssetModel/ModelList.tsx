@@ -46,7 +46,7 @@ interface CatTreeNode extends TreeDataNode {
 function buildTreeData(list: AssetCategory[]): CatTreeNode[] {
   const nodeMap = new Map<number, CatTreeNode>()
   list.forEach(cat => {
-    nodeMap.set(cat.id, { key: cat.id, title: cat.name, value: cat.id, children: [] } as CatTreeNode)
+    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, children: [] } as CatTreeNode)
   })
   const roots: CatTreeNode[] = []
   list.forEach(cat => {
@@ -316,10 +316,11 @@ export default function ModelList({
 
   const categoryName = (code: string) => categories.find((c) => c.code === code)?.name || code
 
-  /* ── 品牌表格列 ─ */
+  /* ── 品牌表格列  */
   const brandColumns: TableColumnsType<AssetBrand> = [
     {
       title: '品牌', key: 'brand', width: 200,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetBrand) => (
         <Space size={6}>
           <span style={{ fontWeight: 600 }}>{r.brandZh}</span>
@@ -329,18 +330,22 @@ export default function ModelList({
     },
     {
       title: '所属分类', dataIndex: 'categoryCode', key: 'categoryCode', width: 140,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string) => <Tag color="blue">{categoryName(v)}</Tag>,
     },
     {
       title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
       title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
       title: t('common.colAction'), key: 'action', width: 160,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, record: AssetBrand) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetailBrand(record.id)}>详情</Button>
@@ -355,32 +360,39 @@ export default function ModelList({
   const productColumns: TableColumnsType<AssetModel> = [
     {
       title: '产品名称', dataIndex: 'name', key: 'name', width: 220, ellipsis: true,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
       title: '型号编码', dataIndex: 'modelNo', key: 'modelNo', width: 160,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
       title: '品牌', key: 'brand', width: 150,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetModel) => (
         <span>{r.brandZh}</span>
       ),
     },
-    { title: t('asset.colUnit'), dataIndex: 'unit', key: 'unit', width: 70 },
+    { title: t('asset.colUnit'), dataIndex: 'unit', key: 'unit', width: 70, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     {
-      title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 120,
-      render: (v: string | undefined) => v || '-',
+      title: '参考单价', dataIndex: 'refPrice', key: 'refPrice', width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: number | undefined) => (v != null ? `¥${v}` : '-'),
     },
     {
       title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
       title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
       title: t('common.colAction'), key: 'action', width: 160,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, record: AssetModel) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetailProduct(record.id)}>详情</Button>
@@ -390,6 +402,22 @@ export default function ModelList({
       ),
     },
   ]
+
+  /** 品牌列字段配置 */
+  const brandColumnMeta = brandColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { config: brandConfig, configComponent: brandConfigComponent, applyConfig: applyBrandConfig } = useColumnConfig('asset-model-brand', brandColumnMeta)
+  const brandScrollX = useMemo(() => {
+    const visibleKeys = new Set(brandConfig.filter(c => c.visible).map(c => c.key))
+    return brandColumns.reduce((sum, col) => sum + (visibleKeys.has(col.key as string) ? (col.width as number) : 0), 0)
+  }, [brandConfig, brandColumns])
+
+  /** 产品列字段配置 */
+  const productColumnMeta = productColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { config: productConfig, configComponent: productConfigComponent, applyConfig: applyProductConfig } = useColumnConfig('asset-model-product', productColumnMeta)
+  const productScrollX = useMemo(() => {
+    const visibleKeys = new Set(productConfig.filter(c => c.visible).map(c => c.key))
+    return productColumns.reduce((sum, col) => sum + (visibleKeys.has(col.key as string) ? (col.width as number) : 0), 0)
+  }, [productConfig, productColumns])
 
   const selectedCategory = categories.find(c => c.id === selectedCatId)
   const selectedBrand = brands.find(b => b.id === selectedBrandId)
@@ -491,14 +519,20 @@ export default function ModelList({
             </div>
             <div className="action-section-right">
               {viewMode === 'brands' && (
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(selectedCategory?.code || '')}>
-                  新增品牌
-                </Button>
+                <>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(selectedCategory?.code || '')}>
+                    新增品牌
+                  </Button>
+                  {brandConfigComponent}
+                </>
               )}
               {viewMode === 'products' && selectedBrand && (
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddProduct(selectedBrand.categoryCode, selectedBrand.id)}>
-                  新增产品
-                </Button>
+                <>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddProduct(selectedBrand.categoryCode, selectedBrand.id)}>
+                    新增产品
+                  </Button>
+                  {productConfigComponent}
+                </>
               )}
             </div>
           </div>
@@ -513,11 +547,12 @@ export default function ModelList({
           {/* 表格 */}
           {viewMode === 'brands' ? (
             <Table<AssetBrand>
-              columns={brandColumns}
+              columns={applyBrandConfig(brandColumns)}
               dataSource={brands}
               rowKey="id"
               loading={loading}
               size="middle"
+              scroll={{ x: brandScrollX }}
               pagination={false}
               onRow={(record) => ({
                 onClick: () => handleBrandClick(record),
@@ -529,11 +564,12 @@ export default function ModelList({
             />
           ) : (
             <Table<AssetModel>
-              columns={productColumns}
+              columns={applyProductConfig(productColumns)}
               dataSource={products}
               rowKey="id"
               loading={loading}
               size="middle"
+              scroll={{ x: productScrollX }}
               pagination={{
                 current: page, pageSize: size, total, showSizeChanger: true,
                 showTotal: (tt) => `${t('common.total', { count: tt })}`,

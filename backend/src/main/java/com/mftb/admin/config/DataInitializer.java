@@ -46,7 +46,7 @@ public class DataInitializer implements CommandLineRunner {
     // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
     // v6.0: OA 中心表自动创建（biz_oa_process / biz_oa_request / biz_oa_approval_task + 种子数据）
     // v7.0: biz_oa_request 扩展审批中心字段（集团/品牌/三级审批详情）
-    private static final String V_SCHEMA = "core:schema-v8";
+    private static final String V_SCHEMA = "core:schema-v9";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增 minor 版本号，无需全量重跑其他迁移 */
     // v11: 「工具註冊中心」更名為「AI 操作授權」，menu_key 由 ai_tool_registry 迁移为 ai-operation-auth
     //      （seedSystemMenus 會先刪除所有含 ai 的舊菜單及授權關聯再重建，舊 key 自動清理）
@@ -77,8 +77,6 @@ public class DataInitializer implements CommandLineRunner {
         versionTracker.applyOnce(V_SCHEMA, this::migrateSchema);
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
-        // 迁移 AI 申请数据到统一 OA 表
-        versionTracker.applyOnce("core:oa-data-migrate-v2", this::migrateAiAccessData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
         versionTracker.applyOnce("core:oa-data-migrate-v3", this::fixMigratedOaData);
         // 修复 AI 申请记录的节点名称和审批人（从 biz_workflow_config 读取）
@@ -107,6 +105,10 @@ public class DataInitializer implements CommandLineRunner {
 versionTracker.applyOnce("core:eam-rename-flow-ops-v1", this::renameAssetFlowOpsMenu);
 // v26: 「領用管理」改名為「領用歸還」
 versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu);
+        // v27: 刪除 ai_access_request 表（AI 申請已統一寫入 biz_oa_request）
+        versionTracker.applyOnce("core:drop-ai-access-request-v1", this::dropAiAccessRequestTable);
+        // v29: 「領用歸還」改名為「領用管理」
+        versionTracker.applyOnce("core:eam-rename-claim-v2", this::renameAssetClaimToManage);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
         migrateDeptCodeToBM();
@@ -243,6 +245,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         migrateEmployeeDetailColumns();
         // 员工详情页: 新建紧急联系人 + 职务记录表
         migrateEmployeeDetailTables();
+        // EAM 基础数据表自动创建 (118 脚本等效, 幂等)
+        migrateEamBasicTables();
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
     }
 
@@ -330,6 +334,84 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "INDEX idx_user_seq (user_id, effective_seq)"
                         + ") COMMENT='员工职务记录'");
         log.info("员工详情页表结构就绪: emp_emergency_contact + emp_position_record");
+    }
+
+    /** EAM 基础数据表自动创建: 资产分类 / 品牌库 / 产品型号库 / 仓库位置（幂等） */
+    private void migrateEamBasicTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_category ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "code VARCHAR(64) NOT NULL COMMENT '分类编码', "
+                        + "name VARCHAR(100) NOT NULL COMMENT '分类名称', "
+                        + "parent_id BIGINT NOT NULL DEFAULT 0 COMMENT '父级ID,0为顶级', "
+                        + "status VARCHAR(16) NOT NULL DEFAULT 'enabled' COMMENT 'enabled/disabled', "
+                        + "param_template JSON DEFAULT NULL COMMENT '参数模板JSON', "
+                        + "sort INT NOT NULL DEFAULT 0 COMMENT '排序', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_code (code), "
+                        + "KEY idx_parent_id (parent_id), "
+                        + "KEY idx_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产分类'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_brand ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "category_code VARCHAR(64) NOT NULL COMMENT '所属分类编码', "
+                        + "brand_zh VARCHAR(100) NOT NULL COMMENT '品牌中文', "
+                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '品牌英文', "
+                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '品牌LOGO URL', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "KEY idx_category_code (category_code)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='品牌库'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_model ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "category_code VARCHAR(64) NOT NULL COMMENT '所属分类编码', "
+                        + "brand_id BIGINT NOT NULL DEFAULT 0 COMMENT '所属品牌ID', "
+                        + "brand_zh VARCHAR(100) DEFAULT '' COMMENT '品牌中文(冗余)', "
+                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '品牌英文(冗余)', "
+                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '品牌LOGO(冗余)', "
+                        + "model_no VARCHAR(100) DEFAULT '' COMMENT '产品型号编码', "
+                        + "name VARCHAR(200) NOT NULL COMMENT '产品名称', "
+                        + "unit VARCHAR(32) NOT NULL DEFAULT '台' COMMENT '计量单位', "
+                        + "ref_price DECIMAL(14,2) DEFAULT 0 COMMENT '参考单价', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "KEY idx_category_code (category_code), "
+                        + "KEY idx_brand_id (brand_id), "
+                        + "KEY idx_name (name)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品型号库'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_location ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "code VARCHAR(64) NOT NULL COMMENT '位置编码', "
+                        + "name VARCHAR(100) NOT NULL COMMENT '位置名称', "
+                        + "parent_id BIGINT NOT NULL DEFAULT 0 COMMENT '父级ID,0为顶级', "
+                        + "type VARCHAR(16) NOT NULL DEFAULT 'warehouse' COMMENT 'warehouse/floor/room', "
+                        + "sort INT NOT NULL DEFAULT 0 COMMENT '排序', "
+                        + "address VARCHAR(500) DEFAULT '' COMMENT '地址', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_code (code), "
+                        + "KEY idx_parent_id (parent_id), "
+                        + "KEY idx_type (type)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='仓库/存放位置'");
+
+        log.info("EAM 基础数据表就绪: biz_eam_category + biz_eam_brand + biz_eam_model + biz_eam_location");
     }
 
     /**
@@ -1284,7 +1366,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
         // 三級菜單 → 資產管理
         menus.put("asset-list",         new String[]{"資產台賬",         "asset-flow-ops",     "1"});
-        menus.put("asset-claim",        new String[]{"領用歸還",         "asset-flow-ops",     "2"});
+        menus.put("asset-claim",        new String[]{"領用管理",         "asset-flow-ops",     "2"});
         menus.put("asset-borrow",       new String[]{"借用管理",         "asset-flow-ops",     "3"});
         menus.put("asset-return",       new String[]{"歸還管理",         "asset-flow-ops",     "4"});
         menus.put("asset-transfer-list",new String[]{"調撥管理",         "asset-flow-ops",     "5"});
@@ -1428,7 +1510,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         String[][] children = {
                 {"asset-list",      "資產台賬",   "AppstoreOutlined",    "1"},
                 {"asset-add",       "資產入庫",   "AppstoreAddOutlined", "2"},
-                {"asset-claim",     "領用歸還",   "UserAddOutlined",     "3"},
+                {"asset-claim",     "領用管理",   "UserAddOutlined",     "3"},
                 {"asset-transfer",  "資產轉移",   "SwapOutlined",        "4"},
                 {"asset-return",    "資產歸還",   "RollbackOutlined",    "5"},
                 {"asset-scrap",     "資產報廢",   "DeleteOutlined",      "6"},
@@ -1835,109 +1917,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             int rows = jdbcTemplate.update(insertSql);
             log.info("已从 biz_fin_approval 迁移 {} 条数据到 biz_oa_request", rows);
 
-            // 迁移 ai_access_request 数据
-            var aiTableCheck = jdbcTemplate.queryForList(
-                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_access_request'");
-            if (!aiTableCheck.isEmpty()) {
-                var aiCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM biz_oa_request WHERE process_code = 'ai_access'",
-                    Long.class);
-                if (aiCount == null || aiCount == 0) {
-                    String aiInsertSql = "INSERT INTO biz_oa_request (" +
-                        "flow_no, process_code, title, applicant, flow_status, " +
-                        "current_node_name, current_approver, reject_reason, " +
-                        "apply_time, complete_time, cancel_time, " +
-                        "group_id, group_name, brand, " +
-                        "biz_approver, biz_approve_time, biz_approve_status, " +
-                        "ops_approver, ops_approve_time, ops_approve_status, " +
-                        "fin_approver, fin_approve_time, fin_approve_status, " +
-                        "form_data, created_at, updated_at) " +
-                        "SELECT " +
-                        "CONCAT('AI', LPAD(CAST(id AS CHAR), 6, '0')), 'ai_access', " +
-                        "CONCAT('AI申請 ', COALESCE(applicant_name, ''), ' ', DATE_FORMAT(created_at, '%Y-%m-%d')), " +
-                        "COALESCE(applicant_name, ''), " +
-                        "CASE WHEN status = 'approved' THEN 'approved' WHEN status = 'rejected' THEN 'rejected' ELSE 'pending' END, " +
-                        "CASE WHEN status = 'pending' THEN 'business' ELSE NULL END, " +
-                        "NULL, " +
-                        "approve_remark, " +
-                        "created_at, " +
-                        "CASE WHEN status = 'approved' THEN approved_at ELSE NULL END, " +
-                        "NULL, " +
-                        "NULL, NULL, NULL, " +
-                        "NULL, NULL, NULL, " +
-                        "NULL, NULL, NULL, " +
-                        "NULL, NULL, NULL, " +
-                        "JSON_OBJECT('request_type', request_type, 'usage_description', usage_description, " +
-                        "  'approved_models', approved_models, 'approved_quota_type', approved_quota_type, " +
-                        "  'approved_quota_value', approved_quota_value, 'approved_quota_period', approved_quota_period), " +
-                        "created_at, updated_at " +
-                        "FROM ai_access_request WHERE deleted = 0";
-                    int aiRows = jdbcTemplate.update(aiInsertSql);
-                    log.info("已从 ai_access_request 迁移 {} 条数据到 biz_oa_request", aiRows);
-                } else {
-                    log.info("biz_oa_request 已有 AI 申请数据，跳过迁移");
-                }
-            }
         } catch (Exception e) {
             log.warn("OA数据迁移失败: {}", e.getMessage());
         }
     }
 
-    /**
-     * 迁移 AI 申请数据到统一 OA 表
-     */
-    private void migrateAiAccessData() {
-        try {
-            var aiTableCheck = jdbcTemplate.queryForList(
-                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_access_request'");
-            if (aiTableCheck.isEmpty()) {
-                log.info("ai_access_request 表不存在，跳过数据迁移");
-                return;
-            }
-
-            var aiCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM biz_oa_request WHERE process_code = 'ai_access'",
-                Long.class);
-            if (aiCount != null && aiCount > 0) {
-                log.info("biz_oa_request 已有 AI 申请数据，跳过迁移");
-                return;
-            }
-
-            String aiInsertSql = "INSERT INTO biz_oa_request (" +
-                "flow_no, process_code, title, applicant, flow_status, " +
-                "current_node_name, current_approver, reject_reason, " +
-                "apply_time, complete_time, cancel_time, " +
-                "group_id, group_name, brand, " +
-                "biz_approver, biz_approve_time, biz_approve_status, " +
-                "ops_approver, ops_approve_time, ops_approve_status, " +
-                "fin_approver, fin_approve_time, fin_approve_status, " +
-                "form_data, created_at, updated_at) " +
-                "SELECT " +
-                "CONCAT('AI', LPAD(CAST(id AS CHAR), 6, '0')), 'ai_access', " +
-                "CONCAT('AI申請 ', COALESCE(applicant_name, ''), ' ', DATE_FORMAT(created_at, '%Y-%m-%d')), " +
-                "COALESCE(applicant_name, ''), " +
-                "CASE WHEN status = 'approved' THEN 'approved' WHEN status = 'rejected' THEN 'rejected' ELSE 'pending' END, " +
-                "CASE WHEN status = 'pending' THEN 'business' ELSE NULL END, " +
-                "NULL, " +
-                "approve_remark, " +
-                "created_at, " +
-                "CASE WHEN status = 'approved' THEN approved_at ELSE NULL END, " +
-                "NULL, " +
-                "NULL, NULL, NULL, " +
-                "NULL, NULL, NULL, " +
-                "NULL, NULL, NULL, " +
-                "NULL, NULL, NULL, " +
-                "JSON_OBJECT('request_type', request_type, 'usage_description', usage_description, " +
-                "  'approved_models', approved_models, 'approved_quota_type', approved_quota_type, " +
-                "  'approved_quota_value', approved_quota_value, 'approved_quota_period', approved_quota_period), " +
-                "created_at, updated_at " +
-                "FROM ai_access_request WHERE deleted = 0";
-            int aiRows = jdbcTemplate.update(aiInsertSql);
-            log.info("已从 ai_access_request 迁移 {} 条数据到 biz_oa_request", aiRows);
-        } catch (Exception e) {
-            log.warn("AI申请数据迁移失败: {}", e.getMessage());
-        }
-    }
 
     /**
      * 修复已迁移的 biz_oa_request 数据：从 biz_fin_approval 重新同步所有字段
@@ -2085,7 +2069,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 return;
             }
             String[][] menusToRestore = {
-                {"asset-claim",  "領用歸還", "UserAddOutlined",  "9"},
+                {"asset-claim",  "領用管理", "UserAddOutlined",  "9"},
                 {"asset-return", "歸還管理", "RollbackOutlined", "11"},
             };
             int restored = 0;
@@ -2163,17 +2147,24 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     }
 
     /**
-     * v26: 「領用管理」改名為「領用歸還」
+     * v26: 「領用管理」改名為「領用歸還」（已废弃，v29 反向修正）
      */
     private void renameAssetClaimMenu() {
+        // no-op: v29 已反向改名
+    }
+
+    /**
+     * v29: 「領用歸還」改名為「領用管理」
+     */
+    private void renameAssetClaimToManage() {
         try {
             Long menuId = queryMenuIdByKey("asset-claim");
             if (menuId == null) {
                 log.info("asset-claim 菜單不存在，跳過改名");
                 return;
             }
-            jdbcTemplate.update("UPDATE sys_menu SET name = '領用歸還', updated_by = 'system' WHERE id = ?", menuId);
-            log.info("已將「領用管理」改名為「領用歸還」 (id={})", menuId);
+            jdbcTemplate.update("UPDATE sys_menu SET name = '領用管理', updated_by = 'system' WHERE id = ?", menuId);
+            log.info("已將「領用歸還」改名為「領用管理」 (id={})", menuId);
         } catch (Exception e) {
             log.warn("改名領用管理菜單失敗: {}", e.getMessage());
         }
@@ -2196,6 +2187,24 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             log.info("已清理 merchant-order-manage 占位菜单 (id={})", menuId);
         } catch (Exception e) {
             log.warn("清理 merchant-order-manage 占位菜单失败: {}", e.getMessage());
+        }
+    }
+
+    /** 刪除 ai_access_request 表（AI 申請已統一寫入 biz_oa_request） */
+    private void dropAiAccessRequestTable() {
+        try {
+            // 檢查表是否存在
+            Integer tableCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'ai_access_request'",
+                    Integer.class);
+            if (tableCount == null || tableCount == 0) {
+                log.info("ai_access_request 表不存在，跳過刪除");
+                return;
+            }
+            jdbcTemplate.update("DROP TABLE ai_access_request");
+            log.info("已刪除 ai_access_request 表（AI 申請已統一寫入 biz_oa_request）");
+        } catch (Exception e) {
+            log.warn("刪除 ai_access_request 表失敗（可忽略）: {}", e.getMessage());
         }
     }
 

@@ -3,7 +3,7 @@
  *
  * - 基於原 AssetManagement/PurchaseRequest/RequestForm 改造
  * - 適配 OA 流程：橙色標題欄 + 模塊化卡片佈局
- * - 前端先行：暫不對接後端 OA 審批 API，使用 mock 提交
+ * - P0-1: 對接 OA 審批 API，提交時調用 submitOaRequest
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -13,17 +13,29 @@ import {
 } from 'antd'
 import type { TableColumnsType, UploadFile } from 'antd'
 import {
-  ArrowLeftOutlined, SendOutlined, PlusOutlined, ShoppingCartOutlined,
-  FileTextOutlined, EditOutlined, UploadOutlined,
+  ArrowLeftOutlined, SendOutlined, SaveOutlined, PlusOutlined, ShoppingCartOutlined,
+  FileTextOutlined, UploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
   FileImageOutlined, FilePdfOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../../contexts/AuthContext'
 import dayjs from 'dayjs'
 import {
-  fetchModelList, type AssetModel,
+  fetchModelList, fetchCategoryList, fetchBrandList,
+  type AssetModel, type AssetCategory, type AssetBrand,
 } from '../../../api/eam'
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
+import { submitOaRequest } from '../../../api/oaRequest'
+import { useWorkflowConfig } from '../../../hooks/useWorkflowConfig'
+
+/** 流程標籤 → 顏色映射（與 WorkflowConfig 保持一致） */
+const FLOW_TAG_COLOR: Record<string, string> = {
+  oa_purchase: '#FA8C16',
+}
+/** 流程標籤 → 文字映射 */
+const FLOW_TAG_LABEL: Record<string, string> = {
+  oa_purchase: '採購',
+}
 
 /* ==================== 部門樹數據 ==================== */
 
@@ -61,10 +73,14 @@ function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
 
 interface ItemRow {
   key: string
+  categoryId?: number
+  categoryName?: string
+  brandId?: number
+  brandName?: string
   modelId?: number
   modelName?: string
+  params?: Record<string, string>
   qty?: number
-  estPrice?: number
   remark?: string
 }
 
@@ -73,7 +89,32 @@ interface FormValues {
   department: number | undefined
   reason: string
   items: ItemRow[]
-  remark?: string
+}
+
+/* ==================== 分類樹（TreeSelect） ==================== */
+
+interface CategoryTreeNode {
+  value: number
+  title: string
+  code: string
+  children?: CategoryTreeNode[]
+}
+
+function buildCategoryTree(list: AssetCategory[]): CategoryTreeNode[] {
+  const nodeMap = new Map<number, CategoryTreeNode>()
+  list.forEach((c) => {
+    nodeMap.set(c.id, { value: c.id, title: c.name, code: c.code, children: [] })
+  })
+  const roots: CategoryTreeNode[] = []
+  list.forEach((c) => {
+    const node = nodeMap.get(c.id)!
+    if (c.parentId && nodeMap.has(c.parentId)) {
+      nodeMap.get(c.parentId)!.children!.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
 }
 
 /* ==================== 明細編輯彈窗 ==================== */
@@ -81,64 +122,201 @@ interface FormValues {
 interface ItemEditModalProps {
   open: boolean
   editing: ItemRow | null
+  categories: AssetCategory[]
+  brands: AssetBrand[]
   models: AssetModel[]
   onOk: (row: ItemRow) => void
   onCancel: () => void
 }
 
-function ItemEditModal({ open, editing, models, onOk, onCancel }: ItemEditModalProps) {
+function ItemEditModal({ open, editing, categories, brands, models, onOk, onCancel }: ItemEditModalProps) {
   const [form] = Form.useForm<ItemRow>()
   const { t } = useTranslation()
+
+  // 級聯狀態
+  const [selectedCategoryCode, setSelectedCategoryCode] = useState<string | undefined>()
+  const [selectedBrandId, setSelectedBrandId] = useState<number | undefined>()
+  const [selectedModel, setSelectedModel] = useState<AssetModel | undefined>()
+
+  // 分類樹
+  const categoryTree = useMemo(() => buildCategoryTree(categories.filter((c) => c.status === 'enabled')), [categories])
+
+  // 根據分類篩選品牌
+  const filteredBrands = useMemo(
+    () => selectedCategoryCode ? brands.filter((b) => b.categoryCode === selectedCategoryCode) : [],
+    [brands, selectedCategoryCode],
+  )
+
+  // 根據分類+品牌篩選型號
+  const filteredModels = useMemo(
+    () => models.filter((m) => {
+      if (!selectedCategoryCode) return false
+      const codeMatch = m.categoryCode === selectedCategoryCode || m.categoryCode.startsWith(`${selectedCategoryCode}-`)
+      const brandMatch = selectedBrandId ? m.brandId === selectedBrandId : true
+      return codeMatch && brandMatch
+    }),
+    [models, selectedCategoryCode, selectedBrandId],
+  )
+
+  // 當前分類的參數模板
+  const paramTemplate = useMemo(() => {
+    if (!selectedCategoryCode) return []
+    const cat = categories.find((c) => c.code === selectedCategoryCode)
+    return cat?.paramTemplate || []
+  }, [categories, selectedCategoryCode])
 
   useEffect(() => {
     if (open && editing) {
       form.setFieldsValue(editing)
+      // 還原級聯狀態
+      const cat = editing.categoryName ? categories.find((c) => c.id === editing.categoryId) : undefined
+      setSelectedCategoryCode(cat?.code)
+      setSelectedBrandId(editing.brandId)
+      setSelectedModel(editing.modelId ? models.find((m) => m.id === editing.modelId) : undefined)
     } else if (open) {
       form.resetFields()
       form.setFieldsValue({ qty: 1 })
+      setSelectedCategoryCode(undefined)
+      setSelectedBrandId(undefined)
+      setSelectedModel(undefined)
     }
-  }, [open, editing, form])
+  }, [open, editing, form, categories, models])
+
+  const handleCategoryChange = (categoryId: number) => {
+    const cat = categories.find((c) => c.id === categoryId)
+    const code = cat?.code
+    setSelectedCategoryCode(code)
+    setSelectedBrandId(undefined)
+    setSelectedModel(undefined)
+    form.setFieldsValue({ brandId: undefined, modelId: undefined, params: {} })
+  }
+
+  const handleBrandChange = (brandId: number) => {
+    setSelectedBrandId(brandId)
+    setSelectedModel(undefined)
+    form.setFieldsValue({ modelId: undefined })
+  }
 
   const handleModelChange = (modelId: number) => {
     const m = models.find((x) => x.id === modelId)
-    if (m) {
-      form.setFieldsValue({ modelName: `${m.brandZh} ${m.modelNo} / ${m.name}`, estPrice: m.refPrice })
-    }
+    setSelectedModel(m)
   }
 
   const handleOk = async () => {
     try {
       const v = await form.validateFields()
-      onOk({ ...v, key: editing?.key || `item_${Date.now()}` })
+      const cat = categories.find((c) => c.id === v.categoryId)
+      const brand = brands.find((b) => b.id === v.brandId)
+      const model = models.find((m) => m.id === v.modelId)
+      onOk({
+        ...v,
+        key: editing?.key || `item_${Date.now()}`,
+        categoryName: cat?.name,
+        brandName: brand?.brandZh,
+        modelName: model?.name,
+      })
     } catch { /* antd 已標紅 */ }
   }
 
   return (
     <Modal
-      title={editing ? '編輯明細' : '添加明細'}
+      title={editing ? '編輯物資' : '添加物資'}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
       okText={t('common:confirm')}
       cancelText={t('common:cancel')}
-      width={560}
+      width={640}
       centered
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Form.Item
-          label="品牌型號" name="modelId"
-          rules={[{ required: true, message: '請選擇型號' }]}
-        >
-          <Select
-            placeholder="請選擇品牌型號" showSearch
-            optionFilterProp="label"
-            onChange={handleModelChange}
-            options={models.map((m) => ({
-              label: `${m.brandZh} ${m.modelNo} / ${m.name}`,
-              value: m.id,
-            }))}
-          />
-        </Form.Item>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Form.Item
+              label="資產分類" name="categoryId"
+              rules={[{ required: true, message: '請選擇資產分類' }]}
+            >
+              <TreeSelect
+                treeData={categoryTree}
+                placeholder="請選擇分類"
+                allowClear
+                treeDefaultExpandAll
+                showSearch
+                treeNodeFilterProp="title"
+                onChange={handleCategoryChange}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item
+              label="品牌" name="brandId"
+              rules={[{ required: true, message: '請選擇品牌' }]}
+            >
+              <Select
+                placeholder={selectedCategoryCode ? '請選擇品牌' : '請先選擇分類'}
+                showSearch
+                optionFilterProp="label"
+                disabled={!selectedCategoryCode}
+                onChange={handleBrandChange}
+                options={filteredBrands.map((b) => ({
+                  label: b.brandZh,
+                  value: b.id,
+                }))}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item
+              label="資產名稱" name="modelId"
+              rules={[{ required: true, message: '請選擇資產名稱' }]}
+            >
+              <Select
+                placeholder={selectedBrandId ? '請選擇資產' : '請先選擇品牌'}
+                showSearch
+                optionFilterProp="label"
+                disabled={!selectedBrandId}
+                onChange={handleModelChange}
+                options={filteredModels.map((m) => ({
+                  label: m.modelNo ? `${m.modelNo} / ${m.name}` : m.name,
+                  value: m.id,
+                }))}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        {/* 參數信息（選擇資產名稱後顯示） */}
+        {selectedModel && paramTemplate.length > 0 && (
+          <div style={{
+            background: '#fafafa', borderRadius: 8, padding: '12px 16px', marginBottom: 16,
+            border: '1px solid #f0f0f0',
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10 }}>參數信息</div>
+            <Row gutter={12}>
+              {paramTemplate.map((p) => (
+                <Col span={8} key={p.key}>
+                  <Form.Item
+                    label={<span style={{ fontSize: 12 }}>{p.label}{p.unit ? ` (${p.unit})` : ''}</span>}
+                    name={['params', p.key]}
+                    style={{ marginBottom: 8 }}
+                  >
+                    {p.type === 'select' ? (
+                      <Select
+                        placeholder={`請選擇${p.label}`}
+                        allowClear
+                        size="small"
+                        options={p.options?.map((o) => ({ label: o, value: o })) || []}
+                      />
+                    ) : (
+                      <Input placeholder={`請輸入${p.label}`} allowClear size="small" />
+                    )}
+                  </Form.Item>
+                </Col>
+              ))}
+            </Row>
+          </div>
+        )}
+
         <Row gutter={16}>
           <Col span={8}>
             <Form.Item
@@ -146,21 +324,6 @@ function ItemEditModal({ open, editing, models, onOk, onCancel }: ItemEditModalP
               rules={[{ required: true, message: '請輸入數量' }]}
             >
               <InputNumber style={{ width: '100%' }} min={1} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="參考單價" name="estPrice">
-              <InputNumber style={{ width: '100%' }} min={0} precision={2} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="小計">
-              <InputNumber
-                style={{ width: '100%' }}
-                value={(form.getFieldValue('qty') || 0) * (form.getFieldValue('estPrice') || 0)}
-                disabled
-                formatter={(v) => `MOP ${Number(v).toLocaleString()}`}
-              />
             </Form.Item>
           </Col>
         </Row>
@@ -183,7 +346,20 @@ export default function OaPurchaseRequest() {
   const [form] = Form.useForm<FormValues>()
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
+  /** 提交成功彈窗（與充值/扣款/轉賬/合併/贈送/AI申請等流程保持一致） */
+  const [successVisible, setSuccessVisible] = useState(false)
+  const [submittedFlowNo, setSubmittedFlowNo] = useState('')
+  const [countdown, setCountdown] = useState(5)
+
+  // 從流程配置獲取採購申請的流程名稱、標籤、審批節點
+  const { getWorkflowByKey } = useWorkflowConfig()
+  const workflowDef = getWorkflowByKey('oa_purchase')
+  const flowName = workflowDef?.name || '採購申請'
+  const flowTag = workflowDef?.tag || FLOW_TAG_LABEL['oa_purchase'] || '採購'
+  const flowTagColor = workflowDef?.tagColor || FLOW_TAG_COLOR['oa_purchase'] || '#FA8C16'
   const [models, setModels] = useState<AssetModel[]>([])
+  const [categories, setCategories] = useState<AssetCategory[]>([])
+  const [brands, setBrands] = useState<AssetBrand[]>([])
 
   // 部門樹數據
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
@@ -198,6 +374,18 @@ export default function OaPurchaseRequest() {
     return map
   }, [departments])
 
+  // 提交成功彈窗倒計時
+  useEffect(() => {
+    if (!successVisible) return
+    if (countdown <= 0) {
+      setSuccessVisible(false)
+      navigate('/oa-requests')
+      return
+    }
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [successVisible, countdown, navigate])
+
   // 明細列表
   const [items, setItems] = useState<ItemRow[]>([])
   const [modalOpen, setModalOpen] = useState(false)
@@ -211,22 +399,30 @@ export default function OaPurchaseRequest() {
 
   const modelOf = (modelId?: number) => models.find((m) => m.id === modelId)
 
-  /** 明細合計 */
-  const totalAmount = items.reduce((s, it) => s + (it.qty || 0) * (it.estPrice || 0), 0)
-
   useEffect(() => {
     let alive = true
     setLoading(true)
-    Promise.all([
-      fetchModelList({ size: 9999 }),
-      fetchDepartments(),
+
+    const safeFetch = <T,>(p: Promise<T>, fallback: T): Promise<T> =>
+      p.catch(() => fallback)
+
+    Promise.allSettled([
+      safeFetch(fetchModelList({ size: 9999 }), { records: [], total: 0 }),
+      safeFetch(fetchCategoryList(), []),
+      safeFetch(fetchBrandList(), []),
+      safeFetch(fetchDepartments(), []),
     ])
-      .then(([modelRes, deptList]) => {
+      .then(([modelRes, catRes, brandRes, deptRes]) => {
         if (!alive) return
-        setModels(modelRes.records || [])
-        setDepartments(deptList)
+        const modelData = modelRes.status === 'fulfilled' ? modelRes.value : { records: [], total: 0 }
+        const catData = catRes.status === 'fulfilled' ? catRes.value : []
+        const brandData = brandRes.status === 'fulfilled' ? brandRes.value : []
+        const deptData = deptRes.status === 'fulfilled' ? deptRes.value : []
+        setModels(modelData.records || [])
+        setCategories(catData)
+        setBrands(brandData)
+        setDepartments(deptData)
       })
-      .catch((e: Error) => message.error(e.message))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [])
@@ -283,6 +479,58 @@ export default function OaPurchaseRequest() {
     return false
   }, [])
 
+  /* ---- 保存草稿（二次確認） ---- */
+  const handleSaveDraft = () => {
+    form.validateFields().then((v) => {
+      if (!items.length) {
+        message.error('請至少添加一條採購明細')
+        return
+      }
+      Modal.confirm({
+        title: '確認保存',
+        icon: <ExclamationCircleOutlined />,
+        content: '確認保存當前採購申請為草稿？保存後可在「我的申請」中查看。',
+        okText: '確認保存',
+        cancelText: '取消',
+        centered: true,
+        onOk: async () => {
+          const payload = {
+            department: v.department ? (deptNameMap.get(v.department) || '') : '',
+            departmentId: v.department,
+            applicant: user?.name || '',
+            applicantEmpId: user?.empId || '',
+            reason: v.reason.trim(),
+            items: items.map((it) => ({
+              modelId: it.modelId as number,
+              modelName: it.modelName || modelOf(it.modelId)?.name || '',
+              qty: it.qty as number,
+              remark: it.remark,
+            })),
+            certificateFiles: certificateFiles.map((f) => f.name),
+          }
+          setSubmitting(true)
+          try {
+            const title = `採購申請-${user?.name || ''}-${dayjs().format('YYYYMMDD')}`
+            await submitOaRequest({
+              processCode: 'oa_purchase',
+              title,
+              formData: JSON.stringify(payload),
+              flowStatus: 'draft',
+            })
+          } catch {
+            message.error('保存失敗，請重試')
+            setSubmitting(false)
+            return
+          } finally {
+            setSubmitting(false)
+          }
+          message.success('草稿已保存')
+          navigate('/oa-requests')
+        },
+      })
+    }).catch(() => { /* antd 已標紅必填字段 */ })
+  }
+
   /* ---- 提交 ---- */
   const handleSubmit = async () => {
     try {
@@ -291,12 +539,7 @@ export default function OaPurchaseRequest() {
         message.error('請至少添加一條採購明細')
         return
       }
-      if (!certificateFiles.length) {
-        message.warning('請上傳相關憑證')
-        return
-      }
       const payload = {
-        title: v.title.trim(),
         department: v.department ? (deptNameMap.get(v.department) || '') : '',
         departmentId: v.department,
         applicant: user?.name || '',
@@ -306,17 +549,21 @@ export default function OaPurchaseRequest() {
           modelId: it.modelId as number,
           modelName: it.modelName || modelOf(it.modelId)?.name || '',
           qty: it.qty as number,
-          estPrice: it.estPrice ?? modelOf(it.modelId)?.refPrice ?? 0,
           remark: it.remark,
         })),
-        remark: v.remark,
         certificateFiles: certificateFiles.map((f) => f.name),
       }
       setSubmitting(true)
-      // 前端先行：暫用 mock 提交
-      console.log('採購申請提交:', payload)
-      message.success('採購申請已提交，請在流程事項中查看審批進度')
-      navigate('/oa-requests')
+      // P0-1: 對接 OA 審批 API
+      const title = `採購申請-${user?.name || ''}-${dayjs().format('YYYYMMDD')}`
+      const flowNo = await submitOaRequest({
+        processCode: 'oa_purchase',
+        title,
+        formData: JSON.stringify(payload),
+      })
+      setSubmittedFlowNo(flowNo || '')
+      setCountdown(5)
+      setSuccessVisible(true)
     } catch (e: unknown) {
       if (e instanceof Error && e.message) message.error(e.message)
     } finally {
@@ -327,28 +574,31 @@ export default function OaPurchaseRequest() {
   /* ---- 明細表格列 ---- */
   const itemColumns: TableColumnsType<ItemRow> = [
     {
-      title: '品牌型號', dataIndex: 'modelName', key: 'modelName',
-      render: (_: unknown, row: ItemRow) => {
-        if (row.modelName) return row.modelName
-        const m = modelOf(row.modelId)
-        return m ? `${m.brandZh} ${m.modelNo} / ${m.name}` : '-'
-      },
-    },
-    { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right' },
-    {
-      title: '參考單價', dataIndex: 'estPrice', key: 'estPrice', width: 120, align: 'right',
-      render: (v: number | undefined) => (v ? `MOP ${v.toLocaleString()}` : '-'),
-    },
-    {
-      title: '小計', key: 'subtotal', width: 120, align: 'right',
-      render: (_: unknown, row: ItemRow) => `MOP ${((row.qty || 0) * (row.estPrice || 0)).toLocaleString()}`,
-    },
-    {
-      title: '備註', dataIndex: 'remark', key: 'remark',
+      title: '資產分類', dataIndex: 'categoryName', key: 'categoryName', width: 120,
       render: (v: string) => v || '-',
     },
     {
-      title: '操作', key: 'action', width: 120, align: 'center',
+      title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 80,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 140,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '參數信息', dataIndex: 'params', key: 'params', width: 160,
+      render: (v: Record<string, string> | undefined) => {
+        if (!v || Object.keys(v).length === 0) return '-'
+        return Object.entries(v).map(([k, val]) => `${k}: ${val}`).join(', ')
+      },
+    },
+    { title: '數量', dataIndex: 'qty', key: 'qty', width: 70, align: 'right' },
+    {
+      title: '備註', dataIndex: 'remark', key: 'remark', width: 140,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '操作', key: 'action', width: 120, align: 'center', fixed: 'right',
       render: (_: unknown, row: ItemRow) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => handleEditItem(row)}>編輯</Button>
@@ -452,8 +702,8 @@ export default function OaPurchaseRequest() {
               }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>採購申請</h2>
-              <Tag color="orange" style={{ fontSize: 11 }}>行政中心</Tag>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{flowName}</h2>
+              <Tag color={flowTagColor} style={{ fontSize: 11 }}>{flowTag}</Tag>
             </div>
           </div>
         </div>
@@ -530,8 +780,8 @@ export default function OaPurchaseRequest() {
           </Row>
 
           <Form.Item
-            label="申請事由" name="reason"
-            rules={[{ required: true, message: '請輸入申請事由' }]}
+            label="採購事由" name="reason"
+            rules={[{ required: true, message: '請輸入採購事由' }]}
           >
             <Input.TextArea rows={2} placeholder="請說明採購原因及用途" />
           </Form.Item>
@@ -550,9 +800,6 @@ export default function OaPurchaseRequest() {
               <ShoppingCartOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>採購明細</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>
-              合計：MOP {totalAmount.toLocaleString()}
-            </Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -561,11 +808,12 @@ export default function OaPurchaseRequest() {
             dataSource={items}
             pagination={false}
             size="small"
+            scroll={{ x: 1100 }}
             locale={{ emptyText: '暫無明細，請點擊下方按鈕添加' }}
             style={{ marginBottom: 16 }}
           />
           <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddItem}>
-            添加明細
+            添加物資
           </Button>
         </div>
 
@@ -588,33 +836,15 @@ export default function OaPurchaseRequest() {
 
           {renderFileList()}
         </div>
-
-        {/* ====== 備註信息 ====== */}
-        <div style={{
-          border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
-          padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 6, background: '#f6ffed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <EditOutlined style={{ fontSize: 14, color: '#52c41a' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>備註信息</span>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
-
-          <Form.Item label="備註" name="remark">
-            <Input.TextArea rows={3} placeholder="其他備註信息" />
-          </Form.Item>
-        </div>
       </Form>
 
       {/* ====== 底部操作欄 ====== */}
       <div className="form-footer">
         <Space>
           <Button onClick={() => navigate('/process-center')}>取消</Button>
+          <Button icon={<SaveOutlined />} loading={submitting} onClick={handleSaveDraft}>
+            保存
+          </Button>
           <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>
             提交審批
           </Button>
@@ -625,10 +855,58 @@ export default function OaPurchaseRequest() {
       <ItemEditModal
         open={modalOpen}
         editing={editingItem}
+        categories={categories}
+        brands={brands}
         models={models}
         onOk={handleModalOk}
         onCancel={() => setModalOpen(false)}
       />
+
+      {/* ====== 提交成功彈窗（與充值/扣款/轉賬/合併/贈送/AI申請等流程統一規範） ====== */}
+      {successVisible && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 12, padding: '32px 28px',
+            width: 400, textAlign: 'center',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{
+              width: 64, height: 64, margin: '0 auto 20px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #52C41A, #73D13D)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(82,196,26,0.3)',
+            }}>
+              <CheckCircleOutlined style={{ fontSize: 32, color: '#fff' }} />
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+              提交成功
+            </h3>
+            <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+              {submittedFlowNo && (
+                <>
+                  流程編號：<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span>
+                  <br />
+                </>
+              )}
+              採購申請已提交，請在流程事項中查看審批進度
+            </p>
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => { setSuccessVisible(false); navigate('/oa-requests') }}
+              style={{ minWidth: 120, height: 40, borderRadius: 8, backgroundColor: '#E8720C', borderColor: '#E8720C' }}
+            >
+              前往流程事項（{countdown}s）
+            </Button>
+          </div>
+        </div>
+      )}
     </Spin>
   )
 }

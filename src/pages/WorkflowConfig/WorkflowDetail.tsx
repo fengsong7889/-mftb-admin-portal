@@ -96,6 +96,9 @@ export default function WorkflowDetail() {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <Descriptions column={2} size="middle" labelStyle={{ color: '#8C8C8C', width: 120 }} contentStyle={{ color: '#262626' }}>
+          <Descriptions.Item label="配置ID">
+            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#E8720C' }}>{workflow.configId || '-'}</span>
+          </Descriptions.Item>
           <Descriptions.Item label="流程名稱">
             <span style={{ fontWeight: 600 }}>{workflow.name}</span>
           </Descriptions.Item>

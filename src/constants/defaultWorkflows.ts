@@ -11,6 +11,10 @@ const uid = () => `wf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 const nid = () => `nd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 const rid = () => `rr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
+/** 配置ID計數器（LC + 5位自增序號） */
+let _configIdSeq = 0
+const cid = () => `LC${String(++_configIdSeq).padStart(5, '0')}`
+
 /** 業務主管審批節點（模板） */
 const bizNode = (sortOrder: number) => ({
   id: nid(),
@@ -58,6 +62,7 @@ const now = new Date().toISOString()
 const rawDefaults: WorkflowDefinition[] = [
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'recharge',
     name: '充值申請',
     approvalType: 'recharge',
@@ -76,6 +81,7 @@ const rawDefaults: WorkflowDefinition[] = [
   },
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'transfer',
     name: '轉賬申請',
     approvalType: 'transfer',
@@ -91,6 +97,7 @@ const rawDefaults: WorkflowDefinition[] = [
   },
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'deduct',
     name: '扣款申請',
     approvalType: 'deduct',
@@ -106,6 +113,7 @@ const rawDefaults: WorkflowDefinition[] = [
   },
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'merge',
     name: '合併申請',
     approvalType: 'merge',
@@ -121,6 +129,7 @@ const rawDefaults: WorkflowDefinition[] = [
   },
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'gift',
     name: '贈送申請',
     approvalType: 'gift',
@@ -136,6 +145,7 @@ const rawDefaults: WorkflowDefinition[] = [
   },
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'ai_access',
     name: 'AI申請',
     approvalType: 'ai_access',
@@ -151,6 +161,7 @@ const rawDefaults: WorkflowDefinition[] = [
   },
   {
     id: uid(),
+    configId: cid(),
     workflowKey: 'oa_purchase',
     name: '採購申請',
     approvalType: 'oa_purchase',

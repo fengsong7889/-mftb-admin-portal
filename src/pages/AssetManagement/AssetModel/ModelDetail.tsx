@@ -121,7 +121,6 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
             <Descriptions.Item label="参考单价">
               {model.refPrice != null ? `¥${model.refPrice}` : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="供应商">{model.supplier || '-'}</Descriptions.Item>
             <Descriptions.Item label="最后更新人">{model.updatedBy || '-'}</Descriptions.Item>
             <Descriptions.Item label="最后更新时间">{model.updatedAt || '-'}</Descriptions.Item>
           </Descriptions>

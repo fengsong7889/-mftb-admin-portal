@@ -456,6 +456,8 @@ export default function RuleConfig() {
                         if (key.startsWith('config_pricing_')) return { label: '定價', color: '#E8720C' }
                         if (key.startsWith('algo_')) return { label: '算法', color: '#722ED1' }
                         if (key.startsWith('batch_')) return { label: '批次', color: '#52C41A' }
+                        if (key.startsWith('eam_category')) return { label: '分類', color: '#1890FF' }
+                        if (key.startsWith('eam_location')) return { label: '倉庫', color: '#52C41A' }
                         return null
                       }
 

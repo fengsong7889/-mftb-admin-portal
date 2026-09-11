@@ -15,12 +15,15 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../../contexts/AuthContext'
 import { fetchOaRequests, type OaRequestVO, type OaFlowStatus } from '../../../api/oaRequest'
+import { getApprovalRecords, type ApprovalRecord } from '../../../utils/approvalStore'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 import { fetchRoles, type RoleItem } from '../../../api/role'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const { RangePicker } = DatePicker
 
@@ -63,8 +66,14 @@ const FLOW_NAME_PREFIX: Record<string, string> = {
   oa_general: '通用審批',
 }
 
+/** 流程標籤短標籤（列表 Tag 用，與表單頁 FLOW_TAG_LABEL 保持一致） */
+const FLOW_TAG_LABEL: Record<string, string> = {
+  oa_purchase: '採購',
+}
+
 /** 流程狀態 → Tag 顏色 */
 const FLOW_STATUS_COLOR: Record<string, string> = {
+  draft: 'warning',
   pending: 'processing',
   approved: 'success',
   rejected: 'error',
@@ -73,6 +82,7 @@ const FLOW_STATUS_COLOR: Record<string, string> = {
 
 /** 流程狀態 → i18n key */
 const FLOW_STATUS_I18N: Record<string, string> = {
+  draft: '待提交',
   pending: 'approvalCenter.flowPending',
   approved: 'approvalCenter.flowApproved',
   rejected: 'approvalCenter.flowRejected',
@@ -140,6 +150,21 @@ function oaToRow(r: OaRequestVO): FlowRow {
     flowStatus: r.flowStatus || 'pending',
     currentNodeName: r.currentNodeName || '',
     currentApprover: r.currentApprover || '--',
+  }
+}
+
+/** 將 localStorage 審批記錄映射為 FlowRow（AI 申請/採購草稿） */
+function localRecordToRow(r: ApprovalRecord): FlowRow {
+  return {
+    key: r.flowNo,
+    flowNo: r.flowNo,
+    approvalType: r.approvalType,
+    processCode: r.approvalType,
+    applicant: r.applicant || '--',
+    applyTime: r.applyTime || '',
+    flowStatus: r.flowStatus || 'draft',
+    currentNodeName: '',
+    currentApprover: '--',
   }
 }
 
@@ -251,6 +276,15 @@ export default function OaRequests() {
       // 只保留當前用戶的申請
       const userName = user?.name || ''
       rows = rows.filter(r => r.applicant.includes(userName))
+
+      // 合併 localStorage 中的 AI 申請和採購草稿（這些草稿未提交到後端）
+      const localRecords = getApprovalRecords()
+        .filter(r => (r.approvalType === 'ai_access' || r.approvalType === 'oa_purchase') && r.applicant.includes(userName))
+        .map(localRecordToRow)
+      // 按 flowNo 去重（後端數據優先）
+      const apiFlowNos = new Set(rows.map(r => r.flowNo))
+      const uniqueLocalRows = localRecords.filter(r => !apiFlowNos.has(r.flowNo))
+      rows = [...rows, ...uniqueLocalRows]
 
       // 前端過濾
       if (myFilters.flowTag) {
@@ -396,7 +430,7 @@ export default function OaRequests() {
 
   const renderFlowTag = (type: string) => {
     const color = FLOW_TAG_COLOR[type]
-    const label = APPROVAL_TYPE_I18N[type] ? t(APPROVAL_TYPE_I18N[type]) : type
+    const label = FLOW_TAG_LABEL[type] || (APPROVAL_TYPE_I18N[type] ? t(APPROVAL_TYPE_I18N[type]) : type)
     return <Tag color={color}>{label}</Tag>
   }
 
@@ -414,15 +448,35 @@ export default function OaRequests() {
     { label: t('approvalCenter.typeMerge'), value: 'merge' },
     { label: t('approvalCenter.typeGift'), value: 'gift' },
     { label: t('oaRequests.aiAccessType'), value: 'ai_access' },
+    { label: t('oaRequests.typePurchase'), value: 'oa_purchase' },
   ], [t])
 
   const flowStatusOptions = useMemo(() => [
     { label: t('common.all'), value: 'all' },
+    { label: '待提交', value: 'draft' },
     { label: t('approvalCenter.flowPending'), value: 'pending' },
     { label: t('approvalCenter.flowApproved'), value: 'approved' },
     { label: t('approvalCenter.flowRejected'), value: 'rejected' },
     { label: t('approvalCenter.flowCancelled'), value: 'cancelled' },
   ], [t])
+
+  /* ==================== 列配置元數據 ==================== */
+  const columnMeta = useMemo(() => [
+    { key: 'flowNo', title: t('common.colFlowNo') },
+    { key: 'flowName', title: t('oaRequests.colFlowName') },
+    { key: 'approvalType', title: t('oaRequests.colRequestType') },
+    { key: 'applicant', title: t('oaRequests.colApplicant') },
+    { key: 'applyTime', title: t('oaRequests.colApplyTime') },
+    { key: 'flowStatus', title: t('common.colStatus') },
+    { key: 'currentNodeName', title: t('oaRequests.colCurrentNode') },
+    { key: 'currentApprover', title: t('oaRequests.colCurrentApprover') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const { configComponent, applyConfig } = useColumnConfig('oa-requests', columnMeta, [
+    { key: 'flowNo', visible: true, locked: 'head' as const },
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
 
   /* ==================== 列定義 ==================== */
   const sharedColumns: TableColumnsType<FlowRow> = [
@@ -506,40 +560,44 @@ export default function OaRequests() {
     },
   ]
 
-  const myColumns: TableColumnsType<FlowRow> = [
-    ...sharedColumns,
-    {
-      title: t('common.colAction'),
-      key: 'action',
-      width: 80,
-      fixed: 'right',
-      render: (_: unknown, record: FlowRow) => (
+  const myActionColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('common.colAction'),
+    key: 'action',
+    width: 80,
+    fixed: 'right' as const,
+    render: (_: unknown, record: FlowRow) => (
+      <Button type="link" size="small" onClick={() => handleDetail(record)}>
+        {t('common.detail')}
+      </Button>
+    ),
+  }
+
+  const pendingActionColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('common.colAction'),
+    key: 'action',
+    width: 130,
+    fixed: 'right' as const,
+    render: (_: unknown, record: FlowRow) => (
+      <Space size={0} split={<span className="action-split">|</span>}>
+        <Button type="link" size="small" onClick={() => handleApprove(record)}>
+          {t('approvalCenter.approve')}
+        </Button>
         <Button type="link" size="small" onClick={() => handleDetail(record)}>
           {t('common.detail')}
         </Button>
-      ),
-    },
-  ]
+      </Space>
+    ),
+  }
 
-  const pendingColumns: TableColumnsType<FlowRow> = [
-    ...sharedColumns,
-    {
-      title: t('common.colAction'),
-      key: 'action',
-      width: 130,
-      fixed: 'right',
-      render: (_: unknown, record: FlowRow) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleApprove(record)}>
-            {t('approvalCenter.approve')}
-          </Button>
-          <Button type="link" size="small" onClick={() => handleDetail(record)}>
-            {t('common.detail')}
-          </Button>
-        </Space>
-      ),
-    },
-  ]
+  const myColumns = useMemo(
+    () => applyConfig([...sharedColumns, myActionColumn]) as TableColumnsType<FlowRow>,
+    [applyConfig, sharedColumns, activeTab, myData],
+  )
+
+  const pendingColumns = useMemo(
+    () => applyConfig([...sharedColumns, pendingActionColumn]) as TableColumnsType<FlowRow>,
+    [applyConfig, sharedColumns, activeTab, pendingData],
+  )
 
   /* ==================== 搜索表單 ==================== */
   const renderSearchForm = (
@@ -598,6 +656,7 @@ export default function OaRequests() {
               <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/process-center')}>
                 {t('oaRequests.btnFlowApply')}
               </Button>
+              {configComponent}
             </div>
           </div>
           <Table<FlowRow>

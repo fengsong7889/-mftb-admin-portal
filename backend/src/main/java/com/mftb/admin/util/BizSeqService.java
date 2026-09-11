@@ -93,6 +93,16 @@ public class BizSeqService {
     public static final String RULE_AI_CONVERSATION = "ai_conversation";
     /** OA流程编号 */
     public static final String RULE_OA_REQUEST = "oa_request";
+    /** EAM 採購申請 */
+    public static final String RULE_EAM_PURCHASE_REQUEST = "eam_purchase_request";
+    /** EAM 採購訂單 */
+    public static final String RULE_EAM_PURCHASE_ORDER = "eam_purchase_order";
+    /** EAM 入庫批次 */
+    public static final String RULE_EAM_INBOUND_BATCH = "eam_inbound_batch";
+    /** EAM 資產編號 */
+    public static final String RULE_EAM_ASSET = "eam_asset";
+    /** 流程配置ID */
+    public static final String RULE_WORKFLOW_CONFIG = "workflow_config";
 
     /** 无日期维度规则在序号表中的固定 dateKey */
     private static final String FIXED_DATE_KEY = "00000000";

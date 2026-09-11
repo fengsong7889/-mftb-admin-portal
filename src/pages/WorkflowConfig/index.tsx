@@ -107,6 +107,15 @@ export default function WorkflowConfig() {
 
   const columns: ColumnsType<WorkflowDefinition> = [
     {
+      title: '配置ID',
+      dataIndex: 'configId',
+      key: 'configId',
+      width: 110,
+      render: (v: string) => (
+        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#E8720C' }}>{v || '-'}</span>
+      ),
+    },
+    {
       title: '流程名稱',
       dataIndex: 'name',
       key: 'name',

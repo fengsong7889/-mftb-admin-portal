@@ -296,6 +296,7 @@ export default function Home() {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [menuNameMap, setMenuNameMap] = useState<Record<string, string>>({})
+  const [backendMenuTree, setBackendMenuTree] = useState<MenuVO[]>([])
   const [quoteIndex, setQuoteIndex] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -614,22 +615,31 @@ export default function Home() {
     return () => { cancelled = true }
   }, [])
 
-  /** 从后端加载当前用户的快捷入口（后端不可用时回退 localStorage） */
+  /** 从后端加载当前用户的快捷入口（后端不可用或返回空时回退 localStorage） */
   useEffect(() => {
     let cancelled = false
-    fetchQuickFavorites().then((keys) => {
-      if (!cancelled && keys.length > 0) setFavorites(keys)
-    }).catch(() => {
-      // 后端不可用，回退 localStorage
+    const loadFromLocal = () => {
       if (!cancelled && user?.username) {
         const cached = loadFavorites(user.username)
-        if (cached !== defaultFavorites) setFavorites(cached)
+        setFavorites(cached)
       }
+    }
+    fetchQuickFavorites().then((keys) => {
+      if (cancelled) return
+      if (keys && keys.length > 0) {
+        setFavorites(keys)
+      } else {
+        // 后端返回空，回退 localStorage
+        loadFromLocal()
+      }
+    }).catch(() => {
+      // 后端不可用，回退 localStorage
+      loadFromLocal()
     })
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 加载后端菜单名称 */
+  /** 加载后端菜单树（名称映射 + 扁平化搜索列表） */
   useEffect(() => {
     let cancelled = false
     fetchMenuTree().then((tree) => {
@@ -637,6 +647,7 @@ export default function Home() {
         const map: Record<string, string> = {}
         collectMenuNames(tree, map)
         setMenuNameMap(map)
+        setBackendMenuTree(tree)
       }
     })
     return () => { cancelled = true }
@@ -664,12 +675,43 @@ export default function Home() {
     return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
-  const menuList = useMemo(() => (
-    allMenus.map((m) => {
-      const backendName = menuNameMap[m.key]
-      return backendName ? { ...m, label: backendName } : m
+  /** 递归扁平化后端菜单树 → 可搜索的菜單項（僅 type=2 的菜單，path 可選） */
+  const flattenBackendMenus = useCallback((menus: MenuVO[], parentGroup?: string): { key: string; label: string; icon: React.ReactNode; path: string; group: string }[] => {
+    const result: { key: string; label: string; icon: React.ReactNode; path: string; group: string }[] = []
+    menus.forEach((m) => {
+      if (m.type === 2) {
+        result.push({
+          key: m.menuKey,
+          label: m.name,
+          icon: <SearchOutlined />,
+          path: m.path ?? `/${m.menuKey}`,
+          group: parentGroup ?? m.parentName ?? '',
+        })
+      }
+      if (m.children?.length) {
+        const groupName = m.type === 1 ? m.name : (parentGroup ?? m.parentName ?? '')
+        result.push(...flattenBackendMenus(m.children, groupName))
+      }
     })
-  ), [menuNameMap])
+    return result
+  }, [])
+
+  const menuList = useMemo(() => {
+    // 从后端菜单树扁平化得到的菜单
+    const backendMenus = flattenBackendMenus(backendMenuTree)
+    const backendKeys = new Set(backendMenus.map((m) => m.key))
+    // 静态 allMenus 中不在后端的项（兜底）
+    const staticOnly = allMenus.filter((m) => !backendKeys.has(m.key))
+    // 合并：后端菜单优先（名称来自后端），静态菜单兜底
+    const merged = [
+      ...backendMenus.map((bm) => {
+        const staticItem = allMenus.find((s) => s.key === bm.key)
+        return staticItem ? { ...bm, icon: staticItem.icon } : bm
+      }),
+      ...staticOnly,
+    ]
+    return merged
+  }, [backendMenuTree, flattenBackendMenus])
 
   /** 时钟 */
   useEffect(() => {
@@ -727,11 +769,35 @@ export default function Home() {
   /** 日期时间本地化 */
   const dateLocale = i18nInstance.language?.startsWith('en') ? 'en-MO' : 'zh-Hant-MO'
 
+  /** 模糊匹配：searchText 的每個字符按順序出現在 target 中即可命中 */
+  const fuzzyMatch = (target: string, searchText: string): boolean => {
+    if (!searchText) return false
+    const t = target.toLowerCase()
+    const s = searchText.toLowerCase()
+    // 1. 精確子串匹配（優先）
+    if (t.includes(s)) return true
+    // 2. 字符順序模糊匹配：s 的每個字符在 t 中按順序出現
+    let ti = 0
+    for (let si = 0; si < s.length; si++) {
+      const idx = t.indexOf(s[si], ti)
+      if (idx === -1) return false
+      ti = idx + 1
+    }
+    return true
+  }
+
   const filteredMenus = searchText
     ? menuList.filter((m) => {
         const label = translateMenuName(m.key, m.label)
         const group = translateGroup(m.group)
-        return label.includes(searchText) || group.includes(searchText)
+        // 中文/英文模糊匹配
+        if (fuzzyMatch(label, searchText) || fuzzyMatch(group, searchText)) return true
+        // 拼音匹配：將中文 label 轉拼音後再匹配（去除空格以支持連續拼音搜索）
+        if (/[\u4e00-\u9fa5]/.test(label)) {
+          const py = pinyin(label, { toneType: 'none' }).toLowerCase().replace(/\s+/g, '')
+          if (fuzzyMatch(py, searchText)) return true
+        }
+        return false
       })
     : []
 
@@ -1765,27 +1831,32 @@ export default function Home() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onFocus={() => setShowAddMenu(true)}
+              onBlur={() => setTimeout(() => setShowAddMenu(false), 200)}
               allowClear
               className="home-quick-field"
             />
-            {showAddMenu && searchText && filteredMenus.length > 0 && (
+            {showAddMenu && searchText && (
               <div className="home-quick-dropdown">
-                {filteredMenus.map((menu) => (
-                  <div
-                    key={menu.key}
-                    className={`home-quick-item ${favorites.includes(menu.key) ? 'is-added' : ''}`}
-                    onClick={() => !favorites.includes(menu.key) && addFavorite(menu.key)}
-                  >
-                    <span className="home-quick-item-icon">{menu.icon}</span>
-                    <span className="home-quick-item-label">{translateMenuName(menu.key, menu.label)}</span>
-                    <Tag>{translateGroup(menu.group)}</Tag>
-                    {favorites.includes(menu.key) ? (
-                      <span className="home-quick-item-added">{t('home.added')}</span>
-                    ) : (
-                      <PlusOutlined className="home-quick-item-add" />
-                    )}
-                  </div>
-                ))}
+                {filteredMenus.length > 0 ? (
+                  filteredMenus.map((menu) => (
+                    <div
+                      key={menu.key}
+                      className={`home-quick-item ${favorites.includes(menu.key) ? 'is-added' : ''}`}
+                      onClick={() => !favorites.includes(menu.key) && addFavorite(menu.key)}
+                    >
+                      <span className="home-quick-item-icon">{menu.icon}</span>
+                      <span className="home-quick-item-label">{translateMenuName(menu.key, menu.label)}</span>
+                      <Tag>{translateGroup(menu.group)}</Tag>
+                      {favorites.includes(menu.key) ? (
+                        <span className="home-quick-item-added">{t('home.added')}</span>
+                      ) : (
+                        <PlusOutlined className="home-quick-item-add" />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="home-quick-dropdown-empty">{t('home.quickEntryNoResult', '無匹配結果')}</div>
+                )}
               </div>
             )}
           </div>

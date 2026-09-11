@@ -14,11 +14,12 @@ import {
   fetchLocationList, createLocation, updateLocation, type AssetLocation,
 } from '../../../api/eam'
 import { buildTree, toTreeSelectData, type TreeSelectNode } from '../eamUtils'
+import { generateLocationCode } from '../../../utils/generateCode'
 
 const TYPE_OPTIONS: { value: AssetLocation['type']; label: string }[] = [
   { value: 'warehouse', label: '倉庫' },
   { value: 'floor', label: '樓層' },
-  { value: 'room', label: '辦公室' },
+  { value: 'room', label: '房号' },
 ]
 
 interface FormValues {
@@ -44,6 +45,8 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [treeData, setTreeData] = useState<TreeSelectNode[]>([])
   const [existingCode, setExistingCode] = useState<string>('')
+  const [existingCodes, setExistingCodes] = useState<string[]>([])
+  const [idToInfo, setIdToInfo] = useState<Map<number, { code: string; type: string }>>(new Map())
 
   useEffect(() => {
     let alive = true
@@ -52,6 +55,8 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
       .then((list) => {
         if (!alive) return
         setTreeData(toTreeSelectData(buildTree(list), isEdit && id ? [id] : []))
+        setExistingCodes(list.map(l => l.code))
+        setIdToInfo(new Map(list.map(l => [l.id, { code: l.code, type: l.type }])))
         if (isEdit && id) {
           const cur = list.find((l) => l.id === id)
           if (cur) {
@@ -67,12 +72,39 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
           }
         } else {
           form.setFieldsValue({ parentId: parentId || undefined, type: 'warehouse' })
+          // 新增模式：自动生成编码
+          const parentInfo = parentId ? list.find(l => l.id === parentId) : undefined
+          const autoCode = generateLocationCode(
+            list.map(l => l.code),
+            'warehouse',
+            parentId,
+            parentInfo?.code,
+            parentInfo?.type,
+          )
+          form.setFieldsValue({ code: autoCode })
         }
       })
       .catch((e: Error) => message.error(e.message))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [form, id, isEdit, parentId])
+
+  /** 位置类型或上级变更时重新生成编码 */
+  const handleTypeOrParentChange = () => {
+    if (isEdit) return
+    const values = form.getFieldsValue()
+    const type = values.type || 'warehouse'
+    const parentId = values.parentId
+    const parentInfo = parentId ? idToInfo.get(parentId) : undefined
+    const autoCode = generateLocationCode(
+      existingCodes,
+      type,
+      parentId,
+      parentInfo?.code,
+      parentInfo?.type,
+    )
+    form.setFieldsValue({ code: autoCode })
+  }
 
   const handleSubmit = async () => {
     try {
@@ -135,12 +167,10 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
               <Form.Item
                 label="編碼"
                 name="code"
-                rules={isEdit ? [] : [{ required: true, message: '請輸入編碼' }]}
               >
                 <Input
-                  placeholder={isEdit ? undefined : '請輸入編碼'}
-                  allowClear
-                  disabled={isEdit}
+                  placeholder="系统自动生成"
+                  disabled={!isEdit}
                   style={{ fontFamily: 'monospace' }}
                 />
               </Form.Item>
@@ -158,7 +188,7 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
                 label="位置類型" name="type"
                 rules={[{ required: true }]}
               >
-                <Select options={TYPE_OPTIONS} />
+                <Select options={TYPE_OPTIONS} onChange={handleTypeOrParentChange} />
               </Form.Item>
             </Col>
           </Row>
@@ -171,6 +201,7 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
                   placeholder="請選擇上級倉庫"
                   allowClear
                   treeDefaultExpandAll
+                  onChange={handleTypeOrParentChange}
                 />
               </Form.Item>
             </Col>

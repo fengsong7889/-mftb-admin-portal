@@ -926,6 +926,12 @@
 .home-quick-item-added { font-size: 11px; color: #9ca3af; }
 .home-quick-item-add { color: #52c41a; font-size: 14px; }
 
+.home-quick-dropdown-empty {
+  padding: 16px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: #8C8C8C;
+}
 .home-quick-list {
   display: flex;
   flex-direction: column;

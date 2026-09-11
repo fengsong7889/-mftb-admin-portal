@@ -19,6 +19,7 @@ import {
   type AssetCategory,
 } from '../../../api/eam'
 import { buildTree, toTreeSelectData } from '../eamUtils'
+import { generateCategoryCode } from '../../../utils/generateCode'
 
 interface FormValues {
   code: string
@@ -41,11 +42,15 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [treeData, setTreeData] = useState<ReturnType<typeof toTreeSelectData>>([])
+  const [existingCodes, setExistingCodes] = useState<string[]>([])
+  const [idToCode, setIdToCode] = useState<Map<number, string>>(new Map())
 
   const loadOptions = useCallback(async () => {
     const list = await fetchCategoryList()
     const tree = buildTree(list)
     setTreeData(toTreeSelectData(tree, isEdit && id ? [id] : [], 3))
+    setExistingCodes(list.map(c => c.code))
+    setIdToCode(new Map(list.map((c: AssetCategory) => [c.id, c.code])))
     return list
   }, [id, isEdit])
 
@@ -68,12 +73,28 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
           }
         } else {
           form.setFieldsValue({ parentId: parentId || undefined, status: 'enabled' })
+          // 新增模式：自动生成编码
+          const parentCat = parentId ? list.find((c: AssetCategory) => c.id === parentId) : undefined
+          const autoCode = generateCategoryCode(
+            list.map((c: AssetCategory) => c.code),
+            parentId,
+            parentCat?.code,
+          )
+          form.setFieldsValue({ code: autoCode })
         }
       })
       .catch((e: Error) => message.error(e.message))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [form, id, isEdit, loadOptions, parentId])
+
+  /** 上级分类变更时重新生成编码 */
+  const handleParentChange = (newParentId?: number) => {
+    if (isEdit) return
+    const parentCode = newParentId ? idToCode.get(newParentId) : undefined
+    const autoCode = generateCategoryCode(existingCodes, newParentId, parentCode)
+    form.setFieldsValue({ code: autoCode, parentId: newParentId })
+  }
 
   const handleSubmit = async () => {
     try {
@@ -162,7 +183,11 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
               label="分类编码" name="code"
               rules={[{ required: true, message: '请输入分类编码' }]}
             >
-              <Input placeholder="如 010101" allowClear />
+              <Input
+                placeholder="系统自动生成"
+                disabled={!isEdit}
+                style={{ fontFamily: 'monospace' }}
+              />
             </Form.Item>
             <Form.Item
               label="分类名称" name="name"
@@ -184,6 +209,7 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
                 placeholder="请选择上级分类"
                 allowClear
                 treeDefaultExpandAll
+                onChange={handleParentChange}
               />
             </Form.Item>
           </div>

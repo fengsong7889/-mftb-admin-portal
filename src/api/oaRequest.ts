@@ -5,7 +5,7 @@
 import request from './request'
 
 /** 流程狀態 */
-export type OaFlowStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+export type OaFlowStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 /** 審批任務節點 */
 export interface OaApprovalTaskVO {
@@ -74,6 +74,7 @@ export interface OaRequestCreateDTO {
   processCode: string
   title: string
   formData?: string
+  flowStatus?: OaFlowStatus
 }
 
 /** 審批推進結果 */
@@ -101,8 +102,11 @@ export function submitOaRequest(data: OaRequestCreateDTO): Promise<string> {
 }
 
 /** 通過當前待審節點 */
-export function approveOaRequest(flowNo: string, comment?: string): Promise<ApproveResultVO> {
-  return request.post(`/oa/requests/${flowNo}/approve`, comment ? { comment } : undefined)
+export function approveOaRequest(flowNo: string, comment?: string, formData?: string): Promise<ApproveResultVO> {
+  const body: Record<string, unknown> = {}
+  if (comment) body.comment = comment
+  if (formData) body.formData = formData
+  return request.post(`/oa/requests/${flowNo}/approve`, Object.keys(body).length > 0 ? body : undefined)
 }
 
 /** 駁回當前待審節點 */

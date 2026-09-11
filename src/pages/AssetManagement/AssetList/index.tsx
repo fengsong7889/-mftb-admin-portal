@@ -10,9 +10,9 @@
  *  - 操作列移除「领用」「归还」，统一入口改为领用管理 / 归还管理菜单
  *  - 支持 URL ?assetNo= 带入编号过滤（由验收入库页点击资产编号跳转）
  *
- * 保留的行操作：详情 / 维修 / 查看维修 / 报废 / 编辑 / 删除
+ * 保留的行操作（按序）：详情 / 编辑 / 维修(查看维修) / 报废 / 删除
  *
- * 搜索条件（11 字段）：资产编号、资产类型、品牌、所属公司、归属部门、来源、
+ * 搜索条件（11 字段）：资产编号、资产类型、品牌、所属公司、归属部门、采购形式、
  *                      状态、购买日期、报废日期、最后更新人、最后更新时间
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -219,7 +219,7 @@ export default function AssetList() {
       { title: t('asset.colCurrentUserName'), dataIndex: 'userName' },
       { title: '所在部门',  dataIndex: 'department' },
       { title: t('asset.colClaimDate'), dataIndex: 'usageDate' },
-      { title: t('asset.colSource'),      dataIndex: 'source' },
+      { title: '採購形式',      dataIndex: 'source' },
       { title: t('asset.colPurchaseValue'), dataIndex: 'purchaseValue' },
       { title: t('asset.colPurchaseDate'),  dataIndex: 'purchaseDate' },
       { title: t('asset.colUsageDate'),     dataIndex: 'usageDate' },
@@ -261,7 +261,7 @@ export default function AssetList() {
     { key: 'userName', title: t('asset.colCurrentUserName') },
     { key: 'department', title: '所在部门' },
     { key: 'usageDate', title: t('asset.colClaimDate') },
-    { key: 'source', title: t('asset.colSource') },
+    { key: 'source', title: '採購形式' },
     { key: 'quantity', title: t('asset.colQuantity') },
     { key: 'purchaseValue', title: t('asset.colPurchaseValue') },
     { key: 'purchaseDate', title: t('asset.colPurchaseDate') },
@@ -317,8 +317,8 @@ export default function AssetList() {
       render: (v: string | null) => v || '-',
     },
     {
-      title: t('asset.colSource'),
-      dataIndex: 'source', key: 'source', width: 80,
+      title: '採購形式',
+      dataIndex: 'source', key: 'source', width: 90,
       render: (v: AssetSource) => renderSource(v),
     },
     {
@@ -369,6 +369,9 @@ export default function AssetList() {
             <Button type="link" size="small" onClick={() => handleDetail(record)}>
               {t('common.detail')}
             </Button>
+            <Button type="link" size="small" onClick={() => handleEdit(record)}>
+              {t('common.edit')}
+            </Button>
             {canNewRepair && (
               <Button type="link" size="small" onClick={() => handleRepair(record)}>
                 {t('asset.btnRepair')}
@@ -384,9 +387,6 @@ export default function AssetList() {
                 {t('asset.btnScrap')}
               </Button>
             )}
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              {t('common.edit')}
-            </Button>
             <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
               {t('common.delete')}
             </Button>
@@ -446,7 +446,7 @@ export default function AssetList() {
           <Form.Item label="所在部门" name="department">
             <Input placeholder="请输入所在部门" allowClear />
           </Form.Item>
-          <Form.Item label={t('asset.colSource')} name="source">
+          <Form.Item label="採購形式" name="source">
             <Select placeholder={t('common.all')} allowClear options={sourceOptions} />
           </Form.Item>
           <Form.Item label={t('asset.colStatus')} name="status">

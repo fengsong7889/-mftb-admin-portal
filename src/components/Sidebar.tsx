@@ -682,7 +682,7 @@ const menuItems: MenuItem[] = [
         label: '資產管理',
         children: [
           { key: 'asset-list', icon: <AppstoreOutlined />, label: '資產台賬' },
-          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用歸還' },
+          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用管理' },
           { key: 'asset-borrow', icon: <ScheduleOutlined />, label: '借用管理' },
           { key: 'asset-return', icon: <RollbackOutlined />, label: '歸還管理' },
           { key: 'asset-transfer-list', icon: <SwapOutlined />, label: '調撥管理' },

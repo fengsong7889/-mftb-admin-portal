@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Form, Input, Select, InputNumber, Upload, message, Modal, Radio } from 'antd'
+import { Button, Form, Input, Select, InputNumber, Upload, message, Modal, Radio, Tag } from 'antd'
 import { ArrowLeftOutlined, SendOutlined, PlusOutlined, ShopOutlined, GiftOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -298,6 +298,7 @@ export default function GiftAdd() {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
                 {isGiftMode ? t('giftAdDays') : t('addGift')}
               </h2>
+              <Tag style={{ fontSize: 11, color: '#722ED1', borderColor: '#722ED1' }}>{t('approvalCenter.typeGift')}</Tag>
               {isGiftMode && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,

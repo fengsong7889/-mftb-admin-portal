@@ -391,21 +391,12 @@ export default function EmployeeDetail() {
     const info = tabUpdateInfo[tabKey]
     return (
       <div style={{
-        marginTop: 16, padding: '10px 16px', borderRadius: 8,
-        border: '1px solid #e8eaed', background: '#fafafa',
-        display: 'flex', alignItems: 'center', gap: 24,
+        marginTop: 16, padding: '12px 24px', borderRadius: 8,
+        border: '1px solid #f0f0f0', background: '#fafafa',
+        display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <div style={{ width: 20, height: 20, borderRadius: 4, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ClockCircleOutlined style={{ fontSize: 11, color: '#1890ff' }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.tabLastUpdatedBy')}：</span>
-          <span style={{ fontSize: 13, color: '#262626' }}>{info?.updatedBy || '-'}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.tabLastUpdatedAt')}：</span>
-          <span style={{ fontSize: 13, color: '#262626' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span>
-        </div>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{info?.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span></span>
       </div>
     )
   }

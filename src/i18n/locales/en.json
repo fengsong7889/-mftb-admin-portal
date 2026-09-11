@@ -326,6 +326,7 @@
     "typeTitleMerge": "Merge Request",
     "typeTitleGift": "Gift Request",
     "typeTitleAiAccess": "AI Access Request",
+        "typeTitlePurchase": "Purchase Request",
     "nodeFinance": "Finance Approval",
     "nodeOperation": "Operations Approval",
     "nodeBusiness": "Business Approval",

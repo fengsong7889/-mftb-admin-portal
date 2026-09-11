@@ -36,6 +36,12 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: AI 对话编号规则种子 + 补列 + 存量回填 */
     private static final String V_INIT_AI_CONVERSATION = "seq:init-v3";
 
+    /** 增量版本: EAM 采购申请流程编号规则种子（CG+YYYYMMDD+4位） */
+    private static final String V_INIT_EAM_PURCHASE = "seq:init-v4";
+
+    /** 增量版本: 流程配置ID编号规则种子（LC+5位自增） + biz_workflow_config 补列 */
+    private static final String V_INIT_WORKFLOW_CONFIG = "seq:init-v5";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -54,6 +60,14 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
             seedAiConversationRule();
             ensureAiConversationColumn();
             backfillAiConversationIds();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_PURCHASE, () -> {
+            seedEamPurchaseRequestRule();
+        });
+        versionTracker.applyOnce(V_INIT_WORKFLOW_CONFIG, () -> {
+            seedWorkflowConfigRule();
+            ensureWorkflowConfigIdColumn();
+            backfillWorkflowConfigIds();
         });
     }
 
@@ -298,6 +312,64 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         }
         if (!rows.isEmpty()) {
             log.info("已为 {} 条存量对话回填对话编号", rows.size());
+        }
+    }
+
+    /** EAM 采购申请流程编号规则种子（CG + YYYYMMDD + 4位自增序号，归属审批中心） */
+    private void seedEamPurchaseRequestRule() {
+        // 先修正可能由旧 SQL 迁移写入的格式不一致记录（date_format 大小写、biz_menu 缺失）
+        jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET date_format = 'YYYYMMDD', biz_menu = '審批中心', "
+                        + "seq_start = 0, remark = '{prefix} + YYYYMMDD + {n}位自增序號' "
+                        + "WHERE rule_key = ?",
+                BizSeqService.RULE_EAM_PURCHASE_REQUEST);
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                BizSeqService.RULE_EAM_PURCHASE_REQUEST, "採購申請流程編號", "審批中心",
+                "CG", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入 EAM 采购申请流程编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 流程配置ID编号规则种子（LC + 5位自增序号，无日期维度，归属审批中心） */
+    private void seedWorkflowConfigRule() {
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                BizSeqService.RULE_WORKFLOW_CONFIG, "流程配置ID", "審批中心",
+                "LC", "", 5, 1, 1,
+                "{prefix} + {n}位自增序號（全局自增）");
+        if (inserted > 0) {
+            log.info("已写入流程配置ID编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** biz_workflow_config 补充 config_id 字段 */
+    private void ensureWorkflowConfigIdColumn() {
+        ensureColumn("biz_workflow_config", "config_id",
+                "VARCHAR(32) NULL COMMENT '配置ID（LC+5位自增序号）' AFTER id");
+    }
+
+    /** 存量流程配置回填 config_id（幂等） */
+    private void backfillWorkflowConfigIds() {
+        if (!tableExists("biz_workflow_config") || !columnExists("biz_workflow_config", "config_id")) {
+            return;
+        }
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM biz_workflow_config WHERE config_id IS NULL OR config_id = '' ORDER BY id", Long.class);
+        for (Long id : ids) {
+            String configId = bizSeqService.next(BizSeqService.RULE_WORKFLOW_CONFIG);
+            jdbcTemplate.update("UPDATE biz_workflow_config SET config_id = ? WHERE id = ?", configId, id);
+        }
+        if (!ids.isEmpty()) {
+            log.info("已为 {} 条存量流程配置回填配置ID", ids.size());
         }
     }
 

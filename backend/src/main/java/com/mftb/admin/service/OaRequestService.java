@@ -29,7 +29,7 @@ public interface OaRequestService {
     /**
      * 通过当前待审节点
      */
-    ApproveResultVO approve(String flowNo, String comment);
+    ApproveResultVO approve(String flowNo, String comment, String formData);
 
     /**
      * 驳回当前待审节点，返回被驳回的节点名称

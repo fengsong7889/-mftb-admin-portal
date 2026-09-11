@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Drawer, Checkbox, Button, Space } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
@@ -48,11 +48,6 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
   const [draft, setDraft] = useState<ColumnConfig[]>(() => loadConfig(storageKey, columns))
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<{ zone: string; index: number } | null>(null)
-
-  // 同步外部 columns 变化
-  useEffect(() => {
-    setDraft(loadConfig(storageKey, columns))
-  }, [columns, storageKey])
 
   // 保存到 localStorage 并通知父组件
   const applyConfig = useCallback((newConfig: ColumnConfig[]) => {

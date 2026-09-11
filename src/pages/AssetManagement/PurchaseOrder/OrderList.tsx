@@ -6,10 +6,10 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, Progress, DatePicker } from 'antd'
+import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import dayjs from 'dayjs'
-import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -61,6 +61,24 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
   const [stats, setStats] = useState<Record<ExecStatus | 'all', number>>({
     all: 0, pending: 0, purchasing: 0, completed: 0,
   })
+
+  // 員工姓名 → 部門 映射（用於列表展示服務部門）
+  const [empDeptMap, setEmpDeptMap] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    fetchEmployees({ page: 1, size: 999, employmentStatus: 'active' })
+      .then((res) => {
+        const map = new Map<string, string>()
+        ;(res.records || []).forEach((e) => {
+          if (e.department) {
+            map.set(e.name, e.department)
+            map.set(e.empId, e.department)
+          }
+        })
+        setEmpDeptMap(map)
+      })
+      .catch(() => {})
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -217,6 +235,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     { key: 'confirmedAmount', title: t('asset.colConfirmedAmount') },
     { key: 'trackingNo', title: t('asset.colTrackingNo') },
     { key: 'purchaser', title: t('asset.colPurchaser') },
+    { key: 'department', title: '服務部門' },
     { key: 'execStatus', title: t('asset.execStatus') },
     { key: 'inboundProgress', title: t('asset.inboundTitle') },
     { key: 'createdAt', title: t('asset.colCreatedAt') },
@@ -251,21 +270,34 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       render: (v: string | undefined) => v || <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
+      title: '服務部門', key: 'department', width: 120,
+      render: (_: unknown, r: PurchaseOrder) => {
+        const dept = empDeptMap.get(r.purchaser || '') || ''
+        return dept || <span style={{ color: '#bfbfbf' }}>-</span>
+      },
+    },
+    {
       title: t('asset.execStatus'), dataIndex: 'execStatus', key: 'execStatus', width: 100,
       render: (v: ExecStatus) => <Tag color={EXEC_META[v].color}>{t(EXEC_META[v].key)}</Tag>,
     },
     {
-      title: t('asset.inboundTitle'), key: 'inboundProgress', width: 150,
+      title: t('asset.inboundTitle'), key: 'inboundProgress', width: 220,
       render: (_: unknown, r: PurchaseOrder) => {
         if (r.execStatus !== 'completed') return <span style={{ color: '#bfbfbf', fontSize: 12 }}>—</span>
         const totalQty = r.items.reduce((s, it) => s + it.qty, 0)
-        const received = r.items.reduce((s, it) => s + it.receivedQty, 0)
-        const percent = totalQty ? Math.round((received / totalQty) * 100) : 0
+        const accepted = r.acceptedQty ?? r.items.reduce((s, it) => s + it.receivedQty, 0)
+        const pending = totalQty - accepted - (r.returnQty || 0) - (r.exchangeQty || 0) - (r.concessionQty || 0)
+        const returnQty = r.returnQty || 0
+        const exchangeQty = r.exchangeQty || 0
+        const concessionQty = r.concessionQty || 0
         return (
-          <Space direction="vertical" size={0} style={{ width: '100%' }}>
-            <span style={{ fontSize: 12 }}>{`${received} / ${totalQty}`}</span>
-            <Progress percent={percent} size="small" showInfo={false} />
-          </Space>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+            <Tag color="success" style={{ margin: 0, fontSize: 11 }}>已驗收 {accepted}</Tag>
+            {pending > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>未驗收 {pending}</Tag>}
+            {returnQty > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>退貨 {returnQty}</Tag>}
+            {exchangeQty > 0 && <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>換貨 {exchangeQty}</Tag>}
+            {concessionQty > 0 && <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>讓步接收 {concessionQty}</Tag>}
+          </div>
         )
       },
     },
@@ -277,28 +309,20 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       render: (v: string | undefined) => v || <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: t('common.colAction'), key: 'action', width: 240, fixed: 'right',
+      title: t('common.colAction'), key: 'action', width: 200, fixed: 'right',
       render: (_: unknown, record: PurchaseOrder) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetail(record.id)}>
             {t('common.detail')}
           </Button>
-          {record.execStatus !== 'completed' && (
-            <Button type="link" size="small"
-              onClick={() => onEdit(record.id)}>
-              {t('common.edit')}
+          {record.status !== 'received' && (
+            <Button type="link" size="small" onClick={() => onEdit(record.id)}>
+              編輯
             </Button>
           )}
-          {record.execStatus === 'pending' && (
-            <Button type="link" size="small"
-              onClick={() => handleStartPurchase(record)}>
-              {t('asset.btnStartPurchase')}
-            </Button>
-          )}
-          {record.execStatus === 'purchasing' && (
-            <Button type="link" size="small"
-              onClick={() => handleCompletePurchase(record)}>
-              {t('asset.btnCompletePurchase')}
+          {record.execStatus === 'completed' && record.status !== 'received' && (
+            <Button type="link" size="small" onClick={() => onInbound(record.id)}>
+              驗收
             </Button>
           )}
           {record.execStatus === 'pending' && (
@@ -357,6 +381,9 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/oa-purchase-request?from=purchase-order')}>
             {t('asset.purchaseReqTitle')}
           </Button>
+          <Button icon={<ShoppingCartOutlined />} onClick={() => navigate('/purchase-order?mode=add')}>
+            錄入訂單
+          </Button>
           {configComponent}
         </div>
       </div>
@@ -380,7 +407,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2200 }}
+        scroll={{ x: 2270 }}
         pagination={{
           current: page, pageSize: size, total, showSizeChanger: true,
           showTotal: (tt) => `${t('common.total', { count: tt })}`,

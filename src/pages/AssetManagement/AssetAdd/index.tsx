@@ -3,13 +3,13 @@
  *
  * 五大模块卡片布局：
  *  1. 资产信息 — 资产编码/资产分类/品牌/资产名称/资产照片/资产参数信息
- *  2. 租/购信息 — 来源(自购/租用)/价值/日期/存放位置
+ *  2. 租/购信息 — 采购形式(自购/租用)/价值/日期/存放位置
  *  3. 当前使用人 — 使用人/所在部门/领用日期
  *  4. 备注信息
  *  5. 入库信息 — 批次号/入库时间/入库数量/验收人（验收入库跳转时自动带入）
  *
  * 级联逻辑：分类 → 品牌 → 产品型号 → 参数模板
- * 来源条件：自购显示购买公司，租用显示租用公司+租借公司
+ * 采购形式条件：自购显示购买公司，租用显示租用公司+租借公司
  * 位置级联：仓库 → 楼层 → 办公室
  *
  * URL 参数：
@@ -117,7 +117,7 @@ export default function AssetAdd() {
   /* ----- 图片 ----- */
   const [imageFiles, setImageFiles] = useState<UploadFile[]>([])
 
-  /* ----- 来源条件显示 ----- */
+  /* ----- 采购形式条件显示 ----- */
   const source = Form.useWatch('source', form)
 
   /* ----- 位置级联 ----- */
@@ -213,8 +213,6 @@ export default function AssetAdd() {
     setParamValues({})
     form.setFieldsValue({ brand: undefined, assetName: undefined })
     if (!code) { setBrands([]); setModels([]); return }
-    const cat = categories.find((c) => c.code === code)
-    if (cat?.paramTemplate) setParamFields(cat.paramTemplate)
     // 品牌前缀匹配：选择一级分类时加载其下所有子分类的品牌
     fetchBrandList()
       .then((list) => setBrands(list.filter((b) => b.categoryCode.startsWith(code))))
@@ -233,13 +231,24 @@ export default function AssetAdd() {
       .catch(() => setModels([]))
   }, [selectedCategoryCode, form])
 
-  /* ----- 型号变更 → 预填名称 ----- */
+  /* ----- 型号变更 → 预填名称 + 加载参数模板 ----- */
   const handleModelChange = useCallback((modelId: number | undefined) => {
     const model = models.find((m) => m.id === modelId)
     if (model) {
       form.setFieldsValue({ assetName: model.name })
+      // 选择资产名称后才加载参数模板
+      const cat = categories.find((c) => c.code === model.categoryCode)
+      if (cat?.paramTemplate) {
+        setParamFields(cat.paramTemplate)
+      } else {
+        setParamFields([])
+      }
+      setParamValues({})
+    } else {
+      setParamFields([])
+      setParamValues({})
     }
-  }, [models, form])
+  }, [models, form, categories])
 
   /* ----- 位置级联处理 ----- */
   const handleWarehouseChange = (id: number | undefined) => {
@@ -379,7 +388,7 @@ export default function AssetAdd() {
 
   /* ==================== 参数动态字段渲染 ==================== */
   const renderParamFields = () => {
-    if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>请先选择资产分类</span>
+    if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>请先选择资产名称</span>
     return (
       <Row gutter={[16, 16]}>
         {paramFields.map((field) => (
@@ -515,7 +524,7 @@ export default function AssetAdd() {
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item label="来源" name="source" initialValue="self" rules={[{ required: true, message: '请选择来源' }]}>
+                <Form.Item label="採購形式" name="source" initialValue="self" rules={[{ required: true, message: '請選擇採購形式' }]}>
                   <Select>
                     <Select.Option value="self">自购</Select.Option>
                     <Select.Option value="lease">租用</Select.Option>

@@ -18,6 +18,9 @@ public class WorkflowConfig {
     @TableId
     private Long id;
 
+    /** 配置ID（LC+5位自增序号） */
+    private String configId;
+
     /** 流程类型标识: recharge/deduct/transfer/merge/gift */
     private String flowType;
 

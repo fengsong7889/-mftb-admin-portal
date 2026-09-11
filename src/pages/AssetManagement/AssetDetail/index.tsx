@@ -5,7 +5,7 @@
  *  - 顶部：DetailPageHeader（渐变顶条 + 编辑按钮）
  *  - 主体：独立白色卡片分模块展示
  *    1. 资产信息 — 编码/分类/品牌/名称/参数/照片
- *    2. 租/购信息 — 来源/公司/价值/日期/存放位置
+ *    2. 租/购信息 — 采购形式/公司/价值/日期/存放位置
  *    3. 当前使用人 — 使用人/部门/领用日期
  *    4. 入库信息 — 批次号/入库时间/数量/验收人
  *    5. 操作记录 — 最后更新人/最后更新时间
@@ -168,7 +168,7 @@ export default function AssetDetail() {
           title="租/购信息"
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label={t('asset.colSource')}>
+          <Field label="採購形式">
             <Tag color={asset.source === 'self' ? 'blue' : 'orange'}>
               {asset.source === 'self' ? t('asset.sourceSelf') : t('asset.sourceLease')}
             </Tag>

@@ -11,6 +11,9 @@ public class WorkflowConfigVO {
 
     private Long id;
 
+    /** 配置ID */
+    private String configId;
+
     /** 流程类型标识 */
     private String flowType;
 
@@ -37,6 +40,7 @@ public class WorkflowConfigVO {
     public static WorkflowConfigVO from(WorkflowConfig config) {
         WorkflowConfigVO vo = new WorkflowConfigVO();
         vo.setId(config.getId());
+        vo.setConfigId(config.getConfigId());
         vo.setFlowType(config.getFlowType());
         vo.setFlowName(config.getFlowName());
         vo.setApprovalEnabled(config.getApprovalEnabled() != null && config.getApprovalEnabled() == 1);

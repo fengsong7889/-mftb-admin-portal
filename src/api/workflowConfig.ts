@@ -9,6 +9,7 @@ import request, { SILENT_HEADER } from './request'
 /** 流程配置 VO（與後端 WorkflowConfigVO 對齊） */
 export interface WorkflowConfigVO {
   id: number
+  configId: string
   flowType: string
   flowName: string
   approvalEnabled: boolean

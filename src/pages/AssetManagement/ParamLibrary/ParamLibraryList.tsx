@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { DatabaseOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { fetchCategoryList, fetchParamTypeList, deleteParamType, updateParamType, fetchParamValuesByType, createParamType, createParamValue, deleteParamValue } from '../../../api/eam'
 import type { AssetCategory, ParamType, ParamValue } from '../../../api/eam'
 import './index.css'
@@ -17,7 +18,7 @@ interface CatTreeNode extends TreeDataNode {
 function buildTreeData(list: AssetCategory[]): CatTreeNode[] {
   const nodeMap = new Map<number, CatTreeNode>()
   list.forEach(cat => {
-    nodeMap.set(cat.id, { key: cat.id, title: cat.name, value: cat.id, children: [] } as CatTreeNode)
+    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, children: [] } as CatTreeNode)
   })
   const roots: CatTreeNode[] = []
   list.forEach(cat => {
@@ -375,14 +376,15 @@ export default function ParamLibraryList() {
   }
 
   const typeColumns: TableColumnsType<ParamType> = [
-    { title: '参数编码', dataIndex: 'code', key: 'code', width: 120 },
-    { title: '参数名称', dataIndex: 'name', key: 'name', width: 140 },
-    { title: '单位', dataIndex: 'unit', key: 'unit', width: 80, render: (v: string) => v || '-' },
+    { title: '参数编码', dataIndex: 'code', key: 'code', width: 120, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
+    { title: '参数名称', dataIndex: 'name', key: 'name', width: 140, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
+    { title: '单位', dataIndex: 'unit', key: 'unit', width: 80, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
     {
       title: '值类型',
       dataIndex: 'valueType',
       key: 'valueType',
       width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string) => {
         const map: Record<string, string> = { select: '下拉选择', text: '文本', number: '数字' }
         return map[v] || v
@@ -393,6 +395,7 @@ export default function ParamLibraryList() {
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (status: string, record: ParamType) => (
         <Switch
           checked={status === 'enabled'}
@@ -402,13 +405,14 @@ export default function ParamLibraryList() {
         />
       ),
     },
-    { title: '描述', dataIndex: 'description', key: 'description', width: 160, render: (v: string) => v || '-' },
-    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { title: '描述', dataIndex: 'description', key: 'description', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
+    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
+    { title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 120,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleTypeRowClick(record)}>参数值</Button>
@@ -426,26 +430,36 @@ export default function ParamLibraryList() {
     },
   ]
 
+  /** 列字段配置 */
+  const typeColumnMeta = typeColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { config: typeConfig, configComponent: typeConfigComponent, applyConfig: applyTypeConfig } = useColumnConfig('param-type', typeColumnMeta)
+  const typeScrollX = useMemo(() => {
+    const visibleKeys = new Set(typeConfig.filter(c => c.visible).map(c => c.key))
+    return typeColumns.reduce((sum, col) => sum + (visibleKeys.has(col.key as string) ? (col.width as number) : 0), 0)
+  }, [typeConfig, typeColumns])
+
   const valueColumns: TableColumnsType<ParamValue> = [
-    { title: '序号', key: 'index', width: 60, render: (_: unknown, __: unknown, index: number) => index + 1 },
-    { title: '参数值', dataIndex: 'value', key: 'value', width: 200 },
+    { title: '序号', key: 'index', width: 60, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (_: unknown, __: unknown, index: number) => index + 1 },
+    { title: '参数值', dataIndex: 'value', key: 'value', width: 200, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (status: string) => (
         <span style={{ color: status === 'enabled' ? '#52C41A' : '#8C8C8C' }}>
           {status === 'enabled' ? '启用' : '停用'}
         </span>
       ),
     },
-    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
+    { title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
     {
       title: '操作',
       key: 'action',
-      width: 80,
+      width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_, record) => (
         <Popconfirm
           title="确认删除"
@@ -459,6 +473,14 @@ export default function ParamLibraryList() {
       ),
     },
   ]
+
+  /** 参数值列字段配置 */
+  const valueColumnMeta = valueColumns.map(col => ({ key: col.key as string, title: col.title as string }))
+  const { config: valueConfig, applyConfig: applyValueConfig } = useColumnConfig('param-value', valueColumnMeta)
+  const valueScrollX = useMemo(() => {
+    const visibleKeys = new Set(valueConfig.filter(c => c.visible).map(c => c.key))
+    return valueColumns.reduce((sum, col) => sum + (visibleKeys.has(col.key as string) ? (col.width as number) : 0), 0)
+  }, [valueConfig, valueColumns])
 
   return (
     <>
@@ -513,15 +535,17 @@ export default function ParamLibraryList() {
               <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAddType}>
                 新增参数类型
               </Button>
+              {typeConfigComponent}
             </div>
           </div>
 
           {/* 参数类型表格 */}
           <Table
-            columns={typeColumns}
+            columns={applyTypeConfig(typeColumns)}
             dataSource={tableData}
             rowKey="id"
             loading={loading}
+            scroll={{ x: typeScrollX }}
             rowClassName={(record) => selectedType?.id === record.id ? 'param-type-selected' : ''}
             onRow={(record) => ({
               onClick: () => handleTypeRowClick(record),
@@ -555,11 +579,12 @@ export default function ParamLibraryList() {
                 />
               </div>
               <Table
-                columns={valueColumns}
+                columns={applyValueConfig(valueColumns)}
                 dataSource={filteredValues}
                 rowKey="id"
                 loading={valuesLoading}
                 size="small"
+                scroll={{ x: valueScrollX }}
                 pagination={{
                   showSizeChanger: true,
                   showQuickJumper: true,

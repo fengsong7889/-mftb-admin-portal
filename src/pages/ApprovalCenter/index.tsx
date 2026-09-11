@@ -27,7 +27,6 @@ const approvalTypeMapKeys: Record<string, string> = {
   transfer: 'approvalCenter.typeTransfer',
   merge: 'approvalCenter.typeMerge',
   gift: 'approvalCenter.typeGift',
-  ai_access: 'approvalCenter.typeAiAccess',
 }
 
 /** 流程狀態映射（i18n key） */
@@ -108,10 +107,10 @@ function matchesApprovalQuery(r: ApprovalRecord, query: Record<string, unknown>)
   return true
 }
 
-/** 前端流程審批（贈送、AI 申請）：後端查詢結果需合併本地審批記錄 */
+/** 前端流程審批（贈送）：後端查詢結果需合併本地審批記錄 */
 function localFrontendApprovals(query: FinApprovalQuery): ApprovalRecord[] {
   return (getApprovalRecords() as ApprovalRecord[])
-    .filter(r => (r.approvalType === 'gift' || r.approvalType === 'ai_access') && matchesApprovalQuery(r, query as unknown as Record<string, unknown>))
+    .filter(r => r.approvalType === 'gift' && matchesApprovalQuery(r, query as unknown as Record<string, unknown>))
 }
 
 /** 流程狀態 → Tag 顏色 */
@@ -136,7 +135,6 @@ export default function ApprovalCenter() {
     { label: t('approvalCenter.typeTransfer'), value: 'transfer' },
     { label: t('approvalCenter.typeMerge'), value: 'merge' },
     { label: t('approvalCenter.typeGift'), value: 'gift' },
-    { label: t('approvalCenter.typeAiAccess'), value: 'ai_access' },
   ]
 
   /** 流程狀態選項 */

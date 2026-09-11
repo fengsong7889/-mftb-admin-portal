@@ -2,7 +2,7 @@
  * 品牌/产品 新增/编辑独立表单页
  *
  * - type="brand"：品牌表单（所属分类 + 品牌中英文名 + LOGO）
- * - type="product"：产品表单（所属品牌 + 产品名称 + 型号编码 + 单位 + 供应商）
+ * - type="product"：产品表单（所属品牌 + 产品名称 + 型号编码 + 单位 + 参考单价）
  * - 无参数配置（参数从参数库读取）
  * - 底部「取消 + 保存」（全局表单规范）
  */
@@ -33,7 +33,6 @@ interface ProductFormValues {
   modelNo?: string
   unit: string
   refPrice?: number
-  supplier?: string
 }
 
 interface Props {
@@ -94,7 +93,6 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               modelNo: model.modelNo,
               unit: model.unit,
               refPrice: model.refPrice,
-              supplier: model.supplier,
             })
           }
         } else {
@@ -160,7 +158,6 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
           modelNo: v.modelNo?.trim(),
           unit: v.unit,
           refPrice: v.refPrice,
-          supplier: v.supplier?.trim(),
         }
         setSubmitting(true)
         if (isEdit && id) {
@@ -180,9 +177,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
   }
 
   const categoryName = (code: string) => categories.find(c => c.code === code)?.name || code
-  const categoryOptions = categories
-    .filter(c => c.parentId !== 0) // 只显示子分类
-    .map(c => ({ label: c.name, value: c.code }))
+  const categoryOptions = categories.map(c => ({ label: `${c.name}(${c.code})`, value: c.code }))
   const brandOptions = brands.map(b => ({
     label: `${b.brandZh}（${b.brandEn}）`,
     value: b.id,
@@ -318,13 +313,6 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                 <Col span={8}>
                   <Form.Item label="参考单价（元）" name="refPrice">
                     <Input type="number" placeholder="请输入参考单价" allowClear />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item label="供应商" name="supplier">
-                    <Input placeholder="请输入供应商" allowClear />
                   </Form.Item>
                 </Col>
               </Row>

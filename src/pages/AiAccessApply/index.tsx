@@ -13,19 +13,51 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Input, message, Modal, Radio, Row, Col, Select, Tag, Tooltip, Upload } from 'antd'
 import {
-  ArrowLeftOutlined, SendOutlined, CheckCircleOutlined,
+  ArrowLeftOutlined, SendOutlined, SaveOutlined, CheckCircleOutlined,
   LockOutlined, WalletOutlined, QuestionCircleOutlined,
-  UploadOutlined, FileImageOutlined, FilePdfOutlined, PaperClipOutlined,
+  ExclamationCircleOutlined,
+  UploadOutlined, FileImageOutlined, FilePdfOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import {
-  submitAiAccessRequest, uploadAiCredential,
-  type AiApplyReason, type AiCredentialItem, type AiRequestType, type UsageFrequency,
-} from '../../api/aiAccessRequest'
+import { submitOaRequest } from '../../api/oaRequest'
+
+/** 申請類型 */
+type AiRequestType = 'model_only' | 'model_and_quota' | 'quota_only'
+/** 申請場景入口 */
+type AiApplyReason =
+  | 'no-models' | 'no-quota' | 'no-both'
+  | 'topup' | 'add-model' | 'quota-exhausted' | 'needs-approval'
+/** 使用頻率 */
+type UsageFrequency = 'occasional' | 'regular' | 'heavy'
+/** 憑證附件項（base64 dataUrl 直存） */
+interface AiCredentialItem {
+  name: string
+  type: string
+  size: number
+  dataUrl: string
+}
+
+/** 憑證上傳：客戶端轉 base64 dataUrl（後端端點已移除，隨表單一併提交） */
+function uploadAiCredential(file: File): Promise<AiCredentialItem> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      resolve({
+        name: file.name,
+        type: file.type.startsWith('image/') ? 'image' : 'pdf',
+        size: file.size,
+        dataUrl: reader.result as string,
+      })
+    }
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
+}
 import { fetchModels, type AiModel } from '../../api/aiModel'
 import { fetchMyModels, type MyModel } from '../../api/aiMyCenter'
 import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
+import type { ApprovalRecord } from '../../utils/approvalStore'
 import { useAuth } from '../../contexts/AuthContext'
 import dayjs from 'dayjs'
 
@@ -118,7 +150,7 @@ export default function AiAccessApply() {
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
   const [countdown, setCountdown] = useState(5)
 
-  /* ---- 申請憑證（圖片/PDF，隨申請一併提交存入 ai_access_request.credentials） ---- */
+  /* ---- 申請憑證（圖片/PDF，隨申請一併提交存入 biz_oa_request.form_data） ---- */
   const [credentials, setCredentials] = useState<AiCredentialItem[]>([])
   const [uploading, setUploading] = useState(false)
 
@@ -229,7 +261,7 @@ export default function AiAccessApply() {
     }
     setUploading(true)
     uploadAiCredential(file)
-      .then((item) => {
+      .then((item: AiCredentialItem) => {
         setCredentials((prev) => [...prev, item])
       })
       .catch(() => message.error(t('aiApply.credentialUploadFailed')))
@@ -240,6 +272,63 @@ export default function AiAccessApply() {
   const removeCredential = useCallback((index: number) => {
     setCredentials((prev) => prev.filter((_, i) => i !== index))
   }, [])
+
+  /* ---- 保存草稿（二次確認） ---- */
+  const handleSaveDraft = useCallback(() => {
+    if (!usageDesc.trim()) {
+      message.warning('請填寫用途說明')
+      return
+    }
+    if (showModelSection && selectedModels.length === 0) {
+      message.warning('請至少選擇一個模型')
+      return
+    }
+    Modal.confirm({
+      title: '確認保存',
+      icon: <ExclamationCircleOutlined />,
+      content: '確認保存當前 AI 申請為草稿？保存後可在「我的申請」中查看。',
+      okText: '確認保存',
+      cancelText: '取消',
+      centered: true,
+      onOk: () => {
+        const applicant = user ? `${user.name}(${user.empId})` : '未知'
+        const flowNo = generateFlowNo('ai_access')
+        const record: ApprovalRecord = {
+          key: `ai_draft_${Date.now()}`,
+          groupId: '--',
+          groupName: user?.name || '--',
+          brand: '--',
+          flowNo,
+          approvalType: 'ai_access',
+          applicant,
+          applyTime: formatNow(),
+          bizApprover: '--',
+          bizApproveTime: '',
+          bizApproveStatus: 'pending',
+          opsApprover: '--',
+          opsApproveTime: '',
+          opsApproveStatus: 'pending',
+          finApprover: '--',
+          finApproveTime: '',
+          finApproveStatus: '--',
+          flowStatus: 'draft',
+          rejectReason: '',
+          extra: {
+            isDraft: true,
+            requestType,
+            requestedModels: showModelSection && selectedModels.length > 0 ? selectedModels : undefined,
+            usageDescription: usageDesc.trim(),
+            usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
+            usageFrequency: usageFrequency ?? undefined,
+            credentialCount: credentials.length,
+          },
+        }
+        addApprovalRecord(record)
+        message.success('草稿已保存')
+        navigate('/oa-requests')
+      },
+    })
+  }, [requestType, selectedModels, usageDesc, usageScenarios, usageFrequency, credentials, navigate, showModelSection, user])
 
   /* ---- 提交 ---- */
   const handleSubmit = useCallback(async () => {
@@ -302,49 +391,20 @@ export default function AiAccessApply() {
         onOk: async () => {
           setSubmitting(true)
           try {
-            // 后端申請 ID：審批人可跨設備透過該 ID 拉取詳情並執行審批即授權
-            const requestId = await submitAiAccessRequest({
+            // 直接提交到 OA 流程表
+            const formData = JSON.stringify({
               requestType,
               applyReason: validReason,
               requestedModels: showModelSection && selectedModels.length > 0 ? selectedModels : undefined,
               usageDescription: usageDesc.trim(),
               usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
               usageFrequency: usageFrequency ?? undefined,
-              credentials: credentials.length > 0 ? credentials : undefined,
+              credentialCount: credentials.length,
             })
-            // 寫入審批記錄，使申請出現在審批中心
-            const applicant = user ? `${user.name}(${user.empId})` : '未知'
-            const flowNo = generateFlowNo('ai_access')
-            addApprovalRecord({
-              key: `ai_${Date.now()}`,
-              groupId: '--',
-              groupName: user?.name || '--',
-              brand: '--',
-              flowNo,
-              approvalType: 'ai_access',
-              applicant,
-              applyTime: formatNow(),
-              bizApprover: '--',
-              bizApproveTime: '',
-              bizApproveStatus: 'pending',
-              opsApprover: '--',
-              opsApproveTime: '',
-              opsApproveStatus: 'pending',
-              finApprover: '--',
-              finApproveTime: '',
-              finApproveStatus: '--',
-              flowStatus: 'pending',
-              rejectReason: '',
-              extra: {
-                requestId,
-                applyReason: validReason,
-                requestType,
-                requestedModels: selectedModels.length > 0 ? selectedModels : undefined,
-                usageDescription: usageDesc.trim(),
-                usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
-                usageFrequency: usageFrequency ?? undefined,
-                credentialCount: credentials.length,
-              },
+            const flowNo = await submitOaRequest({
+              processCode: 'ai_access',
+              title: `AI申請 ${user?.name || ''} ${dayjs().format('YYYY-MM-DD')}`,
+              formData,
             })
             // 按充值/扣款/轉賬/合併/贈送等流程的統一標準：全屏彈窗 + 5 秒倒計時
             setSubmittedFlowNo(flowNo)
@@ -412,9 +472,12 @@ export default function AiAccessApply() {
               {t('aiApply.backToHome')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {t('aiApply.pageTitle')}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+                {t('aiApply.pageTitle')}
+              </h2>
+              <Tag style={{ fontSize: 11, color: '#1677FF', borderColor: '#1677FF' }}>{t('oaRequests.aiAccessType')}</Tag>
+            </div>
           </div>
         </div>
       </div>
@@ -700,74 +763,87 @@ export default function AiAccessApply() {
         </div>
       </div>
 
-      {/* ====== 申請憑證（選填，隨申請一併提交供審批人查看） ====== */}
+      {/* ====== 相關憑證（選填，隨申請一併提交供審批人查看） ====== */}
       <div style={{
         border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <PaperClipOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{
+            width: 28, height: 28, borderRadius: 6, background: '#e6f7ff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <UploadOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.credentialSection')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>相關憑證</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>支持 JPG、PNG、PDF，單文件不超過 5MB</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('aiApply.credentialHint')}</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Upload
-            multiple
-            accept="image/*,application/pdf"
-            showUploadList={false}
-            beforeUpload={handleUploadCredential}
-          >
-            <Button icon={<UploadOutlined />} loading={uploading} style={{ borderRadius: 6 }}>
-              {t('aiApply.credentialUpload')}
-            </Button>
-          </Upload>
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-            {t('aiApply.credentialCount', { current: credentials.length, max: CREDENTIAL_MAX_COUNT })}
-          </span>
-        </div>
-
-        {credentials.length > 0 && (
-          <div style={{ marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
-            {credentials.map((c, i) => (
-              <div key={`${c.name}_${i}`} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 8px', borderRadius: 6, marginBottom: 4,
-                background: '#fafafa', transition: 'background 0.2s',
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {credentials.map((c, i) => (
+            <div key={`${c.name}_${i}`} style={{
+              width: 88, height: 88, border: '1px solid #e8e8e8', borderRadius: 8,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              position: 'relative', background: '#fafafa',
+            }}>
+              {c.type === 'pdf'
+                ? <FilePdfOutlined style={{ fontSize: 28, color: '#E53935' }} />
+                : <FileImageOutlined style={{ fontSize: 28, color: '#1976D2' }} />}
+              <span style={{
+                fontSize: 10, color: '#999', marginTop: 4, maxWidth: 76,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{c.name}</span>
+              <Button type="text" size="small" danger
+                style={{
+                  position: 'absolute', top: -6, right: -6, width: 20, height: 20,
+                  borderRadius: '50%', background: '#ff4d4f', color: '#fff',
+                  fontSize: 12, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+                onClick={() => removeCredential(i)}
+              >×</Button>
+            </div>
+          ))}
+          {credentials.length < CREDENTIAL_MAX_COUNT && (
+            <Upload
+              multiple
+              accept="image/*,application/pdf"
+              showUploadList={false}
+              beforeUpload={handleUploadCredential}
+            >
+              <div style={{
+                width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa',
+                transition: 'all 0.3s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#fafafa')}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget
+                  el.style.borderColor = '#E8720C'
+                  el.style.background = '#fff7e6'
+                  el.style.color = '#E8720C'
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget
+                  el.style.borderColor = '#d9d9d9'
+                  el.style.background = '#fafafa'
+                  el.style.color = '#999'
+                }}
               >
-                {c.type === 'pdf'
-                  ? <FilePdfOutlined style={{ fontSize: 16, color: '#ff4d4f' }} />
-                  : <FileImageOutlined style={{ fontSize: 16, color: '#1890ff' }} />}
-                <span style={{ fontSize: 13, color: '#262626', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.name}
-                </span>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                  {(c.size / 1024).toFixed(1)} KB
-                </span>
-                <Button
-                  type="link"
-                  danger
-                  size="small"
-                  style={{ padding: '0 4px', height: 'auto' }}
-                  onClick={() => removeCredential(i)}
-                >
-                  {t('aiApply.credentialRemove')}
-                </Button>
+                <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
+                <span>上傳憑證</span>
               </div>
-            ))}
-          </div>
-        )}
+            </Upload>
+          )}
+        </div>
       </div>
 
       {/* ====== 底部操作按鈕 ====== */}
       <div className="form-footer">
         <Button onClick={() => navigate(-1)}>{t('aiApply.cancel')}</Button>
+        <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={submitting}>
+          保存
+        </Button>
         <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit} loading={submitting}>
           {t('aiApply.submit')}
         </Button>

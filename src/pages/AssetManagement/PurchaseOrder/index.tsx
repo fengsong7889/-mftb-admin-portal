@@ -9,21 +9,29 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import OrderList from './OrderList'
 import OrderDetail from './OrderDetail'
 import OrderEdit from './OrderEdit'
+import OrderAdd from './OrderAdd'
 
 type View =
   | { mode: 'list' }
   | { mode: 'detail'; id: number }
   | { mode: 'edit'; id: number }
+  | { mode: 'add' }
 
 export default function PurchaseOrder() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null
-  const [view, setView] = useState<View>(urlId ? { mode: 'detail', id: urlId } : { mode: 'list' })
+  const urlMode = searchParams.get('mode')
+  const [view, setView] = useState<View>(
+    urlMode === 'add' ? { mode: 'add' } : urlId ? { mode: 'detail', id: urlId } : { mode: 'list' }
+  )
 
   useEffect(() => {
-    if (urlId) setView({ mode: 'detail', id: urlId })
-  }, [urlId])
+    if (urlMode === 'add') setView({ mode: 'add' })
+    else if (urlMode === 'edit' && urlId) setView({ mode: 'edit', id: urlId })
+    else if (urlId) setView({ mode: 'detail', id: urlId })
+    else setView({ mode: 'list' })
+  }, [urlId, urlMode])
 
   const goList = () => { setView({ mode: 'list' }); navigate('/purchase-order', { replace: true }) }
 
@@ -31,8 +39,8 @@ export default function PurchaseOrder() {
     <div className="content-area">
       {view.mode === 'list' ? (
         <OrderList
-          onDetail={(id) => setView({ mode: 'detail', id })}
-          onEdit={(id) => setView({ mode: 'edit', id })}
+          onDetail={(id) => { setView({ mode: 'detail', id }); navigate(`/purchase-order?id=${id}`, { replace: true }) }}
+          onEdit={(id) => { setView({ mode: 'edit', id }); navigate(`/purchase-order?mode=edit&id=${id}`, { replace: true }) }}
           onInbound={(poId) => navigate(`/asset-inbound?poId=${poId}`)}
         />
       ) : view.mode === 'detail' ? (
@@ -40,16 +48,18 @@ export default function PurchaseOrder() {
           key={view.id}
           id={view.id}
           onBack={goList}
-          onEdit={(id) => setView({ mode: 'edit', id })}
+          onEdit={(id) => { setView({ mode: 'edit', id }); navigate(`/purchase-order?mode=edit&id=${id}`, { replace: true }) }}
           onInbound={(poId) => navigate(`/asset-inbound?poId=${poId}`)}
           onViewRequest={(reqId) => navigate(`/oa-requests`)}
         />
+      ) : view.mode === 'add' ? (
+        <OrderAdd />
       ) : (
         <OrderEdit
           key={view.id}
           id={view.id}
           onBack={goList}
-          onSaved={() => setView({ mode: 'detail', id: view.id })}
+          onSaved={() => { setView({ mode: 'detail', id: view.id }); navigate(`/purchase-order?id=${view.id}`, { replace: true }) }}
         />
       )}
     </div>

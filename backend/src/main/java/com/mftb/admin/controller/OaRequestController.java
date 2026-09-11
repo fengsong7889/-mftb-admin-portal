@@ -58,7 +58,8 @@ public class OaRequestController {
             @PathVariable String flowNo,
             @RequestBody(required = false) OaApproveDTO dto) {
         String comment = dto != null ? dto.getComment() : null;
-        ApproveResultVO result = oaRequestService.approve(flowNo, comment);
+        String formData = dto != null ? dto.getFormData() : null;
+        ApproveResultVO result = oaRequestService.approve(flowNo, comment, formData);
         String message = result.isFinished()
                 ? "审批已全部通过"
                 : "「" + result.getNodeName() + "」已通过，流转至「" + result.getNextNode() + "」";

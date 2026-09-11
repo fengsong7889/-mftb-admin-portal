@@ -20,7 +20,7 @@ interface Props {
 const TYPE_META: Record<AssetLocation['type'], { label: string; color: string }> = {
   warehouse: { label: '倉庫', color: 'blue' },
   floor:     { label: '樓層', color: 'cyan' },
-  room:      { label: '辦公室', color: 'green' },
+  room:      { label: '房号', color: 'green' },
 }
 
 export default function LocationDetail({ id, onBack, onEdit }: Props) {
