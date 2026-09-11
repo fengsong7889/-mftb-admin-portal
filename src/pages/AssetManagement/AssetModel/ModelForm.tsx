@@ -23,6 +23,7 @@ interface BrandFormValues {
   categoryCode: string
   brandZh: string
   brandEn: string
+  brandLogo?: string
 }
 
 interface ProductFormValues {
