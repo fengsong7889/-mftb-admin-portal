@@ -83,6 +83,18 @@ const flattenTree = (data: MenuItem[]): MenuItem[] => {
   return result
 }
 
+/** 从树结构中查找指定菜单的真实父 ID（保证子菜单编辑时 parentId 不丢失） */
+const findRealParentId = (items: MenuItem[], targetId: string, parentItemId?: string): string | undefined => {
+  for (const item of items) {
+    if (item.id === targetId) return parentItemId
+    if (item.children) {
+      const found = findRealParentId(item.children, targetId, item.id)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
 /** ────── 主组件 ────── */
 export default function MenuConfig() {
   const { t } = useTranslation()
@@ -229,7 +241,9 @@ export default function MenuConfig() {
       const record = findItem(data)
       if (!record) return
       const updated = { ...record, ...values }
-      await updateMenu(Number(id), itemToPayload(updated))
+      // 从树结构中查找真实父 ID，防止子菜单编辑名称后 parent_id 被清空
+      const realParentId = findRealParentId(data, id)
+      await updateMenu(Number(id), itemToPayload(updated, realParentId))
       message.success(t('menuConfig.saveSuccess'))
       setEditingKey(null)
       loadData()
@@ -273,8 +287,8 @@ export default function MenuConfig() {
     const current = siblings[idx]
     const target = siblings[targetIdx]
     try {
-      await updateMenu(Number(current.id), { ...itemToPayload(current), sort: target.sortOrder })
-      await updateMenu(Number(target.id), { ...itemToPayload(target), sort: current.sortOrder })
+      await updateMenu(Number(current.id), { ...itemToPayload(current, findRealParentId(data, current.id)), sort: target.sortOrder })
+      await updateMenu(Number(target.id), { ...itemToPayload(target, findRealParentId(data, target.id)), sort: current.sortOrder })
       message.success(direction === 'up' ? t('menuConfig.movedUp') : t('menuConfig.movedDown'))
       loadData()
     } catch {

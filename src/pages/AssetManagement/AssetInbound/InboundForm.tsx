@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Button, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message,
+  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -63,6 +63,8 @@ const REJECT_COLOR: Record<RejectStatus, string> = { return: 'error', exchange: 
 /* ==================== 驗收狀態 ==================== */
 
 interface InboundItem extends PurchaseOrderItem {
+  /** 是否參與本次驗收（未勾選行不提交，強化「選擇性拉取」的操作感知） */
+  selected: boolean
   /** 本次驗收數量 */
   inboundQty: number
   /** 存放位置 */
@@ -141,6 +143,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           return {
             ...it,
             key: it.key || `${g.id}_${idx}_${it.modelId || 'x'}`,
+            selected: true,
             inboundQty: remaining,
             locationId: defaultLoc,
             confirmed: false,
@@ -206,10 +209,18 @@ export default function InboundForm({ poId, onBack }: Props) {
 
   const grandTotal = groups.reduce((s, g) => s + groupSubtotal(g), 0)
 
-  /** 已驗收總數 */
-  const totalInboundQty = groups.reduce((s, g) => s + g.items.reduce((ss, it) => ss + (it.confirmed ? it.inboundQty : 0), 0), 0)
-  /** 不通過總數 */
-  const totalRejectedQty = groups.reduce((s, g) => s + g.items.filter((it) => it.rejectStatus).length, 0)
+  /** 全選/取消全選分組內未處理明細（已通過或不通過的行必須隨批次提交，不可取消勾選） */
+  const toggleGroupAll = (groupId: string, checked: boolean) => {
+    setGroups((prev) => prev.map((g) => {
+      if (g.id !== groupId) return g
+      return { ...g, items: g.items.map((it) => ((it.confirmed || it.rejectStatus) ? it : { ...it, selected: checked })) }
+    }))
+  }
+
+  /** 已驗收總數（僅計勾選參與本次驗收的明細） */
+  const totalInboundQty = groups.reduce((s, g) => s + g.items.reduce((ss, it) => ss + (it.selected && it.confirmed ? it.inboundQty : 0), 0), 0)
+  /** 不通過總數（僅計勾選參與本次驗收的明細） */
+  const totalRejectedQty = groups.reduce((s, g) => s + g.items.filter((it) => it.selected && it.rejectStatus).length, 0)
   /** 待驗收總數 */
   const totalRemainingQty = groups.reduce((s, g) => s + g.items.reduce((ss, it) => ss + Math.max(0, it.qty - it.receivedQty), 0), 0)
 
@@ -221,6 +232,7 @@ export default function InboundForm({ poId, onBack }: Props) {
       rejectStatus: rejectType,
       rejectReason: rejectReason.trim(),
       confirmed: false,
+      selected: true,
     })
     setRejectModal(null)
     setRejectType('return')
@@ -229,6 +241,31 @@ export default function InboundForm({ poId, onBack }: Props) {
 
   /* ----- 明細表格列 ----- */
   const itemColumns = useCallback((groupId: string): TableColumnsType<InboundItem> => [
+    {
+      title: (() => {
+        const g = groups.find((gg) => gg.id === groupId)
+        const items = g?.items || []
+        const allSelected = items.length > 0 && items.every((it) => it.selected)
+        const someSelected = items.some((it) => it.selected)
+        const allLocked = items.length > 0 && items.every((it) => it.confirmed || it.rejectStatus)
+        return (
+          <Checkbox
+            checked={allSelected}
+            indeterminate={!allSelected && someSelected}
+            disabled={allLocked}
+            onChange={(e) => toggleGroupAll(groupId, e.target.checked)}
+          />
+        )
+      })(),
+      key: 'selected', width: 50, align: 'center',
+      render: (_: unknown, r: InboundItem) => (
+        <Checkbox
+          checked={r.selected}
+          disabled={r.confirmed || !!r.rejectStatus}
+          onChange={(e) => updateGroupItem(groupId, r.key!, { selected: e.target.checked })}
+        />
+      ),
+    },
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
     { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
@@ -264,7 +301,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           min={0}
           max={Math.max(0, r.qty - r.receivedQty)}
           size="small"
-          disabled={r.confirmed || !!r.rejectStatus}
+          disabled={!r.selected || r.confirmed || !!r.rejectStatus}
         />
       ),
     },
@@ -279,7 +316,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           treeData={locationTree}
           treeDefaultExpandAll
           placeholder="請選擇存放位置"
-          disabled={r.confirmed || !!r.rejectStatus}
+          disabled={!r.selected || r.confirmed || !!r.rejectStatus}
         />
       ),
     },
@@ -321,15 +358,15 @@ export default function InboundForm({ poId, onBack }: Props) {
           <Space size={4}>
             <Button
               type="link" size="small"
-              disabled={r.inboundQty <= 0 || !r.locationId || maxQty <= 0}
-              onClick={() => updateGroupItem(groupId, r.key!, { confirmed: true })}
+              disabled={!r.selected || r.inboundQty <= 0 || !r.locationId || maxQty <= 0}
+              onClick={() => updateGroupItem(groupId, r.key!, { confirmed: true, selected: true })}
               style={{ color: '#52C41A', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
             >
               通過
             </Button>
             <Button
               type="link" size="small" danger
-              disabled={maxQty <= 0}
+              disabled={!r.selected || maxQty <= 0}
               onClick={() => { setRejectModal({ groupId, rowKey: r.key! }); setRejectType('return'); setRejectReason('') }}
               style={{ fontSize: 12, padding: '0 2px' }}
             >
@@ -339,7 +376,7 @@ export default function InboundForm({ poId, onBack }: Props) {
         )
       },
     },
-  ], [locations])
+  ], [locations, groups])
 
   /* ----- 提交 / 保存 ----- */
   const [saving, setSaving] = useState(false)
@@ -378,14 +415,31 @@ export default function InboundForm({ poId, onBack }: Props) {
   /** 確認驗收（跳轉回列表） */
   const handleSubmit = async () => {
     if (!order) return
-    const confirmedItems = groups.flatMap((g) =>
-      g.items.filter((it) => it.confirmed && it.inboundQty > 0 && it.locationId).map((it) => ({
-        modelId: it.modelId!,
-        qty: it.inboundQty,
-        locationId: it.locationId!,
-      }))
+    // 驗收通過項：生成資產編號並寫入台賬
+    const passItems = groups.flatMap((g) =>
+      g.items
+        .filter((it) => it.selected && it.confirmed && it.inboundQty > 0 && it.locationId)
+        .map((it) => ({
+          modelId: it.modelId!,
+          qty: it.inboundQty,
+          locationId: it.locationId!,
+          disposition: 'pass' as const,
+        }))
     )
-    if (!confirmedItems.length) {
+    // 驗收不通過項：退貨/換貨/讓步接收，隨批次提交留痕（不生成資產）
+    const rejectItems = groups.flatMap((g) =>
+      g.items
+        .filter((it) => it.selected && it.rejectStatus)
+        .map((it) => ({
+          modelId: it.modelId!,
+          qty: it.inboundQty,
+          locationId: 0,
+          disposition: it.rejectStatus!,
+          rejectReason: it.rejectReason || undefined,
+        }))
+    )
+    const allItems = [...passItems, ...rejectItems]
+    if (!allItems.length) {
       message.warning('請至少驗收一條明細')
       return
     }
@@ -395,7 +449,7 @@ export default function InboundForm({ poId, onBack }: Props) {
         poId: order.id,
         inboundDate: groups[0]?.inboundDate.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
         operator: selectedEmp?.name || order.purchaser || '',
-        items: confirmedItems,
+        items: allItems,
         remark: `採購訂單 ${order.poNo} 驗收入庫`,
       })
       // 驗收成功後清除草稿
@@ -539,7 +593,11 @@ export default function InboundForm({ poId, onBack }: Props) {
               size="small"
               pagination={false}
               scroll={{ x: 1200 }}
-              rowClassName={(r) => r.rejectStatus ? 'inbound-rejected-row' : ''}
+              rowClassName={(r) => {
+                if (r.rejectStatus) return 'inbound-rejected-row'
+                if (!r.selected && !r.confirmed) return 'inbound-unselected-row'
+                return ''
+              }}
             />
           </div>
         )
@@ -607,8 +665,8 @@ export default function InboundForm({ poId, onBack }: Props) {
             保存
           </Button>
           <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSubmit}
-            disabled={totalInboundQty <= 0}>
-            確認驗收（{totalInboundQty} 件）{totalRejectedQty > 0 ? ` · 不通過 ${totalRejectedQty} 件` : ''}
+            disabled={totalInboundQty <= 0 && totalRejectedQty <= 0}>
+            確認驗收（{totalInboundQty} 件）{totalRejectedQty > 0 ? ` · 不通過 ${totalRejectedQty} 項` : ''}
           </Button>
         </Space>
       </div>

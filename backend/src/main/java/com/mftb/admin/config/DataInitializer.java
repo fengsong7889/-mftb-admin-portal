@@ -68,7 +68,10 @@ public class DataInitializer implements CommandLineRunner {
     // v26: 採購申請/採購訂單菜單遷移至 OA 中心，移除物資管理下的採購菜單
     // v27: 种子数据不再覆盖用户在「菜单配置」中自定义的菜单名称（仅修复占位数据名称）
     // v28: 移除 merchant-order-manage（訂單管理）菜单——所有訂單入口統一至廣告類型卡片上的「查看訂單」按鈕
-    private static final String V_MENU_SEED = "core:menu-seed-v28";
+    // v30: 「集團人事」更名為「集團人事(HR)」；「物資管理」更名為「資產管理(EAM)」
+    //      seedSystemMenus 对已存在菜单不再覆盖 sort_order / name（占位除外），
+    //      但 parent_id 始终与种子结构保持一致，防止前端 bug 或数据库异常导致层级错乱
+    private static final String V_MENU_SEED = "core:menu-seed-v31";
 
     @Override
     public void run(String... args) {
@@ -1260,8 +1263,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("finance",             new String[]{"財務管理",          null,  "6"});
         menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
         menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
-        menus.put("hr",                  new String[]{"集團人事",          null,  "9"});
-        menus.put("asset-management",    new String[]{"物資管理",          null,  "10"});
+        menus.put("hr",                  new String[]{"集團人事(HR)",      null,  "9"});
+        menus.put("asset-management",    new String[]{"資產管理(EAM)",     null,  "10"});
         menus.put("oa-center",           new String[]{"OA中心",            null,  "11"});
         menus.put("permission",          new String[]{"權限管理",          null,  "12"});
         menus.put("system-config",       new String[]{"系統配置",          null,  "13"});
@@ -1379,7 +1382,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-flow",         new String[]{"變更歷史",         "asset-maintenance",  "5"});
         // 三級菜單 → 基礎設置
         menus.put("asset-category",     new String[]{"資產分類",         "asset-basic",        "1"});
-        menus.put("asset-model",        new String[]{"資產型號",         "asset-basic",        "2"});
+        menus.put("asset-model",        new String[]{"產品庫",           "asset-basic",        "2"});
         menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"參數庫",           "asset-basic",        "4"});
         // ── OA中心 ──
@@ -1417,11 +1420,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             }
 
             if (existing != null) {
-                // 修复占位数据（resolveMenuId 自动创建的记录）的 parent_id / sort_order；
-                // 名称仅在确为占位（空/null/等于 menu_key/menu_ 前缀）时才修正，
-                // 用户通过「菜单配置」自定义的名称不会被种子覆盖
+                // 对已存在的菜单：
+                // 1. 名称仅在确为占位（空/null/等于 menu_key/menu_ 前缀）时才修正，
+                //    用户通过「菜单配置」自定义的名称永远不会被种子覆盖
+                // 2. parent_id 始终与种子结构保持一致——parent_id 是层级结构数据，
+                //    不属于用户自定义范畴；前端编辑 bug 或数据库重置可能导致层级错乱，
+                //    种子启动时必须修正
+                // 3. sort_order 不覆盖——用户可能在菜单配置中调整过排序
                 Map<String, Object> row = jdbcTemplate.queryForList(
-                        "SELECT name, parent_id, sort_order FROM sys_menu WHERE id = ?", existing)
+                        "SELECT name, parent_id FROM sys_menu WHERE id = ?", existing)
                         .stream().findFirst().orElse(null);
                 if (row != null) {
                     String curName = (String) row.get("name");
@@ -1432,12 +1439,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                             || curName.equals(menuKey)
                             || curName.startsWith("menu_");
                     boolean needsNameFix = nameIsPlaceholder && !name.equals(curName);
+                    // parent_id 是结构数据，始终与种子保持一致
                     boolean needsParentFix = !java.util.Objects.equals(curParentId, parentId);
                     if (needsNameFix || needsParentFix) {
                         String finalName = needsNameFix ? name : curName;
                         jdbcTemplate.update(
-                                "UPDATE sys_menu SET name = ?, parent_id = ?, sort_order = ? WHERE id = ?",
-                                finalName, parentId, sort, existing);
+                                "UPDATE sys_menu SET name = ?, parent_id = ? WHERE id = ?",
+                                finalName, parentId, existing);
                         updated++;
                     }
                 }
@@ -1467,7 +1475,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // actions 為空會導致「功能角色登錄（非 sys_user.role=admin）」的用戶 hasMenuPermission 判定失敗，菜單不可見/不可進
         ensureAdminMenuGrants(menus);
         if (updated > 0) {
-            log.info("已修正 {} 个系统菜单的名称/层级/排序", updated);
+            log.info("已修正 {} 个系统菜单的占位名称/层级", updated);
         }
 
 
@@ -1503,7 +1511,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 一级菜单：物資管理
         jdbcTemplate.update(
                 "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, actions, status, updated_by, deleted) "
-                        + "VALUES (NULL, 'asset-management', '物資管理', 'InboxOutlined', 1, 10, '[\"view\"]', 1, 'system', 0)");
+                        + "VALUES (NULL, 'asset-management', '資產管理(EAM)', 'InboxOutlined', 1, 10, '[\"view\"]', 1, 'system', 0)");
         Long parentId = queryMenuIdByKey("asset-management");
         if (parentId == null) return;
         // 二级子菜单

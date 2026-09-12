@@ -1034,7 +1034,7 @@ export const menuPermissionTree: PermissionModule[] = [
   },
   {
     key: 'hr',
-    name: '集團人事',
+    name: '集團人事(HR)',
     children: [
       { key: 'employee-management', name: '員工管理' },
       { key: 'organization-management', name: '組織管理' },

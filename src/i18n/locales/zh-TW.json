@@ -577,7 +577,7 @@
     "unpin": "取消常用"
   },
   "asset": {
-    "pageTitle": "物資管理",
+    "pageTitle": "資產管理(EAM)",
     "addTitle": "資產入庫",
     "editTitle": "編輯資產",
     "claimTitle": "資產領用",

@@ -33,6 +33,12 @@ public class EamInboundBatchItem {
     /** 生成的資產編號列表 JSON */
     private String assetNos;
 
+    /** 驗收處置方式：pass=通過 / return=退貨 / exchange=換貨 / concession=讓步接收 */
+    private String disposition;
+
+    /** 驗收不通過原因 */
+    private String rejectReason;
+
     /** 排序 */
     private Integer sortOrder;
 }

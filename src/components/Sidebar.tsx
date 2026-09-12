@@ -73,7 +73,7 @@ import {
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
   TagsOutlined, // 资产分类
-  BarcodeOutlined, // 资产型号
+  BarcodeOutlined, // 產品庫
   EnvironmentOutlined, // 仓库维护
   ShoppingCartOutlined, // 采购申请
   FileDoneOutlined, // 采购订单
@@ -637,7 +637,7 @@ const menuItems: MenuItem[] = [
   {
     key: 'hr',
     icon: <TeamOutlined />,
-    label: '集團人事',
+    label: '集團人事(HR)',
     children: [
       {
         key: 'employee-management',
@@ -664,7 +664,7 @@ const menuItems: MenuItem[] = [
   {
     key: 'asset-management',
     icon: <InboxOutlined />,
-    label: '物資管理',
+    label: '資產管理(EAM)',
     children: [
       { key: 'asset-dashboard', icon: <DashboardOutlined />, label: '資產看板' },
       {
@@ -707,7 +707,7 @@ const menuItems: MenuItem[] = [
         label: '基礎設置',
         children: [
           { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類' },
-          { key: 'asset-model', icon: <BarcodeOutlined />, label: '資產型號' },
+          { key: 'asset-model', icon: <BarcodeOutlined />, label: '產品庫' },
           { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
           { key: 'param-library', icon: <DatabaseOutlined />, label: '參數庫' },
         ],

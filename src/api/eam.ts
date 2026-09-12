@@ -291,6 +291,10 @@ export interface InboundBatchItem {
   modelName: string
   qty: number
   locationId: number
+  /** 驗收處置方式：pass=通過 / return=退貨 / exchange=換貨 / concession=讓步接收 */
+  disposition?: 'pass' | 'return' | 'exchange' | 'concession'
+  /** 驗收不通過原因 */
+  rejectReason?: string
   /** 入庫後生成的資產編號 */
   assetNos: string[]
 }
@@ -1041,7 +1045,14 @@ export async function createInboundBatch(data: {
   poId: number
   inboundDate: string
   operator: string
-  items: { modelId: number; qty: number; locationId: number }[]
+  items: {
+    modelId: number
+    qty: number
+    locationId: number
+    /** 驗收處置方式：缺省視為 pass；不通過項不生成資產 */
+    disposition?: 'pass' | 'return' | 'exchange' | 'concession'
+    rejectReason?: string
+  }[]
   remark?: string
 }): Promise<InboundBatch> {
   // 並行加載型號、分類、位置數據
@@ -1055,11 +1066,12 @@ export async function createInboundBatch(data: {
   const categoryMap = new Map(categories.map((c) => [c.code, c.name]))
   const locationMap = new Map(locations.map((l) => [l.id, l.name]))
 
-  // 逐條展開為單件資產（一物一碼）
+  // 逐條展開為單件資產（一物一碼，不通過項不生成資產）
   const flat: { model: AssetModel; locationId: number }[] = []
   data.items.forEach((it) => {
     const model = modelMap.get(it.modelId)
     if (!model) throw new Error('型號不存在')
+    if (it.disposition && it.disposition !== 'pass') return
     for (let i = 0; i < it.qty; i += 1) flat.push({ model, locationId: it.locationId })
   })
 
@@ -1092,13 +1104,19 @@ export async function createInboundBatch(data: {
 
   const assetNos = await bulkCreateAssets(payload as unknown as Omit<AssetItem, 'id' | 'createdAt' | 'updatedAt' | 'assetNo'>[])
 
-  // 組織批次明細（按型號聚合生成的編號）
+  // 組織批次明細（按型號聚合生成的編號，不通過項攜帶處置方式與原因）
   let cursor = 0
   const items: InboundBatchItem[] = data.items.map((it) => {
     const model = modelMap.get(it.modelId)!
-    const nos = assetNos.slice(cursor, cursor + it.qty)
-    cursor += it.qty
-    return { modelId: it.modelId, modelName: model.name, qty: it.qty, locationId: it.locationId, assetNos: nos }
+    const isPass = !it.disposition || it.disposition === 'pass'
+    const nos = isPass ? assetNos.slice(cursor, cursor + it.qty) : []
+    if (isPass) cursor += it.qty
+    return {
+      modelId: it.modelId, modelName: model.name, qty: it.qty,
+      locationId: it.locationId, assetNos: nos,
+      disposition: it.disposition || 'pass',
+      rejectReason: it.rejectReason,
+    }
   })
 
   // 調用後端 API 創建入庫批次

@@ -137,7 +137,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'asset-dashboard':   'Asset Dashboard',
   'asset-list':       'Asset Ledger',
   'asset-category':   'Asset Category',
-  'asset-model':      'Asset Model',
+  'asset-model':      'Product Library',
   'asset-location':   'Asset Location',
   'param-library':    'Parameter Library',
   'purchase-request':  'Purchase Request',

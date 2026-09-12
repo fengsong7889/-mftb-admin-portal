@@ -84,6 +84,8 @@ public class EamInboundServiceImpl implements EamInboundService {
             m.put("modelName", it.getModelName());
             m.put("qty", it.getQty());
             m.put("locationId", it.getLocationId());
+            m.put("disposition", it.getDisposition() != null ? it.getDisposition() : "pass");
+            m.put("rejectReason", it.getRejectReason());
             m.put("assetNos", it.getAssetNos() != null ? JsonUtils.parseStringList(it.getAssetNos()) : List.of());
             return m;
         }).collect(Collectors.toList());
@@ -223,12 +225,14 @@ public class EamInboundServiceImpl implements EamInboundService {
                 }
             }
 
-            // 保存批次明細
+            // 保存批次明細（含驗收處置留痕）
             EamInboundBatchItem batchItem = new EamInboundBatchItem();
             batchItem.setModelId(modelId);
             batchItem.setModelName(modelName);
             batchItem.setQty(qty);
             batchItem.setLocationId(locationId);
+            batchItem.setDisposition(disposition.isEmpty() ? "pass" : disposition);
+            batchItem.setRejectReason(str(item, "rejectReason"));
             batchItem.setAssetNos(JsonUtils.toJson(assetNos));
             batchItem.setSortOrder(sort++);
             batchItemsToInsert.add(batchItem);
@@ -334,6 +338,8 @@ public class EamInboundServiceImpl implements EamInboundService {
             m.put("modelName", it.getModelName());
             m.put("qty", it.getQty());
             m.put("locationId", it.getLocationId());
+            m.put("disposition", it.getDisposition() != null ? it.getDisposition() : "pass");
+            m.put("rejectReason", it.getRejectReason());
             m.put("assetNos", it.getAssetNos() != null ? JsonUtils.parseStringList(it.getAssetNos()) : List.of());
             return m;
         }).collect(Collectors.toList()));

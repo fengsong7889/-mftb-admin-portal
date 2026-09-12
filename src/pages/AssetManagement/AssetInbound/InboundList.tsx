@@ -1,14 +1,16 @@
 /**
- * 驗收入庫批次列表
+ * 驗收入庫（雙 Tab 視圖）
  *
- * 搜索條件（5 字段）：入庫批次號、訂單編號、創建時間、最後更新人、最後更新時間
- * 列表字段：入庫批次號、訂單編號、創建時間、最後更新人、最後更新時間、總數量、已驗收數量、未驗收數量、採購事由、操作
+ * - 待驗收訂單（默認）：自動同步「採購完成且有待驗收明細」的訂單，點擊「驗收」進入表單
+ * - 入庫批次：驗收動作的歷史記錄
+ *   搜索條件（5 字段）：入庫批次號、訂單編號、創建時間、最後更新人、最後更新時間
+ *   列表字段：入庫批次號、訂單編號、創建時間、最後更新人、最後更新時間、總數量、已驗收數量、未驗收數量、採購事由、操作
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Table, DatePicker, Modal, Select, message } from 'antd'
+import { Button, Form, Input, Table, DatePicker, Tabs, message } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
-  SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined,
+  SearchOutlined, ReloadOutlined, ExportOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { fetchInboundList, fetchPurchaseOrderList, type InboundBatch, type PurchaseOrder } from '../../../api/eam'
@@ -37,6 +39,30 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     updatedBy?: string
     updatedDateRange?: [string, string]
   }>({})
+  const [activeTab, setActiveTab] = useState<'pending' | 'batches'>('pending')
+
+  /* ----- 待驗收訂單（自動同步採購完成的訂單） ----- */
+  const [poLoading, setPoLoading] = useState(false)
+  const [pendingOrders, setPendingOrders] = useState<PurchaseOrder[]>([])
+
+  const loadPendingOrders = useCallback(async () => {
+    setPoLoading(true)
+    try {
+      const res = await fetchPurchaseOrderList({ size: 200 })
+      // 與採購訂單頁驗收入庫入口規則一致：僅採購完成且有待驗收明細的訂單
+      //（待處理/採購中的訂單貨未到，不可驗收；已全部入庫的訂單無明細可驗收）
+      const available = (res.records || []).filter((o) =>
+        o.execStatus === 'completed' && o.items.some((it) => it.receivedQty < it.qty)
+      )
+      setPendingOrders(available)
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
+    } finally {
+      setPoLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => { loadPendingOrders() }, [loadPendingOrders])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -196,140 +222,152 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     message.info('刪除功能開發中')
   }
 
-  /* ----- PO 選擇彈窗（驗收入庫） ----- */
-  const [poModalOpen, setPoModalOpen] = useState(false)
-  const [poList, setPoList] = useState<PurchaseOrder[]>([])
-  const [poLoading, setPoLoading] = useState(false)
-  const [selectedPoId, setSelectedPoId] = useState<number | undefined>()
+  /* ----- 待驗收訂單表格列 ----- */
+  const pendingQtyOf = (o: PurchaseOrder) =>
+    o.items.reduce((s, it) => s + Math.max(0, it.qty - it.receivedQty), 0)
 
-  const handleOpenPoModal = async () => {
-    setPoModalOpen(true)
-    setPoLoading(true)
-    try {
-      const res = await fetchPurchaseOrderList({ size: 100 })
-      // 只顯示可驗收的訂單（有未驗收明細）
-      const available = (res.records || []).filter((o) =>
-        o.items.some((it) => it.receivedQty < it.qty)
-      )
-      setPoList(available)
-    } catch {
-      message.error('加載採購訂單失敗')
-    } finally {
-      setPoLoading(false)
-    }
-  }
-
-  const handlePoConfirm = () => {
-    if (!selectedPoId) { message.warning('請選擇採購訂單'); return }
-    setPoModalOpen(false)
-    onAdd(selectedPoId)
-    setSelectedPoId(undefined)
-  }
+  const pendingColumns: TableColumnsType<PurchaseOrder> = [
+    {
+      title: '訂單編號', dataIndex: 'poNo', key: 'poNo', width: 160,
+      render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
+    },
+    {
+      title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 180, ellipsis: true,
+      render: (v: string | undefined) => v || '待定',
+    },
+    {
+      title: '採購經辦人', dataIndex: 'purchaser', key: 'purchaser', width: 120,
+      render: (v: string | undefined) => v || '-',
+    },
+    {
+      title: '訂單總計', dataIndex: 'confirmedAmount', key: 'confirmedAmount', width: 130, align: 'right',
+      render: (v: number | undefined, r: PurchaseOrder) => (
+        <span style={{ fontWeight: 600 }}>MOP {(v ?? r.amount).toLocaleString()}</span>
+      ),
+    },
+    {
+      title: '待驗收件數', key: 'pendingQty', width: 110, align: 'right',
+      render: (_: unknown, r: PurchaseOrder) => (
+        <span style={{ color: '#FF4D4F', fontWeight: 600 }}>{pendingQtyOf(r)}</span>
+      ),
+    },
+    {
+      title: '完成採購時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      render: (v: string | undefined) => v || '-',
+    },
+    {
+      title: '操作', key: 'action', width: 90, fixed: 'right',
+      render: (_: unknown, r: PurchaseOrder) => (
+        <Button type="link" size="small" onClick={() => onAdd(r.id)}>驗收</Button>
+      ),
+    },
+  ]
 
   return (
-    <>
-      {/* ====== 搜索區 ====== */}
-      <div className="search-section">
-        <Form form={form} layout="inline">
-          <Form.Item label="入庫批次號" name="batchNo">
-            <Input placeholder="請輸入入庫批次號" allowClear />
-          </Form.Item>
-          <Form.Item label="訂單編號" name="poNo">
-            <Input placeholder="請輸入訂單編號" allowClear />
-          </Form.Item>
-          <Form.Item label="創建時間" name="createdDateRange">
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="最後更新人" name="updatedBy">
-            <Input placeholder="請輸入最後更新人" allowClear />
-          </Form.Item>
-          <Form.Item label="最後更新時間" name="updatedDateRange">
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item>
-            <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </div>
-          </Form.Item>
-        </Form>
-      </div>
-
-      {/* ====== 操作區 ====== */}
-      <div className="action-section">
-        <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
-        </div>
-        <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenPoModal}>
-            {t('asset.btnReceive')}
-          </Button>
-          {configComponent}
-        </div>
-      </div>
-
-      {/* ====== 表格（展開行顯示生成的資產編號） ====== */}
-      <Table<InboundBatch>
-        columns={applyConfig(allColumns)}
-        dataSource={dataSource}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        scroll={{ x: 1850 }}
-        expandable={{
-          expandedRowRender: (record) => (
-            <div style={{ padding: '4px 0' }}>
-              <div style={{ marginBottom: 8, fontWeight: 600 }}>{t('asset.colGeneratedNos')}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {record.items.flatMap((it) => it.assetNos).map((no) => (
-                  <span
-                    key={no}
-                    style={{
-                      padding: '2px 8px', borderRadius: 4,
-                      background: '#f0f5ff', border: '1px solid #adc6ff',
-                      fontFamily: 'monospace', fontSize: 12,
-                    }}
-                  >
-                    {no}
-                  </span>
-                ))}
+    <Tabs
+      activeKey={activeTab}
+      onChange={(k) => setActiveTab(k as 'pending' | 'batches')}
+      items={[
+        {
+          key: 'pending',
+          label: `待驗收訂單 (${pendingOrders.length})`,
+          children: (
+            <>
+              <div style={{ marginBottom: 12, fontSize: 13, color: '#8C8C8C' }}>
+                採購完成的訂單自動同步至此，請核對到貨物資後點擊「驗收」；支持分批多次驗收
               </div>
-            </div>
+              <Table<PurchaseOrder>
+                columns={pendingColumns}
+                dataSource={pendingOrders}
+                rowKey="id"
+                loading={poLoading}
+                size="middle"
+                pagination={{ showSizeChanger: false, showTotal: (tt) => `共 ${tt} 條` }}
+              />
+            </>
           ),
-        }}
-        pagination={{
-          current: page, pageSize: size, total, showSizeChanger: true,
-          showTotal: (tt) => `共 ${tt} 條`,
-        }}
-        onChange={handleTableChange}
-      />
+        },
+        {
+          key: 'batches',
+          label: '入庫批次',
+          children: (
+            <>
+              {/* ====== 搜索區 ====== */}
+              <div className="search-section">
+                <Form form={form} layout="inline">
+                  <Form.Item label="入庫批次號" name="batchNo">
+                    <Input placeholder="請輸入入庫批次號" allowClear />
+                  </Form.Item>
+                  <Form.Item label="訂單編號" name="poNo">
+                    <Input placeholder="請輸入訂單編號" allowClear />
+                  </Form.Item>
+                  <Form.Item label="創建時間" name="createdDateRange">
+                    <RangePicker style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item label="最後更新人" name="updatedBy">
+                    <Input placeholder="請輸入最後更新人" allowClear />
+                  </Form.Item>
+                  <Form.Item label="最後更新時間" name="updatedDateRange">
+                    <RangePicker style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item>
+                    <div className="search-actions">
+                      <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+                      <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                    </div>
+                  </Form.Item>
+                </Form>
+              </div>
 
-      {/* ====== 選擇採購訂單彈窗 ====== */}
-      <Modal
-        title="選擇採購訂單"
-        open={poModalOpen}
-        onOk={handlePoConfirm}
-        onCancel={() => { setPoModalOpen(false); setSelectedPoId(undefined) }}
-        okText="確認"
-        cancelText="取消"
-        width={560}
-        centered
-      >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#8C8C8C' }}>請選擇要驗收入庫的採購訂單</div>
-        <Select
-          style={{ width: '100%' }}
-          placeholder="請選擇採購訂單"
-          loading={poLoading}
-          value={selectedPoId}
-          onChange={(v) => setSelectedPoId(v)}
-          showSearch
-          optionFilterProp="label"
-          options={poList.map((o) => ({
-            value: o.id,
-            label: `${o.poNo} — ${o.supplier || '待定'}（待驗收 ${o.items.reduce((s, it) => s + Math.max(0, it.qty - it.receivedQty), 0)} 件）`,
-          }))}
-        />
-      </Modal>
-    </>
+              {/* ====== 操作區 ====== */}
+              <div className="action-section">
+                <div className="action-section-left">
+                  <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+                </div>
+                <div className="action-section-right">
+                  {configComponent}
+                </div>
+              </div>
+
+              {/* ====== 表格（展開行顯示生成的資產編號） ====== */}
+              <Table<InboundBatch>
+                columns={applyConfig(allColumns)}
+                dataSource={dataSource}
+                rowKey="id"
+                loading={loading}
+                size="middle"
+                scroll={{ x: 1850 }}
+                expandable={{
+                  expandedRowRender: (record) => (
+                    <div style={{ padding: '4px 0' }}>
+                      <div style={{ marginBottom: 8, fontWeight: 600 }}>{t('asset.colGeneratedNos')}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {record.items.flatMap((it) => it.assetNos).map((no) => (
+                          <span
+                            key={no}
+                            style={{
+                              padding: '2px 8px', borderRadius: 4,
+                              background: '#f0f5ff', border: '1px solid #adc6ff',
+                              fontFamily: 'monospace', fontSize: 12,
+                            }}
+                          >
+                            {no}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ),
+                }}
+                pagination={{
+                  current: page, pageSize: size, total, showSizeChanger: true,
+                  showTotal: (tt) => `共 ${tt} 條`,
+                }}
+                onChange={handleTableChange}
+              />
+            </>
+          ),
+        },
+      ]}
+    />
   )
 }

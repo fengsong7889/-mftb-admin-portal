@@ -20,6 +20,15 @@ interface Props {
   onBack: () => void
 }
 
+/** 驗收處置方式展示映射 */
+type Disposition = 'pass' | 'return' | 'exchange' | 'concession'
+const DISPOSITION_META: Record<Disposition, { label: string; color: string }> = {
+  pass: { label: '通過', color: 'success' },
+  return: { label: '退貨', color: 'error' },
+  exchange: { label: '換貨', color: 'warning' },
+  concession: { label: '讓步接收', color: 'processing' },
+}
+
 export default function InboundDetail({ batchId, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [batch, setBatch] = useState<InboundBatch | null>(null)
@@ -56,8 +65,19 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right',
       render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
+    {
+      title: '處置方式', dataIndex: 'disposition', key: 'disposition', width: 100,
+      render: (v: Disposition | undefined) => {
+        const meta = DISPOSITION_META[v || 'pass']
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
     { title: '存放位置', dataIndex: 'locationId', key: 'locationId', width: 120,
       render: (v: number) => <span style={{ color: '#262626' }}>{locationMap.get(v) || '-'}</span>,
+    },
+    {
+      title: '不通過原因', dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
+      render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
     },
     {
       title: '生成資產編號', key: 'assetNos', width: 300,
