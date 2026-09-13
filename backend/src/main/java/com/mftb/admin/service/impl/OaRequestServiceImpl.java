@@ -24,6 +24,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.mapper.WorkflowConfigMapper;
 import com.mftb.admin.service.ApproverResolverService;
+import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.OaRequestService;
@@ -35,6 +36,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -42,6 +45,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * OA流程事项服务实现
@@ -69,6 +73,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final EamPurchaseService eamPurchaseService;
     private final EamPurchaseRequestMapper eamPurchaseRequestMapper;
     private final DingTalkService dingTalkService;
+    private final DataScopeService dataScopeService;
 
     /* ==================== 查询 ==================== */
 
@@ -123,28 +128,49 @@ public class OaRequestServiceImpl implements OaRequestService {
             }
             wrapper.in(OaRequest::getId, approvedIds);
         } else if ("department_all".equals(scope)) {
-            // 全部流程：当前用户作为部门 leader 可查看本部门所有流程
-            List<Long> deptIds = resolveDeptLeaderScope(userName);
-            if (deptIds.isEmpty()) {
-                return new PageResult<>(List.of(), 0L);
-            }
-            List<String> memberNames = sysUserMapper.selectList(
-                    new LambdaQueryWrapper<SysUser>()
-                            .in(SysUser::getDepartmentId, deptIds))
-                    .stream().map(SysUser::getName).distinct().toList();
-            if (memberNames.isEmpty()) {
-                return new PageResult<>(List.of(), 0L);
-            }
-            wrapper.and(w -> {
-                for (int i = 0; i < memberNames.size(); i++) {
-                    String name = memberNames.get(i);
-                    if (i == 0) {
-                        w.like(OaRequest::getApplicant, name);
-                    } else {
-                        w.or().like(OaRequest::getApplicant, name);
+            // 全部流程：超管看全公司，部门负责人看本部门，非负责人看自己相关的
+            // 超管判定：role=admin 或 functionRoles 绑定 sys_admin 角色
+            Set<String> authGroups = dataScopeService.resolveAuthorizedGroupCodes();
+            if (authGroups == null) {
+                // 超管 → 不加任何过滤，返回全公司所有流程
+            } else {
+                List<Long> deptIds = resolveDeptLeaderScope(userName);
+                if (deptIds.isEmpty()) {
+                    // 非部门负责人 → 自己提交的 + 待自己审批的 + 自己已审批的
+                    List<Long> pendingIds = resolvePendingMyApproval(userName);
+                    List<Long> approvedIds = resolveMyApproved(userName);
+                    wrapper.and(w -> {
+                        if (StringUtils.hasText(userName)) {
+                            w.like(OaRequest::getApplicant, userName);
+                        }
+                        if (!pendingIds.isEmpty()) {
+                            w.or().in(OaRequest::getId, pendingIds);
+                        }
+                        if (!approvedIds.isEmpty()) {
+                            w.or().in(OaRequest::getId, approvedIds);
+                        }
+                    });
+                } else {
+                    // 部门负责人 → 查看本部门所有成员流程
+                    List<String> memberNames = sysUserMapper.selectList(
+                            new LambdaQueryWrapper<SysUser>()
+                                    .in(SysUser::getDepartmentId, deptIds))
+                            .stream().map(SysUser::getName).distinct().toList();
+                    if (memberNames.isEmpty()) {
+                        return new PageResult<>(List.of(), 0L);
                     }
+                    wrapper.and(w -> {
+                        for (int i = 0; i < memberNames.size(); i++) {
+                            String name = memberNames.get(i);
+                            if (i == 0) {
+                                w.like(OaRequest::getApplicant, name);
+                            } else {
+                                w.or().like(OaRequest::getApplicant, name);
+                            }
+                        }
+                    });
                 }
-            });
+            }
         }
 
         wrapper.orderByDesc(OaRequest::getApplyTime);
@@ -273,12 +299,19 @@ public class OaRequestServiceImpl implements OaRequestService {
         }
     }
 
-    /** 检查当前用户是否为部门 leader */
+    /** 检查当前用户是否为部门 leader（超管始终视为 leader） */
     public Map<String, Object> checkDeptLeader(String userName) {
         Map<String, Object> result = new HashMap<>();
         if (!StringUtils.hasText(userName)) {
             result.put("isLeader", false);
             result.put("departmentName", null);
+            return result;
+        }
+        // 超管判定：role=admin 或 functionRoles 绑定 sys_admin 角色 → 始终视为 leader
+        Set<String> authGroups = dataScopeService.resolveAuthorizedGroupCodes();
+        if (authGroups == null) {
+            result.put("isLeader", true);
+            result.put("departmentName", "全公司");
             return result;
         }
         List<SysDepartment> depts = sysDepartmentMapper.selectList(
@@ -402,7 +435,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                                     + "- **流程编号**: %s\n- **流程类型**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
                                     + "请及时处理。",
                             flowNo, process.getProcessName(), request.getTitle(), applicant);
-                    dingTalkService.sendMarkdown("新的待审批流程", text, null, false);
+                    sendDingTalkAfterCommit("新的待审批流程", text, null, false);
                 }
             } catch (Exception e) {
                 log.warn("OA流程钉钉通知发送失败: {}", e.getMessage());
@@ -708,7 +741,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                                 + "- **流程编号**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
                                 + "您的流程已全部审批通过。",
                         flowNo, request.getTitle(), request.getApplicant());
-                dingTalkService.sendMarkdown("流程审批通过", text, null, false);
+                sendDingTalkAfterCommit("流程审批通过", text, null, false);
             } catch (Exception e) {
                 log.warn("OA流程通过钉钉通知发送失败: {}", e.getMessage());
             }
@@ -727,7 +760,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                                 + "- **流程编号**: %s\n- **标题**: %s\n- **当前节点**: %s\n\n"
                                 + "流程已流转至您，请及时处理。",
                         flowNo, request.getTitle(), nextTask.getNodeName());
-                dingTalkService.sendMarkdown("流程流转通知", text, null, false);
+                sendDingTalkAfterCommit("流程流转通知", text, null, false);
             } catch (Exception e) {
                 log.warn("OA流程流转钉钉通知发送失败: {}", e.getMessage());
             }
@@ -791,7 +824,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                             + "- **流程编号**: %s\n- **标题**: %s\n- **申请人**: %s\n- **驳回节点**: %s\n- **驳回原因**: %s\n\n"
                             + "请修改后重新提交。",
                     flowNo, request.getTitle(), request.getApplicant(), currentTask.getNodeName(), reason);
-            dingTalkService.sendMarkdown("流程已驳回", text, null, false);
+            sendDingTalkAfterCommit("流程已驳回", text, null, false);
         } catch (Exception e) {
             log.warn("OA流程驳回钉钉通知发送失败: {}", e.getMessage());
         }
@@ -850,7 +883,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                             + "- **流程编号**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
                             + "该流程已被申请人撤销。",
                     flowNo, request.getTitle(), request.getApplicant());
-            dingTalkService.sendMarkdown("流程已撤销", text, null, false);
+            sendDingTalkAfterCommit("流程已撤销", text, null, false);
         } catch (Exception e) {
             log.warn("OA流程撤销钉钉通知发送失败: {}", e.getMessage());
         }
@@ -896,7 +929,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                                 + "- **流程编号**: %s\n- **流程类型**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
                                 + "请及时处理。",
                         flowNo, process.getProcessName(), request.getTitle(), request.getApplicant());
-                dingTalkService.sendMarkdown("新的待审批流程", text, null, false);
+                sendDingTalkAfterCommit("新的待审批流程", text, null, false);
             }
         } catch (Exception e) {
             log.warn("OA流程提交钉钉通知发送失败: {}", e.getMessage());
@@ -1011,6 +1044,32 @@ public class OaRequestServiceImpl implements OaRequestService {
         } catch (Exception e) {
             log.warn("刷新待审任务审批人失败，继续使用原审批人: taskId={}, error={}",
                     task.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 事务提交后发送钉钉通知，避免事务内 HTTP 调用导致连接池耗尽。
+     * 如果当前没有活跃事务，则直接发送。
+     */
+    private void sendDingTalkAfterCommit(String title, String text, String atMobiles, boolean atAll) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        dingTalkService.sendMarkdown(title, text, atMobiles, atAll);
+                    } catch (Exception e) {
+                        log.warn("钉钉通知发送失败: {}", e.getMessage());
+                    }
+                }
+            });
+        } else {
+            // 无活跃事务时直接发送
+            try {
+                dingTalkService.sendMarkdown(title, text, atMobiles, atAll);
+            } catch (Exception e) {
+                log.warn("钉钉通知发送失败: {}", e.getMessage());
+            }
         }
     }
 

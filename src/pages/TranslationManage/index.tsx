@@ -45,27 +45,7 @@ import {
 } from '../../api/translation'
 import type { TranslationVO, LanguageVO } from '../../api/translation'
 import { useTranslation } from 'react-i18next'
-
-/* ---- 数字加载动画 Hook ---- */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-  useEffect(() => {
-    const start = performance.now()
-    const animate = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setValue(Math.round(target * eased))
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-  return value
-}
+import { useCountUp } from '../../hooks/useCountUp'
 
 /* ---- 动画数字组件 ---- */
 function AnimatedNumber({ value }: { value: number }) {

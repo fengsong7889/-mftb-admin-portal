@@ -13,11 +13,10 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions, isShanfeng } from '../../constants/brand'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import type { DebtStoreRecord } from '../../utils/approvalStore'
 import { fetchFinDebts } from '../../api/finance'
 import type { FinDebtBrandStats, FinDebtPageResult, FinDebtQuery } from '../../api/finance'
-import { getAllDebtBills } from './mockBills'
 
 const { RangePicker } = DatePicker
 
@@ -125,41 +124,6 @@ function pickValue(v?: string) {
 const emptyBrandStats: FinDebtBrandStats = {
   shanfeng: { amount: 0, count: 0 },
   mfood: { amount: 0, count: 0 },
-}
-
-/**
- * 後端不可用時的降級查詢：本地欠款單（審批寫入 + 演示數據）篩選分頁
- * 品牌待還統計口徑與後端一致：僅累計未結清賬單的剩餘待還
- */
-function _mockFetchDebts(query: FinDebtQuery): FinDebtPageResult {
-  const filtered = getAllDebtBills().filter(b => {
-    if (query.groupId && !b.groupId.includes(query.groupId)) return false
-    if (query.groupName && !b.groupName.includes(query.groupName)) return false
-    if (query.storeName && !b.storeName.includes(query.storeName)) return false
-    if (query.brand && b.brand !== query.brand) return false
-    if (query.billNo && !b.billNo.includes(query.billNo)) return false
-    if (query.batchNo && !b.batchNo.includes(query.batchNo)) return false
-    if (query.flowNo && !b.flowNo.includes(query.flowNo)) return false
-    if (query.status && b.status !== query.status) return false
-    if (query.source && b.source !== query.source) return false
-    if (query.channel && b.channel !== query.channel) return false
-    if (query.loanFrom && b.loanDate < query.loanFrom) return false
-    if (query.loanTo && b.loanDate > query.loanTo) return false
-    return true
-  })
-  const brandStats: FinDebtBrandStats = {
-    shanfeng: { amount: 0, count: 0 },
-    mfood: { amount: 0, count: 0 },
-  }
-  filtered.forEach(b => {
-    if (b.status !== 'unsettled') return
-    const target = isShanfeng(b.brand) ? brandStats.shanfeng : brandStats.mfood
-    target.amount = r2(target.amount + b.remainAmount)
-    target.count += 1
-  })
-  const page = query.page || 1
-  const size = query.size || 10
-  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length, brandStats }
 }
 
 export default function DebtReconcile() {

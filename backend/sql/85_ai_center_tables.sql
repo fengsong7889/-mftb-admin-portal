@@ -1,7 +1,8 @@
 -- ============================================================
 -- MFTB 搜广推系统 - AI 智能中心完整数据库脚本
--- 版本：v2026.09.03
+-- 版本：v2026.09.03（v2026.09.13 修复：移除 DROP TABLE，改为幂等创建）
 -- 说明：包含 AI 供应商、模型、权限、配额、工具注册、能耗统计等 8 张表
+-- 注意：此脚本已改为幂等设计，可安全重复执行
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -10,8 +11,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ----------------------------
 -- 1. AI 供应商表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_provider`;
-CREATE TABLE `ai_provider` (
+CREATE TABLE IF NOT EXISTS `ai_provider` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `provider_key` VARCHAR(50) NOT NULL UNIQUE COMMENT '供应商标识',
     `name` VARCHAR(100) NOT NULL COMMENT '供应商名称',
@@ -33,8 +33,7 @@ CREATE TABLE `ai_provider` (
 -- ----------------------------
 -- 2. AI 模型表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_model`;
-CREATE TABLE `ai_model` (
+CREATE TABLE IF NOT EXISTS `ai_model` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `provider_id` BIGINT DEFAULT NULL COMMENT '供应商 ID（外键）',
     `model_key` VARCHAR(50) NOT NULL COMMENT '模型标识',
@@ -59,8 +58,7 @@ CREATE TABLE `ai_model` (
 -- ----------------------------
 -- 3. 部门模型权限表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_department_auth`;
-CREATE TABLE `ai_department_auth` (
+CREATE TABLE IF NOT EXISTS `ai_department_auth` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `department_id` BIGINT NOT NULL COMMENT '部门 ID',
     `model_id` BIGINT NOT NULL COMMENT '模型 ID',
@@ -84,8 +82,7 @@ CREATE TABLE `ai_department_auth` (
 -- ----------------------------
 -- 4. 员工模型权限表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_employee_auth`;
-CREATE TABLE `ai_employee_auth` (
+CREATE TABLE IF NOT EXISTS `ai_employee_auth` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `employee_id` BIGINT NOT NULL COMMENT '员工 ID',
     `model_id` BIGINT NOT NULL COMMENT '模型 ID',
@@ -110,8 +107,7 @@ CREATE TABLE `ai_employee_auth` (
 -- ----------------------------
 -- 5. 职位模型权限映射表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_position_model_mapping`;
-CREATE TABLE `ai_position_model_mapping` (
+CREATE TABLE IF NOT EXISTS `ai_position_model_mapping` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `position_id` BIGINT NOT NULL COMMENT '职位 ID',
     `model_id` BIGINT NOT NULL COMMENT '模型 ID',
@@ -132,8 +128,7 @@ CREATE TABLE `ai_position_model_mapping` (
 -- ----------------------------
 -- 6. 角色模型权限映射表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_role_model_mapping`;
-CREATE TABLE `ai_role_model_mapping` (
+CREATE TABLE IF NOT EXISTS `ai_role_model_mapping` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `role_id` BIGINT NOT NULL COMMENT '角色 ID',
     `model_id` BIGINT NOT NULL COMMENT '模型 ID',
@@ -154,8 +149,7 @@ CREATE TABLE `ai_role_model_mapping` (
 -- ----------------------------
 -- 7. AI 用量日志表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_usage_log`;
-CREATE TABLE `ai_usage_log` (
+CREATE TABLE IF NOT EXISTS `ai_usage_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `target_type` VARCHAR(20) NOT NULL COMMENT '目标类型：employee/department',
     `target_id` BIGINT NOT NULL COMMENT '目标 ID（员工 ID 或部门 ID）',
@@ -180,8 +174,7 @@ CREATE TABLE `ai_usage_log` (
 -- ----------------------------
 -- 8. 部门/员工额度配置表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_quota_config`;
-CREATE TABLE `ai_quota_config` (
+CREATE TABLE IF NOT EXISTS `ai_quota_config` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `quota_type` VARCHAR(20) NOT NULL COMMENT '配额类型：department/employee',
     `target_id` BIGINT NOT NULL COMMENT '目标 ID（部门 ID 或员工 ID）',
@@ -207,8 +200,7 @@ CREATE TABLE `ai_quota_config` (
 -- ----------------------------
 -- 9. AI 工具注册表
 -- ----------------------------
-DROP TABLE IF EXISTS `ai_tool_registry`;
-CREATE TABLE `ai_tool_registry` (
+CREATE TABLE IF NOT EXISTS `ai_tool_registry` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
     `tool_key` VARCHAR(50) NOT NULL UNIQUE COMMENT '工具标识',
     `name` VARCHAR(100) NOT NULL COMMENT '工具名称',
@@ -231,16 +223,17 @@ CREATE TABLE `ai_tool_registry` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 工具注册表';
 
 -- ----------------------------
--- 初始化数据：测试供应商和模型
+-- 初始化数据：测试供应商和模型（幂等插入，忽略已存在的记录）
+-- 注意：生产环境应通过管理界面配置供应商，此处仅为开发环境提供默认数据
 -- ----------------------------
 BEGIN;
 
-INSERT INTO `ai_provider` (`provider_key`, `name`, `api_base_url`, `api_key`, `status`, `is_default`, `sort_order`) VALUES
+INSERT IGNORE INTO `ai_provider` (`provider_key`, `name`, `api_base_url`, `api_key`, `status`, `is_default`, `sort_order`) VALUES
 ('openai', 'OpenAI', 'https://api.openai.com/v1', NULL, 1, 1, 1),
 ('azure-openai', 'Azure OpenAI', 'https://your-resource.openai.azure.com', NULL, 1, 0, 2),
 ('anthropic', 'Anthropic Claude', 'https://api.anthropic.com/v1', NULL, 1, 0, 3);
 
-INSERT INTO `ai_model` (`provider_id`, `model_key`, `name`, `description`, `type`, `context_window`, `max_output_tokens`, `input_price`, `output_price`, `status`, `sort_order`) VALUES
+INSERT IGNORE INTO `ai_model` (`provider_id`, `model_key`, `name`, `description`, `type`, `context_window`, `max_output_tokens`, `input_price`, `output_price`, `status`, `sort_order`) VALUES
 (1, 'gpt-4o', 'GPT-4o', 'OpenAI GPT-4o 模型', 'chat', 128000, 4096, 5.000000, 15.000000, 1, 1),
 (1, 'gpt-4o-mini', 'GPT-4o Mini', 'OpenAI GPT-4o Mini 模型', 'chat', 128000, 4096, 0.150000, 0.600000, 1, 2),
 (1, 'o1-preview', 'o1 Preview', 'OpenAI o1 预览版', 'chat', 128000, 100000, 15.000000, 60.000000, 1, 3),

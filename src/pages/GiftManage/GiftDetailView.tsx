@@ -22,29 +22,9 @@ import type { GiftRecordItem } from '../../api/gift'
 import { fetchGiftRecordDetail, fetchGiftRecordsByStore, deductGiftDays } from '../../api/gift'
 import { fillGiftApprovalNoFallback } from '../../utils/approvalStore'
 import { getSystemRuleValue } from '../../hooks/useSystemRules'
+import { useCountUp } from '../../hooks/useCountUp'
 
 const { RangePicker } = DatePicker
-
-/* ---- 數字動畫 Hook ---- */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-  useEffect(() => {
-    const start = performance.now()
-    const animate = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setValue(Math.round(target * eased))
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-  return value
-}
 
 function AnimatedNumber({ value }: { value: number }) {
   const animated = useCountUp(value)

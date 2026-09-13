@@ -12,6 +12,7 @@ export interface VersionHistoryRecord {
   frontendChanges: string
   backendChanges: string
   databaseChanges: string
+  commitHash: string
   status: number
   createdBy: string
   updatedBy: string

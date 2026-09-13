@@ -28,33 +28,13 @@ import {
 } from '../../api/finance'
 import type { DebtRepaymentPayload, FinDebtBill, FinDebtRepayment } from '../../api/finance'
 import { getAllDebtBills } from '../DebtReconcile/mockBills'
+import { useCountUp } from '../../hooks/useCountUp'
 
 /** 格式化金額（千分位 + 兩位小數） */
 const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** 保留兩位小數 */
 const r2 = (n: number) => Math.round(n * 100) / 100
-
-/* ---- 數字加載動畫（遵循數據指標統計卡標準 12.1） ---- */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-  useEffect(() => {
-    const start = performance.now()
-    const animate = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setValue(r2(target * eased))
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-  return value
-}
 
 function AnimatedAmount({ value }: { value: number }) {
   const animated = useCountUp(value)

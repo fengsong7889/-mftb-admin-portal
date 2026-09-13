@@ -481,7 +481,7 @@ export default function OaRequests() {
   const [allFilters, setAllFilters] = useState<Filters>({})
 
   const loadAllFlows = useCallback(async () => {
-    if (!refReady || !isDeptLeader) return
+    if (!refReady) return
     setAllLoading(true)
     try {
       const params: Record<string, unknown> = {
@@ -530,7 +530,7 @@ export default function OaRequests() {
     } finally {
       setAllLoading(false)
     }
-  }, [allFilters, refReady, isDeptLeader])
+  }, [allFilters, refReady])
 
   useEffect(() => { loadAllFlows() }, [loadAllFlows])
 
@@ -957,7 +957,7 @@ export default function OaRequests() {
         </>
       ),
     },
-    ...(isDeptLeader ? [{
+    {
       key: 'all',
       label: t('oaRequests.tabAll'),
       children: (
@@ -980,7 +980,7 @@ export default function OaRequests() {
           />
         </>
       ),
-    }] : []),
+    },
   ]
 
   return (

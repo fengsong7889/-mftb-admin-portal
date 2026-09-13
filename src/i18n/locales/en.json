@@ -6312,7 +6312,9 @@
     "deleteConfirmTitle": "Confirm Delete",
     "deleteConfirmContent": "Are you sure to delete version {{version}}? This action cannot be undone.",
     "noChanges": "No changes recorded",
-    "notFound": "Version record not found"
+    "notFound": "Version record not found",
+    "commitHash": "Sync Anchor Commit",
+    "commitHashTip": "The Git Commit SHA synced in this record; next sync will incrementally pull from this commit"
   },
   "mcpService": {
     "pageTitle": "MCP Services",

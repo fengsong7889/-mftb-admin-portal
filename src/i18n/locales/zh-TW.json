@@ -6322,7 +6322,9 @@
     "syncConfirmContent": "將從 Git 提交歷史自動生成版本記錄，已存在的版本不會重複創建。確定要繼續嗎？",
     "syncSuccess": "同步成功",
     "syncNoNewCommits": "沒有新的 Git 提交需要同步",
-    "syncGitNotAvailable": "當前環境未安裝 Git，無法同步"
+    "syncGitNotAvailable": "當前環境未安裝 Git，無法同步",
+    "commitHash": "同步錨點 Commit",
+    "commitHashTip": "此記錄同步到的 Git Commit SHA，下次同步將從此提交開始增量拉取"
   },
 
   "mcpService": {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Spin, Tag } from 'antd'
 import dayjs from 'dayjs'
-import { ArrowLeftOutlined, FileTextOutlined, CodeOutlined, DatabaseOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, FileTextOutlined, CodeOutlined, DatabaseOutlined, InfoCircleOutlined, BranchesOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchVersionDetail } from '../../api/versionHistory'
@@ -122,6 +122,20 @@ export default function VersionHistoryDetail() {
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('versionHistory.summary')}</div>
             <div style={{ fontSize: 14, color: '#262626', lineHeight: 1.8 }}>{data.summary}</div>
+          </div>
+        )}
+        {data.commitHash && (
+          <div style={{ marginTop: 16, padding: '10px 14px', background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <BranchesOutlined style={{ fontSize: 13, color: '#52c41a' }} />
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('versionHistory.commitHash')}</span>
+            </div>
+            <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#389e0d', wordBreak: 'break-all' }}>
+              {data.commitHash}
+            </div>
+            <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+              {t('versionHistory.commitHashTip')}
+            </div>
           </div>
         )}
       </div>

@@ -1145,7 +1145,7 @@ export async function createInboundBatch(data: {
   })
 
   // 調用後端 API 創建入庫批次
-  return await request.post<unknown, InboundBatch>('/eam/inbound/batch', {
+  return await request.post<unknown, InboundBatch>('/eam/inbound', {
     poId: data.poId,
     inboundDate: data.inboundDate,
     operator: data.operator,

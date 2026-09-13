@@ -691,8 +691,23 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         return approval;
     }
 
+    /**
+     * 查询审批记录并加行锁（SELECT ... FOR UPDATE），防止并发审批操作导致数据不一致。
+     * 仅用于 approve/reject/cancel 等写操作。
+     */
+    private FinApproval requireApprovalForUpdate(String flowNo) {
+        FinApproval approval = approvalMapper.selectOne(
+                new LambdaQueryWrapper<FinApproval>()
+                        .eq(FinApproval::getFlowNo, flowNo)
+                        .last("FOR UPDATE"));
+        if (approval == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "审批流程不存在: " + flowNo);
+        }
+        return approval;
+    }
+
     private FinApproval requirePendingApproval(String flowNo) {
-        FinApproval approval = requireApproval(flowNo);
+        FinApproval approval = requireApprovalForUpdate(flowNo);  // 使用行锁防止并发竞态
         if (!FLOW_PENDING.equals(approval.getFlowStatus())) {
             throw new BusinessException("该流程已结束，无法继续操作");
         }

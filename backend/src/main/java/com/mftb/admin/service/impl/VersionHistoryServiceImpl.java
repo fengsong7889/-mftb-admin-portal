@@ -127,6 +127,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         vo.setFrontendChanges(entity.getFrontendChanges());
         vo.setBackendChanges(entity.getBackendChanges());
         vo.setDatabaseChanges(entity.getDatabaseChanges());
+        vo.setCommitHash(entity.getCommitHash());
         vo.setStatus(entity.getStatus());
         vo.setCreatedBy(entity.getCreatedBy());
         vo.setUpdatedBy(entity.getUpdatedBy());
@@ -143,6 +144,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         entity.setFrontendChanges(vo.getFrontendChanges());
         entity.setBackendChanges(vo.getBackendChanges());
         entity.setDatabaseChanges(vo.getDatabaseChanges());
+        entity.setCommitHash(vo.getCommitHash());
         entity.setStatus(vo.getStatus());
     }
 
@@ -259,7 +261,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         } catch (Exception e) {
             log.warn("無法獲取 Git 項目根目錄: {}", e.getMessage());
         }
-        String[] candidates = {"/Users/yangjingjing/Desktop/SRAS", "."};
+        String[] candidates = {"/Users/yangjingjing/Desktop/SARY", "."};
         for (String dir : candidates) {
             File f = new File(dir, ".git");
             if (f.exists()) {
