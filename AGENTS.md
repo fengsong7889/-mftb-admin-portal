@@ -103,6 +103,34 @@ src/
 - **规则**：TypeScript ESLint recommended + React Hooks 核心规则
 - **已知警告**：现有代码库存在约 300 个 warning（unused vars、any 类型），渐进修复中
 
+## 编辑后验证
+
+每次代码编辑完成后，必须执行对应的验证命令：
+
+```bash
+# 前端代码变更
+npm run typecheck        # 类型检查
+npm run lint             # Lint 检查
+
+# 后端代码变更
+cd backend && mvn compile -q   # 编译检查
+cd backend && mvn test -B      # 单元测试
+```
+
+验证失败时必须尝试修复，不可忽略。CI 门禁会在推送后再次拦截，但本地验证是第一道防线。
+
+## MCP 工具使用指引
+
+项目配置了以下 MCP 服务器，按需使用：
+
+| MCP | 用途 | 使用场景 |
+|-----|------|----------|
+| **github** | GitHub API 操作 | 查看 PR、Issue、提交历史、代码搜索 |
+| **Framelink MCP for Figma** | Figma 设计稿解析 | 用户贴出 Figma 链接时，提取设计数据 |
+| **context7** | 库文档查询 | 查询第三方库最新 API 和用法 |
+
+约束：不要在没有明确需求时主动调用 MCP；Figma 仅在设计相关任务中使用。
+
 ## 设计规范
 
 UI/UX 设计规范详见 `.qoder/rules/System-rules.md`（含色彩体系、圆角、阴影、间距、字体、交互效果等完整设计令牌）。
