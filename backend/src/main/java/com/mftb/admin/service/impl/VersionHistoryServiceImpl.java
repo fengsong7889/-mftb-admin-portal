@@ -75,9 +75,12 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
                 + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',3),'.',-1) AS UNSIGNED) DESC, "
                 + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',4),'.',-1) AS UNSIGNED) DESC");
 
-        long total = mapper.selectCount(wrapper);
-        List<SysVersionHistory> records = mapper.selectList(
-                wrapper.last("LIMIT " + (page - 1) * size + "," + size));
+        // 使用 MyBatis-Plus Page 自动处理 count + 分页
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<SysVersionHistory> pageObj =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size, true);
+        mapper.selectPage(pageObj, wrapper);
+        long total = pageObj.getTotal();
+        List<SysVersionHistory> records = pageObj.getRecords();
 
         List<VersionHistoryVO> voList = records.stream().map(this::toVO).toList();
         return new PageResult<>(voList, total);
