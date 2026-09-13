@@ -1052,12 +1052,15 @@ public class OaRequestServiceImpl implements OaRequestService {
      * 如果当前没有活跃事务，则直接发送。
      */
     private void sendDingTalkAfterCommit(String title, String text, String atMobiles, boolean atAll) {
+        List<String> mobileList = StringUtils.hasText(atMobiles)
+                ? List.of(atMobiles.split(","))
+                : List.of();
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
                     try {
-                        dingTalkService.sendMarkdown(title, text, atMobiles, atAll);
+                        dingTalkService.sendMarkdown(title, text, mobileList, atAll);
                     } catch (Exception e) {
                         log.warn("钉钉通知发送失败: {}", e.getMessage());
                     }
@@ -1066,7 +1069,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         } else {
             // 无活跃事务时直接发送
             try {
-                dingTalkService.sendMarkdown(title, text, atMobiles, atAll);
+                dingTalkService.sendMarkdown(title, text, mobileList, atAll);
             } catch (Exception e) {
                 log.warn("钉钉通知发送失败: {}", e.getMessage());
             }
