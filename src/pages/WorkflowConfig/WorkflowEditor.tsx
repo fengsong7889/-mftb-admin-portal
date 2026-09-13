@@ -23,7 +23,7 @@ import {
   BRAND_CONFIG_OPTIONS,
 } from './types'
 import type { WorkflowNode, WorkflowDefinition, ApproverConfig, RoutingRule } from './types'
-import { getApproverOptions, loadApproverOptions } from './options'
+import { getApproverOptions, loadApproverOptions, resolveApproverLabel } from './options'
 import { saveWorkflowConfig } from '../../api/workflowConfig'
 import ApproverConfigModal from './ApproverConfigModal'
 import RoutingRuleConfigModal from './RoutingRuleConfigModal'
@@ -35,7 +35,10 @@ export default function WorkflowEditor() {
   const { getWorkflow, addWorkflow, updateWorkflow } = useWorkflowConfig()
 
   /* 加載選項（用於審批人下拉） */
-  useEffect(() => { loadApproverOptions() }, [])
+  const [optionsLoaded, setOptionsLoaded] = useState(false)
+  useEffect(() => {
+    loadApproverOptions().then(() => setOptionsLoaded(true)).catch(() => setOptionsLoaded(true))
+  }, [])
 
   const existing = isNew ? undefined : getWorkflow(id || '')
 
@@ -133,8 +136,7 @@ export default function WorkflowEditor() {
       const s = cfg.default
       const typeLabel = APPROVER_TYPE_LABELS[s.approverType]
       if (s.approverType === 'initiator_leader') return typeLabel
-      const options = getApproverOptions(s.approverType)
-      const names = s.approverIds.map(v => options.find(o => o.value === v)?.label || v).join('、')
+      const names = s.approverIds.map(v => resolveApproverLabel(s.approverType, v)).join('、')
       return `${typeLabel}：${names || '未選擇'}`
     }
     // 按品牌時簡要展示
@@ -143,7 +145,8 @@ export default function WorkflowEditor() {
       const s = cfg.brands[brand.value]
       if (s) {
         const typeLabel = APPROVER_TYPE_LABELS[s.approverType]
-        parts.push(`${brand.label}: ${typeLabel}`)
+        const names = s.approverIds.map(v => resolveApproverLabel(s.approverType, v)).join('、')
+        parts.push(`${brand.label}: ${typeLabel}${names ? `（${names}）` : ''}`)
       }
     }
     if (cfg.default) {
@@ -151,7 +154,7 @@ export default function WorkflowEditor() {
       parts.unshift(`默認: ${typeLabel}`)
     }
     return parts.join('；') || '未配置'
-  }, [])
+  }, [optionsLoaded])
 
   /* 審批規則展示 */
   const getApprovalRuleText = useCallback((node: WorkflowNode) => {

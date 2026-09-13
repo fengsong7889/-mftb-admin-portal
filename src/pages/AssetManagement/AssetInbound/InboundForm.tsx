@@ -7,17 +7,19 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message,
+  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message, Upload,
 } from 'antd'
-import type { TableColumnsType } from 'antd'
+import type { TableColumnsType, UploadFile } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, ShoppingCartOutlined, ExclamationCircleOutlined,
+  CameraOutlined, DeleteOutlined, EyeOutlined, PlusOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import {
   fetchPurchaseOrderDetail, fetchLocationList, createInboundBatch,
   saveInboundDraft, loadInboundDraft, deleteInboundDraft,
+  uploadInboundPhoto,
   type PurchaseOrder, type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
   type AssetLocation,
 } from '../../../api/eam'
@@ -75,6 +77,8 @@ interface InboundItem extends PurchaseOrderItem {
   rejectStatus?: RejectStatus
   /** 不通過原因 */
   rejectReason?: string
+  /** 驗收照片 [{name, dataUrl}] */
+  photos: { name: string; dataUrl: string }[]
 }
 
 interface InboundGroup extends PurchaseOrderSupplierGroup {
@@ -104,6 +108,12 @@ export default function InboundForm({ poId, onBack }: Props) {
   const [rejectModal, setRejectModal] = useState<{ groupId: string; rowKey: string } | null>(null)
   const [rejectType, setRejectType] = useState<RejectStatus>('return')
   const [rejectReason, setRejectReason] = useState('')
+  const [rejectPhotos, setRejectPhotos] = useState<{ name: string; dataUrl: string }[]>([])
+
+  // 照片預覽
+  const [previewVisible, setPreviewVisible] = useState(false)
+  const [previewImage, setPreviewImage] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   /** 更新分組驗收日期 */
   const updateGroupDate = (groupId: string, date: dayjs.Dayjs) => {
@@ -149,6 +159,7 @@ export default function InboundForm({ poId, onBack }: Props) {
             confirmed: false,
             rejectStatus: undefined,
             rejectReason: '',
+            photos: [],
           }
         }),
       }))
@@ -204,6 +215,51 @@ export default function InboundForm({ poId, onBack }: Props) {
     }))
   }
 
+  /* ----- 照片上傳 ----- */
+  const handleItemPhotoUpload = useCallback(async (groupId: string, rowKey: string, file: File) => {
+    setUploading(true)
+    try {
+      const result = await uploadInboundPhoto(file)
+      updateGroupItem(groupId, rowKey, {
+        photos: [...(groups.find((g) => g.id === groupId)?.items.find((it) => it.key === rowKey)?.photos || []), result],
+      })
+    } catch {
+      message.error('照片上傳失敗')
+    } finally {
+      setUploading(false)
+    }
+    return false // 阻止 antd Upload 自動上傳
+  }, [groups])
+
+  const handleItemPhotoRemove = useCallback((groupId: string, rowKey: string, idx: number) => {
+    const item = groups.find((g) => g.id === groupId)?.items.find((it) => it.key === rowKey)
+    if (!item) return
+    const next = [...item.photos]
+    next.splice(idx, 1)
+    updateGroupItem(groupId, rowKey, { photos: next })
+  }, [groups])
+
+  const handleRejectPhotoUpload = useCallback(async (file: File) => {
+    setUploading(true)
+    try {
+      const result = await uploadInboundPhoto(file)
+      setRejectPhotos((prev) => [...prev, result])
+    } catch {
+      message.error('照片上傳失敗')
+    } finally {
+      setUploading(false)
+    }
+    return false
+  }, [])
+
+  const handleRejectPhotoRemove = useCallback((idx: number) => {
+    setRejectPhotos((prev) => {
+      const next = [...prev]
+      next.splice(idx, 1)
+      return next
+    })
+  }, [])
+
   const groupSubtotal = (group: InboundGroup) =>
     group.items.reduce((s, it) => s + (it.confirmedPrice || it.price) * it.qty, 0)
 
@@ -231,12 +287,14 @@ export default function InboundForm({ poId, onBack }: Props) {
     updateGroupItem(rejectModal.groupId, rejectModal.rowKey, {
       rejectStatus: rejectType,
       rejectReason: rejectReason.trim(),
+      photos: rejectPhotos,
       confirmed: false,
       selected: true,
     })
     setRejectModal(null)
     setRejectType('return')
     setRejectReason('')
+    setRejectPhotos([])
   }
 
   /* ----- 明細表格列 ----- */
@@ -321,58 +379,105 @@ export default function InboundForm({ poId, onBack }: Props) {
       ),
     },
     {
-      title: '操作', key: 'action', width: 160, align: 'center',
+      title: '操作', key: 'action', width: 200, align: 'center',
       render: (_: unknown, r: InboundItem) => {
         const maxQty = Math.max(0, r.qty - r.receivedQty)
-        // 已不通過 → 顯示處置標籤 + 撤銷
+        const photoCount = r.photos.length
+        // 照片上傳區域（通過/不通過均可拍照）
+        const photoSection = (
+          <div style={{ marginTop: 4 }}>
+            <Upload
+              showUploadList={false}
+              beforeUpload={(file) => { handleItemPhotoUpload(groupId, r.key!, file); return false }}
+              accept="image/*"
+              disabled={!r.selected}
+            >
+              <Button
+                type="link" size="small"
+                icon={<CameraOutlined />}
+                loading={uploading}
+                style={{ fontSize: 11, padding: '0 2px', color: photoCount > 0 ? '#1890ff' : '#8c8c8c' }}
+              >
+                {photoCount > 0 ? `${photoCount}張` : '拍照'}
+              </Button>
+            </Upload>
+            {photoCount > 0 && (
+              <div style={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {r.photos.map((p, idx) => (
+                  <div key={idx} style={{ position: 'relative', width: 32, height: 32 }}>
+                    <img
+                      src={p.dataUrl} alt={p.name}
+                      style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #d9d9d9', cursor: 'pointer' }}
+                      onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
+                    />
+                    <span
+                      onClick={() => handleItemPhotoRemove(groupId, r.key!, idx)}
+                      style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1 }}
+                    >×</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+        // 已不通過 → 顯示處置標籤 + 撤銷 + 照片
         if (r.rejectStatus) {
           return (
-            <Space size={4}>
-              <Tag color={REJECT_COLOR[r.rejectStatus]} style={{ margin: 0, fontSize: 11 }}>
-                {REJECT_LABEL[r.rejectStatus]}
-              </Tag>
+            <div>
+              <Space size={4}>
+                <Tag color={REJECT_COLOR[r.rejectStatus]} style={{ margin: 0, fontSize: 11 }}>
+                  {REJECT_LABEL[r.rejectStatus]}
+                </Tag>
+                <Button
+                  type="link" size="small" danger
+                  onClick={() => updateGroupItem(groupId, r.key!, { rejectStatus: undefined, rejectReason: '', photos: [] })}
+                  style={{ fontSize: 12, padding: '0 2px' }}
+                >
+                  撤銷
+                </Button>
+              </Space>
+              {photoSection}
+            </div>
+          )
+        }
+        // 已驗收通過 → 撤銷 + 照片
+        if (r.confirmed) {
+          return (
+            <div>
               <Button
                 type="link" size="small" danger
-                onClick={() => updateGroupItem(groupId, r.key!, { rejectStatus: undefined, rejectReason: '' })}
-                style={{ fontSize: 12, padding: '0 2px' }}
+                onClick={() => updateGroupItem(groupId, r.key!, { confirmed: false })}
+                style={{ fontSize: 12 }}
               >
                 撤銷
               </Button>
-            </Space>
+              {photoSection}
+            </div>
           )
         }
-        // 已驗收通過 → 撤銷
-        if (r.confirmed) {
-          return (
-            <Button
-              type="link" size="small" danger
-              onClick={() => updateGroupItem(groupId, r.key!, { confirmed: false })}
-              style={{ fontSize: 12 }}
-            >
-              撤銷
-            </Button>
-          )
-        }
-        // 未處理 → 驗收通過 / 驗收不通過
+        // 未處理 → 驗收通過 / 驗收不通過 + 照片
         return (
-          <Space size={4}>
-            <Button
-              type="link" size="small"
-              disabled={!r.selected || r.inboundQty <= 0 || !r.locationId || maxQty <= 0}
-              onClick={() => updateGroupItem(groupId, r.key!, { confirmed: true, selected: true })}
-              style={{ color: '#52C41A', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
-            >
-              通過
-            </Button>
-            <Button
-              type="link" size="small" danger
-              disabled={!r.selected || maxQty <= 0}
-              onClick={() => { setRejectModal({ groupId, rowKey: r.key! }); setRejectType('return'); setRejectReason('') }}
-              style={{ fontSize: 12, padding: '0 2px' }}
-            >
-              不通過
-            </Button>
-          </Space>
+          <div>
+            <Space size={4}>
+              <Button
+                type="link" size="small"
+                disabled={!r.selected || r.inboundQty <= 0 || !r.locationId || maxQty <= 0}
+                onClick={() => updateGroupItem(groupId, r.key!, { confirmed: true, selected: true })}
+                style={{ color: '#52C41A', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
+              >
+                通過
+              </Button>
+              <Button
+                type="link" size="small" danger
+                disabled={!r.selected || maxQty <= 0}
+                onClick={() => { setRejectModal({ groupId, rowKey: r.key! }); setRejectType('return'); setRejectReason(''); setRejectPhotos([]) }}
+                style={{ fontSize: 12, padding: '0 2px' }}
+              >
+                不通過
+              </Button>
+            </Space>
+            {photoSection}
+          </div>
         )
       },
     },
@@ -424,6 +529,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           qty: it.inboundQty,
           locationId: it.locationId!,
           disposition: 'pass' as const,
+          photos: it.photos.length > 0 ? it.photos : undefined,
         }))
     )
     // 驗收不通過項：退貨/換貨/讓步接收，隨批次提交留痕（不生成資產）
@@ -436,6 +542,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           locationId: 0,
           disposition: it.rejectStatus!,
           rejectReason: it.rejectReason || undefined,
+          photos: it.photos.length > 0 ? it.photos : undefined,
         }))
     )
     const allItems = [...passItems, ...rejectItems]
@@ -709,6 +816,51 @@ export default function InboundForm({ poId, onBack }: Props) {
             style={{ resize: 'none' }}
           />
         </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
+            <CameraOutlined style={{ marginRight: 4 }} />
+            現場照片（損壞/不符憑證）
+          </div>
+          <Upload
+            showUploadList={false}
+            beforeUpload={(file) => { handleRejectPhotoUpload(file); return false }}
+            accept="image/*"
+            listType="picture-card"
+          >
+            <div style={{ padding: '8px 0' }}>
+              <Button icon={<CameraOutlined />} loading={uploading} size="small">
+                拍照 / 上傳
+              </Button>
+            </div>
+          </Upload>
+          {rejectPhotos.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {rejectPhotos.map((p, idx) => (
+                <div key={idx} style={{ position: 'relative', width: 56, height: 56 }}>
+                  <img
+                    src={p.dataUrl} alt={p.name}
+                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid #d9d9d9', cursor: 'pointer' }}
+                    onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
+                  />
+                  <span
+                    onClick={() => handleRejectPhotoRemove(idx)}
+                    style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1 }}
+                  >×</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* ====== 照片預覽 ====== */}
+      <Modal
+        open={previewVisible}
+        footer={null}
+        onCancel={() => setPreviewVisible(false)}
+        centered
+      >
+        <img alt="preview" style={{ width: '100%' }} src={previewImage} />
       </Modal>
     </Spin>
   )

@@ -6,6 +6,7 @@ import com.mftb.admin.entity.BizGiftRecord;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.NotificationService;
 import com.mftb.admin.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final BizGiftRecordMapper giftRecordMapper;
     private final BizStoreMapper storeMapper;
     private final SysConfigService sysConfigService;
+    private final DingTalkService dingTalkService;
 
     /** 广告类型显示名映射 */
     private static final Map<String, String> AD_TYPE_LABELS = Map.of(
@@ -59,6 +61,15 @@ public class NotificationServiceImpl implements NotificationService {
         // 后续可在此追加其它通知类型:
         // notifications.addAll(generateApprovalPendingNotifications());
         // notifications.addAll(generateRechargeNotifications());
+
+        // 钉钉推送：将赠送到期提醒聚合为一条 Markdown 消息推送到钉钉群
+        if (!notifications.isEmpty() && dingTalkService.isEnabled()) {
+            try {
+                sendGiftExpiryDingTalkSummary(notifications);
+            } catch (Exception e) {
+                log.warn("赠送到期钉钉推送失败: {}", e.getMessage());
+            }
+        }
 
         return notifications;
     }
@@ -144,6 +155,32 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         return notifs;
+    }
+
+    /**
+     * 将赠送到期提醒聚合为一条 Markdown 消息推送到钉钉群
+     */
+    private void sendGiftExpiryDingTalkSummary(List<NotificationItemVO> notifications) {
+        StringBuilder text = new StringBuilder();
+        text.append("### ⏰ 赠送到期提醒\n\n");
+        text.append("以下 ").append(notifications.size()).append(" 条赠送记录即将到期，请及时处理：\n\n");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        for (NotificationItemVO n : notifications) {
+            String adLabel = AD_TYPE_LABELS.getOrDefault(n.getAdType(), n.getAdType());
+            if (n.getDaysLeft() != null && n.getDaysLeft() == 0) {
+                text.append("- 🔴 **今日到期** | ").append(n.getStoreCode()).append(" ").append(n.getStoreName())
+                        .append(" | ").append(adLabel).append("\n");
+            } else {
+                text.append("- 🟡 **剩余 ").append(n.getDaysLeft()).append(" 天** | ")
+                        .append(n.getStoreCode()).append(" ").append(n.getStoreName())
+                        .append(" | ").append(adLabel);
+                if (n.getExpireDate() != null) {
+                    text.append(" | 到期: ").append(n.getExpireDate().format(fmt));
+                }
+                text.append("\n");
+            }
+        }
+        dingTalkService.sendMarkdown("赠送到期提醒", text.toString(), null, false);
     }
 
     /**

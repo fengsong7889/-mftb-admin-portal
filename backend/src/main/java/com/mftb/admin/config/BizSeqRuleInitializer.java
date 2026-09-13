@@ -42,6 +42,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 流程配置ID编号规则种子（LC+5位自增） + biz_workflow_config 补列 */
     private static final String V_INIT_WORKFLOW_CONFIG = "seq:init-v5";
 
+    /** 增量版本: AI 使用申请流程编号规则种子（AI+YYYYMMDD+4位） */
+    private static final String V_INIT_AI_ACCESS = "seq:init-v6";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -68,6 +71,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
             seedWorkflowConfigRule();
             ensureWorkflowConfigIdColumn();
             backfillWorkflowConfigIds();
+        });
+        versionTracker.applyOnce(V_INIT_AI_ACCESS, () -> {
+            seedAiAccessRequestRule();
         });
     }
 
@@ -370,6 +376,21 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         }
         if (!ids.isEmpty()) {
             log.info("已为 {} 条存量流程配置回填配置ID", ids.size());
+        }
+    }
+
+    /** AI 使用申请流程编号规则种子（AI + YYYYMMDD + 4位自增序号，归属审批中心） */
+    private void seedAiAccessRequestRule() {
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                BizSeqService.RULE_AI_ACCESS_REQUEST, "AI申請流程編號", "審批中心",
+                "AI", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入 AI 使用申请流程编号规则种子数据");
+            bizSeqService.refreshRules();
         }
     }
 

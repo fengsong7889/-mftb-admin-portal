@@ -46,7 +46,7 @@ public class DataInitializer implements CommandLineRunner {
     // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
     // v6.0: OA 中心表自动创建（biz_oa_process / biz_oa_request / biz_oa_approval_task + 种子数据）
     // v7.0: biz_oa_request 扩展审批中心字段（集团/品牌/三级审批详情）
-    private static final String V_SCHEMA = "core:schema-v9";
+    private static final String V_SCHEMA = "core:schema-v10";
     /** 菜单种子版本：新增/调整种子菜单或英文名时递增 minor 版本号，无需全量重跑其他迁移 */
     // v11: 「工具註冊中心」更名為「AI 操作授權」，menu_key 由 ai_tool_registry 迁移为 ai-operation-auth
     //      （seedSystemMenus 會先刪除所有含 ai 的舊菜單及授權關聯再重建，舊 key 自動清理）
@@ -71,7 +71,9 @@ public class DataInitializer implements CommandLineRunner {
     // v30: 「集團人事」更名為「集團人事(HR)」；「物資管理」更名為「資產管理(EAM)」
     //      seedSystemMenus 对已存在菜单不再覆盖 sort_order / name（占位除外），
     //      但 parent_id 始终与种子结构保持一致，防止前端 bug 或数据库异常导致层级错乱
-    private static final String V_MENU_SEED = "core:menu-seed-v31";
+        // v32: 「員工AI權額管理」調整；基礎配置子菜單統一「XX庫」命名（資產分類庫/品牌產品庫/產品參數庫）
+    // v34: 修正 oa-requests 菜单名称（曾与 process-center 重名为"流程中心"，改为"流程事項"）
+    private static final String V_MENU_SEED = "core:menu-seed-v34";
 
     @Override
     public void run(String... args) {
@@ -112,6 +114,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         versionTracker.applyOnce("core:drop-ai-access-request-v1", this::dropAiAccessRequestTable);
         // v29: 「領用歸還」改名為「領用管理」
         versionTracker.applyOnce("core:eam-rename-claim-v2", this::renameAssetClaimToManage);
+        // v30: 钉钉通知种子数据（sys_config + mcp_tool）
+        versionTracker.applyOnce("core:dingtalk-notification-v1", this::seedDingTalkNotification);
+        // v31: 补充 ai_access 流程类型到 biz_oa_process 和 biz_workflow_config
+        versionTracker.applyOnce("core:oa-ai-access-seed-v1", this::seedAiAccessProcessType);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
         migrateDeptCodeToBM();
@@ -250,6 +256,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         migrateEmployeeDetailTables();
         // EAM 基础数据表自动创建 (118 脚本等效, 幂等)
         migrateEamBasicTables();
+        // EAM 验收入库照片字段 (126 脚本等效, 幂等)
+        migrateEamInboundPhotos();
         // 菜单种子化与旧权限迁移由 run() 按独立版本调度, 保证顺序: schema → 菜单种子 → 权限迁移
     }
 
@@ -415,6 +423,20 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='仓库/存放位置'");
 
         log.info("EAM 基础数据表就绪: biz_eam_category + biz_eam_brand + biz_eam_model + biz_eam_location");
+    }
+
+    /** EAM 验收入库批次明细增加照片字段 (126 脚本等效) */
+    private void migrateEamInboundPhotos() {
+        // 仅当表已存在时才补列，避免首次启动表尚未创建时报错
+        Integer tableCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_inbound_batch_item'",
+                Integer.class);
+        if (tableCount != null && tableCount > 0) {
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "photos",
+                    "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN photos JSON DEFAULT NULL "
+                            + "COMMENT '验收照片JSON数组 [{name,dataUrl}]' AFTER reject_reason");
+        }
     }
 
     /**
@@ -986,6 +1008,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("rule-config", "Rule Config"),
                 Map.entry("workflow-config", "Workflow Config"),
                 Map.entry("version-history", "Version History"),
+                                Map.entry("notification-config", "Notification Channels"),
                 Map.entry("ai-assistant", "AI Center (AI)"),
                 Map.entry("ai_model_hub", "Model Access"),
                 Map.entry("ai_quota_auth", "Authorization & Quota"),
@@ -1053,6 +1076,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 1 WHERE menu_key = 'process-center' AND sort_order != 1");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'oa-requests' AND sort_order != 2");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE menu_key = 'workflow-config' AND sort_order != 3");
+        // 修正 oa-requests 名称（曾与 process-center 重名为"流程中心"，应为"流程事項"）
+        jdbcTemplate.update("UPDATE sys_menu SET name = '流程事項' WHERE menu_key = 'oa-requests' AND name != '流程事項'");
         // 图标统一（无条件覆盖，前端 Sidebar 图标颜色由 CSS nth-child 按位置着色，顺序正确后颜色自然对齐）
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'RobotOutlined' WHERE menu_key = 'ai-assistant'");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingFilled' WHERE menu_key = 'group-purchase'");
@@ -1062,7 +1087,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingCartOutlined' WHERE menu_key = 'asset-purchase' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'SwapOutlined'       WHERE menu_key = 'asset-flow-ops' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ToolOutlined'       WHERE menu_key = 'asset-maintenance' AND (icon IS NULL OR icon = '')");
-        jdbcTemplate.update("UPDATE sys_menu SET icon = 'SettingOutlined'    WHERE menu_key = 'asset-basic' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ControlOutlined'    WHERE menu_key = 'asset-basic' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'DashboardOutlined'  WHERE menu_key = 'asset-dashboard'  AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'AppstoreOutlined'  WHERE menu_key = 'asset-list'      AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'TagsOutlined'      WHERE menu_key = 'asset-category'  AND (icon IS NULL OR icon = '')");
@@ -1363,7 +1388,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-purchase",    new String[]{"採購入庫",         "asset-management",   "2"});
         menus.put("asset-flow-ops",    new String[]{"資產管理",         "asset-management",   "3"});
         menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "4"});
-        menus.put("asset-basic",       new String[]{"基礎設置",         "asset-management",   "5"});
+        menus.put("asset-basic",       new String[]{"基礎配置",         "asset-management",   "5"});
         // 三級菜單 → 採購入庫
         menus.put("purchase-order",     new String[]{"採購訂單",         "asset-purchase",     "1"});
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
@@ -1380,14 +1405,14 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-scrap",        new String[]{"資產報廢",         "asset-maintenance",  "3"});
         menus.put("asset-inventory",    new String[]{"資產盤點",         "asset-maintenance",  "4"});
         menus.put("asset-flow",         new String[]{"變更歷史",         "asset-maintenance",  "5"});
-        // 三級菜單 → 基礎設置
-        menus.put("asset-category",     new String[]{"資產分類",         "asset-basic",        "1"});
-        menus.put("asset-model",        new String[]{"產品庫",           "asset-basic",        "2"});
+        // 三級菜單 → 基礎配置
+        menus.put("asset-category",     new String[]{"資產分類庫",       "asset-basic",        "1"});
+        menus.put("asset-model",        new String[]{"品牌產品庫",       "asset-basic",        "2"});
         menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
-        menus.put("param-library",      new String[]{"參數庫",           "asset-basic",        "4"});
+        menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
         // ── OA中心 ──
         menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
-        menus.put("oa-requests",        new String[]{"流程中心",         "oa-center",         "2"});
+        menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
         menus.put("workflow-config",     new String[]{"流程配置",         "oa-center",         "3"});
         // ── 權限管理 ──
         menus.put("role-management",     new String[]{"角色管理",         "permission",         "1"});
@@ -1398,6 +1423,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("translation-manage",  new String[]{"多語言配置",         "system-config",      "2"});
         menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "3"});
         menus.put("version-history",    new String[]{"版本管理",         "system-config",      "4"});
+        menus.put("notification-config", new String[]{"通知渠道配置",     "system-config",      "5"});
 
         int created = 0;
         int updated = 0;
@@ -1623,7 +1649,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         if (basicId != null) {
             jdbcTemplate.update(
                     "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, icon, status, deleted, updated_by) "
-                            + "VALUES (?, 'param-library', '參數庫', 2, 4, 'DatabaseOutlined', 1, 0, 'system') "
+                            + "VALUES (?, 'param-library', '產品參數庫', 2, 4, 'DatabaseOutlined', 1, 0, 'system') "
                             + "ON DUPLICATE KEY UPDATE parent_id = VALUES(parent_id), deleted = 0, sort_order = 4, updated_by = 'system'",
                     basicId);
             // 给 admin 角色授权
@@ -1810,12 +1836,18 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             + "('oa_reimburse', '報銷申請', 'finance', 'DollarOutlined', '費用報銷申請流程', 'oa_general', 2, 1), "
             + "('oa_purchase', '採購申請', 'finance', 'ShoppingCartOutlined', '辦公物資採購申請流程', 'oa_general', 3, 1), "
             + "('oa_seal', '用章申請', 'office', 'AuditOutlined', '公章使用申請流程', 'oa_general', 4, 1), "
-            + "('oa_general', '通用審批', 'general', 'FormOutlined', '通用審批流程，適用於一般事項', 'oa_general', 5, 1)");
+            + "('oa_general', '通用審批', 'general', 'FormOutlined', '通用審批流程，適用於一般事項', 'oa_general', 5, 1), "
+            + "('ai_access', 'AI使用申請', 'general', 'RobotOutlined', 'AI模型權限與額度申請流程', 'ai_access', 6, 1)");
 
         // 5. 流程配置：OA通用审批流程
         jdbcTemplate.update(
             "INSERT IGNORE INTO biz_workflow_config (flow_type, flow_name, approval_enabled, description) "
             + "VALUES ('oa_general', 'OA通用審批', 1, 'OA中心通用審批流程，默認一級審批')");
+
+        // 5.1 流程配置：AI使用申请流程
+        jdbcTemplate.update(
+            "INSERT IGNORE INTO biz_workflow_config (flow_type, flow_name, approval_enabled, description) "
+            + "VALUES ('ai_access', 'AI使用申請審批', 1, 'AI模型權限與額度申請審批流程')");
 
         // 6. 编号规则：OA流程编号
         jdbcTemplate.update(
@@ -1823,6 +1855,20 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             + "VALUES ('oa_request', 'OA流程編號', 'OA中心', 'OA', 'YYYYMMDD', 4, 1, '{prefix} + YYYYMMDD + {n}位自增序號')");
 
         log.info("OA中心表及种子数据已就绪");
+    }
+
+    /**
+     * v31: 补充 ai_access 流程类型到 biz_oa_process 和 biz_workflow_config
+     * （之前 migrateOaTables 已执行过，无法重跑，故独立迁移）
+     */
+    private void seedAiAccessProcessType() {
+        jdbcTemplate.update(
+            "INSERT IGNORE INTO biz_oa_process (process_code, process_name, category, icon, description, workflow_type, sort_order, status) "
+            + "VALUES ('ai_access', 'AI使用申請', 'general', 'RobotOutlined', 'AI模型權限與額度申請流程', 'ai_access', 6, 1)");
+        jdbcTemplate.update(
+            "INSERT IGNORE INTO biz_workflow_config (flow_type, flow_name, approval_enabled, description) "
+            + "VALUES ('ai_access', 'AI使用申請審批', 1, 'AI模型權限與額度申請審批流程')");
+        log.info("已补充 ai_access 流程类型种子数据");
     }
 
     /**
@@ -2196,6 +2242,35 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         } catch (Exception e) {
             log.warn("清理 merchant-order-manage 占位菜单失败: {}", e.getMessage());
         }
+    }
+
+    /** 钉钉通知种子数据：sys_config 配置项 + mcp_tool 工具注册 */
+    private void seedDingTalkNotification() {
+        // sys_config 种子
+        String[][] configs = {
+                {"dingtalk_webhook_url", "", "钉钉自定义机器人 Webhook 地址"},
+                {"dingtalk_secret", "", "钉钉自定义机器人加签密钥（SEC 开头）"},
+                {"dingtalk_enabled", "false", "钉钉通知全局开关（true/false）"},
+                {"dingtalk_at_mobiles", "", "钉钉通知默认 @手机号列表（逗号分隔）"},
+        };
+        for (String[] cfg : configs) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_config (config_key, config_value, description) VALUES (?, ?, ?)",
+                    cfg[0], cfg[1], cfg[2]);
+        }
+        // mcp_tool 种子
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mcp_tool WHERE tool_key = 'dingtalk_sender'", Integer.class);
+        if (exists == null || exists == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO mcp_tool (tool_key, name, category, description, icon, version, risk_level, params_json, enabled, installed, source, transport, sort, deleted) "
+                            + "VALUES ('dingtalk_sender', '釘釘通知', 'notify', "
+                            + "'通過釘釘自定義機器人 Webhook 向群聊發送消息', "
+                            + "'BellOutlined', '1.0.0', 'L3', "
+                            + "'{\"type\":\"object\",\"properties\":{\"content\":{\"type\":\"string\",\"description\":\"消息內容\"},\"msgType\":{\"type\":\"string\",\"description\":\"text 或 markdown\"}},\"required\":[\"content\"]}', "
+                            + "1, 0, 'external', 'remote-http', 104, 0)");
+        }
+        log.info("钉钉通知种子数据已初始化");
     }
 
     /** 刪除 ai_access_request 表（AI 申請已統一寫入 biz_oa_request） */

@@ -29,6 +29,7 @@ import {
   HomeOutlined,
   ColumnHeightOutlined,
   SettingOutlined,
+  ControlOutlined,
   GlobalOutlined,
   ThunderboltOutlined,
   StopOutlined,
@@ -78,6 +79,7 @@ import {
   ShoppingCartOutlined, // 采购申请
   FileDoneOutlined, // 采购订单
   ImportOutlined, // 验收入库
+  BellOutlined, // 通知渠道配置
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -201,6 +203,7 @@ const keyToPath: Record<string, string> = {
   'menu-config': '/menu-config',
   'translation-manage': '/translation-manage',
   'rule-config': '/rule-config',
+  'notification-config': '/notification-config',
   'workflow-config': '/workflow-config',
     'version-history': '/version-history',
   // 智能中心(AI)
@@ -703,13 +706,13 @@ const menuItems: MenuItem[] = [
       },
       {
         key: 'asset-basic',
-        icon: <SettingOutlined />,
-        label: '基礎設置',
+        icon: <ControlOutlined />,
+        label: '基礎配置',
         children: [
-          { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類' },
-          { key: 'asset-model', icon: <BarcodeOutlined />, label: '產品庫' },
+          { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類庫' },
+          { key: 'asset-model', icon: <BarcodeOutlined />, label: '品牌產品庫' },
           { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
-          { key: 'param-library', icon: <DatabaseOutlined />, label: '參數庫' },
+          { key: 'param-library', icon: <DatabaseOutlined />, label: '產品參數庫' },
         ],
       },
     ],
@@ -787,6 +790,11 @@ const menuItems: MenuItem[] = [
         key: 'version-history',
         icon: <HistoryOutlined />,
         label: '版本管理',
+      },
+      {
+        key: 'notification-config',
+        icon: <BellOutlined />,
+        label: '通知渠道配置',
       },
     ],
   },
@@ -883,6 +891,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'rule-config': <SwapOutlined />,
   'workflow-config': <ApartmentOutlined />,
   'version-history': <HistoryOutlined />,
+  'notification-config': <BellOutlined />,
   // 智能中心 (AI)
   'ai-assistant': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
@@ -917,7 +926,10 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-emp-permission': <UnlockOutlined />,     // 員工AI權額管理 - 解鎖/權限管理
   // 物資管理
   'asset-management': <InboxOutlined />,
-  'asset-basic':      <SettingOutlined />,
+  'asset-basic':      <ControlOutlined />, // 控制面板，与系統配置的齿轮区分
+  'asset-category':   <TagsOutlined />,      // 資產分類庫
+  'asset-model':      <BarcodeOutlined />,   // 品牌產品庫
+  'asset-location':   <EnvironmentOutlined />, // 倉庫維護
   'asset-flow-ops':   <SwapOutlined />,
   'asset-maintenance': <ToolOutlined />,
   'asset-purchase':   <ShoppingCartOutlined />,

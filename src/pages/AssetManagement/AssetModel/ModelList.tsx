@@ -114,6 +114,9 @@ export default function ModelList({
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
 
+  // 删除后触发列表刷新
+  const [deleteTrigger, setDeleteTrigger] = useState(0)
+
   // 搜索过滤
   const [brandFilters, setBrandFilters] = useState<BrandQuery>({})
   const [filters, setFilters] = useState<{
@@ -139,10 +142,10 @@ export default function ModelList({
     }
   }, [brandFilters])
 
-  const loadProducts = useCallback(async (brandId?: number) => {
+  const loadProducts = useCallback(async (brandId?: number, categoryCode?: string) => {
     setLoading(true)
     try {
-      const res = await fetchModelList({ ...filters, brandId, page, size })
+      const res = await fetchModelList({ ...filters, brandId, categoryCode, page, size })
       setProducts(res.records || [])
       setTotal(res.total || 0)
     } catch (e: unknown) {
@@ -243,7 +246,6 @@ export default function ModelList({
     setViewMode('products')
     setFilters({})
     setPage(1)
-    loadProducts(brand.id)
   }
 
   const handleSearch = () => {
@@ -259,13 +261,11 @@ export default function ModelList({
     }
     setFilters(next)
     setPage(1)
-    if (selectedBrandId) loadProducts(selectedBrandId)
   }
   const handleReset = () => {
     form.resetFields()
     setFilters({})
     setPage(1)
-    if (selectedBrandId) loadProducts(selectedBrandId)
   }
 
   const handleDeleteBrand = (record: AssetBrand) => {
@@ -301,13 +301,25 @@ export default function ModelList({
         try {
           await deleteModel(record.id)
           message.success(t('asset.deleteSuccess'))
-          if (selectedBrandId) loadProducts(selectedBrandId)
+          setDeleteTrigger(n => n + 1)
         } catch (e: unknown) {
           message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))
         }
       },
     })
   }
+
+  /** 产品视图状态变化时自动加载数据（含分页、搜索、品牌切换等场景） */
+  useEffect(() => {
+    if (viewMode !== 'products' || !selectedBrandId) return
+    const brand = brands.find(b => b.id === selectedBrandId)
+    if (!brand) return
+    // 优先用选中分类的 code；未选分类时用品牌自身的 categoryCode 保底
+    const catCode = selectedCatId
+      ? categories.find(c => c.id === selectedCatId)?.code
+      : brand.categoryCode
+    loadProducts(brand.id, catCode)
+  }, [viewMode, selectedBrandId, selectedCatId, page, size, filters, brands, categories, deleteTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current || 1)

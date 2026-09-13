@@ -237,7 +237,7 @@ export default function AiAccessApply() {
     if (!successVisible) return
     if (countdown <= 0) {
       setSuccessVisible(false)
-      navigate('/')
+      navigate('/oa-requests')
       return
     }
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
@@ -321,6 +321,9 @@ export default function AiAccessApply() {
             usageScenarios: usageScenarios.length > 0 ? usageScenarios : undefined,
             usageFrequency: usageFrequency ?? undefined,
             credentialCount: credentials.length,
+            department: user?.department || '',
+            position: user?.position || '',
+            company: t('aiApply.companyName'),
           },
         }
         addApprovalRecord(record)
@@ -498,7 +501,7 @@ export default function AiAccessApply() {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
-        {/* 申請人信息行 */}
+        {/* 第一行：申請人、申請日期、流程編號 */}
         <Row gutter={24} style={{ marginBottom: 16 }}>
           <Col span={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.applicant')}</div>
@@ -516,8 +519,12 @@ export default function AiAccessApply() {
           </Col>
         </Row>
 
-        {/* 部門 / 職位 / 公司 */}
-        <Row gutter={24}>
+        {/* 第二行：所屬公司、服務部門、職位 */}
+        <Row gutter={24} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.company')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{t('aiApply.companyName')}</div>
+          </Col>
           <Col span={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.department')}</div>
             <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.department || '-'}</div>
@@ -526,9 +533,15 @@ export default function AiAccessApply() {
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.position')}</div>
             <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.position || '-'}</div>
           </Col>
+        </Row>
+
+        {/* 第三行：流程狀態 */}
+        <Row gutter={24}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.company')}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{t('aiApply.companyName')}</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('approvalCenter.colFlowStatus')}</div>
+            <div>
+              <Tag color="warning" style={{ fontSize: 13, padding: '2px 10px' }}>{t('approvalCenter.flowDraft')}</Tag>
+            </div>
           </Col>
         </Row>
       </div>
@@ -887,7 +900,7 @@ export default function AiAccessApply() {
             <Button
               type="primary"
               size="large"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/oa-requests')}
               style={{ minWidth: 120, height: 40, borderRadius: 8 }}
             >
               {t('aiApply.backToHomeWithCountdown', { count: countdown })}

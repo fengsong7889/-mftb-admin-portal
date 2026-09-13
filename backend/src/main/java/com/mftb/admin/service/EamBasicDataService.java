@@ -75,4 +75,33 @@ public interface EamBasicDataService {
 
     /** 刪除位置 */
     void deleteLocation(long id);
+
+    /* ==================== 參數庫 ==================== */
+
+    /** 參數類型分頁列表 */
+    PageResult<Map<String, Object>> pageParamTypes(int page, int size, String categoryCode, String name, String code, String status);
+
+    /** 新增參數類型 */
+    long createParamType(Map<String, Object> data);
+
+    /** 更新參數類型 */
+    void updateParamType(long id, Map<String, Object> data);
+
+    /** 刪除參數類型 */
+    void deleteParamType(long id);
+
+    /** 根據參數類型編碼查詢參數值列表 */
+    List<Map<String, Object>> listParamValuesByType(String paramTypeCode);
+
+    /** 查詢所有參數值（分頁） */
+    PageResult<Map<String, Object>> pageParamValues(int page, int size, String paramTypeCode, String categoryCode);
+
+    /** 新增參數值 */
+    long createParamValue(Map<String, Object> data);
+
+    /** 更新參數值 */
+    void updateParamValue(long id, Map<String, Object> data);
+
+    /** 刪除參數值 */
+    void deleteParamValue(long id);
 }

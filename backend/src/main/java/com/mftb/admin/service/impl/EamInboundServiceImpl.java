@@ -86,6 +86,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             m.put("locationId", it.getLocationId());
             m.put("disposition", it.getDisposition() != null ? it.getDisposition() : "pass");
             m.put("rejectReason", it.getRejectReason());
+            m.put("photos", it.getPhotos() != null ? JsonUtils.parseMapList(it.getPhotos()) : List.of());
             m.put("assetNos", it.getAssetNos() != null ? JsonUtils.parseStringList(it.getAssetNos()) : List.of());
             return m;
         }).collect(Collectors.toList());
@@ -233,6 +234,11 @@ public class EamInboundServiceImpl implements EamInboundService {
             batchItem.setLocationId(locationId);
             batchItem.setDisposition(disposition.isEmpty() ? "pass" : disposition);
             batchItem.setRejectReason(str(item, "rejectReason"));
+            // 验收照片 JSON
+            Object photosObj = item.get("photos");
+            if (photosObj != null) {
+                batchItem.setPhotos(JsonUtils.toJson(photosObj));
+            }
             batchItem.setAssetNos(JsonUtils.toJson(assetNos));
             batchItem.setSortOrder(sort++);
             batchItemsToInsert.add(batchItem);
@@ -340,6 +346,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             m.put("locationId", it.getLocationId());
             m.put("disposition", it.getDisposition() != null ? it.getDisposition() : "pass");
             m.put("rejectReason", it.getRejectReason());
+            m.put("photos", it.getPhotos() != null ? JsonUtils.parseMapList(it.getPhotos()) : List.of());
             m.put("assetNos", it.getAssetNos() != null ? JsonUtils.parseStringList(it.getAssetNos()) : List.of());
             return m;
         }).collect(Collectors.toList()));

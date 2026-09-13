@@ -220,17 +220,17 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
 
   return (
     <Modal
-      title={editing ? '編輯物資' : '添加物資'}
+      title={editing ? '編輯資產' : '添加資產'}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
       okText={t('common:confirm')}
       cancelText={t('common:cancel')}
-      width={640}
+      width={800}
       centered
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Row gutter={16}>
+        <Row gutter={24}>
           <Col span={8}>
             <Form.Item
               label="資產分類" name="categoryId"
@@ -277,7 +277,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
                 disabled={!selectedBrandId}
                 onChange={handleModelChange}
                 options={filteredModels.map((m) => ({
-                  label: m.modelNo ? `${m.modelNo} / ${m.name}` : m.name,
+                  label: m.name,
                   value: m.id,
                 }))}
               />
@@ -292,11 +292,11 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
             border: '1px solid #f0f0f0',
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10 }}>參數信息</div>
-            <Row gutter={12}>
+            <Row gutter={16}>
               {paramTemplate.map((p) => (
                 <Col span={8} key={p.key}>
                   <Form.Item
-                    label={<span style={{ fontSize: 12 }}>{p.label}{p.unit ? ` (${p.unit})` : ''}</span>}
+                    label={<span style={{ fontSize: 13 }}>{p.label}{p.unit ? ` (${p.unit})` : ''}</span>}
                     name={['params', p.key]}
                     style={{ marginBottom: 8 }}
                   >
@@ -304,11 +304,10 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
                       <Select
                         placeholder={`請選擇${p.label}`}
                         allowClear
-                        size="small"
                         options={p.options?.map((o) => ({ label: o, value: o })) || []}
                       />
                     ) : (
-                      <Input placeholder={`請輸入${p.label}`} allowClear size="small" />
+                      <Input placeholder={`請輸入${p.label}`} allowClear />
                     )}
                   </Form.Item>
                 </Col>
@@ -499,10 +498,16 @@ export default function OaPurchaseRequest() {
             departmentId: v.department,
             applicant: user?.name || '',
             applicantEmpId: user?.empId || '',
+            serviceDepartment: user?.department || '',
+            position: user?.position || '',
+            company: '閃蜂科技有限公司',
             reason: v.reason.trim(),
             items: items.map((it) => ({
               modelId: it.modelId as number,
               modelName: it.modelName || modelOf(it.modelId)?.name || '',
+              categoryName: it.categoryName,
+              brandName: it.brandName,
+              params: it.params,
               qty: it.qty as number,
               remark: it.remark,
             })),
@@ -533,42 +538,100 @@ export default function OaPurchaseRequest() {
 
   /* ---- 提交 ---- */
   const handleSubmit = async () => {
+    let v: FormValues
     try {
-      const v = await form.validateFields()
-      if (!items.length) {
-        message.error('請至少添加一條採購明細')
-        return
-      }
-      const payload = {
-        department: v.department ? (deptNameMap.get(v.department) || '') : '',
-        departmentId: v.department,
-        applicant: user?.name || '',
-        applicantEmpId: user?.empId || '',
-        reason: v.reason.trim(),
-        items: items.map((it) => ({
-          modelId: it.modelId as number,
-          modelName: it.modelName || modelOf(it.modelId)?.name || '',
-          qty: it.qty as number,
-          remark: it.remark,
-        })),
-        certificateFiles: certificateFiles.map((f) => f.name),
-      }
-      setSubmitting(true)
-      // P0-1: 對接 OA 審批 API
-      const title = `採購申請-${user?.name || ''}-${dayjs().format('YYYYMMDD')}`
-      const flowNo = await submitOaRequest({
-        processCode: 'oa_purchase',
-        title,
-        formData: JSON.stringify(payload),
-      })
-      setSubmittedFlowNo(flowNo || '')
-      setCountdown(5)
-      setSuccessVisible(true)
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message) message.error(e.message)
-    } finally {
-      setSubmitting(false)
+      v = await form.validateFields()
+    } catch {
+      return
     }
+    if (!items.length) {
+      message.error('請至少添加一條採購明細')
+      return
+    }
+
+    // ====== 二次確認彈窗（與充值/轉賬/AI申請等流程統一規範） ======
+    const deptName = v.department ? (deptNameMap.get(v.department) || '') : ''
+    const totalQty = items.reduce((sum, it) => sum + (it.qty || 0), 0)
+    const reasonText = v.reason?.trim() || ''
+
+    Modal.confirm({
+      title: '確認提交採購申請',
+      icon: (
+        <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>
+      ),
+      centered: true,
+      className: 'custom-confirm-modal',
+      width: 520,
+      okText: '確認提交',
+      cancelText: '取消',
+      content: (
+        <div>
+          <div className="confirm-info-card">
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">申請人</span>
+              <span className="confirm-info-value">{user?.name || '--'}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">申請部門</span>
+              <span className="confirm-info-value">{deptName || '--'}</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">採購明細</span>
+              <span className="confirm-info-value highlight">{items.length} 項，共 {totalQty} 件</span>
+            </div>
+            <div className="confirm-info-row">
+              <span className="confirm-info-label">採購事由</span>
+              <span className="confirm-info-value">{reasonText.length > 50 ? reasonText.slice(0, 50) + '...' : reasonText}</span>
+            </div>
+            {certificateFiles.length > 0 && (
+              <div className="confirm-info-row">
+                <span className="confirm-info-label">憑證文件</span>
+                <span className="confirm-info-value">{certificateFiles.length} 份</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+      onOk: async () => {
+        const payload = {
+          department: v.department ? (deptNameMap.get(v.department) || '') : '',
+          departmentId: v.department,
+          applicant: user?.name || '',
+          applicantEmpId: user?.empId || '',
+          serviceDepartment: user?.department || '',
+          position: user?.position || '',
+          company: '閃蜂科技有限公司',
+          reason: reasonText,
+          items: items.map((it) => ({
+            modelId: it.modelId as number,
+            modelName: it.modelName || modelOf(it.modelId)?.name || '',
+            categoryName: it.categoryName,
+            brandName: it.brandName,
+            params: it.params,
+            qty: it.qty as number,
+            remark: it.remark,
+          })),
+          certificateFiles: certificateFiles.map((f) => f.name),
+        }
+        setSubmitting(true)
+        try {
+          const title = `採購申請-${user?.name || ''}-${dayjs().format('YYYYMMDD')}`
+          const flowNo = await submitOaRequest({
+            processCode: 'oa_purchase',
+            title,
+            formData: JSON.stringify(payload),
+          })
+          setSubmittedFlowNo(flowNo || '')
+          setCountdown(5)
+          // 等待確認彈窗完全關閉後再顯示成功彈窗
+          setTimeout(() => setSuccessVisible(true), 350)
+        } catch (e: unknown) {
+          if (e instanceof Error && e.message) message.error(e.message)
+        } finally {
+          setSubmitting(false)
+        }
+      },
+    })
   }
 
   /* ---- 明細表格列 ---- */
@@ -726,7 +789,7 @@ export default function OaPurchaseRequest() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
-          {/* 申請人信息行 */}
+          {/* 第一行：申請人、申請日期、流程編號 */}
           <Row gutter={24} style={{ marginBottom: 16 }}>
             <Col span={8}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>申請人</div>
@@ -744,8 +807,12 @@ export default function OaPurchaseRequest() {
             </Col>
           </Row>
 
-          {/* 部門 / 職位 / 公司 */}
+          {/* 第二行：所屬公司、服務部門、職位 */}
           <Row gutter={24} style={{ marginBottom: 16 }}>
+            <Col span={8}>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>所屬公司</div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>閃蜂科技有限公司</div>
+            </Col>
             <Col span={8}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>服務部門</div>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.department || '-'}</div>
@@ -754,13 +821,9 @@ export default function OaPurchaseRequest() {
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>職位</div>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.position || '-'}</div>
             </Col>
-            <Col span={8}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>所屬公司</div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>閃蜂科技有限公司</div>
-            </Col>
           </Row>
 
-          {/* 表單字段：部門選擇、事由 */}
+          {/* 第三行：申請部門 + 流程狀態 */}
           <Row gutter={24}>
             <Col span={8}>
               <Form.Item
@@ -776,6 +839,12 @@ export default function OaPurchaseRequest() {
                   treeNodeFilterProp="title"
                 />
               </Form.Item>
+            </Col>
+            <Col span={8}>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>流程狀態</div>
+              <div>
+                <Tag color="warning" style={{ fontSize: 13, padding: '2px 10px' }}>待提交</Tag>
+              </div>
             </Col>
           </Row>
 
@@ -813,7 +882,7 @@ export default function OaPurchaseRequest() {
             style={{ marginBottom: 16 }}
           />
           <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddItem}>
-            添加物資
+            添加資產
           </Button>
         </div>
 
@@ -894,7 +963,7 @@ export default function OaPurchaseRequest() {
                   <br />
                 </>
               )}
-              採購申請已提交，請在流程事項中查看審批進度
+              採購申請已提交，請在「我的申請」中查看審批進度
             </p>
             <Button
               type="primary"
@@ -902,7 +971,7 @@ export default function OaPurchaseRequest() {
               onClick={() => { setSuccessVisible(false); navigate('/oa-requests') }}
               style={{ minWidth: 120, height: 40, borderRadius: 8, backgroundColor: '#E8720C', borderColor: '#E8720C' }}
             >
-              前往流程事項（{countdown}s）
+              查看我的申請（{countdown}s）
             </Button>
           </div>
         </div>

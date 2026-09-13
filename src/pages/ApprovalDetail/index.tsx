@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Tag, Input, Modal, Table, message } from 'antd'
 import {
   UndoOutlined,
+  SendOutlined,
   ExclamationCircleOutlined,
   FileImageOutlined,
   FilePdfOutlined,
@@ -15,6 +16,7 @@ import {
   rejectCurrentNode,
   getApprovalRecordByFlowNo,
   updateApprovalRecord,
+  deleteApprovalRecord,
   hasNodeApprovalRole,
   getRequiredApprovalRole,
   APPROVAL_NODE_LABELS,
@@ -26,7 +28,7 @@ import {
   cancelFinApproval,
 } from '../../api/finance'
 import type { FinApproval } from '../../api/finance'
-import { fetchOaRequestDetail, approveOaRequest, rejectOaRequest, cancelOaRequest, type OaRequestVO } from '../../api/oaRequest'
+import { fetchOaRequestDetail, approveOaRequest, rejectOaRequest, cancelOaRequest, submitDraftOaRequest, type OaRequestVO } from '../../api/oaRequest'
 import AiApprovalActionPanel from './AiApprovalActionPanel'
 import {
   type AiGrantDraft,
@@ -163,10 +165,14 @@ interface ApprovalDetailData {
   aiUsageScenarios?: string[]
   aiUsageFrequency?: string
   // 採購申請
-  purchaseItems?: { modelName: string; qty: number; remark?: string }[]
+  purchaseItems?: { modelName: string; qty: number; remark?: string; categoryName?: string; brandName?: string; params?: Record<string, string> }[]
   // 通用
   groupId?: string
   groupName?: string
+  department?: string
+  applyDepartment?: string
+  position?: string
+  company?: string
   documents?: { type: 'image' | 'pdf' | 'view'; name?: string }[]
   notes?: string
   timeline: ApprovalTimelineItem[]
@@ -422,12 +428,13 @@ const typeTitleMapKeys: Record<string, string> = {
 const brandLabelMap: Record<string, string> = { flashBee: '閃蜂', mFood: 'mFood' }
 /** 流程狀態映射（i18n key，value 為英文枚舉碼） */
 const flowStatusLabelMapKeys: Record<string, string> = {
+  draft: 'approvalCenter.flowDraft',
   pending: 'approvalCenter.flowPending', approved: 'approvalCenter.flowApproved',
   rejected: 'approvalCenter.flowRejected', cancelled: 'approvalCenter.flowCancelled',
 }
-/** 流程狀態標籤顏色（與審批中心列表保持一致：審核中藍/通過綠/駁回紅/撤銷灰） */
+/** 流程狀態標籤顏色（與審批中心列表保持一致：草稿橙/審核中藍/通過綠/駁回紅/撤銷灰） */
 const flowStatusColorMap: Record<string, string> = {
-  pending: 'processing', approved: 'success', rejected: 'error', cancelled: 'default',
+  draft: 'warning', pending: 'processing', approved: 'success', rejected: 'error', cancelled: 'default',
 }
 /** 支付方式映射（i18n key，value 為英文枚舉碼） */
 const payMethodLabelMapKeys: Record<string, string> = {
@@ -494,13 +501,25 @@ function nodeItem(node: string, approver: string, time: string, status: string, 
   }
 }
 
-/** 從流程配置 + 本地審批記錄構建 AI 申請時間軸 */
+/** 從流程配置 + 本地審批記錄構建 AI 申請時間軸（懶展示：draft 僅流程創建；審批中僅展示已完成 + 當前待審節點） */
 function buildAiAccessTimeline(
-  local: { bizApprover?: string; bizApproveTime?: string; bizApproveStatus?: string; opsApprover?: string; opsApproveTime?: string; opsApproveStatus?: string; applyTime?: string; applicant?: string; rejectReason?: string } | null,
+  local: { bizApprover?: string; bizApproveTime?: string; bizApproveStatus?: string; opsApprover?: string; opsApproveTime?: string; opsApproveStatus?: string; applyTime?: string; applicant?: string; rejectReason?: string; flowStatus?: string } | null,
   employees?: EmployeeItem[],
   departments?: DepartmentItem[],
   roles?: RoleItem[],
 ): ApprovalTimelineItem[] {
+  // 提交節點
+  const createdNode: ApprovalTimelineItem = {
+    node: 'created',
+    time: local?.applyTime || '--',
+    approver: local?.applicant || '--',
+    status: 'submitted',
+    comment: '',
+  }
+  // 待提交狀態：僅展示流程創建節點，不暴露後續審批節點
+  if (local?.flowStatus === 'draft') {
+    return [createdNode]
+  }
   // 讀取流程配置獲取節點名稱與審批規則
   let nodeMetas = [
     { name: '業務主管審批', approvalRule: 'any' },
@@ -521,6 +540,8 @@ function buildAiAccessTimeline(
   } catch { /* ignore */ }
 
   const timeline: ApprovalTimelineItem[] = []
+  // 懶展示：僅展示已完成節點與當前待審節點，後續未到的節點不提前暴露
+  let currentPendingShown = false
   // 按流程配置節點順序添加
   nodeMetas.forEach(({ name: nodeName, approvalRule }) => {
     let approver = '--'
@@ -535,6 +556,9 @@ function buildAiAccessTimeline(
       time = local?.opsApproveTime || '--'
       status = nodeItem('', '', '', local?.opsApproveStatus || '').status
     }
+    // 當前待審節點已展示過，後續 pending 節點跳過
+    if (status === 'pending' && currentPendingShown) return
+    if (status === 'pending') currentPendingShown = true
     const item = nodeItem(nodeName, approver, time, status, local?.rejectReason)
     item.approvalRule = approvalRule
     // pending 節點且有參考數據時，從流程配置解析全部候選審批人
@@ -547,14 +571,7 @@ function buildAiAccessTimeline(
     }
     timeline.push(item)
   })
-  // 提交節點
-  timeline.push({
-    node: 'created',
-    time: local?.applyTime || '--',
-    approver: local?.applicant || '--',
-    status: 'submitted',
-    comment: '',
-  })
+  timeline.push(createdNode)
   return timeline
 }
 
@@ -705,14 +722,21 @@ function toDetailData(record: FinApproval, t?: (key: string) => string): Approva
       aiUsageScenarios: scenarios,
       aiUsageFrequency: str(extra.usageFrequency),
       notes: str(extra.usageDescription),
+      department: str(extra.department) || undefined,
+      position: str(extra.position) || undefined,
+      company: str(extra.company) || undefined,
     }
   }
   if (record.approvalType === 'oa_purchase') {
-    const purchaseItems = Array.isArray(extra.items) ? (extra.items as Array<{ modelName: string; qty: number; remark?: string }>) : []
+    const purchaseItems = Array.isArray(extra.items) ? (extra.items as Array<{ modelName: string; qty: number; remark?: string; categoryName?: string; brandName?: string; params?: Record<string, string> }>) : []
     return {
       ...base,
       notes: str(extra.reason),
+      applyDepartment: str(extra.department) || undefined,
+      department: str(extra.serviceDepartment) || undefined,
       purchaseItems,
+      position: str(extra.position) || undefined,
+      company: str(extra.company) || undefined,
     }
   }
   return base
@@ -760,6 +784,10 @@ export default function ApprovalDetail() {
       const localRequested = Array.isArray(localExtra.requestedModels)
         ? (localExtra.requestedModels as number[])
         : []
+      const localScenarios = Array.isArray(localExtra.usageScenarios)
+        ? (localExtra.usageScenarios as string[])
+        : []
+      const usageDesc = str(localExtra.usageDescription)
       return {
         approvalType: 'ai_access',
         applicant: aiLocal?.applicant || '--',
@@ -767,7 +795,16 @@ export default function ApprovalDetail() {
         flowNo,
         flowStatus: aiLocal?.flowStatus || 'pending',
         brand: '--',
+        department: str(localExtra.department) || undefined,
+        position: str(localExtra.position) || undefined,
+        company: str(localExtra.company) || undefined,
+        aiRequestType: str(localExtra.requestType),
+        aiApplyReason: usageDesc || undefined,
         aiRequestedModels: localRequested,
+        aiUsageDescription: usageDesc || undefined,
+        aiUsageScenarios: localScenarios.length > 0 ? localScenarios : undefined,
+        aiUsageFrequency: str(localExtra.usageFrequency) || undefined,
+        notes: usageDesc || undefined,
         aiRequestId,
         timeline: buildAiAccessTimeline(aiLocal || null, refReady ? employeesRef.current : undefined, refReady ? departmentsRef.current : undefined, refReady ? rolesRef.current : undefined),
         hasRevoke: (aiLocal?.flowStatus || 'pending') === 'pending',
@@ -778,7 +815,7 @@ export default function ApprovalDetail() {
       const purchaseLocal = local || undefined
       const purchaseExtra = (purchaseLocal?.extra || {}) as Record<string, unknown>
       const purchaseItems = Array.isArray(purchaseExtra.items)
-        ? (purchaseExtra.items as Array<{ modelName: string; qty: number; remark?: string }>)
+        ? (purchaseExtra.items as Array<{ modelName: string; qty: number; remark?: string; categoryName?: string; brandName?: string; params?: Record<string, string> }>)
         : []
       return {
         approvalType: 'oa_purchase' as const,
@@ -788,8 +825,12 @@ export default function ApprovalDetail() {
         flowStatus: purchaseLocal?.flowStatus || 'draft',
         brand: '--',
         notes: (purchaseExtra.reason as string) || '',
+        applyDepartment: (purchaseExtra.department as string) || undefined,
+        department: (purchaseExtra.serviceDepartment as string) || undefined,
+        position: (purchaseExtra.position as string) || undefined,
+        company: (purchaseExtra.company as string) || undefined,
         purchaseItems,
-        hasRevoke: (purchaseLocal?.flowStatus || 'draft') === 'draft',
+        hasRevoke: (purchaseLocal?.flowStatus || 'draft') === 'pending',
         timeline: [
           { node: 'created', time: purchaseLocal?.applyTime || '', approver: purchaseLocal?.applicant || '--', status: 'submitted' as const, comment: '' },
         ],
@@ -817,6 +858,7 @@ export default function ApprovalDetail() {
   const [submitting, setSubmitting] = useState(false)
   const [approvalComment, setApprovalComment] = useState('')
   const [showRevokeModal, setShowRevokeModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   /** 查看節點全部審批人彈窗（多人審批時時間軸僅展示前 3 人） */
@@ -832,6 +874,18 @@ export default function ApprovalDetail() {
   const type = data.approvalType || urlType
   /** 僅審批中的流程可通過/駁回 */
   const isPending = data.flowStatus === 'pending'
+  /** 是否已有審批人通過（有則不允許撤銷） */
+  const hasApprovedNode = data.timeline?.some((n) => n.status === 'approved') ?? false
+  /** 當前登錄人是否為當前待審節點的審批人（或管理員），僅審批人可見通過/駁回按鈕 */
+  const isCurrentApprover = (() => {
+    try {
+      const info = JSON.parse(localStorage.getItem('user_info') || '{}')
+      if (info.role === 'admin') return true
+      const signature = info.name && info.empId ? `${info.name}(${info.empId})` : (info.name || '')
+      if (!signature) return false
+      return data.timeline?.some((n) => n.status === 'pending' && (n.approver || '').includes(signature)) ?? false
+    } catch { return false }
+  })()
 
   /** 加載審批詳情（AI 申請不走 biz_fin_approval，直接取本地記錄 + 後續 effect 拉後端 AI 詳情） */
   useEffect(() => {
@@ -864,23 +918,26 @@ export default function ApprovalDetail() {
    */
   useEffect(() => {
     if (type !== 'ai_access' || !flowNo) return
+    // 本地草稿（未提交到後端）：跳過後端查詢，避免「流程不存在」報錯
+    const localRecord = getApprovalRecordByFlowNo(flowNo)
+    if (localRecord && localRecord.flowStatus === 'draft') return
     let cancelled = false
     // 優先使用 OA 統一接口按 flowNo 查詢
     fetchOaRequestDetail(flowNo)
       .then((oaVo) => {
         if (cancelled) return
-        // 從 formData 中提取 AI 申請字段
+        // 從 formData 中提取 AI 申請字段（兼容 camelCase 與 snake_case）
         const fd = oaVo.formData || {}
         const applicantText = oaVo.applicant || '--'
         setAiRequest({
           id: oaVo.id,
           applicantName: oaVo.applicant,
           applicantId: 0,
-          requestType: fd.request_type as string || '',
-          requestedModels: (fd.approved_models || fd.requested_models || []) as number[],
-          usageDescription: fd.usage_description as string || '',
-          usageScenarios: (fd.usage_scenarios || []) as string[],
-          usageFrequency: fd.usage_frequency as string || '',
+          requestType: (fd.requestType || fd.request_type || '') as string,
+          requestedModels: (fd.approvedModels || fd.approved_models || fd.requestedModels || fd.requested_models || []) as number[],
+          usageDescription: (fd.usageDescription || fd.usage_description || '') as string,
+          usageScenarios: (fd.usageScenarios || fd.usage_scenarios || []) as string[],
+          usageFrequency: (fd.usageFrequency || fd.usage_frequency || '') as string,
           status: oaVo.flowStatus as 'pending' | 'approved' | 'rejected' | 'cancelled',
           approveRemark: oaVo.rejectReason || '',
           createdAt: oaVo.applyTime || '',
@@ -892,13 +949,13 @@ export default function ApprovalDetail() {
             applicant: applicantText,
             applyDate: oaVo.applyTime || prev.applyDate,
             flowStatus: oaVo.flowStatus,
-            aiRequestType: fd.request_type as string || '',
-            aiApplyReason: fd.usage_description as string || undefined,
-            aiRequestedModels: (fd.approved_models || fd.requested_models || prev.aiRequestedModels) as number[] | undefined,
-            aiUsageDescription: fd.usage_description as string || '',
-            aiUsageScenarios: (fd.usage_scenarios || []) as string[],
-            aiUsageFrequency: fd.usage_frequency as string || undefined,
-            notes: fd.usage_description as string || '',
+            aiRequestType: (fd.requestType || fd.request_type || '') as string,
+            aiApplyReason: (fd.usageDescription || fd.usage_description || '') as string || undefined,
+            aiRequestedModels: (fd.approvedModels || fd.approved_models || fd.requestedModels || fd.requested_models || prev.aiRequestedModels) as number[] | undefined,
+            aiUsageDescription: (fd.usageDescription || fd.usage_description || '') as string,
+            aiUsageScenarios: (fd.usageScenarios || fd.usage_scenarios || []) as string[],
+            aiUsageFrequency: (fd.usageFrequency || fd.usage_frequency || '') as string || undefined,
+            notes: (fd.usageDescription || fd.usage_description || '') as string,
             timeline: prev.timeline.map((item) => item.node === 'created'
               ? { ...item, approver: applicantText, time: oaVo.applyTime || item.time }
               : item),
@@ -914,7 +971,7 @@ export default function ApprovalDetail() {
           setData((prev) => (prev.flowStatus === 'pending' ? { ...prev, flowStatus: oaVo.flowStatus } : prev))
         } else {
           setData((prev) => {
-            const nextModels = (fd.approved_models || fd.requested_models) as number[] | undefined
+            const nextModels = (fd.approvedModels || fd.approved_models || fd.requestedModels || fd.requested_models) as number[] | undefined
             if (nextModels && JSON.stringify(nextModels) !== JSON.stringify(prev.aiRequestedModels)) {
               return { ...prev, aiRequestedModels: nextModels }
             }
@@ -1003,7 +1060,7 @@ export default function ApprovalDetail() {
         const fd = oaVo.formData || {}
         const applicantText = oaVo.applicant || '--'
         const purchaseItems = Array.isArray(fd.items)
-          ? (fd.items as Array<{ modelName: string; qty: number; remark?: string }>)
+          ? (fd.items as Array<{ modelName: string; qty: number; remark?: string; categoryName?: string; brandName?: string; params?: Record<string, string> }>)
           : []
         // 從審批任務構建時間軸
         const timeline: ApprovalTimelineItem[] = []
@@ -1035,9 +1092,13 @@ export default function ApprovalDetail() {
           applicant: applicantText,
           applyDate: oaVo.applyTime || '',
           flowStatus: oaVo.flowStatus,
+          applyDepartment: (fd.department as string) || undefined,
+          department: (fd.serviceDepartment as string) || undefined,
+          position: (fd.position as string) || undefined,
+          company: (fd.company as string) || undefined,
           notes: (fd.reason as string) || '',
           purchaseItems,
-          hasRevoke: oaVo.flowStatus === 'draft' || oaVo.flowStatus === 'pending',
+          hasRevoke: oaVo.flowStatus === 'pending',
           timeline,
         }))
       })
@@ -1119,11 +1180,13 @@ export default function ApprovalDetail() {
               })
             }
           }
-          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批
+          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批；OA 採購走 OA 審批 API
           const isFrontendFlow = type === 'gift' || type === 'ai_access'
-          const result = isFrontendFlow
-            ? approveCurrentNode(flowNo)
-            : await approveFinApproval(flowNo)
+          const result = type === 'oa_purchase'
+            ? ((await approveOaRequest(flowNo, approvalComment)), null)
+            : isFrontendFlow
+              ? approveCurrentNode(flowNo)
+              : await approveFinApproval(flowNo)
           if (result) {
             message.success(result.finished
               ? t('approvalDetail.approveFinished', {
@@ -1132,7 +1195,8 @@ export default function ApprovalDetail() {
                 })
               : t('approvalDetail.approveNext', { nodeName: result.nodeName, nextNode: result.nextNode }))
           }
-          navigate('/approval-center')
+          const isOaFlow = type === 'oa_purchase' || type === 'ai_access'
+          navigate(isOaFlow ? '/oa-requests' : '/approval-center')
         } catch (err) {
           // 無審批權限（403）或審批即授權事務失敗等業務校驗失敗，展示後端給出的具體原因
           message.error((err as Error)?.message || t('approvalDetail.approveFailed'))
@@ -1166,20 +1230,25 @@ export default function ApprovalDetail() {
     try {
       /**
        * AI 申請駁回：同步寫後端（審批人可跨設備操作），失敗時中止保持 pending 可重試；
-       * 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回
+       * 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回；OA 採購走 OA 駁回 API
        */
       if (type === 'ai_access' && data.aiRequestId) {
+        await rejectOaRequest(flowNo, rejectReason)
+      } else if (type === 'oa_purchase') {
         await rejectOaRequest(flowNo, rejectReason)
       }
       const isFrontendFlow = type === 'gift' || type === 'ai_access'
       const rejectedNode = isFrontendFlow
         ? rejectCurrentNode(flowNo, rejectReason)
-        : (await rejectFinApproval(flowNo, rejectReason), null)
+        : type === 'oa_purchase'
+          ? null
+          : (await rejectFinApproval(flowNo, rejectReason), null)
       message.success(rejectedNode
         ? t('approvalDetail.rejectDone', { nodeName: rejectedNode })
         : t('approvalCenter.rejectSuccess'))
       setShowRejectModal(false)
-      navigate('/approval-center')
+      const isOaFlow = type === 'oa_purchase' || type === 'ai_access'
+      navigate(isOaFlow ? '/oa-requests' : '/approval-center')
     } catch (err) {
       message.error((err as Error)?.message || t('approvalDetail.rejectFailed'))
     } finally {
@@ -1194,20 +1263,91 @@ export default function ApprovalDetail() {
   const handleRevokeConfirm = async () => {
     setSubmitting(true)
     try {
-      // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷；AI 申請同步撤銷後端申請
+      // 前端流程（贈送、AI 申請）為本地記錄，直接本地撤銷；OA 類流程同步撤銷後端申請
       if (type === 'ai_access' && data.aiRequestId) {
         await cancelOaRequest(flowNo)
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
       } else if (type === 'gift') {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
+      } else if (type === 'oa_purchase') {
+        await cancelOaRequest(flowNo)
       } else {
         await cancelFinApproval(flowNo)
       }
       message.success(t('approvalDetail.revokeSuccess'))
       setShowRevokeModal(false)
-      navigate('/approval-center')
+      // 停留在當前頁面，更新本地狀態以反映已撤銷的流程
+      setData((prev) => ({ ...prev, flowStatus: 'cancelled', hasRevoke: false }))
     } catch (err) {
       message.error((err as Error)?.message || t('approvalDetail.revokeFailed'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** 刪除草稿（僅 draft 狀態可用） */
+  const handleDelete = () => {
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    // 後端記錄：調用撤銷 API 刪除
+    if ((type === 'oa_purchase' || type === 'ai_access') && flowNo) {
+      try {
+        await cancelOaRequest(flowNo)
+      } catch { /* API 失敗仍刪除本地記錄 */ }
+    }
+    // 刪除本地審批記錄
+    deleteApprovalRecord(flowNo)
+    message.success('草稿已刪除')
+    setShowDeleteModal(false)
+    navigate('/oa-requests')
+  }
+
+  /** 提交草稿（draft → pending） */
+  const handleSubmitDraft = async () => {
+    if (!flowNo) return
+    setSubmitting(true)
+    try {
+      await submitDraftOaRequest(flowNo)
+      message.success('流程已提交')
+      // 刷新詳情
+      const oaVo = await fetchOaRequestDetail(flowNo)
+      const fd = oaVo.formData || {}
+      const purchaseItems = Array.isArray(fd.items)
+        ? (fd.items as Array<{ modelName: string; qty: number; remark?: string; categoryName?: string; brandName?: string; params?: Record<string, string> }>)
+        : []
+      const timeline: ApprovalTimelineItem[] = []
+      timeline.push({
+        node: 'created',
+        time: oaVo.applyTime || '',
+        approver: oaVo.applicant || '--',
+        status: 'submitted',
+        comment: '',
+      })
+      if (oaVo.approvalTasks?.length) {
+        oaVo.approvalTasks.forEach((task) => {
+          let status: ApprovalTimelineItem['status'] = 'pending'
+          if (task.taskStatus === 'approved') status = 'approved'
+          else if (task.taskStatus === 'rejected') status = 'rejected'
+          timeline.push({
+            node: task.nodeName || '',
+            time: task.approveTime || '',
+            approver: task.approver || '--',
+            status,
+            comment: task.comment || '',
+          })
+        })
+      }
+      setData((prev) => ({
+        ...prev,
+        flowStatus: oaVo.flowStatus,
+        purchaseItems,
+        hasRevoke: oaVo.flowStatus === 'pending',
+        timeline,
+      }))
+    } catch (err) {
+      message.error((err as Error)?.message || '提交失敗，請重試')
     } finally {
       setSubmitting(false)
     }
@@ -1261,7 +1401,9 @@ export default function ApprovalDetail() {
         title={typeTitleMapKeys[type] ? t(typeTitleMapKeys[type]) : type}
         tags={
           <>
-            {type !== 'ai_access' && <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>}
+            {type === 'oa_purchase' || type === 'ai_access'
+              ? <Tag color={type === 'oa_purchase' ? 'orange' : 'blue'} style={{ margin: 0 }}>{type === 'oa_purchase' ? '採購' : 'AI申請'}</Tag>
+              : <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>}
             <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
             <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
           </>
@@ -1269,10 +1411,16 @@ export default function ApprovalDetail() {
         onBack={() => navigate(-1)}
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
-            {data.hasRevoke && (
+            {data.flowStatus === 'draft' && (
+              <>
+                <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmitDraft}>提交</Button>
+                <Button danger onClick={handleDelete}>刪除</Button>
+              </>
+            )}
+            {isPending && !hasApprovedNode && (
               <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
             )}
-            {isPending && (
+            {isPending && isCurrentApprover && (
               <>
                 <Button type="primary" loading={submitting} onClick={handleApprove}>{t('approvalCenter.statusApproved')}</Button>
                 <Button danger loading={submitting} onClick={handleReject}>{t('approvalCenter.statusRejected')}</Button>
@@ -1290,6 +1438,7 @@ export default function ApprovalDetail() {
           <div className="approval-section">
             <div className="approval-section-title approval-section-title--blue">{t('approvalDetail.baseInfo')}</div>
             <div className="approval-info-grid">
+              {/* 第一行：申請人、申請日期、流程編號 */}
               <div className="approval-info-item">
                 <span className="approval-info-label">{t('approvalCenter.colApplicant')}</span>
                 <span className="approval-info-value">{data.applicant}</span>
@@ -1302,6 +1451,30 @@ export default function ApprovalDetail() {
                 <span className="approval-info-label">{t('common.colFlowNo')}</span>
                 <span className="approval-info-value">{data.flowNo}</span>
               </div>
+              {/* 第二行：所屬公司、服務部門、職位 */}
+              {type === 'ai_access' || type === 'oa_purchase' ? (
+                <>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">{t('aiApply.company')}</span>
+                    <span className="approval-info-value">{data.company || '--'}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">{t('aiApply.department')}</span>
+                    <span className="approval-info-value">{data.department || '--'}</span>
+                  </div>
+                  <div className="approval-info-item">
+                    <span className="approval-info-label">{t('aiApply.position')}</span>
+                    <span className="approval-info-value">{data.position || '--'}</span>
+                  </div>
+                  {type === 'oa_purchase' && data.applyDepartment && (
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('aiApply.applyDepartment')}</span>
+                      <span className="approval-info-value">{data.applyDepartment}</span>
+                    </div>
+                  )}
+                </>
+              ) : null}
+              {/* 第三行：流程狀態 */}
               <div className="approval-info-item">
                 <span className="approval-info-label">{t('approvalCenter.colFlowStatus')}</span>
                 <span className="approval-info-value">
@@ -1773,6 +1946,24 @@ export default function ApprovalDetail() {
                     </span>
                   </div>
                 )}
+                {data.aiRequestedModels && data.aiRequestedModels.length > 0 && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('aiApply.requestedModels')}</span>
+                    <span className="approval-info-value">
+                      {data.aiRequestedModels.map((id) => (
+                        <Tag key={id} color="blue" style={{ marginRight: 4, marginBottom: 4 }}>
+                          {modelNames[id] ?? id}
+                        </Tag>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                {data.aiUsageDescription && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('aiApply.usageDescription')}</span>
+                    <span className="approval-info-value">{data.aiUsageDescription}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1870,7 +2061,13 @@ export default function ApprovalDetail() {
                 dataSource={data.purchaseItems.map((item, i) => ({ ...item, key: i }))}
                 columns={[
                   { title: '序號', width: 60, render: (_: unknown, __: unknown, i: number) => i + 1 },
+                  { title: '資產分類', dataIndex: 'categoryName', key: 'categoryName', width: 120, render: (v: string) => v || '--' },
+                  { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 100, render: (v: string) => v || '--' },
                   { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', render: (v: string) => v || '--' },
+                  { title: '參數信息', dataIndex: 'params', key: 'params', width: 160, render: (v: Record<string, string> | undefined) => {
+                    if (!v || Object.keys(v).length === 0) return '--'
+                    return Object.entries(v).map(([k, val]) => `${k}: ${val}`).join(', ')
+                  }},
                   { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right', render: (v: number) => v ?? '--' },
                   { title: '備註', dataIndex: 'remark', key: 'remark', render: (v: string) => v || '--' },
                 ]}
@@ -1886,11 +2083,13 @@ export default function ApprovalDetail() {
             </div>
           </div>
 
-          {/* 备注信息 / 採購事由 */}
+          {/* 备注信息 / 採購事由（AI 申請的用途說明已在 AI 申請資訊中展示，此處不重複） */}
+          {type !== 'ai_access' && (
           <div className="approval-section">
             <div className="approval-section-title">{type === 'oa_purchase' ? '採購事由' : t('approvalDetail.notesTitle')}</div>
             <div className="approval-notes">{data.notes}</div>
           </div>
+          )}
 
           {/* 审批意见 */}
           <div className="approval-section">
@@ -1985,9 +2184,6 @@ export default function ApprovalDetail() {
       {/* 底部操作栏 */}
       <div className="approval-detail-footer">
         <Button onClick={() => navigate(-1)}>{t('common.back')}</Button>
-        {data.hasRevoke && (
-          <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
-        )}
         {isPending && (
           <>
             {/* 前端流程審批角色權限提示（贈送、AI 申請） */}
@@ -2041,6 +2237,34 @@ export default function ApprovalDetail() {
           </div>
           <div className="revoke-modal-question">{t('approvalDetail.revokeQuestion')}</div>
           <div className="revoke-modal-warning">{t('approvalDetail.revokeWarning')}</div>
+        </div>
+      </Modal>
+
+      {/* 刪除確認彈窗 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>確認刪除</span>
+            <Button type="link" size="small" onClick={() => setShowDeleteModal(false)} style={{ padding: 0 }}>{t('approvalDetail.close')}</Button>
+          </div>
+        }
+        open={showDeleteModal}
+        onCancel={() => setShowDeleteModal(false)}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <Button onClick={() => setShowDeleteModal(false)}>{t('common.cancel')}</Button>
+            <Button danger onClick={handleDeleteConfirm}>確認刪除</Button>
+          </div>
+        }
+        width={440}
+        centered
+      >
+        <div className="revoke-modal-content">
+          <div className="revoke-modal-icon">
+            <ExclamationCircleOutlined />
+          </div>
+          <div className="revoke-modal-question">確認刪除此草稿？</div>
+          <div className="revoke-modal-warning">刪除後將無法恢復，請謹慎操作！</div>
         </div>
       </Modal>
 

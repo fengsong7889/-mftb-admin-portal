@@ -13,14 +13,18 @@ import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.OaProcess;
 import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.entity.EamPurchaseRequest;
+import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.entity.WorkflowConfig;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.OaProcessMapper;
 import com.mftb.admin.mapper.OaRequestMapper;
+import com.mftb.admin.mapper.SysDepartmentMapper;
+import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.mapper.WorkflowConfigMapper;
 import com.mftb.admin.service.ApproverResolverService;
+import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.util.BizSeqService;
@@ -35,6 +39,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -56,11 +61,14 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final OaApprovalTaskMapper oaApprovalTaskMapper;
     private final OaProcessMapper oaProcessMapper;
     private final WorkflowConfigMapper workflowConfigMapper;
+    private final SysUserMapper sysUserMapper;
+    private final SysDepartmentMapper sysDepartmentMapper;
     private final OperatorResolver operatorResolver;
     private final ApproverResolverService approverResolverService;
     private final BizSeqService bizSeqService;
     private final EamPurchaseService eamPurchaseService;
     private final EamPurchaseRequestMapper eamPurchaseRequestMapper;
+    private final DingTalkService dingTalkService;
 
     /* ==================== 查询 ==================== */
 
@@ -68,6 +76,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     public PageResult<OaRequestVO> page(OaRequestQuery query) {
         LambdaQueryWrapper<OaRequest> wrapper = new LambdaQueryWrapper<>();
 
+        // ── 通用过滤 ──
         if (StringUtils.hasText(query.getFlowNo())) {
             wrapper.like(OaRequest::getFlowNo, query.getFlowNo());
         }
@@ -86,6 +95,58 @@ public class OaRequestServiceImpl implements OaRequestService {
         if (query.applyToTime() != null) {
             wrapper.lt(OaRequest::getApplyTime, query.applyToTime());
         }
+
+        // ── Scope 范围过滤 ──
+        String scope = query.getScope();
+        String userName = operatorResolver.currentOperatorName();
+        boolean isApprovalScope = false; // 标记是否为审批相关 scope（用于后续补充 myApprovalTime）
+
+        if ("my_applied".equals(scope)) {
+            // 我發起的：按申请人过滤
+            if (StringUtils.hasText(userName)) {
+                wrapper.like(OaRequest::getApplicant, userName);
+            }
+        } else if ("pending_my_approval".equals(scope)) {
+            // 待我審批：approver 包含当前用户 + taskStatus=pending，排除会签已审
+            isApprovalScope = true;
+            List<Long> pendingIds = resolvePendingMyApproval(userName);
+            if (pendingIds.isEmpty()) {
+                return new PageResult<>(List.of(), 0L);
+            }
+            wrapper.in(OaRequest::getId, pendingIds);
+        } else if ("my_approved".equals(scope)) {
+            // 我已審批的：当前用户已审批的流程
+            isApprovalScope = true;
+            List<Long> approvedIds = resolveMyApproved(userName);
+            if (approvedIds.isEmpty()) {
+                return new PageResult<>(List.of(), 0L);
+            }
+            wrapper.in(OaRequest::getId, approvedIds);
+        } else if ("department_all".equals(scope)) {
+            // 全部流程：当前用户作为部门 leader 可查看本部门所有流程
+            List<Long> deptIds = resolveDeptLeaderScope(userName);
+            if (deptIds.isEmpty()) {
+                return new PageResult<>(List.of(), 0L);
+            }
+            List<String> memberNames = sysUserMapper.selectList(
+                    new LambdaQueryWrapper<SysUser>()
+                            .in(SysUser::getDepartmentId, deptIds))
+                    .stream().map(SysUser::getName).distinct().toList();
+            if (memberNames.isEmpty()) {
+                return new PageResult<>(List.of(), 0L);
+            }
+            wrapper.and(w -> {
+                for (int i = 0; i < memberNames.size(); i++) {
+                    String name = memberNames.get(i);
+                    if (i == 0) {
+                        w.like(OaRequest::getApplicant, name);
+                    } else {
+                        w.or().like(OaRequest::getApplicant, name);
+                    }
+                }
+            });
+        }
+
         wrapper.orderByDesc(OaRequest::getApplyTime);
 
         Page<OaRequest> page = new Page<>(
@@ -96,7 +157,142 @@ public class OaRequestServiceImpl implements OaRequestService {
         List<OaRequestVO> records = result.getRecords().stream()
                 .map(OaRequestVO::from)
                 .toList();
+
+        // ── 批量补充字段 ──
+        List<Long> requestIds = result.getRecords().stream().map(OaRequest::getId).toList();
+        if (!requestIds.isEmpty()) {
+            // 1. 待審任務 → 補充 currentApprover
+            List<OaApprovalTask> pendingTasks = oaApprovalTaskMapper.selectList(
+                    new LambdaQueryWrapper<OaApprovalTask>()
+                            .in(OaApprovalTask::getRequestId, requestIds)
+                            .eq(OaApprovalTask::getTaskStatus, FLOW_PENDING));
+            Map<Long, String> approverMap = pendingTasks.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            OaApprovalTask::getRequestId,
+                            java.util.stream.Collectors.collectingAndThen(
+                                    java.util.stream.Collectors.toList(),
+                                    tasks -> tasks.stream()
+                                            .map(OaApprovalTask::getApprover)
+                                            .filter(a -> a != null && !a.isEmpty())
+                                            .distinct()
+                                            .reduce((a, b) -> a + "," + b)
+                                            .orElse(""))));
+            for (OaRequestVO vo : records) {
+                if (vo.getId() != null && !StringUtils.hasText(vo.getCurrentApprover())) {
+                    String approver = approverMap.get(vo.getId());
+                    if (approver != null) {
+                        vo.setCurrentApprover(approver);
+                    }
+                }
+            }
+
+            // 2. 審批相關 scope → 補充 myApprovalTime
+            if (isApprovalScope && StringUtils.hasText(userName)) {
+                enrichMyApprovalTime(records, requestIds, userName);
+            }
+        }
+
         return new PageResult<>(records, result.getTotal());
+    }
+
+    /** 查找当前用户待审批的 requestId 集合（排除会签已审） */
+    private List<Long> resolvePendingMyApproval(String userName) {
+        if (!StringUtils.hasText(userName)) return List.of();
+        List<OaApprovalTask> userTasks = oaApprovalTaskMapper.selectList(
+                new LambdaQueryWrapper<OaApprovalTask>()
+                        .like(OaApprovalTask::getApprover, userName)
+                        .eq(OaApprovalTask::getTaskStatus, FLOW_PENDING));
+        // 排除会签模式下用户已审批的（approvedBy 包含用户）
+        return userTasks.stream()
+                .filter(t -> {
+                    if (t.getApprovedBy() == null) return true;
+                    String[] approved = t.getApprovedBy().split(",");
+                    for (String a : approved) {
+                        if (a.trim().contains(userName) || userName.contains(a.trim())) return false;
+                    }
+                    return true;
+                })
+                .map(OaApprovalTask::getRequestId)
+                .distinct()
+                .toList();
+    }
+
+    /** 查找当前用户已审批的 requestId 集合 */
+    private List<Long> resolveMyApproved(String userName) {
+        if (!StringUtils.hasText(userName)) return List.of();
+        // approvedBy 记录实际审批人（或签/会签均适用）：
+        // - 或签模式：只有实际审批的那一个人
+        // - 会签模式：所有已审批的人
+        List<OaApprovalTask> tasks = oaApprovalTaskMapper.selectList(
+                new LambdaQueryWrapper<OaApprovalTask>()
+                        .like(OaApprovalTask::getApprovedBy, userName));
+        return tasks.stream()
+                .map(OaApprovalTask::getRequestId)
+                .distinct()
+                .toList();
+    }
+
+    /** 查找当前用户作为部门 leader 的部门 ID 列表 */
+    private List<Long> resolveDeptLeaderScope(String userName) {
+        if (!StringUtils.hasText(userName)) return List.of();
+        return sysDepartmentMapper.selectList(
+                new LambdaQueryWrapper<SysDepartment>()
+                        .like(SysDepartment::getLeader, userName)
+                        .eq(SysDepartment::getStatus, 1))
+                .stream().map(SysDepartment::getId).distinct().toList();
+    }
+
+    /** 补充 myApprovalTime 字段 */
+    private void enrichMyApprovalTime(List<OaRequestVO> records, List<Long> requestIds, String userName) {
+        Map<Long, String> myTimeMap = new HashMap<>();
+        // 或签模式：任务已 approved，approveTime 有值
+        List<OaApprovalTask> approvedTasks = oaApprovalTaskMapper.selectList(
+                new LambdaQueryWrapper<OaApprovalTask>()
+                        .in(OaApprovalTask::getRequestId, requestIds)
+                        .like(OaApprovalTask::getApprover, userName)
+                        .isNotNull(OaApprovalTask::getApproveTime));
+        for (OaApprovalTask t : approvedTasks) {
+            myTimeMap.putIfAbsent(t.getRequestId(), DateTimeUtils.format(t.getApproveTime()));
+        }
+        // 会签模式：任务仍 pending，但 approvedBy 包含用户
+        List<OaApprovalTask> allModeTasks = oaApprovalTaskMapper.selectList(
+                new LambdaQueryWrapper<OaApprovalTask>()
+                        .in(OaApprovalTask::getRequestId, requestIds)
+                        .like(OaApprovalTask::getApprovedBy, userName)
+                        .eq(OaApprovalTask::getTaskStatus, FLOW_PENDING));
+        for (OaApprovalTask t : allModeTasks) {
+            if (!myTimeMap.containsKey(t.getRequestId()) && t.getApprovedTimes() != null) {
+                String[] times = t.getApprovedTimes().split(",");
+                myTimeMap.put(t.getRequestId(), times[times.length - 1].trim());
+            }
+        }
+        for (OaRequestVO vo : records) {
+            if (vo.getId() != null && myTimeMap.containsKey(vo.getId())) {
+                vo.setMyApprovalTime(myTimeMap.get(vo.getId()));
+            }
+        }
+    }
+
+    /** 检查当前用户是否为部门 leader */
+    public Map<String, Object> checkDeptLeader(String userName) {
+        Map<String, Object> result = new HashMap<>();
+        if (!StringUtils.hasText(userName)) {
+            result.put("isLeader", false);
+            result.put("departmentName", null);
+            return result;
+        }
+        List<SysDepartment> depts = sysDepartmentMapper.selectList(
+                new LambdaQueryWrapper<SysDepartment>()
+                        .like(SysDepartment::getLeader, userName)
+                        .eq(SysDepartment::getStatus, 1));
+        if (depts.isEmpty()) {
+            result.put("isLeader", false);
+            result.put("departmentName", null);
+        } else {
+            result.put("isLeader", true);
+            result.put("departmentName", depts.get(0).getName());
+        }
+        return result;
     }
 
     @Override
@@ -117,7 +313,27 @@ public class OaRequestServiceImpl implements OaRequestService {
                 new LambdaQueryWrapper<OaApprovalTask>()
                         .eq(OaApprovalTask::getRequestId, request.getId())
                         .orderByAsc(OaApprovalTask::getSortOrder));
+
+        // 从最新流程配置刷新待审任务的审批人，保证配置修改后立即在前端生效
+        SysUser initiator = resolveInitiator(request.getApplicant());
+        tasks.stream()
+                .filter(t -> FLOW_PENDING.equals(t.getTaskStatus()))
+                .forEach(t -> refreshTaskApproverFromConfig(t, request, initiator));
+
         vo.setApprovalTasks(tasks.stream().map(OaRequestVO.OaApprovalTaskVO::from).toList());
+
+        // 补充当前待审节点审批人（从任务列表中提取，避免 OaRequest 表字段为空）
+        if (!StringUtils.hasText(vo.getCurrentApprover())) {
+            String pendingApprover = tasks.stream()
+                    .filter(t -> FLOW_PENDING.equals(t.getTaskStatus()))
+                    .map(OaApprovalTask::getApprover)
+                    .filter(a -> a != null && !a.isEmpty())
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse(null);
+            if (pendingApprover != null) {
+                vo.setCurrentApprover(pendingApprover);
+            }
+        }
 
         return vo;
     }
@@ -147,10 +363,12 @@ public class OaRequestServiceImpl implements OaRequestService {
         String applicant = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 生成流程编号（采购申请使用专用 CG 编号规则）
-        String flowRuleKey = "oa_purchase".equals(request.getProcessCode())
-                ? BizSeqService.RULE_EAM_PURCHASE_REQUEST
-                : BizSeqService.RULE_OA_REQUEST;
+        // 生成流程编号（采购申请使用 CG 编号规则，AI 申请使用 AI 编号规则）
+        String flowRuleKey = switch (request.getProcessCode()) {
+            case "oa_purchase" -> BizSeqService.RULE_EAM_PURCHASE_REQUEST;
+            case "ai_access" -> BizSeqService.RULE_AI_ACCESS_REQUEST;
+            default -> BizSeqService.RULE_OA_REQUEST;
+        };
         String flowNo = bizSeqService.next(flowRuleKey);
 
         // 创建流程实例
@@ -174,28 +392,34 @@ public class OaRequestServiceImpl implements OaRequestService {
         }
 
         log.info("OA流程已发起: flowNo={}, processCode={}, applicant={}", flowNo, request.getProcessCode(), applicant);
+
+        // 钉钉通知：通知第一个审批人
+        if (!isDraft) {
+            try {
+                OaApprovalTask firstTask = findCurrentPendingTask(oaRequest.getId());
+                if (firstTask != null) {
+                    String text = String.format("### 📝 新的待审批流程\n\n"
+                                    + "- **流程编号**: %s\n- **流程类型**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
+                                    + "请及时处理。",
+                            flowNo, process.getProcessName(), request.getTitle(), applicant);
+                    dingTalkService.sendMarkdown("新的待审批流程", text, null, false);
+                }
+            } catch (Exception e) {
+                log.warn("OA流程钉钉通知发送失败: {}", e.getMessage());
+            }
+        }
+
         return flowNo;
     }
 
     /**
-     * 解析审批节点并创建审批任务
-     * 复用 WorkflowConfig 的动态节点模型；如果未配置动态节点则创建默认单节点审批
+     * 解析审批节点并创建审批任务（懒创建：仅创建第一个节点）
+     * 復用 WorkflowConfig 的动态节点模型；后续节点在当前节点审批通过时才实时创建，
+     * 保证流程配置中途修改后，后续节点读取到最新的审批人配置，且未到的节点信息不提前暴露
      */
     private void resolveAndCreateTasks(OaRequest oaRequest, OaProcess process, SysUser initiator) {
-        String workflowType = process.getWorkflowType();
-        List<OaApprovalTask> tasks = new ArrayList<>();
-
-        if (StringUtils.hasText(workflowType)) {
-            // 尝试从 workflowConfig 读取动态节点配置
-            WorkflowConfig config = workflowConfigMapper.selectOne(
-                    new LambdaQueryWrapper<WorkflowConfig>()
-                            .eq(WorkflowConfig::getFlowType, workflowType));
-
-            if (config != null && config.getNodesConfig() != null && config.getRoutingRules() != null) {
-                tasks = resolveDynamicNodes(config, initiator);
-            }
-        }
-
+        List<OaApprovalTask> tasks = resolveAllNodes(oaRequest, process, initiator);
+    
         if (tasks.isEmpty()) {
             // 降级：创建默认单节点审批（审批人=当前管理员或发起人主管）
             OaApprovalTask defaultTask = new OaApprovalTask();
@@ -204,7 +428,7 @@ public class OaRequestServiceImpl implements OaRequestService {
             defaultTask.setSortOrder(1);
             defaultTask.setApprovalRule("any");
             defaultTask.setTaskStatus(FLOW_PENDING);
-
+    
             // 尝试解析发起人主管
             Long deptId = initiator != null ? initiator.getDepartmentId() : null;
             if (deptId != null) {
@@ -218,22 +442,80 @@ public class OaRequestServiceImpl implements OaRequestService {
             }
             tasks.add(defaultTask);
         }
-
-        // 批量插入审批任务
-        for (OaApprovalTask task : tasks) {
-            oaApprovalTaskMapper.insert(task);
-        }
-
+    
+        // 懒创建：仅插入第一个节点任务，其余节点待当前节点通过后再实时解析创建
+        OaApprovalTask first = tasks.get(0);
+        first.setRequestId(oaRequest.getId());
+        oaApprovalTaskMapper.insert(first);
+    
         // 设置当前待审节点名称
-        String firstNodeName = tasks.stream()
-                .filter(t -> FLOW_PENDING.equals(t.getTaskStatus()))
-                .findFirst()
-                .map(OaApprovalTask::getNodeName)
-                .orElse(null);
         oaRequestMapper.update(null,
                 new LambdaUpdateWrapper<OaRequest>()
                         .eq(OaRequest::getId, oaRequest.getId())
-                        .set(OaRequest::getCurrentNodeName, firstNodeName));
+                        .set(OaRequest::getCurrentNodeName, first.getNodeName()));
+    }
+    
+    /**
+     * 解析全部动态节点（不落库），供懒创建取指定位置节点
+     */
+    private List<OaApprovalTask> resolveAllNodes(OaRequest oaRequest, OaProcess process, SysUser initiator) {
+        String workflowType = process.getWorkflowType();
+    
+        if (StringUtils.hasText(workflowType)) {
+            // 尝试从 workflowConfig 读取动态节点配置
+            WorkflowConfig config = workflowConfigMapper.selectOne(
+                    new LambdaQueryWrapper<WorkflowConfig>()
+                            .eq(WorkflowConfig::getFlowType, workflowType));
+    
+            if (config != null && config.getNodesConfig() != null && config.getRoutingRules() != null) {
+                return resolveDynamicNodes(config, initiator);
+            }
+        }
+        return new ArrayList<>();
+    }
+    
+    /**
+     * 审批通过后实时创建下一节点任务（懒创建）
+     * 每次推进都重新读取最新流程配置并重新解析审批人，保证读到最新的审批配置；
+     * 解析不到下一节点（已是最后节点/配置被删/无匹配规则）时返回 null，由调用方结束流程
+     */
+    private OaApprovalTask createNextTaskLazily(OaRequest request, int nextSortOrder) {
+        OaProcess process = oaProcessMapper.selectOne(
+                new LambdaQueryWrapper<OaProcess>()
+                        .eq(OaProcess::getProcessCode, request.getProcessCode()));
+        if (process == null) {
+            return null;
+        }
+    
+        // 從申請人簽名（如「冯松(MF00002)」）恢復發起人，節點解析依賴發起人部門
+        SysUser initiator = resolveInitiator(request.getApplicant());
+        List<OaApprovalTask> allNodes = resolveAllNodes(request, process, initiator);
+        if (allNodes.isEmpty() || nextSortOrder > allNodes.size()) {
+            return null;
+        }
+    
+        OaApprovalTask next = allNodes.get(nextSortOrder - 1);
+        next.setRequestId(request.getId());
+        next.setSortOrder(nextSortOrder);
+        oaApprovalTaskMapper.insert(next);
+        return next;
+    }
+    
+    /**
+     * 從申請人簽名（如「冯松(MF00002)」）恢復發起人用戶對象
+     */
+    private SysUser resolveInitiator(String applicantSignature) {
+        if (!StringUtils.hasText(applicantSignature)) {
+            return null;
+        }
+        String empId = applicantSignature;
+        int start = applicantSignature.indexOf('(');
+        int end = applicantSignature.indexOf(')');
+        if (start >= 0 && end > start) {
+            empId = applicantSignature.substring(start + 1, end);
+        }
+        return sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmpId, empId));
     }
 
     /**
@@ -325,16 +607,65 @@ public class OaRequestServiceImpl implements OaRequestService {
             throw new BusinessException("该流程没有待审批节点");
         }
 
+        // 从最新流程配置刷新当前节点审批人，保证配置修改后立即可生效
+        SysUser initiator = resolveInitiator(request.getApplicant());
+        refreshTaskApproverFromConfig(currentTask, request, initiator);
+
         SysUser current = operatorResolver.currentUser();
         String approver = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 标记当前节点为已通过
-        currentTask.setTaskStatus(FLOW_APPROVED);
-        currentTask.setApprover(approver);
-        currentTask.setApproveTime(now);
-        currentTask.setComment(comment);
-        oaApprovalTaskMapper.updateById(currentTask);
+        // 校验审批人身份：当前用户必须是当前节点的指定审批人（或管理员）
+        if (!operatorResolver.isAdmin(current)
+                && currentTask.getApprover() != null
+                && !currentTask.getApprover().contains(approver)) {
+            throw new BusinessException("您不是当前节点的审批人，无法审批");
+        }
+
+        // 判断审批模式：any（或签）/ all（会签）
+        boolean isAllMode = "all".equals(currentTask.getApprovalRule());
+
+        if (isAllMode) {
+            // ── 会签模式：追加审批记录，所有人审完才算通过 ──
+            String existingApprovedBy = currentTask.getApprovedBy() != null ? currentTask.getApprovedBy() : "";
+            String existingApprovedTimes = currentTask.getApprovedTimes() != null ? currentTask.getApprovedTimes() : "";
+
+            String newApprovedBy = existingApprovedBy.isEmpty() ? approver : existingApprovedBy + "," + approver;
+            String newApprovedTimes = existingApprovedTimes.isEmpty()
+                    ? DateTimeUtils.format(now) : existingApprovedTimes + "," + DateTimeUtils.format(now);
+
+            currentTask.setApprovedBy(newApprovedBy);
+            currentTask.setApprovedTimes(newApprovedTimes);
+            currentTask.setComment(comment);
+
+            // 检查是否所有人都已审批
+            String[] allApprovers = currentTask.getApprover().split(",");
+            String[] approvedArr = newApprovedBy.split(",");
+            boolean allApproved = approvedArr.length >= allApprovers.length;
+
+            if (allApproved) {
+                // 所有人已审完 → 任务完成
+                currentTask.setTaskStatus(FLOW_APPROVED);
+                currentTask.setApproveTime(now);
+            }
+            oaApprovalTaskMapper.updateById(currentTask);
+
+            if (!allApproved) {
+                // 还有人未审 → 任务保持 pending，不推进节点
+                int remaining = allApprovers.length - approvedArr.length;
+                return ApproveResultVO.of(currentTask.getNodeName(), false, null);
+            }
+            // 会签完成，继续往下走查找下一节点
+        } else {
+            // ── 或签模式：一人审批即通过，保留原始审批人列表 ──
+            currentTask.setTaskStatus(FLOW_APPROVED);
+            currentTask.setApproveTime(now);
+            currentTask.setComment(comment);
+            currentTask.setApprovedBy(approver);
+            currentTask.setApprovedTimes(DateTimeUtils.format(now));
+            // 注意：不再覆写 approver 字段，保留原始审批人列表用于审计追踪
+            oaApprovalTaskMapper.updateById(currentTask);
+        }
 
         // AI 申请审批：更新 formData 并处理审批即授权
         if ("ai_access".equals(request.getProcessCode()) && formData != null) {
@@ -346,8 +677,12 @@ public class OaRequestServiceImpl implements OaRequestService {
             log.info("AI 申请审批数据已更新：flowNo={}", flowNo);
         }
 
-        // 查找下一个待审节点
+        // 查找下一个待审节点：优先取已存在的 pending 任务（兼容舊的全量創建數據）；
+        // 懒創建模式下實時讀取最新流程配置創建下一節點，保證後續審批人始終為最新配置
         OaApprovalTask nextTask = findNextPendingTask(request.getId(), currentTask.getSortOrder());
+        if (nextTask == null) {
+            nextTask = createNextTaskLazily(request, currentTask.getSortOrder() + 1);
+        }
 
         if (nextTask == null) {
             // 所有节点已通过 → 流程完成
@@ -367,6 +702,17 @@ public class OaRequestServiceImpl implements OaRequestService {
                 }
             }
 
+            // 钉钉通知：流程全部通过，通知发起人
+            try {
+                String text = String.format("### ✅ 流程审批通过\n\n"
+                                + "- **流程编号**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
+                                + "您的流程已全部审批通过。",
+                        flowNo, request.getTitle(), request.getApplicant());
+                dingTalkService.sendMarkdown("流程审批通过", text, null, false);
+            } catch (Exception e) {
+                log.warn("OA流程通过钉钉通知发送失败: {}", e.getMessage());
+            }
+
             return ApproveResultVO.of(currentTask.getNodeName(), true, null);
         } else {
             // 推进到下一节点
@@ -374,6 +720,18 @@ public class OaRequestServiceImpl implements OaRequestService {
                     new LambdaUpdateWrapper<OaRequest>()
                             .eq(OaRequest::getId, request.getId())
                             .set(OaRequest::getCurrentNodeName, nextTask.getNodeName()));
+
+            // 钉钉通知：流转到下一审批人
+            try {
+                String text = String.format("### 📋 流程流转通知\n\n"
+                                + "- **流程编号**: %s\n- **标题**: %s\n- **当前节点**: %s\n\n"
+                                + "流程已流转至您，请及时处理。",
+                        flowNo, request.getTitle(), nextTask.getNodeName());
+                dingTalkService.sendMarkdown("流程流转通知", text, null, false);
+            } catch (Exception e) {
+                log.warn("OA流程流转钉钉通知发送失败: {}", e.getMessage());
+            }
+
             return ApproveResultVO.of(currentTask.getNodeName(), false, nextTask.getNodeName());
         }
     }
@@ -395,9 +753,20 @@ public class OaRequestServiceImpl implements OaRequestService {
             throw new BusinessException("该流程没有待审批节点");
         }
 
+        // 从最新流程配置刷新当前节点审批人，保证配置修改后立即可生效
+        SysUser initiator = resolveInitiator(request.getApplicant());
+        refreshTaskApproverFromConfig(currentTask, request, initiator);
+
         SysUser current = operatorResolver.currentUser();
         String approver = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
+
+        // 校验审批人身份：当前用户必须是当前节点的指定审批人（或管理员）
+        if (!operatorResolver.isAdmin(current)
+                && currentTask.getApprover() != null
+                && !currentTask.getApprover().contains(approver)) {
+            throw new BusinessException("您不是当前节点的审批人，无法驳回");
+        }
 
         // 标记当前节点为已驳回
         currentTask.setTaskStatus(FLOW_REJECTED);
@@ -415,6 +784,18 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .set(OaRequest::getCurrentNodeName, null));
 
         log.info("OA流程已驳回: flowNo={}, node={}, reason={}", flowNo, currentTask.getNodeName(), reason);
+
+        // 钉钉通知：驳回通知发起人
+        try {
+            String text = String.format("### ❌ 流程已驳回\n\n"
+                            + "- **流程编号**: %s\n- **标题**: %s\n- **申请人**: %s\n- **驳回节点**: %s\n- **驳回原因**: %s\n\n"
+                            + "请修改后重新提交。",
+                    flowNo, request.getTitle(), request.getApplicant(), currentTask.getNodeName(), reason);
+            dingTalkService.sendMarkdown("流程已驳回", text, null, false);
+        } catch (Exception e) {
+            log.warn("OA流程驳回钉钉通知发送失败: {}", e.getMessage());
+        }
+
         return currentTask.getNodeName();
     }
 
@@ -424,6 +805,16 @@ public class OaRequestServiceImpl implements OaRequestService {
         OaRequest request = requireRequest(flowNo);
         if (!FLOW_PENDING.equals(request.getFlowStatus())) {
             throw new BusinessException("仅审批中的流程可以撤销");
+        }
+
+        // 检查是否已有审批通过的节点，如有则不允许撤销
+        List<OaApprovalTask> tasks = oaApprovalTaskMapper.selectList(
+                new LambdaQueryWrapper<OaApprovalTask>()
+                        .eq(OaApprovalTask::getRequestId, request.getId()));
+        boolean hasApproved = tasks.stream()
+                .anyMatch(t -> FLOW_APPROVED.equals(t.getTaskStatus()));
+        if (hasApproved) {
+            throw new BusinessException("已有审批人通过，无法撤销，请联系审批人驳回");
         }
 
         // 申请人本人才能撤销
@@ -452,6 +843,64 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .set(OaApprovalTask::getComment, "申請人撤銷"));
 
         log.info("OA流程已撤销: flowNo={}", flowNo);
+
+        // 钉钉通知：撤销通知
+        try {
+            String text = String.format("### 🚫 流程已撤销\n\n"
+                            + "- **流程编号**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
+                            + "该流程已被申请人撤销。",
+                    flowNo, request.getTitle(), request.getApplicant());
+            dingTalkService.sendMarkdown("流程已撤销", text, null, false);
+        } catch (Exception e) {
+            log.warn("OA流程撤销钉钉通知发送失败: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void submitDraft(String flowNo) {
+        OaRequest request = requireRequest(flowNo);
+        if (!FLOW_DRAFT.equals(request.getFlowStatus())) {
+            throw new BusinessException("仅草稿状态可提交，当前状态: " + request.getFlowStatus());
+        }
+
+        // 查找流程定义
+        OaProcess process = oaProcessMapper.selectOne(
+                new LambdaQueryWrapper<OaProcess>()
+                        .eq(OaProcess::getProcessCode, request.getProcessCode())
+                        .eq(OaProcess::getStatus, 1));
+        if (process == null) {
+            throw new BusinessException("流程类型不存在或已停用: " + request.getProcessCode());
+        }
+
+        SysUser current = operatorResolver.currentUser();
+        LocalDateTime now = LocalDateTime.now();
+
+        // 更新流程状态为 pending
+        oaRequestMapper.update(null,
+                new LambdaUpdateWrapper<OaRequest>()
+                        .eq(OaRequest::getId, request.getId())
+                        .set(OaRequest::getFlowStatus, FLOW_PENDING)
+                        .set(OaRequest::getUpdatedAt, now));
+
+        // 创建审批任务
+        resolveAndCreateTasks(request, process, current);
+
+        log.info("OA草稿已提交: flowNo={}, processCode={}", flowNo, request.getProcessCode());
+
+        // 钉钉通知：通知第一个审批人
+        try {
+            OaApprovalTask firstTask = findCurrentPendingTask(request.getId());
+            if (firstTask != null) {
+                String text = String.format("###  新的待审批流程\n\n"
+                                + "- **流程编号**: %s\n- **流程类型**: %s\n- **标题**: %s\n- **申请人**: %s\n\n"
+                                + "请及时处理。",
+                        flowNo, process.getProcessName(), request.getTitle(), request.getApplicant());
+                dingTalkService.sendMarkdown("新的待审批流程", text, null, false);
+            }
+        } catch (Exception e) {
+            log.warn("OA流程提交钉钉通知发送失败: {}", e.getMessage());
+        }
     }
 
     /* ==================== 内部方法 ==================== */
@@ -526,6 +975,43 @@ public class OaRequestServiceImpl implements OaRequestService {
         long orderId = eamPurchaseService.createOrderFromRequest(pr.getId());
         log.info("採購申請審批回調完成: flowNo={}, orderId={}",
                 oaRequest.getFlowNo(), orderId);
+    }
+
+    /**
+     * 刷新待审任务的审批人：从最新流程配置重新解析，保证配置修改后对已在途的流程立即生效
+     */
+    private void refreshTaskApproverFromConfig(OaApprovalTask task, OaRequest request, SysUser initiator) {
+        if (!FLOW_PENDING.equals(task.getTaskStatus())) return;
+        try {
+            OaProcess process = oaProcessMapper.selectOne(
+                    new LambdaQueryWrapper<OaProcess>()
+                            .eq(OaProcess::getProcessCode, request.getProcessCode()));
+            if (process == null || !StringUtils.hasText(process.getWorkflowType())) return;
+
+            WorkflowConfig config = workflowConfigMapper.selectOne(
+                    new LambdaQueryWrapper<WorkflowConfig>()
+                            .eq(WorkflowConfig::getFlowType, process.getWorkflowType()));
+            if (config == null || config.getNodesConfig() == null || config.getRoutingRules() == null) return;
+
+            List<OaApprovalTask> allNodes = resolveDynamicNodes(config, initiator);
+            if (allNodes.isEmpty() || task.getSortOrder() > allNodes.size()) return;
+
+            OaApprovalTask latest = allNodes.get(task.getSortOrder() - 1);
+            String newApprover = latest.getApprover();
+            if (newApprover != null && !newApprover.equals(task.getApprover())) {
+                String oldApprover = task.getApprover();
+                task.setApprover(newApprover);
+                oaApprovalTaskMapper.update(null,
+                        new LambdaUpdateWrapper<OaApprovalTask>()
+                                .eq(OaApprovalTask::getId, task.getId())
+                                .set(OaApprovalTask::getApprover, newApprover));
+                log.info("已刷新待审任务审批人: taskId={}, old={}, new={}",
+                        task.getId(), oldApprover, newApprover);
+            }
+        } catch (Exception e) {
+            log.warn("刷新待审任务审批人失败，继续使用原审批人: taskId={}, error={}",
+                    task.getId(), e.getMessage());
+        }
     }
 
     private static String str(Map<String, Object> m, String key) {

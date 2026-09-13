@@ -4,6 +4,10 @@ node_modules/
 # Build output
 dist/
 
+# Auto-generated version manifest (created by Vite plugin)
+public/version.json
+src/build-meta.ts
+
 # Vercel
 .vercel/
 .vercel-tmp/

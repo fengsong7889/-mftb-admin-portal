@@ -18,7 +18,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../../contexts/AuthContext'
-import { fetchOaRequests, type OaRequestVO, type OaFlowStatus } from '../../../api/oaRequest'
+import { fetchOaRequests, checkIsDeptLeader, cancelOaRequest, type OaRequestVO, type OaFlowStatus } from '../../../api/oaRequest'
 import { getApprovalRecords, type ApprovalRecord } from '../../../utils/approvalStore'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
@@ -82,7 +82,7 @@ const FLOW_STATUS_COLOR: Record<string, string> = {
 
 /** 流程狀態 → i18n key */
 const FLOW_STATUS_I18N: Record<string, string> = {
-  draft: '待提交',
+  draft: 'approvalCenter.flowDraft',
   pending: 'approvalCenter.flowPending',
   approved: 'approvalCenter.flowApproved',
   rejected: 'approvalCenter.flowRejected',
@@ -127,6 +127,8 @@ interface FlowRow {
   currentNodeName: string
   /** 當前審批人姓名 */
   currentApprover: string
+  /** 當前用戶審批時間（待我審批 tab 用） */
+  myApprovalTime: string
 }
 
 /* ==================== 工具函數 ==================== */
@@ -150,6 +152,7 @@ function oaToRow(r: OaRequestVO): FlowRow {
     flowStatus: r.flowStatus || 'pending',
     currentNodeName: r.currentNodeName || '',
     currentApprover: r.currentApprover || '--',
+    myApprovalTime: r.myApprovalTime || '',
   }
 }
 
@@ -165,6 +168,7 @@ function localRecordToRow(r: ApprovalRecord): FlowRow {
     flowStatus: r.flowStatus || 'draft',
     currentNodeName: '',
     currentApprover: '--',
+    myApprovalTime: '',
   }
 }
 
@@ -223,10 +227,19 @@ export default function OaRequests() {
 
   /* ---- Tab 狀態 ---- */
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'my')
+  const [isDeptLeader, setIsDeptLeader] = useState(false)
 
   const handleTabChange = (key: string) => {
     setActiveTab(key)
   }
+
+  /* ---- 部門 leader 檢測 ---- */
+  useEffect(() => {
+    if (!refReady) return
+    checkIsDeptLeader().then(res => {
+      setIsDeptLeader(!!res?.isLeader)
+    }).catch(() => setIsDeptLeader(false))
+  }, [refReady])
 
   /* ==================== 篩選條件 ==================== */
   interface Filters {
@@ -239,7 +252,7 @@ export default function OaRequests() {
     flowStatus?: string
   }
 
-  /* ---- Tab 1：我的申請 ---- */
+  /* ---- Tab 1：我發起的 ---- */
   const [myForm] = Form.useForm()
   const [myData, setMyData] = useState<FlowRow[]>([])
   const [myLoading, setMyLoading] = useState(false)
@@ -249,10 +262,10 @@ export default function OaRequests() {
     if (!refReady) return
     setMyLoading(true)
     try {
-      // 調用統一 OA 流程 API
       const params: Record<string, unknown> = {
         page: 1,
         size: 500,
+        scope: 'my_applied',
       }
       if (myFilters.flowStatus && myFilters.flowStatus !== 'all') {
         params.flowStatus = myFilters.flowStatus
@@ -273,15 +286,11 @@ export default function OaRequests() {
       const res = await fetchOaRequests(params as Parameters<typeof fetchOaRequests>[0]).catch(() => null)
       let rows: FlowRow[] = (res?.records || []).map(oaToRow)
 
-      // 只保留當前用戶的申請
-      const userName = user?.name || ''
-      rows = rows.filter(r => r.applicant.includes(userName))
-
       // 合併 localStorage 中的 AI 申請和採購草稿（這些草稿未提交到後端）
+      const userName = user?.name || ''
       const localRecords = getApprovalRecords()
         .filter(r => (r.approvalType === 'ai_access' || r.approvalType === 'oa_purchase') && r.applicant.includes(userName))
         .map(localRecordToRow)
-      // 按 flowNo 去重（後端數據優先）
       const apiFlowNos = new Set(rows.map(r => r.flowNo))
       const uniqueLocalRows = localRecords.filter(r => !apiFlowNos.has(r.flowNo))
       rows = [...rows, ...uniqueLocalRows]
@@ -302,7 +311,6 @@ export default function OaRequests() {
         rows = rows.filter(r => r.currentApprover.toLowerCase().includes(q))
       }
 
-      // 按申請時間倒序
       rows.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
       setMyData(rows)
     } catch {
@@ -341,11 +349,10 @@ export default function OaRequests() {
     if (!refReady) return
     setPendingLoading(true)
     try {
-      // 調用統一 OA 流程 API，只查詢 pending 狀態
       const params: Record<string, unknown> = {
         page: 1,
         size: 500,
-        flowStatus: 'pending',
+        scope: 'pending_my_approval',
       }
       if (pendingFilters.flowNo?.trim()) {
         params.flowNo = pendingFilters.flowNo.trim()
@@ -363,29 +370,14 @@ export default function OaRequests() {
       const res = await fetchOaRequests(params as Parameters<typeof fetchOaRequests>[0]).catch(() => null)
       let rows: FlowRow[] = (res?.records || []).map(oaToRow)
 
-      // 只顯示當前登錄用戶為審批人的記錄
-      const userName = user?.name || ''
-      if (userName) {
-        rows = rows.filter(r => {
-          if (!r.currentApprover) return false
-          const approvers = r.currentApprover.split(',').map(a => a.trim())
-          return approvers.some(a => a === userName)
-        })
-      }
-
-      // 前端過濾
       if (pendingFilters.flowTag) {
         rows = rows.filter(r => r.approvalType === pendingFilters.flowTag)
       }
-      if (pendingFilters.flowName) {
-        const q = pendingFilters.flowName.trim().toLowerCase()
-        rows = rows.filter(r => {
-          const name = `${r.processCode} ${r.applicant} ${r.applyTime}`.toLowerCase()
-          return name.includes(q)
-        })
+      if (pendingFilters.currentApprover) {
+        const q = pendingFilters.currentApprover.trim().toLowerCase()
+        rows = rows.filter(r => r.currentApprover.toLowerCase().includes(q))
       }
 
-      // 按申請時間倒序
       rows.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
       setPendingData(rows)
     } catch {
@@ -393,7 +385,7 @@ export default function OaRequests() {
     } finally {
       setPendingLoading(false)
     }
-  }, [pendingFilters, refReady])
+  }, [pendingFilters, refReady, user])
 
   useEffect(() => { loadPendingRequests() }, [loadPendingRequests])
 
@@ -403,7 +395,7 @@ export default function OaRequests() {
       flowNo: values.flowNo,
       flowName: values.flowName,
       flowTag: values.flowTag,
-      applicant: values.applicant,
+      currentApprover: values.currentApprover,
       dateRange: values.dateRange,
       flowStatus: values.flowStatus,
     })
@@ -413,12 +405,167 @@ export default function OaRequests() {
     setPendingFilters({})
   }
 
+  /* ---- Tab 3：我已審批的 ---- */
+  const [approvedForm] = Form.useForm()
+  const [approvedData, setApprovedData] = useState<FlowRow[]>([])
+  const [approvedLoading, setApprovedLoading] = useState(false)
+  const [approvedFilters, setApprovedFilters] = useState<Filters>({})
+
+  const loadApprovedRequests = useCallback(async () => {
+    if (!refReady) return
+    setApprovedLoading(true)
+    try {
+      const params: Record<string, unknown> = {
+        page: 1,
+        size: 500,
+        scope: 'my_approved',
+      }
+      if (approvedFilters.flowNo?.trim()) {
+        params.flowNo = approvedFilters.flowNo.trim()
+      }
+      if (approvedFilters.applicant?.trim()) {
+        params.applicant = approvedFilters.applicant.trim()
+      }
+      if (approvedFilters.dateRange?.[0]) {
+        params.applyFrom = approvedFilters.dateRange[0].format('YYYY-MM-DD')
+      }
+      if (approvedFilters.dateRange?.[1]) {
+        params.applyTo = approvedFilters.dateRange[1].format('YYYY-MM-DD')
+      }
+
+      const res = await fetchOaRequests(params as Parameters<typeof fetchOaRequests>[0]).catch(() => null)
+      let rows: FlowRow[] = (res?.records || []).map(oaToRow)
+
+      if (approvedFilters.flowTag) {
+        rows = rows.filter(r => r.approvalType === approvedFilters.flowTag)
+      }
+      if (approvedFilters.flowName) {
+        const q = approvedFilters.flowName.trim().toLowerCase()
+        rows = rows.filter(r => {
+          const name = `${r.processCode} ${r.applicant} ${r.applyTime}`.toLowerCase()
+          return name.includes(q)
+        })
+      }
+
+      rows.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
+      setApprovedData(rows)
+    } catch {
+      setApprovedData([])
+    } finally {
+      setApprovedLoading(false)
+    }
+  }, [approvedFilters, refReady, user])
+
+  useEffect(() => { loadApprovedRequests() }, [loadApprovedRequests])
+
+  const handleApprovedSearch = () => {
+    const values = approvedForm.getFieldsValue()
+    setApprovedFilters({
+      flowNo: values.flowNo,
+      flowName: values.flowName,
+      flowTag: values.flowTag,
+      applicant: values.applicant,
+      dateRange: values.dateRange,
+      flowStatus: values.flowStatus,
+    })
+  }
+  const handleApprovedReset = () => {
+    approvedForm.resetFields()
+    setApprovedFilters({})
+  }
+
+  /* ---- Tab 4：全部流程 ---- */
+  const [allForm] = Form.useForm()
+  const [allData, setAllData] = useState<FlowRow[]>([])
+  const [allLoading, setAllLoading] = useState(false)
+  const [allFilters, setAllFilters] = useState<Filters>({})
+
+  const loadAllFlows = useCallback(async () => {
+    if (!refReady || !isDeptLeader) return
+    setAllLoading(true)
+    try {
+      const params: Record<string, unknown> = {
+        page: 1,
+        size: 500,
+        scope: 'department_all',
+      }
+      if (allFilters.flowNo?.trim()) {
+        params.flowNo = allFilters.flowNo.trim()
+      }
+      if (allFilters.applicant?.trim()) {
+        params.applicant = allFilters.applicant.trim()
+      }
+      if (allFilters.dateRange?.[0]) {
+        params.applyFrom = allFilters.dateRange[0].format('YYYY-MM-DD')
+      }
+      if (allFilters.dateRange?.[1]) {
+        params.applyTo = allFilters.dateRange[1].format('YYYY-MM-DD')
+      }
+      if (allFilters.flowStatus && allFilters.flowStatus !== 'all') {
+        params.flowStatus = allFilters.flowStatus
+      }
+
+      const res = await fetchOaRequests(params as Parameters<typeof fetchOaRequests>[0]).catch(() => null)
+      let rows: FlowRow[] = (res?.records || []).map(oaToRow)
+
+      if (allFilters.flowTag) {
+        rows = rows.filter(r => r.approvalType === allFilters.flowTag)
+      }
+      if (allFilters.flowName) {
+        const q = allFilters.flowName.trim().toLowerCase()
+        rows = rows.filter(r => {
+          const name = `${r.processCode} ${r.applicant} ${r.applyTime}`.toLowerCase()
+          return name.includes(q)
+        })
+      }
+      if (allFilters.currentApprover) {
+        const q = allFilters.currentApprover.trim().toLowerCase()
+        rows = rows.filter(r => r.currentApprover.toLowerCase().includes(q))
+      }
+
+      rows.sort((a, b) => (b.applyTime || '').localeCompare(a.applyTime || ''))
+      setAllData(rows)
+    } catch {
+      setAllData([])
+    } finally {
+      setAllLoading(false)
+    }
+  }, [allFilters, refReady, isDeptLeader])
+
+  useEffect(() => { loadAllFlows() }, [loadAllFlows])
+
+  const handleAllSearch = () => {
+    const values = allForm.getFieldsValue()
+    setAllFilters({
+      flowNo: values.flowNo,
+      flowName: values.flowName,
+      flowTag: values.flowTag,
+      applicant: values.applicant,
+      currentApprover: values.currentApprover,
+      dateRange: values.dateRange,
+      flowStatus: values.flowStatus,
+    })
+  }
+  const handleAllReset = () => {
+    allForm.resetFields()
+    setAllFilters({})
+  }
+
   /* ==================== 導航 ==================== */
   const handleDetail = (record: FlowRow) => {
     navigate(`/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`)
   }
   const handleApprove = (record: FlowRow) => {
     navigate(`/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`)
+  }
+  const handleCancel = async (record: FlowRow) => {
+    try {
+      await cancelOaRequest(record.flowNo)
+      message.success(t('common.cancelSuccess'))
+      loadMyRequests()
+    } catch {
+      // error handled by request interceptor
+    }
   }
 
   /* ==================== 渲染工具 ==================== */
@@ -453,7 +600,7 @@ export default function OaRequests() {
 
   const flowStatusOptions = useMemo(() => [
     { label: t('common.all'), value: 'all' },
-    { label: '待提交', value: 'draft' },
+    { label: t('approvalCenter.flowDraft'), value: 'draft' },
     { label: t('approvalCenter.flowPending'), value: 'pending' },
     { label: t('approvalCenter.flowApproved'), value: 'approved' },
     { label: t('approvalCenter.flowRejected'), value: 'rejected' },
@@ -470,6 +617,9 @@ export default function OaRequests() {
     { key: 'flowStatus', title: t('common.colStatus') },
     { key: 'currentNodeName', title: t('oaRequests.colCurrentNode') },
     { key: 'currentApprover', title: t('oaRequests.colCurrentApprover') },
+    { key: 'pendingApprover', title: t('oaRequests.colCurrentApprover') },
+    { key: 'reviewer', title: t('oaRequests.colReviewer') },
+    { key: 'approvalTime', title: t('oaRequests.colApprovalTime') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
@@ -478,100 +628,122 @@ export default function OaRequests() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  /* ==================== 列定義 ==================== */
-  const sharedColumns: TableColumnsType<FlowRow> = [
-    {
-      title: t('common.colFlowNo'),
-      dataIndex: 'flowNo',
-      key: 'flowNo',
-      width: 170,
-      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v}</span>,
+  /* ==================== 列定義（每個 Tab 獨立） ==================== */
+  const flowNoColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('common.colFlowNo'),
+    dataIndex: 'flowNo',
+    key: 'flowNo',
+    width: 170,
+    render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v}</span>,
+  }
+  const flowNameColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colFlowName'),
+    key: 'flowName',
+    width: 280,
+    ellipsis: true,
+    render: (_: unknown, r: FlowRow) => {
+      const prefix = FLOW_NAME_PREFIX[r.processCode] || FLOW_NAME_PREFIX[r.approvalType] || r.processCode
+      const date = r.applyTime ? r.applyTime.slice(0, 10) : ''
+      const name = stripEmpId(r.applicant)
+      return `${prefix} ${name} ${date}`
     },
-    {
-      title: t('oaRequests.colFlowName'),
-      key: 'flowName',
-      width: 280,
-      ellipsis: true,
-      render: (_: unknown, r: FlowRow) => {
-        const prefix = FLOW_NAME_PREFIX[r.processCode] || FLOW_NAME_PREFIX[r.approvalType] || r.processCode
-        const date = r.applyTime ? r.applyTime.slice(0, 10) : ''
-        const name = stripEmpId(r.applicant)
-        return `${prefix} ${name} ${date}`
-      },
+  }
+  const flowTagColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colRequestType'),
+    dataIndex: 'approvalType',
+    key: 'approvalType',
+    width: 120,
+    render: (v: string) => renderFlowTag(v),
+  }
+  const applicantColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colApplicant'),
+    dataIndex: 'applicant',
+    key: 'applicant',
+    width: 160,
+    render: (_: string, r: FlowRow) => {
+      const display = getApplicantWithEmpId(stripEmpId(r.applicant), r.applicantId)
+      return <span style={{ whiteSpace: 'nowrap' }}>{display || '--'}</span>
     },
-    {
-      title: t('oaRequests.colRequestType'),
-      dataIndex: 'approvalType',
-      key: 'approvalType',
-      width: 120,
-      render: (v: string) => renderFlowTag(v),
+  }
+  const applyTimeColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colApplyTime'),
+    dataIndex: 'applyTime',
+    key: 'applyTime',
+    width: 170,
+    render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '--',
+  }
+  const statusColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('common.colStatus'),
+    dataIndex: 'flowStatus',
+    key: 'flowStatus',
+    width: 100,
+    render: (v: string) => renderFlowStatus(v),
+  }
+  const currentNodeColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colCurrentNode'),
+    dataIndex: 'currentNodeName',
+    key: 'currentNodeName',
+    width: 140,
+    render: (v: string) => renderCurrentNode(v),
+  }
+  const currentApproverColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colCurrentApprover'),
+    dataIndex: 'currentApprover',
+    key: 'currentApprover',
+    width: 140,
+    render: (v: string) => {
+      const display = v ? getApproverWithEmpIdByName(v) : '--'
+      return <span style={{ whiteSpace: 'nowrap' }}>{display}</span>
     },
-    {
-      title: t('oaRequests.colApplicant'),
-      dataIndex: 'applicant',
-      key: 'applicant',
-      width: 160,
-      render: (_: string, r: FlowRow) => {
-        // 優先使用 applicantId，若無則通過姓名查找
-        const display = getApplicantWithEmpId(stripEmpId(r.applicant), r.applicantId)
-        return <span style={{ whiteSpace: 'nowrap' }}>{display || '--'}</span>
-      },
+  }
+  const reviewerColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colReviewer'),
+    dataIndex: 'currentApprover',
+    key: 'reviewer',
+    width: 140,
+    render: (_: string) => {
+      const display = user?.empId ? `${user.name}(${user.empId})` : (user?.name || '--')
+      return <span style={{ whiteSpace: 'nowrap' }}>{display}</span>
     },
-    {
-      title: t('oaRequests.colApplyTime'),
-      dataIndex: 'applyTime',
-      key: 'applyTime',
-      width: 170,
-      render: (v: string) => v ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span> : '--',
-    },
-    {
-      title: t('common.colStatus'),
-      dataIndex: 'flowStatus',
-      key: 'flowStatus',
-      width: 100,
-      render: (v: string) => renderFlowStatus(v),
-    },
-    {
-      title: t('oaRequests.colCurrentNode'),
-      dataIndex: 'currentNodeName',
-      key: 'currentNodeName',
-      width: 140,
-      render: (v: string) => renderCurrentNode(v),
-    },
-    {
-      title: t('oaRequests.colCurrentApprover'),
-      dataIndex: 'currentApprover',
-      key: 'currentApprover',
-      width: 140,
-      render: (v: string) => {
-        // 「待我審批」tab：優先顯示當前登錄用戶的姓名+工號
-        if (activeTab === 'pending' && user?.name) {
-          const currentUserName = user.name
-          const approvers = v ? v.split(',').map(a => a.trim()) : []
-          if (approvers.some(a => a === currentUserName)) {
-            const display = user.empId ? `${currentUserName}(${user.empId})` : currentUserName
-            return <span style={{ whiteSpace: 'nowrap' }}>{display}</span>
-          }
-        }
-        // 「我的申請」tab 或其他情況：按原有規則顯示所有審批人
-        const display = v ? getApproverWithEmpIdByName(v) : '--'
-        return <span style={{ whiteSpace: 'nowrap' }}>{display}</span>
-      },
-    },
-  ]
+  }
+  const approvalTimeColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colApprovalTime'),
+    dataIndex: 'myApprovalTime',
+    key: 'approvalTime',
+    width: 170,
+    render: (v: string) => v
+      ? <span style={{ whiteSpace: 'nowrap' }}>{v}</span>
+      : <span style={{ color: '#999' }}>--</span>,
+  }
 
+  /** Tab 1：我發起的 — 詳情 / 撤銷(draft/pending) */
   const myActionColumn: TableColumnsType<FlowRow>[0] = {
     title: t('common.colAction'),
     key: 'action',
-    width: 80,
+    width: 130,
     fixed: 'right' as const,
-    render: (_: unknown, record: FlowRow) => (
-      <Button type="link" size="small" onClick={() => handleDetail(record)}>
-        {t('common.detail')}
-      </Button>
-    ),
+    render: (_: unknown, record: FlowRow) => {
+      if (record.flowStatus === 'draft' || record.flowStatus === 'pending') {
+        return (
+          <Space size={0} split={<span className="action-split">|</span>}>
+            <Button type="link" size="small" onClick={() => handleDetail(record)}>
+              {t('common.detail')}
+            </Button>
+            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>
+              {t('common.cancel')}
+            </Button>
+          </Space>
+        )
+      }
+      return (
+        <Button type="link" size="small" onClick={() => handleDetail(record)}>
+          {t('common.detail')}
+        </Button>
+      )
+    },
   }
 
+  /** Tab 2：待我審批 — 審批 + 詳情 */
   const pendingActionColumn: TableColumnsType<FlowRow>[0] = {
     title: t('common.colAction'),
     key: 'action',
@@ -589,20 +761,80 @@ export default function OaRequests() {
     ),
   }
 
+  /** Tab 3/4：詳情 */
+  const detailActionColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('common.colAction'),
+    key: 'action',
+    width: 80,
+    fixed: 'right' as const,
+    render: (_: unknown, record: FlowRow) => (
+      <Button type="link" size="small" onClick={() => handleDetail(record)}>
+        {t('common.detail')}
+      </Button>
+    ),
+  }
+
   const myColumns = useMemo(
-    () => applyConfig([...sharedColumns, myActionColumn]) as TableColumnsType<FlowRow>,
-    [applyConfig, sharedColumns, activeTab, myData],
+    () => applyConfig([flowNoColumn, flowNameColumn, flowTagColumn, applyTimeColumn, statusColumn, currentNodeColumn, currentApproverColumn, myActionColumn]) as TableColumnsType<FlowRow>,
+    [applyConfig, activeTab, myData],
   )
 
+  /** 「待我審批」專屬：當前審批人列，多審批人時高亮當前用戶 */
+  const pendingApproverColumn: TableColumnsType<FlowRow>[0] = {
+    title: t('oaRequests.colCurrentApprover'),
+    dataIndex: 'currentApprover',
+    key: 'pendingApprover',
+    width: 180,
+    render: (v: string) => {
+      if (!v || v === '--') return <span>--</span>
+      const currentName = user?.name || ''
+      // 多人審批時，分割顯示並高亮當前用戶
+      const names = v.split(/[,，]/).map(n => n.trim()).filter(Boolean)
+      if (names.length > 1 && currentName) {
+        return (
+          <span style={{ whiteSpace: 'nowrap' }}>
+            {names.map((name, i) => {
+              const isMe = name === currentName
+              const base = getApproverWithEmpIdByName(name)
+              return (
+                <span key={i}>
+                  {i > 0 && ', '}
+                  {isMe
+                    ? <span style={{ color: '#1677ff', fontWeight: 600 }}>{base}</span>
+                    : <span style={{ color: '#999' }}>{base}</span>
+                  }
+                </span>
+              )
+            })}
+          </span>
+        )
+      }
+      const display = getApproverWithEmpIdByName(v)
+      return <span style={{ whiteSpace: 'nowrap' }}>{display}</span>
+    },
+  }
+
   const pendingColumns = useMemo(
-    () => applyConfig([...sharedColumns, pendingActionColumn]) as TableColumnsType<FlowRow>,
-    [applyConfig, sharedColumns, activeTab, pendingData],
+    () => applyConfig([flowNoColumn, flowNameColumn, flowTagColumn, applyTimeColumn, statusColumn, currentNodeColumn, pendingApproverColumn, pendingActionColumn]) as TableColumnsType<FlowRow>,
+    [applyConfig, activeTab, pendingData],
+  )
+
+  const approvedColumns = useMemo(
+    () => applyConfig([flowNoColumn, flowNameColumn, flowTagColumn, applicantColumn, applyTimeColumn, statusColumn, reviewerColumn, approvalTimeColumn, detailActionColumn]) as TableColumnsType<FlowRow>,
+    [applyConfig, activeTab, approvedData],
+  )
+
+  const allColumns = useMemo(
+    () => applyConfig([flowNoColumn, flowNameColumn, flowTagColumn, applicantColumn, applyTimeColumn, statusColumn, currentNodeColumn, currentApproverColumn, detailActionColumn]) as TableColumnsType<FlowRow>,
+    [applyConfig, activeTab, allData],
   )
 
   /* ==================== 搜索表單 ==================== */
   const renderSearchForm = (
     form: ReturnType<typeof Form.useForm>[0],
-    isPending: boolean,
+    fields: { applicant?: boolean; currentApprover?: boolean },
+    onSearch: () => void,
+    onReset: () => void,
   ) => (
     <Form form={form} layout="inline">
       <Form.Item label={t('common.colFlowNo')} name="flowNo">
@@ -614,10 +846,12 @@ export default function OaRequests() {
       <Form.Item label={t('oaRequests.colRequestType')} name="flowTag">
         <Select placeholder={t('common.all')} allowClear options={flowTagOptions} />
       </Form.Item>
-      <Form.Item label={t('oaRequests.colApplicant')} name="applicant">
-        <Input placeholder={t('oaRequests.applicantPlaceholder')} allowClear />
-      </Form.Item>
-      {!isPending && (
+      {fields.applicant && (
+        <Form.Item label={t('oaRequests.colApplicant')} name="applicant">
+          <Input placeholder={t('oaRequests.applicantPlaceholder')} allowClear />
+        </Form.Item>
+      )}
+      {fields.currentApprover && (
         <Form.Item label={t('oaRequests.colCurrentApprover')} name="currentApprover">
           <Input placeholder={t('oaRequests.currentApproverPlaceholder')} allowClear />
         </Form.Item>
@@ -630,10 +864,10 @@ export default function OaRequests() {
       </Form.Item>
       <Form.Item>
         <div className="search-actions">
-          <Button type="primary" icon={<SearchOutlined />} onClick={isPending ? handlePendingSearch : handleMySearch}>
+          <Button type="primary" icon={<SearchOutlined />} onClick={onSearch}>
             {t('common.search')}
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={isPending ? handlePendingReset : handleMyReset}>
+          <Button icon={<ReloadOutlined />} onClick={onReset}>
             {t('common.reset')}
           </Button>
         </div>
@@ -645,11 +879,11 @@ export default function OaRequests() {
   const tabItems = [
     {
       key: 'my',
-      label: t('oaRequests.tabMy'),
+      label: t('oaRequests.tabMyApplied'),
       children: (
         <>
           <div className="search-section">
-            {renderSearchForm(myForm, false)}
+            {renderSearchForm(myForm, { applicant: true, currentApprover: true }, handleMySearch, handleMyReset)}
           </div>
           <div className="action-section">
             <div className="action-section-right">
@@ -666,6 +900,11 @@ export default function OaRequests() {
             loading={myLoading}
             size="middle"
             scroll={{ x: 1400 }}
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => t('common.total', { count: total }),
+            }}
           />
         </>
       ),
@@ -676,7 +915,7 @@ export default function OaRequests() {
       children: (
         <>
           <div className="search-section">
-            {renderSearchForm(pendingForm, true)}
+            {renderSearchForm(pendingForm, { currentApprover: true }, handlePendingSearch, handlePendingReset)}
           </div>
           <Table<FlowRow>
             columns={pendingColumns}
@@ -685,10 +924,63 @@ export default function OaRequests() {
             loading={pendingLoading}
             size="middle"
             scroll={{ x: 1400 }}
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => t('common.total', { count: total }),
+            }}
           />
         </>
       ),
     },
+    {
+      key: 'approved',
+      label: t('oaRequests.tabMyApproved'),
+      children: (
+        <>
+          <div className="search-section">
+            {renderSearchForm(approvedForm, { applicant: true }, handleApprovedSearch, handleApprovedReset)}
+          </div>
+          <Table<FlowRow>
+            columns={approvedColumns}
+            dataSource={approvedData}
+            rowKey="key"
+            loading={approvedLoading}
+            size="middle"
+            scroll={{ x: 1400 }}
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => t('common.total', { count: total }),
+            }}
+          />
+        </>
+      ),
+    },
+    ...(isDeptLeader ? [{
+      key: 'all',
+      label: t('oaRequests.tabAll'),
+      children: (
+        <>
+          <div className="search-section">
+            {renderSearchForm(allForm, { applicant: true, currentApprover: true }, handleAllSearch, handleAllReset)}
+          </div>
+          <Table<FlowRow>
+            columns={allColumns}
+            dataSource={allData}
+            rowKey="key"
+            loading={allLoading}
+            size="middle"
+            scroll={{ x: 1400 }}
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => t('common.total', { count: total }),
+            }}
+          />
+        </>
+      ),
+    }] : []),
   ]
 
   return (

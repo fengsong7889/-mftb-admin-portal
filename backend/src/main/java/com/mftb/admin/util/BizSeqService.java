@@ -93,6 +93,8 @@ public class BizSeqService {
     public static final String RULE_AI_CONVERSATION = "ai_conversation";
     /** OA流程编号 */
     public static final String RULE_OA_REQUEST = "oa_request";
+    /** AI 使用申請流程編號 */
+    public static final String RULE_AI_ACCESS_REQUEST = "ai_access_request";
     /** EAM 採購申請 */
     public static final String RULE_EAM_PURCHASE_REQUEST = "eam_purchase_request";
     /** EAM 採購訂單 */

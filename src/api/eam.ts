@@ -295,6 +295,8 @@ export interface InboundBatchItem {
   disposition?: 'pass' | 'return' | 'exchange' | 'concession'
   /** 驗收不通過原因 */
   rejectReason?: string
+  /** 驗收照片 [{name, dataUrl}] */
+  photos?: { name: string; dataUrl: string }[]
   /** 入庫後生成的資產編號 */
   assetNos: string[]
 }
@@ -1038,6 +1040,26 @@ export function fetchPendingInboundOrders(): Promise<PurchaseOrder[]> {
   return delay(list)
 }
 
+/** 上傳驗收照片，返回 {name, dataUrl} */
+export async function uploadInboundPhoto(file: File): Promise<{ name: string; dataUrl: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    return await request.post<unknown, { name: string; dataUrl: string }>('/eam/inbound/photo/upload', formData)
+  } catch (e) {
+    if (isBackendUnavailable(e)) {
+      // 後端不可用時本地 Base64 預覽
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve({ name: file.name, dataUrl: reader.result as string })
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+    throw e
+  }
+}
+
 /**
  * 創建入庫批次：按型號+數量批量生成資產寫入台賬，並回寫訂單已驗收數量與狀態
  */
@@ -1052,6 +1074,8 @@ export async function createInboundBatch(data: {
     /** 驗收處置方式：缺省視為 pass；不通過項不生成資產 */
     disposition?: 'pass' | 'return' | 'exchange' | 'concession'
     rejectReason?: string
+    /** 驗收照片 [{name, dataUrl}] */
+    photos?: { name: string; dataUrl: string }[]
   }[]
   remark?: string
 }): Promise<InboundBatch> {
@@ -1116,6 +1140,7 @@ export async function createInboundBatch(data: {
       locationId: it.locationId, assetNos: nos,
       disposition: it.disposition || 'pass',
       rejectReason: it.rejectReason,
+      photos: it.photos,
     }
   })
 

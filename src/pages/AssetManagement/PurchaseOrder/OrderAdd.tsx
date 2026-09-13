@@ -165,7 +165,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
 
   return (
     <Modal
-      title={editing ? '編輯明細' : '添加明細'}
+      title={editing ? '編輯資產' : '添加資產'}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
@@ -194,7 +194,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
               <Select placeholder={selectedBrandId ? '請選擇資產' : '請先選擇品牌'} showSearch optionFilterProp="label"
                 disabled={!selectedBrandId} onChange={handleModelChange}
                 options={filteredModels.map((m) => ({
-                  label: m.modelNo ? `${m.modelNo} / ${m.name}` : m.name, value: m.id,
+                  label: m.name, value: m.id,
                 }))} />
             </Form.Item>
           </Col>
@@ -705,7 +705,7 @@ export default function OrderAdd() {
               style={{ marginBottom: 12 }}
             />
             <Button type="dashed" icon={<PlusOutlined />} onClick={() => handleOpenAddModal(group.id)}>
-              添加明細
+              添加資產
             </Button>
           </div>
         ))}

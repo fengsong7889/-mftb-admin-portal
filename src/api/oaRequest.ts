@@ -17,6 +17,10 @@ export interface OaApprovalTaskVO {
   taskStatus: string
   approveTime: string | null
   comment: string | null
+  /** 已审批人列表（会签模式多人追加） */
+  approvedBy: string | null
+  /** 已审批时间列表（与 approvedBy 一一对应） */
+  approvedTimes: string | null
 }
 
 /** OA流程實例 VO */
@@ -31,6 +35,8 @@ export interface OaRequestVO {
   flowStatus: OaFlowStatus
   currentNodeName: string | null
   currentApprover: string | null
+  /** 当前用户审批时间（用于「待我審批」tab） */
+  myApprovalTime: string | null
   rejectReason: string | null
   applyTime: string | null
   completeTime: string | null
@@ -65,6 +71,8 @@ export interface OaRequestQuery {
   processCode?: string
   applicant?: string
   flowStatus?: OaFlowStatus
+  /** 查询范围: my_applied / pending_my_approval / my_approved / department_all */
+  scope?: 'my_applied' | 'pending_my_approval' | 'my_approved' | 'department_all'
   applyFrom?: string
   applyTo?: string
 }
@@ -114,7 +122,17 @@ export function rejectOaRequest(flowNo: string, reason: string): Promise<void> {
   return request.post(`/oa/requests/${flowNo}/reject`, { reason })
 }
 
-/** 撤銷申請 */
+/** 撤销申请 */
 export function cancelOaRequest(flowNo: string): Promise<void> {
   return request.post(`/oa/requests/${flowNo}/cancel`)
+}
+
+/** 提交草稿（draft → pending） */
+export function submitDraftOaRequest(flowNo: string): Promise<void> {
+  return request.post(`/oa/requests/${flowNo}/submit`)
+}
+
+/** 检查当前用户是否为部门 leader */
+export function checkIsDeptLeader(): Promise<{ isLeader: boolean; departmentName: string | null }> {
+  return request.get('/oa/requests/is-dept-leader')
 }

@@ -89,6 +89,16 @@ export function getApprovalRecordByFlowNo(flowNo: string): ApprovalRecord | unde
   return getApprovalRecords().find(r => r.flowNo === flowNo)
 }
 
+/** 刪除審批記錄（按流程編號） */
+export function deleteApprovalRecord(flowNo: string): boolean {
+  const records = getApprovalRecords()
+  const idx = records.findIndex(r => r.flowNo === flowNo)
+  if (idx === -1) return false
+  records.splice(idx, 1)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records))
+  return true
+}
+
 /** 更新審批記錄 */
 export function updateApprovalRecord(flowNo: string, updates: Partial<ApprovalRecord>): void {
   const records = getApprovalRecords()

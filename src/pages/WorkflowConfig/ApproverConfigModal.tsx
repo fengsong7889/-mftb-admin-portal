@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Modal, Form, Input, Select, Radio, Divider, Tabs } from 'antd'
+import { Modal, Form, Input, Select, Radio, Divider, Tabs, Tag } from 'antd'
 import {
   UserOutlined,
   TeamOutlined,
@@ -12,7 +12,7 @@ import {
   createDefaultApproverConfig,
 } from './types'
 import type { WorkflowNode, ApproverType, ApprovalRule, ApproverConfig } from './types'
-import { getApproverOptions, loadApproverOptions } from './options'
+import { getApproverOptions, loadApproverOptions, resolveApproverLabel } from './options'
 
 interface Props {
   open: boolean
@@ -61,53 +61,56 @@ export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, o
   /* 打開時初始化 + 加載選項 */
   useEffect(() => {
     if (!open) return
-    // 異步加載選項（冪等，已加載過則立即返回）
+    // 等待選項加載完成後再設置表單值，確保 Select 能找到對應選項
     setOptionsLoading(true)
-    loadApproverOptions().finally(() => setOptionsLoading(false))
-
-    if (node) {
-      const cfg = node.approverConfig || createDefaultApproverConfig(
-        node.approverType || 'role',
-        node.approverIds || [],
-        node.approvalRule || 'any',
-      )
-      const type = cfg.default.approverType
-      setApproverType(type)
-      setBrandSettings({
-        default: { approverIds: cfg.default.approverIds, approvalRule: cfg.default.approvalRule },
-        '1': {
-          approverIds: cfg.brands['1']?.approverIds || [],
-          approvalRule: cfg.brands['1']?.approvalRule || 'any',
-        },
-        '2': {
-          approverIds: cfg.brands['2']?.approverIds || [],
-          approvalRule: cfg.brands['2']?.approvalRule || 'any',
-        },
-      })
-      setActiveTab('default')
-      form.setFieldsValue({
-        name: node.name,
-        approverType: type,
-        approverIds: cfg.default.approverIds,
-        approvalRule: cfg.default.approvalRule,
-        ccUserIds: node.ccUserIds,
-      })
-    } else {
-      form.resetFields()
-      setApproverType('role')
-      setActiveTab('default')
-      setBrandSettings({
-        default: { approverIds: [], approvalRule: 'any' },
-        '1': { approverIds: [], approvalRule: 'any' },
-        '2': { approverIds: [], approvalRule: 'any' },
-      })
-      form.setFieldsValue({
-        sortOrder: nextSortOrder,
-        approverType: 'role',
-        approverIds: [],
-        approvalRule: 'any',
-      })
-    }
+    loadApproverOptions().then(() => {
+      setOptionsLoading(false)
+      if (node) {
+        const cfg = node.approverConfig || createDefaultApproverConfig(
+          node.approverType || 'role',
+          node.approverIds || [],
+          node.approvalRule || 'any',
+        )
+        const type = cfg.default.approverType
+        setApproverType(type)
+        setBrandSettings({
+          default: { approverIds: cfg.default.approverIds, approvalRule: cfg.default.approvalRule },
+          '1': {
+            approverIds: cfg.brands['1']?.approverIds || [],
+            approvalRule: cfg.brands['1']?.approvalRule || 'any',
+          },
+          '2': {
+            approverIds: cfg.brands['2']?.approverIds || [],
+            approvalRule: cfg.brands['2']?.approvalRule || 'any',
+          },
+        })
+        setActiveTab('default')
+        form.setFieldsValue({
+          name: node.name,
+          approverType: type,
+          approverIds: cfg.default.approverIds,
+          approvalRule: cfg.default.approvalRule,
+          ccUserIds: node.ccUserIds,
+        })
+      } else {
+        form.resetFields()
+        setApproverType('role')
+        setActiveTab('default')
+        setBrandSettings({
+          default: { approverIds: [], approvalRule: 'any' },
+          '1': { approverIds: [], approvalRule: 'any' },
+          '2': { approverIds: [], approvalRule: 'any' },
+        })
+        form.setFieldsValue({
+          sortOrder: nextSortOrder,
+          approverType: 'role',
+          approverIds: [],
+          approvalRule: 'any',
+        })
+      }
+    }).catch(() => {
+      setOptionsLoading(false)
+    })
   }, [open, node, nextSortOrder, form])
 
   /* 切換品牌 Tab 時，先保存當前 Tab 的表單值到 state，再載入新 Tab 的值 */
@@ -165,6 +168,13 @@ export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, o
   /** 審批人類型切換 */
   const handleTypeChange = (type: ApproverType) => {
     setApproverType(type)
+    // 切換類型時清空已選擇的審批人，避免舊類型的值殘留
+    form.setFieldsValue({ approverIds: [] })
+    setBrandSettings(prev => ({
+      default: { ...prev.default, approverIds: [] },
+      '1': { ...prev['1'], approverIds: [] },
+      '2': { ...prev['2'], approverIds: [] },
+    }))
     if (type === 'initiator_leader') {
       setActiveTab('default')
     }
@@ -229,21 +239,75 @@ export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, o
             {/* 指定人員 */}
             {approverType === 'person' && (
               <Form.Item name="approverIds" label="選擇人員" rules={[{ required: true, message: '請選擇審批人員' }]}>
-                <Select mode="multiple" placeholder="選擇審批人員" options={getApproverOptions('person')} />
+                <Select
+                  mode="multiple"
+                  placeholder="選擇審批人員"
+                  options={getApproverOptions('person')}
+                  tagRender={(props) => {
+                    const { label, value, closable, onClose } = props
+                    const displayLabel = resolveApproverLabel('person', String(value))
+                    return (
+                      <Tag
+                        color="green"
+                        closable={closable}
+                        onClose={onClose}
+                        style={{ marginInlineEnd: 4 }}
+                      >
+                        {displayLabel}
+                      </Tag>
+                    )
+                  }}
+                />
               </Form.Item>
             )}
 
             {/* 指定角色 */}
             {approverType === 'role' && (
               <Form.Item name="approverIds" label="選擇角色" rules={[{ required: true, message: '請選擇審批角色' }]}>
-                <Select mode="multiple" placeholder="選擇審批角色" options={getApproverOptions('role')} />
+                <Select
+                  mode="multiple"
+                  placeholder="選擇審批角色"
+                  options={getApproverOptions('role')}
+                  tagRender={(props) => {
+                    const { label, value, closable, onClose } = props
+                    const displayLabel = resolveApproverLabel('role', String(value))
+                    return (
+                      <Tag
+                        color="blue"
+                        closable={closable}
+                        onClose={onClose}
+                        style={{ marginInlineEnd: 4 }}
+                      >
+                        {displayLabel}
+                      </Tag>
+                    )
+                  }}
+                />
               </Form.Item>
             )}
 
             {/* 部門負責人 */}
             {approverType === 'department_leader' && (
               <Form.Item name="approverIds" label="選擇部門" rules={[{ required: true, message: '請選擇部門' }]}>
-                <Select mode="multiple" placeholder="選擇部門（取該部門負責人為審批人）" options={getApproverOptions('department_leader')} />
+                <Select
+                  mode="multiple"
+                  placeholder="選擇部門（取該部門負責人為審批人）"
+                  options={getApproverOptions('department_leader')}
+                  tagRender={(props) => {
+                    const { label, value, closable, onClose } = props
+                    const displayLabel = resolveApproverLabel('department_leader', String(value))
+                    return (
+                      <Tag
+                        color="orange"
+                        closable={closable}
+                        onClose={onClose}
+                        style={{ marginInlineEnd: 4 }}
+                      >
+                        {displayLabel}
+                      </Tag>
+                    )
+                  }}
+                />
               </Form.Item>
             )}
 
@@ -261,7 +325,26 @@ export default function ApproverConfigModal({ open, node, nextSortOrder, onOk, o
 
         {/* 抄送 */}
         <Form.Item name="ccUserIds" label="抄送人員">
-          <Select mode="multiple" placeholder="選擇抄送人員（可選）" options={getApproverOptions('person')} allowClear />
+          <Select
+            mode="multiple"
+            placeholder="選擇抄送人員（可選）"
+            options={getApproverOptions('person')}
+            allowClear
+            tagRender={(props) => {
+              const { label, value, closable, onClose } = props
+              const displayLabel = resolveApproverLabel('person', String(value))
+              return (
+                <Tag
+                  color="default"
+                  closable={closable}
+                  onClose={onClose}
+                  style={{ marginInlineEnd: 4 }}
+                >
+                  {displayLabel}
+                </Tag>
+              )
+            }}
+          />
         </Form.Item>
       </Form>
     </Modal>

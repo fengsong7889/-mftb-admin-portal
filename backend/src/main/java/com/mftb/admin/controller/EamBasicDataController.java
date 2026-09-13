@@ -188,4 +188,83 @@ public class EamBasicDataController {
         basicDataService.deleteLocation(id);
         return Result.success();
     }
+
+    /* ==================== 參數庫 ==================== */
+
+    /** 參數類型分頁列表 */
+    @GetMapping("/param-types")
+    @RequirePermission(menu = "asset-param-library")
+    public Result<PageResult<Map<String, Object>>> pageParamTypes(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String categoryCode,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String status) {
+        return Result.success(basicDataService.pageParamTypes(page, size, categoryCode, name, code, status));
+    }
+
+    /** 新增參數類型 */
+    @PostMapping("/param-types")
+    @RequirePermission(menu = "asset-param-library", action = "edit")
+    public Result<Long> createParamType(@RequestBody Map<String, Object> data) {
+        return Result.success(basicDataService.createParamType(data));
+    }
+
+    /** 更新參數類型 */
+    @PutMapping("/param-types/{id}")
+    @RequirePermission(menu = "asset-param-library", action = "edit")
+    public Result<Void> updateParamType(@PathVariable long id, @RequestBody Map<String, Object> data) {
+        basicDataService.updateParamType(id, data);
+        return Result.success();
+    }
+
+    /** 刪除參數類型 */
+    @DeleteMapping("/param-types/{id}")
+    @RequirePermission(menu = "asset-param-library", action = "delete")
+    public Result<Void> deleteParamType(@PathVariable long id) {
+        basicDataService.deleteParamType(id);
+        return Result.success();
+    }
+
+    /** 根據參數類型編碼查詢參數值 */
+    @GetMapping("/param-types/{paramTypeCode}/values")
+    @RequirePermission(menu = "asset-param-library")
+    public Result<List<Map<String, Object>>> listParamValuesByType(@PathVariable String paramTypeCode) {
+        return Result.success(basicDataService.listParamValuesByType(paramTypeCode));
+    }
+
+    /** 參數值分頁列表 */
+    @GetMapping("/param-values")
+    @RequirePermission(menu = "asset-param-library")
+    public Result<PageResult<Map<String, Object>>> pageParamValues(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String paramTypeCode,
+            @RequestParam(required = false) String categoryCode) {
+        return Result.success(basicDataService.pageParamValues(page, size, paramTypeCode, categoryCode));
+    }
+
+    /** 新增參數值 */
+    @PostMapping("/param-values")
+    @RequirePermission(menu = "asset-param-library", action = "edit")
+    public Result<Long> createParamValue(@RequestBody Map<String, Object> data) {
+        return Result.success(basicDataService.createParamValue(data));
+    }
+
+    /** 更新參數值 */
+    @PutMapping("/param-values/{id}")
+    @RequirePermission(menu = "asset-param-library", action = "edit")
+    public Result<Void> updateParamValue(@PathVariable long id, @RequestBody Map<String, Object> data) {
+        basicDataService.updateParamValue(id, data);
+        return Result.success();
+    }
+
+    /** 刪除參數值 */
+    @DeleteMapping("/param-values/{id}")
+    @RequirePermission(menu = "asset-param-library", action = "delete")
+    public Result<Void> deleteParamValue(@PathVariable long id) {
+        basicDataService.deleteParamValue(id);
+        return Result.success();
+    }
 }

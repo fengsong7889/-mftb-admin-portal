@@ -7,7 +7,7 @@
  *
  * 審批通過後由後端「審批即授權」單事務自動下發模型權限與個人額度（ai_quota_override）。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Checkbox, DatePicker, InputNumber, Radio, Select, Tag, Modal } from 'antd'
 import {
   CheckSquareOutlined, SafetyOutlined, WalletOutlined,
@@ -42,6 +42,8 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
   const [models, setModels] = useState<AiModel[]>([])
   /** 添加模型弹窗 */
   const [showAddModal, setShowAddModal] = useState(false)
+  /** 是否已完成初始同步（防止用户编辑后被覆盖） */
+  const initialSyncedRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +53,8 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
         setModels(list)
         // 申請人勾選的模型補齊默認能力配置（按模型自身能力全開）並加進 selectedModels
         // （解決 fallback draft.selectedModels 為空而「授權範圍」不顯示所選模型）
+        // 僅在首次同步時執行，避免覆蓋用戶後續編輯
+        if (initialSyncedRef.current) return
         const configs = { ...draft.modelConfigs }
         const selected = [...draft.selectedModels]
         let changed = false
@@ -61,13 +65,15 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
             if (m) { configs[id] = modelToConfig(m); changed = true }
           }
         }
-        if (changed) onChange({ ...draft, selectedModels: selected, modelConfigs: configs })
+        if (changed) {
+          onChange({ ...draft, selectedModels: selected, modelConfigs: configs })
+          initialSyncedRef.current = true
+        }
       })
       .catch(() => { /* 後端不可用時保留空模型列表 */ })
     return () => { cancelled = true }
-    // 僅加載時執行一次，draft 變化不觸發重新拉取
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [requestedModels])
 
   const showModelScope = requestType !== 'quota_only'
   const showQuota = requestType !== 'model_only'

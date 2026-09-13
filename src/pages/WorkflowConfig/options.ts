@@ -13,7 +13,7 @@ import { fetchWorkflowRoleOptions, type RoleOption } from '../../api/workflowCon
 
 interface ApproverCache {
   persons: { label: string; value: string }[]
-  roles: { label: string; value: string }[]
+  roles: { label: string; value: string; code?: string }[]
   departments: { label: string; value: string }[]
 }
 
@@ -52,6 +52,7 @@ export function loadApproverOptions(): Promise<ApproverCache> {
         ? roles.value.map((r: RoleOption) => ({
             label: r.name,
             value: String(r.id),
+            code: r.code,
           }))
         : MOCK_ROLES
 
@@ -93,4 +94,24 @@ export function getApproverUnitName(type: string) {
   if (type === 'role') return '角色'
   if (type === 'department_leader') return '部門'
   return ''
+}
+
+/**
+ * 根據值解析顯示名稱（支持 ID 和角色代碼兩種匹配方式）
+ * 當 Select 的 value 與選項不匹配時，嘗試用角色代碼匹配
+ */
+export function resolveApproverLabel(type: string, value: string): string {
+  const options = getApproverOptions(type)
+  // 先嘗試精確匹配 value
+  const exactMatch = options.find(o => o.value === value)
+  if (exactMatch) return exactMatch.label
+  // 對於角色類型，嘗試用代碼匹配
+  if (type === 'role') {
+    const codeMatch = (options as { label: string; value: string; code?: string }[]).find(
+      o => o.code === value
+    )
+    if (codeMatch) return codeMatch.label
+  }
+  // 都匹配不到，返回原始值
+  return value
 }

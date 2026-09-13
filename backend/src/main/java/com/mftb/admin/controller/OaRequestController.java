@@ -9,6 +9,7 @@ import com.mftb.admin.dto.OaRequestQuery;
 import com.mftb.admin.dto.OaRequestVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.OaRequestService;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class OaRequestController {
 
     private final OaRequestService oaRequestService;
+    private final OperatorResolver operatorResolver;
 
     /** 流程事项分页列表 */
     @GetMapping
@@ -60,9 +62,14 @@ public class OaRequestController {
         String comment = dto != null ? dto.getComment() : null;
         String formData = dto != null ? dto.getFormData() : null;
         ApproveResultVO result = oaRequestService.approve(flowNo, comment, formData);
-        String message = result.isFinished()
-                ? "审批已全部通过"
-                : "「" + result.getNodeName() + "」已通过，流转至「" + result.getNextNode() + "」";
+        String message;
+        if (result.isFinished()) {
+            message = "审批已全部通过";
+        } else if (result.getNextNode() != null) {
+            message = "「" + result.getNodeName() + "」已通过，流转至「" + result.getNextNode() + "」";
+        } else {
+            message = "「" + result.getNodeName() + "」已通过，等待其他审批人";
+        }
         return Result.success(message, result);
     }
 
@@ -83,5 +90,21 @@ public class OaRequestController {
     public Result<Void> cancel(@PathVariable String flowNo) {
         oaRequestService.cancel(flowNo);
         return Result.success("申请已撤销", null);
+    }
+
+    /** 提交草稿（draft → pending） */
+    @PostMapping("/{flowNo}/submit")
+    @RequirePermission(menu = "oa-requests", action = "edit")
+    public Result<Void> submitDraft(@PathVariable String flowNo) {
+        oaRequestService.submitDraft(flowNo);
+        return Result.success("草稿已提交", null);
+    }
+
+    /** 检查当前用户是否为部门 leader */
+    @GetMapping("/is-dept-leader")
+    @RequirePermission(menu = "oa-requests")
+    public Result<Map<String, Object>> isDeptLeader() {
+        String userName = operatorResolver.currentOperatorName();
+        return Result.success(oaRequestService.checkDeptLeader(userName));
     }
 }

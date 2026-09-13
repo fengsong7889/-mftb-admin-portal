@@ -36,8 +36,11 @@ public class EamInboundBatchItem {
     /** 驗收處置方式：pass=通過 / return=退貨 / exchange=換貨 / concession=讓步接收 */
     private String disposition;
 
-    /** 驗收不通過原因 */
+    /** 验收不通过原因 */
     private String rejectReason;
+    
+    /** 验收照片 JSON 数组 [{name,dataUrl}] */
+    private String photos;
 
     /** 排序 */
     private Integer sortOrder;

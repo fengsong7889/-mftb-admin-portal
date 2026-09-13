@@ -32,6 +32,9 @@ public class OaRequestQuery {
     /** 流程状态: pending / approved / rejected / cancelled */
     private String flowStatus;
 
+    /** 查询范围: my_applied / pending_my_approval / my_approved / department_all */
+    private String scope;
+
     /** 申请时间-开始日期 */
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate applyFrom;

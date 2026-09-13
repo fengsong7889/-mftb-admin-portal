@@ -1,0 +1,110 @@
+/* 通知渠道配置 - 卡片网格布局 */
+
+.notification-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* 单个渠道卡片 */
+.notification-channel-card {
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notification-channel-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  border-color: #d9d9d9;
+}
+
+/* 未接入/不可用卡片 */
+.notification-channel-card.card-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.3);
+}
+
+.notification-channel-card.card-disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* 平台图标 */
+.channel-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 卡片头部：名称 + 状态标签 */
+.channel-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.channel-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+}
+
+/* 简介文案 */
+.channel-card-desc {
+  font-size: 13px;
+  color: #8c8c8c;
+  line-height: 1.6;
+  flex: 1;
+}
+
+/* 操作区 */
+.channel-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.channel-card-actions .ant-switch {
+  margin-left: auto;
+}
+
+/* 弹窗内表单 */
+.drawer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.drawer-form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawer-form-item label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #262626;
+}
+
+.drawer-form-item .required {
+  color: #ff4d4f;
+}
+
+.drawer-form-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+  line-height: 1.5;
+}

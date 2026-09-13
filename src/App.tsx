@@ -10,6 +10,8 @@ import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import MenuPermissionGuard from './components/MenuPermissionGuard'
+import VersionUpdateNotification from './components/VersionUpdateNotification'
+import useVersionCheck from './hooks/useVersionCheck'
 import './App.css'
 
 /* 懶加载所有页面组件，避免启动时一次性加载所有模块 */
@@ -102,6 +104,7 @@ const FlashSalePrice = lazy(() => import('./pages/GroupPurchase/FlashSalePrice')
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
+const NotificationConfig = lazy(() => import('./pages/NotificationConfig'))
 const VersionHistoryPage = lazy(() => import('./pages/VersionHistory'))
 const VersionHistoryDetailPage = lazy(() => import('./pages/VersionHistory/VersionHistoryDetail'))
 const VersionHistoryFormPage = lazy(() => import('./pages/VersionHistory/VersionHistoryForm'))
@@ -196,6 +199,7 @@ function PageLoading() {
 function AuthenticatedLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
+  const { updateAvailable } = useVersionCheck()
 
   return (
     <Layout className="app-layout">
@@ -301,6 +305,7 @@ function AuthenticatedLayout() {
               <Route path="/menu-config" element={<MenuConfig />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
               <Route path="/rule-config" element={<RuleConfig />} />
+              <Route path="/notification-config" element={<NotificationConfig />} />
               <Route path="/version-history" element={<VersionHistoryPage />} />
               <Route path="/version-history-add" element={<VersionHistoryFormPage />} />
               <Route path="/version-history-edit/:id" element={<VersionHistoryFormPage />} />
@@ -390,6 +395,7 @@ function AuthenticatedLayout() {
         </Content>
       </Layout>
       <PetMascot />
+      <VersionUpdateNotification updateAvailable={updateAvailable} />
     </Layout>
   )
 }

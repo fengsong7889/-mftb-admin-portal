@@ -6,11 +6,11 @@
  * - 遵循全局詳情頁規範：DetailPageHeader（紫色漸變頂條）+ 卡片佈局 + 無底部操作欄
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Table, Tag, Row, Col, Spin, message } from 'antd'
+import { Table, Tag, Row, Col, Spin, message, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   ShoppingCartOutlined, FileTextOutlined, EnvironmentOutlined, CheckCircleOutlined,
-  ExclamationCircleOutlined, SwapOutlined, RollbackOutlined,
+  ExclamationCircleOutlined, SwapOutlined, RollbackOutlined, CameraOutlined,
 } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import { fetchInboundDetail, fetchLocationList, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
@@ -33,6 +33,8 @@ export default function InboundDetail({ batchId, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [batch, setBatch] = useState<InboundBatch | null>(null)
   const [locations, setLocations] = useState<AssetLocation[]>([])
+  const [previewVisible, setPreviewVisible] = useState(false)
+  const [previewImage, setPreviewImage] = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -78,6 +80,27 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     {
       title: '不通過原因', dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
       render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
+    },
+    {
+      title: '驗收照片', key: 'photos', width: 120,
+      render: (_: unknown, r: InboundBatchItem) => {
+        const photos = r.photos || []
+        if (photos.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {photos.slice(0, 3).map((p, idx) => (
+              <img
+                key={idx} src={p.dataUrl} alt={p.name}
+                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #d9d9d9', cursor: 'pointer' }}
+                onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
+              />
+            ))}
+            {photos.length > 3 && (
+              <span style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '32px' }}>+{photos.length - 3}</span>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: '生成資產編號', key: 'assetNos', width: 300,
@@ -260,6 +283,16 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{batch.updatedBy || '-'}</span></span>
         <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{batch.updatedAt || '-'}</span></span>
       </div>
+
+      {/* ====== 照片預覽 ====== */}
+      <Modal
+        open={previewVisible}
+        footer={null}
+        onCancel={() => setPreviewVisible(false)}
+        centered
+      >
+        <img alt="preview" style={{ width: '100%' }} src={previewImage} />
+      </Modal>
     </>
   )
 }

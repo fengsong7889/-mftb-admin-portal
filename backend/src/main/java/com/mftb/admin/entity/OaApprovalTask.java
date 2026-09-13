@@ -42,6 +42,12 @@ public class OaApprovalTask {
     /** 审批意见 */
     private String comment;
 
+    /** 已审批人列表（逗号分隔，会签模式多人追加） */
+    private String approvedBy;
+
+    /** 已审批时间列表（逗号分隔，与 approvedBy 一一对应） */
+    private String approvedTimes;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

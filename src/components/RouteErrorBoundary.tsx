@@ -46,6 +46,10 @@ export default class RouteErrorBoundary extends Component<
     // chunk 加载失败：多为部署更新导致旧资源失效，自动重载一次拉取新资源
     if (isChunkLoadError(error) && !sessionStorage.getItem(RELOAD_FLAG)) {
       sessionStorage.setItem(RELOAD_FLAG, '1')
+      // 清除緩存後強制刷新，確保拿到最新的 HTML 與資源引用
+      if ('caches' in window) {
+        caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)))
+      }
       window.location.reload()
       return
     }

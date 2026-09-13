@@ -6,6 +6,8 @@ import com.mftb.admin.dto.OaRequestQuery;
 import com.mftb.admin.dto.OaRequestVO;
 import com.mftb.admin.dto.PageResult;
 
+import java.util.Map;
+
 /**
  * OA流程事项服务（流程实例全生命周期管理）
  */
@@ -40,4 +42,14 @@ public interface OaRequestService {
      * 撤销申请（仅 pending 状态可撤销）
      */
     void cancel(String flowNo);
+
+    /**
+     * 提交草稿（draft → pending，创建审批任务）
+     */
+    void submitDraft(String flowNo);
+
+    /**
+     * 检查当前用户是否为部门 leader
+     */
+    Map<String, Object> checkDeptLeader(String userName);
 }

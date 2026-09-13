@@ -68,11 +68,16 @@ VALUES
     ('oa_reimburse','報銷申請',   'finance', 'DollarOutlined',      '費用報銷申請流程',         'oa_general', 2, 1),
     ('oa_purchase', '採購申請',   'finance', 'ShoppingCartOutlined', '辦公物資採購申請流程',     'oa_general', 3, 1),
     ('oa_seal',     '用章申請',   'office',  'AuditOutlined',       '公章使用申請流程',         'oa_general', 4, 1),
-    ('oa_general',  '通用審批',   'general', 'FormOutlined',        '通用審批流程，適用於一般事項', 'oa_general', 5, 1);
+    ('oa_general',  '通用審批',   'general', 'FormOutlined',        '通用審批流程，適用於一般事項', 'oa_general', 5, 1),
+    ('ai_access',   'AI使用申請', 'general', 'RobotOutlined',       'AI模型權限與額度申請流程',   'ai_access', 6, 1);
 
 -- 5. 流程配置：OA通用审批流程（如果不存在则插入）
 INSERT IGNORE INTO biz_workflow_config (flow_type, flow_name, approval_enabled, description)
 VALUES ('oa_general', 'OA通用審批', 1, 'OA中心通用審批流程，默認一級審批');
+
+-- 5.1 流程配置：AI使用申请流程
+INSERT IGNORE INTO biz_workflow_config (flow_type, flow_name, approval_enabled, description)
+VALUES ('ai_access', 'AI使用申請審批', 1, 'AI模型權限與額度申請審批流程');
 
 -- 6. 编号规则：OA流程编号
 INSERT IGNORE INTO sys_biz_seq_rule (rule_key, prefix, date_format, seq_length, seq_start, status, description)

@@ -197,6 +197,7 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/menu-config': '菜單配置',
   '/translation-manage': '多語言配置',
   '/rule-config': '規則配置',
+  '/notification-config': '通知渠道配置',
   '/workflow-config': '審批流程',
   '/process-center': '流程中心',
   '/oa-purchase-request': '採購申請',

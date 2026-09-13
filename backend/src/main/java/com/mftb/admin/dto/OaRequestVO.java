@@ -44,6 +44,9 @@ public class OaRequestVO {
     /** 当前审批人 */
     private String currentApprover;
 
+    /** 当前用户审批时间（用于「待我審批」tab） */
+    private String myApprovalTime;
+
     /** 驳回理由 */
     private String rejectReason;
 
@@ -141,6 +144,8 @@ public class OaRequestVO {
         private String taskStatus;
         private String approveTime;
         private String comment;
+        private String approvedBy;
+        private String approvedTimes;
 
         public static OaApprovalTaskVO from(OaApprovalTask task) {
             OaApprovalTaskVO vo = new OaApprovalTaskVO();
@@ -152,6 +157,8 @@ public class OaRequestVO {
             vo.setTaskStatus(task.getTaskStatus());
             vo.setApproveTime(DateTimeUtils.format(task.getApproveTime()));
             vo.setComment(task.getComment());
+            vo.setApprovedBy(task.getApprovedBy());
+            vo.setApprovedTimes(task.getApprovedTimes());
             return vo;
         }
     }
