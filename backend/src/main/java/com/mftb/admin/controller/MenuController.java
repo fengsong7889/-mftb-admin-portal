@@ -36,7 +36,7 @@ public class MenuController {
         return Result.success(menuService.list());
     }
 
-    /** 查询菜单树（首頁解析菜單名稱用，所有登錄用戶可訪問） */
+    /** 查询菜单树（首页解析菜单名称用，所有登录用户可访问） */
     @GetMapping("/tree")
     public Result<List<MenuVO>> tree() {
         return Result.success(menuService.tree());
@@ -53,14 +53,14 @@ public class MenuController {
     @PostMapping
     @RequirePermission(menu = "menu-config", action = "create")
     public Result<MenuVO> create(@Valid @RequestBody MenuRequest request) {
-        return Result.success("菜单创建成功", menuService.create(request));
+        return Result.success("菜單創建成功", menuService.create(request));
     }
 
     /** 编辑菜单 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "menu-config", action = "edit")
     public Result<MenuVO> update(@PathVariable Long id, @Valid @RequestBody MenuRequest request) {
-        return Result.success("菜单信息已更新", menuService.update(id, request));
+        return Result.success("菜單信息已更新", menuService.update(id, request));
     }
 
     /** 启用/停用 */

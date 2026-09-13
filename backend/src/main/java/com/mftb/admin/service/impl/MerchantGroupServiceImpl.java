@@ -150,7 +150,7 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
         Long storeCount = storeMapper.selectCount(
                 new LambdaQueryWrapper<BizStore>().eq(BizStore::getGroupId, id));
         if (storeCount > 0) {
-            throw new BusinessException("该集团下还有 " + storeCount + " 家门店，请先删除门店后再删除集团");
+            throw new BusinessException("該集團下還有 " + storeCount + " 家门店，请先删除门店后再删除集团");
         }
         // @TableLogic 字段会被 updateById 自动忽略, 必须用 deleteById 触发逻辑删除 (UPDATE SET deleted=1)
         group.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -176,7 +176,7 @@ public class MerchantGroupServiceImpl implements MerchantGroupService {
     private BizMerchantGroup requireGroup(Long id) {
         BizMerchantGroup group = groupMapper.selectById(id);
         if (group == null) {
-            throw new BusinessException("集团不存在");
+            throw new BusinessException("集團不存在");
         }
         return group;
     }

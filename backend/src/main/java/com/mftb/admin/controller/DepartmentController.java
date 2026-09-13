@@ -42,14 +42,14 @@ public class DepartmentController {
     @PostMapping
     @RequirePermission(menu = "organization-management", action = "create")
     public Result<DepartmentVO> create(@Valid @RequestBody DepartmentRequest request) {
-        return Result.success("部门创建成功", departmentService.create(request));
+        return Result.success("部門創建成功", departmentService.create(request));
     }
 
     /** 编辑部门 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "organization-management", action = "edit")
     public Result<DepartmentVO> update(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
-        return Result.success("部门信息已更新", departmentService.update(id, request));
+        return Result.success("部門信息已更新", departmentService.update(id, request));
     }
 
     /** 启用/停用 */
@@ -81,6 +81,6 @@ public class DepartmentController {
     @RequirePermission(menu = "organization-management", action = "edit")
     public Result<Map<String, Integer>> translateNames() {
         int count = departmentService.translateNames();
-        return Result.success("翻译完成", Map.of("translated", count));
+        return Result.success("翻譯完成", Map.of("translated", count));
     }
 }

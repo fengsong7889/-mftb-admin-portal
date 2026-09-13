@@ -12,13 +12,13 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * OA 流程 workflow_type 對齊修復
+ * OA 流程 workflow_type 对齐修复
  *
- * 根因：前端工作流編輯器以 process_code（如 oa_purchase）為 key 保存配置到 biz_workflow_config，
- *       但後端 resolveDynamicNodes 使用 biz_oa_process.workflow_type（統一為 oa_general）查找配置，
- *       導致前後端 key 不一致，配置永遠讀不到最新值。
+ * 根因：前端工作流编辑器以 process_code（如 oa_purchase）为 key 保存配置到 biz_workflow_config，
+ *       但后端 resolveDynamicNodes 使用 biz_oa_process.workflow_type（统一为 oa_general）查找配置，
+ *       导致前后端 key 不一致，配置永远读不到最新值。
  *
- * 修復：將每個 OA 流程的 workflow_type 改為其自身的 process_code，並為各流程建立 biz_workflow_config 記錄。
+ * 修复：将每个 OA 流程的 workflow_type 改为其自身的 process_code，并为各流程建立 biz_workflow_config 记录。
  */
 @Slf4j
 @Component

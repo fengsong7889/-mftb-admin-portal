@@ -8,11 +8,11 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * 員工額度 DTO（職位額度 + 角色額度）
+ * 员工额度 DTO（职位额度 + 角色额度）
  */
 public class AiEmpQuotaDTO {
 
-    /* ══════════ 職位額度 VO ══════════ */
+    /* ══════════ 职位额度 VO ══════════ */
     @Data
     public static class PosQuotaVO {
         private Long id;
@@ -38,7 +38,7 @@ public class AiEmpQuotaDTO {
         private String updatedAt;
     }
 
-    /* ══════════ 角色額度 VO ══════════ */
+    /* ══════════ 角色额度 VO ══════════ */
     @Data
     public static class RoleQuotaVO {
         private Long id;
@@ -64,7 +64,7 @@ public class AiEmpQuotaDTO {
         private String updatedAt;
     }
 
-    /* ══════════ 職位額度保存請求 ══════════ */
+    /* ══════════ 职位额度保存请求 ══════════ */
     @Data
     public static class PosQuotaRequest {
         private Long id; // null = 新增
@@ -90,7 +90,7 @@ public class AiEmpQuotaDTO {
         private Integer status = 1;
     }
 
-    /* ══════════ 角色額度保存請求 ══════════ */
+    /* ══════════ 角色额度保存请求 ══════════ */
     @Data
     public static class RoleQuotaRequest {
         private Long id; // null = 新增
@@ -114,7 +114,7 @@ public class AiEmpQuotaDTO {
         private Integer status = 1;
     }
 
-    /* ══════════ 查詢請求 ══════════ */
+    /* ══════════ 查询请求 ══════════ */
     @Data
     public static class QuotaQueryRequest {
         private String name;

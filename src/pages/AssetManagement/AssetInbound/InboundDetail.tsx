@@ -1,9 +1,9 @@
 /**
- * 驗收入庫詳情頁
+ * 验收入库详情页
  *
- * - 展示入庫批次的完整信息（批次號、訂單號、經辦人、日期、數量統計等）
- * - 明細表格展示入庫物資及生成的資產編號
- * - 遵循全局詳情頁規範：DetailPageHeader（紫色漸變頂條）+ 卡片佈局 + 無底部操作欄
+ * - 展示入库批次的完整信息（批次号、订单号、经办人、日期、数量统计等）
+ * - 明细表格展示入库物资及生成的资产编号
+ * - 遵循全局详情页规范：DetailPageHeader（紫色渐变顶条）+ 卡片布局 + 无底部操作栏
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Table, Tag, Row, Col, Spin, message, Modal } from 'antd'
@@ -20,15 +20,20 @@ interface Props {
   onBack: () => void
 }
 
-/** 驗收處置方式展示映射 */
+/** 验收处置方式展示映射 */
 type Disposition = 'pass' | 'return' | 'exchange' | 'concession'
 const DISPOSITION_META: Record<Disposition, { label: string; color: string }> = {
-  pass: { label: '通過', color: 'success' },
-  return: { label: '退貨', color: 'error' },
-  exchange: { label: '換貨', color: 'warning' },
-  concession: { label: '讓步接收', color: 'processing' },
+  pass: { label: '通过', color: 'success' },
+  return: { label: '退货', color: 'error' },
+  exchange: { label: '换货', color: 'warning' },
+  concession: { label: '让步接收', color: 'processing' },
 }
 
+/**
+ * 验收入库详情页组件
+ *
+ * @param props batchId=入库批次 ID；onBack=返回列表
+ */
 export default function InboundDetail({ batchId, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [batch, setBatch] = useState<InboundBatch | null>(null)
@@ -54,21 +59,21 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
   useEffect(() => { loadData() }, [loadData])
 
-  /** 位置 ID → 名稱映射 */
+  /** 位置 ID → 名称映射 */
   const locationMap = useMemo(() => {
     const map = new Map<number, string>()
     locations.forEach((loc) => map.set(loc.id, loc.name))
     return map
   }, [locations])
 
-  /* ----- 明細表格列 ----- */
+  /* ----- 明细表格列 ----- */
   const itemColumns: TableColumnsType<InboundBatchItem> = [
-    { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 180, ellipsis: true },
-    { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right',
+    { title: '资产名称', dataIndex: 'modelName', key: 'modelName', width: 180, ellipsis: true },
+    { title: '数量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right',
       render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '處置方式', dataIndex: 'disposition', key: 'disposition', width: 100,
+      title: '处置方式', dataIndex: 'disposition', key: 'disposition', width: 100,
       render: (v: Disposition | undefined) => {
         const meta = DISPOSITION_META[v || 'pass']
         return <Tag color={meta.color}>{meta.label}</Tag>
@@ -78,11 +83,11 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       render: (v: number) => <span style={{ color: '#262626' }}>{locationMap.get(v) || '-'}</span>,
     },
     {
-      title: '不通過原因', dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
+      title: '不通过原因', dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
       render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
     },
     {
-      title: '驗收照片', key: 'photos', width: 120,
+      title: '验收照片', key: 'photos', width: 120,
       render: (_: unknown, r: InboundBatchItem) => {
         const photos = r.photos || []
         if (photos.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
@@ -103,7 +108,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       },
     },
     {
-      title: '生成資產編號', key: 'assetNos', width: 300,
+      title: '生成资产编号', key: 'assetNos', width: 300,
       render: (_: unknown, r: InboundBatchItem) => (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {r.assetNos.length > 0
@@ -133,9 +138,9 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
   return (
     <>
-      {/* ====== 頁面頭部 ====== */}
+      {/* ====== 页面頭部 ====== */}
       <DetailPageHeader
-        title="驗收入庫詳情"
+        title="验收入库详情"
         tags={<Tag color="orange" style={{ marginLeft: 4 }}>{batch.batchNo}</Tag>}
         meta={<>{batch.poNo} · {batch.operator} · {batch.inboundDate}</>}
         onBack={onBack}
@@ -153,15 +158,15 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
         <Row gutter={24}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>入庫批次號</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>入库批次号</div>
             <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace', fontWeight: 600 }}>{batch.batchNo}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購訂單號</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購订单号</div>
             <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace' }}>{batch.poNo}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>驗收日期</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>验收日期</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{batch.inboundDate}</div>
           </Col>
         </Row>
@@ -185,41 +190,41 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         )}
       </div>
 
-      {/* ====== 驗收統計 ====== */}
+      {/* ====== 验收统计 ====== */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShoppingCartOutlined style={{ fontSize: 14, color: '#52c41a' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>驗收統計</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>验收统计</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Row gutter={16}>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>總數量</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>總数量</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#262626' }}>{batch.totalQty}</div>
             </div>
           </Col>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f22' }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 4 }} />已驗收
+                <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 4 }} />已验收
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>{batch.acceptedQty}</div>
             </div>
           </Col>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.pendingQty > 0 ? '#fff2f0' : '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>未驗收</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>未验收</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.pendingQty > 0 ? '#FF4D4F' : '#8C8C8C' }}>{batch.pendingQty}</div>
             </div>
           </Col>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.returnQty > 0 ? '#fff2f0' : '#FAFAFA', borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <RollbackOutlined style={{ color: '#FF4D4F', marginRight: 4 }} />退貨
+                <RollbackOutlined style={{ color: '#FF4D4F', marginRight: 4 }} />退货
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.returnQty > 0 ? '#FF4D4F' : '#8C8C8C' }}>{batch.returnQty}</div>
             </div>
@@ -227,7 +232,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.exchangeQty > 0 ? '#fffbe6' : '#FAFAFA', borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <SwapOutlined style={{ color: '#FAAD14', marginRight: 4 }} />換貨
+                <SwapOutlined style={{ color: '#FAAD14', marginRight: 4 }} />换货
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.exchangeQty > 0 ? '#FAAD14' : '#8C8C8C' }}>{batch.exchangeQty}</div>
             </div>
@@ -235,7 +240,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.concessionQty > 0 ? '#e6f7ff' : '#FAFAFA', borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <ExclamationCircleOutlined style={{ color: '#1890FF', marginRight: 4 }} />讓步接收
+                <ExclamationCircleOutlined style={{ color: '#1890FF', marginRight: 4 }} />让步接收
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.concessionQty > 0 ? '#1890FF' : '#8C8C8C' }}>{batch.concessionQty}</div>
             </div>
@@ -243,13 +248,13 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         </Row>
       </div>
 
-      {/* ====== 入庫明細 ====== */}
+      {/* ====== 入库明细 ====== */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <EnvironmentOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>入庫明細</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>入库明细</span>
           <Tag color="blue" style={{ fontSize: 11 }}>共 {batch.items.length} 項</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>

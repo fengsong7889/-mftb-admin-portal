@@ -5,37 +5,37 @@ import com.mftb.admin.dto.AiEmpPermissionDTO;
 import java.util.List;
 
 /**
- * 員工AI權額管理服務
+ * 员工AI权额管理服务
  *
- * 管理員視角：查看任意員工的模型授權與額度配置，支持編輯能力開關、調整額度值、查詢調整日誌。
+ * 管理员视角：查看任意员工的模型授权与额度配置，支持编辑能力开关、调整额度值、查询调整日志。
  */
 public interface AiEmpPermissionService {
 
     /**
-     * 列表聚合：查詢全部啟用員工的權額概要
+     * 列表聚合：查询全部启用员工的权额概要
      *
-     * @param queryName        姓名/工號模糊搜索（可空）
-     * @param queryDept        部門名稱模糊搜索（可空）
-     * @param queryUpdatedBy   最後更新人模糊搜索（可空）
-     * @param queryUpdateTimeStart 最後更新時間起（可空，格式 yyyy-MM-dd）
-     * @param queryUpdateTimeEnd   最後更新時間止（可空，格式 yyyy-MM-dd）
+     * @param queryName        姓名/工号模糊搜索（可空）
+     * @param queryDept        部门名称模糊搜索（可空）
+     * @param queryUpdatedBy   最后更新人模糊搜索（可空）
+     * @param queryUpdateTimeStart 最后更新时间起（可空，格式 yyyy-MM-dd）
+     * @param queryUpdateTimeEnd   最后更新时间止（可空，格式 yyyy-MM-dd）
      */
     List<AiEmpPermissionDTO.SummaryVO> listSummaries(
             String queryName, String queryDept, String queryUpdatedBy,
             String queryUpdateTimeStart, String queryUpdateTimeEnd);
 
     /**
-     * 詳情：某員工的模型權限明細 + 額度明細
+     * 详情：某员工的模型权限明细 + 额度明细
      */
     AiEmpPermissionDTO.DetailVO getDetail(Long employeeId);
 
     /**
-     * 保存編輯：能力開關變更 + 額度值調整 + 寫入調整日誌
+     * 保存编辑：能力开关变更 + 额度值调整 + 写入调整日志
      */
     void save(Long employeeId, AiEmpPermissionDTO.SaveReq req);
 
     /**
-     * 查詢調整日誌（按時間倒序）
+     * 查询调整日志（按时间倒序）
      */
     List<AiEmpPermissionDTO.AdjustLogVO> getAdjustLogs(Long employeeId);
 }

@@ -74,5 +74,8 @@ export function updateAvatarApi(avatar: string) {
 export function uploadAvatarApi(file: File) {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post<unknown, { base64: string }>('/auth/avatar/upload', formData)
+  // SILENT：由調用方（HeaderBar）統一展示後端校驗消息，避免全局攔截器與組件重複彈提示
+  return request.post<unknown, { base64: string }>('/auth/avatar/upload', formData, {
+    headers: { [SILENT_HEADER]: '1' },
+  })
 }

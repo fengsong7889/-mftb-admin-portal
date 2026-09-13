@@ -6,6 +6,7 @@ import com.mftb.admin.dto.LanguageVO;
 import com.mftb.admin.dto.MachineTranslateRequest;
 import com.mftb.admin.dto.TranslationCoverageVO;
 import com.mftb.admin.dto.TranslationRequest;
+import com.mftb.admin.dto.TranslateTextDTO;
 import com.mftb.admin.dto.TranslationVO;
 import com.mftb.admin.service.TranslationService;
 import lombok.RequiredArgsConstructor;
@@ -62,7 +63,7 @@ public class TranslationController {
     @RequirePermission(menu = "translation-manage", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         translationService.delete(id);
-        return Result.success("已删除", null);
+        return Result.success("已刪除", null);
     }
 
     /** 语言包：{fieldKey: 译文} 平铺映射（已应用回退链），前端注入 i18next 用 */
@@ -89,7 +90,7 @@ public class TranslationController {
     @PostMapping("/languages")
     @RequirePermission(menu = "translation-manage", action = "create")
     public Result<LanguageVO> createLanguage(@RequestBody LanguageVO request) {
-        return Result.success("语言已添加", translationService.createLanguage(request));
+        return Result.success("語言已添加", translationService.createLanguage(request));
     }
 
     /** 删除语言 */
@@ -97,7 +98,7 @@ public class TranslationController {
     @RequirePermission(menu = "translation-manage", action = "delete")
     public Result<Void> deleteLanguage(@PathVariable String code) {
         translationService.deleteLanguage(code);
-        return Result.success("语言已移除", null);
+        return Result.success("語言已移除", null);
     }
 
     /* ========== 机翻 ========== */
@@ -107,14 +108,14 @@ public class TranslationController {
     @RequirePermission(menu = "translation-manage", action = "edit")
     public Result<Map<String, Integer>> machineTranslate(@RequestBody MachineTranslateRequest request) {
         int filled = translationService.machineTranslate(request);
-        return Result.success("机翻完成", Map.of("filled", filled));
+        return Result.success("機翻完成", Map.of("filled", filled));
     }
 
     /** 单文本翻译：将源文本翻译为目标语言（不持久化，仅返回翻译结果） */
     @PostMapping("/translate-text")
-    public Result<String> translateText(@RequestBody Map<String, String> request) {
-        String text = request.get("text");
-        String targetLang = request.getOrDefault("targetLang", "en");
+    public Result<String> translateText(@RequestBody TranslateTextDTO dto) {
+        String text = dto.getText();
+        String targetLang = dto.getTargetLang() != null ? dto.getTargetLang() : "en";
         String translated = translationService.translateText(text, targetLang);
         return Result.success(translated != null ? translated : "");
     }

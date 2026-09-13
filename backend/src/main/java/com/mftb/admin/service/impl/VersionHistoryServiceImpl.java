@@ -379,7 +379,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             if (output.trim().isEmpty()) {
                 return Collections.emptyList();
             }
-            // git 执行失败时 stderr 会混入输出（redirectErrorStream），识别 fatal/error 行避免静默失败误报「沒有新提交」
+            // git 执行失败时 stderr 会混入输出（redirectErrorStream），识别 fatal/error 行避免静默失败误报「没有新提交」
             if (output.contains("fatal:") || output.contains("error:")) {
                 log.warn("git log 執行失敗（輸出前 500 字符）: {}", output.length() > 500 ? output.substring(0, 500) : output);
                 return Collections.emptyList();
@@ -427,7 +427,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     private String readProcessOutput(Process p) throws Exception {
         StringBuilder sb = new StringBuilder();
-        // git 輸出始終為 UTF-8；Alpine 容器 JVM 默認 charset 非 UTF-8，需顯式指定避免中文亂碼
+        // git 输出始终为 UTF-8；Alpine 容器 JVM 默认 charset 非 UTF-8，需显式指定避免中文乱码
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -437,7 +437,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return sb.toString();
     }
 
-    /** 構建帶 safe.directory 的 git 命令（容器内 .git 歸 root、運行用戶為 app 時，Git 2.35.2+ 會拒絕執行） */
+    /** 构建带 safe.directory 的 git 命令（容器内 .git 归 root、运行用户为 app 时，Git 2.35.2+ 会拒绝执行） */
     private List<String> gitCmd(String... args) {
         List<String> cmd = new ArrayList<>();
         cmd.add("git");
@@ -472,10 +472,10 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             // 功能新增：第三位数增长
             return major + "." + minor + "." + (patch + 1) + ".00";
         } else if (hasFix) {
-            // bug修復：第四位(子补丁)增长
+            // bug修复：第四位(子补丁)增长
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         } else {
-            // 前端交互優化：第四位(子补丁)增长
+            // 前端交互优化：第四位(子补丁)增长
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
@@ -495,7 +495,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
             // 功能新增：第三位数增长
             return major + "." + minor + "." + (patch + 1) + ".00";
         } else {
-            // bug修復 / 前端交互優化：第四位(子补丁)增长
+            // bug修复 / 前端交互优化：第四位(子补丁)增长
             return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
         }
     }
@@ -515,7 +515,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
     }
 
     /**
-     * Git 提交記錄
+     * Git 提交记录
      */
     private static class GitCommit {
         private final String hash;

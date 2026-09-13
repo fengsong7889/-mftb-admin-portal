@@ -82,7 +82,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             case "transfer" -> writeTransfer(approval, extra, tradeTime);
             case "deduct" -> writeDeduct(approval, extra, tradeTime);
             case "merge" -> writeMerge(approval, extra, tradeTime);
-            default -> throw new BusinessException("未知的审批类型: " + approval.getApprovalType());
+            default -> throw new BusinessException("未知的審批類型: " + approval.getApprovalType());
         }
     }
 
@@ -172,14 +172,14 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         String toGroup = FinExtras.text(extra, "toGroupId");
         String toGroupName = FinExtras.textOrDash(extra, "toGroupName");
         if (toGroup == null) {
-            throw new BusinessException("转账申请缺少转入集团信息");
+            throw new BusinessException("轉賬申請缺少轉入集團信息");
         }
         BigDecimal amount = FinExtras.amount(extra, "transferAmount");
         String remark = FinExtras.textOrDash(extra, "remark");
 
         FinAccount fromAccount = accountService.find(fromGroup, approval.getBrand());
         if (fromAccount == null || FinExtras.nonNull(fromAccount.getVirtualBalance()).compareTo(amount) < 0) {
-            throw new BusinessException("转出集团推广金余额不足，无法完成转账");
+            throw new BusinessException("轉出集團推廣金餘額不足，無法完成轉賬");
         }
         // 风控拦截：转账按 FIFO 拆分会触碰含未结清欠款的批次时禁止发起，防止资产转移跑路
         requireTransferBatchesClean(fromGroup, amount);
@@ -235,7 +235,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         }
         String batchNos = blocks.stream().map(FinRiskService.FinTransferBlock::batchNo)
                 .distinct().reduce((a, b) -> a + "、" + b).orElse("");
-        throw new BusinessException("本次转账将扣及充值批次「" + batchNos
+        throw new BusinessException("本次轉賬將扣及充值批次「" + batchNos
                 + "」，该批次尚有未结清欠款，禁止发起转账；如需转账请先结清对应批次欠款");
     }
 
@@ -252,7 +252,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
 
         FinAccount account = accountService.find(approval.getGroupCode(), approval.getBrand());
         if (account == null || FinExtras.nonNull(account.getVirtualBalance()).compareTo(amount) < 0) {
-            throw new BusinessException("集团推广金余额不足，无法完成扣款");
+            throw new BusinessException("集團推廣金餘額不足，無法完成扣款");
         }
 
         boolean consume = "consume".equals(method);
@@ -332,7 +332,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
     /* ==================== 广告消费 ==================== */
 
     /**
-     * 广告消费（商家购买广告算法扣款）: 变动类别记录广告类型（如無敵星星），
+     * 广告消费（商家购买广告算法扣款）: 变动类别记录广告类型（如无敌星星），
      * 按充值批次交易时间 FIFO 拆分明细并挂批次号，批次明细页据此展示消费记录
      * @return 首条明细ID（供订单 flowNo 关联）
      */
@@ -461,14 +461,14 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
 
     /**
      * 合并：注销方偿还欠款后余额转入存续方 + 双方批次明细
-     * + 存续方每个偿还门店生成新欠款单 + 注销方未结清欠款单转结（追加「轉移結算」还款记录）
+     * + 存续方每个偿还门店生成新欠款单 + 注销方未结清欠款单转结（追加「转移结算」还款记录）
      */
     private void writeMerge(FinApproval approval, Map<String, Object> extra, LocalDateTime tradeTime) {
         String sourceGroup = approval.getGroupCode();
         String targetGroup = FinExtras.text(extra, "targetGroupId");
         String targetGroupName = FinExtras.textOrDash(extra, "targetGroupName");
         if (targetGroup == null) {
-            throw new BusinessException("合并申请缺少存续集团信息");
+            throw new BusinessException("合並申請缺少存續集團信息");
         }
         String remark = FinExtras.textOrDash(extra, "remark");
         List<Map<String, Object>> repayStores = FinExtras.rows(extra, "repayStores");
@@ -482,7 +482,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             repayTotal = repayTotal.add(FinExtras.amount(store, "amount"));
         }
         if (repayTotal.compareTo(sourceVirtual) > 0) {
-            throw new BusinessException("注销集团推广金余额不足以偿还欠款，无法完成合并");
+            throw new BusinessException("注銷集團推廣金餘額不足以償還欠款，無法完成合並");
         }
         // 偿还欠款后的剩余余额结转至存续集团
         BigDecimal transferVirtual = sourceVirtual.subtract(repayTotal);
@@ -578,7 +578,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
             newBillNos.add(bill.getBillNo());
         }
 
-        // 4. 注销集团原未结清欠款单转结，追加「轉移結算」还款记录
+        // 4. 注销集团原未结清欠款单转结，追加「转移结算」还款记录
         transferSourceDebts(sourceGroup, targetGroupName, newBillNos, loanDate, tradeTime);
 
         applyDeltas(deltas, approval.getBrand());
@@ -686,7 +686,7 @@ public class FinWriteChainServiceImpl implements FinWriteChainService {
         return batch;
     }
 
-    /** 明细公共字段（默认集团维度：无门店、外賣频道） */
+    /** 明细公共字段（默认集团维度：无门店、外卖频道） */
     private FinDetail baseDetail(FinApproval approval, LocalDateTime tradeTime, String batchNo) {
         FinDetail detail = new FinDetail();
         detail.setDetailId(bizSeqService.next(BizSeqService.RULE_DETAIL));

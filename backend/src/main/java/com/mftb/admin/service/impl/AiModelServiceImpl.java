@@ -6,6 +6,7 @@ import com.mftb.admin.dto.AiModelDTO;
 import com.mftb.admin.entity.AiModel;
 import com.mftb.admin.mapper.AiModelMapper;
 import com.mftb.admin.service.AiModelService;
+import com.mftb.admin.util.ConvertUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -95,9 +96,9 @@ public class AiModelServiceImpl implements AiModelService {
             BeanUtils.copyProperties(request, model);
 
             // 价格字段转换
-            model.setInputPrice(toBigDecimal(request.getInputPrice()));
-            model.setOutputPrice(toBigDecimal(request.getOutputPrice()));
-            model.setCachedInputPrice(toBigDecimal(request.getCachedInputPrice()));
+            model.setInputPrice(ConvertUtils.toBigDecimal(request.getInputPrice()));
+            model.setOutputPrice(ConvertUtils.toBigDecimal(request.getOutputPrice()));
+            model.setCachedInputPrice(ConvertUtils.toBigDecimal(request.getCachedInputPrice()));
 
             modelMapper.insert(model);
             return true;
@@ -117,9 +118,9 @@ public class AiModelServiceImpl implements AiModelService {
         BeanUtils.copyProperties(request, existing);
 
         // 价格字段转换
-        existing.setInputPrice(toBigDecimal(request.getInputPrice()));
-        existing.setOutputPrice(toBigDecimal(request.getOutputPrice()));
-        existing.setCachedInputPrice(toBigDecimal(request.getCachedInputPrice()));
+        existing.setInputPrice(ConvertUtils.toBigDecimal(request.getInputPrice()));
+        existing.setOutputPrice(ConvertUtils.toBigDecimal(request.getOutputPrice()));
+        existing.setCachedInputPrice(ConvertUtils.toBigDecimal(request.getCachedInputPrice()));
 
         modelMapper.updateById(existing);
         return true;
@@ -161,13 +162,6 @@ public class AiModelServiceImpl implements AiModelService {
             entity.getUpdatedAt().toString() : null);
 
         return vo;
-    }
-
-    /**
-     * Double → BigDecimal
-     */
-    private BigDecimal toBigDecimal(Double v) {
-        return v == null ? null : BigDecimal.valueOf(v);
     }
 
     /**

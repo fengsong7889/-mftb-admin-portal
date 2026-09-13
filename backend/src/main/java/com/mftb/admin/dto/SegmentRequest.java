@@ -10,6 +10,6 @@ import lombok.Data;
 public class SegmentRequest {
 
     /** 待分词文本 */
-    @NotBlank(message = "文本不能为空")
+    @NotBlank(message = "文本不能為空")
     private String text;
 }

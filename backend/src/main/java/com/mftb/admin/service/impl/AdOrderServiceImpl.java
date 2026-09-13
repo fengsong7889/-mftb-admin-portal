@@ -37,6 +37,7 @@ import com.mftb.admin.mapper.AdPricingHotSkinMapper;
 import com.mftb.admin.mapper.AdPricingTrafficMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
+import com.mftb.admin.service.AdCellQuotaService;
 import com.mftb.admin.service.AdOrderService;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
@@ -78,6 +79,7 @@ public class AdOrderServiceImpl implements AdOrderService {
 
     private final AdOrderMapper orderMapper;
     private final AdOrderItemStarMapper itemMapper;
+    private final AdCellQuotaService cellQuotaService;
     private final AdOrderItemReviveMapper reviveItemMapper;
     private final AdOrderItemNewStoreMapper newStoreItemMapper;
     private final AdOrderItemHotMapper hotItemMapper;
@@ -249,6 +251,8 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放库存（仅统计活跃明细）
                 reviveItemMapper.updateById(item);
+                // 同步释放计数器占用（防超卖计数与明细保持一致）
+                cellQuotaService.releaseCell(AdCellQuotaService.MODULE_REVIVE, item.getBizDate(), item.getRegion(), "");
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else if (isHot(order)) {
@@ -310,6 +314,8 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3); // 已退款 → 释放格子（库存仅统计活跃明细）
                 itemMapper.updateById(item);
+                // 同步释放计数器占用（防超卖计数与明细保持一致）
+                cellQuotaService.releaseCell(AdCellQuotaService.MODULE_STAR, item.getBizDate(), item.getRegion(), item.getMealSlot());
                 refundTotal = refundTotal.add(refundPrice);
             }
         }
@@ -396,6 +402,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 reviveItemMapper.updateById(item);
+                cellQuotaService.releaseCell(AdCellQuotaService.MODULE_REVIVE, item.getBizDate(), item.getRegion(), "");
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else if (isHot(order)) {
@@ -449,6 +456,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 itemMapper.updateById(item);
+                cellQuotaService.releaseCell(AdCellQuotaService.MODULE_STAR, item.getBizDate(), item.getRegion(), item.getMealSlot());
                 refundTotal = refundTotal.add(refundPrice);
             }
         }
@@ -640,7 +648,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : trafficItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemTraffic>()
                         .in(AdOrderItemTraffic::getOrderId, trafficOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemTraffic::getOrderId));
-        // 人氣商家：構建 skinName → tier 映射（從定價配置表查皮膚等級）
+        // 人气商家：构建 skinName → tier 映射（从定价配置表查皮肤等级）
         Map<String, String> skinTierMap = hotOrderIds.isEmpty() ? Map.of()
                 : hotSkinMapper.selectList(new LambdaQueryWrapper<AdPricingHotSkin>().isNotNull(AdPricingHotSkin::getTier))
                 .stream().collect(Collectors.toMap(
@@ -649,7 +657,7 @@ public class AdOrderServiceImpl implements AdOrderService {
         for (AdOrderVO vo : records) {
             if (isNewStoreType(vo.getAlgoType())) {
                 List<AdOrderItemNewStore> items = newStoreByOrder.getOrDefault(vo.getId(), List.of());
-                // 新店廣告無明細商圈 → 回查門店綁定的所在區域
+                // 新店广告无明细商圈 → 回查门店绑定的所在区域
                 vo.setMealSlots(new ArrayList<>()); // 新店广告无餐段
                 vo.setPurchaseDays(items.stream().map(AdOrderItemNewStore::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
@@ -661,7 +669,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                 vo.setRegions(items.stream().map(AdOrderItemRevive::getRegion)
                         .filter(java.util.Objects::nonNull).distinct().sorted().toList());
                 vo.setMealSlots(new ArrayList<>()); // 盘活复苏按天售卖，无时段维度
-                // 購買日期列表：明細 biz_date 去重排序，供列表「推廣天數」面板展示
+                // 购买日期列表：明细 biz_date 去重排序，供列表「推广天数」面板展示
                 vo.setPurchaseDays(items.stream().map(AdOrderItemRevive::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
                         .map(Object::toString).toList());
@@ -671,14 +679,14 @@ public class AdOrderServiceImpl implements AdOrderService {
                 List<AdOrderItemHot> items = hotByOrder.getOrDefault(vo.getId(), List.of());
                 vo.setRegions(new ArrayList<>());   // 人气商家无商圈
                 vo.setMealSlots(new ArrayList<>()); // 人气商家无餐段
-                // 購買日期/皮膚列表：明細去重排序，供列表展示
+                // 购买日期/皮肤列表：明细去重排序，供列表展示
                 vo.setPurchaseDays(items.stream().map(AdOrderItemHot::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
                         .map(Object::toString).toList());
                 List<String> skinNames = items.stream().map(AdOrderItemHot::getSkinName)
                         .filter(java.util.Objects::nonNull).distinct().sorted().toList();
                 vo.setSkinNames(skinNames);
-                // 皮膚等級：根據 skinName 查定價配置的 tier
+                // 皮肤等级：根据 skinName 查定价配置的 tier
                 vo.setSkinTiers(skinNames.stream()
                         .map(skinTierMap::get)
                         .filter(java.util.Objects::nonNull)
@@ -689,14 +697,14 @@ public class AdOrderServiceImpl implements AdOrderService {
                 List<AdOrderItemSignboard> items = signboardByOrder.getOrDefault(vo.getId(), List.of());
                 vo.setRegions(new ArrayList<>());   // 金字招牌无明细商圈，后续从门店回填
                 vo.setMealSlots(new ArrayList<>()); // 金字招牌无餐段
-                // 購買日期列表：明細去重排序
+                // 购买日期列表：明细去重排序
                 vo.setPurchaseDays(items.stream().map(AdOrderItemSignboard::getBizDate)
                         .filter(java.util.Objects::nonNull).distinct().sorted()
                         .map(Object::toString).toList());
-                // 標籤類型列表：明細去重排序
+                // 标签类型列表：明细去重排序
                 vo.setSkinNames(items.stream().map(AdOrderItemSignboard::getLabelType)
                         .filter(java.util.Objects::nonNull).distinct().sorted().toList());
-                // 按標籤+場景分組日期：供列表頁展示「標籤(場景) + 日期」
+                // 按标签+场景分组日期：供列表页展示「标签(场景) + 日期」
                 Map<String, List<String>> labelDateMap = new LinkedHashMap<>();
                 items.stream()
                         .filter(i -> i.getLabelType() != null && i.getBizDate() != null)
@@ -771,7 +779,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                     .filter(r -> isTrafficType(r.getAlgoType()) && r.getAlgoId() != null)
                     .forEach(r -> r.setBizChannel(bizChannelMap.get(r.getAlgoId())));
         }
-        // 新店廣告 + 金字招牌：從門店綁定區域回填商圈
+        // 新店广告 + 金字招牌：从门店绑定区域回填商圈
         List<String> newStoreCodes = records.stream()
                 .filter(r -> (isNewStoreType(r.getAlgoType()) || isSignboardType(r.getAlgoType())) && StringUtils.hasText(r.getStoreCode()))
                 .map(AdOrderVO::getStoreCode).distinct().toList();
@@ -790,7 +798,7 @@ public class AdOrderServiceImpl implements AdOrderService {
                         vo.setRegions(region != null ? List.of(region) : new ArrayList<>());
                     });
         }
-        // 所有訂單類型：從門店地址回填 storeAddress（門店自身地址，與購買商圈區分）
+        // 所有订单类型：从门店地址回填 storeAddress（门店自身地址，与购买商圈区分）
         List<String> allStoreCodes = records.stream()
                 .filter(r -> StringUtils.hasText(r.getStoreCode()))
                 .map(AdOrderVO::getStoreCode).distinct().toList();

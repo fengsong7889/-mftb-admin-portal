@@ -126,7 +126,7 @@ public class AiProviderServiceImpl implements AiProviderService {
 
         // 如果是默认供应商，不能删除
         if (existing.getIsDefault() != null && existing.getIsDefault() == 1) {
-            throw new BusinessException("默认供应商无法删除");
+            throw new BusinessException("默認供應商無法刪除");
         }
 
         providerMapper.deleteById(id);

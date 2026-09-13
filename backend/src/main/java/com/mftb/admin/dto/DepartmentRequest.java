@@ -12,7 +12,7 @@ public class DepartmentRequest {
     /** 部门编码 (由系统自动生成 MT+5位自增, 前端无需传入) */
     private String code;
 
-    @NotBlank(message = "部门名称不能为空")
+    @NotBlank(message = "部門名稱不能為空")
     private String name;
 
     /** 部门英文名称 */

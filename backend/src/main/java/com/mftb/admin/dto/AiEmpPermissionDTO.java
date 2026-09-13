@@ -7,11 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 員工AI權額管理 DTO：列表聚合、詳情、保存請求、調整日誌
+ * 员工AI权额管理 DTO：列表聚合、详情、保存请求、调整日志
  */
 public class AiEmpPermissionDTO {
 
-    /* ══════════ 列表頁單行 ══════════ */
+    /* ══════════ 列表页单行 ══════════ */
 
     @Data
     public static class SummaryVO {
@@ -22,29 +22,29 @@ public class AiEmpPermissionDTO {
         private Long deptId;
         private String position;
         private String jobLevel;
-        /** 啟用模型數 */
+        /** 启用模型数 */
         private int modelCount;
-        /** 授權模型列表（列表頁展示） */
+        /** 授权模型列表（列表页展示） */
         private List<ModelBrief> models = new ArrayList<>();
-        /** 聚合額度（含已用/總額） */
+        /** 聚合额度（含已用/总额） */
         private List<QuotaBrief> quotas = new ArrayList<>();
         /** 最近操作人 */
         private String lastUpdatedBy;
-        /** 最近操作時間 */
+        /** 最近操作时间 */
         private String lastUpdatedAt;
     }
 
-    /* ══════════ 模型簡要（列表用） ══════════ */
+    /* ══════════ 模型简要（列表用） ══════════ */
 
     @Data
     public static class ModelBrief {
         private Long modelId;
         private String modelName;
-        /** 來源：department/position/role/employee/approval */
+        /** 来源：department/position/role/employee/approval */
         private String source;
     }
 
-    /* ══════════ 額度簡要（列表用） ══════════ */
+    /* ══════════ 额度简要（列表用） ══════════ */
 
     @Data
     public static class QuotaBrief {
@@ -59,15 +59,15 @@ public class AiEmpPermissionDTO {
         private int status;
     }
 
-    /* ══════════ 詳情頁 ══════════ */
+    /* ══════════ 详情页 ══════════ */
 
     @Data
     public static class DetailVO {
-        /** 基本信息（與列表同構） */
+        /** 基本信息（与列表同构） */
         private SummaryVO basic;
-        /** 模型權限明細（含能力開關） */
+        /** 模型权限明细（含能力开关） */
         private List<ModelPermissionVO> models = new ArrayList<>();
-        /** 額度明細 */
+        /** 额度明细 */
         private List<QuotaGrantVO> quotas = new ArrayList<>();
     }
 
@@ -77,13 +77,13 @@ public class AiEmpPermissionDTO {
         private String modelName;
         private String source;
         private String sourceDesc;
-        /** 能力開關 */
+        /** 能力开关 */
         private int visionSupport;
         private int functionCalling;
         private int jsonMode;
         private int streaming;
         private int thinkingMode;
-        /** 狀態：1=啟用 0=禁用 */
+        /** 状态：1=启用 0=禁用 */
         private int status;
         private String grantedAt;
     }
@@ -105,14 +105,14 @@ public class AiEmpPermissionDTO {
         private int status;
     }
 
-    /* ══════════ 保存請求 ══════════ */
+    /* ══════════ 保存请求 ══════════ */
 
     @Data
     public static class SaveReq {
         private Long employeeId;
-        /** 能力開關變更 */
+        /** 能力开关变更 */
         private List<ModelCapToggle> modelToggles = new ArrayList<>();
-        /** 額度值變更 */
+        /** 额度值变更 */
         private List<QuotaAdjust> quotaAdjusts = new ArrayList<>();
         private String reason;
     }
@@ -128,9 +128,9 @@ public class AiEmpPermissionDTO {
 
     @Data
     public static class QuotaAdjust {
-        /** 對應額度記錄ID */
+        /** 对应额度记录ID */
         private Long quotaId;
-        /** 額度來源（department/position/role/approval） */
+        /** 额度来源（department/position/role/approval） */
         private String source;
         private String sourceDesc;
         private String quotaType;
@@ -139,7 +139,7 @@ public class AiEmpPermissionDTO {
         private BigDecimal newValue;
     }
 
-    /* ══════════ 調整日誌 VO ══════════ */
+    /* ══════════ 调整日志 VO ══════════ */
 
     @Data
     public static class AdjustLogVO {

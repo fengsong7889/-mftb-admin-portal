@@ -5,7 +5,7 @@ import com.mftb.admin.entity.AiEmpQuotaAdjustLog;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 員工額度調整日誌 Mapper
+ * 员工额度调整日志 Mapper
  */
 @Mapper
 public interface AiEmpQuotaAdjustLogMapper extends BaseMapper<AiEmpQuotaAdjustLog> {

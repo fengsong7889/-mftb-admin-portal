@@ -25,6 +25,27 @@ import {
 } from '../../../api/eam'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 
+/* ==================== 照片上傳校驗 ==================== */
+
+/** 單張照片大小上限（與後端 EamInboundController 一致：5MB） */
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024
+
+/**
+ * 上傳前 UX 校驗：僅圖片、≤ 5MB。
+ * 註：此處僅作即時反饋減少無效請求，後端仍會以 magic bytes 與大小重新校驗（前端不可信）。
+ */
+function validatePhotoFile(file: File): boolean {
+  if (!file.type.startsWith('image/')) {
+    message.error('僅支持上傳圖片文件')
+    return false
+  }
+  if (file.size > MAX_PHOTO_SIZE) {
+    message.error('圖片大小不能超過 5MB')
+    return false
+  }
+  return true
+}
+
 /* ==================== 位置樹構建 ==================== */
 
 interface LocationTreeNode {
@@ -217,14 +238,16 @@ export default function InboundForm({ poId, onBack }: Props) {
 
   /* ----- 照片上傳 ----- */
   const handleItemPhotoUpload = useCallback(async (groupId: string, rowKey: string, file: File) => {
+    if (!validatePhotoFile(file)) return false
     setUploading(true)
     try {
       const result = await uploadInboundPhoto(file)
       updateGroupItem(groupId, rowKey, {
         photos: [...(groups.find((g) => g.id === groupId)?.items.find((it) => it.key === rowKey)?.photos || []), result],
       })
-    } catch {
-      message.error('照片上傳失敗')
+    } catch (err) {
+      // 優先展示後端具體校驗消息（如文件類型/大小/魔數不合法），否則回退通用文案
+      message.error(err instanceof Error && err.message ? err.message : '照片上傳失敗')
     } finally {
       setUploading(false)
     }
@@ -240,12 +263,14 @@ export default function InboundForm({ poId, onBack }: Props) {
   }, [groups])
 
   const handleRejectPhotoUpload = useCallback(async (file: File) => {
+    if (!validatePhotoFile(file)) return false
     setUploading(true)
     try {
       const result = await uploadInboundPhoto(file)
       setRejectPhotos((prev) => [...prev, result])
-    } catch {
-      message.error('照片上傳失敗')
+    } catch (err) {
+      // 優先展示後端具體校驗消息（如文件類型/大小/魔數不合法），否則回退通用文案
+      message.error(err instanceof Error && err.message ? err.message : '照片上傳失敗')
     } finally {
       setUploading(false)
     }

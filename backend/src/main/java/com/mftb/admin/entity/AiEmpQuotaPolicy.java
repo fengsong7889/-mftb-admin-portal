@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 員工職位額度策略
+ * 员工职位额度策略
  */
 @Data
 @TableName("ai_emp_quota_policy")
@@ -19,59 +19,59 @@ public class AiEmpQuotaPolicy {
     /** 配置ID（按编号生成规则 ai_emp_pos_quota 生成，如 ZWED202609000） */
     private String configCode;
 
-    /** 策略名稱 */
+    /** 策略名称 */
     private String name;
 
     /** 策略描述 */
     private String description;
 
-    /** 職級序列 JSON 數組 */
+    /** 职级序列 JSON 数组 */
     private String sequences;
 
-    /** 職級 JSON 數組 */
+    /** 职级 JSON 数组 */
     private String jobLevels;
 
-    /** 覆蓋人數 */
+    /** 覆盖人数 */
     private Integer totalEmployeeCount;
 
-    /** 限額周期: daily/monthly */
+    /** 限额周期: daily/monthly */
     private String period;
 
-    /** 限額類型: token/cost/request */
+    /** 限额类型: token/cost/request */
     private String quotaType;
 
-    /** 限額值 */
+    /** 限额值 */
     private BigDecimal quotaValue;
 
-    /** 計價幣種 */
+    /** 计价币种 */
     private String currency;
 
-    /** 軟限額提醒閾值(%) */
+    /** 软限额提醒阈值(%) */
     private Integer softThreshold;
 
-    /** 超額動作: reject/approve/downgrade */
+    /** 超额动作: reject/approve/downgrade */
     private String overLimitAction;
 
-    /** 降級目標模型ID */
+    /** 降级目标模型ID */
     private Long downgradeModelId;
 
-    /** 降級豁免額度 */
+    /** 降级豁免额度 */
     private BigDecimal downgradeExemptQuota;
 
     /** 本期已用量 */
     private BigDecimal usedValue;
 
-    /** 狀態: 1=啟用 0=停用 */
+    /** 状态: 1=启用 0=停用 */
     private Integer status;
 
-    /** 邏輯刪除 */
+    /** 逻辑删除 */
     @TableLogic
     private Integer deleted;
 
-    /** 創建人 */
+    /** 创建人 */
     private String createdBy;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT)

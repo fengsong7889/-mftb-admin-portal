@@ -15,7 +15,7 @@ import java.util.List;
 public class AdWaterfallRequest {
 
     /** 瀑布流名称 */
-    @NotBlank(message = "瀑布流名称不能为空")
+    @NotBlank(message = "瀑布流名稱不能為空")
     private String strategyName;
 
     /** 所属品牌: flashBee / mFood */
@@ -41,10 +41,10 @@ public class AdWaterfallRequest {
     @Data
     public static class SlotItem {
         /** 坑位序号（从1开始，同一策略内唯一） */
-        @NotNull(message = "坑位序号不能为空")
+        @NotNull(message = "坑位序號不能為空")
         private Integer slotPosition;
         /** 算法编码（biz_ad_algorithm.algo_code） */
-        @NotBlank(message = "算法编码不能为空")
+        @NotBlank(message = "算法編碼不能為空")
         private String algoId;
         /** 坑位状态: 1=启用 2=停用 */
         private Integer status;

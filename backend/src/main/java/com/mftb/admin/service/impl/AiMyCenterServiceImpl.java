@@ -75,7 +75,7 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
     private static final int RECENT_RECORD_LIMIT = 8;
 
     private final AiQuotaConfigMapper quotaConfigMapper;
-    /** 個人審批授予額度（ai_quota_override，審批下發的獨立/額外額度） */
+    /** 个人审批授予额度（ai_quota_override，审批下发的独立/额外额度） */
     private final AiQuotaOverrideMapper quotaOverrideMapper;
     private final AiEmpQuotaPolicyMapper empQuotaPolicyMapper;
     private final AiRoleQuotaPolicyMapper roleQuotaPolicyMapper;

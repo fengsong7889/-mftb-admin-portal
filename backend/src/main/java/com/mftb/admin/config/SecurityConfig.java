@@ -6,6 +6,7 @@ import com.mftb.admin.common.ResultCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.MediaType;
@@ -33,6 +34,7 @@ import java.util.List;
  */
 @Slf4j
 @Configuration
+@EnableAspectJAutoProxy
 @EnableWebSecurity
 public class SecurityConfig {
 

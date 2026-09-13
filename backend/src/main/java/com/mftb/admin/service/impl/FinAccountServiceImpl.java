@@ -55,10 +55,10 @@ public class FinAccountServiceImpl implements FinAccountService {
         // 尚未开户的集团×品牌组合先零余额建户再冻结
         FinAccount account = getOrCreate(groupId, null, brand);
         if (STATUS_MERGE_FROZEN.equals(account.getStatus())) {
-            throw new BusinessException("该账户处于合并冻结中，请先处理合并流程");
+            throw new BusinessException("該賬戶處於合並凍結中，請先處理合並流程");
         }
         if (STATUS_CANCELLED.equals(account.getStatus())) {
-            throw new BusinessException("该账户已注销，无法冻结");
+            throw new BusinessException("該賬戶已注銷，無法凍結");
         }
         account.setStatus(STATUS_FROZEN);
         account.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -74,10 +74,10 @@ public class FinAccountServiceImpl implements FinAccountService {
             return;
         }
         if (STATUS_MERGE_FROZEN.equals(account.getStatus())) {
-            throw new BusinessException("合并冻结账户需通过商户合并流程解冻");
+            throw new BusinessException("合並凍結賬戶需通過商戶合並流程解凍");
         }
         if (STATUS_CANCELLED.equals(account.getStatus())) {
-            throw new BusinessException("该账户已注销，无法解冻");
+            throw new BusinessException("該賬戶已注銷，無法解凍");
         }
         account.setStatus(STATUS_NORMAL);
         account.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -114,16 +114,16 @@ public class FinAccountServiceImpl implements FinAccountService {
         // 未充值前无账户记录，按余额为 0 提示，避免「尚未开通」文案让人误解
         FinAccount account = findByGroupBrand(groupId, brand);
         if (account == null) {
-            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 推广金账户余额为 0，无法发起资金操作，请先充值");
+            throw new BusinessException("集團 " + groupId + " 品牌 " + brandLabel(brand) + " 推广金账户余额为 0，无法发起资金操作，请先充值");
         }
         if (STATUS_FROZEN.equals(account.getStatus())) {
-            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已冻结，无法发起资金操作");
+            throw new BusinessException("集團 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已冻结，无法发起资金操作");
         }
         if (STATUS_MERGE_FROZEN.equals(account.getStatus())) {
-            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户处于合并冻结中，无法发起资金操作");
+            throw new BusinessException("集團 " + groupId + " 品牌 " + brandLabel(brand) + " 账户处于合并冻结中，无法发起资金操作");
         }
         if (STATUS_CANCELLED.equals(account.getStatus())) {
-            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已注销，无法发起资金操作");
+            throw new BusinessException("集團 " + groupId + " 品牌 " + brandLabel(brand) + " 账户已注销，无法发起资金操作");
         }
         return account;
     }
@@ -163,7 +163,7 @@ public class FinAccountServiceImpl implements FinAccountService {
     private FinAccount requireAccount(String groupId, String brand) {
         FinAccount account = findByGroupBrand(groupId, brand);
         if (account == null) {
-            throw new BusinessException("集团 " + groupId + " 品牌 " + brandLabel(brand) + " 尚未开通推广金账户");
+            throw new BusinessException("集團 " + groupId + " 品牌 " + brandLabel(brand) + " 尚未开通推广金账户");
         }
         return account;
     }

@@ -3,15 +3,15 @@ package com.mftb.admin.service;
 import java.util.Map;
 
 /**
- * MCP 外部服務執行器（後端側 tools/call 路由表的一項）
- * 每個已接入執行鏈路的外部服務實現本接口，McpExecService 按 toolKey 路由；
- * 將來接入第三方 MCP Server 時，增加一個協議轉發實現即可，前端與廣場零改動
+ * MCP 外部服务执行器（后端侧 tools/call 路由表的一项）
+ * 每个已接入执行链路的外部服务实现本接口，McpExecService 按 toolKey 路由；
+ * 将来接入第三方 MCP Server 时，增加一个协议转发实现即可，前端与广场零改动
  */
 public interface McpExternalHandler {
 
-    /** 對應 mcp_tool.tool_key */
+    /** 对应 mcp_tool.tool_key */
     String toolKey();
 
-    /** 執行外部服務調用，返回給 AI 的結果文本 */
+    /** 执行外部服务调用，返回给 AI 的结果文本 */
     String execute(Map<String, Object> args);
 }

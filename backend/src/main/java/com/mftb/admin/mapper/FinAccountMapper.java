@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
+/** 推广金账户实体（集团维度一行） Mapper */
 @Mapper
 public interface FinAccountMapper extends BaseMapper<FinAccount> {
 

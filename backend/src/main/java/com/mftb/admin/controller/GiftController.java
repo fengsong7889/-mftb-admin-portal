@@ -47,7 +47,7 @@ public class GiftController {
     @PostMapping
     @RequirePermission(menu = "gift-detail", action = "create")
     public Result<GiftRecordVO> createRecord(@Valid @RequestBody GiftRecordRequest request) {
-        return Result.success("赠送申请已提交", giftService.createRecord(request));
+        return Result.success("贈送申請已提交", giftService.createRecord(request));
     }
 
     /** 指定门店+广告类型的逐笔赠送记录（赠送明细页） */

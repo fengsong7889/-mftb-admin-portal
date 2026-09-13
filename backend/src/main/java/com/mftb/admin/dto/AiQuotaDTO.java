@@ -38,10 +38,10 @@ public class AiQuotaDTO {
     public static class QuotaConfigRequest implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        @NotNull(message = "配额类型不能为空")
+        @NotNull(message = "配額類型不能為空")
         private String quotaType; // department / employee
 
-        @NotNull(message = "目标 ID 不能为空")
+        @NotNull(message = "目標 ID 不能為空")
         private Long targetId;
 
         private Long modelId;      // NULL = 全局配额

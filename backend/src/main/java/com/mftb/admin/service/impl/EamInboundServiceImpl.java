@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.EamInboundCreateDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamAsset;
 import com.mftb.admin.entity.EamInboundBatch;
@@ -30,10 +31,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 驗收入庫服務實現
+ * 验收入库服务实现
  * <p>
- * P0-3: 驗收入庫 → 生成資產編號 + 寫入資產台賬
- * P0-4: 驗收入庫 → 回寫採購訂單 status / acceptedQty / receivedQty
+ * P0-3: 验收入库 → 生成资产编号 + 写入资产台账
+ * P0-4: 验收入库 → 回写采购订单 status / acceptedQty / receivedQty
  */
 @Slf4j
 @Service
@@ -48,7 +49,7 @@ public class EamInboundServiceImpl implements EamInboundService {
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
-    /* ==================== 分頁查詢 ==================== */
+    /* ==================== 分页查询 ==================== */
 
     @Override
     public PageResult<Map<String, Object>> pageBatches(int page, int size) {
@@ -62,7 +63,7 @@ public class EamInboundServiceImpl implements EamInboundService {
         return new PageResult<>(records, result.getTotal());
     }
 
-    /* ==================== 批次詳情 ==================== */
+    /* ==================== 批次详情 ==================== */
 
     @Override
     public Map<String, Object> getBatchDetail(long batchId) {
@@ -71,7 +72,7 @@ public class EamInboundServiceImpl implements EamInboundService {
 
         Map<String, Object> map = batchToMap(batch);
 
-        // 查詢明細
+        // 查询明细
         List<EamInboundBatchItem> items = batchItemMapper.selectList(
                 new LambdaQueryWrapper<EamInboundBatchItem>()
                         .eq(EamInboundBatchItem::getBatchId, batchId)
@@ -95,46 +96,45 @@ public class EamInboundServiceImpl implements EamInboundService {
         return map;
     }
 
-    /* ==================== 創建入庫批次（核心） ==================== */
+    /* ==================== 创建入库批次（核心） ==================== */
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> createBatch(Map<String, Object> data) {
-        long poId = toLong(data.get("poId"), -1L);
-        if (poId <= 0) throw new BusinessException("缺少採購訂單 ID");
+    public Map<String, Object> createBatch(EamInboundCreateDTO dto) {
+        Long poIdObj = dto.getPoId();
+        if (poIdObj == null || poIdObj <= 0) throw new BusinessException("缺少採購訂單 ID");
+        long poId = poIdObj;
 
         EamPurchaseOrder order = orderMapper.selectById(poId);
         if (order == null) throw new BusinessException("採購訂單不存在");
 
         String operator = operatorResolver.currentOperatorName();
-        String inboundDate = str(data, "inboundDate");
+        String inboundDate = Objects.toString(dto.getInboundDate(), "");
         if (inboundDate.isEmpty()) {
             inboundDate = java.time.LocalDate.now().toString();
         }
 
-        // 解析入庫明細: [{ modelId, qty, locationId, locationName? }]
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> inboundItems = (List<Map<String, Object>>) data.get("items");
+        List<EamInboundCreateDTO.InboundItem> inboundItems = dto.getItems();
         if (inboundItems == null || inboundItems.isEmpty()) {
             throw new BusinessException("入庫明細不能為空");
         }
 
-        // 查詢訂單明細
+        // 查询订单明细
         List<EamPurchaseOrderItem> orderItems = orderItemMapper.selectList(
                 new LambdaQueryWrapper<EamPurchaseOrderItem>()
                         .eq(EamPurchaseOrderItem::getOrderId, poId));
         Map<Long, EamPurchaseOrderItem> orderItemMap = orderItems.stream()
                 .collect(Collectors.toMap(EamPurchaseOrderItem::getModelId, it -> it, (a, b) -> a));
 
-        // 校驗入庫數量不超過訂單剩餘未驗收數量
-        for (Map<String, Object> item : inboundItems) {
-            long modelId = toLong(item.get("modelId"), -1L);
-            int qty = toInt(item.get("qty"), 0);
+        // 校验入库数量不超过订单剩余未验收数量
+        for (EamInboundCreateDTO.InboundItem item : inboundItems) {
+            long modelId = item.getModelId() == null ? -1L : item.getModelId();
+            int qty = item.getQty() == null ? 0 : item.getQty();
             if (modelId <= 0 || qty <= 0) continue;
 
             EamPurchaseOrderItem orderItem = orderItemMap.get(modelId);
             if (orderItem == null) {
-                throw new BusinessException("入庫型號 " + str(item, "modelName") + " 不在訂單明細中");
+                throw new BusinessException("入庫型號 " + Objects.toString(item.getModelName(), "") + " 不在訂單明細中");
             }
             int alreadyReceived = orderItem.getReceivedQty() != null ? orderItem.getReceivedQty() : 0;
             if (alreadyReceived + qty > orderItem.getQty()) {
@@ -144,34 +144,34 @@ public class EamInboundServiceImpl implements EamInboundService {
             }
         }
 
-        // 生成批次編號
+        // 生成批次编号
         String batchNo = bizSeqService.next(BizSeqService.RULE_EAM_INBOUND_BATCH);
 
-        // 統計計數
+        // 统计计数
         int totalQty = 0;
         int acceptedQty = 0;
         int returnQty = 0;
         int exchangeQty = 0;
         int concessionQty = 0;
 
-        // 展開所有資產並收集待寫入列表
+        // 展开所有资产并收集待写入列表
         List<EamAsset> assetsToInsert = new ArrayList<>();
         List<EamInboundBatchItem> batchItemsToInsert = new ArrayList<>();
         int sort = 0;
 
-        for (Map<String, Object> item : inboundItems) {
-            long modelId = toLong(item.get("modelId"), -1L);
-            int qty = toInt(item.get("qty"), 0);
-            long locationId = toLong(item.get("locationId"), null);
-            String locationName = str(item, "locationName");
-            String modelName = str(item, "modelName");
-            String disposition = str(item, "disposition"); // pass / return / exchange / concession
+        for (EamInboundCreateDTO.InboundItem item : inboundItems) {
+            long modelId = item.getModelId() == null ? -1L : item.getModelId();
+            int qty = item.getQty() == null ? 0 : item.getQty();
+            Long locationId = item.getLocationId();
+            String locationName = Objects.toString(item.getLocationName(), "");
+            String modelName = Objects.toString(item.getModelName(), "");
+            String disposition = Objects.toString(item.getDisposition(), ""); // pass / return / exchange / concession
 
             if (modelId <= 0 || qty <= 0) continue;
 
             EamPurchaseOrderItem orderItem = orderItemMap.get(modelId);
 
-            // 根據驗收結果分類數量
+            // 根据验收结果分类数量
             int accepted = qty;
             int ret = 0;
             int exc = 0;
@@ -190,7 +190,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             exchangeQty += exc;
             concessionQty += conc;
 
-            // 僅驗收通過的生成資產編號
+            // 仅验收通过的生成资产编号
             List<String> assetNos = new ArrayList<>();
             if (accepted > 0) {
                 for (int i = 0; i < accepted; i++) {
@@ -226,18 +226,17 @@ public class EamInboundServiceImpl implements EamInboundService {
                 }
             }
 
-            // 保存批次明細（含驗收處置留痕）
+            // 保存批次明细（含验收处置留痕）
             EamInboundBatchItem batchItem = new EamInboundBatchItem();
             batchItem.setModelId(modelId);
             batchItem.setModelName(modelName);
             batchItem.setQty(qty);
             batchItem.setLocationId(locationId);
             batchItem.setDisposition(disposition.isEmpty() ? "pass" : disposition);
-            batchItem.setRejectReason(str(item, "rejectReason"));
+            batchItem.setRejectReason(Objects.toString(item.getRejectReason(), ""));
             // 验收照片 JSON
-            Object photosObj = item.get("photos");
-            if (photosObj != null) {
-                batchItem.setPhotos(JsonUtils.toJson(photosObj));
+            if (item.getPhotos() != null) {
+                batchItem.setPhotos(JsonUtils.toJson(item.getPhotos()));
             }
             batchItem.setAssetNos(JsonUtils.toJson(assetNos));
             batchItem.setSortOrder(sort++);
@@ -257,31 +256,31 @@ public class EamInboundServiceImpl implements EamInboundService {
         batch.setReturnQty(returnQty);
         batch.setExchangeQty(exchangeQty);
         batch.setConcessionQty(concessionQty);
-        batch.setRemark(str(data, "remark"));
+        batch.setRemark(Objects.toString(dto.getRemark(), ""));
         batch.setUpdatedBy(operator);
         batchMapper.insert(batch);
 
-        // 保存明細
+        // 保存明细
         for (EamInboundBatchItem item : batchItemsToInsert) {
             item.setBatchId(batch.getId());
             batchItemMapper.insert(item);
         }
 
-        // 批量插入資產台賬
+        // 批量插入资产台账
         for (EamAsset asset : assetsToInsert) {
             asset.setBatchId(batch.getId());
             assetMapper.insert(asset);
         }
 
-        // ====== P0-4: 回寫採購訂單 ======
-        // 更新訂單明細的 receivedQty
-        for (Map<String, Object> item : inboundItems) {
-            long modelId = toLong(item.get("modelId"), -1L);
-            int qty = toInt(item.get("qty"), 0);
-            String disposition = str(item, "disposition");
+        // ====== P0-4: 回写采购订单 ======
+        // 更新订单明细的 receivedQty
+        for (EamInboundCreateDTO.InboundItem item : inboundItems) {
+            long modelId = item.getModelId() == null ? -1L : item.getModelId();
+            int qty = item.getQty() == null ? 0 : item.getQty();
+            String disposition = Objects.toString(item.getDisposition(), "");
             if (modelId <= 0 || qty <= 0) continue;
 
-            // 只有通過的才計入 receivedQty
+            // 只有通过的才计入 receivedQty
             int accepted = qty;
             if ("return".equals(disposition) || "exchange".equals(disposition) || "concession".equals(disposition)) {
                 accepted = 0;
@@ -296,7 +295,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             }
         }
 
-        // 重新查詢訂單明細計算整體狀態
+        // 重新查询订单明细计算整体状态
         List<EamPurchaseOrderItem> updatedItems = orderItemMapper.selectList(
                 new LambdaQueryWrapper<EamPurchaseOrderItem>()
                         .eq(EamPurchaseOrderItem::getOrderId, poId));
@@ -315,7 +314,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             newStatus = "pending";
         }
 
-        // 計算已驗收總數
+        // 计算已验收总数
         int totalAccepted = updatedItems.stream()
                 .mapToInt(it -> it.getReceivedQty() != null ? it.getReceivedQty() : 0)
                 .sum();
@@ -354,7 +353,7 @@ public class EamInboundServiceImpl implements EamInboundService {
         return result;
     }
 
-    /* ==================== 內部方法 ==================== */
+    /* ==================== 内部方法 ==================== */
 
     private Map<String, Object> batchToMap(EamInboundBatch b) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -376,22 +375,5 @@ public class EamInboundServiceImpl implements EamInboundService {
         m.put("updatedBy", b.getUpdatedBy());
         m.put("updatedAt", b.getUpdatedAt() != null ? b.getUpdatedAt().toString() : null);
         return m;
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v != null ? v.toString() : "";
-    }
-
-    private static Long toLong(Object v, Long def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.longValue();
-        try { return Long.parseLong(v.toString()); } catch (Exception e) { return def; }
-    }
-
-    private static int toInt(Object v, int def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
     }
 }

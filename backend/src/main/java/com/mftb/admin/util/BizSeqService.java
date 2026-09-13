@@ -93,15 +93,15 @@ public class BizSeqService {
     public static final String RULE_AI_CONVERSATION = "ai_conversation";
     /** OA流程编号 */
     public static final String RULE_OA_REQUEST = "oa_request";
-    /** AI 使用申請流程編號 */
+    /** AI 使用申请流程编号 */
     public static final String RULE_AI_ACCESS_REQUEST = "ai_access_request";
-    /** EAM 採購申請 */
+    /** EAM 采购申请 */
     public static final String RULE_EAM_PURCHASE_REQUEST = "eam_purchase_request";
-    /** EAM 採購訂單 */
+    /** EAM 采购订单 */
     public static final String RULE_EAM_PURCHASE_ORDER = "eam_purchase_order";
-    /** EAM 入庫批次 */
+    /** EAM 入库批次 */
     public static final String RULE_EAM_INBOUND_BATCH = "eam_inbound_batch";
-    /** EAM 資產編號 */
+    /** EAM 资产编号 */
     public static final String RULE_EAM_ASSET = "eam_asset";
     /** 流程配置ID */
     public static final String RULE_WORKFLOW_CONFIG = "workflow_config";
@@ -145,7 +145,7 @@ public class BizSeqService {
         bizSeqMapper.increaseSeq(rule.getPrefix(), seqDateKey);
         Integer current = bizSeqMapper.selectCurrentValue(rule.getPrefix(), seqDateKey);
         if (current == null) {
-            throw new BusinessException("业务编号生成失败: " + ruleKey);
+            throw new BusinessException("業務編號生成失敗: " + ruleKey);
         }
         // seq_start=0 时表内从 1 计数、编号从 0000 起；seq_start=1 时编号直接用表内值（如 JT000001）
         int seq = current - (rule.getSeqStart() == null || rule.getSeqStart() == 0 ? 1 : 0);
@@ -241,7 +241,7 @@ public class BizSeqService {
     private SysBizSeqRule requireRule(String ruleKey) {
         SysBizSeqRule rule = loadRules().get(ruleKey);
         if (rule == null || rule.getStatus() == null || rule.getStatus() != 1) {
-            throw new BusinessException("编号生成规则未配置或已停用: " + ruleKey);
+            throw new BusinessException("編號生成規則未配置或已停用: " + ruleKey);
         }
         return rule;
     }
@@ -274,7 +274,7 @@ public class BizSeqService {
             case "YYYYMMDD" -> date.format(FMT_DAY);
             case "YYYYMM" -> date.format(FMT_MONTH_FULL);
             case "YYMM" -> date.format(FMT_MONTH);
-            default -> throw new BusinessException("不支持的编号日期格式: " + dateFormat);
+            default -> throw new BusinessException("不支持的編號日期格式: " + dateFormat);
         };
     }
 }

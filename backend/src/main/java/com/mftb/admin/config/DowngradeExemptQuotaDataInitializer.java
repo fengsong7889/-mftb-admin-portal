@@ -12,7 +12,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 降級豁免額度字段遷移：為 3 張額度策略表新增 downgrade_exempt_quota 字段
+ * 降级豁免额度字段迁移：为 3 张额度策略表新增 downgrade_exempt_quota 字段
  */
 @Slf4j
 @Component

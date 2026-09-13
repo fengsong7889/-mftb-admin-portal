@@ -36,27 +36,27 @@ public class AdOrderVO {
     private String storeAddress;
     /** 购买商圈（明细去重聚合） */
     private List<Integer> regions;
-    /** 購買時段（明細去重聚合, 如 breakfast/lunch） */
+    /** 购买时段（明细去重聚合, 如 breakfast/lunch） */
     private List<String> mealSlots;
-    /** 按(商圈,日期)分組的購買時段（無敵星星） */
+    /** 按(商圈,日期)分组的购买时段（无敌星星） */
     private List<DateSlotGroup> dateSlots;
-    /** 購買日期列表（盤活復蘇按天售賣，明細 biz_date 去重排序） */
+    /** 购买日期列表（盘活复苏按天售卖，明细 biz_date 去重排序） */
     private List<String> purchaseDays;
-    /** 購買皮膚列表（人氣商家明細 skin_name 去重排序） */
+    /** 购买皮肤列表（人气商家明细 skin_name 去重排序） */
     private List<String> skinNames;
-    /** 皮膚等級列表（人氣商家：根據 skin_name 查定價配置 tier 去重排序） */
+    /** 皮肤等级列表（人气商家：根据 skin_name 查定价配置 tier 去重排序） */
     private List<String> skinTiers;
-    /** 按標籤分組的購買日期（金字招牌：每個標籤對應的日期列表） */
+    /** 按标签分组的购买日期（金字招牌：每个标签对应的日期列表） */
     private List<LabelDateGroup> labelDates;
-    /** 業務頻道（投流廣告: 1=美食外賣 2=超市百貨 3=團購到店，自定價配置回填） */
+    /** 业务频道（投流广告: 1=美食外卖 2=超市百货 3=团购到店，自定价配置回填） */
     private Integer bizChannel;
-    /** 購買方式（投流廣告: tier=預設檔位, custom=自定義曝光） */
+    /** 购买方式（投流广告: tier=预设档位, custom=自定义曝光） */
     private String trafficMode;
-    /** 流量包名稱（投流廣告: 套餐名稱或自定義曝光次數） */
+    /** 流量包名称（投流广告: 套餐名称或自定义曝光次数） */
     private String trafficPackageName;
-    /** 購買曝光次數（投流廣告） */
+    /** 购买曝光次数（投流广告） */
     private Long trafficImpressions;
-    /** 投流時段（投流廣告: business=營業時間, allday=全天） */
+    /** 投流时段（投流广告: business=营业时间, allday=全天） */
     private String deliverySlot;
     private Integer itemCount;
     private BigDecimal originalAmount;
@@ -76,7 +76,7 @@ public class AdOrderVO {
     private String remark;
     private LocalDateTime createdAt;
 
-    /** 按(商圈,日期)分組的時段 */
+    /** 按(商圈,日期)分组的时段 */
     @Data
     public static class DateSlotGroup {
         private Integer region;
@@ -91,11 +91,11 @@ public class AdOrderVO {
         }
     }
 
-    /** 按標籤分組的日期（金字招牌） */
+    /** 按标签分组的日期（金字招牌） */
     @Data
     public static class LabelDateGroup {
         private String label;
-        /** 場景: all_macau=全澳對比, district=商圈對比, null=統計類 */
+        /** 场景: all_macau=全澳对比, district=商圈对比, null=统计类 */
         private String scenario;
         private List<String> dates;
 

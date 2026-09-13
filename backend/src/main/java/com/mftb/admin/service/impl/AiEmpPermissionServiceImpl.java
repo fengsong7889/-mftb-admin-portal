@@ -20,10 +20,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * 員工AI權額管理服務實現
+ * 员工AI权额管理服务实现
  *
- * 管理員視角聚合四維度（部門/職位/角色/員工）數據，
- * 復用 AiMyCenterServiceImpl 的聚合邏輯但支持查詢任意員工。
+ * 管理员视角聚合四维度（部门/职位/角色/员工）数据，
+ * 复用 AiMyCenterServiceImpl 的聚合逻辑但支持查询任意员工。
  */
 @Slf4j
 @Service
@@ -54,7 +54,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             String queryName, String queryDept, String queryUpdatedBy,
             String queryUpdateTimeStart, String queryUpdateTimeEnd) {
 
-        // 1. 查詢全部啟用員工
+        // 1. 查询全部启用员工
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getStatus, 1);
         if (queryName != null && !queryName.isBlank()) {
@@ -66,21 +66,21 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         }
         List<SysUser> employees = sysUserMapper.selectList(wrapper);
 
-        // 2. 批量加載模型（避免 N+1）
+        // 2. 批量加载模型（避免 N+1）
         Map<Long, AiModel> allModels = loadAllModels();
 
-        // 3. 逐員工聚合
+        // 3. 逐员工聚合
         List<AiEmpPermissionDTO.SummaryVO> result = new ArrayList<>();
         for (SysUser emp : employees) {
             AiEmpPermissionDTO.SummaryVO vo = buildSummary(emp, allModels);
 
-            // 過濾：最後更新人
+            // 过滤：最后更新人
             if (queryUpdatedBy != null && !queryUpdatedBy.isBlank()) {
                 if (vo.getLastUpdatedBy() == null || !vo.getLastUpdatedBy().contains(queryUpdatedBy.trim())) {
                     continue;
                 }
             }
-            // 過濾：最後更新時間
+            // 过滤：最后更新时间
             if (queryUpdateTimeStart != null && !queryUpdateTimeStart.isBlank()) {
                 if (vo.getLastUpdatedAt() == null || vo.getLastUpdatedAt().compareTo(queryUpdateTimeStart + " 00:00:00") < 0) {
                     continue;
@@ -127,18 +127,18 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         }
         vo.setModelCount(enabledCount);
 
-        // 收集額度
+        // 收集额度
         collectQuotaBriefs(emp, vo, allModels);
 
-        // 最後更新信息：從四維度配置表取 MAX(updated_at)
+        // 最后更新信息：从四维度配置表取 MAX(updated_at)
         fillLastUpdated(emp, vo);
 
         return vo;
     }
 
-    /** 收集額度簡要（列表用） */
+    /** 收集额度简要（列表用） */
     private void collectQuotaBriefs(SysUser emp, AiEmpPermissionDTO.SummaryVO vo, Map<Long, AiModel> allModels) {
-        // 員工/部門額度（ai_quota_config）
+        // 员工/部门额度（ai_quota_config）
         LambdaQueryWrapper<AiQuotaConfig> configWrapper = new LambdaQueryWrapper<AiQuotaConfig>()
                 .eq(AiQuotaConfig::getStatus, 1)
                 .and(w -> {
@@ -163,7 +163,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 職位額度（ai_emp_quota_policy）
+        // 职位额度（ai_emp_quota_policy）
         if (emp.getSequence() != null && emp.getJobLevel() != null) {
             for (AiEmpQuotaPolicy policy : empQuotaPolicyMapper.selectList(
                     new LambdaQueryWrapper<AiEmpQuotaPolicy>().eq(AiEmpQuotaPolicy::getStatus, 1))) {
@@ -176,7 +176,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 角色額度（ai_role_quota_policy）
+        // 角色额度（ai_role_quota_policy）
         for (AiRoleQuotaPolicy policy : roleQuotaPolicyMapper.selectList(
                 new LambdaQueryWrapper<AiRoleQuotaPolicy>().eq(AiRoleQuotaPolicy::getStatus, 1))) {
             List<Long> userIds = JsonUtils.parseLongList(policy.getUserIds());
@@ -186,7 +186,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 審批授予額度（ai_quota_override）
+        // 审批授予额度（ai_quota_override）
         LocalDateTime now = LocalDateTime.now();
         for (AiQuotaOverride grant : quotaOverrideMapper.selectList(
                 new LambdaQueryWrapper<AiQuotaOverride>()
@@ -215,7 +215,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         vo.getQuotas().add(brief);
     }
 
-    /** 簡化用量計算：從 biz_llm_usage 按員工賬號聚合 */
+    /** 简化用量计算：从 biz_llm_usage 按员工账号聚合 */
     private BigDecimal computeUsed(SysUser emp, AiQuotaConfig config, String period) {
         LocalDate today = LocalDate.now();
         LocalDateTime windowStart = "daily".equals(period)
@@ -231,12 +231,12 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         return BigDecimal.valueOf(tokens);
     }
 
-    /** 填充最後更新信息：從四維度配置表取 MAX(updated_at) 及對應 updated_by */
+    /** 填充最后更新信息：从四维度配置表取 MAX(updated_at) 及对应 updated_by */
     private void fillLastUpdated(SysUser emp, AiEmpPermissionDTO.SummaryVO vo) {
         String latestBy = null;
         String latestAt = null;
 
-        // 部門策略組
+        // 部门策略组
         if (emp.getDepartmentId() != null) {
             List<AiDeptAuthGroupDept> links = deptGroupDeptMapper.selectList(
                     new LambdaQueryWrapper<AiDeptAuthGroupDept>()
@@ -256,7 +256,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 職位策略
+        // 职位策略
         for (AiEmpPosAuthStrategy s : empPosAuthStrategyMapper.selectList(
                 new LambdaQueryWrapper<AiEmpPosAuthStrategy>().eq(AiEmpPosAuthStrategy::getStatus, 1))) {
             List<String> seqs = JsonUtils.parseStringList(s.getSequences());
@@ -271,7 +271,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 角色授權
+        // 角色授权
         for (AiEmpRoleAuth r : empRoleAuthMapper.selectList(
                 new LambdaQueryWrapper<AiEmpRoleAuth>().eq(AiEmpRoleAuth::getStatus, 1))) {
             List<Long> userIds = JsonUtils.parseLongList(r.getUserIds());
@@ -284,7 +284,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 員工個人授權
+        // 员工个人授权
         for (AiEmployeeAuth a : employeeAuthMapper.selectList(
                 new LambdaQueryWrapper<AiEmployeeAuth>()
                         .eq(AiEmployeeAuth::getEmployeeId, emp.getId()))) {
@@ -299,7 +299,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         vo.setLastUpdatedAt(latestAt != null ? latestAt : format(emp.getUpdatedAt()));
     }
 
-    /* ══════════════════════ 詳情 ══════════════════════ */
+    /* ══════════════════════ 详情 ══════════════════════ */
 
     @Override
     public AiEmpPermissionDTO.DetailVO getDetail(Long employeeId) {
@@ -314,18 +314,18 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         // 基本信息
         detail.setBasic(buildSummary(emp, allModels));
 
-        // 模型權限明細（含能力開關）
+        // 模型权限明细（含能力开关）
         collectModelPermissions(emp, detail, allModels);
 
-        // 額度明細
+        // 额度明细
         collectQuotaGrants(emp, detail);
 
         return detail;
     }
 
-    /** 收集模型權限明細（四維度，含能力開關 + 來源） */
+    /** 收集模型权限明细（四维度，含能力开关 + 来源） */
     private void collectModelPermissions(SysUser emp, AiEmpPermissionDTO.DetailVO detail, Map<Long, AiModel> allModels) {
-        // 部門維度
+        // 部门维度
         if (emp.getDepartmentId() != null) {
             List<AiDeptAuthGroupDept> links = deptGroupDeptMapper.selectList(
                     new LambdaQueryWrapper<AiDeptAuthGroupDept>()
@@ -362,7 +362,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 職位維度
+        // 职位维度
         if (emp.getSequence() != null && emp.getJobLevel() != null) {
             for (AiEmpPosAuthStrategy strategy : empPosAuthStrategyMapper.selectList(
                     new LambdaQueryWrapper<AiEmpPosAuthStrategy>().eq(AiEmpPosAuthStrategy::getStatus, 1))) {
@@ -392,7 +392,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 角色維度
+        // 角色维度
         for (AiEmpRoleAuth role : empRoleAuthMapper.selectList(
                 new LambdaQueryWrapper<AiEmpRoleAuth>().eq(AiEmpRoleAuth::getStatus, 1))) {
             List<Long> userIds = JsonUtils.parseLongList(role.getUserIds());
@@ -419,7 +419,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 員工維度
+        // 员工维度
         for (AiEmployeeAuth auth : employeeAuthMapper.selectList(
                 new LambdaQueryWrapper<AiEmployeeAuth>()
                         .eq(AiEmployeeAuth::getEmployeeId, emp.getId())
@@ -442,9 +442,9 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         }
     }
 
-    /** 收集額度明細（詳情頁用） */
+    /** 收集额度明细（详情页用） */
     private void collectQuotaGrants(SysUser emp, AiEmpPermissionDTO.DetailVO detail) {
-        // 員工/部門額度
+        // 员工/部门额度
         LambdaQueryWrapper<AiQuotaConfig> configWrapper = new LambdaQueryWrapper<AiQuotaConfig>()
                 .eq(AiQuotaConfig::getStatus, 1)
                 .and(w -> {
@@ -471,7 +471,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 職位額度
+        // 职位额度
         if (emp.getSequence() != null && emp.getJobLevel() != null) {
             for (AiEmpQuotaPolicy policy : empQuotaPolicyMapper.selectList(
                     new LambdaQueryWrapper<AiEmpQuotaPolicy>().eq(AiEmpQuotaPolicy::getStatus, 1))) {
@@ -487,7 +487,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 角色額度
+        // 角色额度
         for (AiRoleQuotaPolicy policy : roleQuotaPolicyMapper.selectList(
                 new LambdaQueryWrapper<AiRoleQuotaPolicy>().eq(AiRoleQuotaPolicy::getStatus, 1))) {
             List<Long> userIds = JsonUtils.parseLongList(policy.getUserIds());
@@ -500,7 +500,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 審批授予
+        // 审批授予
         LocalDateTime now = LocalDateTime.now();
         for (AiQuotaOverride grant : quotaOverrideMapper.selectList(
                 new LambdaQueryWrapper<AiQuotaOverride>()
@@ -541,14 +541,14 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         detail.getQuotas().add(gvo);
     }
 
-    /* ══════════════════════ 保存編輯 ══════════════════════ */
+    /* ══════════════════════ 保存编辑 ══════════════════════ */
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void save(Long employeeId, AiEmpPermissionDTO.SaveReq req) {
         String operator = currentUsername();
 
-        // 1. 能力開關變更 → 更新 ai_employee_auth
+        // 1. 能力开关变更 → 更新 ai_employee_auth
         for (AiEmpPermissionDTO.ModelCapToggle toggle : req.getModelToggles()) {
             AiEmployeeAuth auth = employeeAuthMapper.selectOne(
                     new LambdaQueryWrapper<AiEmployeeAuth>()
@@ -568,11 +568,11 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             }
         }
 
-        // 2. 額度值調整 → 根據 source 定位到具體表並更新
+        // 2. 额度值调整 → 根据 source 定位到具体表并更新
         for (AiEmpPermissionDTO.QuotaAdjust adj : req.getQuotaAdjusts()) {
             updateQuotaValue(adj, employeeId);
 
-            // 寫入調整日誌
+            // 写入调整日志
             AiEmpQuotaAdjustLog logEntry = new AiEmpQuotaAdjustLog();
             logEntry.setEmployeeId(employeeId);
             logEntry.setSource(adj.getSource() != null ? adj.getSource() : "employee");
@@ -587,7 +587,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         }
     }
 
-    /** 更新額度值：根據來源定位到具體表和行 */
+    /** 更新额度值：根据来源定位到具体表和行 */
     private void updateQuotaValue(AiEmpPermissionDTO.QuotaAdjust adj, Long employeeId) {
         if (adj.getQuotaId() == null) return;
         switch (adj.getSource()) {
@@ -627,16 +627,16 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         }
     }
 
-    /** 設置能力開關字段 */
+    /** 设置能力开关字段 */
     private void setCapabilityField(AiEmployeeAuth auth, String field, int value) {
-        // ai_employee_auth 表沒有獨立能力字段，使用 limitType 標記
-        // 能力開關實際存儲在模型層（ai_model），此處記錄員工級覆蓋
-        // 為簡化實現，將能力開關存儲在員工授權記錄的擴展字段中
-        // 當前 ai_employee_auth 表無能力字段，因此僅記錄日誌
-        // 後續可擴展 ai_employee_auth 表增加能力字段
+        // ai_employee_auth 表没有独立能力字段，使用 limitType 标记
+        // 能力开关实际存储在模型层（ai_model），此处记录员工级覆盖
+        // 为简化实现，将能力开关存储在员工授权记录的扩展字段中
+        // 当前 ai_employee_auth 表无能力字段，因此仅记录日志
+        // 后续可扩展 ai_employee_auth 表增加能力字段
     }
 
-    /* ══════════════════════ 調整日誌 ══════════════════════ */
+    /* ══════════════════════ 调整日志 ══════════════════════ */
 
     @Override
     public List<AiEmpPermissionDTO.AdjustLogVO> getAdjustLogs(Long employeeId) {
@@ -659,7 +659,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         }).toList();
     }
 
-    /* ══════════════════════ 模型收集（復用 AiMyCenterServiceImpl 邏輯） ══════════════════════ */
+    /* ══════════════════════ 模型收集（复用 AiMyCenterServiceImpl 逻辑） ══════════════════════ */
 
     private void collectDeptModels(SysUser user, Map<Long, Set<String>> sources) {
         if (user.getDepartmentId() == null) return;
@@ -751,7 +751,7 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
         return value != null ? value : 0;
     }
 
-    /** 從 Map 中安全提取 int 值（modelConfigs JSON 解析後的能力開關） */
+    /** 从 Map 中安全提取 int 值（modelConfigs JSON 解析后的能力开关） */
     private static int intFromMap(Map<String, Object> map, String key) {
         Object v = map.get(key);
         if (v instanceof Number n) return n.intValue();

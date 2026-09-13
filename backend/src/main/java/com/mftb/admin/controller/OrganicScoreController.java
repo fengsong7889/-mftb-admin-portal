@@ -6,6 +6,7 @@ import com.mftb.admin.dto.OrganicScoreConfigVO;
 import com.mftb.admin.dto.OrganicScoreDimensionRequest;
 import com.mftb.admin.dto.OrganicScoreRuleRequest;
 import com.mftb.admin.dto.OrganicScoreRuleVO;
+import com.mftb.admin.dto.RuleScoreUpdateDTO;
 import com.mftb.admin.service.OrganicScoreService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 自然流量评分配置接口
@@ -59,7 +59,7 @@ public class OrganicScoreController {
     @PutMapping("/rules/{identifier}")
     @RequirePermission(menu = "promotion-algorithm", action = "edit")
     public Result<OrganicScoreRuleVO> updateRule(@PathVariable String identifier, @Valid @RequestBody OrganicScoreRuleRequest request) {
-        return Result.success("编辑成功", organicScoreService.updateRuleByIdentifier(identifier, request));
+        return Result.success("編輯成功", organicScoreService.updateRuleByIdentifier(identifier, request));
     }
 
     /** 切换规则状态（启用/停用） */
@@ -73,19 +73,8 @@ public class OrganicScoreController {
     /** 更新规则分值（表格内联编辑） */
     @PutMapping("/rules/{identifier}/score")
     @RequirePermission(menu = "promotion-algorithm", action = "edit")
-    public Result<Void> updateRuleScore(@PathVariable String identifier, @RequestBody Map<String, Object> body) {
-        Object raw = body.get("score");
-        Integer score = null;
-        if (raw instanceof Number num) {
-            score = num.intValue();
-        } else if (raw instanceof String str && !str.isBlank()) {
-            try {
-                score = Integer.parseInt(str.trim());
-            } catch (NumberFormatException ignored) {
-                // 非数字字符串，保持 null
-            }
-        }
-        organicScoreService.updateRuleScoreByIdentifier(identifier, score);
+    public Result<Void> updateRuleScore(@PathVariable String identifier, @RequestBody RuleScoreUpdateDTO dto) {
+        organicScoreService.updateRuleScoreByIdentifier(identifier, dto.getScore());
         return Result.success();
     }
 

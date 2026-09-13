@@ -14,7 +14,7 @@ import java.util.Map;
 public class AdPricingStarRequest {
 
     /** 关联算法ID */
-    @NotNull(message = "关联算法不能为空")
+    @NotNull(message = "關聯算法不能為空")
     private Long algoId;
 
     /** 所属品牌: flashBee / mFood */
@@ -24,7 +24,7 @@ public class AdPricingStarRequest {
     private Integer channel;
 
     /** 预售天数（今天起 N 天可售） */
-    @NotNull(message = "预售天数不能为空")
+    @NotNull(message = "預售天數不能為空")
     private Integer presaleDays;
 
     /** 退款开关: 1=允许退款 2=不允许 */

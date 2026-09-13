@@ -5,7 +5,9 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdOrderDetailVO;
 import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.service.AdOrderService;
+import com.mftb.admin.util.ApiRateLimiter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdOrderController {
 
     private final AdOrderService orderService;
+    private final ApiRateLimiter rateLimiter;
 
     /** 订单分页查询 */
     @GetMapping
@@ -52,6 +55,9 @@ public class AdOrderController {
     @PostMapping("/{orderNo}/refund")
     @RequirePermission(menu = "promotion-order-manage", action = "edit")
     public Result<AdOrderDetailVO> refund(@PathVariable String orderNo) {
+        if (!rateLimiter.tryAcquire("ad:refund", 5, 60_000L)) {
+            throw new BusinessException("退款操作過於頻繁，請稍後再試");
+        }
         return Result.success("退款成功", orderService.refund(orderNo));
     }
 
@@ -59,6 +65,9 @@ public class AdOrderController {
     @PostMapping("/{orderNo}/cancel")
     @RequirePermission(menu = "promotion-order-manage", action = "edit")
     public Result<AdOrderDetailVO> cancel(@PathVariable String orderNo) {
+        if (!rateLimiter.tryAcquire("ad:cancel", 5, 60_000L)) {
+            throw new BusinessException("取消操作過於頻繁，請稍後再試");
+        }
         return Result.success("取消成功", orderService.cancel(orderNo));
     }
 }

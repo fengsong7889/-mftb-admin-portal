@@ -7,6 +7,14 @@ import { fetchCategoryList, fetchParamTypeList, deleteParamType, updateParamType
 import type { AssetCategory, ParamType, ParamValue } from '../../../api/eam'
 import './index.css'
 
+/**
+ * 参数库列表页
+ *
+ * 左侧为资产分类树（选中后右侧过滤），右侧上半部为参数类型列表，
+ * 下半部为选中参数类型对应的参数值列表。
+ * 支持参数类型与参数值的新增/编辑/删除/启用停用。
+ */
+
 /** 树节点 */
 interface CatTreeNode extends TreeDataNode {
   key: number

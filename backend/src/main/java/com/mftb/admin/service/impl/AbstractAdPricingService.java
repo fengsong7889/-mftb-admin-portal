@@ -83,7 +83,7 @@ public abstract class AbstractAdPricingService<
     protected Entity require(Long id) {
         Entity entity = pricingMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("计价配置不存在");
+            throw new BusinessException("計價配置不存在");
         }
         return entity;
     }
@@ -96,7 +96,7 @@ public abstract class AbstractAdPricingService<
     /** 更新状态（启用/停用） */
     public void updateStatus(Long id, Integer status) {
         if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
+            throw new BusinessException("非法的服務狀態: " + status);
         }
         Entity entity = require(id);
         setStatus(entity, status);

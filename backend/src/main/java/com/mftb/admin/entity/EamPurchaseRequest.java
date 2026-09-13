@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 採購申請實體
+ * 采购申请实体
  */
 @Data
 @TableName("biz_eam_purchase_request")
@@ -16,37 +16,37 @@ public class EamPurchaseRequest {
     @TableId
     private Long id;
 
-    /** 申請編號 */
+    /** 申请编号 */
     private String reqNo;
 
-    /** 關聯 OA 流程編號 */
+    /** 关联 OA 流程编号 */
     private String flowNo;
 
-    /** 申請標題 */
+    /** 申请标题 */
     private String title;
 
-    /** 申請部門 */
+    /** 申请部门 */
     private String department;
 
-    /** 申請部門 ID */
+    /** 申请部门 ID */
     private Long departmentId;
 
-    /** 申請人 */
+    /** 申请人 */
     private String applicant;
 
-    /** 申請人工號 */
+    /** 申请人工号 */
     private String applicantEmpId;
 
-    /** 採購事由 */
+    /** 采购事由 */
     private String reason;
 
-    /** 預算金額 */
+    /** 预算金额 */
     private BigDecimal budget;
 
     /** pending/approved/rejected */
     private String status;
 
-    /** 審批通過後生成的採購訂單 ID */
+    /** 审批通过后生成的采购订单 ID */
     private Long orderId;
 
     @TableField(fill = FieldFill.INSERT)

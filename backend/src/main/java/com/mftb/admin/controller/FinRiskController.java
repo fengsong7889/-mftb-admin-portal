@@ -49,7 +49,7 @@ public class FinRiskController {
     @RequirePermission(menu = "consume-risk", action = "edit")
     public Result<Void> saveConfig(@RequestBody FinRiskConfigDTO dto) {
         finRiskService.saveConfig(dto);
-        return Result.success("风控配置已保存", null);
+        return Result.success("風控配置已保存", null);
     }
 
     /** 启用/停用风控登记（停用后不限制消费） */

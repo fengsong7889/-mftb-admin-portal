@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 倉庫 / 存放位置實體（樹形：倉庫/樓層/辦公室）
+ * 仓库 / 存放位置实体（树形：仓库/楼层/办公室）
  */
 @Data
 @TableName("biz_eam_location")
@@ -15,16 +15,16 @@ public class EamLocation {
     @TableId
     private Long id;
 
-    /** 位置編碼（唯一） */
+    /** 位置编码（唯一） */
     private String code;
 
-    /** 位置名稱 */
+    /** 位置名称 */
     private String name;
 
-    /** 父級 ID，0 為頂級 */
+    /** 父级 ID，0 为顶级 */
     private Long parentId;
 
-    /** 類型：warehouse / floor / room */
+    /** 类型：warehouse / floor / room */
     private String type;
 
     /** 排序 */
@@ -33,10 +33,10 @@ public class EamLocation {
     /** 地址 */
     private String address;
 
-    /** 備註 */
+    /** 备注 */
     private String remark;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

@@ -57,7 +57,7 @@ public class EmergencyContactServiceImpl implements EmergencyContactService {
         requireUser(userId);
         EmpEmergencyContact entity = emergencyContactMapper.selectById(contactId);
         if (entity == null || !userId.equals(entity.getUserId())) {
-            throw new BusinessException("紧急联系人不存在");
+            throw new BusinessException("緊急聯繫人不存在");
         }
         entity.setName(request.getName());
         entity.setPhone(request.getPhone());
@@ -72,14 +72,14 @@ public class EmergencyContactServiceImpl implements EmergencyContactService {
         requireUser(userId);
         EmpEmergencyContact entity = emergencyContactMapper.selectById(contactId);
         if (entity == null || !userId.equals(entity.getUserId())) {
-            throw new BusinessException("紧急联系人不存在");
+            throw new BusinessException("緊急聯繫人不存在");
         }
         emergencyContactMapper.deleteById(contactId);
     }
 
     private void requireUser(Long userId) {
         if (sysUserMapper.selectById(userId) == null) {
-            throw new BusinessException("员工不存在");
+            throw new BusinessException("員工不存在");
         }
     }
 }

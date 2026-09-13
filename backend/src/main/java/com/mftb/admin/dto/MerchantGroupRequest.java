@@ -11,7 +11,7 @@ import lombok.Data;
 @Data
 public class MerchantGroupRequest {
 
-    @NotBlank(message = "集团名称不能为空")
+    @NotBlank(message = "集團名稱不能為空")
     private String groupName;
 
     /** 登录主账号 */

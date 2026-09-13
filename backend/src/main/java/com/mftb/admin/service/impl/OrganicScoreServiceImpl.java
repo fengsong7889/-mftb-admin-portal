@@ -71,17 +71,17 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     @Transactional
     public void updateDimensionWeights(List<OrganicScoreDimensionRequest> requests) {
         if (requests == null || requests.isEmpty()) {
-            throw new BusinessException("权重配置不能为空");
+            throw new BusinessException("權重配置不能為空");
         }
         String operator = operatorResolver.currentOperatorName();
         int totalWeight = 0;
 
         for (OrganicScoreDimensionRequest req : requests) {
             if (!VALID_DIMENSIONS.contains(req.getDimension())) {
-                throw new BusinessException("无效的维度值: " + req.getDimension());
+                throw new BusinessException("無效的維度值: " + req.getDimension());
             }
             if (req.getWeight() == null || req.getWeight() < 0 || req.getWeight() > 100) {
-                throw new BusinessException("权重必须在 0~100 之间");
+                throw new BusinessException("權重必須在 0~100 之間");
             }
             totalWeight += req.getWeight();
 
@@ -104,7 +104,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         }
 
         if (totalWeight != 100) {
-            throw new BusinessException("维度权重总和必须等于 100%，当前为 " + totalWeight + "%");
+            throw new BusinessException("維度權重總和必須等於 100%，當前為 " + totalWeight + "%");
         }
     }
 
@@ -153,7 +153,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         validateRuleRequest(request);
         OrganicScoreRule entity = ruleMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("评分规则不存在");
+            throw new BusinessException("評分規則不存在");
         }
 
         entity.setDimension(request.getDimension());
@@ -187,7 +187,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     public void toggleRuleStatus(Long id) {
         OrganicScoreRule entity = ruleMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("评分规则不存在");
+            throw new BusinessException("評分規則不存在");
         }
         entity.setStatus(entity.getStatus() == 1 ? 2 : 1);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -199,10 +199,10 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     public void deleteRule(Long id) {
         OrganicScoreRule entity = ruleMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("评分规则不存在");
+            throw new BusinessException("評分規則不存在");
         }
         if (entity.getBuiltin() != null && entity.getBuiltin() == 1) {
-            throw new BusinessException("系统内置规则不可删除");
+            throw new BusinessException("系統內置規則不可刪除");
         }
         ruleMapper.deleteById(id);
     }
@@ -212,10 +212,10 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     public void updateRuleScore(Long id, Integer score) {
         OrganicScoreRule entity = ruleMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("评分规则不存在");
+            throw new BusinessException("評分規則不存在");
         }
         if (score == null) {
-            throw new BusinessException("分值不能为空");
+            throw new BusinessException("分值不能為空");
         }
         entity.setScore(score);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -256,7 +256,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
      */
     private Long resolveRuleId(String identifier) {
         if (identifier == null || identifier.isBlank()) {
-            throw new BusinessException("规则标识不能为空");
+            throw new BusinessException("規則標識不能為空");
         }
         try {
             return Long.parseLong(identifier);
@@ -268,7 +268,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
                         .eq(OrganicScoreRule::getRuleCode, identifier)
                         .last("LIMIT 1"));
         if (rule == null) {
-            throw new BusinessException("评分规则不存在: " + identifier);
+            throw new BusinessException("評分規則不存在: " + identifier);
         }
         return rule.getId();
     }
@@ -276,13 +276,13 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     /** 校验规则请求参数 */
     private void validateRuleRequest(OrganicScoreRuleRequest request) {
         if (!VALID_DIMENSIONS.contains(request.getDimension())) {
-            throw new BusinessException("无效的维度值: " + request.getDimension());
+            throw new BusinessException("無效的維度值: " + request.getDimension());
         }
         if (!VALID_MODES.contains(request.getMode())) {
-            throw new BusinessException("无效的计分方式: " + request.getMode());
+            throw new BusinessException("無效的計分方式: " + request.getMode());
         }
         if (!VALID_STATUS.contains(request.getStatus())) {
-            throw new BusinessException("无效的状态值: " + request.getStatus());
+            throw new BusinessException("無效的狀態值: " + request.getStatus());
         }
     }
 
@@ -299,7 +299,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
             case 1 -> PREFIX_COM;
             case 2 -> PREFIX_STB;
             case 4 -> PREFIX_PLT;
-            default -> throw new BusinessException("无效的维度值: " + dimension);
+            default -> throw new BusinessException("無效的維度值: " + dimension);
         };
 
         // 查询该维度下所有未删除的规则（@TableLogic 自动过滤 deleted）

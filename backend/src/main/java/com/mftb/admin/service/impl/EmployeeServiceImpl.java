@@ -129,7 +129,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeVO create(EmployeeRequest request) {
         if (!StringUtils.hasText(request.getPassword()) || request.getPassword().length() < 6) {
-            throw new BusinessException("登录密码不能为空且长度不少于 6 位");
+            throw new BusinessException("登錄密碼不能為空且長度不少於 6 位");
         }
         // 工号由系统按编号生成规则 employee_no 自动生成, 同时作为登录账号, 不接受前端传入
         String empId = generateEmpId();
@@ -191,7 +191,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public void updateStatus(Long id, Integer status) {
         SysUser user = requireUser(id);
         if (BUILTIN_ADMIN.equals(user.getUsername()) && status != null && status == 0) {
-            throw new BusinessException("內置管理员账号不允许停用");
+            throw new BusinessException("內置管理員賬號不允許停用");
         }
         user.setStatus(status);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -233,7 +233,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public void delete(Long id) {
         SysUser user = requireUser(id);
         if (BUILTIN_ADMIN.equals(user.getUsername())) {
-            throw new BusinessException("内置管理员账号不允许删除");
+            throw new BusinessException("內置管理員賬號不允許刪除");
         }
         sysUserMapper.deleteById(id);
         permissionService.evictAll();
@@ -264,7 +264,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         SysDepartment dept = sysDepartmentMapper.selectById(departmentId);
         if (dept == null) {
-            throw new BusinessException("所选部门不存在");
+            throw new BusinessException("所選部門不存在");
         }
         user.setDepartmentId(dept.getId());
         user.setDepartment(dept.getName());
@@ -284,7 +284,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         SysPosition position = sysPositionMapper.selectById(positionId);
         if (position == null) {
-            throw new BusinessException("所选职位不存在");
+            throw new BusinessException("所選職位不存在");
         }
         user.setPositionId(position.getId());
         user.setPosition(position.getName());
@@ -378,7 +378,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private SysUser requireUser(Long id) {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
-            throw new BusinessException("员工不存在");
+            throw new BusinessException("員工不存在");
         }
         return user;
     }

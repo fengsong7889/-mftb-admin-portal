@@ -217,7 +217,7 @@ public class LoginLogServiceImpl implements LoginLogService {
         // 2. 查询登录日志记录
         SysLoginLog logEntry = loginLogMapper.selectById(loginLogId);
         if (logEntry == null || logEntry.getLogoutTime() != null) {
-            throw new BusinessException("该用户已不在线");
+            throw new BusinessException("該用戶已不在線");
         }
 
         // 3. 更新登录日志: 标记为强制下线
@@ -242,11 +242,11 @@ public class LoginLogServiceImpl implements LoginLogService {
     public void deleteById(Long id) {
         SysLoginLog logEntry = loginLogMapper.selectById(id);
         if (logEntry == null) {
-            throw new BusinessException("记录不存在");
+            throw new BusinessException("記錄不存在");
         }
         // 在线中的记录不允许直接删除
         if (logEntry.getLogoutTime() == null) {
-            throw new BusinessException("该用户当前在线，请先强制下线后再删除");
+            throw new BusinessException("該用戶當前在線，請先強制下線後再刪除");
         }
         loginLogMapper.deleteById(id);
         log.info("删除登录日志: id={}, empId={}", id, logEntry.getEmpId());

@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 產品型號庫實體
+ * 产品型号库实体
  */
 @Data
 @TableName("biz_eam_model")
@@ -16,37 +16,37 @@ public class EamModel {
     @TableId
     private Long id;
 
-    /** 所屬分類編碼 */
+    /** 所属分类编码 */
     private String categoryCode;
 
-    /** 所屬品牌 ID */
+    /** 所属品牌 ID */
     private Long brandId;
 
-    /** 品牌中文（冗餘） */
+    /** 品牌中文（冗余） */
     private String brandZh;
 
-    /** 品牌英文（冗餘） */
+    /** 品牌英文（冗余） */
     private String brandEn;
 
-    /** 品牌 LOGO（冗餘） */
+    /** 品牌 LOGO（冗余） */
     private String brandLogo;
 
-    /** 產品型號編碼 */
+    /** 产品型号编码 */
     private String modelNo;
 
-    /** 產品名稱 */
+    /** 产品名称 */
     private String name;
 
-    /** 計量單位 */
+    /** 计量单位 */
     private String unit;
 
-    /** 參考單價（澳門元） */
+    /** 参考单价（澳门元） */
     private BigDecimal refPrice;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

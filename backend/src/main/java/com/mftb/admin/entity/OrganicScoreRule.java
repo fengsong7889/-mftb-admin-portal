@@ -23,7 +23,7 @@ public class OrganicScoreRule {
     /** 规则编码（COM_01 / STB_01 / PLT_01 等） */
     private String ruleCode;
 
-    /** 所属维度: 1=商業 2=店鋪 4=平台 */
+    /** 所属维度: 1=商业 2=店铺 4=平台 */
     private Integer dimension;
 
     /** 规则名称 */
@@ -77,10 +77,10 @@ public class OrganicScoreRule {
     /** 衰减系数 */
     private BigDecimal decayCoefficient;
 
-    /** 屏蔽商家列表 JSON（店鋪代碼數組） */
+    /** 屏蔽商家列表 JSON（店铺代码数组） */
     private String blockedMerchants;
 
-    /** 活动加分配置 JSON（[{activityId, activityName, score}]，僅 STB_ACT 規則使用） */
+    /** 活动加分配置 JSON（[{activityId, activityName, score}]，仅 STB_ACT 规则使用） */
     private String activityItems;
 
     /** 服务状态: 1=启用 2=停用 */

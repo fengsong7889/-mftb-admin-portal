@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.math.BigDecimal;
 
+/** 推广金交易明细实体（充消对账报表由本表按集团按日聚合得出） Mapper */
 @Mapper
 public interface FinDetailMapper extends BaseMapper<FinDetail> {
 
@@ -18,7 +19,7 @@ public interface FinDetailMapper extends BaseMapper<FinDetail> {
 
     /**
      * 集团×品牌累计净消费（消费风控限额计算）：
-     * 口径 = 广告消费（trade_type=消費）+ 消费扣款（change_type=消費扣款）；
+     * 口径 = 广告消费（trade_type=消费）+ 消费扣款（change_type=消费扣款）；
      * 负向变动计为消费，正向变动（广告退款）冲减消费；
      * 转账转出/账户扣款/批次扣款/欠款偿还不计入。
      */

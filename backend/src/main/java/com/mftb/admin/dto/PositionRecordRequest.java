@@ -13,10 +13,10 @@ import java.time.LocalDate;
 public class PositionRecordRequest {
 
     // 变动信息
-    @NotNull(message = "生效日期不能为空")
+    @NotNull(message = "生效日期不能為空")
     private LocalDate effectiveDate;
 
-    @NotBlank(message = "操作类型不能为空")
+    @NotBlank(message = "操作類型不能為空")
     private String operation;
 
     private String reason;

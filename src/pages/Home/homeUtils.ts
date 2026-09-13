@@ -4,12 +4,12 @@ import type { QuotaSource } from '../../api/aiMyCenter'
 
 /* ── 类型定义 ── */
 
-/** AI 助手未開通原因：無模型權限 / 無額度 / 兩者皆無 / 額度已用完(拒絕) / 需審批 */
+/** AI 助手未开通原因：无模型权限 / 无额度 / 两者皆无 / 额度已用完(拒绝) / 需审批 */
 export type AiBlockReason = 'no-models' | 'no-quota' | 'no-both' | 'quota-exhausted' | 'needs-approval'
 
 /* ── 常量 ── */
 
-/** 額度維度來源 → Tag 顏色（員工/部門/職位/角色四維度 + 審批授予視覺區分） */
+/** 额度维度来源 → Tag 颜色（员工/部门/职位/角色四维度 + 审批授予视觉区分） */
 export const DIM_SOURCE_COLOR: Record<QuotaSource, string> = {
   employee: '#722ED1',
   department: '#1890FF',
@@ -18,7 +18,7 @@ export const DIM_SOURCE_COLOR: Record<QuotaSource, string> = {
   grant: '#52C41A',
 }
 
-/** 額度維度來源 → i18n key */
+/** 额度维度来源 → i18n key */
 export const DIM_SOURCE_LABEL_KEY: Record<QuotaSource, string> = {
   employee: 'home.usageDimSourceEmployee',
   department: 'home.usageDimSourceDepartment',
@@ -41,7 +41,7 @@ export const defaultFavorites = [
 
 /* ── 纯函数 ── */
 
-/** localStorage key（按用戶隔離） */
+/** localStorage key（按用户隔离） */
 export const FAV_KEY = (username: string) => `home_favorites:${username}`
 
 /** 从 localStorage 读取已保存的快捷入口 */
@@ -76,7 +76,7 @@ export const getGreeting = (hour: number, t: (key: string) => string) => {
   return t('home.greetingEvening')
 }
 
-/** 將 AI 回覆中的字面 \n 轉為真正換行（CSS white-space: pre-wrap 負責渲染） */
+/** 将 AI 回复中的字面 \n 转为真正换行（CSS white-space: pre-wrap 负责渲染） */
 export const formatAiText = (text: string) => text.replace(/\\n/g, '\n')
 
 /** 递归收集菜单 key → 名称映射 */

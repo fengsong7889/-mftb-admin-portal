@@ -20,10 +20,10 @@ public class SysBizSeqRule {
     /** 规则唯一标识（与前端 key 一致，如 ad_order_star） */
     private String ruleKey;
 
-    /** 业务类型名称（如 無敵星星訂單） */
+    /** 业务类型名称（如 无敌星星订单） */
     private String ruleName;
 
-    /** 所属菜单（如 廣告銷售） */
+    /** 所属菜单（如 广告销售） */
     private String bizMenu;
 
     /** 编号前缀（如 DDWD） */

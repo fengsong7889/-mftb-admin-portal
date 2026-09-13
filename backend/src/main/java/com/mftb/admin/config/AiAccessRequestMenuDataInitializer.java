@@ -8,8 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * AI 使用申請菜單初始化：新增 ai-access-request 菜單至 sys_menu
- * 使用 JdbcTemplate 直接操作，避免 SQL 解析問題
+ * AI 使用申请菜单初始化：新增 ai-access-request 菜单至 sys_menu
+ * 使用 JdbcTemplate 直接操作，避免 SQL 解析问题
  */
 @Slf4j
 @Component
@@ -24,7 +24,7 @@ public class AiAccessRequestMenuDataInitializer implements CommandLineRunner {
     public void run(String... args) {
         try {
             versionTracker.applyOnce("ai_access_menu:v5", () -> {
-                // 1. 檢查菜單是否已存在
+                // 1. 检查菜单是否已存在
                 Integer existCount = jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'ai-access-request' AND deleted = 0",
                         Integer.class);
@@ -33,7 +33,7 @@ public class AiAccessRequestMenuDataInitializer implements CommandLineRunner {
                     return;
                 }
 
-                // 2. 查找父菜單 ai-assistant 的 ID，找不到則用第一個頂級菜單
+                // 2. 查找父菜单 ai-assistant 的 ID，找不到则用第一个顶级菜单
                 Long parentId = null;
                 try {
                     parentId = jdbcTemplate.queryForObject(
@@ -51,14 +51,14 @@ public class AiAccessRequestMenuDataInitializer implements CommandLineRunner {
                     }
                 }
 
-                // 3. 插入菜單
+                // 3. 插入菜单
                 jdbcTemplate.update(
                         "INSERT INTO sys_menu (parent_id, menu_key, name, path, component, icon, type, sort_order, actions, status, updated_by, deleted) "
                                 + "VALUES (?, 'ai-access-request', 'AI 使用申請', '/ai-access-apply', 'AiAccessApply', 'KeyOutlined', 2, 10, '[\"view\",\"create\",\"edit\"]', 1, 'system', 0)",
                         parentId);
                 log.info("已創建 ai-access-request 菜單, parent_id={}", parentId);
 
-                // 4. 授予 admin 角色全部權限
+                // 4. 授予 admin 角色全部权限
                 try {
                     jdbcTemplate.update(
                             "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "

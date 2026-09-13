@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * MCP 工具控制器
- * 廣場管「接入」：工具列表、安裝/卸載、已安裝 manifest 下發（AI 助手動態拉取）
+ * 广场管「接入」：工具列表、安装/卸载、已安装 manifest 下发（AI 助手动态拉取）
  */
 @RestController
 @RequestMapping("/api/mcp/tools")

@@ -163,7 +163,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     public String submitRecharge(RechargeApplyDTO request) {
         requireText(request.getGroupId(), "请选择充值集团");
         if (FinExtras.nonNull(request.getVirtualAmount()).compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("虚拟账户充值金额必须大于 0");
+            throw new BusinessException("虛擬賬戶充值金額必須大於 0");
         }
         // 首次充值自动建户，已冻结/已注销账户不允许充值（账户按集团+品牌隔离）
         FinAccount account = accountService.find(request.getGroupId(), request.getBrand());
@@ -202,7 +202,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
                                         String brand, Map<String, Object> extra) {
         String flowRuleKey = BizSeqService.flowRuleKey(approvalType);
         if (flowRuleKey == null) {
-            throw new BusinessException("未知的审批类型: " + approvalType);
+            throw new BusinessException("未知的審批類型: " + approvalType);
         }
         LocalDateTime now = LocalDateTime.now();
 
@@ -226,15 +226,15 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         requireText(request.getFromGroupId(), "请选择转出集团");
         requireText(request.getToGroupId(), "请选择转入集团");
         if (request.getFromGroupId().equals(request.getToGroupId())) {
-            throw new BusinessException("转出集团与转入集团不能相同");
+            throw new BusinessException("轉出集團與轉入集團不能相同");
         }
         BigDecimal amount = FinExtras.nonNull(request.getTransferAmount());
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("转账金额必须大于 0");
+            throw new BusinessException("轉賬金額必須大於 0");
         }
         FinAccount from = accountService.requireUsable(request.getFromGroupId(), request.getBrand());
         if (FinExtras.nonNull(from.getVirtualBalance()).compareTo(amount) < 0) {
-            throw new BusinessException("转账金额超出转出集团推广金余额");
+            throw new BusinessException("轉賬金額超出轉出集團推廣金餘額");
         }
         // 风控拦截：转账按 FIFO 拆分会触碰含未结清欠款的批次时禁止发起（白名单集团同样受限）
         List<FinRiskService.FinTransferBlock> blocks =
@@ -242,7 +242,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (!blocks.isEmpty()) {
             String batchNos = blocks.stream().map(FinRiskService.FinTransferBlock::batchNo)
                     .distinct().reduce((a, b) -> a + "、" + b).orElse("");
-            throw new BusinessException("本次转账将扣及充值批次「" + batchNos
+            throw new BusinessException("本次轉賬將扣及充值批次「" + batchNos
                     + "」，该批次尚有未结清欠款，禁止发起转账；如需转账请先结清对应批次欠款");
         }
 
@@ -269,11 +269,11 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         requireText(request.getGroupId(), "请选择扣款集团");
         BigDecimal amount = FinExtras.nonNull(request.getDeductAmount());
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("扣款金额必须大于 0");
+            throw new BusinessException("扣款金額必須大於 0");
         }
         FinAccount account = accountService.requireUsable(request.getGroupId(), request.getBrand());
         if (FinExtras.nonNull(account.getVirtualBalance()).compareTo(amount) < 0) {
-            throw new BusinessException("扣款金额超出集团推广金余额");
+            throw new BusinessException("扣款金額超出集團推廣金餘額");
         }
         String method = StringUtils.hasText(request.getDeductMethod()) ? request.getDeductMethod() : "account";
         if ("batch".equals(method) && !StringUtils.hasText(request.getBatchNo())) {
@@ -309,12 +309,12 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         requireText(request.getSourceGroupId(), "请选择注销集团");
         requireText(request.getTargetGroupId(), "请选择存续集团");
         if (request.getSourceGroupId().equals(request.getTargetGroupId())) {
-            throw new BusinessException("注销集团与存续集团不能相同");
+            throw new BusinessException("注銷集團與存續集團不能相同");
         }
         // 注销集团：未充值开户或余额为 0 时无资金可并，直接拦截
         FinAccount source = accountService.find(request.getSourceGroupId(), request.getBrand());
         if (source == null || FinExtras.nonNull(source.getVirtualBalance()).compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("集团 " + request.getSourceGroupId() + " 品牌 " + brandLabel(request.getBrand())
+            throw new BusinessException("集團 " + request.getSourceGroupId() + " 品牌 " + brandLabel(request.getBrand())
                     + " 推广金账户余额为 0，无需合并推广金申请");
         }
         source = accountService.requireUsable(request.getSourceGroupId(), request.getBrand());
@@ -329,11 +329,11 @@ public class FinApprovalServiceImpl implements FinApprovalService {
             repayTotal = repayTotal.add(FinExtras.nonNull(store.getAmount()));
         }
         if (debtTotal.compareTo(BigDecimal.ZERO) > 0 && repayTotal.compareTo(debtTotal) != 0) {
-            throw new BusinessException("偿还金额合计 " + repayTotal.toPlainString()
+            throw new BusinessException("償還金額合計 " + repayTotal.toPlainString()
                     + " 与注销集团待还欠款总额 " + debtTotal.toPlainString() + " 不一致");
         }
         if (repayTotal.compareTo(FinExtras.nonNull(source.getVirtualBalance())) > 0) {
-            throw new BusinessException("注销集团推广金余额不足以偿还欠款");
+            throw new BusinessException("注銷集團推廣金餘額不足以償還欠款");
         }
 
         Map<String, Object> extra = new LinkedHashMap<>();
@@ -365,7 +365,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         SysUser current = operatorResolver.currentUser();
         String flowRuleKey = BizSeqService.flowRuleKey(approvalType);
         if (flowRuleKey == null) {
-            throw new BusinessException("未知的审批类型: " + approvalType);
+            throw new BusinessException("未知的審批類型: " + approvalType);
         }
         FinApproval approval = new FinApproval();
         approval.setFlowNo(bizSeqService.next(flowRuleKey));
@@ -553,14 +553,14 @@ public class FinApprovalServiceImpl implements FinApprovalService {
             }
             return ApproveResultVO.of(NODE_FIN, true, null);
         }
-        throw new BusinessException("该流程没有待审批节点");
+        throw new BusinessException("該流程沒有待審批節點");
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String reject(String flowNo, String reason) {
         if (!StringUtils.hasText(reason)) {
-            throw new BusinessException("请填写驳回原因");
+            throw new BusinessException("請填寫駁回原因");
         }
         FinApproval approval = requirePendingApproval(flowNo);
         SysUser current = operatorResolver.currentUser();
@@ -587,7 +587,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
             approval.setFinApproveStatus(FLOW_REJECTED);
             nodeName = NODE_FIN;
         } else {
-            throw new BusinessException("该流程没有待审批节点");
+            throw new BusinessException("該流程沒有待審批節點");
         }
 
         approval.setFlowStatus(FLOW_REJECTED);
@@ -709,7 +709,7 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private FinApproval requirePendingApproval(String flowNo) {
         FinApproval approval = requireApprovalForUpdate(flowNo);  // 使用行锁防止并发竞态
         if (!FLOW_PENDING.equals(approval.getFlowStatus())) {
-            throw new BusinessException("该流程已结束，无法继续操作");
+            throw new BusinessException("該流程已結束，無法繼續操作");
         }
         return approval;
     }

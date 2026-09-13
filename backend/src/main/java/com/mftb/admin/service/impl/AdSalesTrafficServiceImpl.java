@@ -9,20 +9,14 @@ import com.mftb.admin.entity.AdOrderItemTraffic;
 import com.mftb.admin.entity.AdPricingTraffic;
 import com.mftb.admin.entity.AdPricingTrafficLadder;
 import com.mftb.admin.entity.AdPricingTrafficTier;
-import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
-import com.mftb.admin.entity.FinAccount;
-import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdOrderItemTrafficMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.AdPricingTrafficLadderMapper;
 import com.mftb.admin.mapper.AdPricingTrafficMapper;
 import com.mftb.admin.mapper.AdPricingTrafficTierMapper;
-import com.mftb.admin.mapper.BizMerchantGroupMapper;
-import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.AdOrderSupport;
 import com.mftb.admin.service.AdSalesTrafficService;
-import com.mftb.admin.service.FinAccountService;
-import com.mftb.admin.service.FinWriteChainService;
 import com.mftb.admin.service.GiftService;
 import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.AdCalcUtils;
@@ -65,14 +59,11 @@ public class AdSalesTrafficServiceImpl implements AdSalesTrafficService {
     private final AdPricingTrafficMapper pricingMapper;
     private final AdPricingTrafficTierMapper tierMapper;
     private final AdPricingTrafficLadderMapper ladderMapper;
-    private final BizMerchantGroupMapper groupMapper;
-    private final BizStoreMapper storeMapper;
-    private final FinAccountService accountService;
-    private final FinWriteChainService finWriteChainService;
-    private final GiftService giftService;
+    private final AdOrderSupport orderSupport;
     private final SysConfigService sysConfigService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
+    private final GiftService giftService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -136,11 +127,7 @@ public class AdSalesTrafficServiceImpl implements AdSalesTrafficService {
 
         // 3. 赠送天数抵扣: 按每日折算价值抵扣（投流按曝光计价无天数维度）
         int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
-        BizStore store = StringUtils.hasText(request.getStoreCode())
-                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
-                        .eq(BizStore::getStoreCode, request.getStoreCode())
-                        .last("LIMIT 1"))
-                : null;
+        BizStore store = orderSupport.findStore(request.getStoreCode());
         BigDecimal giftDeduction = BigDecimal.ZERO;
         if (giftDays > 0) {
             if (store == null) {
@@ -167,21 +154,11 @@ public class AdSalesTrafficServiceImpl implements AdSalesTrafficService {
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
         // 4. 推广金账户校验 + 余额校验（仅实际需要推广金时才检查账户状态）
-        if (actualTotal.signum() > 0) {
-            FinAccount account = accountService.requireUsable(request.getGroupCode(), pricing.getBrand());
-            BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
-            if (balance.compareTo(actualTotal) < 0) {
-                throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
-            }
-        }
+        orderSupport.requireSufficientBalance(request.getGroupCode(), pricing.getBrand(), actualTotal);
 
         // 5. 写订单主表 + 明细
         LocalDateTime now = LocalDateTime.now();
         String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_TRAFFIC);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
@@ -190,20 +167,15 @@ public class AdSalesTrafficServiceImpl implements AdSalesTrafficService {
         order.setAlgoName(pricing.getAlgoName());
         order.setAlgoCode(pricing.getPricingNo()); // 存定价编号，用于订单列表展示"配置ID"
         order.setBrand(pricing.getBrand());
-        // 订单频道统一语义: 2=外賣 3=超市百貨 4=團購（业务频道 1/2/3 映射）
+        // 订单频道统一语义: 2=外卖 3=超市百货 4=团购（业务频道 1/2/3 映射）
         order.setChannel(trafficOrderChannel(pricing.getBizChannel()));
         order.setGroupCode(request.getGroupCode());
-        order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
+        order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
         order.setStoreName(store != null ? store.getStoreName() : null);
         order.setBdEmpId(request.getBdEmpId());
         // 下单人快照: 当前登录的业务人员
-        SysUser operator = operatorResolver.currentUser();
-        if (operator != null) {
-            order.setOperatorType(2);
-            order.setOperatorId(StringUtils.hasText(operator.getEmpId()) ? operator.getEmpId() : operator.getUsername());
-            order.setOperatorName(StringUtils.hasText(operator.getName()) ? operator.getName() : operator.getUsername());
-        }
+        orderSupport.applyOperatorSnapshot(order);
         order.setItemCount(1);
         order.setOriginalAmount(originalTotal);
         order.setDiscountAmount(discountAmount);
@@ -243,29 +215,20 @@ public class AdSalesTrafficServiceImpl implements AdSalesTrafficService {
         itemMapper.insert(item);
 
         // 6. 扣减赠送天数余额并写消费流水（与订单同事务）
-        if (giftDays > 0 && store != null) {
-            giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
-                    pricing.getPricingNo(), pricing.getAlgoName());
-        }
+        orderSupport.deductGiftDays(GIFT_AD_TYPE, store, giftDays, orderNo,
+                pricing.getPricingNo(), pricing.getAlgoName());
 
-        // 7. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=投流廣告）
+        // 7. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=投流广告）
         String changeType = "投流廣告";
         String finChannel = Integer.valueOf(4).equals(order.getChannel()) ? "團購" : "外賣";
-        if (actualTotal.signum() > 0) {
-            String firstDetailId = finWriteChainService.writeAdConsume(
-                    request.getGroupCode(), order.getGroupName(), pricing.getBrand(),
-                    order.getStoreCode(), order.getStoreName(), finChannel,
-                    actualTotal, changeType, request.getBdEmpId(),
-                    changeType + "廣告購買 訂單" + orderNo, orderNo, now);
-            order.setFlowNo(firstDetailId);
-            orderMapper.updateById(order);
-        }
+        orderSupport.writeAdConsume(order, request.getGroupCode(), pricing.getBrand(), finChannel,
+                actualTotal, changeType, request.getBdEmpId(), now);
         return AdOrderVO.from(order);
     }
 
     /* ==================== 内部方法 ==================== */
 
-    /** 业务频道 → 订单频道: 1=美食外賣→2, 2=超市百貨→3, 3=團購到店→4 */
+    /** 业务频道 → 订单频道: 1=美食外卖→2, 2=超市百货→3, 3=团购到店→4 */
     static Integer trafficOrderChannel(Integer bizChannel) {
         if (bizChannel == null) {
             return null;

@@ -5,6 +5,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdPricingTrafficRequest;
 import com.mftb.admin.dto.AdPricingTrafficVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StatusUpdateDTO;
 import com.mftb.admin.service.AdPricingTrafficService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 投流广告销售定价接口
@@ -70,7 +70,7 @@ public class AdPricingTrafficController {
     @PostMapping
     @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<AdPricingTrafficVO> create(@Valid @RequestBody AdPricingTrafficRequest request) {
-        return Result.success("计价配置已保存", pricingService.create(request));
+        return Result.success("計價配置已保存", pricingService.create(request));
     }
 
     /** 编辑计价配置 */
@@ -78,14 +78,14 @@ public class AdPricingTrafficController {
     @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<AdPricingTrafficVO> update(@PathVariable Long id,
                                              @Valid @RequestBody AdPricingTrafficRequest request) {
-        return Result.success("计价配置已更新", pricingService.update(id, request));
+        return Result.success("計價配置已更新", pricingService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
     @RequirePermission(menu = "ad-sales", action = "edit")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
-        pricingService.updateStatus(id, body.get("status"));
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusUpdateDTO dto) {
+        pricingService.updateStatus(id, dto.getStatus());
         return Result.success();
     }
 

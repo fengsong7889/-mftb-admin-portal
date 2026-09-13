@@ -312,28 +312,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 调用后端登录接口，所有认证必须经过后端数据库验证
       const result = await loginApi({ username, password })
       
-      // 兼容处理：确保 userInfo 存在
+      // 后端返回异常时直接报错，不降级 mock 登录（安全边界：禁止前端自授 admin 权限）
       if (!result || !result.userInfo) {
-        console.warn('后端返回格式异常，使用 Mock 数据:', result)
-        // 使用预定义的 admin 账号信息作为降级方案
-        const mockUser: UserInfo = {
-          username: 'MF00001',
-          name: 'Bee',
-          empId: 'MF00001',
-          avatar: 'pikachu-wink',
-          role: 'admin',
-          department: '董事长兼首席执行官办公室',
-          departmentEn: 'Office of the Chairman and Chief Executive Officer',
-          position: '首席执行官',
-          positionEn: 'CEO',
-          jobLevel: 'M12',
-        }
-        setIsAuthenticated(true)
-        setUser(mockUser)
-        localStorage.setItem(TOKEN_KEY, 'fallback_token')
-        localStorage.setItem('is_authenticated', 'true')
-        localStorage.setItem('user_info', JSON.stringify(mockUser))
-        return { success: true, redirectPath: '/' }
+        return { success: false, message: '服務端返回異常，請稍後重試' }
       }
       
       const backendUser = result.userInfo

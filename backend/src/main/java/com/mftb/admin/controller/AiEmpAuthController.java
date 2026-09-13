@@ -92,7 +92,7 @@ public class AiEmpAuthController {
     @RequirePermission(menu = MENU_ROLE)
     public Result<RoleAuthVO> getRoleAuth(@PathVariable String roleCode) {
         RoleAuthVO vo = empAuthService.getRoleAuth(roleCode);
-        return vo != null ? Result.success(vo) : Result.error("角色授权不存在");
+        return vo != null ? Result.success(vo) : Result.error("角色授權不存在");
     }
 
     @PostMapping("/role-auths")
@@ -100,7 +100,7 @@ public class AiEmpAuthController {
     @RequirePermission(menu = MENU_ROLE, action = "create")
     public Result<String> createRoleAuth(@RequestBody RoleAuthSaveRequest request) {
         String roleCode = empAuthService.createRoleAuth(request);
-        return roleCode != null ? Result.success(roleCode) : Result.error("角色编码已存在，请重试");
+        return roleCode != null ? Result.success(roleCode) : Result.error("角色編碼已存在，請重試");
     }
 
     @PutMapping("/role-auths/by-code/{roleCode}")
@@ -108,7 +108,7 @@ public class AiEmpAuthController {
     @RequirePermission(menu = MENU_ROLE, action = "edit")
     public Result<Boolean> updateRoleAuth(@PathVariable String roleCode, @RequestBody RoleAuthSaveRequest request) {
         boolean ok = empAuthService.updateRoleAuth(roleCode, request);
-        return ok ? Result.success(true) : Result.error("角色授权不存在");
+        return ok ? Result.success(true) : Result.error("角色授權不存在");
     }
 
     @PutMapping("/role-auths/by-code/{roleCode}/status")
@@ -116,7 +116,7 @@ public class AiEmpAuthController {
     @RequirePermission(menu = MENU_ROLE, action = "edit")
     public Result<Boolean> toggleRoleAuthStatus(@PathVariable String roleCode, @RequestParam Integer status) {
         boolean ok = empAuthService.toggleRoleAuthStatus(roleCode, status);
-        return ok ? Result.success(true) : Result.error("角色授权不存在");
+        return ok ? Result.success(true) : Result.error("角色授權不存在");
     }
 
     @DeleteMapping("/role-auths/by-code/{roleCode}")
@@ -124,7 +124,7 @@ public class AiEmpAuthController {
     @RequirePermission(menu = MENU_ROLE, action = "delete")
     public Result<Boolean> deleteRoleAuth(@PathVariable String roleCode) {
         boolean ok = empAuthService.deleteRoleAuth(roleCode);
-        return ok ? Result.success(true) : Result.error("角色授权不存在");
+        return ok ? Result.success(true) : Result.error("角色授權不存在");
     }
 
     /* ═══════════════ DTO ═══════════════ */

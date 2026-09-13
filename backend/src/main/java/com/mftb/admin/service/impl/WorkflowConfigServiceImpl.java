@@ -58,7 +58,7 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
                         .set(WorkflowConfig::getApprovalEnabled, value)
                         .set(WorkflowConfig::getUpdatedBy, operatorResolver.currentOperatorName()));
         if (rows == 0) {
-            throw new BusinessException("流程类型不存在: " + flowType);
+            throw new BusinessException("流程類型不存在: " + flowType);
         }
 
         // 立即刷新缓存
@@ -105,7 +105,7 @@ public class WorkflowConfigServiceImpl implements WorkflowConfigService {
                         .select(WorkflowConfig::getFlowType)
                         .eq(WorkflowConfig::getFlowType, flowType));
         if (count == null || count == 0) {
-            throw new BusinessException("流程类型不存在: " + flowType);
+            throw new BusinessException("流程類型不存在: " + flowType);
         }
         workflowConfigMapper.update(null,
                 new LambdaUpdateWrapper<WorkflowConfig>()

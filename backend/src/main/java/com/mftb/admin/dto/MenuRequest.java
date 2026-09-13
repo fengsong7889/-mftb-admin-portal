@@ -16,11 +16,11 @@ public class MenuRequest {
     private Long parentId;
 
     /** 菜单标识: 用于权限判断与前端路由key */
-    @NotBlank(message = "菜单标识不能为空")
+    @NotBlank(message = "菜單標識不能為空")
     private String menuKey;
 
     /** 菜单名称 */
-    @NotBlank(message = "菜单名称不能为空")
+    @NotBlank(message = "菜單名稱不能為空")
     private String name;
 
     /** 菜单英文名称 (可选, 留空时前端回退显示中文名称) */
@@ -36,7 +36,7 @@ public class MenuRequest {
     private String icon;
 
     /** 类型: 1=目录 2=菜单 3=按钮 */
-    @NotNull(message = "菜单类型不能为空")
+    @NotNull(message = "菜單類型不能為空")
     private Integer type;
 
     /** 排序 */

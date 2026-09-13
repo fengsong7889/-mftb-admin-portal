@@ -51,7 +51,7 @@ public class AiProviderController {
     public Result<AiProviderDTO.ProviderVO> getById(@PathVariable Long id) {
         AiProviderDTO.ProviderVO vo = providerService.getById(id);
         if (vo == null) {
-            return Result.error("供应商不存在");
+            return Result.error("供應商不存在");
         }
         return Result.success(vo);
     }
@@ -66,12 +66,12 @@ public class AiProviderController {
         try {
             boolean ok = providerService.create(request);
             if (!ok) {
-                return Result.error("供应商标识已存在");
+                return Result.error("供應商標識已存在");
             }
             return Result.success(true);
         } catch (Exception e) {
             log.error("新增供应商失败", e);
-            return Result.error("创建失败，请稍后重试");
+            return Result.error("創建失敗，請稍後重試");
         }
     }
 
@@ -84,7 +84,7 @@ public class AiProviderController {
     public Result<Boolean> update(@PathVariable Long id, @Valid @RequestBody AiProviderDTO.ProviderSaveRequest request) {
         boolean ok = providerService.update(id, request);
         if (!ok) {
-            return Result.error("供应商不存在");
+            return Result.error("供應商不存在");
         }
         return Result.success(true);
     }
@@ -98,7 +98,7 @@ public class AiProviderController {
     public Result<Boolean> delete(@PathVariable Long id) {
         boolean ok = providerService.delete(id);
         if (!ok) {
-            return Result.error("供应商不存在");
+            return Result.error("供應商不存在");
         }
         return Result.success(true);
     }

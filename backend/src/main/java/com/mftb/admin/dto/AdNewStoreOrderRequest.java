@@ -15,7 +15,7 @@ import java.util.List;
 public class AdNewStoreOrderRequest {
 
     /** 算法ID */
-    @NotNull(message = "算法不能为空")
+    @NotNull(message = "算法不能為空")
     private Long algoId;
 
     /** 购买集团ID */

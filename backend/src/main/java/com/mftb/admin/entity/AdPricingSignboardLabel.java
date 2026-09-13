@@ -26,7 +26,7 @@ public class AdPricingSignboardLabel {
     /** 标签类型（hot/popular/sales/rating/repurchase/favorites/customers） */
     private String labelType;
 
-    /** 场景（all_macau=全澳對比, district=商圈對比, NULL=統計類無場景） */
+    /** 场景（all_macau=全澳对比, district=商圈对比, NULL=统计类无场景） */
     private String scenario;
 
     /** 是否启用: 1=启用 0=禁用 */

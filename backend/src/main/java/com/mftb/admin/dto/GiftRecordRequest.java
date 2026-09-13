@@ -12,25 +12,25 @@ import java.util.List;
 @Data
 public class GiftRecordRequest {
 
-    @NotNull(message = "集团不能为空")
+    @NotNull(message = "集團不能為空")
     private Long groupId;
 
-    @NotNull(message = "门店不能为空")
+    @NotNull(message = "門店不能為空")
     private Long storeId;
 
-    @NotBlank(message = "品牌不能为空")
+    @NotBlank(message = "品牌不能為空")
     private String brand;
 
-    @NotBlank(message = "广告类型不能为空")
+    @NotBlank(message = "廣告類型不能為空")
     private String adType;
 
-    @NotNull(message = "赠送天数不能为空")
+    @NotNull(message = "贈送天數不能為空")
     private Integer giftDays;
 
-    @NotNull(message = "有效期不能为空")
+    @NotNull(message = "有效期不能為空")
     private Integer validDays;
 
-    @NotBlank(message = "赠送原因不能为空")
+    @NotBlank(message = "贈送原因不能為空")
     private String reason;
 
     /** 凭证URL列表 */

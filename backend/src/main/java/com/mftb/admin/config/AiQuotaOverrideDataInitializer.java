@@ -12,9 +12,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * AI 訪問申請閉環遷移：
- * 1. 建立員工獨立額度授予表 ai_quota_override（審批下發的個人額度）
- * 2. ai_access_request 擴展申請側（apply_reason / credentials）與審批側（approved_model_configs / quota_effective_type / quota_expire_at）字段
+ * AI 访问申请闭环迁移：
+ * 1. 建立员工独立额度授予表 ai_quota_override（审批下发的个人额度）
+ * 2. ai_access_request 扩展申请侧（apply_reason / credentials）与审批侧（approved_model_configs / quota_effective_type / quota_expire_at）字段
  */
 @Slf4j
 @Component

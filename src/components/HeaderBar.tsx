@@ -354,8 +354,9 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
       if (result?.base64) {
         setUploadPreview(result.base64)
       }
-    } catch {
-      message.error(t('header.avatarUploadFailed'))
+    } catch (err) {
+      // 優先展示後端具體校驗消息（如文件大小/類型/魔數不合法），否則回退通用文案
+      message.error(err instanceof Error && err.message ? err.message : t('header.avatarUploadFailed'))
     } finally {
       setUploading(false)
     }

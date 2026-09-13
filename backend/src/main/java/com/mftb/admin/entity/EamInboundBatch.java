@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 驗收入庫批次實體
+ * 验收入库批次实体
  */
 @Data
 @TableName("biz_eam_inbound_batch")
@@ -15,49 +15,49 @@ public class EamInboundBatch {
     @TableId
     private Long id;
 
-    /** 批次編號 */
+    /** 批次编号 */
     private String batchNo;
 
-    /** 關聯採購訂單 ID */
+    /** 关联采购订单 ID */
     private Long poId;
 
-    /** 採購訂單號（冗餘） */
+    /** 采购订单号（冗余） */
     private String poNo;
 
-    /** 驗收日期 */
+    /** 验收日期 */
     private String inboundDate;
 
     /** 操作人 */
     private String operator;
 
-    /** 入庫總數 */
+    /** 入库总数 */
     private Integer totalQty;
 
-    /** 已驗收數量 */
+    /** 已验收数量 */
     private Integer acceptedQty;
 
-    /** 未驗收數量 */
+    /** 未验收数量 */
     private Integer pendingQty;
 
-    /** 退貨數量 */
+    /** 退货数量 */
     private Integer returnQty;
 
-    /** 換貨數量 */
+    /** 换货数量 */
     private Integer exchangeQty;
 
-    /** 讓步接收數量 */
+    /** 让步接收数量 */
     private Integer concessionQty;
 
-    /** 採購事由 */
+    /** 采购事由 */
     private String purchaseReason;
 
-    /** 備註 */
+    /** 备注 */
     private String remark;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

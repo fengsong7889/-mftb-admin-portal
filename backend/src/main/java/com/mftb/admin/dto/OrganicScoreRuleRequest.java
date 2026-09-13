@@ -12,20 +12,20 @@ import java.math.BigDecimal;
 @Data
 public class OrganicScoreRuleRequest {
 
-    /** 所属维度: 1=商業 2=店鋪 4=平台 */
-    @NotNull(message = "维度不能为空")
+    /** 所属维度: 1=商业 2=店铺 4=平台 */
+    @NotNull(message = "維度不能為空")
     private Integer dimension;
 
     /** 规则名称 */
-    @NotBlank(message = "规则名称不能为空")
+    @NotBlank(message = "規則名稱不能為空")
     private String name;
 
     /** 计分说明 */
-    @NotBlank(message = "计分说明不能为空")
+    @NotBlank(message = "計分說明不能為空")
     private String description;
 
     /** 计分方式: 1=规则加分 2=衰减函数 3=规则减分 4=金额倍率 5=梯度计分 6=条件计分 */
-    @NotNull(message = "计分方式不能为空")
+    @NotNull(message = "計分方式不能為空")
     private Integer mode;
 
     /** 分值 */
@@ -73,10 +73,10 @@ public class OrganicScoreRuleRequest {
     /** 屏蔽商家列表 JSON 字符串 */
     private String blockedMerchants;
 
-    /** 活动加分配置 JSON 字符串（STB_ACT 活動加分規則使用） */
+    /** 活动加分配置 JSON 字符串（STB_ACT 活动加分规则使用） */
     private String activityItems;
 
     /** 服务状态: 1=启用 2=停用 */
-    @NotNull(message = "状态不能为空")
+    @NotNull(message = "狀態不能為空")
     private Integer status;
 }

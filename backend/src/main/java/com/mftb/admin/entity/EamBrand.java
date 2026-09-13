@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 品牌庫實體
+ * 品牌库实体
  */
 @Data
 @TableName("biz_eam_brand")
@@ -15,7 +15,7 @@ public class EamBrand {
     @TableId
     private Long id;
 
-    /** 所屬分類編碼 */
+    /** 所属分类编码 */
     private String categoryCode;
 
     /** 品牌中文 */
@@ -30,7 +30,7 @@ public class EamBrand {
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

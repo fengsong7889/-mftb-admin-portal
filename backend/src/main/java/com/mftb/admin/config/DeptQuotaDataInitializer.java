@@ -12,7 +12,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 部門額度模組資料初始化器：啟動時自動建立 ai_dept_quota_policy 表
+ * 部门额度模组资料初始化器：启动时自动建立 ai_dept_quota_policy 表
  */
 @Slf4j
 @Component

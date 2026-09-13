@@ -18,7 +18,7 @@ export enum AppType { SHANFENG = 1, MFOOD = 2 }
 
 export enum RecommendChannel { DELIVERY = 2, GROUP_BUY = 3, SUPERMARKET = 4 }
 
-/** 投流廣告：訂單業務頻道 → 定價配置業務頻道（讀取退款開關/手續費比例配置） */
+/** 投流广告：订单业务频道 → 定价配置业务频道（读取退款开关/手续费比例配置） */
 export const ORDER_CHANNEL_TO_TRAFFIC_BIZ: Record<number, string> = {
   [RecommendChannel.DELIVERY]: BIZ_CHANNEL.FOOD_DELIVERY,
   [RecommendChannel.SUPERMARKET]: BIZ_CHANNEL.SUPERMARKET,
@@ -70,7 +70,7 @@ export interface OrderItem {
   promotionName: string
   app: AppType
   channel: RecommendChannel
-  region: number | number[]  // 所屬商圈（無敵星星可能有多個）
+  region: number | number[]  // 所屬商圈（无敌星星可能有多个）
   recommendType: RecommendType
   slotPosition: number
   groupId: string
@@ -92,23 +92,23 @@ export interface OrderItem {
   refundEnabled?: boolean // 是否允许退款
   promoStartDate?: string // 推广开始日期
   promoData?: PromoRecord[] // 推广数据
-  purchaseDays?: string[] // 新店廣告/人氣商家：推廣日期列表
-  skinName?: string // 人氣商家：皮膚名稱
-  giftDays?: number // 贈送天數抵扣快照（抵扣天數）
-  giftAmount?: number // 贈送抵扣金額快照
-  terminalTime?: string // 終態（已退款/已取消/已中止/已完成）發生的日期時間
+  purchaseDays?: string[] // 新店广告/人气商家：推广日期列表
+  skinName?: string // 人气商家：皮膚名称
+  giftDays?: number // 赠送天数抵扣快照（抵扣天数）
+  giftAmount?: number // 赠送抵扣金额快照
+  terminalTime?: string // 终态（已退款/已取消/已中止/已完成）发生的日期时间
   operatorName?: string // 操作人姓名
   operatorId?: string // 操作人工號
-  terminalActor?: 'staff' | 'merchant' // 終態操作發起方：業務人員 / 商家
+  terminalActor?: 'staff' | 'merchant' // 终态操作发起方：业务人员 / 商家
   /** 数据来源：api=后端真实数据 mock=演示数据 */
   source?: 'api' | 'mock'
   /** 金字招牌：按标签分组的购买日期 */
   labelDates?: { label: string; scenario?: string | null; dates: string[] }[]
-  /** 投流廣告：購買方式（預設檔位 / 自定義） */
+  /** 投流广告：购买方式（预设档位 / 自定义） */
   trafficMode?: 'tier' | 'custom'
-  /** 投流廣告：流量包名稱（檔位購買時） */
+  /** 投流广告：流量包名称（档位购买时） */
   trafficPackageName?: string
-  /** 投流廣告：購買曝光次數 */
+  /** 投流广告：购买曝光次数 */
   trafficImpressions?: number
 }
 
@@ -120,7 +120,7 @@ export const MEAL_SLOT_LABEL: Record<string, string> = {
   breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
 }
 
-/** 后端频道 → 前端频道（3=超市百貨 4=團購到店，其余归美食外卖） */
+/** 后端频道 → 前端频道（3=超市百货 4=团购到店，其余归美食外卖） */
 export function mapAdChannel(channel?: number): RecommendChannel {
   if (channel === 3) return RecommendChannel.SUPERMARKET
   if (channel === 4) return RecommendChannel.GROUP_BUY
@@ -149,7 +149,7 @@ export function parseCancelFeeTiers(json?: string): { maxDays: number; feePercen
   }
 }
 
-/** 解析多時段梯度折扣 JSON（[{minSlots,discount}]，百分比記法） */
+/** 解析多时段梯度折扣 JSON（[{minSlots,discount}]，百分比记法） */
 export function parseDiscountTiers(json?: string): { minSlots: number; discount: number }[] {
   if (!json) return []
   try {
@@ -163,7 +163,7 @@ export function parseDiscountTiers(json?: string): { minSlots: number; discount:
   }
 }
 
-/** 解析多天梯度折扣 JSON（[{minDays,discount}]，盤活復蘇，映射為 minSlots 口徑復用展示邏輯） */
+/** 解析多天梯度折扣 JSON（[{minDays,discount}]，盘活复苏，映射为 minSlots 口徑复用展示邏輯） */
 export function parseDayDiscountTiers(json?: string): { minSlots: number; discount: number }[] {
   if (!json) return []
   try {

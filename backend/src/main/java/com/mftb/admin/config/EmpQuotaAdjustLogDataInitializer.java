@@ -12,8 +12,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 員工額度調整日誌表初始化器
- * 啟動時自動執行 111_emp_quota_adjust_log.sql 建表
+ * 员工额度调整日志表初始化器
+ * 启动时自动执行 111_emp_quota_adjust_log.sql 建表
  */
 @Slf4j
 @Component

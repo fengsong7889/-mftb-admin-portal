@@ -18,7 +18,7 @@ public class OrganicScoreDimension {
     @TableId
     private Long id;
 
-    /** 维度: 1=商業 2=店鋪 4=平台 */
+    /** 维度: 1=商业 2=店铺 4=平台 */
     private Integer dimension;
 
     /** 权重百分比（0~100） */

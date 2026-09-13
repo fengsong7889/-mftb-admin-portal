@@ -333,6 +333,13 @@ const MOCK_REWARDS_PUNISH: RewardPunishRecord[] = [
    主组件
    ═══════════════════════════════════════════ */
 
+/**
+ * 员工详情页（新增 / 编辑 / 查看 三合一）
+ *
+ * 通过 URL query `id` 区分模式：无 id=新增，有 id=编辑/查看。
+ * 包含 Tab：基础信息、职务记录、紧急联系人、账号管理、合同信息、奖惩信息。
+ * 基础信息按模块分卡片：个人信息 / 证件信息 / 通讯信息，各模块独立保存。
+ */
 export default function EmployeeDetail() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -340,10 +347,10 @@ export default function EmployeeDetail() {
   const empId = searchParams.get('id')
   const isEdit = !!empId
 
-  /** 當前是否非繁中語言 */
+  /** 当前是否非繁中语言 */
   const isNonZh = !i18n.language?.startsWith('zh')
 
-  /** 狀態標籤（依賴 t，定義在組件內以便響應語言切換） */
+  /** 状态标签（依赖 t，定义在组件内以便响应语言切换） */
   const statusTag = (status: number) =>
     status === 1
       ? <Tag color="success">{t('employee.statusEnabled')}</Tag>
@@ -367,26 +374,26 @@ export default function EmployeeDetail() {
   /* ── Tab 状态 ── */
   const [activeTab, setActiveTab] = useState('position')
 
-  /* ── 各 Tab 最後更新追蹤 ── */
+  /* ── 各 Tab 最后更新追蹤 ── */
   const { user } = useAuth()
   const [tabUpdateInfo, setTabUpdateInfo] = useState<Record<string, { updatedBy: string; updatedAt: string }>>({})
 
-  /** 標記某個 Tab 已更新（寫入 state + localStorage） */
+  /** 标记某个 Tab 已更新（写入 state + localStorage） */
   const markTabUpdated = (tabKey: string, empIdStr: string) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const by = user?.name || user?.username || '-'
     const newInfo = { updatedBy: by, updatedAt: now }
     setTabUpdateInfo(prev => ({ ...prev, [tabKey]: newInfo }))
-    // 同步寫入 localStorage，供列表頁讀取
+    // 同步写入 localStorage，供列表页讀取
     const storageKey = `emp_tab_update_${empIdStr}`
     try {
       const existing = JSON.parse(localStorage.getItem(storageKey) || '{}')
       existing[tabKey] = newInfo
       localStorage.setItem(storageKey, JSON.stringify(existing))
-    } catch { /* 靜默 */ }
+    } catch { /* 静默 */ }
   }
 
-  /** 渲染 Tab 底部更新資訊條 */
+  /** 渲染 Tab 底部更新資訊条 */
   const renderTabUpdateBar = (tabKey: string) => {
     const info = tabUpdateInfo[tabKey]
     return (
@@ -395,8 +402,8 @@ export default function EmployeeDetail() {
         border: '1px solid #f0f0f0', background: '#fafafa',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{info?.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最后更新人：<span style={{ color: '#595959' }}>{info?.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最后更新時間：<span style={{ color: '#595959' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span></span>
       </div>
     )
   }
@@ -706,14 +713,14 @@ export default function EmployeeDetail() {
   const handleBack = () => navigate('/employee-management')
 
   /* ══════════════════════════════════════════
-     （tabItems 已移至「頁面渲染」前統一組裝求值，此處僅存說明）
+     （tabItems 已移至「页面渲染」前统一组装求值，此处仅存说明）
      ═══════════════════════════════════════════ */
 
   /* ═══════════════════════════════════════════
-     3.1 職務數據 Tab
+     3.1 职务數據 Tab
      ═══════════════════════════════════════════ */
 
-  /* ── 職務狀態軸：選中節點（默認最新一條），左側詳情聯動展示 ── */
+  /* ── 职务状态轴：选中节点（默认最新一条），左侧详情联动展示 ── */
   const [selectedPosId, setSelectedPosId] = useState<number | null>(null)
   const sortedPosRecords = useMemo(
     () => [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || '')),
@@ -724,7 +731,7 @@ export default function EmployeeDetail() {
     [sortedPosRecords, selectedPosId],
   )
 
-  /** 最新一條職務記錄的生效日期（新增時用於限制最早可填日期） */
+  /** 最新一条职务记錄的生效日期（新增時用於限制最早可填日期） */
   const minEffectiveDate = useMemo(() => {
     if (positionRecords.length === 0) return ''
     return [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || ''))[0]?.effectiveDate || ''
@@ -747,14 +754,14 @@ export default function EmployeeDetail() {
   }, [positionRecords])
   const canRehire = !latestPosOperation || /离职/.test(latestPosOperation)
 
-  /** 職務操作類型 → 標籤顏色 */
+  /** 职务操作類型 → 标签顏色 */
   const posOpColor = (op?: string) => {
     if (!op) return 'default'
-    if (/離職|离职/.test(op)) return 'red'
+    if (/離职|离职/.test(op)) return 'red'
     if (/晉升|晋升/.test(op)) return 'gold'
-    if (/降職|降职/.test(op)) return 'orange'
-    if (/調動|调动/.test(op)) return 'blue'
-    if (/入職|入职/.test(op)) return 'green'
+    if (/降职|降职/.test(op)) return 'orange'
+    if (/調动|调动/.test(op)) return 'blue'
+    if (/入职|入职/.test(op)) return 'green'
     if (/重新/.test(op)) return 'cyan'
     return 'blue'
   }
@@ -965,7 +972,7 @@ export default function EmployeeDetail() {
   }
 
   /* ═══════════════════════════════════════════
-     3.3 基礎信息 Tab（4 個模塊獨立編輯）
+     3.3 基礎信息 Tab（4 个模塊獨立編輯）
      ═══════════════════════════════════════════ */
 
   const handleEditPersonal = () => {
@@ -1299,10 +1306,10 @@ export default function EmployeeDetail() {
   }
 
   /* ═══════════════════════════════════════════
-     渲染 Tab 內容
+     渲染 Tab 内容
      ═══════════════════════════════════════════ */
 
-  /** 職務詳情分組小節：橙色豎條標題 + 兩列水平字段 */
+  /** 职务详情分组小节：橙色豎条标題 + 兩列水平字段 */
   function renderPosSection(title: string, items: Array<{ label: string; value?: string }>) {
     return (
       <div style={{ marginBottom: 16 }}>
@@ -1325,7 +1332,7 @@ export default function EmployeeDetail() {
   function renderPositionTab() {
     return (
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        {/* 左側：當前選中節點的職務變動詳情（各節點部門/職位可能不同） */}
+        {/* 左侧：當前选中节点的职务變动详情（各节点部門/职位可能不同） */}
         <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1378,7 +1385,7 @@ export default function EmployeeDetail() {
           )}
         </div>
 
-        {/* 右側：人事變動軌跡狀態軸（點擊節點聯動左側詳情） */}
+        {/* 右侧：人事變动軌跡状态轴（点擊节点联动左侧详情） */}
         <div style={{ width: 320, flexShrink: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1534,7 +1541,7 @@ export default function EmployeeDetail() {
   function renderBasicTab() {
     return (
       <div>
-        {/* 個人信息 */}
+        {/* 个人信息 */}
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1652,7 +1659,7 @@ export default function EmployeeDetail() {
           </div>
         </div>
 
-        {/* 緊急聯繫人 */}
+        {/* 緊急联繫人 */}
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1748,7 +1755,7 @@ export default function EmployeeDetail() {
   }
 
   /* ═══════════════════════════════════════════
-     頁面渲染
+     页面渲染
      ═══════════════════════════════════════════ */
 
   if (loading) {
@@ -1760,7 +1767,7 @@ export default function EmployeeDetail() {
   }
 
   /* ═══════════════════════════════════════════
-     Tab 配置（依賴上方 renderXxxTab 與 columns 定義，須在其後求值，避免 TDZ 報錯）
+     Tab 配置（依赖上方 renderXxxTab 與 columns 定义，須在其后求值，避免 TDZ 報錯）
      ═══════════════════════════════════════════ */
 
   const tabItems: TabsProps['items'] = [
@@ -1774,7 +1781,7 @@ export default function EmployeeDetail() {
 
   return (
     <div className="content-area">
-      {/* ═══ 頁面頭部（全局統一風格） ═══ */}
+      {/* ═══ 页面頭部（全局统一風格） ═══ */}
       <div style={{
         position: 'relative', background: '#fff', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
@@ -1839,27 +1846,27 @@ export default function EmployeeDetail() {
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.deptLabel')}：</span>
                 <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.serviceDept || employee.department || '-'}</span>
               </div>
-              {/* 職位 */}
+              {/* 职位 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.positionLabel')}：</span>
                 <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.position || employee.position || '-'}</span>
               </div>
-              {/* 職級序列 */}
+              {/* 职級序列 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.sequenceLabel')}：</span>
                 <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.sequence || employee.sequence || '-'}</span>
               </div>
-              {/* 職級 */}
+              {/* 职級 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colJobLevel')}：</span>
                 <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.positionLevel || employee.jobLevel || '-'}</span>
               </div>
-              {/* 職等 */}
+              {/* 职等 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.rankLabel')}：</span>
                 <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.rank || employee.rank || '-'}</span>
               </div>
-              {/* 在職狀態 */}
+              {/* 在职状态 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.employmentStatus')}：</span>
                 {latestPosOperation === '离职'
@@ -1902,7 +1909,7 @@ export default function EmployeeDetail() {
             </div>
           )
         ) : (
-          /* 新增模式：頂部為可編輯表單，工號由後端自動生成 */
+          /* 新增模式：頂部為可編輯表單，工號由后端自动生成 */
           <Form form={createForm} layout="vertical" autoComplete="off">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0 16px' }}>
               <Form.Item name="name" label={t('employee.nameLabel')} rules={[{ required: true, message: t('employee.nameRequired') }]}>
@@ -1984,7 +1991,7 @@ export default function EmployeeDetail() {
         style={{ marginBottom: 16 }}
       />
 
-      {/* ══ 底部操作按鈕（僅新增模式顯示，全局統一 form-footer） ═══ */}
+      {/* ══ 底部操作按鈕（仅新增模式顯示，全局统一 form-footer） ═══ */}
       {!isEdit && (
         <div className="form-footer">
           <Button onClick={handleBack}>{t('common.cancel')}</Button>
@@ -1995,7 +2002,7 @@ export default function EmployeeDetail() {
       )}
 
       {/* ═══════════════════════════════════════════
-         彈窗：職務數據
+         彈窗：职务數據
          ═══════════════════════════════════════════ */}
       <Modal
         title={editingPos ? t('employeeDetail.editPosTitle') : t('employeeDetail.addPosTitle')}
@@ -2006,7 +2013,7 @@ export default function EmployeeDetail() {
         destroyOnClose
       >
         <Form form={posForm} layout="vertical">
-          {/* 變動信息 */}
+          {/* 變动信息 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
             <span style={{ width: 3, height: 12, borderRadius: 2, background: '#E8720C' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupChange')}</span>
@@ -2044,7 +2051,7 @@ export default function EmployeeDetail() {
           </Form.Item>
           <div style={{ height: 1, background: '#f0f0f0', margin: '8px 0 16px' }} />
 
-          {/* 任職信息 */}
+          {/* 任职信息 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
             <span style={{ width: 3, height: 12, borderRadius: 2, background: '#1890ff' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupAppointment')}</span>
@@ -2289,7 +2296,7 @@ export default function EmployeeDetail() {
       </Modal>
 
       {/* ═══════════════════════════════════════════
-         彈窗：個人信息
+         彈窗：个人信息
          ═══════════════════════════════════════════ */}
       <Modal
         title={t('employeeDetail.personalInfo')}
@@ -2447,7 +2454,7 @@ export default function EmployeeDetail() {
       </Modal>
 
       {/* ═══════════════════════════════════════════
-         彈窗：緊急聯繫人
+         彈窗：緊急联繫人
          ═══════════════════════════════════════════ */}
       <Modal
         title={t('employeeDetail.emergencyInfo')}

@@ -29,6 +29,11 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET 长度不足 32 字符，当前长度: " + (secret == null ? 0 : secret.length())
+                    + "。请通过环境变量设置强密钥");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 

@@ -1,5 +1,6 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.util.ConvertUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -208,8 +209,8 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
             for (Map<String, Object> row : rows) {
                 BigDecimal virtual = new BigDecimal(String.valueOf(row.get("virtual_change")));
                 BigDecimal ratio = virtual.signum() < 0
-                        ? batchActualRatioForRepair(str(row.get("batch_no")), str(row.get("group_code")))
-                        : refundRatioForRepair(str(row.get("flow_no")), str(row.get("group_code")));
+                        ? batchActualRatioForRepair(ConvertUtils.toStr(row.get("batch_no")), ConvertUtils.toStr(row.get("group_code")))
+                        : refundRatioForRepair(ConvertUtils.toStr(row.get("flow_no")), ConvertUtils.toStr(row.get("group_code")));
                 if (ratio == null) {
                     continue;
                 }
@@ -248,7 +249,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
                     "SELECT batch_no FROM biz_fin_detail WHERE flow_no = ? AND trade_type = '消費'"
                             + " AND virtual_change < 0 ORDER BY id LIMIT 1", flowNo);
             if (!consumes.isEmpty()) {
-                BigDecimal ratio = batchActualRatioForRepair(str(consumes.get(0).get("batch_no")), groupCode);
+                BigDecimal ratio = batchActualRatioForRepair(ConvertUtils.toStr(consumes.get(0).get("batch_no")), groupCode);
                 if (ratio != null) {
                     return ratio;
                 }
@@ -284,10 +285,6 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         return actual.divide(virtual, 10, RoundingMode.HALF_UP);
     }
 
-    private static String str(Object value) {
-        return value == null ? null : String.valueOf(value);
-    }
-
     /**
      * 存量库兼容: biz_ad_order 旧表无 algo_code / operator_* 列时自动补列（幂等）
      */
@@ -304,7 +301,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
 
     /**
      * 存量广告消费/退款明细迁移（幂等）:
-     * 1) 旧口径變動類別「廣告消費/廣告退款」按备注识别广告类型（如無敵星星）;
+     * 1) 旧口径变动类别「广告消费/广告退款」按备注识别广告类型（如无敌星星）;
      * 2) 未挂批次号的广告消费明细挂集团最早充值批次，使批次明细页可见消费记录
      */
     private void migrateAdConsumeDetails() {

@@ -9,15 +9,13 @@ import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.BizGiftRecord;
-import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
-import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.BizGiftRecordMapper;
-import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.AdOrderSupport;
 import com.mftb.admin.service.AdSalesNewStoreService;
 import com.mftb.admin.service.GiftService;
 import com.mftb.admin.util.BizSeqService;
@@ -50,7 +48,7 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
     private final AdAlgorithmMapper algorithmMapper;
     private final AdOrderMapper orderMapper;
     private final AdOrderItemNewStoreMapper itemMapper;
-    private final BizMerchantGroupMapper groupMapper;
+    private final AdOrderSupport orderSupport;
     private final BizStoreMapper storeMapper;
     private final BizGiftRecordMapper giftRecordMapper;
     private final GiftService giftService;
@@ -160,10 +158,6 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
         // 4. 写订单主表（actualAmount=0, giftDays=N, giftAmount=0）
         LocalDateTime now = LocalDateTime.now();
         String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_NEW_STORE);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
@@ -174,17 +168,12 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
         order.setBrand(brand);
         order.setChannel(algorithm.getChannel());
         order.setGroupCode(request.getGroupCode());
-        order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
+        order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store.getStoreCode());
         order.setStoreName(store.getStoreName());
         order.setBdEmpId(request.getBdEmpId());
         // 下单人快照: 当前登录的业务人员
-        SysUser operator = operatorResolver.currentUser();
-        if (operator != null) {
-            order.setOperatorType(2);
-            order.setOperatorId(StringUtils.hasText(operator.getEmpId()) ? operator.getEmpId() : operator.getUsername());
-            order.setOperatorName(StringUtils.hasText(operator.getName()) ? operator.getName() : operator.getUsername());
-        }
+        orderSupport.applyOperatorSnapshot(order);
         order.setItemCount(giftDays);
         order.setOriginalAmount(BigDecimal.ZERO);
         order.setDiscountAmount(BigDecimal.ZERO);
@@ -212,7 +201,7 @@ public class AdSalesNewStoreServiceImpl implements AdSalesNewStoreService {
         }
 
         // 6. 扣减赠送天数余额并写消费流水（与订单同事务）
-        giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
+        orderSupport.deductGiftDays(GIFT_AD_TYPE, store, giftDays, orderNo,
                 algorithm.getAlgoCode(), algorithm.getAlgoName());
 
         // 7. 不调用 finWriteChainService（实付为 0，无推广金变动）

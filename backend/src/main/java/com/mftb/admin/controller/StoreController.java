@@ -46,12 +46,14 @@ public class StoreController {
 
     /** 按集团查询门店（下拉选项用） */
     @GetMapping("/by-group/{groupId}")
+    @RequirePermission(menu = "store-list")
     public Result<List<StoreVO>> listByGroup(@PathVariable Long groupId) {
         return Result.success(storeService.listByGroupId(groupId));
     }
 
     /** 按集团编码+品牌查询门店下拉选项（充值扣款门店用） */
     @GetMapping("/by-group-code")
+    @RequirePermission(menu = "store-list")
     public Result<List<OptionVO>> listByGroupCode(@RequestParam String groupCode,
                                                    @RequestParam(required = false) String brand) {
         return Result.success(storeService.listByGroupCode(groupCode, brand));
@@ -59,18 +61,21 @@ public class StoreController {
 
     /** 门店ID/名称搜索下拉选项 */
     @GetMapping("/options")
+    @RequirePermission(menu = "store-list")
     public Result<List<OptionVO>> options(@RequestParam(required = false) String keyword) {
         return Result.success(storeService.searchOptions(keyword));
     }
 
     /** 门店最后更新人搜索下拉选项 */
     @GetMapping("/updated-by-options")
+    @RequirePermission(menu = "store-list")
     public Result<List<OptionVO>> updatedByOptions(@RequestParam(required = false) String keyword) {
         return Result.success(storeService.searchUpdatedByOptions(keyword));
     }
 
     /** 按集团ID（group_code）查询集团下门店已绑定的BD选项（推广金充值归属BD用） */
     @GetMapping("/bd-options")
+    @RequirePermission(menu = "store-list")
     public Result<List<OptionVO>> bdOptions(@RequestParam String groupCode) {
         return Result.success(storeService.listBdOptionsByGroupCode(groupCode));
     }
@@ -79,14 +84,14 @@ public class StoreController {
     @PostMapping
     @RequirePermission(menu = "store-list", action = "create")
     public Result<StoreVO> create(@Valid @RequestBody StoreRequest request) {
-        return Result.success("门店创建成功", storeService.create(request));
+        return Result.success("門店創建成功", storeService.create(request));
     }
 
     /** 编辑门店 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "store-list", action = "edit")
     public Result<StoreVO> update(@PathVariable Long id, @Valid @RequestBody StoreRequest request) {
-        return Result.success("门店信息已更新", storeService.update(id, request));
+        return Result.success("門店信息已更新", storeService.update(id, request));
     }
 
     /** 查询门店已绑定的BD列表（含部门/职位/职级） */
@@ -100,7 +105,7 @@ public class StoreController {
     @PostMapping("/{id}/bds")
     @RequirePermission(menu = "store-list", action = "edit")
     public Result<StoreBdVO> addBd(@PathVariable Long id, @RequestBody StoreBindBdRequest request) {
-        return Result.success("BD绑定成功", storeService.addBd(id, request.getBdEmpId()));
+        return Result.success("BD綁定成功", storeService.addBd(id, request.getBdEmpId()));
     }
 
     /** 解除绑定BD */
@@ -108,7 +113,7 @@ public class StoreController {
     @RequirePermission(menu = "store-list", action = "edit")
     public Result<Void> removeBd(@PathVariable Long id, @PathVariable Long bindId) {
         storeService.removeBd(id, bindId);
-        return Result.success("BD已解绑", null);
+        return Result.success("BD已解綁", null);
     }
 
     /** 删除门店 */
@@ -116,7 +121,7 @@ public class StoreController {
     @RequirePermission(menu = "store-list", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         storeService.delete(id);
-        return Result.success("门店已删除", null);
+        return Result.success("門店已刪除", null);
     }
 
     /** 查询门店金字招牌数据配置（无配置时系统按门店预生成） */
@@ -129,7 +134,7 @@ public class StoreController {
     /** 保存门店金字招牌数据配置 */
     @PutMapping("/{id}/data-config")
     @RequirePermission(menu = "store-list", action = "edit")
-    public Result<Void> updateDataConfig(@PathVariable Long id, @RequestBody StoreDataConfigDTO request) {
+    public Result<Void> updateDataConfig(@PathVariable Long id, @Valid @RequestBody StoreDataConfigDTO request) {
         storeDataConfigService.updateConfig(id, request);
         return Result.success("配置已保存", null);
     }

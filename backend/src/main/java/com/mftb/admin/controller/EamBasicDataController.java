@@ -2,6 +2,12 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.EamBrandSaveDTO;
+import com.mftb.admin.dto.EamCategorySaveDTO;
+import com.mftb.admin.dto.EamLocationSaveDTO;
+import com.mftb.admin.dto.EamModelSaveDTO;
+import com.mftb.admin.dto.EamParamTypeSaveDTO;
+import com.mftb.admin.dto.EamParamValueSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.EamBasicDataService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * EAM 基礎數據控制器（分類 / 品牌 / 型號 / 位置）
+ * EAM 基础数据控制器（分类 / 品牌 / 型号 / 位置）
  */
 @RestController
 @RequestMapping("/api/eam/basic")
@@ -20,9 +26,9 @@ public class EamBasicDataController {
 
     private final EamBasicDataService basicDataService;
 
-    /* ==================== 資產分類 ==================== */
+    /* ==================== 资产分类 ==================== */
 
-    /** 分類列表（平鋪返回，頁面自行構樹） */
+    /** 分类列表（平铺返回，页面自行构树） */
     @GetMapping("/categories")
     @RequirePermission(menu = "asset-category")
     public Result<List<Map<String, Object>>> listCategories(
@@ -35,22 +41,22 @@ public class EamBasicDataController {
         return Result.success(basicDataService.listCategories(keyword, name, code, updatedBy, updatedAtStart, updatedAtEnd));
     }
 
-    /** 新增分類 */
+    /** 新增分类 */
     @PostMapping("/categories")
     @RequirePermission(menu = "asset-category", action = "edit")
-    public Result<Long> createCategory(@RequestBody Map<String, Object> data) {
-        return Result.success(basicDataService.createCategory(data));
+    public Result<Long> createCategory(@RequestBody EamCategorySaveDTO dto) {
+        return Result.success(basicDataService.createCategory(dto));
     }
 
-    /** 更新分類 */
+    /** 更新分类 */
     @PutMapping("/categories/{id}")
     @RequirePermission(menu = "asset-category", action = "edit")
-    public Result<Void> updateCategory(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        basicDataService.updateCategory(id, data);
+    public Result<Void> updateCategory(@PathVariable long id, @RequestBody EamCategorySaveDTO dto) {
+        basicDataService.updateCategory(id, dto);
         return Result.success();
     }
 
-    /** 刪除分類 */
+    /** 删除分类 */
     @DeleteMapping("/categories/{id}")
     @RequirePermission(menu = "asset-category", action = "delete")
     public Result<Void> deleteCategory(@PathVariable long id) {
@@ -58,7 +64,7 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /** 切換分類狀態 */
+    /** 切换分类状态 */
     @PutMapping("/categories/{id}/toggle")
     @RequirePermission(menu = "asset-category", action = "edit")
     public Result<Void> toggleCategoryStatus(@PathVariable long id) {
@@ -66,7 +72,7 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /* ==================== 品牌庫 ==================== */
+    /* ==================== 品牌库 ==================== */
 
     /** 品牌列表 */
     @GetMapping("/brands")
@@ -83,19 +89,19 @@ public class EamBasicDataController {
     /** 新增品牌 */
     @PostMapping("/brands")
     @RequirePermission(menu = "asset-model", action = "edit")
-    public Result<Long> createBrand(@RequestBody Map<String, Object> data) {
-        return Result.success(basicDataService.createBrand(data));
+    public Result<Long> createBrand(@RequestBody EamBrandSaveDTO dto) {
+        return Result.success(basicDataService.createBrand(dto));
     }
 
     /** 更新品牌 */
     @PutMapping("/brands/{id}")
     @RequirePermission(menu = "asset-model", action = "edit")
-    public Result<Void> updateBrand(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        basicDataService.updateBrand(id, data);
+    public Result<Void> updateBrand(@PathVariable long id, @RequestBody EamBrandSaveDTO dto) {
+        basicDataService.updateBrand(id, dto);
         return Result.success();
     }
 
-    /** 刪除品牌 */
+    /** 删除品牌 */
     @DeleteMapping("/brands/{id}")
     @RequirePermission(menu = "asset-model", action = "delete")
     public Result<Void> deleteBrand(@PathVariable long id) {
@@ -103,9 +109,9 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /* ==================== 產品型號庫 ==================== */
+    /* ==================== 产品型号库 ==================== */
 
-    /** 型號分頁列表 */
+    /** 型号分页列表 */
     @GetMapping("/models")
     @RequirePermission(menu = "asset-model")
     public Result<PageResult<Map<String, Object>>> pageModels(
@@ -122,29 +128,29 @@ public class EamBasicDataController {
                 updatedBy, updatedAtStart, updatedAtEnd));
     }
 
-    /** 型號詳情 */
+    /** 型号详情 */
     @GetMapping("/models/{id}")
     @RequirePermission(menu = "asset-model")
     public Result<Map<String, Object>> modelDetail(@PathVariable long id) {
         return Result.success(basicDataService.getModelDetail(id));
     }
 
-    /** 新增型號 */
+    /** 新增型号 */
     @PostMapping("/models")
     @RequirePermission(menu = "asset-model", action = "edit")
-    public Result<Long> createModel(@RequestBody Map<String, Object> data) {
-        return Result.success(basicDataService.createModel(data));
+    public Result<Long> createModel(@RequestBody EamModelSaveDTO dto) {
+        return Result.success(basicDataService.createModel(dto));
     }
 
-    /** 更新型號 */
+    /** 更新型号 */
     @PutMapping("/models/{id}")
     @RequirePermission(menu = "asset-model", action = "edit")
-    public Result<Void> updateModel(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        basicDataService.updateModel(id, data);
+    public Result<Void> updateModel(@PathVariable long id, @RequestBody EamModelSaveDTO dto) {
+        basicDataService.updateModel(id, dto);
         return Result.success();
     }
 
-    /** 刪除型號 */
+    /** 删除型号 */
     @DeleteMapping("/models/{id}")
     @RequirePermission(menu = "asset-model", action = "delete")
     public Result<Void> deleteModel(@PathVariable long id) {
@@ -152,9 +158,9 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /* ==================== 倉庫 / 存放位置 ==================== */
+    /* ==================== 仓库 / 存放位置 ==================== */
 
-    /** 位置列表（平鋪返回，頁面自行構樹） */
+    /** 位置列表（平铺返回，页面自行构树） */
     @GetMapping("/locations")
     @RequirePermission(menu = "asset-location")
     public Result<List<Map<String, Object>>> listLocations(
@@ -169,19 +175,19 @@ public class EamBasicDataController {
     /** 新增位置 */
     @PostMapping("/locations")
     @RequirePermission(menu = "asset-location", action = "edit")
-    public Result<Long> createLocation(@RequestBody Map<String, Object> data) {
-        return Result.success(basicDataService.createLocation(data));
+    public Result<Long> createLocation(@RequestBody EamLocationSaveDTO dto) {
+        return Result.success(basicDataService.createLocation(dto));
     }
 
     /** 更新位置 */
     @PutMapping("/locations/{id}")
     @RequirePermission(menu = "asset-location", action = "edit")
-    public Result<Void> updateLocation(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        basicDataService.updateLocation(id, data);
+    public Result<Void> updateLocation(@PathVariable long id, @RequestBody EamLocationSaveDTO dto) {
+        basicDataService.updateLocation(id, dto);
         return Result.success();
     }
 
-    /** 刪除位置 */
+    /** 删除位置 */
     @DeleteMapping("/locations/{id}")
     @RequirePermission(menu = "asset-location", action = "delete")
     public Result<Void> deleteLocation(@PathVariable long id) {
@@ -189,9 +195,9 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /* ==================== 參數庫 ==================== */
+    /* ==================== 参数库 ==================== */
 
-    /** 參數類型分頁列表 */
+    /** 参数类型分页列表 */
     @GetMapping("/param-types")
     @RequirePermission(menu = "asset-param-library")
     public Result<PageResult<Map<String, Object>>> pageParamTypes(
@@ -204,22 +210,22 @@ public class EamBasicDataController {
         return Result.success(basicDataService.pageParamTypes(page, size, categoryCode, name, code, status));
     }
 
-    /** 新增參數類型 */
+    /** 新增参数类型 */
     @PostMapping("/param-types")
     @RequirePermission(menu = "asset-param-library", action = "edit")
-    public Result<Long> createParamType(@RequestBody Map<String, Object> data) {
-        return Result.success(basicDataService.createParamType(data));
+    public Result<Long> createParamType(@RequestBody EamParamTypeSaveDTO dto) {
+        return Result.success(basicDataService.createParamType(dto));
     }
 
-    /** 更新參數類型 */
+    /** 更新参数类型 */
     @PutMapping("/param-types/{id}")
     @RequirePermission(menu = "asset-param-library", action = "edit")
-    public Result<Void> updateParamType(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        basicDataService.updateParamType(id, data);
+    public Result<Void> updateParamType(@PathVariable long id, @RequestBody EamParamTypeSaveDTO dto) {
+        basicDataService.updateParamType(id, dto);
         return Result.success();
     }
 
-    /** 刪除參數類型 */
+    /** 删除参数类型 */
     @DeleteMapping("/param-types/{id}")
     @RequirePermission(menu = "asset-param-library", action = "delete")
     public Result<Void> deleteParamType(@PathVariable long id) {
@@ -227,14 +233,14 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /** 根據參數類型編碼查詢參數值 */
+    /** 根据参数类型编码查询参数值 */
     @GetMapping("/param-types/{paramTypeCode}/values")
     @RequirePermission(menu = "asset-param-library")
     public Result<List<Map<String, Object>>> listParamValuesByType(@PathVariable String paramTypeCode) {
         return Result.success(basicDataService.listParamValuesByType(paramTypeCode));
     }
 
-    /** 參數值分頁列表 */
+    /** 参数值分页列表 */
     @GetMapping("/param-values")
     @RequirePermission(menu = "asset-param-library")
     public Result<PageResult<Map<String, Object>>> pageParamValues(
@@ -245,22 +251,22 @@ public class EamBasicDataController {
         return Result.success(basicDataService.pageParamValues(page, size, paramTypeCode, categoryCode));
     }
 
-    /** 新增參數值 */
+    /** 新增参数值 */
     @PostMapping("/param-values")
     @RequirePermission(menu = "asset-param-library", action = "edit")
-    public Result<Long> createParamValue(@RequestBody Map<String, Object> data) {
-        return Result.success(basicDataService.createParamValue(data));
+    public Result<Long> createParamValue(@RequestBody EamParamValueSaveDTO dto) {
+        return Result.success(basicDataService.createParamValue(dto));
     }
 
-    /** 更新參數值 */
+    /** 更新参数值 */
     @PutMapping("/param-values/{id}")
     @RequirePermission(menu = "asset-param-library", action = "edit")
-    public Result<Void> updateParamValue(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        basicDataService.updateParamValue(id, data);
+    public Result<Void> updateParamValue(@PathVariable long id, @RequestBody EamParamValueSaveDTO dto) {
+        basicDataService.updateParamValue(id, dto);
         return Result.success();
     }
 
-    /** 刪除參數值 */
+    /** 删除参数值 */
     @DeleteMapping("/param-values/{id}")
     @RequirePermission(menu = "asset-param-library", action = "delete")
     public Result<Void> deleteParamValue(@PathVariable long id) {

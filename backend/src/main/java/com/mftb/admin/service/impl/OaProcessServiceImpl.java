@@ -36,7 +36,7 @@ public class OaProcessServiceImpl implements OaProcessService {
                         .eq(OaProcess::getProcessCode, processCode)
                         .eq(OaProcess::getStatus, 1));
         if (process == null) {
-            throw new BusinessException("流程类型不存在或已停用: " + processCode);
+            throw new BusinessException("流程類型不存在或已停用: " + processCode);
         }
         return OaProcessVO.from(process);
     }

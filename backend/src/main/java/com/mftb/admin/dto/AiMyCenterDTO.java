@@ -9,53 +9,53 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 智能中心「我的」視圖 DTO：我的額度維度與用量、我的授權模型
+ * 智能中心「我的」视图 DTO：我的额度维度与用量、我的授权模型
  */
 public class AiMyCenterDTO {
 
-    /* ══════════ 我的用量（額度維度 + 實際用量） ══════════ */
+    /* ══════════ 我的用量（额度维度 + 实际用量） ══════════ */
 
     @Data
     public static class MyQuotaUsageVO {
         private String username;
         private String name;
         private String empId;
-        /** 當前賬號生效的額度維度（員工/部門/職位/角色） */
+        /** 当前账号生效的额度维度（员工/部门/职位/角色） */
         private List<QuotaDimensionVO> dimensions = new ArrayList<>();
-        /** 整體用量概覽（今日/本月） */
+        /** 整体用量概览（今日/本月） */
         private UsageSummaryVO usage = new UsageSummaryVO();
-        /** 最近使用記錄（最新 8 條） */
+        /** 最近使用记录（最新 8 条） */
         private List<RecentRecordVO> recentRecords = new ArrayList<>();
     }
 
     /**
-     * 單個額度維度：一條「來源 + 周期 + 類型」的限額規則及其本期已用。
-     * 已用量按 biz_llm_usage 明細實時聚合（與能耗統計同源），不依賴配置表冗余字段。
+     * 单个额度维度：一条「来源 + 周期 + 类型」的限额规则及其本期已用。
+     * 已用量按 biz_llm_usage 明细实时聚合（与能耗统计同源），不依赖配置表冗余字段。
      */
     @Data
     public static class QuotaDimensionVO {
-        /** 維度來源：employee=員工 department=部門 position=職位 role=角色 grant=審批授予（個人獨立額度，優先生效） */
+        /** 维度来源：employee=员工 department=部门 position=职位 role=角色 grant=审批授予（个人独立额度，优先生效） */
         private String source;
-        /** 來源名稱（員工專屬 / 部門名 / 策略名 / 角色名 / 審批授予） */
+        /** 来源名称（员工专属 / 部门名 / 策略名 / 角色名 / 审批授予） */
         private String sourceName;
         /** 限定模型 ID；null = 全部模型 */
         private Long modelId;
-        /** 限定模型標識；null = 全部模型 */
+        /** 限定模型标识；null = 全部模型 */
         private String modelKey;
         private String modelName;
-        /** 限額周期：daily/monthly */
+        /** 限额周期：daily/monthly */
         private String period;
-        /** 限額類型：token/cost/request */
+        /** 限额类型：token/cost/request */
         private String quotaType;
-        /** 限額值（token 數 / 金額 / 次數） */
+        /** 限额值（token 数 / 金额 / 次数） */
         private BigDecimal quotaValue;
-        /** 計價幣種（cost 類型使用，其餘為空） */
+        /** 计价币种（cost 类型使用，其余为空） */
         private String currency;
         /** 本期已用（按 quotaType 口径聚合） */
         private BigDecimal usedValue;
-        /** 軟限額提醒閾值(%) */
+        /** 软限额提醒阈值(%) */
         private Integer softThreshold;
-        /** 本期重置日（yyyy-MM-dd）：daily=明日，monthly=下一個周期起始日 */
+        /** 本期重置日（yyyy-MM-dd）：daily=明日，monthly=下一个周期起始日 */
         private String resetDate;
     }
 
@@ -130,31 +130,31 @@ public class AiMyCenterDTO {
         private String message;
     }
 
-    /* ══════════ 我的授權模型 ══════════ */
+    /* ══════════ 我的授权模型 ══════════ */
 
     @Data
     public static class MyModelVO {
         private Long modelId;
         private String modelKey;
         private String modelName;
-        /** 供應商名稱（無供應商時為空） */
+        /** 供应商名称（无供应商时为空） */
         private String providerName;
-        /** 部署類型：cloud/private */
+        /** 部署类型：cloud/private */
         private String deployType;
-        /** 授權來源：dept/position/role/employee */
+        /** 授权来源：dept/position/role/employee */
         private List<String> sources = new ArrayList<>();
 
         /* ── 模型能力字段（前端展示能力标签 & 输入方式提示） ── */
 
-        /** 支持模態：text,image,audio,video（逗號分隔） */
+        /** 支持模态：text,image,audio,video（逗号分隔） */
         private String modalities;
-        /** 視覺理解（圖像識別） */
+        /** 视觉理解（图像识别） */
         private Boolean visionSupport;
-        /** 工具調用（Function Calling） */
+        /** 工具调用（Function Calling） */
         private Boolean functionCalling;
-        /** JSON 結構化輸出 */
+        /** JSON 结构化输出 */
         private Boolean jsonMode;
-        /** 流式響應 */
+        /** 流式响应 */
         private Boolean streaming;
         /** 深度思考模式 */
         private Boolean thinkingMode;

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.mftb.admin.entity.BizActivity;
 import org.apache.ibatis.annotations.Mapper;
 
+/** 系统活动实体 Mapper */
 @Mapper
 public interface BizActivityMapper extends BaseMapper<BizActivity> {
 }

@@ -39,7 +39,7 @@ public class FinAccountController {
     @RequirePermission(menu = "account-balance", action = "edit")
     public Result<Void> freeze(@PathVariable String groupId, @RequestParam String brand) {
         finAccountService.freeze(groupId, brand);
-        return Result.success("账户已冻结", null);
+        return Result.success("賬戶已凍結", null);
     }
 
     /** 解冻账户（按集团+品牌） */
@@ -47,7 +47,7 @@ public class FinAccountController {
     @RequirePermission(menu = "account-balance", action = "edit")
     public Result<Void> unfreeze(@PathVariable String groupId, @RequestParam String brand) {
         finAccountService.unfreeze(groupId, brand);
-        return Result.success("账户已解冻", null);
+        return Result.success("賬戶已解凍", null);
     }
 
     /** 诊断接口：查询指定集团的所有账户原始数据（含 virtual_balance / actual_balance） */

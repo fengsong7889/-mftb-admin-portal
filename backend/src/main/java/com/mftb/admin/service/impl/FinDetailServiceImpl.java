@@ -46,7 +46,7 @@ public class FinDetailServiceImpl implements FinDetailService {
             wrapper.eq(FinDetail::getChannel, query.getChannel());
         }
         if (StringUtils.hasText(query.getTradeType())) {
-            // 展示口径: 退款=正数消费明细，消费=非正数消费明细（存储均为「消費」）
+            // 展示口径: 退款=正数消费明细，消费=非正数消费明细（存储均为「消费」）
             if ("退款".equals(query.getTradeType())) {
                 wrapper.eq(FinDetail::getTradeType, "消費")
                         .gt(FinDetail::getVirtualChange, BigDecimal.ZERO);

@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
+/** 推广金消费风控配置实体（集团+品牌维度一行） Mapper */
 @Mapper
 public interface FinRiskConfigMapper extends BaseMapper<FinRiskConfig> {
 

@@ -1,6 +1,7 @@
 package com.mftb.admin.controller;
 
 import com.mftb.admin.common.Result;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +33,7 @@ public class IconfontController {
     public Result<Map<String, Object>> getAvatars(
             @RequestParam(defaultValue = "卡通头像") String q,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "40") int pageSize) {
+            @RequestParam(defaultValue = "40") @Max(200) int pageSize) {
         
         try {
             // 模拟从 IconFont 网站获取数据（实际项目中应该使用爬虫或官方 API）
@@ -47,7 +48,7 @@ public class IconfontController {
             return Result.success(result);
         } catch (Exception e) {
             log.error("获取 IconFont 头像失败", e);
-            return Result.error("Failed to load avatars: " + e.getMessage());
+            return Result.error("頭像載入失敗，請稍後重試");
         }
     }
 

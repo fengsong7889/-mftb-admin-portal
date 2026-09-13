@@ -5,6 +5,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdWaterfallRequest;
 import com.mftb.admin.dto.AdWaterfallVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StatusUpdateDTO;
 import com.mftb.admin.service.AdWaterfallService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 /**
  * 瀑布流策略接口
@@ -71,8 +70,8 @@ public class AdWaterfallController {
     /** 启用/停用 */
     @PutMapping("/{id}/status")
     @RequirePermission(menu = "promotion-slot-config", action = "edit")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
-        waterfallService.updateStatus(id, body.get("status"));
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusUpdateDTO dto) {
+        waterfallService.updateStatus(id, dto.getStatus());
         return Result.success();
     }
 

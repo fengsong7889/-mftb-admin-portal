@@ -10,16 +10,14 @@ import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdCellLock;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemStar;
-import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
-import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdCellLockMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
-import com.mftb.admin.mapper.BizMerchantGroupMapper;
-import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.AdCellQuotaService;
+import com.mftb.admin.service.AdOrderSupport;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.AdSalesStarService;
 import com.mftb.admin.service.FinAccountService;
@@ -75,9 +73,9 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     private final AdCellLockMapper lockMapper;
     private final AdOrderMapper orderMapper;
     private final AdOrderItemStarMapper itemMapper;
-    private final BizMerchantGroupMapper groupMapper;
-    private final BizStoreMapper storeMapper;
     private final AdPricingStarService pricingService;
+    private final AdCellQuotaService cellQuotaService;
+    private final AdOrderSupport orderSupport;
     private final FinAccountService accountService;
     private final SysConfigService sysConfigService;
     private final FinWriteChainService finWriteChainService;
@@ -193,7 +191,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
                 throw new BusinessException("格子信息不完整");
             }
             if (!MEAL_SLOTS.contains(cell.getMealSlot())) {
-                throw new BusinessException("非法的餐段时段: " + cell.getMealSlot());
+                throw new BusinessException("非法的餐段時段: " + cell.getMealSlot());
             }
             if (cell.getBizDate().isBefore(today) || cell.getBizDate().isAfter(endDate)) {
                 throw new BusinessException("購買日期超出預售窗口(" + today + " ~ " + endDate + ")");
@@ -215,15 +213,19 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             }
         }
 
-        // 3. 库存校验（仅活跃订单占用格子）+ 规则4 其它商家加购锁校验
+        // 3. 库存校验（仅活跃订单占用格子）+ 规则4 其它商家加购锁校验 + 原子占位（防并发超卖）
         Map<String, Integer> occupied = occupiedCounts(today, endDate);
         Map<String, Set<String>> lockGroups = activeLockGroups(request.getAlgoId(), today, endDate);
-        for (String key : requestKeys) {
+        for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
+            String key = cellKey(cell.getBizDate(), cell.getRegion(), cell.getMealSlot());
             int taken = takenCount(key, occupied, lockGroups, request.getGroupCode());
             int limit = salesLimitOfKey(key, regionSalesLimit);
             if (taken >= limit) {
                 throw new BusinessException("部分格子已售罄，請刷新後重新選擇");
             }
+            // 原子占位: 计数+1 受 taken<limit 约束, 计数器与订单同事务, 失败即整体回滚
+            cellQuotaService.takeCell(AdCellQuotaService.MODULE_STAR,
+                    cell.getBizDate(), cell.getRegion(), cell.getMealSlot(), limit);
         }
 
         // 4. 计价: 先时段折扣（全时段/单独时段），再按时段个数梯度折上折
@@ -270,15 +272,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         // 6. 写订单主表 + 明细 + 财务扣款（非 BusinessException 一律转为友好提示，避免「系统繁忙」）
         try {
         String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_STAR);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
-        BizStore store = StringUtils.hasText(request.getStoreCode())
-                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
-                        .eq(BizStore::getStoreCode, request.getStoreCode())
-                        .last("LIMIT 1"))
-                : null;
+        BizStore store = orderSupport.findStore(request.getStoreCode());
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
@@ -289,17 +283,12 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         order.setBrand(brand);
         order.setChannel(algorithm.getChannel());
         order.setGroupCode(request.getGroupCode());
-        order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
+        order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
         order.setStoreName(store != null ? store.getStoreName() : null);
         order.setBdEmpId(request.getBdEmpId());
         // 下单人快照: 当前登录的业务人员
-        SysUser operator = operatorResolver.currentUser();
-        if (operator != null) {
-            order.setOperatorType(2);
-            order.setOperatorId(StringUtils.hasText(operator.getEmpId()) ? operator.getEmpId() : operator.getUsername());
-            order.setOperatorName(StringUtils.hasText(operator.getName()) ? operator.getName() : operator.getUsername());
-        }
+        orderSupport.applyOperatorSnapshot(order);
         order.setItemCount(request.getCells().size());
         order.setOriginalAmount(originalTotal);
         order.setDiscountAmount(discountAmount);

@@ -195,13 +195,13 @@ public class StoreServiceImpl implements StoreService {
             } catch (DuplicateKeyException e) {
                 if (attempt == maxRetries) {
                     log.error("门店编码生成连续 {} 次冲突，store_code 序列可能严重偏移", maxRetries + 1);
-                    throw new BusinessException("门店编码生成失败，请联系管理员检查编号序列");
+                    throw new BusinessException("門店編碼生成失敗，請聯繫管理員檢查編號序列");
                 }
                 log.warn("门店编码冲突（第{}次），将重新生成: {}", attempt + 1, e.getMessage());
             }
         }
         // unreachable
-        throw new BusinessException("门店创建失败");
+        throw new BusinessException("門店創建失敗");
     }
 
     @Override
@@ -235,18 +235,18 @@ public class StoreServiceImpl implements StoreService {
     public StoreBdVO addBd(Long storeId, String bdEmpId) {
         requireStore(storeId);
         if (!StringUtils.hasText(bdEmpId)) {
-            throw new BusinessException("请选择BD员工");
+            throw new BusinessException("請選擇BD員工");
         }
         SysUser bd = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getEmpId, bdEmpId.trim()).last("LIMIT 1"));
         if (bd == null) {
-            throw new BusinessException("BD员工不存在");
+            throw new BusinessException("BD員工不存在");
         }
         Long exists = bdMapper.selectCount(new LambdaQueryWrapper<BizStoreBd>()
                 .eq(BizStoreBd::getStoreId, storeId)
                 .eq(BizStoreBd::getBdEmpId, bd.getEmpId()));
         if (exists != null && exists > 0) {
-            throw new BusinessException("该员工已绑定为门店BD");
+            throw new BusinessException("該員工已綁定為門店BD");
         }
         BizStoreBd bind = new BizStoreBd();
         bind.setStoreId(storeId);
@@ -269,7 +269,7 @@ public class StoreServiceImpl implements StoreService {
     public void removeBd(Long storeId, Long bindId) {
         BizStoreBd bind = bdMapper.selectById(bindId);
         if (bind == null || !bind.getStoreId().equals(storeId)) {
-            throw new BusinessException("绑定记录不存在");
+            throw new BusinessException("綁定記錄不存在");
         }
         bdMapper.deleteById(bindId);
         touchStore(storeId);
@@ -398,14 +398,14 @@ public class StoreServiceImpl implements StoreService {
 
     private void requireGroupExists(Long groupId) {
         if (groupMapper.selectById(groupId) == null) {
-            throw new BusinessException("所属集团不存在");
+            throw new BusinessException("所屬集團不存在");
         }
     }
 
     private BizStore requireStore(Long id) {
         BizStore store = storeMapper.selectById(id);
         if (store == null) {
-            throw new BusinessException("门店不存在");
+            throw new BusinessException("門店不存在");
         }
         return store;
     }

@@ -2,6 +2,7 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.EamPurchaseSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.EamPurchaseService;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * EAM 採購訂單控制器
+ * EAM 采购订单控制器
  */
 @RestController
 @RequestMapping("/api/eam/purchase")
@@ -21,7 +22,7 @@ public class EamPurchaseController {
 
     private final EamPurchaseService purchaseService;
 
-    /** 分頁查詢採購訂單 */
+    /** 分页查询采购订单 */
     @GetMapping
     @RequirePermission(menu = MENU)
     public Result<PageResult<Map<String, Object>>> page(
@@ -40,29 +41,29 @@ public class EamPurchaseController {
                 createdAtStart, createdAtEnd, updatedAtStart, updatedAtEnd));
     }
 
-    /** 採購訂單詳情 */
+    /** 采购订单详情 */
     @GetMapping("/{id}")
     @RequirePermission(menu = MENU)
     public Result<Map<String, Object>> detail(@PathVariable long id) {
         return Result.success(purchaseService.getOrderDetail(id));
     }
 
-    /** 創建採購訂單（直接錄入） */
+    /** 创建采购订单（直接录入） */
     @PostMapping
     @RequirePermission(menu = MENU, action = "edit")
-    public Result<Long> create(@RequestBody Map<String, Object> data) {
-        return Result.success(purchaseService.createOrder(data));
+    public Result<Long> create(@RequestBody EamPurchaseSaveDTO dto) {
+        return Result.success(purchaseService.createOrder(dto));
     }
 
-    /** 更新採購訂單執行信息 */
+    /** 更新采购订单执行信息 */
     @PutMapping("/{id}")
     @RequirePermission(menu = MENU, action = "edit")
-    public Result<Void> updateExec(@PathVariable long id, @RequestBody Map<String, Object> data) {
-        purchaseService.updateOrderExec(id, data);
+    public Result<Void> updateExec(@PathVariable long id, @RequestBody EamPurchaseSaveDTO dto) {
+        purchaseService.updateOrderExec(id, dto);
         return Result.success();
     }
 
-    /** 刪除採購訂單 */
+    /** 删除采购订单 */
     @DeleteMapping("/{id}")
     @RequirePermission(menu = MENU, action = "delete")
     public Result<Void> delete(@PathVariable long id) {

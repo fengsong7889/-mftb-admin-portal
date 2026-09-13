@@ -258,17 +258,17 @@ public class FinRiskServiceImpl implements FinRiskService {
     @Transactional(rollbackFor = Exception.class)
     public void saveConfig(FinRiskConfigDTO dto) {
         if (!StringUtils.hasText(dto.getGroupId()) || !StringUtils.hasText(dto.getBrand())) {
-            throw new BusinessException("缺少集团或品牌信息");
+            throw new BusinessException("缺少集團或品牌信息");
         }
         String releaseMode = StringUtils.hasText(dto.getReleaseMode()) ? dto.getReleaseMode() : RELEASE_REPAY;
         if (!RELEASE_REPAY.equals(releaseMode) && !RELEASE_MONTHLY.equals(releaseMode)) {
-            throw new BusinessException("未知的风控模式: " + releaseMode);
+            throw new BusinessException("未知的風控模式: " + releaseMode);
         }
         if (RELEASE_MONTHLY.equals(releaseMode)
                 && (dto.getMonthlyReleaseRatio() == null
                 || dto.getMonthlyReleaseRatio().compareTo(BigDecimal.ZERO) <= 0
                 || dto.getMonthlyReleaseRatio().compareTo(BigDecimal.ONE) > 0)) {
-            throw new BusinessException("每月释放比例需大于 0 且不超过 100%");
+            throw new BusinessException("每月釋放比例需大於 0 且不超過 100%");
         }
 
         FinRiskConfig config = findConfig(dto.getGroupId(), dto.getBrand());
@@ -299,11 +299,11 @@ public class FinRiskServiceImpl implements FinRiskService {
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(String groupCode, String brand, String status) {
         if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
-            throw new BusinessException("未知的风控状态: " + status);
+            throw new BusinessException("未知的風控狀態: " + status);
         }
         FinRiskConfig config = findConfig(groupCode, brand);
         if (config == null) {
-            throw new BusinessException("集团 " + groupCode + "（" + brandLabel(brand) + "）未登记消费风控，请先新增");
+            throw new BusinessException("集團 " + groupCode + "（" + brandLabel(brand) + "）未登记消费风控，请先新增");
         }
         config.setStatus(status);
         config.setUpdatedBy(operatorResolver.currentOperatorName());

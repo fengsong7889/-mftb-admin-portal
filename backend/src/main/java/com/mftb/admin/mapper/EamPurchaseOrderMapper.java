@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.mftb.admin.entity.EamPurchaseOrder;
 import org.apache.ibatis.annotations.Mapper;
 
+/** 采购订单实体 Mapper */
 @Mapper
 public interface EamPurchaseOrderMapper extends BaseMapper<EamPurchaseOrder> {
 }

@@ -12,10 +12,10 @@ import lombok.Data;
 @Data
 public class StoreRequest {
 
-    @NotNull(message = "所属集团不能为空")
+    @NotNull(message = "所屬集團不能為空")
     private Long groupId;
 
-    @NotBlank(message = "门店名称不能为空")
+    @NotBlank(message = "門店名稱不能為空")
     private String storeName;
 
     /** 所属品牌 */

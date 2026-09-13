@@ -13,11 +13,11 @@ import java.util.Map;
 public class AdAlgorithmRequest {
 
     /** 算法名称 */
-    @NotBlank(message = "算法名称不能为空")
+    @NotBlank(message = "算法名稱不能為空")
     private String algoName;
 
     /** 算法类型: 1=无敌星星 ... */
-    @NotNull(message = "算法类型不能为空")
+    @NotNull(message = "算法類型不能為空")
     private Integer algoType;
 
     /** 所属品牌: flashBee / mFood */

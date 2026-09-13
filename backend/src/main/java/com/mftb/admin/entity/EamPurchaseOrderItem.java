@@ -8,7 +8,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * 採購訂單明細實體
+ * 采购订单明细实体
  */
 @Data
 @TableName("biz_eam_purchase_order_item")
@@ -17,49 +17,49 @@ public class EamPurchaseOrderItem {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 所屬訂單 ID */
+    /** 所属订单 ID */
     private Long orderId;
 
-    /** 所屬供應商分組 ID */
+    /** 所属供应商分组 ID */
     private String groupId;
 
-    /** 資產型號 ID */
+    /** 资产型号 ID */
     private Long modelId;
 
-    /** 資產名稱 */
+    /** 资产名称 */
     private String modelName;
 
-    /** 分類 ID */
+    /** 分类 ID */
     private Long categoryId;
 
-    /** 分類名稱 */
+    /** 分类名称 */
     private String categoryName;
 
-    /** 分類編碼 */
+    /** 分类编码 */
     private String categoryCode;
 
     /** 品牌 ID */
     private Long brandId;
 
-    /** 品牌名稱 */
+    /** 品牌名称 */
     private String brandName;
 
-    /** 參數信息 JSON */
+    /** 参数信息 JSON */
     private String params;
 
     /** purchase/lease */
     private String purchaseType;
 
-    /** 數量 */
+    /** 数量 */
     private Integer qty;
 
-    /** 參考單價 */
+    /** 参考单价 */
     private BigDecimal price;
 
-    /** 成交單價 */
+    /** 成交单价 */
     private BigDecimal confirmedPrice;
 
-    /** 已驗收數量 */
+    /** 已验收数量 */
     private Integer receivedQty;
 
     /** 排序 */

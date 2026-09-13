@@ -161,7 +161,7 @@ public class AdPricingReviveServiceImpl extends
     private AdAlgorithm requireAlgorithm(Long algoId) {
         AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
         if (algorithm == null) {
-            throw new BusinessException("关联算法不存在");
+            throw new BusinessException("關聯算法不存在");
         }
         return algorithm;
     }
@@ -174,10 +174,10 @@ public class AdPricingReviveServiceImpl extends
         Set<Integer> seen = new HashSet<>();
         for (AdPricingReviveRequest.RegionPrice price : prices) {
             if (price.getRegion() == null) {
-                throw new BusinessException("商圈不能为空");
+                throw new BusinessException("商圈不能為空");
             }
             if (!seen.add(price.getRegion())) {
-                throw new BusinessException("商圈配置重复");
+                throw new BusinessException("商圈配置重複");
             }
             AdPricingReviveRegion region = new AdPricingReviveRegion();
             region.setPricingId(pricingId);

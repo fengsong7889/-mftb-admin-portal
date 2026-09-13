@@ -1,6 +1,8 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.SysConfigUpdateDTO;
 import com.mftb.admin.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,19 +25,21 @@ public class SysConfigController {
 
     private final SysConfigService sysConfigService;
 
-    /** 读取指定 key 的配置值 */
+    /** 读取指定 key 的配置值（规则配置页） */
     @GetMapping("/{key}")
+    @RequirePermission(menu = "rule-config")
     public Result<Map<String, String>> get(@PathVariable String key) {
         String value = sysConfigService.getConfigValue(key);
         return Result.success(Map.of("key", key, "value", value != null ? value : ""));
     }
 
-    /** 更新指定 key 的配置值 */
+    /** 更新指定 key 的配置值（规则配置页） */
     @PutMapping("/{key}")
-    public Result<Void> update(@PathVariable String key, @RequestBody Map<String, String> body) {
-        String value = body.get("value");
+    @RequirePermission(menu = "rule-config", action = "edit")
+    public Result<Void> update(@PathVariable String key, @RequestBody SysConfigUpdateDTO dto) {
+        String value = dto.getValue();
         if (value == null || value.isBlank()) {
-            return Result.error(400, "配置值不能为空");
+            return Result.error(400, "配置值不能為空");
         }
         sysConfigService.updateConfig(key, value);
         return Result.success();

@@ -73,12 +73,12 @@ public class AiModelController {
         try {
             boolean ok = modelService.create(request);
             if (!ok) {
-                return Result.error("模型标识已存在");
+                return Result.error("模型標識已存在");
             }
             return Result.success(true);
         } catch (Exception e) {
             log.error("新增模型失败", e);
-            return Result.error("创建失败，请稍后重试");
+            return Result.error("創建失敗，請稍後重試");
         }
     }
 

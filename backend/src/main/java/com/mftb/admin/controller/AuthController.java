@@ -3,12 +3,14 @@ package com.mftb.admin.controller;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.AvatarUpdateRequest;
+import com.mftb.admin.dto.AvatarUrlDTO;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.dto.UserInfoVO;
 import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.LoginLogService;
+import com.mftb.admin.util.FileValidator;
 import com.mftb.admin.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -53,7 +55,7 @@ public class AuthController {
     /** 登录 */
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        return Result.success("登录成功", authService.login(request, httpRequest));
+        return Result.success("登錄成功", authService.login(request, httpRequest));
     }
 
     /** 登出 */
@@ -146,14 +148,19 @@ public class AuthController {
     @PostMapping("/avatar/upload")
     public Result<Map<String, String>> uploadAvatar(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return Result.error("文件不能为空");
+            return Result.error("文件不能為空");
         }
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            return Result.error("仅支持上传图片文件");
+            return Result.error("僅支持上傳圖片文件");
         }
         if (file.getSize() > 2 * 1024 * 1024) {
-            return Result.error("文件大小不能超过 2MB");
+            return Result.error("文件大小不能超過 2MB");
+        }
+        // Magic bytes 校验：防止伪造 Content-Type 的恶意文件
+        String magicError = FileValidator.validateImageMagicBytes(file);
+        if (magicError != null) {
+            return Result.error(magicError);
         }
         try {
             byte[] bytes = file.getBytes();
@@ -162,7 +169,7 @@ public class AuthController {
             return Result.success(Map.of("base64", dataUrl));
         } catch (IOException e) {
             log.error("头像上传失败: {}", e.getMessage());
-            return Result.error("头像上传失败");
+            return Result.error("頭像上傳失敗");
         }
     }
 
@@ -191,20 +198,29 @@ public class AuthController {
      * @param request
      */
     @PutMapping("/avatar-url")
-    public Result<Void> saveAvatarUrl(@RequestBody Map<String, String> body, HttpServletRequest httpRequest) {
-        String avatarUrl = body.get("avatarUrl");
+    public Result<Void> saveAvatarUrl(@RequestBody AvatarUrlDTO dto, HttpServletRequest httpRequest) {
+        String avatarUrl = dto.getAvatarUrl();
         if (avatarUrl == null || avatarUrl.isBlank()) {
-            return Result.error("Invalid avatar URL");
+            return Result.error("頭像URL不能為空");
+        }
+        // 安全校验: 仅允许 http/https 协议，禁止 javascript:/file://data: 等危险协议
+        String trimmed = avatarUrl.trim();
+        if (trimmed.length() > 500) {
+            return Result.error("頭像URL長度超出限制");
+        }
+        if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) {
+            return Result.error("頭像URL僅支持 http/https 協議");
         }
         String username = currentUsername();
         if (username == null) {
             return Result.error(ResultCode.UNAUTHORIZED);
         }
         try {
-            authService.saveAvatarUrl(username, avatarUrl);
+            authService.saveAvatarUrl(username, trimmed);
             return Result.success();
         } catch (Exception e) {
-            return Result.error("Failed to save avatar URL: " + e.getMessage());
+            log.error("保存头像URL失败: {}", e.getMessage());
+            return Result.error("保存頭像URL失敗，請稍後重試");
         }
     }
 

@@ -248,7 +248,6 @@ export default function TransferAdd() {
               fromGroupId: groupIdParam,
               fromGroupName: groupNameParam,
               brand: brandParam,
-              fromVirtualBalance: sourceVirtualBalance,
               toGroupId: targetGroupId || '',
               toGroupName: targetAccount?.groupName || '',
               transferAmount,

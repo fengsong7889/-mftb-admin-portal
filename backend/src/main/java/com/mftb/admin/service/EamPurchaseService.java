@@ -1,16 +1,17 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.EamPurchaseSaveDTO;
 import com.mftb.admin.dto.PageResult;
 
 import java.util.Map;
 
 /**
- * EAM 採購訂單服務
+ * EAM 采购订单服务
  */
 public interface EamPurchaseService {
 
     /**
-     * 分頁查詢採購訂單
+     * 分页查询采购订单
      */
     PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String supplier,
                                                 String purchaser, String execStatus,
@@ -18,28 +19,28 @@ public interface EamPurchaseService {
                                                 String updatedAtStart, String updatedAtEnd);
 
     /**
-     * 採購訂單詳情
+     * 采购订单详情
      */
     Map<String, Object> getOrderDetail(long id);
 
     /**
-     * 創建採購訂單（直接錄入）
+     * 创建采购订单（直接录入）
      */
-    long createOrder(Map<String, Object> data);
+    long createOrder(EamPurchaseSaveDTO dto);
 
     /**
-     * 更新採購訂單（執行信息回填/狀態推進）
+     * 更新采购订单（执行信息回填/状态推进）
      */
-    void updateOrderExec(long id, Map<String, Object> data);
+    void updateOrderExec(long id, EamPurchaseSaveDTO dto);
 
     /**
-     * 刪除採購訂單（僅 pending 可刪）
+     * 删除采购订单（仅 pending 可删）
      */
     void deleteOrder(long id);
 
     /**
-     * 審批通過 → 自動從採購申請創建採購訂單
-     * @return 生成的訂單 ID
+     * 审批通过 → 自动从采购申请创建采购订单
+     * @return 生成的订单 ID
      */
     long createOrderFromRequest(long requestId);
 }

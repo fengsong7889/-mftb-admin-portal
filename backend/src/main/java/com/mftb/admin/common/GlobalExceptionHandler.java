@@ -50,14 +50,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
         log.warn("请求体解析失败: {}", e.getMessage());
-        return Result.error(ResultCode.PARAM_ERROR.getCode(), "请求参数格式错误，请检查数据类型后重试");
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), "請求參數格式錯誤，請檢查數據類型後重試");
     }
 
     /** 唯一键冲突: 并发写入或历史残留时给出友好提示, 避免暴露 "系统繁忙" */
     @ExceptionHandler(DuplicateKeyException.class)
     public Result<Void> handleDuplicateKeyException(DuplicateKeyException e) {
         log.warn("唯一键冲突: {}", e.getMessage());
-        return Result.error(ResultCode.PARAM_ERROR.getCode(), "数据已存在（可能为并发写入或历史残留），请刷新后重试");
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), "數據已存在（可能為並發寫入或歷史殘留），請刷新後重試");
     }
 
     /** 其它未捕获异常（含 SQL 异常） */
@@ -76,10 +76,10 @@ public class GlobalExceptionHandler {
         if (isSql) {
             // 异常详情仅记录在服务端日志，不返回给前端，避免暴露表结构/SQL 细节
             log.error("SQL异常 [{}]: {}", e.getClass().getSimpleName(), exMsg, e);
-            return Result.error(ResultCode.ERROR.getCode(), "数据库操作异常, 请稍后重试");
+            return Result.error(ResultCode.ERROR.getCode(), "數據庫操作異常, 請稍後重試");
         }
         log.error("系统异常 [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
-        return Result.error(ResultCode.ERROR.getCode(), "系统繁忙, 请稍后重试");
+        return Result.error(ResultCode.ERROR.getCode(), "系統繁忙, 請稍後重試");
     }
 
     /** 判断类名是否包含 SQL 关键字 */

@@ -12,7 +12,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 員工詳情模組資料初始化器：啟動時自動執行 116_employee_detail.sql
+ * 员工详情模组资料初始化器：启动时自动执行 116_employee_detail.sql
  * 包含 sys_user 新增列 + emp_emergency_contact 建表 + emp_position_record 建表
  */
 @Slf4j
@@ -55,7 +55,7 @@ public class EmployeeDetailDataInitializer implements CommandLineRunner {
                     try {
                         jdbcTemplate.execute(trimmed);
                     } catch (Exception ex) {
-                        // ALTER TABLE ADD COLUMN 可能因列已存在而報錯，忽略重複列錯誤
+                        // ALTER TABLE ADD COLUMN 可能因列已存在而报错，忽略重复列错误
                         String msg = ex.getMessage();
                         Throwable cause = ex.getCause();
                         String causeMsg = cause != null ? cause.getMessage() : "";

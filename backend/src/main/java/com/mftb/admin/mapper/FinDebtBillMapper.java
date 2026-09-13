@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.math.BigDecimal;
 
+/** 欠款单实体 Mapper */
 @Mapper
 public interface FinDebtBillMapper extends BaseMapper<FinDebtBill> {
 

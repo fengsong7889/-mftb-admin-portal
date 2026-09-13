@@ -107,7 +107,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
         validateChannel(request.getChannel());
         PromWordLibrary entity = wordLibraryMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("词条不存在");
+            throw new BusinessException("詞條不存在");
         }
         String word = request.getWord().trim();
         String channel = request.getChannel().trim();
@@ -129,7 +129,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
     public void toggleStatus(Long id) {
         PromWordLibrary entity = wordLibraryMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("词条不存在");
+            throw new BusinessException("詞條不存在");
         }
         entity.setStatus(entity.getStatus() == 1 ? 2 : 1);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -141,7 +141,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
     public void deleteWord(Long id) {
         PromWordLibrary entity = wordLibraryMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("词条不存在");
+            throw new BusinessException("詞條不存在");
         }
         wordLibraryMapper.deleteById(id);
     }
@@ -213,7 +213,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
     /** 校验频道值合法性 */
     private void validateChannel(String channel) {
         if (!StringUtils.hasText(channel) || !VALID_CHANNELS.contains(channel.trim())) {
-            throw new BusinessException("所属频道只能为 takeaway/supermarket/groupBuy");
+            throw new BusinessException("所屬頻道只能為 takeaway/supermarket/groupBuy");
         }
     }
 
@@ -227,7 +227,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
         }
         Long count = wordLibraryMapper.selectCount(wrapper);
         if (count != null && count > 0) {
-            throw new BusinessException("该频道下已存在相同词条");
+            throw new BusinessException("該頻道下已存在相同詞條");
         }
     }
 

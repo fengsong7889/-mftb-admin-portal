@@ -12,7 +12,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * AI 使用申請表字段遷移：estimated_requests → usage_scenarios / usage_frequency
+ * AI 使用申请表字段迁移：estimated_requests → usage_scenarios / usage_frequency
  */
 @Slf4j
 @Component

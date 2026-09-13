@@ -11,7 +11,7 @@ import java.util.List;
 @Data
 public class RoleRequest {
 
-    @NotBlank(message = "角色名称不能为空")
+    @NotBlank(message = "角色名稱不能為空")
     private String name;
 
     /** 角色描述 */

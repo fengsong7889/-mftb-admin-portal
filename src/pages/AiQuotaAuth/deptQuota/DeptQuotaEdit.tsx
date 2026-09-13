@@ -81,6 +81,7 @@ export default function DeptQuotaEdit() {
               softThreshold: policy.softThreshold,
               overLimitAction: policy.overLimitAction,
               downgradeModelId: policy.downgradeModelId ?? undefined,
+              downgradeExemptQuota: policy.downgradeExemptQuota ?? undefined,
               status: policy.status,
             })
             setSelectedDeptIds(policy.deptIds)
@@ -192,6 +193,7 @@ export default function DeptQuotaEdit() {
         softThreshold: (values.softThreshold ?? 80) as number,
         overLimitAction: String(values.overLimitAction),
         downgradeModelId: values.overLimitAction === 'downgrade' ? (values.downgradeModelId ?? null) : null,
+        downgradeExemptQuota: values.overLimitAction === 'downgrade' ? (values.downgradeExemptQuota ?? null) : null,
         status: (values.status ?? 1) as number,
       }
       await saveDeptQuota(payload)
@@ -504,10 +506,15 @@ export default function DeptQuotaEdit() {
 
           {/* 降級目標模型（僅自動降級時） */}
           {overLimitAction === 'downgrade' && (
-            <Form.Item name="downgradeModelId" label="降級目標模型" rules={[{ required: true, message: '請選擇降級目標模型' }]}
-              extra="超出限額後，該部門請求自動路由到此模型（通常為更輕量 / 更便宜的模型）">
-              <Select showSearch optionFilterProp="label" placeholder="選擇降級後使用的模型" options={modelOptions} />
-            </Form.Item>
+            <>
+              <Form.Item name="downgradeModelId" label="降級目標模型" rules={[{ required: true, message: '請選擇降級目標模型' }]}
+                extra="超出限額後，該部門請求自動路由到此模型（通常為更輕量 / 更便宜的模型）">
+                <Select showSearch optionFilterProp="label" placeholder="選擇降級後使用的模型" options={modelOptions} />
+              </Form.Item>
+              <Form.Item name="downgradeExemptQuota" label="降級豁免額度" tooltip="主額度用完後，降級模型可獨立使用的額外額度（跟隨主額度分配方式）">
+                <InputNumber min={0} style={{ width: '100%' }} placeholder="留空表示不設獨立豁免額度" />
+              </Form.Item>
+            </>
           )}
 
           {/* 實時額度解讀 */}

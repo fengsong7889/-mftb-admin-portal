@@ -187,7 +187,6 @@ export interface TransferApplyPayload {
   fromGroupId: string
   fromGroupName: string
   brand: string
-  fromVirtualBalance?: number
   toGroupId: string
   toGroupName: string
   transferAmount: number

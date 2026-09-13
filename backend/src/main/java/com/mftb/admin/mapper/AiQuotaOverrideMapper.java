@@ -5,7 +5,7 @@ import com.mftb.admin.entity.AiQuotaOverride;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 員工獨立額度授予 Mapper
+ * 员工独立额度授予 Mapper
  */
 @Mapper
 public interface AiQuotaOverrideMapper extends BaseMapper<AiQuotaOverride> {

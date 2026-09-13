@@ -10,22 +10,16 @@ import com.mftb.admin.dto.StoreDataConfigDTO;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemSignboard;
-import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.BizStoreDataConfig;
-import com.mftb.admin.entity.FinAccount;
-import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
-import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreDataConfigMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.AdOrderSupport;
 import com.mftb.admin.service.AdPricingSignboardService;
 import com.mftb.admin.service.AdSalesSignboardService;
-import com.mftb.admin.service.FinAccountService;
-import com.mftb.admin.service.FinWriteChainService;
-import com.mftb.admin.service.GiftService;
 import com.mftb.admin.service.StoreDataConfigService;
 import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
@@ -68,13 +62,10 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
     private final AdOrderMapper orderMapper;
     private final AdOrderItemSignboardMapper itemMapper;
     private final AdAlgorithmMapper algorithmMapper;
-    private final BizMerchantGroupMapper groupMapper;
     private final BizStoreMapper storeMapper;
     private final BizStoreDataConfigMapper storeDataConfigMapper;
     private final AdPricingSignboardService pricingService;
-    private final FinAccountService accountService;
-    private final FinWriteChainService finWriteChainService;
-    private final GiftService giftService;
+    private final AdOrderSupport orderSupport;
     private final StoreDataConfigService storeDataConfigService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
@@ -191,16 +182,12 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         Set<String> purchased = purchasedCells(pricing.getId(), request.getGroupCode(), today, endDate);
         for (String key : requestKeys) {
             if (purchased.contains(key)) {
-                throw new BusinessException("該標籤在所选日期已購買，不能重複購買");
+                throw new BusinessException("該標籤在所選日期已購買，不能重複購買");
             }
         }
 
         // 3.5 对比类标签资格校验 + 同一天同一标签场景互斥校验
-        BizStore store = StringUtils.hasText(request.getStoreCode())
-                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
-                        .eq(BizStore::getStoreCode, request.getStoreCode())
-                        .last("LIMIT 1"))
-                : null;
+        BizStore store = orderSupport.findStore(request.getStoreCode());
         validateComparisonCells(pricing, request, store, purchased);
 
         // 4. 计价: 按标签x场景分别计算原价 → 按该组合天数匹配梯度折扣
@@ -236,43 +223,16 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
 
         // 5. 赠送天数抵扣
         int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
-        BigDecimal giftDeduction = BigDecimal.ZERO;
-        if (giftDays > 0) {
-            if (store == null) {
-                throw new BusinessException("請選擇門店後再使用贈送天數抵扣");
-            }
-            int available = giftService.availableDays(store.getId(), GIFT_AD_TYPE);
-            if (available < giftDays) {
-                throw new BusinessException("贈送天數餘額不足，當前可用 " + available + " 天");
-            }
-            if (giftDays > request.getCells().size()) {
-                throw new BusinessException("抵扣天數不能超過購買天數");
-            }
-            giftDeduction = AdCalcUtils.round2(discountedTotal
-                    .multiply(BigDecimal.valueOf(giftDays))
-                    .divide(BigDecimal.valueOf(request.getCells().size()), RoundingMode.HALF_UP));
-            if (giftDeduction.compareTo(discountedTotal) > 0) {
-                giftDeduction = discountedTotal;
-            }
-        }
+        BigDecimal giftDeduction = orderSupport.calcGiftDeduction(GIFT_AD_TYPE, store, giftDays,
+                request.getCells().size(), discountedTotal);
         BigDecimal actualTotal = discountedTotal.subtract(giftDeduction);
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
         // 6. 推广金账户校验 + 余额校验
-        if (actualTotal.signum() > 0) {
-            FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
-            BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
-            if (balance.compareTo(actualTotal) < 0) {
-                throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
-            }
-        }
+        orderSupport.requireSufficientBalance(request.getGroupCode(), brand, actualTotal);
 
         // 7. 写订单主表
         String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_SIGNBOARD);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
@@ -283,16 +243,11 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         order.setBrand(brand);
         order.setChannel(channel);
         order.setGroupCode(request.getGroupCode());
-        order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
+        order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
         order.setStoreName(store != null ? store.getStoreName() : null);
         order.setBdEmpId(request.getBdEmpId());
-        SysUser operator = operatorResolver.currentUser();
-        if (operator != null) {
-            order.setOperatorType(2);
-            order.setOperatorId(StringUtils.hasText(operator.getEmpId()) ? operator.getEmpId() : operator.getUsername());
-            order.setOperatorName(StringUtils.hasText(operator.getName()) ? operator.getName() : operator.getUsername());
-        }
+        orderSupport.applyOperatorSnapshot(order);
         order.setItemCount(request.getCells().size());
         order.setOriginalAmount(originalTotal);
         order.setDiscountAmount(discountAmount);
@@ -345,30 +300,21 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
         }
 
         // 9. 扣减赠送天数
-        if (giftDays > 0 && store != null) {
-            giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
-                    pricing.getPricingNo(), pricing.getAlgoName());
-        }
+        orderSupport.deductGiftDays(GIFT_AD_TYPE, store, giftDays, orderNo,
+                pricing.getPricingNo(), pricing.getAlgoName());
 
         // 10. 扣款 + 写消费明细
         String changeType = "金字招牌";
         String finChannel = channel != null && channel == 4 ? "團購" : "外賣";
-        if (actualTotal.signum() > 0) {
-            String firstDetailId = finWriteChainService.writeAdConsume(
-                    request.getGroupCode(), order.getGroupName(), brand,
-                    order.getStoreCode(), order.getStoreName(), finChannel,
-                    actualTotal, changeType, request.getBdEmpId(),
-                    changeType + "廣告購買 訂單" + orderNo, orderNo, now);
-            order.setFlowNo(firstDetailId);
-            orderMapper.updateById(order);
-        }
+        orderSupport.writeAdConsume(order, request.getGroupCode(), brand, finChannel,
+                actualTotal, changeType, request.getBdEmpId(), now);
         return AdOrderVO.from(order);
     }
 
     /* ==================== 内部方法 ==================== */
 
     private AdPricingSignboardVO requireActivePricing(Long algoId) {
-        // activeByAlgo 按 algo_id 字段查找已啟用的定價配置（與 DayPicker/Revive 保持一致）
+        // activeByAlgo 按 algo_id 字段查找已启用的定价配置（与 DayPicker/Revive 保持一致）
         AdPricingSignboardVO pricing = pricingService.activeByAlgo(algoId);
         if (pricing == null) {
             throw new BusinessException("該算法未配置銷售定價或定價未啟用");

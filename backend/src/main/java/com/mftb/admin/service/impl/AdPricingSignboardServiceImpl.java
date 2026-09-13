@@ -152,13 +152,13 @@ public class AdPricingSignboardServiceImpl extends
         Set<String> seen = new HashSet<>();
         for (AdPricingSignboardRequest.LabelPrice item : items) {
             if (!StringUtils.hasText(item.getLabelType())) {
-                throw new BusinessException("标签类型不能为空");
+                throw new BusinessException("標籤類型不能為空");
             }
             // 按 labelType + scenario 联合唯一校验
             String scenarioKey = item.getScenario() != null ? item.getScenario() : "";
             String compositeKey = item.getLabelType() + ":" + scenarioKey;
             if (!seen.add(compositeKey)) {
-                throw new BusinessException("标签配置重复: " + item.getLabelType()
+                throw new BusinessException("標籤配置重複: " + item.getLabelType()
                         + (StringUtils.hasText(item.getScenario()) ? "[" + item.getScenario() + "]" : ""));
             }
             AdPricingSignboardLabel entity = new AdPricingSignboardLabel();

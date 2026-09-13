@@ -29,10 +29,10 @@ public class AiProviderDTO {
     public static class ProviderSaveRequest implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        @NotBlank(message = "供应商标识不能为空")
+        @NotBlank(message = "供應商標識不能為空")
         private String providerKey;
 
-        @NotBlank(message = "供应商名称不能为空")
+        @NotBlank(message = "供應商名稱不能為空")
         private String name;
 
         private String description;

@@ -1,6 +1,7 @@
 package com.mftb.admin.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.entity.AiConversation;
 import com.mftb.admin.service.AiConversationService;
@@ -91,6 +92,7 @@ public class AiConversationController {
 
     /** 管理员分页查询所有会话 */
     @GetMapping("/audit")
+    @RequirePermission(menu = "ai-conversation-audit")
     @Operation(summary = "管理员审计：分页查询所有会话")
     public Result<Page<AiConversation>> audit(
             @RequestParam(defaultValue = "1") int page,
@@ -108,6 +110,7 @@ public class AiConversationController {
 
     /** 获取所有已使用过的模型标识列表 */
     @GetMapping("/audit/model-keys")
+    @RequirePermission(menu = "ai-conversation-audit")
     @Operation(summary = "获取所有已使用的模型标识")
     public Result<List<String>> modelKeys() {
         return Result.success(conversationService.listDistinctModelKeys());
@@ -115,11 +118,12 @@ public class AiConversationController {
 
     /** 管理员查看单个会话详情（含所有状态，含员工姓名） */
     @GetMapping("/audit/{id}")
+    @RequirePermission(menu = "ai-conversation-audit")
     @Operation(summary = "管理员查看单个会话详情")
     public Result<AiConversation> auditDetail(@PathVariable Long id) {
         AiConversation conv = conversationService.getConversationForAudit(id);
         if (conv == null) {
-            return Result.error(404, "会话不存在");
+            return Result.error(404, "會話不存在");
         }
         return Result.success(conv);
     }

@@ -42,7 +42,7 @@ public class RoleController {
     @PostMapping
     @RequirePermission(menu = "role-management", action = "create")
     public Result<RoleVO> create(@Valid @RequestBody RoleRequest request) {
-        return Result.success("角色创建成功", roleService.create(request));
+        return Result.success("角色創建成功", roleService.create(request));
     }
 
     /** 编辑角色基础信息 */

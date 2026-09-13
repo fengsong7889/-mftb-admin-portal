@@ -5,6 +5,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdPricingSignboardRequest;
 import com.mftb.admin.dto.AdPricingSignboardVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StatusUpdateDTO;
 import com.mftb.admin.service.AdPricingSignboardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 /**
  * 金字招牌销售定价接口
@@ -60,21 +59,21 @@ public class AdPricingSignboardController {
     @PostMapping
     @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<AdPricingSignboardVO> create(@Valid @RequestBody AdPricingSignboardRequest request) {
-        return Result.success("计价配置已保存", pricingService.create(request));
+        return Result.success("計價配置已保存", pricingService.create(request));
     }
 
     /** 编辑计价配置 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "ad-sales", action = "edit")
     public Result<AdPricingSignboardVO> update(@PathVariable Long id, @Valid @RequestBody AdPricingSignboardRequest request) {
-        return Result.success("计价配置已更新", pricingService.update(id, request));
+        return Result.success("計價配置已更新", pricingService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
     @RequirePermission(menu = "ad-sales", action = "edit")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
-        pricingService.updateStatus(id, body.get("status"));
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusUpdateDTO dto) {
+        pricingService.updateStatus(id, dto.getStatus());
         return Result.success();
     }
 

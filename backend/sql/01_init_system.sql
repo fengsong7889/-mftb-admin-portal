@@ -80,9 +80,7 @@ CREATE TABLE sys_role_menu (
 -- ============================================================
 
 -- 初始用户
--- 注意: 密码为 BCrypt 加密值。
---   admin 密码明文: 111222
---   guest 密码明文: 123456
+-- 注意: 密码为 BCrypt 加密值, 明文不写入仓库;
 -- 下方 BCrypt 值为占位符, 首次启动后端时会由 DataInitializer 自动重置为正确加密值。
 INSERT INTO sys_user (username, password, name, emp_id, avatar, role, department, position, status) VALUES
 ('admin', '$2a$10$placeholder', 'Bee', 'SF0001', 'pikachu-default', 'admin', '集团总裁办', '高级副总裁', 1),

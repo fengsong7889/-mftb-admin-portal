@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 /**
  * MCP 工具注册表
- * AI 助手工具广场：广场管「接入」（安装/卸载），AI 操作授權管「放行」（L0-L4 治理）
+ * AI 助手工具广场：广场管「接入」（安装/卸载），AI 操作授权管「放行」（L0-L4 治理）
  */
 @Data
 @TableName("mcp_tool")

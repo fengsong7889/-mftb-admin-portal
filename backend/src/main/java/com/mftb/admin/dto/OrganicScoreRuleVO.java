@@ -15,7 +15,7 @@ public class OrganicScoreRuleVO {
     /** 规则编码 */
     private String ruleCode;
 
-    /** 所属维度: 1=商業 2=店鋪 4=平台 */
+    /** 所属维度: 1=商业 2=店铺 4=平台 */
     private Integer dimension;
 
     /** 规则名称 */
@@ -72,7 +72,7 @@ public class OrganicScoreRuleVO {
     /** 屏蔽商家列表 JSON 字符串 */
     private String blockedMerchants;
 
-    /** 活动加分配置 JSON 字符串（STB_ACT 活動加分規則使用） */
+    /** 活动加分配置 JSON 字符串（STB_ACT 活动加分规则使用） */
     private String activityItems;
 
     /** 服务状态: 1=启用 2=停用 */

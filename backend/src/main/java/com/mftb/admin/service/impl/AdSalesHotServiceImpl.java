@@ -8,19 +8,12 @@ import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemHot;
-import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
-import com.mftb.admin.entity.FinAccount;
-import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdOrderItemHotMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
-import com.mftb.admin.mapper.BizMerchantGroupMapper;
-import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.AdOrderSupport;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdSalesHotService;
-import com.mftb.admin.service.FinAccountService;
-import com.mftb.admin.service.FinWriteChainService;
-import com.mftb.admin.service.GiftService;
 import com.mftb.admin.util.AdCalcUtils;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
@@ -57,12 +50,8 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
 
     private final AdOrderMapper orderMapper;
     private final AdOrderItemHotMapper itemMapper;
-    private final BizMerchantGroupMapper groupMapper;
-    private final BizStoreMapper storeMapper;
     private final AdPricingHotService pricingService;
-    private final FinAccountService accountService;
-    private final FinWriteChainService finWriteChainService;
-    private final GiftService giftService;
+    private final AdOrderSupport orderSupport;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -155,7 +144,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         Set<String> purchased = purchasedCells(request.getAlgoId(), request.getGroupCode(), today, endDate);
         for (String key : requestKeys) {
             if (purchased.contains(key)) {
-                throw new BusinessException("該皮膚在所选日期已購買，不能重複購買");
+                throw new BusinessException("該皮膚在所選日期已購買，不能重複購買");
             }
         }
 
@@ -174,69 +163,33 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
 
         // 5. 赠送天数抵扣: 按折后日均价折算，封顶折后总额（赠送部分不走推广金，退款不返还）
         int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
-        BizStore store = StringUtils.hasText(request.getStoreCode())
-                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
-                        .eq(BizStore::getStoreCode, request.getStoreCode())
-                        .last("LIMIT 1"))
-                : null;
-        BigDecimal giftDeduction = BigDecimal.ZERO;
-        if (giftDays > 0) {
-            if (store == null) {
-                throw new BusinessException("請選擇門店後再使用贈送天數抵扣");
-            }
-            int available = giftService.availableDays(store.getId(), GIFT_AD_TYPE);
-            if (available < giftDays) {
-                throw new BusinessException("贈送天數餘額不足，當前可用 " + available + " 天");
-            }
-            if (giftDays > request.getCells().size()) {
-                throw new BusinessException("抵扣天數不能超過購買天數");
-            }
-            giftDeduction = AdCalcUtils.round2(discountedTotal
-                    .multiply(BigDecimal.valueOf(giftDays))
-                    .divide(BigDecimal.valueOf(request.getCells().size()), RoundingMode.HALF_UP));
-            if (giftDeduction.compareTo(discountedTotal) > 0) {
-                giftDeduction = discountedTotal;
-            }
-        }
+        BizStore store = orderSupport.findStore(request.getStoreCode());
+        BigDecimal giftDeduction = orderSupport.calcGiftDeduction(GIFT_AD_TYPE, store, giftDays,
+                request.getCells().size(), discountedTotal);
         BigDecimal actualTotal = discountedTotal.subtract(giftDeduction);
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
         // 6. 推广金账户校验 + 余额校验（仅实际需要推广金时才检查账户状态）
-        if (actualTotal.signum() > 0) {
-            FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
-            BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
-            if (balance.compareTo(actualTotal) < 0) {
-                throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
-            }
-        }
+        orderSupport.requireSufficientBalance(request.getGroupCode(), brand, actualTotal);
 
         // 7. 写订单主表 + 明细
         String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_POPULAR);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
-        order.setAlgoType(5); // 人氣商家固定类型
-        order.setAlgoId(pricing.getId()); // 解耦後存定價配置ID，用於已購格子查詢
+        order.setAlgoType(5); // 人气商家固定类型
+        order.setAlgoId(pricing.getId()); // 解耦后存定价配置ID，用于已购格子查询
         order.setAlgoName(pricing.getAlgoName());
         order.setAlgoCode(pricing.getPricingNo()); // 存定价编号，用于订单列表展示"配置ID"
         order.setBrand(brand);
         order.setChannel(channel);
         order.setGroupCode(request.getGroupCode());
-        order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
+        order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
         order.setStoreName(store != null ? store.getStoreName() : null);
         order.setBdEmpId(request.getBdEmpId());
         // 下单人快照: 当前登录的业务人员
-        SysUser operator = operatorResolver.currentUser();
-        if (operator != null) {
-            order.setOperatorType(2);
-            order.setOperatorId(StringUtils.hasText(operator.getEmpId()) ? operator.getEmpId() : operator.getUsername());
-            order.setOperatorName(StringUtils.hasText(operator.getName()) ? operator.getName() : operator.getUsername());
-        }
+        orderSupport.applyOperatorSnapshot(order);
         order.setItemCount(request.getCells().size());
         order.setOriginalAmount(originalTotal);
         order.setDiscountAmount(discountAmount);
@@ -284,23 +237,14 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         }
 
         // 8. 扣减赠送天数余额并写消费流水（与订单同事务）
-        if (giftDays > 0 && store != null) {
-            giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
-                    pricing.getPricingNo(), pricing.getAlgoName());
-        }
+        orderSupport.deductGiftDays(GIFT_AD_TYPE, store, giftDays, orderNo,
+                pricing.getPricingNo(), pricing.getAlgoName());
 
         // 9. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=广告类型）
         String changeType = "人氣商家";
         String finChannel = channel != null && channel == 4 ? "團購" : "外賣";
-        if (actualTotal.signum() > 0) {
-            String firstDetailId = finWriteChainService.writeAdConsume(
-                    request.getGroupCode(), order.getGroupName(), brand,
-                    order.getStoreCode(), order.getStoreName(), finChannel,
-                    actualTotal, changeType, request.getBdEmpId(),
-                    changeType + "廣告購買 訂單" + orderNo, orderNo, now);
-            order.setFlowNo(firstDetailId);
-            orderMapper.updateById(order);
-        }
+        orderSupport.writeAdConsume(order, request.getGroupCode(), brand, finChannel,
+                actualTotal, changeType, request.getBdEmpId(), now);
         return AdOrderVO.from(order);
     }
 
@@ -345,7 +289,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         return purchased;
     }
 
-    /** 皮膚銷量統計: 有效訂單(待推廣/推廣中/已推廣)中每單每個皮膚記一次 */
+    /** 皮肤销量统计: 有效订单(待推广/推广中/已推广)中每单每个皮肤记一次 */
     private Map<String, Integer> skinSoldCounts(Long algoId) {
         Map<String, Integer> soldCounts = new LinkedHashMap<>();
         List<Long> orderIds = orderMapper.selectList(
@@ -361,7 +305,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
                 new LambdaQueryWrapper<AdOrderItemHot>()
                         .in(AdOrderItemHot::getOrderId, orderIds)
                         .in(AdOrderItemHot::getDeliveryStatus, 1, 2));
-        // 同一訂單同一皮膚只記一次（一單多天只算一單銷量）
+        // 同一订单同一皮肤只记一次（一单多天只算一单销量）
         Set<String> counted = new HashSet<>();
         for (AdOrderItemHot item : items) {
             if (counted.add(item.getOrderId() + "|" + item.getSkinName())) {

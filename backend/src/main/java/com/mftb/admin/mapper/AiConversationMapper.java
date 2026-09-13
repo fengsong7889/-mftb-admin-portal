@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
+/** AI 助手会话实体 Mapper */
 @Mapper
 public interface AiConversationMapper extends BaseMapper<AiConversation> {
 

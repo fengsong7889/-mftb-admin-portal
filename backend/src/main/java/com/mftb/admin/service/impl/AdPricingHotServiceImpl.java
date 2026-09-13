@@ -155,10 +155,10 @@ public class AdPricingHotServiceImpl extends
         Set<String> seen = new HashSet<>();
         for (AdPricingHotRequest.SkinPrice skin : skins) {
             if (!StringUtils.hasText(skin.getSkinName())) {
-                throw new BusinessException("皮肤名称不能为空");
+                throw new BusinessException("皮膚名稱不能為空");
             }
             if (!seen.add(skin.getSkinName())) {
-                throw new BusinessException("皮肤配置重复: " + skin.getSkinName());
+                throw new BusinessException("皮膚配置重複: " + skin.getSkinName());
             }
             AdPricingHotSkin entity = new AdPricingHotSkin();
             entity.setPricingId(pricingId);

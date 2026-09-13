@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 參數類型實體（按分類維度管理，如 CPU / 內存 / 存儲）
+ * 参数类型实体（按分类维度管理，如 CPU / 内存 / 存储）
  */
 @Data
 @TableName("biz_eam_param_type")
@@ -15,28 +15,28 @@ public class EamParamType {
     @TableId
     private Long id;
 
-    /** 所屬分類編碼 */
+    /** 所属分类编码 */
     private String categoryCode;
 
-    /** 參數編碼（分類內唯一） */
+    /** 参数编码（分类内唯一） */
     private String code;
 
-    /** 參數名稱 */
+    /** 参数名称 */
     private String name;
 
-    /** 計量單位 */
+    /** 计量单位 */
     private String unit;
 
-    /** 值類型：select / text / number */
+    /** 值类型：select / text / number */
     private String valueType;
 
-    /** 狀態 */
+    /** 状态 */
     private String status;
 
     /** 排序 */
     private Integer sort;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

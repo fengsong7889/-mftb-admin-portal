@@ -20,6 +20,7 @@ import com.mftb.admin.mapper.BizStoreBdMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.FlashSaleService;
 import com.mftb.admin.service.SysConfigService;
+import com.mftb.admin.util.ConvertUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -438,7 +439,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         vo.setTotalSales(cur.getTotalSales());
         vo.setTotalProducts(cur.getTotalProducts());
         vo.setSoldProducts(cur.getSoldProducts());
-        vo.setSoldRate(rate(toBigDecimal(cur.getSoldProducts()), toBigDecimal(cur.getTotalProducts())));
+        vo.setSoldRate(rate(ConvertUtils.toBigDecimal(cur.getSoldProducts()), ConvertUtils.toBigDecimal(cur.getTotalProducts())));
         vo.setBuyers(cur.getBuyers());
         vo.setRepurchaseBuyers(cur.getRepurchaseBuyers());
         vo.setRepurchaseRate(cur.getRepurchaseRate());
@@ -446,9 +447,9 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         if (prev != null) {
             vo.setPayableChange(change(cur.getTotalPayable(), prev.getTotalPayable()));
             vo.setActualChange(change(cur.getTotalActual(), prev.getTotalActual()));
-            vo.setOrdersChange(change(toBigDecimal(cur.getTotalOrders()), toBigDecimal(prev.getTotalOrders())));
-            vo.setSalesChange(change(toBigDecimal(cur.getTotalSales()), toBigDecimal(prev.getTotalSales())));
-            vo.setBuyersChange(change(toBigDecimal(cur.getBuyers()), toBigDecimal(prev.getBuyers())));
+            vo.setOrdersChange(change(ConvertUtils.toBigDecimal(cur.getTotalOrders()), ConvertUtils.toBigDecimal(prev.getTotalOrders())));
+            vo.setSalesChange(change(ConvertUtils.toBigDecimal(cur.getTotalSales()), ConvertUtils.toBigDecimal(prev.getTotalSales())));
+            vo.setBuyersChange(change(ConvertUtils.toBigDecimal(cur.getBuyers()), ConvertUtils.toBigDecimal(prev.getBuyers())));
         }
         return vo;
     }
@@ -584,10 +585,6 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             }
         }
         return DEFAULT_BLACKLIST_THRESHOLD;
-    }
-
-    private static BigDecimal toBigDecimal(Integer v) {
-        return v == null ? null : BigDecimal.valueOf(v);
     }
 
     /** 环比: (cur - prev) / prev，保留4位；prev 为空或 0 时返回 null */

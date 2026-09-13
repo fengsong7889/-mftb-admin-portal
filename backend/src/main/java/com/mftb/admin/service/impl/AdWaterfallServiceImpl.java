@@ -124,7 +124,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
     @Override
     public void updateStatus(Long id, Integer status) {
         if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
+            throw new BusinessException("非法的服務狀態: " + status);
         }
         AdWaterfall entity = require(id);
         entity.setStatus(status);
@@ -161,7 +161,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
         Set<Integer> positions = new HashSet<>();
         for (AdWaterfallRequest.SlotItem slot : slots) {
             if (slot.getSlotPosition() == null || slot.getSlotPosition() < 1) {
-                throw new BusinessException("坑位序号必须为正整数");
+                throw new BusinessException("坑位序號必須為正整數");
             }
             if (!positions.add(slot.getSlotPosition())) {
                 throw new BusinessException(slot.getSlotPosition() + "号位配置重复，一个坑位只能展示一种算法");

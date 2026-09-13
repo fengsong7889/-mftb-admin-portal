@@ -3,6 +3,7 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.BatchDataAuthorizationRequest;
+import com.mftb.admin.dto.BatchIdsDTO;
 import com.mftb.admin.dto.DataAuthorizationRequest;
 import com.mftb.admin.dto.DataAuthorizationVO;
 import com.mftb.admin.service.DataAuthorizationService;
@@ -100,9 +101,8 @@ public class DataAuthorizationController {
     /** 批量删除数据授权 */
     @DeleteMapping("/batch")
     @RequirePermission(menu = "data-permission", action = "delete")
-    public Result<Void> batchDelete(@RequestBody Map<String, List<Long>> body) {
-        List<Long> ids = body.get("ids");
-        dataAuthorizationService.batchDelete(ids);
+    public Result<Void> batchDelete(@RequestBody BatchIdsDTO dto) {
+        dataAuthorizationService.batchDelete(dto.getIds());
         return Result.success();
     }
 }

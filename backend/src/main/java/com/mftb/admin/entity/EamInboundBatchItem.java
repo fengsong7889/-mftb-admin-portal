@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 驗收入庫批次明細實體
+ * 验收入库批次明细实体
  */
 @Data
 @TableName("biz_eam_inbound_batch_item")
@@ -15,25 +15,25 @@ public class EamInboundBatchItem {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 所屬批次 ID */
+    /** 所属批次 ID */
     private Long batchId;
 
-    /** 資產型號 ID */
+    /** 资产型号 ID */
     private Long modelId;
 
-    /** 資產名稱 */
+    /** 资产名称 */
     private String modelName;
 
-    /** 驗收數量 */
+    /** 验收数量 */
     private Integer qty;
 
     /** 存放位置 ID */
     private Long locationId;
 
-    /** 生成的資產編號列表 JSON */
+    /** 生成的资产编号列表 JSON */
     private String assetNos;
 
-    /** 驗收處置方式：pass=通過 / return=退貨 / exchange=換貨 / concession=讓步接收 */
+    /** 验收处置方式：pass=通过 / return=退货 / exchange=换货 / concession=让步接收 */
     private String disposition;
 
     /** 验收不通过原因 */

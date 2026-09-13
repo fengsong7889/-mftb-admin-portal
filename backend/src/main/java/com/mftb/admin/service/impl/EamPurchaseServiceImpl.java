@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.EamPurchaseSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamPurchaseOrder;
 import com.mftb.admin.entity.EamPurchaseOrderItem;
@@ -38,7 +39,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
-    /* ==================== 分頁查詢 ==================== */
+    /* ==================== 分页查询 ==================== */
 
     @Override
     public PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String supplier,
@@ -65,7 +66,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         return new PageResult<>(records, result.getTotal());
     }
 
-    /* ==================== 詳情 ==================== */
+    /* ==================== 详情 ==================== */
 
     @Override
     public Map<String, Object> getOrderDetail(long id) {
@@ -74,7 +75,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
 
         Map<String, Object> map = orderToMap(order);
 
-        // 查詢明細
+        // 查询明细
         List<EamPurchaseOrderItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<EamPurchaseOrderItem>()
                         .eq(EamPurchaseOrderItem::getOrderId, id)
@@ -84,7 +85,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         // 解析 supplierGroups JSON
         if (order.getSupplierGroups() != null && !order.getSupplierGroups().isBlank()) {
             List<Map<String, Object>> groups = JsonUtils.parseMapList(order.getSupplierGroups());
-            // 為每個 group 填充 items
+            // 为每个 group 填充 items
             for (Map<String, Object> group : groups) {
                 String gid = String.valueOf(group.get("id"));
                 List<Map<String, Object>> groupItems = items.stream()
@@ -98,20 +99,20 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         return map;
     }
 
-    /* ==================== 創建訂單（直接錄入） ==================== */
+    /* ==================== 创建订单（直接录入） ==================== */
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public long createOrder(Map<String, Object> data) {
+    public long createOrder(EamPurchaseSaveDTO dto) {
         String operator = operatorResolver.currentOperatorName();
 
         EamPurchaseOrder order = new EamPurchaseOrder();
-        order.setReqId(toLong(data.get("reqId"), 0L));
-        order.setSupplier(str(data, "supplier"));
-        order.setAmount(toBigDecimal(data.get("amount"), BigDecimal.ZERO));
-        order.setDeliveryDate(str(data, "deliveryDate"));
-        order.setPurchaser(str(data, "purchaser"));
-        order.setRemark(str(data, "remark"));
+        order.setReqId(dto.getReqId() != null ? dto.getReqId() : 0L);
+        order.setSupplier(Objects.toString(dto.getSupplier(), ""));
+        order.setAmount(dto.getAmount() != null ? dto.getAmount() : BigDecimal.ZERO);
+        order.setDeliveryDate(Objects.toString(dto.getDeliveryDate(), ""));
+        order.setPurchaser(Objects.toString(dto.getPurchaser(), ""));
+        order.setRemark(Objects.toString(dto.getRemark(), ""));
         order.setExecStatus("pending");
         order.setStatus("pending");
         order.setAcceptedQty(0);
@@ -120,35 +121,29 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setConcessionQty(0);
         order.setUpdatedBy(operator);
 
-        // 供應商分組 JSON
-        Object sgObj = data.get("supplierGroups");
-        if (sgObj instanceof List<?> sgList && !sgList.isEmpty()) {
-            order.setSupplierGroups(JsonUtils.toJson(sgList));
-            // 取第一個分組的供應商作為兼容字段
-            Map<String, Object> first = (Map<String, Object>) sgList.get(0);
-            order.setSupplier(str(first, "supplier"));
+        // 供应商分组 JSON
+        List<EamPurchaseSaveDTO.SupplierGroup> groups = dto.getSupplierGroups();
+        if (groups != null && !groups.isEmpty()) {
+            order.setSupplierGroups(JsonUtils.toJson(groups));
+            // 取第一个分组的供应商作为兼容字段
+            order.setSupplier(Objects.toString(groups.get(0).getSupplier(), ""));
         }
 
         orderMapper.insert(order);
 
-        // 生成 PO 編號
+        // 生成 PO 编号
         String poNo = "PO" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                 + String.format("%04d", order.getId());
         order.setPoNo(poNo);
         orderMapper.updateById(order);
 
-        // 保存明細（從 supplierGroups 中提取）
-        if (sgObj instanceof List<?> sgList) {
+        // 保存明细（从 supplierGroups 中提取）
+        if (groups != null) {
             int sort = 0;
-            for (Object sg : sgList) {
-                Map<String, Object> group = (Map<String, Object>) sg;
-                String groupId = String.valueOf(group.get("id"));
-                Object itemsObj = group.get("items");
-                if (itemsObj instanceof List<?> itemList) {
-                    for (Object it : itemList) {
-                        Map<String, Object> itemMap = (Map<String, Object>) it;
-                        saveOrderItem(order.getId(), groupId, itemMap, sort++);
-                    }
+            for (EamPurchaseSaveDTO.SupplierGroup group : groups) {
+                if (group.getItems() == null) continue;
+                for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
+                    saveOrderItem(order.getId(), group.getId(), item, sort++);
                 }
             }
         }
@@ -157,11 +152,11 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         return order.getId();
     }
 
-    /* ==================== 更新執行信息 ==================== */
+    /* ==================== 更新执行信息 ==================== */
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateOrderExec(long id, Map<String, Object> data) {
+    public void updateOrderExec(long id, EamPurchaseSaveDTO dto) {
         EamPurchaseOrder order = orderMapper.selectById(id);
         if (order == null) throw new BusinessException("採購訂單不存在");
 
@@ -170,47 +165,39 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         LambdaUpdateWrapper<EamPurchaseOrder> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(EamPurchaseOrder::getId, id);
 
-        if (data.containsKey("purchaser")) wrapper.set(EamPurchaseOrder::getPurchaser, str(data, "purchaser"));
-        if (data.containsKey("execStatus")) wrapper.set(EamPurchaseOrder::getExecStatus, str(data, "execStatus"));
-        if (data.containsKey("remark")) wrapper.set(EamPurchaseOrder::getRemark, str(data, "remark"));
-        if (data.containsKey("trackingNo")) wrapper.set(EamPurchaseOrder::getTrackingNo, str(data, "trackingNo"));
+        if (dto.getPurchaser() != null) wrapper.set(EamPurchaseOrder::getPurchaser, dto.getPurchaser());
+        if (dto.getExecStatus() != null) wrapper.set(EamPurchaseOrder::getExecStatus, dto.getExecStatus());
+        if (dto.getRemark() != null) wrapper.set(EamPurchaseOrder::getRemark, dto.getRemark());
+        if (dto.getTrackingNo() != null) wrapper.set(EamPurchaseOrder::getTrackingNo, dto.getTrackingNo());
 
-        // 供應商分組更新
-        Object sgObj = data.get("supplierGroups");
-        if (sgObj instanceof List<?> sgList && !sgList.isEmpty()) {
-            wrapper.set(EamPurchaseOrder::getSupplierGroups, JsonUtils.toJson(sgList));
+        // 供应商分组更新
+        List<EamPurchaseSaveDTO.SupplierGroup> groups = dto.getSupplierGroups();
+        if (groups != null && !groups.isEmpty()) {
+            wrapper.set(EamPurchaseOrder::getSupplierGroups, JsonUtils.toJson(groups));
 
-            // 重新計算成交金額
+            // 重新计算成交金额
             BigDecimal confirmedAmount = BigDecimal.ZERO;
-            for (Object sg : sgList) {
-                Map<String, Object> group = (Map<String, Object>) sg;
-                Object itemsObj = group.get("items");
-                if (itemsObj instanceof List<?> itemList) {
-                    for (Object it : itemList) {
-                        Map<String, Object> itemMap = (Map<String, Object>) it;
-                        BigDecimal cp = toBigDecimal(itemMap.get("confirmedPrice"), null);
-                        BigDecimal price = toBigDecimal(itemMap.get("price"), BigDecimal.ZERO);
-                        int qty = toInt(itemMap.get("qty"), 1);
-                        BigDecimal unitPrice = cp != null ? cp : price;
-                        confirmedAmount = confirmedAmount.add(unitPrice.multiply(BigDecimal.valueOf(qty)));
-                    }
+            for (EamPurchaseSaveDTO.SupplierGroup group : groups) {
+                if (group.getItems() == null) continue;
+                for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
+                    BigDecimal cp = item.getConfirmedPrice();
+                    BigDecimal price = item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO;
+                    int qty = item.getQty() != null ? item.getQty() : 1;
+                    BigDecimal unitPrice = cp != null ? cp : price;
+                    confirmedAmount = confirmedAmount.add(unitPrice.multiply(BigDecimal.valueOf(qty)));
                 }
             }
             wrapper.set(EamPurchaseOrder::getConfirmedAmount, confirmedAmount);
-            wrapper.set(EamPurchaseOrder::getSupplier, str((Map<String, Object>) sgList.get(0), "supplier"));
+            wrapper.set(EamPurchaseOrder::getSupplier, Objects.toString(groups.get(0).getSupplier(), ""));
 
-            // 同步更新明細表
+            // 同步更新明细表
             itemMapper.delete(new LambdaQueryWrapper<EamPurchaseOrderItem>()
                     .eq(EamPurchaseOrderItem::getOrderId, id));
             int sort = 0;
-            for (Object sg : sgList) {
-                Map<String, Object> group = (Map<String, Object>) sg;
-                String groupId = String.valueOf(group.get("id"));
-                Object itemsObj = group.get("items");
-                if (itemsObj instanceof List<?> itemList) {
-                    for (Object it : itemList) {
-                        saveOrderItem(id, groupId, (Map<String, Object>) it, sort++);
-                    }
+            for (EamPurchaseSaveDTO.SupplierGroup group : groups) {
+                if (group.getItems() == null) continue;
+                for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
+                    saveOrderItem(id, group.getId(), item, sort++);
                 }
             }
         }
@@ -219,7 +206,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         orderMapper.update(null, wrapper);
     }
 
-    /* ==================== 刪除訂單 ==================== */
+    /* ==================== 删除订单 ==================== */
 
     @Override
     public void deleteOrder(long id) {
@@ -231,7 +218,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                 .eq(EamPurchaseOrderItem::getOrderId, id));
     }
 
-    /* ==================== 從採購申請自動創建訂單 ==================== */
+    /* ==================== 从采购申请自动创建订单 ==================== */
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -240,8 +227,8 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         if (req == null) throw new BusinessException("採購申請不存在");
         if (req.getOrderId() != null) throw new BusinessException("該申請已生成採購訂單");
 
-        // 解析 formData 中的 items（如果有的話，從 OA formData JSON 中提取）
-        // 這裡從 request 的基本信息構建訂單
+        // 解析 formData 中的 items（如果有的话，从 OA formData JSON 中提取）
+        // 这里从 request 的基本信息构建订单
         EamPurchaseOrder order = new EamPurchaseOrder();
         order.setReqId(req.getId());
         order.setSupplier("待定供應商");
@@ -256,13 +243,13 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setUpdatedBy("system");
         orderMapper.insert(order);
 
-        // 生成 PO 編號
+        // 生成 PO 编号
         String poNo = "PO" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                 + String.format("%04d", order.getId());
         order.setPoNo(poNo);
         orderMapper.updateById(order);
 
-        // 回寫申請表的 orderId
+        // 回写申请表的 orderId
         requestMapper.update(null, new LambdaUpdateWrapper<EamPurchaseRequest>()
                 .eq(EamPurchaseRequest::getId, req.getId())
                 .set(EamPurchaseRequest::getOrderId, order.getId())
@@ -272,30 +259,29 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         return order.getId();
     }
 
-    /* ==================== 內部方法 ==================== */
+    /* ==================== 内部方法 ==================== */
 
-    private void saveOrderItem(long orderId, String groupId, Map<String, Object> item, int sort) {
+    private void saveOrderItem(long orderId, String groupId, EamPurchaseSaveDTO.SupplierItem item, int sort) {
         EamPurchaseOrderItem entity = new EamPurchaseOrderItem();
         entity.setOrderId(orderId);
         entity.setGroupId(groupId);
-        entity.setModelId(toLong(item.get("modelId"), null));
-        entity.setModelName(str(item, "modelName"));
-        entity.setCategoryId(toLong(item.get("categoryId"), null));
-        entity.setCategoryName(str(item, "categoryName"));
-        entity.setCategoryCode(str(item, "categoryCode"));
-        entity.setBrandId(toLong(item.get("brandId"), null));
-        entity.setBrandName(str(item, "brandName"));
-        entity.setPurchaseType(str(item, "purchaseType"));
-        entity.setQty(toInt(item.get("qty"), 1));
-        entity.setPrice(toBigDecimal(item.get("price"), BigDecimal.ZERO));
-        entity.setConfirmedPrice(toBigDecimal(item.get("confirmedPrice"), null));
+        entity.setModelId(item.getModelId());
+        entity.setModelName(Objects.toString(item.getModelName(), ""));
+        entity.setCategoryId(item.getCategoryId());
+        entity.setCategoryName(Objects.toString(item.getCategoryName(), ""));
+        entity.setCategoryCode(Objects.toString(item.getCategoryCode(), ""));
+        entity.setBrandId(item.getBrandId());
+        entity.setBrandName(Objects.toString(item.getBrandName(), ""));
+        entity.setPurchaseType(Objects.toString(item.getPurchaseType(), ""));
+        entity.setQty(item.getQty() != null ? item.getQty() : 1);
+        entity.setPrice(item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO);
+        entity.setConfirmedPrice(item.getConfirmedPrice());
         entity.setReceivedQty(0);
         entity.setSortOrder(sort);
 
         // params JSON
-        Object params = item.get("params");
-        if (params != null) {
-            entity.setParams(params instanceof String ? (String) params : JsonUtils.toJson(params));
+        if (item.getParams() != null) {
+            entity.setParams(JsonUtils.toJson(item.getParams()));
         }
         itemMapper.insert(entity);
     }
@@ -346,27 +332,4 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         return m;
     }
 
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v != null ? v.toString() : "";
-    }
-
-    private static Long toLong(Object v, Long def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.longValue();
-        try { return Long.parseLong(v.toString()); } catch (Exception e) { return def; }
-    }
-
-    private static int toInt(Object v, int def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
-    }
-
-    private static BigDecimal toBigDecimal(Object v, BigDecimal def) {
-        if (v == null) return def;
-        if (v instanceof BigDecimal bd) return bd;
-        if (v instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
-        try { return new BigDecimal(v.toString()); } catch (Exception e) { return def; }
-    }
 }

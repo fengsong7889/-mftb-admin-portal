@@ -124,9 +124,9 @@ public class GiftServiceImpl implements GiftService {
     @Transactional(rollbackFor = Exception.class)
     public GiftRecordVO createRecord(GiftRecordRequest request) {
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());
-        if (group == null) throw new BusinessException("集团不存在");
+        if (group == null) throw new BusinessException("集團不存在");
         BizStore store = storeMapper.selectById(request.getStoreId());
-        if (store == null) throw new BusinessException("门店不存在");
+        if (store == null) throw new BusinessException("門店不存在");
 
         boolean needApproval = workflowConfigService.isApprovalEnabled("gift");
         String approvalNo = null;
@@ -196,7 +196,7 @@ public class GiftServiceImpl implements GiftService {
     @Override
     public GiftRecordVO getRecordDetail(Long id) {
         BizGiftRecord record = giftRecordMapper.selectById(id);
-        if (record == null) throw new BusinessException("赠送记录不存在");
+        if (record == null) throw new BusinessException("贈送記錄不存在");
         GiftRecordVO vo = GiftRecordVO.from(record);
         enrichRecordGroupStore(List.of(vo));
         return vo;
@@ -206,9 +206,9 @@ public class GiftServiceImpl implements GiftService {
     @Transactional(rollbackFor = Exception.class)
     public void deductDays(Long id, GiftDeductRequest request) {
         BizGiftRecord record = giftRecordMapper.selectById(id);
-        if (record == null) throw new BusinessException("赠送记录不存在");
+        if (record == null) throw new BusinessException("贈送記錄不存在");
         if (record.getRemainingDays() < request.getDeductDays()) {
-            throw new BusinessException("扣除天数不能超过剩余天数 " + record.getRemainingDays());
+            throw new BusinessException("扣除天數不能超過剩餘天數 " + record.getRemainingDays());
         }
 
         // 更新赠送记录
@@ -295,13 +295,14 @@ public class GiftServiceImpl implements GiftService {
                 continue;
             }
             int deduct = Math.min(balance, remaining);
+            // 原子扣减: WHERE remaining_days >= deduct 保证并发下不超扣; 影响行数 0 表示余额已被并发扣减
+            if (giftRecordMapper.deductAtomic(record.getId(), deduct,
+                    operatorResolver.currentOperatorName()) == 0) {
+                throw new BusinessException("贈送天數餘額不足，請刷新後重試");
+            }
+            // 仅同步内存快照供消费流水使用, 不再整体回写记录(避免覆盖并发扣减结果)
             record.setUsedDays((record.getUsedDays() == null ? 0 : record.getUsedDays()) + deduct);
             record.setRemainingDays(balance - deduct);
-            if (record.getRemainingDays() == 0) {
-                record.setStatus(2); // 已用完
-            }
-            record.setUpdatedBy(operatorResolver.currentOperatorName());
-            giftRecordMapper.updateById(record);
 
             BizGiftConsume consume = new BizGiftConsume();
             consume.setGiftRecordId(record.getId());

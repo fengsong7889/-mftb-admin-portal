@@ -69,7 +69,7 @@ public class AiModel {
     /** 模型类型：chat/completion/embedding/token_count */
     private String type;
 
-    /** 部署类型：cloud=公有云 private=私有化部署（數據不出域策略僅可選私有化模型） */
+    /** 部署类型：cloud=公有云 private=私有化部署（数据不出域策略仅可选私有化模型） */
     private String deployType;
 
     /** 上下文窗口大小（tokens） */

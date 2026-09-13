@@ -32,7 +32,7 @@ public class AiEmpQuotaServiceImpl implements AiEmpQuotaService {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /* ══════════════════════ 職位額度 ══════════════════════ */
+    /* ══════════════════════ 职位额度 ══════════════════════ */
 
     @Override
     public List<AiEmpQuotaDTO.PosQuotaVO> listPosQuotas(AiEmpQuotaDTO.QuotaQueryRequest query) {
@@ -116,7 +116,7 @@ public class AiEmpQuotaServiceImpl implements AiEmpQuotaService {
         posMapper.updateById(entity);
     }
 
-    /* ══════════════════════ 角色額度 ══════════════════════ */
+    /* ══════════════════════ 角色额度 ══════════════════════ */
 
     @Override
     public List<AiEmpQuotaDTO.RoleQuotaVO> listRoleQuotas(AiEmpQuotaDTO.QuotaQueryRequest query) {
@@ -195,7 +195,7 @@ public class AiEmpQuotaServiceImpl implements AiEmpQuotaService {
         roleMapper.updateById(entity);
     }
 
-    /* ══════════════════════ Entity → VO 轉換 ══════════════════════ */
+    /* ══════════════════════ Entity → VO 转换 ══════════════════════ */
 
     private AiEmpQuotaDTO.PosQuotaVO toPosVO(AiEmpQuotaPolicy e) {
         var vo = new AiEmpQuotaDTO.PosQuotaVO();

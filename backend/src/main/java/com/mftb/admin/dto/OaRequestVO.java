@@ -44,7 +44,7 @@ public class OaRequestVO {
     /** 当前审批人 */
     private String currentApprover;
 
-    /** 当前用户审批时间（用于「待我審批」tab） */
+    /** 当前用户审批时间（用于「待我审批」tab） */
     private String myApprovalTime;
 
     /** 驳回理由 */

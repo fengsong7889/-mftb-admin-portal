@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 員工AI權額管理控制器
+ * 员工AI权额管理控制器
  *
- * 管理員視角：查看任意員工的模型授權與額度配置，
- * 支持編輯能力開關、調整額度值、查詢調整日誌。
+ * 管理员视角：查看任意员工的模型授权与额度配置，
+ * 支持编辑能力开关、调整额度值、查询调整日志。
  */
 @RestController
 @RequestMapping("/api/ai/emp-permission")

@@ -15,11 +15,11 @@ import java.util.List;
 public class AdStarOrderRequest {
 
     /** 算法ID */
-    @NotNull(message = "算法不能为空")
+    @NotNull(message = "算法不能為空")
     private Long algoId;
 
     /** 购买集团ID（关联推广金账户） */
-    @NotBlank(message = "购买集团不能为空")
+    @NotBlank(message = "購買集團不能為空")
     private String groupCode;
 
     /** 购买门店ID */
@@ -32,7 +32,7 @@ public class AdStarOrderRequest {
     private String remark;
 
     /** 选购的格子列表（组合商圈在前端拆解后传入） */
-    @NotEmpty(message = "请至少选择一个格子")
+    @NotEmpty(message = "請至少選擇一個格子")
     private List<CellSelection> cells;
 
     /** 格子选择 */

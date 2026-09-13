@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * email_sender 外部服務執行器：MCP 執行網關的 SMTP 落地
- * 收件人由 AI 在對話中向用戶確認後傳入（前端已有人工確認彈窗，此處做服務端最後校驗）
+ * email_sender 外部服务执行器：MCP 执行网关的 SMTP 落地
+ * 收件人由 AI 在对话中向用户确认后传入（前端已有人工确认弹窗，此处做服务端最后校验）
  */
 @Slf4j
 @Component

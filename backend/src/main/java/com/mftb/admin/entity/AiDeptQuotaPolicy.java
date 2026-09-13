@@ -6,6 +6,9 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * AI 部门配额策略实体（按部门维度授予模型额度）
+ */
 @Data
 @TableName("ai_dept_quota_policy")
 public class AiDeptQuotaPolicy {
@@ -16,9 +19,9 @@ public class AiDeptQuotaPolicy {
     private String configCode;
     private String name;
     private String description;
-    /** JSON 序列化：部門 ID 數組 */
+    /** JSON 序列化：部门 ID 数组 */
     private String deptIds;
-    /** JSON 序列化：部門名稱數組 */
+    /** JSON 序列化：部门名称数组 */
     private String deptNames;
     private Integer totalEmployeeCount;
     private String allocateMode;

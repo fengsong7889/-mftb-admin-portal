@@ -9,9 +9,9 @@ interface Props {
 
 /**
  * 版本更新通知
- * - 檢測到新版本時在右上角彈出提示，引導用戶刷新頁面獲取最新資源
- * - 使用 antd notification API，非阻塞、可手動關閉
- * - 僅在 updateAvailable 變為 true 時觸發一次
+ * - 检测到新版本时在右上角弹出提示，引导用户刷新页面获取最新资源
+ * - 使用 antd notification API，非阻塞、可手动关闭
+ * - 仅在 updateAvailable 变为 true 时触发一次
  */
 export default function VersionUpdateNotification({ updateAvailable }: Props) {
   const { t } = useTranslation()
@@ -27,7 +27,7 @@ export default function VersionUpdateNotification({ updateAvailable }: Props) {
       message: t('versionUpdate.title'),
       description: t('versionUpdate.desc'),
       icon: <CloudUploadOutlined style={{ color: '#E8720C' }} />,
-      duration: 0, // 不自動關閉，直到用戶手動刷新或關閉
+      duration: 0, // 不自动关闭，直到用户手动刷新或关闭
       btn: (
         <Button
           type="primary"

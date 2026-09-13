@@ -70,18 +70,18 @@ public class FinDebtServiceImpl implements FinDebtService {
     public void addRepayment(String billNo, DebtRepaymentDTO request) {
         FinDebtBill bill = requireBill(billNo);
         if (STATUS_TRANSFERRED.equals(bill.getStatus())) {
-            throw new BusinessException("该账单已转结至存续集团，不可再新增扣款");
+            throw new BusinessException("該賬單已轉結至存續集團，不可再新增扣款");
         }
         if (!StringUtils.hasText(request.getChannel())) {
-            throw new BusinessException("请选择扣款渠道");
+            throw new BusinessException("請選擇扣款渠道");
         }
         BigDecimal amount = FinExtras.nonNull(request.getAmount());
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("扣款金额必须大于 0");
+            throw new BusinessException("扣款金額必須大於 0");
         }
         BigDecimal remain = FinExtras.nonNull(bill.getRemainAmount());
         if (amount.compareTo(remain) > 0) {
-            throw new BusinessException("扣款金额不能超过剩余待还 " + remain.toPlainString());
+            throw new BusinessException("扣款金額不能超過剩餘待還 " + remain.toPlainString());
         }
 
         FinDebtRepayment repayment = new FinDebtRepayment();
@@ -107,7 +107,7 @@ public class FinDebtServiceImpl implements FinDebtService {
             throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "还款记录不存在");
         }
         if (repayment.getCanDelete() != null && repayment.getCanDelete() == 0) {
-            throw new BusinessException("系统生成的转移结算记录不可删除");
+            throw new BusinessException("系統生成的轉移結算記錄不可刪除");
         }
         FinDebtBill bill = billMapper.selectById(repayment.getBillId());
         if (bill == null) {

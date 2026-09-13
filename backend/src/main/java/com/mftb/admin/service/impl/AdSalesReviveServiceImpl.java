@@ -10,21 +10,15 @@ import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdDayLockRevive;
 import com.mftb.admin.entity.AdOrder;
 import com.mftb.admin.entity.AdOrderItemRevive;
-import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
-import com.mftb.admin.entity.FinAccount;
-import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdDayLockReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
-import com.mftb.admin.mapper.BizMerchantGroupMapper;
-import com.mftb.admin.mapper.BizStoreMapper;
+import com.mftb.admin.service.AdCellQuotaService;
+import com.mftb.admin.service.AdOrderSupport;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdSalesReviveService;
-import com.mftb.admin.service.FinAccountService;
-import com.mftb.admin.service.FinWriteChainService;
-import com.mftb.admin.service.GiftService;
 import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.AdAlgoTypeNames;
 import com.mftb.admin.util.AdCalcUtils;
@@ -68,12 +62,9 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
     private final AdDayLockReviveMapper lockMapper;
     private final AdOrderMapper orderMapper;
     private final AdOrderItemReviveMapper itemMapper;
-    private final BizMerchantGroupMapper groupMapper;
-    private final BizStoreMapper storeMapper;
     private final AdPricingReviveService pricingService;
-    private final FinAccountService accountService;
-    private final FinWriteChainService finWriteChainService;
-    private final GiftService giftService;
+    private final AdCellQuotaService cellQuotaService;
+    private final AdOrderSupport orderSupport;
     private final SysConfigService sysConfigService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
@@ -163,15 +154,19 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
             }
         }
 
-        // 3. 库存校验（活跃订单占用）+ 其它商家加购锁校验
+        // 3. 库存校验（活跃订单占用）+ 其它商家加购锁校验 + 原子占位（防并发超卖）
         Map<String, Integer> occupied = occupiedCounts(today, endDate);
         Map<String, Set<String>> lockGroups = activeLockGroups(request.getAlgoId(), today, endDate);
-        for (String key : requestKeys) {
+        for (AdReviveOrderRequest.CellSelection cell : request.getCells()) {
+            String key = cellKey(cell.getBizDate(), cell.getRegion());
             int taken = takenCount(key, occupied, lockGroups, request.getGroupCode());
             int limit = salesLimitOfKey(key, regionSalesLimit);
             if (taken >= limit) {
                 throw new BusinessException("部分日期已售罄，請刷新後重新選擇");
             }
+            // 原子占位: 计数+1 受 taken<limit 约束, 计数器与订单同事务, 失败即整体回滚（无餐段维度, mealSlot 传空串）
+            cellQuotaService.takeCell(AdCellQuotaService.MODULE_REVIVE,
+                    cell.getBizDate(), cell.getRegion(), "", limit);
         }
 
         // 4. 计价: 日单价合计 → 按购买天数匹配多天梯度折扣
@@ -189,48 +184,17 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
 
         // 5. 赠送天数抵扣: 按折后日均价折算，封顶折后总额（赠送部分不走推广金，退款不返还）
         int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
-        BizStore store = StringUtils.hasText(request.getStoreCode())
-                ? storeMapper.selectOne(new LambdaQueryWrapper<BizStore>()
-                        .eq(BizStore::getStoreCode, request.getStoreCode())
-                        .last("LIMIT 1"))
-                : null;
-        BigDecimal giftDeduction = BigDecimal.ZERO;
-        if (giftDays > 0) {
-            if (store == null) {
-                throw new BusinessException("請選擇門店後再使用贈送天數抵扣");
-            }
-            int available = giftService.availableDays(store.getId(), GIFT_AD_TYPE);
-            if (available < giftDays) {
-                throw new BusinessException("贈送天數餘額不足，當前可用 " + available + " 天");
-            }
-            if (giftDays > request.getCells().size()) {
-                throw new BusinessException("抵扣天數不能超過購買天數");
-            }
-            giftDeduction = AdCalcUtils.round2(discountedTotal
-                    .multiply(BigDecimal.valueOf(giftDays))
-                    .divide(BigDecimal.valueOf(request.getCells().size()), RoundingMode.HALF_UP));
-            if (giftDeduction.compareTo(discountedTotal) > 0) {
-                giftDeduction = discountedTotal;
-            }
-        }
+        BizStore store = orderSupport.findStore(request.getStoreCode());
+        BigDecimal giftDeduction = orderSupport.calcGiftDeduction(GIFT_AD_TYPE, store, giftDays,
+                request.getCells().size(), discountedTotal);
         BigDecimal actualTotal = discountedTotal.subtract(giftDeduction);
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
 
         // 6. 推广金账户校验 + 余额校验（仅实际需要推广金时才检查账户状态）
-        if (actualTotal.signum() > 0) {
-            FinAccount account = accountService.requireUsable(request.getGroupCode(), brand);
-            BigDecimal balance = account.getVirtualBalance() == null ? BigDecimal.ZERO : account.getVirtualBalance();
-            if (balance.compareTo(actualTotal) < 0) {
-                throw new BusinessException("推廣金餘額不足，當前餘額 " + balance + "，需支付 " + actualTotal);
-            }
-        }
+        orderSupport.requireSufficientBalance(request.getGroupCode(), brand, actualTotal);
 
         // 7. 写订单主表 + 明细
         String orderNo = bizSeqService.next(BizSeqService.RULE_AD_ORDER_REVIVE);
-        BizMerchantGroup group = groupMapper.selectOne(
-                new LambdaQueryWrapper<BizMerchantGroup>()
-                        .eq(BizMerchantGroup::getGroupCode, request.getGroupCode())
-                        .last("LIMIT 1"));
 
         AdOrder order = new AdOrder();
         order.setOrderNo(orderNo);
@@ -241,17 +205,12 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         order.setBrand(brand);
         order.setChannel(algorithm.getChannel());
         order.setGroupCode(request.getGroupCode());
-        order.setGroupName(group != null ? group.getGroupName() : request.getGroupCode());
+        order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
         order.setStoreName(store != null ? store.getStoreName() : null);
         order.setBdEmpId(request.getBdEmpId());
         // 下单人快照: 当前登录的业务人员
-        SysUser operator = operatorResolver.currentUser();
-        if (operator != null) {
-            order.setOperatorType(2);
-            order.setOperatorId(StringUtils.hasText(operator.getEmpId()) ? operator.getEmpId() : operator.getUsername());
-            order.setOperatorName(StringUtils.hasText(operator.getName()) ? operator.getName() : operator.getUsername());
-        }
+        orderSupport.applyOperatorSnapshot(order);
         order.setItemCount(request.getCells().size());
         order.setOriginalAmount(originalTotal);
         order.setDiscountAmount(discountAmount);
@@ -299,23 +258,14 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         }
 
         // 8. 扣减赠送天数余额并写消费流水（与订单同事务）
-        if (giftDays > 0 && store != null) {
-            giftService.deductForOrder(store.getId(), GIFT_AD_TYPE, giftDays, orderNo,
-                    algorithm.getAlgoCode(), algorithm.getAlgoName());
-        }
+        orderSupport.deductGiftDays(GIFT_AD_TYPE, store, giftDays, orderNo,
+                algorithm.getAlgoCode(), algorithm.getAlgoName());
 
         // 9. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=广告类型）
         String changeType = AdAlgoTypeNames.of(algorithm.getAlgoType());
         String finChannel = algorithm.getChannel() != null && algorithm.getChannel() == 4 ? "團購" : "外賣";
-        if (actualTotal.signum() > 0) {
-            String firstDetailId = finWriteChainService.writeAdConsume(
-                    request.getGroupCode(), order.getGroupName(), brand,
-                    order.getStoreCode(), order.getStoreName(), finChannel,
-                    actualTotal, changeType, request.getBdEmpId(),
-                    changeType + "廣告購買 訂單" + orderNo, orderNo, now);
-            order.setFlowNo(firstDetailId);
-            orderMapper.updateById(order);
-        }
+        orderSupport.writeAdConsume(order, request.getGroupCode(), brand, finChannel,
+                actualTotal, changeType, request.getBdEmpId(), now);
 
         // 10. 下单成功后释放本商家对这些格子的加购锁
         releaseLocks(request.getAlgoId(), request.getGroupCode(), request.getCells());

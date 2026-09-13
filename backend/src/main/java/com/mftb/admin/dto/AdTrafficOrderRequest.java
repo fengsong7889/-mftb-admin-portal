@@ -15,11 +15,11 @@ import lombok.Data;
 public class AdTrafficOrderRequest {
 
     /** 投流定价配置ID（biz_ad_pricing_traffic.id，即某算法某业务频道的定价） */
-    @NotNull(message = "定价配置不能为空")
+    @NotNull(message = "定價配置不能為空")
     private Long pricingId;
 
     /** 购买方式: tier=预设档位 custom=自定义数量 */
-    @NotBlank(message = "购买方式不能为空")
+    @NotBlank(message = "購買方式不能為空")
     private String mode;
 
     /** 档位ID（mode=tier 时必填） */
@@ -32,7 +32,7 @@ public class AdTrafficOrderRequest {
     private String deliverySlot;
 
     /** 购买集团ID（关联推广金账户） */
-    @NotBlank(message = "集团不能为空")
+    @NotBlank(message = "集團不能為空")
     private String groupCode;
 
     /** 购买门店编码 */

@@ -27,7 +27,7 @@ public class AdPricingHotRequest {
     private Integer channel;
 
     /** 预售天数（今天起 N 天可售），缺省 30 */
-    @NotNull(message = "预售天数不能为空")
+    @NotNull(message = "預售天數不能為空")
     private Integer presaleDays;
 
     /** 赠送天数每日现金价值（MOP） */
@@ -55,7 +55,7 @@ public class AdPricingHotRequest {
     private String remark;
 
     /** 皮肤计价配置（整体替换, 定价界面自定义皮肤） */
-    @NotEmpty(message = "请至少配置一个皮肤")
+    @NotEmpty(message = "請至少配置一個皮膚")
     private List<SkinPrice> skins;
 
     /** 皮肤计价条目 */

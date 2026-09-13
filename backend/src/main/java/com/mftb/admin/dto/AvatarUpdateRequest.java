@@ -10,6 +10,6 @@ import lombok.Data;
 public class AvatarUpdateRequest {
 
     /** 头像值（pikachu expression / dicebear URL / base64 Data URL） */
-    @NotBlank(message = "头像不能为空")
+    @NotBlank(message = "頭像不能為空")
     private String avatar;
 }

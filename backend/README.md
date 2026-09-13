@@ -48,8 +48,8 @@ mvn spring-boot:run
 
 首次启动时，`DataInitializer` 会自动把初始用户的密码重置为正确的 BCrypt 加密值：
 
-- 管理员账号：`admin` / `111222`
-- 访客账号：`guest` / `123456`
+- 管理员账号：工号 `MF00001`（初始密码见部署交付物，首次登录后请及时修改）
+- 访客账号已随系统升级移除（`migrateBuiltinAccounts` 会自动清理）
 
 ## 五、接口
 
@@ -64,7 +64,7 @@ mvn spring-boot:run
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"111222"}'
+  -d '{"username":"<工号>","password":"<初始密码见部署交付物>"}'
 ```
 
 ### 携带 Token 访问
@@ -88,7 +88,7 @@ mvn spring-boot:run
 npm run dev
 ```
 
-前端访问 `http://localhost:3000`，用 `admin/111222` 登录即可打通全链路。
+前端访问 `http://localhost:3000`，使用管理员工号与初始密码（见部署交付物）登录即可打通全链路。
 
 ## 七、目录结构
 

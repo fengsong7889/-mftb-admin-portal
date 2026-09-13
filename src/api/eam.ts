@@ -1045,7 +1045,8 @@ export async function uploadInboundPhoto(file: File): Promise<{ name: string; da
   const formData = new FormData()
   formData.append('file', file)
   try {
-    return await request.post<unknown, { name: string; dataUrl: string }>('/eam/inbound/photo/upload', formData)
+    // SILENT：由調用方統一展示後端校驗消息（如文件類型/大小/魔數不合法），避免全局攔截器與組件重複彈提示
+    return await request.post<unknown, { name: string; dataUrl: string }>('/eam/inbound/photo/upload', formData, { headers: { [SILENT_HEADER]: '1' } })
   } catch (e) {
     if (isBackendUnavailable(e)) {
       // 後端不可用時本地 Base64 預覽

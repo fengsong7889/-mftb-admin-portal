@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 員工額度策略控制器（職位額度 + 角色額度）
+ * 员工额度策略控制器（职位额度 + 角色额度）
  */
 @RestController
 @RequestMapping("/api/ai/emp-quota")
@@ -28,7 +28,7 @@ public class AiEmpQuotaPolicyController {
     private final AiEmpQuotaService quotaService;
     private final OperatorResolver operatorResolver;
 
-    /* ══════════════════════ 職位額度 ══════════════════════ */
+    /* ══════════════════════ 职位额度 ══════════════════════ */
 
     @GetMapping("/positions")
     @Operation(summary = "查詢職位額度列表")
@@ -71,7 +71,7 @@ public class AiEmpQuotaPolicyController {
         return Result.success(true);
     }
 
-    /* ══════════════════════ 角色額度 ══════════════════════ */
+    /* ══════════════════════ 角色额度 ══════════════════════ */
 
     @GetMapping("/roles")
     @Operation(summary = "查詢角色額度列表")

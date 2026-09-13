@@ -37,10 +37,10 @@ public class AiModelDTO {
     public static class ModelSaveRequest implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        @NotBlank(message = "模型标识不能为空")
+        @NotBlank(message = "模型標識不能為空")
         private String modelKey;
 
-        @NotBlank(message = "模型名称不能为空")
+        @NotBlank(message = "模型名稱不能為空")
         private String name;
 
         private Long providerId;

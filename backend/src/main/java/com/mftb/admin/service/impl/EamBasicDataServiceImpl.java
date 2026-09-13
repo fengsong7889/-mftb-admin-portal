@@ -3,6 +3,12 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.EamBrandSaveDTO;
+import com.mftb.admin.dto.EamCategorySaveDTO;
+import com.mftb.admin.dto.EamLocationSaveDTO;
+import com.mftb.admin.dto.EamModelSaveDTO;
+import com.mftb.admin.dto.EamParamTypeSaveDTO;
+import com.mftb.admin.dto.EamParamValueSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamBrand;
 import com.mftb.admin.entity.EamCategory;
@@ -79,7 +85,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         log.info("EAM 參數庫表就緒");
     }
 
-    /* ==================== 資產分類 ==================== */
+    /* ==================== 资产分类 ==================== */
 
     @Override
     public List<Map<String, Object>> listCategories(String keyword, String name, String code,
@@ -103,23 +109,23 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public long createCategory(Map<String, Object> data) {
-        String code = str(data, "code");
+    public long createCategory(EamCategorySaveDTO dto) {
+        String code = dto.getCode();
         if (code == null || code.isBlank()) throw new BusinessException("分類編碼不能為空");
 
-        // 唯一性校驗
+        // 唯一性校验
         Long count = categoryMapper.selectCount(
                 new LambdaQueryWrapper<EamCategory>().eq(EamCategory::getCode, code));
         if (count > 0) throw new BusinessException("分類編碼已存在");
 
         EamCategory cat = new EamCategory();
         cat.setCode(code);
-        cat.setName(str(data, "name"));
-        cat.setParentId(longVal(data, "parentId", 0L));
-        cat.setStatus(strOrDefault(data, "status", "enabled"));
-        cat.setParamTemplate(str(data, "paramTemplate"));
-        cat.setSort(intVal(data, "sort", 0));
-        cat.setRemark(strOrDefault(data, "remark", ""));
+        cat.setName(dto.getName());
+        cat.setParentId(dto.getParentId() == null ? 0L : dto.getParentId());
+        cat.setStatus(dto.getStatus() == null ? "enabled" : dto.getStatus());
+        cat.setParamTemplate(dto.getParamTemplate());
+        cat.setSort(dto.getSort() == null ? 0 : dto.getSort());
+        cat.setRemark(Objects.toString(dto.getRemark(), ""));
         cat.setUpdatedBy(operatorResolver.currentOperatorName());
         cat.setCreatedAt(LocalDateTime.now());
         cat.setUpdatedAt(LocalDateTime.now());
@@ -130,24 +136,24 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public void updateCategory(long id, Map<String, Object> data) {
+    public void updateCategory(long id, EamCategorySaveDTO dto) {
         EamCategory cat = categoryMapper.selectById(id);
         if (cat == null) throw new BusinessException("分類不存在");
 
-        // 編碼唯一性校驗
-        String newCode = str(data, "code");
+        // 编码唯一性校验
+        String newCode = dto.getCode();
         if (newCode != null && !newCode.isBlank() && !newCode.equals(cat.getCode())) {
             Long count = categoryMapper.selectCount(
                     new LambdaQueryWrapper<EamCategory>().eq(EamCategory::getCode, newCode));
             if (count > 0) throw new BusinessException("分類編碼已存在");
             cat.setCode(newCode);
         }
-        if (data.containsKey("name")) cat.setName(str(data, "name"));
-        if (data.containsKey("parentId")) cat.setParentId(longVal(data, "parentId", cat.getParentId()));
-        if (data.containsKey("status")) cat.setStatus(str(data, "status"));
-        if (data.containsKey("paramTemplate")) cat.setParamTemplate(str(data, "paramTemplate"));
-        if (data.containsKey("sort")) cat.setSort(intVal(data, "sort", cat.getSort()));
-        if (data.containsKey("remark")) cat.setRemark(strOrDefault(data, "remark", cat.getRemark()));
+        if (dto.getName() != null) cat.setName(dto.getName());
+        if (dto.getParentId() != null) cat.setParentId(dto.getParentId());
+        if (dto.getStatus() != null) cat.setStatus(dto.getStatus());
+        if (dto.getParamTemplate() != null) cat.setParamTemplate(dto.getParamTemplate());
+        if (dto.getSort() != null) cat.setSort(dto.getSort());
+        if (dto.getRemark() != null) cat.setRemark(dto.getRemark());
         cat.setUpdatedBy(operatorResolver.currentOperatorName());
         cat.setUpdatedAt(LocalDateTime.now());
         categoryMapper.updateById(cat);
@@ -159,12 +165,12 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         EamCategory cat = categoryMapper.selectById(id);
         if (cat == null) throw new BusinessException("分類不存在");
 
-        // 檢查下級分類
+        // 检查下级分类
         Long childCount = categoryMapper.selectCount(
                 new LambdaQueryWrapper<EamCategory>().eq(EamCategory::getParentId, id));
         if (childCount > 0) throw new BusinessException("請先刪除下級分類");
 
-        // 檢查是否有關聯型號
+        // 检查是否有关联型号
         Long modelCount = modelMapper.selectCount(
                 new LambdaQueryWrapper<EamModel>().eq(EamModel::getCategoryCode, cat.getCode()));
         if (modelCount > 0) throw new BusinessException("該分類下已存在型號，無法刪除");
@@ -183,7 +189,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         categoryMapper.updateById(cat);
     }
 
-    /* ==================== 品牌庫 ==================== */
+    /* ==================== 品牌库 ==================== */
 
     @Override
     public List<Map<String, Object>> listBrands(String categoryCode, String brandZh,
@@ -206,12 +212,12 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public long createBrand(Map<String, Object> data) {
+    public long createBrand(EamBrandSaveDTO dto) {
         EamBrand brand = new EamBrand();
-        brand.setCategoryCode(str(data, "categoryCode"));
-        brand.setBrandZh(str(data, "brandZh"));
-        brand.setBrandEn(strOrDefault(data, "brandEn", ""));
-        brand.setBrandLogo(strOrDefault(data, "brandLogo", ""));
+        brand.setCategoryCode(dto.getCategoryCode());
+        brand.setBrandZh(dto.getBrandZh());
+        brand.setBrandEn(Objects.toString(dto.getBrandEn(), ""));
+        brand.setBrandLogo(Objects.toString(dto.getBrandLogo(), ""));
         brand.setUpdatedBy(operatorResolver.currentOperatorName());
         brand.setCreatedAt(LocalDateTime.now());
         brand.setUpdatedAt(LocalDateTime.now());
@@ -222,13 +228,13 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public void updateBrand(long id, Map<String, Object> data) {
+    public void updateBrand(long id, EamBrandSaveDTO dto) {
         EamBrand brand = brandMapper.selectById(id);
         if (brand == null) throw new BusinessException("品牌不存在");
-        if (data.containsKey("categoryCode")) brand.setCategoryCode(str(data, "categoryCode"));
-        if (data.containsKey("brandZh")) brand.setBrandZh(str(data, "brandZh"));
-        if (data.containsKey("brandEn")) brand.setBrandEn(str(data, "brandEn"));
-        if (data.containsKey("brandLogo")) brand.setBrandLogo(str(data, "brandLogo"));
+        if (dto.getCategoryCode() != null) brand.setCategoryCode(dto.getCategoryCode());
+        if (dto.getBrandZh() != null) brand.setBrandZh(dto.getBrandZh());
+        if (dto.getBrandEn() != null) brand.setBrandEn(dto.getBrandEn());
+        if (dto.getBrandLogo() != null) brand.setBrandLogo(dto.getBrandLogo());
         brand.setUpdatedBy(operatorResolver.currentOperatorName());
         brand.setUpdatedAt(LocalDateTime.now());
         brandMapper.updateById(brand);
@@ -242,7 +248,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         brandMapper.deleteById(id);
     }
 
-    /* ==================== 產品型號庫 ==================== */
+    /* ==================== 产品型号库 ==================== */
 
     @Override
     public PageResult<Map<String, Object>> pageModels(int page, int size, String categoryCode, Long brandId,
@@ -282,17 +288,17 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public long createModel(Map<String, Object> data) {
+    public long createModel(EamModelSaveDTO dto) {
         EamModel model = new EamModel();
-        model.setCategoryCode(str(data, "categoryCode"));
-        model.setBrandId(longVal(data, "brandId", 0L));
-        model.setBrandZh(strOrDefault(data, "brandZh", ""));
-        model.setBrandEn(strOrDefault(data, "brandEn", ""));
-        model.setBrandLogo(strOrDefault(data, "brandLogo", ""));
-        model.setModelNo(strOrDefault(data, "modelNo", ""));
-        model.setName(str(data, "name"));
-        model.setUnit(strOrDefault(data, "unit", "台"));
-        model.setRefPrice(bigDecimalVal(data, "refPrice", BigDecimal.ZERO));
+        model.setCategoryCode(dto.getCategoryCode());
+        model.setBrandId(dto.getBrandId() == null ? 0L : dto.getBrandId());
+        model.setBrandZh(Objects.toString(dto.getBrandZh(), ""));
+        model.setBrandEn(Objects.toString(dto.getBrandEn(), ""));
+        model.setBrandLogo(Objects.toString(dto.getBrandLogo(), ""));
+        model.setModelNo(Objects.toString(dto.getModelNo(), ""));
+        model.setName(dto.getName());
+        model.setUnit(dto.getUnit() == null ? "台" : dto.getUnit());
+        model.setRefPrice(dto.getRefPrice() == null ? BigDecimal.ZERO : dto.getRefPrice());
         model.setUpdatedBy(operatorResolver.currentOperatorName());
         model.setCreatedAt(LocalDateTime.now());
         model.setUpdatedAt(LocalDateTime.now());
@@ -303,18 +309,18 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public void updateModel(long id, Map<String, Object> data) {
+    public void updateModel(long id, EamModelSaveDTO dto) {
         EamModel model = modelMapper.selectById(id);
         if (model == null) throw new BusinessException("型號不存在");
-        if (data.containsKey("categoryCode")) model.setCategoryCode(str(data, "categoryCode"));
-        if (data.containsKey("brandId")) model.setBrandId(longVal(data, "brandId", model.getBrandId()));
-        if (data.containsKey("brandZh")) model.setBrandZh(str(data, "brandZh"));
-        if (data.containsKey("brandEn")) model.setBrandEn(str(data, "brandEn"));
-        if (data.containsKey("brandLogo")) model.setBrandLogo(str(data, "brandLogo"));
-        if (data.containsKey("modelNo")) model.setModelNo(str(data, "modelNo"));
-        if (data.containsKey("name")) model.setName(str(data, "name"));
-        if (data.containsKey("unit")) model.setUnit(str(data, "unit"));
-        if (data.containsKey("refPrice")) model.setRefPrice(bigDecimalVal(data, "refPrice", model.getRefPrice()));
+        if (dto.getCategoryCode() != null) model.setCategoryCode(dto.getCategoryCode());
+        if (dto.getBrandId() != null) model.setBrandId(dto.getBrandId());
+        if (dto.getBrandZh() != null) model.setBrandZh(dto.getBrandZh());
+        if (dto.getBrandEn() != null) model.setBrandEn(dto.getBrandEn());
+        if (dto.getBrandLogo() != null) model.setBrandLogo(dto.getBrandLogo());
+        if (dto.getModelNo() != null) model.setModelNo(dto.getModelNo());
+        if (dto.getName() != null) model.setName(dto.getName());
+        if (dto.getUnit() != null) model.setUnit(dto.getUnit());
+        if (dto.getRefPrice() != null) model.setRefPrice(dto.getRefPrice());
         model.setUpdatedBy(operatorResolver.currentOperatorName());
         model.setUpdatedAt(LocalDateTime.now());
         modelMapper.updateById(model);
@@ -328,7 +334,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         modelMapper.deleteById(id);
     }
 
-    /* ==================== 倉庫 / 存放位置 ==================== */
+    /* ==================== 仓库 / 存放位置 ==================== */
 
     @Override
     public List<Map<String, Object>> listLocations(String keyword, String name, String code, String type, String updatedBy) {
@@ -350,12 +356,12 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public long createLocation(Map<String, Object> data) {
-        String code = str(data, "code");
+    public long createLocation(EamLocationSaveDTO dto) {
+        String code = dto.getCode();
 
-        // 自動生成編碼邏輯
+        // 自动生成编码逻辑
         if ("__auto__".equals(code) || code == null || code.isBlank()) {
-            String type = strOrDefault(data, "type", "warehouse");
+            String type = dto.getType() == null ? "warehouse" : dto.getType();
             String prefix;
             switch (type) {
                 case "floor": prefix = "CKDZ"; break;
@@ -369,19 +375,19 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
             code = p + String.format("%03d", sameDayCount + 1);
         }
 
-        // 唯一性校驗
+        // 唯一性校验
         Long count = locationMapper.selectCount(
                 new LambdaQueryWrapper<EamLocation>().eq(EamLocation::getCode, code));
         if (count > 0) throw new BusinessException("位置編碼已存在");
 
         EamLocation loc = new EamLocation();
         loc.setCode(code);
-        loc.setName(str(data, "name"));
-        loc.setParentId(longVal(data, "parentId", 0L));
-        loc.setType(strOrDefault(data, "type", "warehouse"));
-        loc.setSort(intVal(data, "sort", 0));
-        loc.setAddress(strOrDefault(data, "address", ""));
-        loc.setRemark(strOrDefault(data, "remark", ""));
+        loc.setName(dto.getName());
+        loc.setParentId(dto.getParentId() == null ? 0L : dto.getParentId());
+        loc.setType(dto.getType() == null ? "warehouse" : dto.getType());
+        loc.setSort(dto.getSort() == null ? 0 : dto.getSort());
+        loc.setAddress(Objects.toString(dto.getAddress(), ""));
+        loc.setRemark(Objects.toString(dto.getRemark(), ""));
         loc.setUpdatedBy(operatorResolver.currentOperatorName());
         loc.setCreatedAt(LocalDateTime.now());
         loc.setUpdatedAt(LocalDateTime.now());
@@ -392,23 +398,23 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public void updateLocation(long id, Map<String, Object> data) {
+    public void updateLocation(long id, EamLocationSaveDTO dto) {
         EamLocation loc = locationMapper.selectById(id);
         if (loc == null) throw new BusinessException("位置不存在");
 
-        String newCode = str(data, "code");
+        String newCode = dto.getCode();
         if (newCode != null && !newCode.isBlank() && !"__auto__".equals(newCode) && !newCode.equals(loc.getCode())) {
             Long count = locationMapper.selectCount(
                     new LambdaQueryWrapper<EamLocation>().eq(EamLocation::getCode, newCode));
             if (count > 0) throw new BusinessException("位置編碼已存在");
             loc.setCode(newCode);
         }
-        if (data.containsKey("name")) loc.setName(str(data, "name"));
-        if (data.containsKey("parentId")) loc.setParentId(longVal(data, "parentId", loc.getParentId()));
-        if (data.containsKey("type")) loc.setType(str(data, "type"));
-        if (data.containsKey("sort")) loc.setSort(intVal(data, "sort", loc.getSort()));
-        if (data.containsKey("address")) loc.setAddress(str(data, "address"));
-        if (data.containsKey("remark")) loc.setRemark(strOrDefault(data, "remark", loc.getRemark()));
+        if (dto.getName() != null) loc.setName(dto.getName());
+        if (dto.getParentId() != null) loc.setParentId(dto.getParentId());
+        if (dto.getType() != null) loc.setType(dto.getType());
+        if (dto.getSort() != null) loc.setSort(dto.getSort());
+        if (dto.getAddress() != null) loc.setAddress(dto.getAddress());
+        if (dto.getRemark() != null) loc.setRemark(dto.getRemark());
         loc.setUpdatedBy(operatorResolver.currentOperatorName());
         loc.setUpdatedAt(LocalDateTime.now());
         locationMapper.updateById(loc);
@@ -420,7 +426,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         EamLocation loc = locationMapper.selectById(id);
         if (loc == null) throw new BusinessException("位置不存在");
 
-        // 檢查下級
+        // 检查下级
         Long childCount = locationMapper.selectCount(
                 new LambdaQueryWrapper<EamLocation>().eq(EamLocation::getParentId, id));
         if (childCount > 0) throw new BusinessException("請先刪除下級位置");
@@ -428,7 +434,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         locationMapper.deleteById(id);
     }
 
-    /* ==================== 實體 → Map 轉換 ==================== */
+    /* ==================== 实体 → Map 转换 ==================== */
 
     private Map<String, Object> categoryToMap(EamCategory cat) {
         Map<String, Object> map = new LinkedHashMap<>();
@@ -493,42 +499,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         return map;
     }
 
-    /* ==================== 工具方法 ==================== */
-
-    private String str(Map<String, Object> data, String key) {
-        Object v = data.get(key);
-        return v != null ? v.toString() : null;
-    }
-
-    private String strOrDefault(Map<String, Object> data, String key, String defaultValue) {
-        Object v = data.get(key);
-        if (v == null) return defaultValue;
-        String s = v.toString();
-        return s.isBlank() ? defaultValue : s;
-    }
-
-    private long longVal(Map<String, Object> data, String key, long defaultValue) {
-        Object v = data.get(key);
-        if (v == null) return defaultValue;
-        if (v instanceof Number) return ((Number) v).longValue();
-        try { return Long.parseLong(v.toString()); } catch (Exception e) { return defaultValue; }
-    }
-
-    private int intVal(Map<String, Object> data, String key, int defaultValue) {
-        Object v = data.get(key);
-        if (v == null) return defaultValue;
-        if (v instanceof Number) return ((Number) v).intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return defaultValue; }
-    }
-
-    private BigDecimal bigDecimalVal(Map<String, Object> data, String key, BigDecimal defaultValue) {
-        Object v = data.get(key);
-        if (v == null) return defaultValue;
-        if (v instanceof Number) return BigDecimal.valueOf(((Number) v).doubleValue());
-        try { return new BigDecimal(v.toString()); } catch (Exception e) { return defaultValue; }
-    }
-
-    /* ==================== 參數庫 ==================== */
+    /* ==================== 参数库 ==================== */
 
     @Override
     public PageResult<Map<String, Object>> pageParamTypes(int page, int size, String categoryCode, String name, String code, String status) {
@@ -553,9 +524,9 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public long createParamType(Map<String, Object> data) {
-        String categoryCode = str(data, "categoryCode");
-        String code = str(data, "code");
+    public long createParamType(EamParamTypeSaveDTO dto) {
+        String categoryCode = dto.getCategoryCode();
+        String code = dto.getCode();
         if (categoryCode == null || categoryCode.isBlank()) throw new BusinessException("分類編碼不能為空");
         if (code == null || code.isBlank()) throw new BusinessException("參數編碼不能為空");
 
@@ -568,11 +539,11 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         EamParamType pt = new EamParamType();
         pt.setCategoryCode(categoryCode);
         pt.setCode(code);
-        pt.setName(str(data, "name"));
-        pt.setUnit(strOrDefault(data, "unit", ""));
-        pt.setValueType(strOrDefault(data, "valueType", "select"));
-        pt.setStatus(strOrDefault(data, "status", "enabled"));
-        pt.setSort(intVal(data, "sort", 0));
+        pt.setName(dto.getName());
+        pt.setUnit(Objects.toString(dto.getUnit(), ""));
+        pt.setValueType(dto.getValueType() == null ? "select" : dto.getValueType());
+        pt.setStatus(dto.getStatus() == null ? "enabled" : dto.getStatus());
+        pt.setSort(dto.getSort() == null ? 0 : dto.getSort());
         pt.setUpdatedBy(operatorResolver.currentOperatorName());
         pt.setCreatedAt(LocalDateTime.now());
         pt.setUpdatedAt(LocalDateTime.now());
@@ -583,14 +554,14 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public void updateParamType(long id, Map<String, Object> data) {
+    public void updateParamType(long id, EamParamTypeSaveDTO dto) {
         EamParamType pt = paramTypeMapper.selectById(id);
         if (pt == null) throw new BusinessException("參數類型不存在");
-        if (data.containsKey("name")) pt.setName(str(data, "name"));
-        if (data.containsKey("unit")) pt.setUnit(str(data, "unit"));
-        if (data.containsKey("valueType")) pt.setValueType(str(data, "valueType"));
-        if (data.containsKey("status")) pt.setStatus(str(data, "status"));
-        if (data.containsKey("sort")) pt.setSort(intVal(data, "sort", pt.getSort()));
+        if (dto.getName() != null) pt.setName(dto.getName());
+        if (dto.getUnit() != null) pt.setUnit(dto.getUnit());
+        if (dto.getValueType() != null) pt.setValueType(dto.getValueType());
+        if (dto.getStatus() != null) pt.setStatus(dto.getStatus());
+        if (dto.getSort() != null) pt.setSort(dto.getSort());
         pt.setUpdatedBy(operatorResolver.currentOperatorName());
         pt.setUpdatedAt(LocalDateTime.now());
         paramTypeMapper.updateById(pt);
@@ -601,7 +572,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     public void deleteParamType(long id) {
         EamParamType pt = paramTypeMapper.selectById(id);
         if (pt == null) throw new BusinessException("參數類型不存在");
-        // 同時刪除該參數類型下的所有參數值
+        // 同时删除该参数类型下的所有参数值
         paramValueMapper.delete(new LambdaQueryWrapper<EamParamValue>()
                 .eq(EamParamValue::getParamTypeCode, pt.getCode())
                 .eq(EamParamValue::getCategoryCode, pt.getCategoryCode()));
@@ -637,13 +608,13 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public long createParamValue(Map<String, Object> data) {
+    public long createParamValue(EamParamValueSaveDTO dto) {
         EamParamValue pv = new EamParamValue();
-        pv.setParamTypeCode(str(data, "paramTypeCode"));
-        pv.setCategoryCode(str(data, "categoryCode"));
-        pv.setValue(str(data, "value"));
-        pv.setSort(intVal(data, "sort", 0));
-        pv.setStatus(strOrDefault(data, "status", "enabled"));
+        pv.setParamTypeCode(dto.getParamTypeCode());
+        pv.setCategoryCode(dto.getCategoryCode());
+        pv.setValue(dto.getValue());
+        pv.setSort(dto.getSort() == null ? 0 : dto.getSort());
+        pv.setStatus(dto.getStatus() == null ? "enabled" : dto.getStatus());
         pv.setUpdatedBy(operatorResolver.currentOperatorName());
         pv.setCreatedAt(LocalDateTime.now());
         pv.setUpdatedAt(LocalDateTime.now());
@@ -654,12 +625,12 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     @Transactional
-    public void updateParamValue(long id, Map<String, Object> data) {
+    public void updateParamValue(long id, EamParamValueSaveDTO dto) {
         EamParamValue pv = paramValueMapper.selectById(id);
         if (pv == null) throw new BusinessException("參數值不存在");
-        if (data.containsKey("value")) pv.setValue(str(data, "value"));
-        if (data.containsKey("sort")) pv.setSort(intVal(data, "sort", pv.getSort()));
-        if (data.containsKey("status")) pv.setStatus(str(data, "status"));
+        if (dto.getValue() != null) pv.setValue(dto.getValue());
+        if (dto.getSort() != null) pv.setSort(dto.getSort());
+        if (dto.getStatus() != null) pv.setStatus(dto.getStatus());
         pv.setUpdatedBy(operatorResolver.currentOperatorName());
         pv.setUpdatedAt(LocalDateTime.now());
         paramValueMapper.updateById(pv);

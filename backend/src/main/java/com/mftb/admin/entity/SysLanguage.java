@@ -21,7 +21,7 @@ public class SysLanguage {
     /** 语言代码 ISO 639-1, 如 zh-TW/en/ja/th */
     private String code;
 
-    /** 母语名称, 如 日本語/ภาษาไทย */
+    /** 母语名称, 如 日本语/ภาษาไทย */
     private String nativeName;
 
     /** 国旗 Emoji */

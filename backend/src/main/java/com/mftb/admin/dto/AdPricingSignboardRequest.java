@@ -15,7 +15,7 @@ import java.util.Map;
 public class AdPricingSignboardRequest {
 
     /** 关联算法ID */
-    @NotNull(message = "请选择算法")
+    @NotNull(message = "請選擇算法")
     private Long algoId;
 
     /** 算法名称（前端传入快照） */
@@ -28,7 +28,7 @@ public class AdPricingSignboardRequest {
     private Integer channel;
 
     /** 预售天数（默认 7） */
-    @NotNull(message = "预售天数不能为空")
+    @NotNull(message = "預售天數不能為空")
     private Integer presaleDays;
 
     /** 退款开关: 1=允许退款 2=不允许 */
@@ -50,7 +50,7 @@ public class AdPricingSignboardRequest {
     private String remark;
 
     /** 标签计价配置（至少一个启用标签） */
-    @NotEmpty(message = "请至少配置一个标签")
+    @NotEmpty(message = "請至少配置一個標籤")
     private List<LabelPrice> signboardItems;
 
     /** 标签计价条目 */
@@ -58,7 +58,7 @@ public class AdPricingSignboardRequest {
     public static class LabelPrice {
         /** 标签类型 */
         private String labelType;
-        /** 场景（all_macau/district，統計類不傳） */
+        /** 场景（all_macau/district，统计类不传） */
         private String scenario;
         /** 是否启用 */
         private Boolean enabled;

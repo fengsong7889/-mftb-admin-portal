@@ -15,11 +15,11 @@ import java.util.List;
 public class AdSignboardOrderRequest {
 
     /** 定价配置ID（biz_ad_pricing_signboard.id） */
-    @NotNull(message = "定价配置不能为空")
+    @NotNull(message = "定價配置不能為空")
     private Long algoId;
 
     /** 购买集团ID（关联推广金账户） */
-    @NotBlank(message = "购买集团不能为空")
+    @NotBlank(message = "購買集團不能為空")
     private String groupCode;
 
     /** 购买门店ID */
@@ -35,7 +35,7 @@ public class AdSignboardOrderRequest {
     private Integer giftDays;
 
     /** 选购的格子列表（标签 x 日期） */
-    @NotEmpty(message = "请至少选择一个格子")
+    @NotEmpty(message = "請至少選擇一個格子")
     private List<CellSelection> cells;
 
     /** 格子选择 */

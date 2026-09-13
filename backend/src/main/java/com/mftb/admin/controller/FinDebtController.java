@@ -45,7 +45,7 @@ public class FinDebtController {
     @RequirePermission(menu = "debt-reconcile", action = "create")
     public Result<Void> addRepayment(@PathVariable String billNo, @RequestBody DebtRepaymentDTO request) {
         finDebtService.addRepayment(billNo, request);
-        return Result.success("扣款记录已新增", null);
+        return Result.success("扣款記錄已新增", null);
     }
 
     /** 删除还款记录 */
@@ -53,6 +53,6 @@ public class FinDebtController {
     @RequirePermission(menu = "debt-reconcile", action = "delete")
     public Result<Void> deleteRepayment(@PathVariable Long id) {
         finDebtService.deleteRepayment(id);
-        return Result.success("还款记录已删除", null);
+        return Result.success("還款記錄已刪除", null);
     }
 }

@@ -26,8 +26,8 @@ public class McpToolServiceImpl implements McpToolService {
 
     @Override
     public List<McpTool> listInstalled() {
-        // 內置與外部工具的 manifest 均下發給 AI 助手（多輪編排的基礎）：
-        // 內置工具前端直調後端 API；外部工具執行鏈路 = 前端人工確認 → /api/mcp/exec 服務端網關
+        // 内置与外部工具的 manifest 均下发给 AI 助手（多轮编排的基础）：
+        // 内置工具前端直调后端 API；外部工具执行链路 = 前端人工确认 → /api/mcp/exec 服务端网关
         return mcpToolMapper.selectList(new LambdaQueryWrapper<McpTool>()
                 .eq(McpTool::getEnabled, 1)
                 .eq(McpTool::getInstalled, 1)
@@ -39,7 +39,7 @@ public class McpToolServiceImpl implements McpToolService {
     public void install(String toolKey, String operator) {
         McpTool tool = requireTool(toolKey);
         if (tool.getInstalled() != null && tool.getInstalled() == 1) {
-            return; // 冪等
+            return; // 幂等
         }
         tool.setInstalled(1);
         tool.setInstalledBy(operator);
@@ -51,7 +51,7 @@ public class McpToolServiceImpl implements McpToolService {
     public void uninstall(String toolKey) {
         McpTool tool = requireTool(toolKey);
         if (tool.getInstalled() == null || tool.getInstalled() == 0) {
-            return; // 冪等
+            return; // 幂等
         }
         tool.setInstalled(0);
         tool.setInstalledBy(null);

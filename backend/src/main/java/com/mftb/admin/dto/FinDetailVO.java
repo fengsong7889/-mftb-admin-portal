@@ -76,7 +76,7 @@ public class FinDetailVO {
 
     /**
      * 展示交易类型: 消费类型中金额为正的明细是退款回补（消费是扣费），
-     * 展示为「退款」；存储仍为「消費」以保持与原消费明细正负相抵口径。
+     * 展示为「退款」；存储仍为「消费」以保持与原消费明细正负相抵口径。
      */
     private static String displayTradeType(FinDetail detail) {
         if (STORED_CONSUME.equals(detail.getTradeType())

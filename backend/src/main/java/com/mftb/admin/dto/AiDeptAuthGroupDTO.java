@@ -86,7 +86,7 @@ public class AiDeptAuthGroupDTO {
     public static class ModelConfigItem implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        @NotNull(message = "模型 ID 不能为空")
+        @NotNull(message = "模型 ID 不能為空")
         private Long modelId;
         /** 视觉理解 */
         private Integer visionSupport;
@@ -109,7 +109,7 @@ public class AiDeptAuthGroupDTO {
     public static class GroupSaveRequest implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        @NotBlank(message = "策略名称不能为空")
+        @NotBlank(message = "策略名稱不能為空")
         private String name;
 
         /** 策略描述 */
@@ -122,11 +122,11 @@ public class AiDeptAuthGroupDTO {
         private Integer status;
 
         /** 关联部门 ID 列表 */
-        @NotEmpty(message = "请至少选择一个部门")
+        @NotEmpty(message = "請至少選擇一個部門")
         private List<Long> deptIds;
 
         /** 模型配置列表 */
-        @NotEmpty(message = "请至少授权一个模型")
+        @NotEmpty(message = "請至少授權一個模型")
         private List<ModelConfigItem> modelConfigs;
 
         /** 更新人 */

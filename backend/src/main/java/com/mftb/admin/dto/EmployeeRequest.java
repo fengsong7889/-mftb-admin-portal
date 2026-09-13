@@ -1,6 +1,7 @@
 package com.mftb.admin.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.util.List;
@@ -17,7 +18,7 @@ public class EmployeeRequest {
     /** 登录密码 (仅新增时使用) */
     private String password;
 
-    @NotBlank(message = "姓名不能为空")
+    @NotBlank(message = "姓名不能為空")
     private String name;
 
     /** 员工工号 (由后端按编号生成规则 employee_no 自增生成, 前端传入将被忽略) */
@@ -32,7 +33,8 @@ public class EmployeeRequest {
     /** 职等 (R1~R5) */
     private String rank;
 
-    /** 基础角色: admin/guest, 默认 guest */
+    /** 基础角色: admin/guest, 默认 guest（前端传入将被服务层覆盖，此处仅作入参校验） */
+    @Pattern(regexp = "^(admin|guest)$", message = "角色只允許 admin 或 guest")
     private String role;
 
     /** 绑定的功能角色ID */

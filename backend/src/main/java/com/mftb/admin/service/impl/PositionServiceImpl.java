@@ -88,7 +88,7 @@ public class PositionServiceImpl implements PositionService {
         Long count = sysUserMapper.selectCount(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getPositionId, id));
         if (count != null && count > 0) {
-            throw new BusinessException("该职位已被员工绑定，请先调整相关员工的职位");
+            throw new BusinessException("該職位已被員工綁定，請先調整相關員工的職位");
         }
         sysPositionMapper.deleteById(id);
     }
@@ -96,7 +96,7 @@ public class PositionServiceImpl implements PositionService {
     /** 职级序列合法性校验 */
     private void validate(PositionRequest request) {
         if (!VALID_SEQUENCES.contains(request.getSequence())) {
-            throw new BusinessException("职级序列只能为 M(管理)/T(技术)/P(专业)");
+            throw new BusinessException("職級序列只能為 M(管理)/T(技術)/P(專業)");
         }
     }
 
@@ -124,7 +124,7 @@ public class PositionServiceImpl implements PositionService {
         }
         Long count = sysPositionMapper.selectCount(wrapper);
         if (count != null && count > 0) {
-            throw new BusinessException("职位名称已存在");
+            throw new BusinessException("職位名稱已存在");
         }
     }
 
@@ -144,7 +144,7 @@ public class PositionServiceImpl implements PositionService {
     private SysPosition requirePosition(Long id) {
         SysPosition position = sysPositionMapper.selectById(id);
         if (position == null) {
-            throw new BusinessException("职位不存在");
+            throw new BusinessException("職位不存在");
         }
         return position;
     }

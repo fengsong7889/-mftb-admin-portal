@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import type { FlashSaleRegisterRow, FlashSaleStatsRow, FlashSaleSummaryRow, FlashSaleTier } from '../api/flashSale'
 import {
   SUBSIDY_TYPE_LABEL_REVERSE,
@@ -8,6 +8,16 @@ import {
   LAST_PERIOD_NONE_DATA,
 } from '../constants/flashSale'
 
+/**
+ * 秒杀数据分析 Excel 导入工具
+ *
+ * 解析运营侧提供的秒杀 Excel（包含登记/销量/汇总三个 sheet），
+ * 输出前端可直接使用的结构化数据。
+ *
+ * 注：表格内容可能使用繁体文案（例如「▲價格」「無上期數據」「補貼類型」「合計」），
+ * 为了兼容实际业务表格，下方匹配逻辑保留繁体字面量。
+ */
+
 /** 解析结果 */
 export interface ParsedFlashSaleExcel {
   registerRows: FlashSaleRegisterRow[]
@@ -15,7 +25,12 @@ export interface ParsedFlashSaleExcel {
   summaryByPeriod: Array<{ periodNo: number; rows: FlashSaleSummaryRow[] }>
 }
 
-/** 阶梯文本解析: ▲價格:9.1,庫存:10,補貼:8.10（逐行） */
+/**
+ * 阶梯文本解析：匹配「▲價格:x,庫存:y,補貼:z」格式的多行阶梯（繁体字面来自 Excel）
+ *
+ * @param text 原始单元格内容
+ * @returns 阶梯数组；非字符串或无匹配时返回空数组
+ */
 export function parseTierText(text: unknown): FlashSaleTier[] {
   if (typeof text !== 'string') return []
   const tiers: FlashSaleTier[] = []
@@ -39,7 +54,7 @@ const toNum = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
-/** 環比/上期字段: 「無上期數據」-> null */
+/** 环比/上期字段：单元格内容包含「無上期數據」（繁体字面来自 Excel）时视为 null */
 const toChange = (v: unknown): number | null => {
   if (v === null || v === undefined) return null
   if (typeof v === 'string' && v.includes('無上期數據')) return null
@@ -71,6 +86,14 @@ const serialToDate = (serial: number): string => {
   return `${y}-${m}-${day}`
 }
 
+/** 将 ExcelJS 单元格值转为原始值（Date/number/string） */
+const cellValue = (v: ExcelJS.CellValue): unknown => {
+  if (v === null || v === undefined) return null
+  if (v instanceof Date) return v
+  if (typeof v === 'object' && v !== null && 'result' in v) return (v as { result: ExcelJS.CellValue }).result
+  return v
+}
+
 const cellToDate = (v: unknown): string | null => {
   if (v === null || v === undefined) return null
   if (v instanceof Date) {
@@ -86,15 +109,38 @@ const cellToDate = (v: unknown): string | null => {
 
 const str = (v: unknown): string => (v === null || v === undefined ? '' : String(v).trim())
 
-/** 解析秒杀数据分析 Excel（三个 sheet: 汇总/登记/统计） */
+/** 将 ExcelJS Worksheet 转为二维数组 */
+function sheetToRows(ws: ExcelJS.Worksheet): unknown[][] {
+  const rows: unknown[][] = []
+  ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    const cells: unknown[] = []
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      cells[colNumber - 1] = cellValue(cell.value)
+    })
+    // 补齐列数
+    while (cells.length < (ws.columnCount || 1)) cells.push(null)
+    rows[rowNumber - 1] = cells
+  })
+  // 过滤尾部空行
+  while (rows.length > 0 && rows[rows.length - 1].every(c => c == null)) rows.pop()
+  return rows
+}
+
+/**
+ * 解析秒杀数据分析 Excel（三个 sheet：汇总/登记/统计）
+ *
+ * @param file 用户选择的 Excel 文件
+ * @returns 登记行、统计行、按期分组的汇总行
+ */
 export async function parseFlashSaleExcel(file: File): Promise<ParsedFlashSaleExcel> {
   const buffer = await file.arrayBuffer()
-  const wb = XLSX.read(buffer, { cellDates: true })
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(buffer)
   const result: ParsedFlashSaleExcel = { registerRows: [], statsRows: [], summaryByPeriod: [] }
 
-  for (const name of wb.SheetNames) {
-    const sheet = wb.Sheets[name]
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null })
+  for (const ws of wb.worksheets) {
+    const name = ws.name
+    const rows = sheetToRows(ws)
     if (name.includes('登記')) {
       result.registerRows = parseRegisterSheet(rows)
     } else if (name.includes('銷量') || name.includes('統計')) {
@@ -106,7 +152,7 @@ export async function parseFlashSaleExcel(file: File): Promise<ParsedFlashSaleEx
   return result
 }
 
-/** 登记 sheet: 跳过合并表头行, 从「補貼類型」表头后开始 */
+/** 登记 sheet：跳过合并表头行，从「補貼類型」（繁体字面来自 Excel）表头后开始 */
 function parseRegisterSheet(rows: unknown[][]): FlashSaleRegisterRow[] {
   const out: FlashSaleRegisterRow[] = []
   let started = false
@@ -140,7 +186,7 @@ function parseRegisterSheet(rows: unknown[][]): FlashSaleRegisterRow[] {
   return out
 }
 
-/** 统计 sheet: 表头「商品ID」后开始 */
+/** 统计 sheet：从表头「商品ID」后开始 */
 function parseStatsSheet(rows: unknown[][]): FlashSaleStatsRow[] {
   const out: FlashSaleStatsRow[] = []
   let started = false
@@ -178,7 +224,7 @@ function parseStatsSheet(rows: unknown[][]): FlashSaleStatsRow[] {
   return out
 }
 
-/** 汇总 sheet: 按期数分组（每日行 + 合计行） */
+/** 汇总 sheet：按期数分组（每日行 + 合计行）；「合計」/「合计」为繁体/简体兼容字面 */
 function parseSummarySheet(rows: unknown[][]): Array<{ periodNo: number; rows: FlashSaleSummaryRow[] }> {
   const byPeriod = new Map<number, FlashSaleSummaryRow[]>()
   let current: number | null = null

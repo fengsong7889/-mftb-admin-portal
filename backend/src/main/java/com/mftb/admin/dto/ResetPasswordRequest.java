@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 32, message = "密码长度需在 6~32 位之间")
+    @NotBlank(message = "密碼不能為空")
+    @Size(min = 6, max = 32, message = "密碼長度需在 6~32 位之間")
     private String password;
 }

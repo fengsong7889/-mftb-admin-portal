@@ -5,6 +5,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.StatusUpdateDTO;
 import com.mftb.admin.service.AdAlgorithmService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +55,7 @@ public class AdAlgorithmController {
         return Result.success(algorithmService.detail(id));
     }
 
-    /** 按算法ID（algoCode）获取算法名称与状态（自然流量「活動加分」配置聯動用） */
+    /** 按算法ID（algoCode）获取算法名称与状态（自然流量「活动加分」配置联动用） */
     @GetMapping("/by-code/{algoCode}")
     @RequirePermission(menu = "promotion-algorithm")
     public Result<AdAlgorithmVO> getByCode(@PathVariable String algoCode) {
@@ -78,8 +79,8 @@ public class AdAlgorithmController {
     /** 启用/停用 */
     @PutMapping("/{id}/status")
     @RequirePermission(menu = "promotion-algorithm", action = "edit")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
-        algorithmService.updateStatus(id, body.get("status"));
+    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusUpdateDTO dto) {
+        algorithmService.updateStatus(id, dto.getStatus());
         return Result.success();
     }
 

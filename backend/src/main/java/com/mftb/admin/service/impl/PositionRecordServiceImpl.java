@@ -76,7 +76,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         requireUser(userId);
         EmpPositionRecord entity = positionRecordMapper.selectById(recordId);
         if (entity == null || !userId.equals(entity.getUserId())) {
-            throw new BusinessException("职务记录不存在");
+            throw new BusinessException("職務記錄不存在");
         }
         // 编辑时按新日期重新计算 effectiveSeq（同日期第 N 条 = N-1）
         int nextSeq = getNextEffectiveSeq(userId, request.getEffectiveDate());
@@ -109,7 +109,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         requireUser(userId);
         EmpPositionRecord entity = positionRecordMapper.selectById(recordId);
         if (entity == null || !userId.equals(entity.getUserId())) {
-            throw new BusinessException("职务记录不存在");
+            throw new BusinessException("職務記錄不存在");
         }
         positionRecordMapper.deleteById(recordId);
     }
@@ -127,7 +127,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
 
     private void requireUser(Long userId) {
         if (sysUserMapper.selectById(userId) == null) {
-            throw new BusinessException("员工不存在");
+            throw new BusinessException("員工不存在");
         }
     }
 }

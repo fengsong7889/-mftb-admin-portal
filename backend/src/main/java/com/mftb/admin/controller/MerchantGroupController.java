@@ -64,14 +64,14 @@ public class MerchantGroupController {
     @PostMapping
     @RequirePermission(menu = "merchant-group-list", action = "create")
     public Result<MerchantGroupVO> create(@Valid @RequestBody MerchantGroupRequest request) {
-        return Result.success("集团创建成功", merchantGroupService.create(request));
+        return Result.success("集團創建成功", merchantGroupService.create(request));
     }
 
     /** 编辑集团 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "merchant-group-list", action = "edit")
     public Result<MerchantGroupVO> update(@PathVariable Long id, @Valid @RequestBody MerchantGroupRequest request) {
-        return Result.success("集团信息已更新", merchantGroupService.update(id, request));
+        return Result.success("集團信息已更新", merchantGroupService.update(id, request));
     }
 
     /** 删除集团(存在关联门店时禁止删除) */
@@ -79,6 +79,6 @@ public class MerchantGroupController {
     @RequirePermission(menu = "merchant-group-list", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         merchantGroupService.delete(id);
-        return Result.success("集团已删除", null);
+        return Result.success("集團已刪除", null);
     }
 }

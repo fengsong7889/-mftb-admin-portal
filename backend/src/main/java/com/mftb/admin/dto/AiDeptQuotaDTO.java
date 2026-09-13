@@ -8,6 +8,9 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * AI 部门额度策略请求/响应 DTO 集合（VO/查询/保存请求）
+ */
 public class AiDeptQuotaDTO {
 
     /* ══════════ VO ══════════ */

@@ -9,11 +9,11 @@ import lombok.Data;
 @Data
 public class OrganicScoreDimensionRequest {
 
-    /** 维度: 1=商業 2=店鋪 4=平台 */
-    @NotNull(message = "维度不能为空")
+    /** 维度: 1=商业 2=店铺 4=平台 */
+    @NotNull(message = "維度不能為空")
     private Integer dimension;
 
     /** 权重百分比（0~100） */
-    @NotNull(message = "权重不能为空")
+    @NotNull(message = "權重不能為空")
     private Integer weight;
 }

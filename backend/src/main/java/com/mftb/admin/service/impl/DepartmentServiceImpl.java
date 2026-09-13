@@ -106,7 +106,7 @@ public class DepartmentServiceImpl implements DepartmentService {
             Long cursor = request.getParentId();
             while (cursor != null) {
                 if (Objects.equals(cursor, id)) {
-                    throw new BusinessException("上级部门不能选择自身或其下级部门");
+                    throw new BusinessException("上級部門不能選擇自身或其下級部門");
                 }
                 SysDepartment parent = sysDepartmentMapper.selectById(cursor);
                 cursor = parent == null ? null : parent.getParentId();
@@ -150,7 +150,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         Long childCount = sysDepartmentMapper.selectCount(
                 new LambdaQueryWrapper<SysDepartment>().eq(SysDepartment::getParentId, id));
         if (childCount != null && childCount > 0) {
-            throw new BusinessException("该部门存在下级部门，请先删除下级部门");
+            throw new BusinessException("該部門存在下級部門，請先刪除下級部門");
         }
         sysDepartmentMapper.deleteById(id);
         // 清理部门菜单关联
@@ -313,7 +313,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private SysDepartment requireDept(Long id) {
         SysDepartment dept = sysDepartmentMapper.selectById(id);
         if (dept == null) {
-            throw new BusinessException("部门不存在");
+            throw new BusinessException("部門不存在");
         }
         return dept;
     }

@@ -4,6 +4,7 @@ import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.ApproveResultVO;
 import com.mftb.admin.dto.OaApproveDTO;
+import com.mftb.admin.dto.OaRejectDTO;
 import com.mftb.admin.dto.OaRequestCreateDTO;
 import com.mftb.admin.dto.OaRequestQuery;
 import com.mftb.admin.dto.OaRequestVO;
@@ -50,7 +51,7 @@ public class OaRequestController {
     @RequirePermission(menu = "oa-requests", action = "create")
     public Result<String> submit(@RequestBody OaRequestCreateDTO request) {
         String flowNo = oaRequestService.submit(request);
-        return Result.success("流程已提交，流程编号：" + flowNo, flowNo);
+        return Result.success("流程已提交，流程編號：" + flowNo, flowNo);
     }
 
     /** 通过当前待审节点 */
@@ -64,7 +65,7 @@ public class OaRequestController {
         ApproveResultVO result = oaRequestService.approve(flowNo, comment, formData);
         String message;
         if (result.isFinished()) {
-            message = "审批已全部通过";
+            message = "審批已全部通過";
         } else if (result.getNextNode() != null) {
             message = "「" + result.getNodeName() + "」已通过，流转至「" + result.getNextNode() + "」";
         } else {
@@ -78,8 +79,8 @@ public class OaRequestController {
     @RequirePermission(menu = "oa-requests", action = "edit")
     public Result<Void> reject(
             @PathVariable String flowNo,
-            @RequestBody Map<String, String> body) {
-        String reason = body != null ? body.get("reason") : null;
+            @RequestBody OaRejectDTO dto) {
+        String reason = dto != null ? dto.getReason() : null;
         String nodeName = oaRequestService.reject(flowNo, reason);
         return Result.success("「" + nodeName + "」已驳回", null);
     }
@@ -89,7 +90,7 @@ public class OaRequestController {
     @RequirePermission(menu = "oa-requests", action = "edit")
     public Result<Void> cancel(@PathVariable String flowNo) {
         oaRequestService.cancel(flowNo);
-        return Result.success("申请已撤销", null);
+        return Result.success("申請已撤銷", null);
     }
 
     /** 提交草稿（draft → pending） */

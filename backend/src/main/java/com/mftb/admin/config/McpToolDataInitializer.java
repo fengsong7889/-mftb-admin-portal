@@ -12,8 +12,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * MCP 服務模組資料初始化器：啟動時自動建立 mcp_tool 工具註冊表並種子首批工具
- * 廣場管「接入」（安裝/卸載），AI 操作授權管「放行」（L0-L4 治理）
+ * MCP 服务模组资料初始化器：启动时自动建立 mcp_tool 工具注册表并种子首批工具
+ * 广场管「接入」（安装/卸载），AI 操作授权管「放行」（L0-L4 治理）
  */
 @Slf4j
 @Component
@@ -22,10 +22,10 @@ public class McpToolDataInitializer implements CommandLineRunner {
 
     private static final String INIT_SCRIPT = "103_mcp_tool.sql";
 
-    /** 外部服務種子腳本（MCP Server 接入規劃目錄） */
+    /** 外部服务种子脚本（MCP Server 接入规划目录） */
     private static final String EXTERNAL_SCRIPT = "104_mcp_tool_external.sql";
 
-    /** 內置工具 Schema 升級腳本（query_batches 金額過濾參數） */
+    /** 内置工具 Schema 升级脚本（query_batches 金额过滤参数） */
     private static final String PARAMS_SCRIPT = "105_mcp_tool_params.sql";
 
     private final JdbcTemplate jdbcTemplate;
@@ -41,8 +41,8 @@ public class McpToolDataInitializer implements CommandLineRunner {
                     throw new IllegalStateException("讀取初始化腳本失敗: " + INIT_SCRIPT, e);
                 }
             });
-            // 外部服務遷移：補列（冪等，存在即跳過）+ 種子入庫。
-            // 新增 schema 變更必須註冊為新的 applyOnce 版本，否則存量庫永不執行（schema 漂移）
+            // 外部服务迁移：补列（幂等，存在即跳过）+ 种子入库。
+            // 新增 schema 变更必须注册为新的 applyOnce 版本，否则存量库永不执行（schema 漂移）
             versionTracker.applyOnce("mcp_tool:mcp-tool-external:v1", () -> {
                 addColumnIfAbsent("source",
                         "VARCHAR(16) NOT NULL DEFAULT 'builtin' COMMENT '工具來源: builtin=內置工具 external=外部服務(MCP Server)'");
@@ -54,7 +54,7 @@ public class McpToolDataInitializer implements CommandLineRunner {
                     throw new IllegalStateException("讀取初始化腳本失敗: " + EXTERNAL_SCRIPT, e);
                 }
             });
-            // 內置工具 Schema 升級：冪等 UPDATE，新增必須註冊新版本否則存量庫永不執行
+            // 内置工具 Schema 升级：幂等 UPDATE，新增必须注册新版本否则存量库永不执行
             versionTracker.applyOnce("mcp_tool:mcp-tool-params:v1", () -> {
                 try {
                     executeSqlScript(PARAMS_SCRIPT);
@@ -67,7 +67,7 @@ public class McpToolDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** 列存在性判定後補列（INFORMATION_SCHEMA 判定，與 DataInitializer.addColumnIfAbsent 模式一致） */
+    /** 列存在性判定后补列（INFORMATION_SCHEMA 判定，与 DataInitializer.addColumnIfAbsent 模式一致） */
     private void addColumnIfAbsent(String column, String definition) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "

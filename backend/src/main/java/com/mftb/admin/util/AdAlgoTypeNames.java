@@ -3,7 +3,7 @@ package com.mftb.admin.util;
 /**
  * 广告算法类型编码 → 广告类型名称
  * <p>
- * 财务明细「变动类别」记录广告类型（如無敵星星），便于按广告算法追溯消费/退款。
+ * 财务明细「变动类别」记录广告类型（如无敌星星），便于按广告算法追溯消费/退款。
  * 新增广告算法时在此登记类型名称。
  */
 public final class AdAlgoTypeNames {
@@ -14,7 +14,7 @@ public final class AdAlgoTypeNames {
     private AdAlgoTypeNames() {
     }
 
-    /** 广告类型名称: 1=無敵星星 2=新店廣告 3=盤活復蘇 4=流量廣告 5=人氣商家 13=金字招牌 15=投流廣告 */
+    /** 广告类型名称: 1=无敌星星 2=新店广告 3=盘活复苏 4=流量广告 5=人气商家 13=金字招牌 15=投流广告 */
     public static String of(Integer algoType) {
         if (algoType == null) {
             return FALLBACK;

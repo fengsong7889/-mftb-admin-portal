@@ -1,9 +1,9 @@
 /**
- * 採購執行編輯頁（多供應商分組版）
+ * 采购执行编辑页（多供应商分组版）
  *
- * - 全局信息：採購經辦人（搜索下拉）、服務部門（自動帶出）、執行狀態、備註
- * - 供應商分組卡片：收貨方式、預計收貨日期、快遞單號（條件顯示）
- * - 明細表格列與錄入頁對齊：分類、品牌、資產名稱、參數、數量、採購形式、參考單價、成交單價、小計
+ * - 全局信息：采购经办人（搜索下拉）、服务部门（自动带出）、执行状态、备注
+ * - 供应商分组卡片：收货方式、预计收货日期、快递单号（条件显示）
+ * - 明细表格列与录入页对齐：分类、品牌、资产名称、参数、数量、采购形式、参考单价、成交单价、小计
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
@@ -28,8 +28,8 @@ interface Props {
 }
 
 const EXEC_STATUS_OPTIONS: { value: ExecStatus; label: string; color: string }[] = [
-  { value: 'pending', label: '待處理', color: 'default' },
-  { value: 'purchasing', label: '採購中', color: 'processing' },
+  { value: 'pending', label: '待处理', color: 'default' },
+  { value: 'purchasing', label: '采购中', color: 'processing' },
   { value: 'completed', label: '已完成', color: 'success' },
 ]
 
@@ -42,6 +42,11 @@ interface GlobalFormValues {
   remark: string
 }
 
+/**
+ * 采购订单执行信息编辑页
+ *
+ * @param props id=订单 ID；onBack=返回列表；onSaved=保存成功回调
+ */
 export default function OrderEdit({ id, onBack, onSaved }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<GlobalFormValues>()
@@ -66,7 +71,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         execStatus: o.execStatus,
         remark: o.remark || '',
       })
-      // 初始化供應商分組
+      // 初始化供应商分组
       if (o.supplierGroups && o.supplierGroups.length > 0) {
         setSupplierGroups(o.supplierGroups)
       } else {
@@ -105,7 +110,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
     form.setFieldsValue({ department: emp?.department || '' })
   }
 
-  /* ----- 供應商分組操作 ----- */
+  /* ----- 供应商分组操作 ----- */
   const handleAddGroup = () => {
     setSupplierGroups((prev) => [
       ...prev,
@@ -115,8 +120,8 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
   const handleRemoveGroup = (groupId: string) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: '確定刪除此分組及其所有明細？',
+      title: '确认删除',
+      content: '确定删除此分组及其所有明细？',
       okText: t('common.confirm'),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel'),
@@ -140,19 +145,19 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
   const grandTotal = supplierGroups.reduce((s, g) => s + groupSubtotal(g), 0)
 
-  /** 根據收貨方式判斷字段顯示 */
+  /** 根据收货方式判断字段显示 */
   const showReceiveDate = (dm?: DeliveryMethod) => dm === 'supplier_delivery' || dm === 'express'
   const showTrackingNo = (dm?: DeliveryMethod) => dm === 'express'
 
-  /* ----- 明細表格列（與 OrderAdd 對齊） ----- */
+  /* ----- 明细表格列（与 OrderAdd 对齐） ----- */
   const itemColumns = useCallback((groupId: string): TableColumnsType<PurchaseOrderItem> => [
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
     { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
+    { title: '资产名称', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {
-      title: '參數', key: 'params', width: 130, ellipsis: true,
+      title: '参数', key: 'params', width: 130, ellipsis: true,
       render: (_: unknown, r: PurchaseOrderItem) => {
         if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
         const entries = Object.entries(r.params).filter(([, v]) => v)
@@ -160,21 +165,21 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${k}:${v}`).join(' / ')}</span>
       },
     },
-    { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
+    { title: '数量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
     {
-      title: '採購形式', key: 'purchaseType', width: 80,
+      title: '采购形式', key: 'purchaseType', width: 80,
       render: (_: unknown, r: PurchaseOrderItem) => r.purchaseType
-        ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? '購買' : '租賃'}</Tag>
+        ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? '购买' : '租赁'}</Tag>
         : '-',
     },
     {
-      title: '參考單價', key: 'price', width: 100, align: 'right',
+      title: '参考单价', key: 'price', width: 100, align: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => (
         <span style={{ color: '#8c8c8c', fontSize: 12 }}>{r.price ? `MOP ${r.price.toLocaleString()}` : '-'}</span>
       ),
     },
     {
-      title: '成交單價', key: 'confirmedPrice', width: 130,
+      title: '成交单价', key: 'confirmedPrice', width: 130,
       render: (_: unknown, r: PurchaseOrderItem) => (
         <InputNumber
           value={r.confirmedPrice}
@@ -182,14 +187,14 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           style={{ width: '100%' }}
           min={0}
           precision={2}
-          placeholder="成交價"
+          placeholder="成交价"
           addonBefore="MOP"
           size="small"
         />
       ),
     },
     {
-      title: '小計', key: 'subtotal', width: 100, align: 'right',
+      title: '小计', key: 'subtotal', width: 100, align: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => {
         const cp = r.confirmedPrice || r.price
         return <span style={{ fontWeight: 600 }}>MOP ${(cp * r.qty).toLocaleString()}</span>
@@ -202,7 +207,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
     try {
       const v = await form.validateFields()
       const emptyGroups = supplierGroups.filter((g) => !g.supplier.trim())
-      if (emptyGroups.length > 0) { message.warning('請填寫所有分組的名稱'); return }
+      if (emptyGroups.length > 0) { message.warning('请填寫所有分组的名称'); return }
       setSubmitting(true)
 
       await updatePurchaseOrderExec(id, {
@@ -238,7 +243,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
   return (
     <Spin spinning={loading}>
-      {/* ====== 頁面頭部 ====== */}
+      {/* ====== 页面头部 ====== */}
       <div style={{
         position: 'relative', background: '#fff', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
@@ -252,33 +257,33 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
             style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>編輯採購訂單</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>编辑采购订单</h2>
           <Tag color="orange" style={{ marginLeft: 4 }}>{order.poNo}</Tag>
         </div>
       </div>
 
       <Form<GlobalFormValues> form={form} layout="vertical">
-        {/* ====== 訂單信息 ====== */}
+        {/* ====== 订单信息 ====== */}
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShoppingCartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>訂單信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>订单信息</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <Row gutter={24}>
             <Col span={8}>
-              <Form.Item label="採購經辦人" name="purchaser" rules={[{ required: true, message: '請選擇採購經辦人' }]}>
+              <Form.Item label="采购经办人" name="purchaser" rules={[{ required: true, message: '请选择采购经办人' }]}>
                 <Select
                   showSearch
-                  placeholder="輸入姓名/工號搜索"
+                  placeholder="输入姓名/工号搜索"
                   loading={empLoading}
                   filterOption={false}
                   onSearch={handleEmpSearch}
                   onChange={handleEmpChange}
-                  notFoundContent={empLoading ? <Spin size="small" /> : '暫無數據'}
+                  notFoundContent={empLoading ? <Spin size="small" /> : '暂无数据'}
                   options={employees.map((e) => ({
                     value: e.empId,
                     label: `${e.name}（${e.empId}）${e.department ? ` · ${e.department}` : ''}`,
@@ -288,12 +293,12 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item label="服務部門" name="department">
-                <Input disabled placeholder="選擇經辦人後自動帶出" style={{ color: '#262626' }} />
+              <Form.Item label="服务部门" name="department">
+                <Input disabled placeholder="选择经办人后自动带出" style={{ color: '#262626' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item label={t('asset.execStatus')} name="execStatus" rules={[{ required: true, message: '請選擇執行狀態' }]}>
+              <Form.Item label={t('asset.execStatus')} name="execStatus" rules={[{ required: true, message: '请选择执行状态' }]}>
                 <Select disabled options={EXEC_STATUS_OPTIONS.map((o) => ({
                   value: o.value,
                   label: <Tag color={o.color}>{o.label}</Tag>,
@@ -303,24 +308,24 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           </Row>
           <Row gutter={24}>
             <Col span={16}>
-              <Form.Item label="採購事由" name="remark" style={{ marginBottom: 0 }}>
+              <Form.Item label="采购事由" name="remark" style={{ marginBottom: 0 }}>
                 <Input.TextArea rows={2} placeholder={t('asset.remarkPh')} maxLength={300} showCount style={{ resize: 'none' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>訂單總計</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>订单总计</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
             </Col>
           </Row>
         </div>
 
-        {/* ====== 採購物資分組 ====== */}
+        {/* ====== 采购物资分组 ====== */}
         {supplierGroups.map((group, gi) => {
           const subtotal = groupSubtotal(group)
           const dm = group.deliveryMethod as DeliveryMethod | undefined
           return (
             <div key={group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              {/* 分組標題 */}
+              {/* 分组标题 */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{
@@ -330,79 +335,79 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                     color: '#fff', fontSize: 11, fontWeight: 700,
                     boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                   }}>{gi + 1}</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>採購物資</span>
-                  <Tag color="blue" style={{ fontSize: 11 }}>小計：MOP {subtotal.toLocaleString()}</Tag>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>采购物资</span>
+                  <Tag color="blue" style={{ fontSize: 11 }}>小计：MOP {subtotal.toLocaleString()}</Tag>
                 </div>
                 {supplierGroups.length > 1 && (
                   <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleRemoveGroup(group.id)}>
-                    刪除此分組
+                    删除此分组
                   </Button>
                 )}
               </div>
 
-              {/* 供應商信息 */}
+              {/* 供应商信息 */}
               <Row gutter={16} style={{ marginBottom: 16 }}>
                 <Col span={6}>
-                  <Form.Item label="供應商名稱" required style={{ marginBottom: 0 }}>
+                  <Form.Item label="供应商名称" required style={{ marginBottom: 0 }}>
                     <Input value={group.supplier} onChange={(e) => updateGroup(group.id, { supplier: e.target.value })}
-                      placeholder="請輸入供應商名稱" allowClear />
+                      placeholder="请输入供应商名称" allowClear />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item label="供應商聯絡人" style={{ marginBottom: 0 }}>
+                  <Form.Item label="供应商联络人" style={{ marginBottom: 0 }}>
                     <Input value={group.contact} onChange={(e) => updateGroup(group.id, { contact: e.target.value })}
-                      placeholder="請輸入供應商聯絡人" allowClear />
+                      placeholder="请输入供应商联络人" allowClear />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item label="下單日期" style={{ marginBottom: 0 }}>
+                  <Form.Item label="下单日期" style={{ marginBottom: 0 }}>
                     <DatePicker value={group.orderDate ? dayjs(group.orderDate) : null}
                       onChange={(d: Dayjs | null) => updateGroup(group.id, { orderDate: d?.format('YYYY-MM-DD') || '' })}
-                      style={{ width: '100%' }} placeholder="請選擇下單日期" />
+                      style={{ width: '100%' }} placeholder="请选择下单日期" />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item label="收貨方式" required style={{ marginBottom: 0 }}>
+                  <Form.Item label="收货方式" required style={{ marginBottom: 0 }}>
                     <Select value={group.deliveryMethod}
                       onChange={(v: DeliveryMethod) => updateGroup(group.id, { deliveryMethod: v })}
-                      placeholder="請選擇收貨方式" allowClear
+                      placeholder="请选择收货方式" allowClear
                       options={[
                         { label: '自取', value: 'self_pickup' },
-                        { label: '供應商送貨上門', value: 'supplier_delivery' },
-                        { label: '快遞發貨', value: 'express' },
+                        { label: '供应商送货上门', value: 'supplier_delivery' },
+                        { label: '快递发货', value: 'express' },
                       ]}
                     />
                   </Form.Item>
                 </Col>
               </Row>
 
-              {/* 條件字段 */}
+              {/* 条件字段 */}
               {(showReceiveDate(dm) || showTrackingNo(dm)) && (
                 <Row gutter={16} style={{ marginBottom: 16 }}>
                   {showReceiveDate(dm) && (
                     <Col span={6}>
-                      <Form.Item label="預計收貨日期" style={{ marginBottom: 0 }}>
+                      <Form.Item label="预计收货日期" style={{ marginBottom: 0 }}>
                         <DatePicker
                           value={group.expectedReceiveDate ? dayjs(group.expectedReceiveDate) : null}
                           onChange={(d: Dayjs | null) => updateGroup(group.id, { expectedReceiveDate: d?.format('YYYY-MM-DD') || '' })}
-                          style={{ width: '100%' }} placeholder="請選擇預計收貨日期"
+                          style={{ width: '100%' }} placeholder="请选择预计收货日期"
                         />
                       </Form.Item>
                     </Col>
                   )}
                   {showTrackingNo(dm) && (
                     <Col span={6}>
-                      <Form.Item label="快遞單號" style={{ marginBottom: 0 }}>
+                      <Form.Item label="快递单号" style={{ marginBottom: 0 }}>
                         <Input value={group.trackingNo}
                           onChange={(e) => updateGroup(group.id, { trackingNo: e.target.value })}
-                          placeholder="請輸入快遞單號" allowClear style={{ fontFamily: 'monospace' }} />
+                          placeholder="请输入快递单号" allowClear style={{ fontFamily: 'monospace' }} />
                       </Form.Item>
                     </Col>
                   )}
                 </Row>
               )}
 
-              {/* 明細表格 */}
+              {/* 明细表格 */}
               {group.items.length > 0 ? (
                 <Table<PurchaseOrderItem>
                   columns={itemColumns(group.id)}
@@ -414,7 +419,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                 />
               ) : (
                 <div style={{ textAlign: 'center', color: '#bfbfbf', padding: '24px 0', fontSize: 13 }}>
-                  暫無明細
+                  暂无明细
                 </div>
               )}
             </div>
@@ -422,11 +427,11 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         })}
 
         <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddGroup} style={{ width: '100%', marginBottom: 16, height: 40 }}>
-          + 新增供應商分組
+          + 新增供应商分组
         </Button>
       </Form>
 
-      {/* ====== 底部操作欄 ====== */}
+      {/* ====== 底部操作栏 ====== */}
       <div className="form-footer">
         <Space>
           <Button onClick={onBack}>取消</Button>

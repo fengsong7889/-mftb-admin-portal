@@ -61,7 +61,7 @@ public class WordLibraryController {
     @PutMapping("/{id}")
     @RequirePermission(menu = "promotion-word-library", action = "edit")
     public Result<WordLibraryVO> updateWord(@PathVariable Long id, @Valid @RequestBody WordLibraryRequest request) {
-        return Result.success("编辑成功", wordLibraryService.updateWord(id, request));
+        return Result.success("編輯成功", wordLibraryService.updateWord(id, request));
     }
 
     /** 切换状态（启用/停用） */

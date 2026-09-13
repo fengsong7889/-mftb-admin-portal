@@ -39,14 +39,14 @@ public class PositionController {
     @PostMapping
     @RequirePermission(menu = "position-management", action = "create")
     public Result<PositionVO> create(@Valid @RequestBody PositionRequest request) {
-        return Result.success("职位创建成功", positionService.create(request));
+        return Result.success("職位創建成功", positionService.create(request));
     }
 
     /** 编辑职位 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "position-management", action = "edit")
     public Result<PositionVO> update(@PathVariable Long id, @Valid @RequestBody PositionRequest request) {
-        return Result.success("职位信息已更新", positionService.update(id, request));
+        return Result.success("職位信息已更新", positionService.update(id, request));
     }
 
     /** 删除职位 */

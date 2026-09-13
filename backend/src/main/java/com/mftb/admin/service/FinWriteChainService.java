@@ -15,7 +15,7 @@ public interface FinWriteChainService {
     void writeApprovedRecords(FinApproval approval, LocalDateTime tradeTime);
 
     /**
-     * 广告消费写入: 按充值批次 FIFO 拆分明细（变动类别=广告类型，如無敵星星），
+     * 广告消费写入: 按充值批次 FIFO 拆分明细（变动类别=广告类型，如无敌星星），
      * 实收按所扣批次实收比例等比例扣减，并同步账户余额
      *
      * @param amount 消费金额（正数，内部取负写入）

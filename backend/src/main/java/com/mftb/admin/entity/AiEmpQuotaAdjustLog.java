@@ -11,10 +11,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 員工額度調整日誌實體
+ * 员工额度调整日志实体
  *
- * 記錄管理員對員工額度的人工調整操作（舊值→新值+原因+操作人），
- * 供詳情頁調整歷史展示。
+ * 记录管理员对员工额度的人工调整操作（旧值→新值+原因+操作人），
+ * 供详情页调整历史展示。
  */
 @Data
 @TableName("ai_emp_quota_adjust_log")
@@ -23,28 +23,28 @@ public class AiEmpQuotaAdjustLog {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 被調整員工ID (sys_user.id) */
+    /** 被调整员工ID (sys_user.id) */
     private Long employeeId;
 
-    /** 來源維度: department/position/role/approval */
+    /** 来源维度: department/position/role/approval */
     private String source;
 
-    /** 來源描述 */
+    /** 来源描述 */
     private String sourceDesc;
 
-    /** 限額類型: token/request/cost */
+    /** 限额类型: token/request/cost */
     private String quotaType;
 
-    /** 限額週期: daily/monthly */
+    /** 限额周期: daily/monthly */
     private String quotaPeriod;
 
-    /** 調整前值 */
+    /** 调整前值 */
     private BigDecimal oldValue;
 
-    /** 調整後值 */
+    /** 调整后值 */
     private BigDecimal newValue;
 
-    /** 調整原因 */
+    /** 调整原因 */
     private String reason;
 
     /** 操作人 */

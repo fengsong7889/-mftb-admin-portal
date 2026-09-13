@@ -1,5 +1,6 @@
 package com.mftb.admin.controller;
 
+import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.SysConfigService;
@@ -39,6 +40,7 @@ public class NotificationChannelController {
      * 读取指定渠道的配置（secret 脱敏返回）
      */
     @GetMapping("/{channel}/config")
+    @RequirePermission(menu = "notification-config")
     public Result<Map<String, Object>> getConfig(@PathVariable String channel) {
         validateChannel(channel);
 
@@ -65,6 +67,7 @@ public class NotificationChannelController {
      * 更新指定渠道的配置
      */
     @PutMapping("/{channel}/config")
+    @RequirePermission(menu = "notification-config", action = "edit")
     public Result<Void> updateConfig(@PathVariable String channel, @RequestBody Map<String, String> body) {
         validateChannel(channel);
 
@@ -91,6 +94,7 @@ public class NotificationChannelController {
      * 发送测试消息（支持携带当前表单配置，无需先保存）
      */
     @PostMapping("/{channel}/test")
+    @RequirePermission(menu = "notification-config", action = "edit")
     public Result<String> test(@PathVariable String channel, @RequestBody(required = false) Map<String, String> body) {
         validateChannel(channel);
 

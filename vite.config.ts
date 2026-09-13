@@ -520,6 +520,12 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
+  // 显式預構建「僅被懶加載頁面引用」的依賴：Vite 初始掃描可能漏掉這些依賴，
+  // 導致運行時按需重新優化、browserHash 變更，已緩存的轉換結果引用舊 hash 而返回
+  // 504 (Outdated Optimize Dep)，進而使整條動態 import 鏈失敗（表現為「頁面資源加載失敗」）。
+  optimizeDeps: {
+    include: ['dompurify'],
+  },
   server: {
     port: 3000,
     host: '0.0.0.0', // 允许局域网访问
@@ -534,5 +540,12 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 2000,
+    // 生产构建移除 console/debugger，防止敏感信息泄露（SEC-009）
+    minify: 'esbuild',
+    target: 'es2020',
+  },
+  esbuild: {
+    drop: ['debugger'],
+    pure: ['console.log', 'console.info'],
   },
 })

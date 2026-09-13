@@ -10,8 +10,8 @@ import lombok.Data;
 @Data
 public class GiftDeductRequest {
 
-    @NotNull(message = "扣除天数不能为空")
-    @Min(value = 1, message = "扣除天数至少为1天")
+    @NotNull(message = "扣除天數不能為空")
+    @Min(value = 1, message = "扣除天數至少為1天")
     private Integer deductDays;
 
     /** 扣除原因 */

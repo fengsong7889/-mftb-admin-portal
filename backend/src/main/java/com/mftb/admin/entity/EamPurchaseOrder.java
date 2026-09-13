@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 採購訂單實體
+ * 采购订单实体
  */
 @Data
 @TableName("biz_eam_purchase_order")
@@ -16,67 +16,67 @@ public class EamPurchaseOrder {
     @TableId
     private Long id;
 
-    /** 訂單編號 */
+    /** 订单编号 */
     private String poNo;
 
-    /** 關聯採購申請 ID（0=直接下單） */
+    /** 关联采购申请 ID（0=直接下单） */
     private Long reqId;
 
-    /** 供應商（兼容舊數據） */
+    /** 供应商（兼容旧数据） */
     private String supplier;
 
-    /** 訂單金額（預估） */
+    /** 订单金额（预估） */
     private BigDecimal amount;
 
-    /** 實際成交金額 */
+    /** 实际成交金额 */
     private BigDecimal confirmedAmount;
 
-    /** 預計交貨日期 */
+    /** 预计交货日期 */
     private String deliveryDate;
 
-    /** 採購經辦人 */
+    /** 采购经办人 */
     private String purchaser;
 
-    /** 服務部門（持久化） */
+    /** 服务部门（持久化） */
     private String department;
 
-    /** 採購事由/備註 */
+    /** 采购事由/备注 */
     private String remark;
 
-    /** 快遞單號（兼容舊數據） */
+    /** 快递单号（兼容旧数据） */
     private String trackingNo;
 
-    /** 供應商聯絡人（兼容舊數據） */
+    /** 供应商联络人（兼容旧数据） */
     private String contact;
 
-    /** 下單日期（兼容舊數據） */
+    /** 下单日期（兼容旧数据） */
     private String orderDate;
 
-    /** 執行狀態：pending/purchasing/completed */
+    /** 执行状态：pending/purchasing/completed */
     private String execStatus;
 
-    /** 驗收狀態：pending/partial/received */
+    /** 验收状态：pending/partial/received */
     private String status;
 
-    /** 已驗收總數 */
+    /** 已验收总数 */
     private Integer acceptedQty;
 
-    /** 退貨總數 */
+    /** 退货总数 */
     private Integer returnQty;
 
-    /** 換貨總數 */
+    /** 换货总数 */
     private Integer exchangeQty;
 
-    /** 讓步接收總數 */
+    /** 让步接收总数 */
     private Integer concessionQty;
 
-    /** 供應商分組 JSON */
+    /** 供应商分组 JSON */
     private String supplierGroups;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

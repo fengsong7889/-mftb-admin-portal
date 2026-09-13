@@ -12,12 +12,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 員工獨立額度授予實體（審批下發）
+ * 员工独立额度授予实体（审批下发）
  *
- * 員工通過 AI 使用申請審批獲得的「獨立/額外額度」：
- * - 不修改部門/職位/角色等組織織維度配置，僅對本人生效；
- * - 臨時額度（effective_type=temporary）查詢時按 expire_at 動態過濾，無需定時任務；
- * - source_request_id 回鏈審批記錄，授權來源可審計。
+ * 员工通过 AI 使用申请审批获得的「独立/额外额度」：
+ * - 不修改部门/职位/角色等组织织维度配置，仅对本人生效；
+ * - 临时额度（effective_type=temporary）查询时按 expire_at 动态过滤，无需定时任务；
+ * - source_request_id 回链审批记录，授权来源可审计。
  */
 @Data
 @TableName("ai_quota_override")
@@ -26,46 +26,46 @@ public class AiQuotaOverride {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 員工 ID (sys_user.id) */
+    /** 员工 ID (sys_user.id) */
     private Long userId;
 
-    /** 員工賬號（冗餘，用量聚合鍵） */
+    /** 员工账号（冗余，用量聚合键） */
     private String username;
 
-    /** 來源申請 ID (ai_access_request.id) */
+    /** 来源申请 ID (ai_access_request.id) */
     private Long sourceRequestId;
 
     /** 限定模型 ID（NULL=全部模型） */
     private Long modelId;
 
-    /** 限額類型: token/request */
+    /** 限额类型: token/request */
     private String quotaType;
 
-    /** 限額值 */
+    /** 限额值 */
     private BigDecimal quotaValue;
 
-    /** 限額週期: daily/monthly */
+    /** 限额周期: daily/monthly */
     private String quotaPeriod;
 
-    /** 生效類型: permanent=永久 temporary=臨時 */
+    /** 生效类型: permanent=永久 temporary=临时 */
     private String effectiveType;
 
-    /** 生效時間 */
+    /** 生效时间 */
     private LocalDateTime effectiveAt;
 
-    /** 臨時額度到期時間（NULL=永久） */
+    /** 临时额度到期时间（NULL=永久） */
     private LocalDateTime expireAt;
 
-    /** 超閾動作: reject/approve/downgrade */
+    /** 超阈动作: reject/approve/downgrade */
     private String overLimitAction;
 
-    /** 狀態: 1=啟用 0=停用 */
+    /** 状态: 1=启用 0=停用 */
     private Integer status;
 
     private String createdBy;
     private String updatedBy;
 
-    /** 邏輯刪除 */
+    /** 逻辑删除 */
     @TableLogic
     private Integer deleted;
 

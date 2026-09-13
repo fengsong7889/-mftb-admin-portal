@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 資產台賬實體
+ * 资产台账实体
  */
 @Data
 @TableName("biz_eam_asset")
@@ -16,19 +16,19 @@ public class EamAsset {
     @TableId
     private Long id;
 
-    /** 資產編號（系統生成，唯一） */
+    /** 资产编号（系统生成，唯一） */
     private String assetNo;
 
-    /** 資產名稱 */
+    /** 资产名称 */
     private String assetName;
 
-    /** 資產分類名稱 */
+    /** 资产分类名称 */
     private String assetType;
 
-    /** 分類 ID */
+    /** 分类 ID */
     private Long categoryId;
 
-    /** 分類編碼 */
+    /** 分类编码 */
     private String categoryCode;
 
     /** 品牌 */
@@ -37,61 +37,61 @@ public class EamAsset {
     /** 品牌 ID */
     private Long brandId;
 
-    /** 型號 ID */
+    /** 型号 ID */
     private Long modelId;
 
-    /** 參數信息 JSON */
+    /** 参数信息 JSON */
     private String params;
 
-    /** 單位 */
+    /** 单位 */
     private String unit;
 
-    /** 購買價值 */
+    /** 购买价值 */
     private BigDecimal purchaseValue;
 
-    /** 購買日期 */
+    /** 购买日期 */
     private String purchaseDate;
 
     /** purchase/lease */
     private String purchaseType;
 
-    /** 來源：self/lease */
+    /** 来源：self/lease */
     private String source;
 
-    /** 所屬公司 */
+    /** 所属公司 */
     private String company;
 
-    /** 存放地點名稱 */
+    /** 存放地点名称 */
     private String location;
 
     /** 存放位置 ID */
     private Long locationId;
 
-    /** 歸屬部門 */
+    /** 归属部门 */
     private String department;
 
     /** 使用人 */
     private String userName;
 
-    /** 狀態：idle/in_use/in_repair/scrapped */
+    /** 状态：idle/in_use/in_repair/scrapped */
     private String status;
 
     /** 持有方式：owned/borrowed */
     private String holdType;
 
-    /** 關聯採購訂單 ID */
+    /** 关联采购订单 ID */
     private Long orderId;
 
-    /** 關聯入庫批次 ID */
+    /** 关联入库批次 ID */
     private Long batchId;
 
-    /** 備註 */
+    /** 备注 */
     private String remark;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    /** 最後更新人 */
+    /** 最后更新人 */
     private String updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

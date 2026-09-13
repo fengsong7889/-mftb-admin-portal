@@ -29,6 +29,7 @@ import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -107,12 +108,12 @@ public class OaRequestServiceImpl implements OaRequestService {
         boolean isApprovalScope = false; // 标记是否为审批相关 scope（用于后续补充 myApprovalTime）
 
         if ("my_applied".equals(scope)) {
-            // 我發起的：按申请人过滤
+            // 我发起的：按申请人过滤
             if (StringUtils.hasText(userName)) {
                 wrapper.like(OaRequest::getApplicant, userName);
             }
         } else if ("pending_my_approval".equals(scope)) {
-            // 待我審批：approver 包含当前用户 + taskStatus=pending，排除会签已审
+            // 待我审批：approver 包含当前用户 + taskStatus=pending，排除会签已审
             isApprovalScope = true;
             List<Long> pendingIds = resolvePendingMyApproval(userName);
             if (pendingIds.isEmpty()) {
@@ -120,7 +121,7 @@ public class OaRequestServiceImpl implements OaRequestService {
             }
             wrapper.in(OaRequest::getId, pendingIds);
         } else if ("my_approved".equals(scope)) {
-            // 我已審批的：当前用户已审批的流程
+            // 我已审批的：当前用户已审批的流程
             isApprovalScope = true;
             List<Long> approvedIds = resolveMyApproved(userName);
             if (approvedIds.isEmpty()) {
@@ -187,7 +188,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         // ── 批量补充字段 ──
         List<Long> requestIds = result.getRecords().stream().map(OaRequest::getId).toList();
         if (!requestIds.isEmpty()) {
-            // 1. 待審任務 → 補充 currentApprover
+            // 1. 待审任务 → 补充 currentApprover
             List<OaApprovalTask> pendingTasks = oaApprovalTaskMapper.selectList(
                     new LambdaQueryWrapper<OaApprovalTask>()
                             .in(OaApprovalTask::getRequestId, requestIds)
@@ -212,7 +213,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                 }
             }
 
-            // 2. 審批相關 scope → 補充 myApprovalTime
+            // 2. 审批相关 scope → 补充 myApprovalTime
             if (isApprovalScope && StringUtils.hasText(userName)) {
                 enrichMyApprovalTime(records, requestIds, userName);
             }
@@ -377,10 +378,10 @@ public class OaRequestServiceImpl implements OaRequestService {
     @Transactional(rollbackFor = Exception.class)
     public String submit(OaRequestCreateDTO request) {
         if (!StringUtils.hasText(request.getProcessCode())) {
-            throw new BusinessException("请选择流程类型");
+            throw new BusinessException("請選擇流程類型");
         }
         if (!StringUtils.hasText(request.getTitle())) {
-            throw new BusinessException("请填写流程标题");
+            throw new BusinessException("請填寫流程標題");
         }
 
         // 查找流程定义
@@ -389,7 +390,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .eq(OaProcess::getProcessCode, request.getProcessCode())
                         .eq(OaProcess::getStatus, 1));
         if (process == null) {
-            throw new BusinessException("流程类型不存在或已停用: " + request.getProcessCode());
+            throw new BusinessException("流程類型不存在或已停用: " + request.getProcessCode());
         }
 
         SysUser current = operatorResolver.currentUser();
@@ -447,7 +448,7 @@ public class OaRequestServiceImpl implements OaRequestService {
 
     /**
      * 解析审批节点并创建审批任务（懒创建：仅创建第一个节点）
-     * 復用 WorkflowConfig 的动态节点模型；后续节点在当前节点审批通过时才实时创建，
+     * 复用 WorkflowConfig 的动态节点模型；后续节点在当前节点审批通过时才实时创建，
      * 保证流程配置中途修改后，后续节点读取到最新的审批人配置，且未到的节点信息不提前暴露
      */
     private void resolveAndCreateTasks(OaRequest oaRequest, OaProcess process, SysUser initiator) {
@@ -520,7 +521,7 @@ public class OaRequestServiceImpl implements OaRequestService {
             return null;
         }
     
-        // 從申請人簽名（如「冯松(MF00002)」）恢復發起人，節點解析依賴發起人部門
+        // 从申请人签名（如「冯松(MF00002)」）恢复发起人，节点解析依赖发起人部门
         SysUser initiator = resolveInitiator(request.getApplicant());
         List<OaApprovalTask> allNodes = resolveAllNodes(request, process, initiator);
         if (allNodes.isEmpty() || nextSortOrder > allNodes.size()) {
@@ -535,7 +536,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     }
     
     /**
-     * 從申請人簽名（如「冯松(MF00002)」）恢復發起人用戶對象
+     * 从申请人签名（如「冯松(MF00002)」）恢复发起人用户对象
      */
     private SysUser resolveInitiator(String applicantSignature) {
         if (!StringUtils.hasText(applicantSignature)) {
@@ -631,13 +632,13 @@ public class OaRequestServiceImpl implements OaRequestService {
     public ApproveResultVO approve(String flowNo, String comment, String formData) {
         OaRequest request = requireRequest(flowNo);
         if (!FLOW_PENDING.equals(request.getFlowStatus())) {
-            throw new BusinessException("该流程不在审批中");
+            throw new BusinessException("該流程不在審批中");
         }
 
         // 找到当前待审节点（sort_order 最小的 pending 任务）
         OaApprovalTask currentTask = findCurrentPendingTask(request.getId());
         if (currentTask == null) {
-            throw new BusinessException("该流程没有待审批节点");
+            throw new BusinessException("該流程沒有待審批節點");
         }
 
         // 从最新流程配置刷新当前节点审批人，保证配置修改后立即可生效
@@ -652,7 +653,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         if (!operatorResolver.isAdmin(current)
                 && currentTask.getApprover() != null
                 && !currentTask.getApprover().contains(approver)) {
-            throw new BusinessException("您不是当前节点的审批人，无法审批");
+            throw new BusinessException("您不是當前節點的審批人，無法審批");
         }
 
         // 判断审批模式：any（或签）/ all（会签）
@@ -710,8 +711,8 @@ public class OaRequestServiceImpl implements OaRequestService {
             log.info("AI 申请审批数据已更新：flowNo={}", flowNo);
         }
 
-        // 查找下一个待审节点：优先取已存在的 pending 任务（兼容舊的全量創建數據）；
-        // 懒創建模式下實時讀取最新流程配置創建下一節點，保證後續審批人始終為最新配置
+        // 查找下一个待审节点：优先取已存在的 pending 任务（兼容旧的全量创建数据）；
+        // 懒创建模式下实时读取最新流程配置创建下一节点，保证后续审批人始终为最新配置
         OaApprovalTask nextTask = findNextPendingTask(request.getId(), currentTask.getSortOrder());
         if (nextTask == null) {
             nextTask = createNextTaskLazily(request, currentTask.getSortOrder() + 1);
@@ -773,17 +774,17 @@ public class OaRequestServiceImpl implements OaRequestService {
     @Transactional(rollbackFor = Exception.class)
     public String reject(String flowNo, String reason) {
         if (!StringUtils.hasText(reason)) {
-            throw new BusinessException("请填写驳回原因");
+            throw new BusinessException("請填寫駁回原因");
         }
 
         OaRequest request = requireRequest(flowNo);
         if (!FLOW_PENDING.equals(request.getFlowStatus())) {
-            throw new BusinessException("该流程不在审批中");
+            throw new BusinessException("該流程不在審批中");
         }
 
         OaApprovalTask currentTask = findCurrentPendingTask(request.getId());
         if (currentTask == null) {
-            throw new BusinessException("该流程没有待审批节点");
+            throw new BusinessException("該流程沒有待審批節點");
         }
 
         // 从最新流程配置刷新当前节点审批人，保证配置修改后立即可生效
@@ -798,7 +799,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         if (!operatorResolver.isAdmin(current)
                 && currentTask.getApprover() != null
                 && !currentTask.getApprover().contains(approver)) {
-            throw new BusinessException("您不是当前节点的审批人，无法驳回");
+            throw new BusinessException("您不是當前節點的審批人，無法駁回");
         }
 
         // 标记当前节点为已驳回
@@ -837,7 +838,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     public void cancel(String flowNo) {
         OaRequest request = requireRequest(flowNo);
         if (!FLOW_PENDING.equals(request.getFlowStatus())) {
-            throw new BusinessException("仅审批中的流程可以撤销");
+            throw new BusinessException("僅審批中的流程可以撤銷");
         }
 
         // 检查是否已有审批通过的节点，如有则不允许撤销
@@ -847,14 +848,14 @@ public class OaRequestServiceImpl implements OaRequestService {
         boolean hasApproved = tasks.stream()
                 .anyMatch(t -> FLOW_APPROVED.equals(t.getTaskStatus()));
         if (hasApproved) {
-            throw new BusinessException("已有审批人通过，无法撤销，请联系审批人驳回");
+            throw new BusinessException("已有審批人通過，無法撤銷，請聯繫審批人駁回");
         }
 
         // 申请人本人才能撤销
         SysUser current = operatorResolver.currentUser();
         String applicant = operatorResolver.operatorSignature(current);
         if (!applicant.equals(request.getApplicant()) && !operatorResolver.isAdmin(current)) {
-            throw new BusinessException("仅申请人或管理员可以撤销流程");
+            throw new BusinessException("僅申請人或管理員可以撤銷流程");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -894,7 +895,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     public void submitDraft(String flowNo) {
         OaRequest request = requireRequest(flowNo);
         if (!FLOW_DRAFT.equals(request.getFlowStatus())) {
-            throw new BusinessException("仅草稿状态可提交，当前状态: " + request.getFlowStatus());
+            throw new BusinessException("僅草稿狀態可提交，當前狀態: " + request.getFlowStatus());
         }
 
         // 查找流程定义
@@ -903,7 +904,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .eq(OaProcess::getProcessCode, request.getProcessCode())
                         .eq(OaProcess::getStatus, 1));
         if (process == null) {
-            throw new BusinessException("流程类型不存在或已停用: " + request.getProcessCode());
+            throw new BusinessException("流程類型不存在或已停用: " + request.getProcessCode());
         }
 
         SysUser current = operatorResolver.currentUser();
@@ -968,7 +969,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     }
 
     /**
-     * P0-2 回調：採購申請審批通過 → 創建採購申請記錄 → 自動生成採購訂單
+     * P0-2 回调：采购申请审批通过 → 创建采购申请记录 → 自动生成采购订单
      */
     private void handlePurchaseApprovalCallback(OaRequest oaRequest) {
         Map<String, Object> formData = JsonUtils.parseMap(oaRequest.getFormData());
@@ -977,19 +978,19 @@ public class OaRequestServiceImpl implements OaRequestService {
             return;
         }
 
-        // 創建採購申請記錄（flowNo 即 CG 編號，直接作為 reqNo）
+        // 创建采购申请记录（flowNo 即 CG 编号，直接作为 reqNo）
         EamPurchaseRequest pr = new EamPurchaseRequest();
         pr.setFlowNo(oaRequest.getFlowNo());
         pr.setReqNo(oaRequest.getFlowNo());
         pr.setTitle(oaRequest.getTitle());
-        pr.setDepartment(str(formData, "department"));
-        pr.setDepartmentId(toLong(formData.get("departmentId"), null));
-        pr.setApplicant(str(formData, "applicant"));
-        pr.setApplicantEmpId(str(formData, "applicantEmpId"));
-        pr.setReason(str(formData, "reason"));
+        pr.setDepartment(ConvertUtils.str(formData, "department"));
+        pr.setDepartmentId(ConvertUtils.toLong(formData.get("departmentId"), null));
+        pr.setApplicant(ConvertUtils.str(formData, "applicant"));
+        pr.setApplicantEmpId(ConvertUtils.str(formData, "applicantEmpId"));
+        pr.setReason(ConvertUtils.str(formData, "reason"));
         pr.setStatus("approved");
 
-        // 計算預算（items 合計）
+        // 计算预算（items 合计）
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) formData.get("items");
         java.math.BigDecimal budget = java.math.BigDecimal.ZERO;
@@ -1004,7 +1005,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         pr.setBudget(budget);
         eamPurchaseRequestMapper.insert(pr);
 
-        // 自動創建採購訂單
+        // 自动创建采购订单
         long orderId = eamPurchaseService.createOrderFromRequest(pr.getId());
         log.info("採購申請審批回調完成: flowNo={}, orderId={}",
                 oaRequest.getFlowNo(), orderId);
@@ -1076,14 +1077,4 @@ public class OaRequestServiceImpl implements OaRequestService {
         }
     }
 
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v != null ? v.toString() : "";
-    }
-
-    private static Long toLong(Object v, Long def) {
-        if (v == null) return def;
-        if (v instanceof Number n) return n.longValue();
-        try { return Long.parseLong(v.toString()); } catch (Exception e) { return def; }
-    }
 }

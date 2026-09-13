@@ -29,6 +29,8 @@ export interface DeptQuotaVO {
   softThreshold: number
   overLimitAction: OverLimitAction
   downgradeModelId: number | null
+  /** 降級豁免額度（僅超額動作=自動降級時有效，null 表示不設獨立豁免額度） */
+  downgradeExemptQuota: number | null
   usedValue: number
   status: number
   createdBy: string
@@ -52,6 +54,8 @@ export interface DeptQuotaRequest {
   softThreshold?: number
   overLimitAction: string
   downgradeModelId?: number | null
+  /** 降級豁免額度（僅超額動作=自動降級時提交，null 表示不設獨立豁免額度） */
+  downgradeExemptQuota?: number | null
   status?: number
 }
 

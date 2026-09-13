@@ -3,6 +3,8 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.RoleVO;
+import com.mftb.admin.dto.WorkflowApprovalToggleDTO;
+import com.mftb.admin.dto.WorkflowConfigSaveDTO;
 import com.mftb.admin.dto.WorkflowConfigVO;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.service.WorkflowConfigService;
@@ -41,10 +43,10 @@ public class WorkflowConfigController {
     @RequirePermission(menu = "workflow-config", action = "edit")
     public Result<Void> updateApprovalEnabled(
             @PathVariable String flowType,
-            @RequestBody Map<String, Boolean> body) {
-        Boolean value = body.get("value");
+            @RequestBody WorkflowApprovalToggleDTO dto) {
+        Boolean value = dto.getValue();
         if (value == null) {
-            return Result.error(400, "审批开关值不能为空");
+            return Result.error(400, "審批開關值不能為空");
         }
         workflowConfigService.updateApprovalEnabled(flowType, value);
         return Result.success();
@@ -55,9 +57,9 @@ public class WorkflowConfigController {
     @RequirePermission(menu = "workflow-config", action = "edit")
     public Result<Void> updateConfig(
             @PathVariable String flowType,
-            @RequestBody Map<String, String> body) {
-        String nodesConfig = body.get("nodesConfig");
-        String routingRules = body.get("routingRules");
+            @RequestBody WorkflowConfigSaveDTO dto) {
+        String nodesConfig = dto.getNodesConfig();
+        String routingRules = dto.getRoutingRules();
         workflowConfigService.updateNodesConfig(flowType, nodesConfig, routingRules);
         return Result.success();
     }
@@ -71,7 +73,7 @@ public class WorkflowConfigController {
                 .filter(c -> flowType.equals(c.getFlowType()))
                 .findFirst().orElse(null);
         if (config == null) {
-            return Result.error(404, "流程类型不存在: " + flowType);
+            return Result.error(404, "流程類型不存在: " + flowType);
         }
         return Result.success(config);
     }

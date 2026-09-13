@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import DOMPurify from 'dompurify'
 import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -2588,7 +2589,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         footer={<Button onClick={() => setRuleModalOpen(false)}>{t('organicTrafficScore.close')}</Button>}
       >
         <div style={{ fontSize: 13, lineHeight: 2, color: '#595959', marginTop: 12 }}>
-          <div dangerouslySetInnerHTML={{ __html: t('organicTrafficScore.rule1') }} />
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t('organicTrafficScore.rule1')) }} />
           <div>{t('organicTrafficScore.rule2')}</div>
           <div>{t('organicTrafficScore.rule3')}</div>
           <div>{t('organicTrafficScore.rule4', { total: DIMENSION_WEIGHT_TOTAL })}</div>

@@ -15,9 +15,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * MCP 外部工具統一執行網關（MCP tools/call 語義的服務端落地）
- * 執行鏈路：AI 發起 → 前端人工確認（AI 操作授權 L3 治理）→ 本網關 → 對應 McpExternalHandler
- * 服務端兜底校驗：工具存在且已安裝、source=external、執行器已接入；調用結果日誌留痕
+ * MCP 外部工具统一执行网关（MCP tools/call 语义的服务端落地）
+ * 执行链路：AI 发起 → 前端人工确认（AI 操作授权 L3 治理）→ 本网关 → 对应 McpExternalHandler
+ * 服务端兜底校验：工具存在且已安装、source=external、执行器已接入；调用结果日志留痕
  */
 @Slf4j
 @Service

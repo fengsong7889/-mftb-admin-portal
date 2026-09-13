@@ -210,7 +210,7 @@ public class AuthServiceImpl implements AuthService {
         }
         if (attempt.count.get() >= MAX_LOGIN_ATTEMPTS) {
             long remainMinutes = (LOCK_DURATION_MS - elapsed) / 60000 + 1;
-            throw new BusinessException("登录失败次数过多，请 " + remainMinutes + " 分钟后再试");
+            throw new BusinessException("登錄失敗次數過多，請 " + remainMinutes + " 分钟后再试");
         }
     }
 
@@ -301,7 +301,7 @@ public class AuthServiceImpl implements AuthService {
                 log.info("成功 fallback 保存到 avatar field for user: {}", username);
             } catch (Exception e2) {
                 log.error("Fallback save also failed: {}", e2.getMessage());
-                throw new BusinessException("保存头像URL失败: " + e2.getMessage());
+                throw new BusinessException("保存頭像URL失敗: " + e2.getMessage());
             }
         }
     }

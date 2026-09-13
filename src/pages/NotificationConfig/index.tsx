@@ -56,6 +56,13 @@ const CHANNELS: ChannelMeta[] = [
   },
 ]
 
+/**
+ * 通知渠道配置页
+ *
+ * 以卡片形式展示各通知渠道（钉钉/企微/飞书）的接入状态，
+ * 支持配置 Webhook URL / Secret、启用开关、发送测试消息。
+ * 当前仅钉钉渠道已接入，企微/飞书为预留位（available=false）。
+ */
 export default function NotificationConfig() {
   const [channelConfigs, setChannelConfigs] = useState<Record<string, ChannelConfig>>({})
   const [loading, setLoading] = useState(false)

@@ -1,107 +1,113 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.EamBrandSaveDTO;
+import com.mftb.admin.dto.EamCategorySaveDTO;
+import com.mftb.admin.dto.EamLocationSaveDTO;
+import com.mftb.admin.dto.EamModelSaveDTO;
+import com.mftb.admin.dto.EamParamTypeSaveDTO;
+import com.mftb.admin.dto.EamParamValueSaveDTO;
 import com.mftb.admin.dto.PageResult;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * EAM 基礎數據服務（分類 / 品牌 / 型號 / 位置）
+ * EAM 基础数据服务（分类 / 品牌 / 型号 / 位置）
  */
 public interface EamBasicDataService {
 
-    /* ==================== 資產分類 ==================== */
+    /* ==================== 资产分类 ==================== */
 
-    /** 分類列表（平鋪返回，頁面自行構樹） */
+    /** 分类列表（平铺返回，页面自行构树） */
     List<Map<String, Object>> listCategories(String keyword, String name, String code,
                                               String updatedBy, String updatedAtStart, String updatedAtEnd);
 
-    /** 新增分類 */
-    long createCategory(Map<String, Object> data);
+    /** 新增分类 */
+    long createCategory(EamCategorySaveDTO dto);
 
-    /** 更新分類 */
-    void updateCategory(long id, Map<String, Object> data);
+    /** 更新分类 */
+    void updateCategory(long id, EamCategorySaveDTO dto);
 
-    /** 刪除分類 */
+    /** 删除分类 */
     void deleteCategory(long id);
 
-    /** 切換分類狀態 */
+    /** 切换分类状态 */
     void toggleCategoryStatus(long id);
 
-    /* ==================== 品牌庫 ==================== */
+    /* ==================== 品牌库 ==================== */
 
     /** 品牌列表 */
     List<Map<String, Object>> listBrands(String categoryCode, String brandZh,
                                           String updatedBy, String updatedAtStart, String updatedAtEnd);
 
     /** 新增品牌 */
-    long createBrand(Map<String, Object> data);
+    long createBrand(EamBrandSaveDTO dto);
 
     /** 更新品牌 */
-    void updateBrand(long id, Map<String, Object> data);
+    void updateBrand(long id, EamBrandSaveDTO dto);
 
-    /** 刪除品牌 */
+    /** 删除品牌 */
     void deleteBrand(long id);
 
-    /* ==================== 產品型號庫 ==================== */
+    /* ==================== 产品型号库 ==================== */
 
-    /** 型號分頁列表 */
+    /** 型号分页列表 */
     PageResult<Map<String, Object>> pageModels(int page, int size, String categoryCode, Long brandId,
                                                 String brandZh, String name,
                                                 String updatedBy, String updatedAtStart, String updatedAtEnd);
 
-    /** 型號詳情 */
+    /** 型号详情 */
     Map<String, Object> getModelDetail(long id);
 
-    /** 新增型號 */
-    long createModel(Map<String, Object> data);
+    /** 新增型号 */
+    long createModel(EamModelSaveDTO dto);
 
-    /** 更新型號 */
-    void updateModel(long id, Map<String, Object> data);
+    /** 更新型号 */
+    void updateModel(long id, EamModelSaveDTO dto);
 
-    /** 刪除型號 */
+    /** 删除型号 */
     void deleteModel(long id);
 
-    /* ==================== 倉庫 / 存放位置 ==================== */
+    /* ==================== 仓库 / 存放位置 ==================== */
 
-    /** 位置列表（平鋪返回，頁面自行構樹） */
+    /** 位置列表（平铺返回，页面自行构树） */
     List<Map<String, Object>> listLocations(String keyword, String name, String code, String type, String updatedBy);
 
     /** 新增位置 */
-    long createLocation(Map<String, Object> data);
+    long createLocation(EamLocationSaveDTO dto);
 
     /** 更新位置 */
-    void updateLocation(long id, Map<String, Object> data);
+    void updateLocation(long id, EamLocationSaveDTO dto);
 
-    /** 刪除位置 */
+    /** 删除位置 */
     void deleteLocation(long id);
 
-    /* ==================== 參數庫 ==================== */
+    /* ==================== 参数库 ==================== */
 
-    /** 參數類型分頁列表 */
+    /** 参数类型分页列表 */
     PageResult<Map<String, Object>> pageParamTypes(int page, int size, String categoryCode, String name, String code, String status);
 
-    /** 新增參數類型 */
-    long createParamType(Map<String, Object> data);
+    /** 新增参数类型 */
+    long createParamType(EamParamTypeSaveDTO dto);
 
-    /** 更新參數類型 */
-    void updateParamType(long id, Map<String, Object> data);
+    /** 更新参数类型 */
+    void updateParamType(long id, EamParamTypeSaveDTO dto);
 
-    /** 刪除參數類型 */
+    /** 删除参数类型 */
     void deleteParamType(long id);
 
-    /** 根據參數類型編碼查詢參數值列表 */
+    /** 根据参数类型编码查询参数值列表 */
     List<Map<String, Object>> listParamValuesByType(String paramTypeCode);
 
-    /** 查詢所有參數值（分頁） */
+    /** 查询所有参数值（分页） */
     PageResult<Map<String, Object>> pageParamValues(int page, int size, String paramTypeCode, String categoryCode);
 
-    /** 新增參數值 */
-    long createParamValue(Map<String, Object> data);
+    /** 新增参数值 */
+    long createParamValue(EamParamValueSaveDTO dto);
 
-    /** 更新參數值 */
-    void updateParamValue(long id, Map<String, Object> data);
+    /** 更新参数值 */
+    void updateParamValue(long id, EamParamValueSaveDTO dto);
 
-    /** 刪除參數值 */
+    /** 删除参数值 */
     void deleteParamValue(long id);
 }

@@ -116,20 +116,20 @@ public class TranslationServiceImpl implements TranslationService {
     @Override
     public TranslationVO create(TranslationRequest request) {
         if (!StringUtils.hasText(request.getFieldName())) {
-            throw new BusinessException("字段名称不能为空");
+            throw new BusinessException("字段名稱不能為空");
         }
         if (request.getFieldName().trim().length() > MAX_FIELD_NAME_LEN) {
-            throw new BusinessException("字段名称不能超过 " + MAX_FIELD_NAME_LEN + " 个字符");
+            throw new BusinessException("字段名稱不能超過 " + MAX_FIELD_NAME_LEN + " 个字符");
         }
         String category = StringUtils.hasText(request.getCategory()) ? request.getCategory() : "biz";
         String fieldKey = normalizeKey(request.getFieldKey(), category);
         if (fieldKey.length() > MAX_FIELD_KEY_LEN) {
-            throw new BusinessException("字段 Key 不能超过 " + MAX_FIELD_KEY_LEN + " 个字符");
+            throw new BusinessException("字段 Key 不能超過 " + MAX_FIELD_KEY_LEN + " 个字符");
         }
 
         // fieldKey 全局唯一校验
         if (existsByKey(fieldKey, null)) {
-            throw new BusinessException("字段 Key 已存在：Key 必须全局唯一，请修改后重试");
+            throw new BusinessException("字段 Key 已存在：Key 必須全局唯一，請修改後重試");
         }
 
         SysTranslation entity = new SysTranslation();
@@ -148,33 +148,33 @@ public class TranslationServiceImpl implements TranslationService {
     public TranslationVO update(Long id, TranslationRequest request) {
         SysTranslation entity = translationMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException("翻译字段不存在");
+            throw new BusinessException("翻譯字段不存在");
         }
         boolean menuSyncField = entity.getFieldKey() != null && entity.getFieldKey().startsWith(MENU_KEY_PREFIX);
         // Key 留空保持原值；填写则校验全局唯一（排除自身）
         if (StringUtils.hasText(request.getFieldKey())) {
             String newKey = request.getFieldKey().trim();
             if (newKey.length() > MAX_FIELD_KEY_LEN) {
-                throw new BusinessException("字段 Key 不能超过 " + MAX_FIELD_KEY_LEN + " 个字符");
+                throw new BusinessException("字段 Key 不能超過 " + MAX_FIELD_KEY_LEN + " 个字符");
             }
             // 菜单同步字段的 Key 与菜单 menu_key 绑定, 改名会导致下次启动同步重复插入
             if (menuSyncField && !newKey.equals(entity.getFieldKey())) {
-                throw new BusinessException("菜单同步字段的 Key 与菜单绑定，不允许修改");
+                throw new BusinessException("菜單同步字段的 Key 與菜單綁定，不允許修改");
             }
             if (existsByKey(newKey, id)) {
-                throw new BusinessException("字段 Key 已存在：Key 必须全局唯一，请修改后重试");
+                throw new BusinessException("字段 Key 已存在：Key 必須全局唯一，請修改後重試");
             }
             entity.setFieldKey(newKey);
         }
         if (StringUtils.hasText(request.getFieldName())) {
             if (request.getFieldName().trim().length() > MAX_FIELD_NAME_LEN) {
-                throw new BusinessException("字段名称不能超过 " + MAX_FIELD_NAME_LEN + " 个字符");
+                throw new BusinessException("字段名稱不能超過 " + MAX_FIELD_NAME_LEN + " 个字符");
             }
             entity.setFieldName(request.getFieldName().trim());
         }
         if (StringUtils.hasText(request.getCategory())) {
             if (menuSyncField && !"menu".equals(request.getCategory())) {
-                throw new BusinessException("菜单同步字段的分类不允许修改");
+                throw new BusinessException("菜單同步字段的分類不允許修改");
             }
             entity.setCategory(request.getCategory());
         }
@@ -250,16 +250,16 @@ public class TranslationServiceImpl implements TranslationService {
     @Override
     public LanguageVO createLanguage(LanguageVO request) {
         if (!StringUtils.hasText(request.getCode()) || !StringUtils.hasText(request.getName())) {
-            throw new BusinessException("语言代码与名称不能为空");
+            throw new BusinessException("語言代碼與名稱不能為空");
         }
         String code = normalizeLangCode(request.getCode());
         if (request.getName().trim().length() > MAX_LANG_NAME_LEN) {
-            throw new BusinessException("语言名称不能超过 " + MAX_LANG_NAME_LEN + " 个字符");
+            throw new BusinessException("語言名稱不能超過 " + MAX_LANG_NAME_LEN + " 个字符");
         }
         Long exists = languageMapper.selectCount(
                 new LambdaQueryWrapper<SysLanguage>().eq(SysLanguage::getCode, code));
         if (exists > 0) {
-            throw new BusinessException("该语言代码已存在");
+            throw new BusinessException("該語言代碼已存在");
         }
         SysLanguage entity = new SysLanguage();
         entity.setCode(code);
@@ -275,7 +275,7 @@ public class TranslationServiceImpl implements TranslationService {
     public void deleteLanguage(String code) {
         // 回退链兜底语言不允许删除, 否则 bundle/coverage 回退规则失效
         if (FALLBACK_EN.equalsIgnoreCase(code) || FALLBACK_ZH.equalsIgnoreCase(code)) {
-            throw new BusinessException("内置兜底语言（" + FALLBACK_EN + " / " + FALLBACK_ZH + "）不允许删除");
+            throw new BusinessException("內置兜底語言（" + FALLBACK_EN + " / " + FALLBACK_ZH + "）不允许删除");
         }
         SysLanguage lang = languageMapper.selectOne(
                 new LambdaQueryWrapper<SysLanguage>().eq(SysLanguage::getCode, code));
@@ -289,13 +289,13 @@ public class TranslationServiceImpl implements TranslationService {
     @Override
     public int machineTranslate(MachineTranslateRequest request) {
         if (request.getIds() == null || request.getIds().isEmpty()) {
-            throw new BusinessException("请选择需要机翻的字段");
+            throw new BusinessException("請選擇需要機翻的字段");
         }
 
         // 确定目标语言：指定语言 或 所有已注册语言（排除 zh-TW 源语言）
         List<String> targetLangs = resolveTargetLangs(request.getTargetLangs());
         if (targetLangs.isEmpty()) {
-            throw new BusinessException("没有可翻译的目标语言");
+            throw new BusinessException("沒有可翻譯的目標語言");
         }
 
         // 批量查询翻译记录，避免 N+1
@@ -519,7 +519,7 @@ public class TranslationServiceImpl implements TranslationService {
         String code = raw.trim();
         Matcher matcher = LANG_CODE_PATTERN.matcher(code);
         if (!matcher.matches()) {
-            throw new BusinessException("语言代码格式不正确，应为 ISO 639-1 格式，如 en、zh-TW");
+            throw new BusinessException("語言代碼格式不正確，應為 ISO 639-1 格式，如 en、zh-TW");
         }
         String primary = matcher.group(1).toLowerCase(Locale.ROOT);
         return matcher.group(2) == null ? primary : primary + "-" + matcher.group(2).toUpperCase(Locale.ROOT);

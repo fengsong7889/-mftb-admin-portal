@@ -9,12 +9,12 @@ import lombok.Data;
 @Data
 public class EmergencyContactRequest {
 
-    @NotBlank(message = "联系人姓名不能为空")
+    @NotBlank(message = "聯繫人姓名不能為空")
     private String name;
 
-    @NotBlank(message = "联系电话不能为空")
+    @NotBlank(message = "聯繫電話不能為空")
     private String phone;
 
-    @NotBlank(message = "关系不能为空")
+    @NotBlank(message = "關係不能為空")
     private String relation;
 }

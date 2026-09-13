@@ -14,7 +14,7 @@ import java.util.List;
 public class AdPricingTrafficRequest {
 
     /** 关联算法ID（biz_ad_algorithm.id，algo_type=15） */
-    @NotNull(message = "算法不能为空")
+    @NotNull(message = "算法不能為空")
     private Long algoId;
 
     /** 算法名称快照 */
@@ -24,7 +24,7 @@ public class AdPricingTrafficRequest {
     private String brand;
 
     /** 业务频道: 1=美食外卖 2=超市百货 3=团购到店 */
-    @NotNull(message = "业务频道不能为空")
+    @NotNull(message = "業務頻道不能為空")
     private Integer bizChannel;
 
     /** 自定义购买最低起购量（曝光次数），缺省 100 */

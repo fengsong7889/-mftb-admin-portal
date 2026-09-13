@@ -56,14 +56,14 @@ public class EmployeeController {
     @PostMapping
     @RequirePermission(menu = "employee-management", action = "create")
     public Result<EmployeeVO> create(@Valid @RequestBody EmployeeRequest request) {
-        return Result.success("员工创建成功", employeeService.create(request));
+        return Result.success("員工創建成功", employeeService.create(request));
     }
 
     /** 编辑员工 */
     @PutMapping("/{id}")
     @RequirePermission(menu = "employee-management", action = "edit")
     public Result<EmployeeVO> update(@PathVariable Long id, @Valid @RequestBody EmployeeRequest request) {
-        return Result.success("员工信息已更新", employeeService.update(id, request));
+        return Result.success("員工信息已更新", employeeService.update(id, request));
     }
 
     /** 重置密码 */
@@ -137,7 +137,7 @@ public class EmployeeController {
     @RequirePermission(menu = "employee-management", action = "edit")
     public Result<EmergencyContactVO> createEmergencyContact(@PathVariable Long id,
                                                              @Valid @RequestBody EmergencyContactRequest request) {
-        return Result.success("紧急联系人已添加", emergencyContactService.create(id, request));
+        return Result.success("緊急聯繫人已添加", emergencyContactService.create(id, request));
     }
 
     /** 编辑紧急联系人 */
@@ -146,7 +146,7 @@ public class EmployeeController {
     public Result<EmergencyContactVO> updateEmergencyContact(@PathVariable Long id,
                                                               @PathVariable Long contactId,
                                                               @Valid @RequestBody EmergencyContactRequest request) {
-        return Result.success("紧急联系人已更新", emergencyContactService.update(id, contactId, request));
+        return Result.success("緊急聯繫人已更新", emergencyContactService.update(id, contactId, request));
     }
 
     /** 删除紧急联系人 */
@@ -171,7 +171,7 @@ public class EmployeeController {
     @RequirePermission(menu = "employee-management", action = "edit")
     public Result<PositionRecordVO> createPositionRecord(@PathVariable Long id,
                                                           @Valid @RequestBody PositionRecordRequest request) {
-        return Result.success("职务记录已添加", positionRecordService.create(id, request));
+        return Result.success("職務記錄已添加", positionRecordService.create(id, request));
     }
 
     /** 编辑职务记录（effectiveSeq +1） */
@@ -180,7 +180,7 @@ public class EmployeeController {
     public Result<PositionRecordVO> updatePositionRecord(@PathVariable Long id,
                                                           @PathVariable Long recordId,
                                                           @Valid @RequestBody PositionRecordRequest request) {
-        return Result.success("职务记录已更新", positionRecordService.update(id, recordId, request));
+        return Result.success("職務記錄已更新", positionRecordService.update(id, recordId, request));
     }
 
     /** 删除职务记录 */

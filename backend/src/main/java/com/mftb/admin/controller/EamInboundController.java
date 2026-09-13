@@ -2,8 +2,10 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.EamInboundCreateDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.EamInboundService;
+import com.mftb.admin.util.FileValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +27,7 @@ public class EamInboundController {
 
     private final EamInboundService inboundService;
 
-    /** 分頁查詢入庫批次 */
+    /** 分页查询入库批次 */
     @GetMapping
     @RequirePermission(menu = MENU)
     public Result<PageResult<Map<String, Object>>> page(
@@ -34,18 +36,18 @@ public class EamInboundController {
         return Result.success(inboundService.pageBatches(page, size));
     }
 
-    /** 入庫批次詳情 */
+    /** 入库批次详情 */
     @GetMapping("/{batchId}")
     @RequirePermission(menu = MENU)
     public Result<Map<String, Object>> detail(@PathVariable long batchId) {
         return Result.success(inboundService.getBatchDetail(batchId));
     }
 
-    /** 創建入庫批次（驗收入庫提交） */
+    /** 创建入库批次（验收入库提交） */
     @PostMapping
     @RequirePermission(menu = MENU, action = "edit")
-    public Result<Map<String, Object>> create(@RequestBody Map<String, Object> data) {
-        return Result.success(inboundService.createBatch(data));
+    public Result<Map<String, Object>> create(@RequestBody EamInboundCreateDTO dto) {
+        return Result.success(inboundService.createBatch(dto));
     }
 
     /** 上传验收照片，返回 Base64 Data URL */
@@ -53,14 +55,19 @@ public class EamInboundController {
     @RequirePermission(menu = MENU, action = "edit")
     public Result<Map<String, String>> uploadPhoto(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return Result.error("文件不能为空");
+            return Result.error("文件不能為空");
         }
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            return Result.error("仅支持上传图片文件");
+            return Result.error("僅支持上傳圖片文件");
         }
         if (file.getSize() > 5 * 1024 * 1024) {
-            return Result.error("文件大小不能超过 5MB");
+            return Result.error("文件大小不能超過 5MB");
+        }
+        // Magic bytes 校验：防止伪造 Content-Type 的恶意文件
+        String magicError = FileValidator.validateImageMagicBytes(file);
+        if (magicError != null) {
+            return Result.error(magicError);
         }
         try {
             byte[] bytes = file.getBytes();
@@ -70,7 +77,7 @@ public class EamInboundController {
             return Result.success(Map.of("name", name, "dataUrl", dataUrl));
         } catch (Exception e) {
             log.error("验收照片上传失败: {}", e.getMessage());
-            return Result.error("照片上传失败");
+            return Result.error("照片上傳失敗");
         }
     }
 }

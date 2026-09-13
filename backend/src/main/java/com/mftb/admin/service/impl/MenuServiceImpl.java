@@ -144,7 +144,7 @@ public class MenuServiceImpl implements MenuService {
         Long childCount = sysMenuMapper.selectCount(
                 new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, id));
         if (childCount != null && childCount > 0) {
-            throw new BusinessException("该菜单存在子菜单，请先删除子菜单");
+            throw new BusinessException("該菜單存在子菜單，請先刪除子菜單");
         }
         sysMenuMapper.deleteById(id);
     }
@@ -196,17 +196,17 @@ public class MenuServiceImpl implements MenuService {
         }
         SysMenu parent = sysMenuMapper.selectById(parentId);
         if (parent == null) {
-            throw new BusinessException("上级菜单不存在");
+            throw new BusinessException("上級菜單不存在");
         }
         if (currentId != null && Objects.equals(parentId, currentId)) {
-            throw new BusinessException("上级菜单不能选择自身");
+            throw new BusinessException("上級菜單不能選擇自身");
         }
         // 防止将父菜单设置为自己的后代节点
         if (currentId != null) {
             Long cursor = parent.getParentId();
             while (cursor != null) {
                 if (Objects.equals(cursor, currentId)) {
-                    throw new BusinessException("上级菜单不能选择自身或其下级菜单");
+                    throw new BusinessException("上級菜單不能選擇自身或其下級菜單");
                 }
                 SysMenu ancestor = sysMenuMapper.selectById(cursor);
                 cursor = ancestor == null ? null : ancestor.getParentId();
@@ -226,14 +226,14 @@ public class MenuServiceImpl implements MenuService {
         }
         Long count = sysMenuMapper.selectCount(wrapper);
         if (count != null && count > 0) {
-            throw new BusinessException("菜单标识已存在");
+            throw new BusinessException("菜單標識已存在");
         }
     }
 
     private SysMenu requireMenu(Long id) {
         SysMenu menu = sysMenuMapper.selectById(id);
         if (menu == null) {
-            throw new BusinessException("菜单不存在");
+            throw new BusinessException("菜單不存在");
         }
         return menu;
     }

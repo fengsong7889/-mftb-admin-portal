@@ -109,7 +109,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         return new PageResult<>(records, result.getTotal());
     }
 
-    /** 判断算法是否有啟用中的定價配置 */
+    /** 判断算法是否有启用中的定价配置 */
     private boolean hasActivePricing(Long algoId, Integer algoType) {
         if (algoId == null || algoType == null) return false;
         if (algoType == 3) {
@@ -117,7 +117,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         } else if (algoType == 5) {
             return hotPricingService.activeByAlgo(algoId) != null;
         } else if (algoType == 13) {
-            // 金字招牌：查獨立計價表，且需至少有一個啟用的標籤定價
+            // 金字招牌：查独立计价表，且需至少有一个启用的标签定价
             var pricing = signboardPricingService.activeByAlgo(algoId);
             if (pricing == null) return false;
             return pricing.getSignboardItems() != null && pricing.getSignboardItems().stream()
@@ -191,7 +191,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Override
     public AdAlgorithmVO getByCode(String algoCode) {
         if (!StringUtils.hasText(algoCode)) {
-            throw new BusinessException("算法ID不能为空");
+            throw new BusinessException("算法ID不能為空");
         }
         AdAlgorithm entity = algorithmMapper.selectOne(
                 new LambdaQueryWrapper<AdAlgorithm>()
@@ -230,7 +230,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
         if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
+            throw new BusinessException("非法的服務狀態: " + status);
         }
         AdAlgorithm entity = require(id);
         entity.setStatus(status);
@@ -334,7 +334,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
      * 未配置规则的算法类型退回旧规则：拼音首字母前缀 + 5位自增序号（每个算法模块独立排序）
      * <p>
      * 旧规则：
-     * 1. 取算法名称前2个汉字的拼音首字母作为前缀（如「無敵星星」→ WD）
+     * 1. 取算法名称前2个汉字的拼音首字母作为前缀（如「无敌星星」→ WD）
      * 2. 若不同 algoType 模块前缀冲突，追加第3个字的首字母（如 WDG）
      * 3. 仍冲突则追加 algoType 数字（如 WD1）
      * 4. 序号取同前缀下最大序号 +1，格式 %05d
@@ -352,11 +352,11 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
 
     /** algoType → 固定兜底前缀（当名称无法提取合法字母前缀时使用） */
     private static final Map<Integer, String> TYPE_FALLBACK_PREFIX = Map.of(
-            1, "WD",   // 無敵星星
-            2, "XD",   // 新店廣告
-            3, "PH",   // 盤活復蘇
-            4, "LL",   // 流量廣告
-            5, "RQ"    // 人氣商家
+            1, "WD",   // 无敌星星
+            2, "XD",   // 新店广告
+            3, "PH",   // 盘活复苏
+            4, "LL",   // 流量广告
+            5, "RQ"    // 人气商家
     );
 
     /** 根据算法名称构建编码前缀 */

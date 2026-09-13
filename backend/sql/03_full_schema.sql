@@ -99,8 +99,8 @@ CREATE TABLE IF NOT EXISTS sys_position (
 -- 五、初始数据（幂等：仅当不存在时插入）
 -- ============================================================
 
--- 内置管理员（登录账号统一为工号，工号按 MT 前缀自增；密码为占位符，后端 DataInitializer 首次启动时
--- 会自动重置为 BCrypt 值: MT0001=111222）
+-- 内置管理员（登录账号统一为工号，工号按 MT 前缀自增；密码字段为占位符，
+-- 后端 DataInitializer 首次启动时会自动重置为正确的 BCrypt 加密值，初始密码见部署交付物）
 INSERT INTO sys_user (username, password, name, emp_id, avatar, role, department, position, status)
 SELECT 'MT0001', '$2a$10$placeholder', 'Bee', 'MT0001', 'pikachu-default', 'admin', '集团总裁办', '高级副总裁', 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'MT0001');
