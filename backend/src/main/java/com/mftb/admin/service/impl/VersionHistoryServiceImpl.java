@@ -68,8 +68,8 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         if (updatedEndDate != null) {
             wrapper.le(SysVersionHistory::getUpdatedAt, updatedEndDate.plusDays(1).atStartOfDay());
         }
-        // 按发布日期降序 + 版本号数值降序排列（避免批量同步时 createdAt 相同导致顺序错乱）
-        wrapper.last("ORDER BY release_date DESC, "
+        // 按版本号数值降序排列（最大版本号在最前面，进入菜单即可看到最新版本）
+        wrapper.last("ORDER BY "
                 + "CAST(SUBSTRING_INDEX(version_no,'.',1) AS UNSIGNED) DESC, "
                 + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',2),'.',-1) AS UNSIGNED) DESC, "
                 + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',3),'.',-1) AS UNSIGNED) DESC, "
