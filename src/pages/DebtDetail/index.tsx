@@ -37,7 +37,7 @@ const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDig
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 function AnimatedAmount({ value }: { value: number }) {
-  const animated = useCountUp(value)
+  const animated = useCountUp(value, 1200, 2)
   return <>{fmtAmt(animated)}</>
 }
 

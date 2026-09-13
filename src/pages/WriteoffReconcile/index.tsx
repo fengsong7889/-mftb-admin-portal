@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Button, Input, Select, DatePicker, Table, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
@@ -127,28 +127,10 @@ const mockData: ReconcileRecord[] = (() => {
 })()
 
 /* ---- 數字加載動畫（遵循數據指標統計卡標準，支持兩位小數） ---- */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-  useEffect(() => {
-    const start = performance.now()
-    const animate = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setValue(r2(target * eased))
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-  return value
-}
+import { useCountUp } from '../../hooks/useCountUp'
 
 function AnimatedAmount({ value }: { value: number }) {
-  const animated = useCountUp(value)
+  const animated = useCountUp(value, 1200, 2)
   return <>{fmtAmt(animated)}</>
 }
 

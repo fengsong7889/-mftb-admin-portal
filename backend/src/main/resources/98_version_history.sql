@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS sys_version_history (
 -- 写入当前版本作为第一条记录
 INSERT IGNORE INTO sys_version_history (version_no, release_date, release_type, summary, frontend_changes, backend_changes, database_changes, status, created_by)
 VALUES (
-    '1.0.0',
+    '1.0.0.00',
     CURDATE(),
     'major',
     '系统初始版本发布，包含完整的搜广推管理后台功能',

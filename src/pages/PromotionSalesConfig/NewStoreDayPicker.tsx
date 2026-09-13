@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Tag, Button, Space, message, Empty, Modal, Select, Card, Form } from 'antd'
 import {
@@ -14,30 +14,10 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { AlgorithmType } from '../Recommend/constants'
 import { fetchAdAlgorithms } from '../../api/adPromotion'
+import { useCountUp } from '../../hooks/useCountUp'
 
 // 中文星期映射 → 移入組件內使用 t()
 // const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
-
-/* ---- 數字動畫 Hook（與訂單詳情推廣數據卡片一致） ---- */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-  useEffect(() => {
-    const start = performance.now()
-    const animate = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setValue(Math.round(target * eased))
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-  return value
-}
 
 /* ---- 動畫數字組件 ---- */
 function AnimatedNumber({ value, suffix }: { value: number; suffix?: string }) {

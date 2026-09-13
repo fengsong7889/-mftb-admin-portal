@@ -5,10 +5,14 @@ import { useEffect, useRef, useState } from 'react'
  * - 時長 1200ms
  * - 緩動函數 1 - Math.pow(2, -10 * progress)
  * - 基於 requestAnimationFrame 實現
+ * - 支持小數位精度（decimals 參數，預設為 0 取整）
  */
-export function useCountUp(target: number, duration = 1200) {
+export function useCountUp(target: number, duration = 1200, decimals = 0) {
   const [value, setValue] = useState(0)
   const rafRef = useRef<number>(0)
+  const round = decimals === 0
+    ? Math.round
+    : (n: number) => Math.round(n * 100) / 100
 
   useEffect(() => {
     const start = performance.now()
@@ -16,14 +20,14 @@ export function useCountUp(target: number, duration = 1200) {
       const elapsed = now - start
       const progress = Math.min(elapsed / duration, 1)
       const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setValue(Math.round(target * eased))
+      setValue(round(target * eased))
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(animate)
       }
     }
     rafRef.current = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
+  }, [target, duration, decimals])
 
   return value
 }

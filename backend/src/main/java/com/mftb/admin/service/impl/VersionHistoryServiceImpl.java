@@ -68,7 +68,12 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         if (updatedEndDate != null) {
             wrapper.le(SysVersionHistory::getUpdatedAt, updatedEndDate.plusDays(1).atStartOfDay());
         }
-        wrapper.orderByDesc(SysVersionHistory::getCreatedAt);
+        // 按发布日期降序 + 版本号数值降序排列（避免批量同步时 createdAt 相同导致顺序错乱）
+        wrapper.last("ORDER BY release_date DESC, "
+                + "CAST(SUBSTRING_INDEX(version_no,'.',1) AS UNSIGNED) DESC, "
+                + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',2),'.',-1) AS UNSIGNED) DESC, "
+                + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',3),'.',-1) AS UNSIGNED) DESC, "
+                + "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(version_no,'.',4),'.',-1) AS UNSIGNED) DESC");
 
         long total = mapper.selectCount(wrapper);
         List<SysVersionHistory> records = mapper.selectList(
@@ -271,12 +276,12 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return null;
     }
 
-    /** 获取最新同步的 commit hash（优先按 createdAt 倒序取有 commitHash 的记录） */
+    /** 获取最新同步的 commit hash（按 id 倒序取有 commitHash 的记录，比 createdAt 更可靠） */
     private String getLastSyncedCommitHash() {
         LambdaQueryWrapper<SysVersionHistory> wrapper = new LambdaQueryWrapper<>();
         wrapper.isNotNull(SysVersionHistory::getCommitHash);
         wrapper.ne(SysVersionHistory::getCommitHash, "");
-        wrapper.orderByDesc(SysVersionHistory::getCreatedAt);
+        wrapper.orderByDesc(SysVersionHistory::getId);
         wrapper.last("LIMIT 1");
         SysVersionHistory latest = mapper.selectOne(wrapper);
         return latest != null ? latest.getCommitHash() : null;

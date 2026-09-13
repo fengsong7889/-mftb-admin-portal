@@ -36,10 +36,9 @@ public interface LoginLogService {
     /**
      * 强制下线指定用户
      * @param loginLogId 登录日志 ID（在线记录）
-     * @param operatorName 操作人姓名
-     * @param operatorEmpId 操作人工号
+     * @param operatorUsername 操作人用户名（由 Service 层查询详细信息）
      */
-    void forceLogout(Long loginLogId, String operatorName, String operatorEmpId);
+    void forceLogout(Long loginLogId, String operatorUsername);
 
     /**
      * 删除登录日志

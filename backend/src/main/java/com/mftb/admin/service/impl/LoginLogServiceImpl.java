@@ -204,19 +204,28 @@ public class LoginLogServiceImpl implements LoginLogService {
 
     @Override
     @Transactional
-    public void forceLogout(Long loginLogId, String operatorName, String operatorEmpId) {
-        // 1. 查询登录日志记录
+    public void forceLogout(Long loginLogId, String operatorUsername) {
+        // 1. 查询操作人信息
+        SysUser operator = sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, operatorUsername));
+        if (operator == null) {
+            throw new BusinessException("操作人信息不存在");
+        }
+        String operatorName = operator.getName();
+        String operatorEmpId = operator.getEmpId();
+
+        // 2. 查询登录日志记录
         SysLoginLog logEntry = loginLogMapper.selectById(loginLogId);
         if (logEntry == null || logEntry.getLogoutTime() != null) {
             throw new BusinessException("该用户已不在线");
         }
 
-        // 2. 更新登录日志: 标记为强制下线
+        // 3. 更新登录日志: 标记为强制下线
         logEntry.setLogoutTime(LocalDateTime.now());
         logEntry.setLogoutReason("forced");
         loginLogMapper.updateById(logEntry);
 
-        // 3. 更新 sys_user: 清除 activeToken, 设置强制下线标记
+        // 4. 更新 sys_user: 清除 activeToken, 设置强制下线标记
         sysUserMapper.update(null,
                 new LambdaUpdateWrapper<SysUser>()
                         .eq(SysUser::getId, logEntry.getUserId())

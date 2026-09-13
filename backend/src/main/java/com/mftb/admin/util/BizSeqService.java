@@ -163,6 +163,14 @@ public class BizSeqService {
         return requireRule(ruleKey);
     }
 
+    /** 查询全部启用中的规则（按 ID 升序），供前端规则配置页展示 */
+    public List<SysBizSeqRule> listActiveRules() {
+        return ruleMapper.selectList(
+                new LambdaQueryWrapper<SysBizSeqRule>()
+                        .eq(SysBizSeqRule::getStatus, 1)
+                        .orderByAsc(SysBizSeqRule::getId));
+    }
+
     /** 规则表变更后刷新缓存 */
     public void refreshRules() {
         ruleCache = null;

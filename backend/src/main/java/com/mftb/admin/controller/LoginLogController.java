@@ -4,8 +4,6 @@ import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.LoginLogVO;
 import com.mftb.admin.dto.PageResult;
-import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.LoginLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,7 +22,6 @@ import java.time.LocalDate;
 public class LoginLogController {
 
     private final LoginLogService loginLogService;
-    private final SysUserMapper sysUserMapper;
 
     /** 分页查询登录日志 */
     @GetMapping
@@ -44,17 +41,11 @@ public class LoginLogController {
     @PostMapping("/{id}/force-logout")
     @RequirePermission(menu = "login-log", action = "edit")
     public Result<Void> forceLogout(@PathVariable Long id) {
-        // 获取当前操作人信息
+        // 获取当前操作人用户名，由 Service 层查询详细信息
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth.getName();
-        SysUser operator = sysUserMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser>()
-                        .eq(SysUser::getUsername, username));
-        if (operator == null) {
-            return Result.error("操作人信息不存在");
-        }
         try {
-            loginLogService.forceLogout(id, operator.getName(), operator.getEmpId());
+            loginLogService.forceLogout(id, username);
             return Result.success();
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());

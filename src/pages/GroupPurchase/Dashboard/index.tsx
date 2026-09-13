@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Table, Select, Button, Space, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -16,24 +16,7 @@ import FlashSaleImportModal from '../../../components/FlashSaleImportModal'
 import { fetchFlashSalePeriods, fetchFlashSaleOverview, importFlashSaleSummary } from '../../../api/flashSale'
 import type { FlashSalePeriod, FlashSaleOverviewVO, FlashSaleSummaryDayVO } from '../../../api/flashSale'
 import type { ParsedFlashSaleExcel } from '../../../utils/flashSaleImport'
-
-/** 数字加载动画 Hook（1200ms 缓动） */
-function useCountUp(target: number, duration = 1200) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef(0)
-  useEffect(() => {
-    const start = performance.now()
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(2, -10 * progress)
-      setValue(target * (progress === 1 ? 1 : eased))
-      if (progress < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
-  return value
-}
+import { useCountUp } from '../../../hooks/useCountUp'
 
 /** 动效数字 */
 function AnimatedNumber({ value, decimals = 0, prefix = '', suffix = '' }: {
