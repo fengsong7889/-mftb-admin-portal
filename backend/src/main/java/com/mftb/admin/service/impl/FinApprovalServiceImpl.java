@@ -826,4 +826,24 @@ public class FinApprovalServiceImpl implements FinApprovalService {
         if (FLOW_PENDING.equals(approval.getOpsApproveStatus())) return approval.getOpsApprover();
         return approval.getFinApprover();
     }
+
+    @Override
+    public Map<String, Object> debugExtra(String flowNo) {
+        FinApproval approval = approvalMapper.selectOne(
+                new LambdaQueryWrapper<FinApproval>()
+                        .eq(FinApproval::getFlowNo, flowNo));
+        if (approval == null) {
+            return null;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("flowNo", approval.getFlowNo());
+        data.put("groupCode", approval.getGroupCode());
+        data.put("groupName", approval.getGroupName());
+        data.put("brand", approval.getBrand());
+        data.put("approvalType", approval.getApprovalType());
+        data.put("bizApproveStatus", approval.getBizApproveStatus());
+        data.put("opsApproveStatus", approval.getOpsApproveStatus());
+        data.put("extra", approval.getExtra());
+        return data;
+    }
 }

@@ -7,9 +7,6 @@ import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.dto.UserInfoVO;
-import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.SysUserMapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.util.JwtUtil;
@@ -47,7 +44,6 @@ public class AuthController {
     private final AuthService authService;
     private final LoginLogService loginLogService;
     private final JwtUtil jwtUtil;
-    private final SysUserMapper sysUserMapper;
 
     /** 活跃时间更新节流间隔（毫秒），与 JwtAuthenticationFilter 保持一致 5 分钟 */
     private static final long UPDATE_THROTTLE_MS = 5 * 60 * 1000L;
@@ -132,19 +128,7 @@ public class AuthController {
      * 前端 /api/auth/check 轮询跳过了 Filter，需在此处补充更新。
      */
     private void throttleUpdateLastActive(String username) {
-        long now = System.currentTimeMillis();
-        Long lastUpdate = checkLastUpdateMap.get(username);
-        if (lastUpdate == null || now - lastUpdate > UPDATE_THROTTLE_MS) {
-            sysUserMapper.update(null,
-                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
-                            .eq(SysUser::getUsername, username)
-                            .set(SysUser::getLastActiveAt, LocalDateTime.now()));
-            checkLastUpdateMap.put(username, now);
-        }
-        if (checkLastUpdateMap.size() > 500) {
-            long threshold = now - UPDATE_THROTTLE_MS * 2;
-            checkLastUpdateMap.entrySet().removeIf(e -> e.getValue() < threshold);
-        }
+        authService.throttleUpdateLastActive(username, UPDATE_THROTTLE_MS, checkLastUpdateMap);
     }
 
     /* ────────────── 头像管理 ────────────── */
@@ -154,10 +138,7 @@ public class AuthController {
     public Result<Void> updateAvatar(@Valid @RequestBody AvatarUpdateRequest request) {
         String username = currentUsername();
         if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
-        sysUserMapper.update(null,
-                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
-                        .eq(SysUser::getUsername, username)
-                        .set(SysUser::getAvatar, request.getAvatar()));
+        authService.updateAvatar(username, request.getAvatar());
         return Result.success();
     }
 
@@ -192,12 +173,7 @@ public class AuthController {
     public Result<List<String>> getQuickFavorites() {
         String username = currentUsername();
         if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
-        SysUser user = sysUserMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser>()
-                        .eq(SysUser::getUsername, username)
-                        .select(SysUser::getQuickFavorites));
-        List<String> keys = parseFavoritesJson(user != null ? user.getQuickFavorites() : null);
-        return Result.success(keys);
+        return Result.success(authService.getQuickFavorites(username));
     }
 
     /** 保存当前用户快捷入口 */
@@ -206,10 +182,7 @@ public class AuthController {
         String username = currentUsername();
         if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
         String json = keys != null && !keys.isEmpty() ? toJson(keys) : null;
-        sysUserMapper.update(null,
-                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
-                        .eq(SysUser::getUsername, username)
-                        .set(SysUser::getQuickFavorites, json));
+        authService.saveQuickFavorites(username, json);
         return Result.success();
     }
 
@@ -227,28 +200,11 @@ public class AuthController {
         if (username == null) {
             return Result.error(ResultCode.UNAUTHORIZED);
         }
-        // 优先保存到 avatar_url 字段，如果字段不存在则降级到 avatar 字段
         try {
-            sysUserMapper.update(null,
-                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
-                            .eq(SysUser::getUsername, username)
-                            .set(SysUser::getAvatarUrl, avatarUrl));
-            log.info("成功保存 avatar_url for user: {}", username);
+            authService.saveAvatarUrl(username, avatarUrl);
             return Result.success();
-        } catch (Exception e1) {
-            log.warn("save avatar_url failed: {}, trying fallback to avatar field", e1.getMessage());
-            try {
-                // Fallback: 保存到 avatar 字段（兼容旧版本）
-                sysUserMapper.update(null,
-                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
-                                .eq(SysUser::getUsername, username)
-                                .set(SysUser::getAvatar, avatarUrl));
-                log.info("成功 fallback 保存到 avatar field for user: {}", username);
-                return Result.success();
-            } catch (Exception e2) {
-                log.error("Fallback save also failed: {}", e2.getMessage());
-                return Result.error("Failed to save avatar URL: " + e2.getMessage());
-            }
+        } catch (Exception e) {
+            return Result.error("Failed to save avatar URL: " + e.getMessage());
         }
     }
 
@@ -261,58 +217,14 @@ public class AuthController {
         if (username == null) {
             return Result.error(ResultCode.UNAUTHORIZED);
         }
-        try {
-            SysUser user = sysUserMapper.selectOne(Wrappers.lambdaQuery(SysUser.class)
-                .eq(SysUser::getUsername, username));
-            if (user == null) {
-                return Result.error("User not found");
-            }
-            // 尝试从 avatar_url 字段读取
-            String avatarUrlField = user.getAvatarUrl();
-            if (avatarUrlField != null && !avatarUrlField.isEmpty()) {
-                return Result.success(avatarUrlField);
-            }
-            // 如果没有 avatar_url 字段，fallback 到 avatar 字段
-            String avatarField = user.getAvatar();
-            if (avatarField != null && !avatarField.isEmpty() && 
-                (avatarField.startsWith("https://") || avatarField.startsWith("data:"))) {
-                return Result.success(avatarField);
-            }
-            return Result.success(null);
-        } catch (Exception e) {
-            log.warn("获取 avatar_url 失败：{}", e.getMessage());
-            // 如果没有 avatar_url 字段，fallback 到 avatar 字段
-            try {
-                SysUser user = sysUserMapper.selectOne(Wrappers.lambdaQuery(SysUser.class)
-                    .eq(SysUser::getUsername, username));
-                if (user != null) {
-                    String avatarField = user.getAvatar();
-                    if (avatarField != null && !avatarField.isEmpty() && 
-                        (avatarField.startsWith("https://") || avatarField.startsWith("data:"))) {
-                        return Result.success(avatarField);
-                    }
-                }
-            } catch (Exception ex) {
-                log.warn("Fallback get avatar failed: {}", ex.getMessage());
-            }
-            return Result.success(null);
-        }
+        String avatarUrl = authService.getAvatarUrl(username);
+        return Result.success(avatarUrl);
     }
 
     private String currentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return (auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName()))
                 ? auth.getName() : null;
-    }
-
-    private List<String> parseFavoritesJson(String json) {
-        if (json == null || json.isBlank()) return List.of();
-        try {
-            return com.mftb.admin.util.JsonUtils.parseStringList(json);
-        } catch (Exception e) {
-            log.warn("解析 quick_favorites 失败: {}", e.getMessage());
-            return List.of();
-        }
     }
 
     private String toJson(List<String> keys) {

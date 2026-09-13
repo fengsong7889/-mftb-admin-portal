@@ -14,9 +14,7 @@ import com.mftb.admin.service.AdPricingSignboardService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -28,8 +26,9 @@ import java.util.Set;
  * 金字招牌计价服务实现
  */
 @Service
-@RequiredArgsConstructor
-public class AdPricingSignboardServiceImpl implements AdPricingSignboardService {
+public class AdPricingSignboardServiceImpl extends
+        AbstractAdPricingService<AdPricingSignboard, AdPricingSignboardVO, AdPricingSignboardRequest, AdPricingSignboardMapper>
+        implements AdPricingSignboardService {
 
     /** 预售天数缺省值（金字招牌默认 7 天） */
     private static final int DEFAULT_PRESALE_DAYS = 7;
@@ -37,10 +36,17 @@ public class AdPricingSignboardServiceImpl implements AdPricingSignboardService 
     /** 编号生成规则 key */
     public static final String RULE_PRICING_SIGNBOARD = "config_pricing_signboard";
 
-    private final AdPricingSignboardMapper pricingMapper;
     private final AdPricingSignboardLabelMapper labelMapper;
-    private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+
+    public AdPricingSignboardServiceImpl(AdPricingSignboardMapper pricingMapper, OperatorResolver operatorResolver,
+                                         AdPricingSignboardLabelMapper labelMapper, BizSeqService bizSeqService) {
+        super(pricingMapper, operatorResolver);
+        this.labelMapper = labelMapper;
+        this.bizSeqService = bizSeqService;
+    }
+
+    /* ==================== 接口方法 — 签名各异不能提至基类 ==================== */
 
     @Override
     public PageResult<AdPricingSignboardVO> page(long page, long size, Long algoId, String brand, Integer status) {
@@ -60,11 +66,6 @@ public class AdPricingSignboardServiceImpl implements AdPricingSignboardService 
     }
 
     @Override
-    public AdPricingSignboardVO detail(Long id) {
-        return toVO(require(id));
-    }
-
-    @Override
     public AdPricingSignboardVO activeByAlgo(Long algoId) {
         AdPricingSignboard pricing = pricingMapper.selectOne(
                 new LambdaQueryWrapper<AdPricingSignboard>()
@@ -75,68 +76,35 @@ public class AdPricingSignboardServiceImpl implements AdPricingSignboardService 
         return pricing == null ? null : toVO(pricing);
     }
 
+    /* ==================== 抽象方法实现 ==================== */
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingSignboardVO create(AdPricingSignboardRequest request) {
-        AdPricingSignboard entity = new AdPricingSignboard();
-        entity.setPricingNo(bizSeqService.next(RULE_PRICING_SIGNBOARD));
-        applyRequest(entity, request);
-        if (entity.getStatus() == null) {
-            entity.setStatus(1);
+    protected AdPricingSignboardVO toVO(AdPricingSignboard entity) {
+        AdPricingSignboardVO vo = AdPricingSignboardVO.from(entity);
+        List<AdPricingSignboardLabel> labels = labelMapper.selectList(
+                new LambdaQueryWrapper<AdPricingSignboardLabel>()
+                        .eq(AdPricingSignboardLabel::getPricingId, entity.getId())
+                        .orderByAsc(AdPricingSignboardLabel::getId));
+        for (AdPricingSignboardLabel label : labels) {
+            AdPricingSignboardVO.LabelPriceItem item = new AdPricingSignboardVO.LabelPriceItem();
+            item.setId(label.getId());
+            item.setLabelType(label.getLabelType());
+            item.setScenario(label.getScenario());
+            item.setEnabled(label.getEnabled() != null && label.getEnabled() == 1);
+            item.setPrice(label.getPrice());
+            item.setDiscountTiers(label.getDiscountTiers());
+            vo.getSignboardItems().add(item);
         }
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        entity.setDeleted(0);
-        pricingMapper.insert(entity);
-
-        saveLabelPrices(entity.getId(), request);
-        return detail(entity.getId());
+        return vo;
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingSignboardVO update(Long id, AdPricingSignboardRequest request) {
-        AdPricingSignboard entity = require(id);
-        applyRequest(entity, request);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-
-        // 标签计价整体替换
-        labelMapper.delete(new LambdaQueryWrapper<AdPricingSignboardLabel>()
-                .eq(AdPricingSignboardLabel::getPricingId, id));
-        saveLabelPrices(id, request);
-        return detail(id);
+    protected String nextPricingNo() {
+        return bizSeqService.next(RULE_PRICING_SIGNBOARD);
     }
 
     @Override
-    public void updateStatus(Long id, Integer status) {
-        if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
-        }
-        AdPricingSignboard entity = require(id);
-        entity.setStatus(status);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-    }
-
-    @Override
-    public void delete(Long id) {
-        require(id);
-        pricingMapper.deleteById(id);
-        labelMapper.delete(new LambdaQueryWrapper<AdPricingSignboardLabel>()
-                .eq(AdPricingSignboardLabel::getPricingId, id));
-    }
-
-    /* ==================== 内部方法 ==================== */
-
-    private AdPricingSignboard require(Long id) {
-        AdPricingSignboard entity = pricingMapper.selectById(id);
-        if (entity == null) {
-            throw new BusinessException("计价配置不存在");
-        }
-        return entity;
-    }
-
-    private void applyRequest(AdPricingSignboard entity, AdPricingSignboardRequest request) {
+    protected void applyRequest(AdPricingSignboard entity, AdPricingSignboardRequest request) {
         entity.setAlgoId(request.getAlgoId());
         entity.setAlgoName(StringUtils.hasText(request.getAlgoName()) ? request.getAlgoName() : entity.getAlgoName());
         entity.setBrand(request.getBrand());
@@ -152,6 +120,29 @@ public class AdPricingSignboardServiceImpl implements AdPricingSignboardService 
         }
         entity.setRemark(request.getRemark());
     }
+
+    @Override
+    protected void saveChildren(Long pricingId, AdPricingSignboardRequest request) {
+        saveLabelPrices(pricingId, request);
+    }
+
+    @Override
+    protected void deleteChildren(Long pricingId) {
+        labelMapper.delete(new LambdaQueryWrapper<AdPricingSignboardLabel>()
+                .eq(AdPricingSignboardLabel::getPricingId, pricingId));
+    }
+
+    /* ==================== 实体 Hook（一行实现） ==================== */
+
+    @Override protected AdPricingSignboard newEntity() { return new AdPricingSignboard(); }
+    @Override protected void setPricingNo(AdPricingSignboard e, String no) { e.setPricingNo(no); }
+    @Override protected Integer getStatus(AdPricingSignboard e) { return e.getStatus(); }
+    @Override protected void setStatus(AdPricingSignboard e, Integer s) { e.setStatus(s); }
+    @Override protected void setUpdatedBy(AdPricingSignboard e, String u) { e.setUpdatedBy(u); }
+    @Override protected void setDeleted(AdPricingSignboard e, int d) { e.setDeleted(d); }
+    @Override protected Long getId(AdPricingSignboard e) { return e.getId(); }
+
+    /* ==================== 内部方法 ==================== */
 
     private void saveLabelPrices(Long pricingId, AdPricingSignboardRequest request) {
         List<AdPricingSignboardRequest.LabelPrice> items = request.getSignboardItems();
@@ -180,24 +171,5 @@ public class AdPricingSignboardServiceImpl implements AdPricingSignboardService 
             entity.setDeleted(0);
             labelMapper.insert(entity);
         }
-    }
-
-    private AdPricingSignboardVO toVO(AdPricingSignboard entity) {
-        AdPricingSignboardVO vo = AdPricingSignboardVO.from(entity);
-        List<AdPricingSignboardLabel> labels = labelMapper.selectList(
-                new LambdaQueryWrapper<AdPricingSignboardLabel>()
-                        .eq(AdPricingSignboardLabel::getPricingId, entity.getId())
-                        .orderByAsc(AdPricingSignboardLabel::getId));
-        for (AdPricingSignboardLabel label : labels) {
-            AdPricingSignboardVO.LabelPriceItem item = new AdPricingSignboardVO.LabelPriceItem();
-            item.setId(label.getId());
-            item.setLabelType(label.getLabelType());
-            item.setScenario(label.getScenario());
-            item.setEnabled(label.getEnabled() != null && label.getEnabled() == 1);
-            item.setPrice(label.getPrice());
-            item.setDiscountTiers(label.getDiscountTiers());
-            vo.getSignboardItems().add(item);
-        }
-        return vo;
     }
 }

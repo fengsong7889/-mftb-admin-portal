@@ -11,8 +11,6 @@ import com.mftb.admin.dto.MergeApplyDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RechargeApplyDTO;
 import com.mftb.admin.dto.TransferApplyDTO;
-import com.mftb.admin.entity.FinApproval;
-import com.mftb.admin.mapper.FinApprovalMapper;
 import com.mftb.admin.service.FinApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class FinApprovalController {
 
     private final FinApprovalService finApprovalService;
-    private final FinApprovalMapper finApprovalMapper;
 
     /** 审批中心列表（分页） */
     @GetMapping
@@ -109,19 +106,10 @@ public class FinApprovalController {
     /** 诊断接口：查看审批记录原始 extra 数据 */
     @GetMapping("/debug/{flowNo}")
     public Result<?> debugExtra(@PathVariable String flowNo) {
-        FinApproval approval = finApprovalMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FinApproval>()
-                        .eq(FinApproval::getFlowNo, flowNo));
-        if (approval == null) return Result.success("未找到审批记录", null);
-        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
-        data.put("flowNo", approval.getFlowNo());
-        data.put("groupCode", approval.getGroupCode());
-        data.put("groupName", approval.getGroupName());
-        data.put("brand", approval.getBrand());
-        data.put("approvalType", approval.getApprovalType());
-        data.put("bizApproveStatus", approval.getBizApproveStatus());
-        data.put("opsApproveStatus", approval.getOpsApproveStatus());
-        data.put("extra", approval.getExtra());
+        java.util.Map<String, Object> data = finApprovalService.debugExtra(flowNo);
+        if (data == null) {
+            return Result.success("未找到审批记录", null);
+        }
         return Result.success(data);
     }
 }

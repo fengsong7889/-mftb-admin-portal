@@ -16,9 +16,7 @@ import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -30,17 +28,27 @@ import java.util.Set;
  * 盘活复苏销售定价服务实现
  */
 @Service
-@RequiredArgsConstructor
-public class AdPricingReviveServiceImpl implements AdPricingReviveService {
+public class AdPricingReviveServiceImpl extends
+        AbstractAdPricingService<AdPricingRevive, AdPricingReviveVO, AdPricingReviveRequest, AdPricingReviveMapper>
+        implements AdPricingReviveService {
 
     /** 预售天数缺省值（盘活复苏默认 180 天） */
     private static final int DEFAULT_PRESALE_DAYS = 180;
 
-    private final AdPricingReviveMapper pricingMapper;
     private final AdPricingReviveRegionMapper regionMapper;
     private final AdAlgorithmMapper algorithmMapper;
-    private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+
+    public AdPricingReviveServiceImpl(AdPricingReviveMapper pricingMapper, OperatorResolver operatorResolver,
+                                      AdPricingReviveRegionMapper regionMapper, AdAlgorithmMapper algorithmMapper,
+                                      BizSeqService bizSeqService) {
+        super(pricingMapper, operatorResolver);
+        this.regionMapper = regionMapper;
+        this.algorithmMapper = algorithmMapper;
+        this.bizSeqService = bizSeqService;
+    }
+
+    /* ==================== 接口方法 — 签名各异不能提至基类 ==================== */
 
     @Override
     public PageResult<AdPricingReviveVO> page(long page, long size, Long algoId, String brand, Integer status) {
@@ -60,11 +68,6 @@ public class AdPricingReviveServiceImpl implements AdPricingReviveService {
     }
 
     @Override
-    public AdPricingReviveVO detail(Long id) {
-        return toVO(require(id));
-    }
-
-    @Override
     public AdPricingReviveVO activeByAlgo(Long algoId) {
         AdPricingRevive pricing = pricingMapper.selectOne(
                 new LambdaQueryWrapper<AdPricingRevive>()
@@ -75,80 +78,46 @@ public class AdPricingReviveServiceImpl implements AdPricingReviveService {
         return pricing == null ? null : toVO(pricing);
     }
 
+    /* ==================== 创建/更新前校验钩子 ==================== */
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingReviveVO create(AdPricingReviveRequest request) {
+    protected void preCreate(AdPricingReviveRequest request) {
+        requireAlgorithm(request.getAlgoId());
+    }
+
+    @Override
+    protected void preUpdate(Long id, AdPricingReviveRequest request) {
+        requireAlgorithm(request.getAlgoId());
+    }
+
+    /* ==================== 抽象方法实现 ==================== */
+
+    @Override
+    protected AdPricingReviveVO toVO(AdPricingRevive entity) {
+        AdPricingReviveVO vo = AdPricingReviveVO.from(entity);
+        List<AdPricingReviveRegion> regions = regionMapper.selectList(
+                new LambdaQueryWrapper<AdPricingReviveRegion>()
+                        .eq(AdPricingReviveRegion::getPricingId, entity.getId())
+                        .orderByAsc(AdPricingReviveRegion::getRegion));
+        for (AdPricingReviveRegion region : regions) {
+            AdPricingReviveVO.RegionPriceItem item = new AdPricingReviveVO.RegionPriceItem();
+            item.setId(region.getId());
+            item.setRegion(region.getRegion());
+            item.setDailyPrice(region.getDailyPrice());
+            item.setDailySalesLimit(region.getDailySalesLimit() == null ? 1 : region.getDailySalesLimit());
+            vo.getRegionPrices().add(item);
+        }
+        return vo;
+    }
+
+    @Override
+    protected String nextPricingNo() {
+        return bizSeqService.next(BizSeqService.RULE_PRICING_REVIVE);
+    }
+
+    @Override
+    protected void applyRequest(AdPricingRevive entity, AdPricingReviveRequest request) {
         AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
-
-        AdPricingRevive entity = new AdPricingRevive();
-        // 定价编号：按编号生成规则 config_pricing_revive（DJPH + YYYYMMDD + 3位）
-        entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_REVIVE));
-        applyRequest(entity, request, algorithm);
-        if (entity.getStatus() == null) {
-            entity.setStatus(1);
-        }
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        entity.setDeleted(0);
-        pricingMapper.insert(entity);
-
-        saveRegionPrices(entity.getId(), request);
-        return detail(entity.getId());
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingReviveVO update(Long id, AdPricingReviveRequest request) {
-        AdPricingRevive entity = require(id);
-        AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
-        applyRequest(entity, request, algorithm);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-
-        // 商圈计价整体替换：旧明细逻辑删除后写入新明细
-        regionMapper.delete(new LambdaQueryWrapper<AdPricingReviveRegion>()
-                .eq(AdPricingReviveRegion::getPricingId, id));
-        saveRegionPrices(id, request);
-        return detail(id);
-    }
-
-    @Override
-    public void updateStatus(Long id, Integer status) {
-        if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
-        }
-        AdPricingRevive entity = require(id);
-        entity.setStatus(status);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-    }
-
-    @Override
-    public void delete(Long id) {
-        require(id);
-        pricingMapper.deleteById(id);
-        regionMapper.delete(new LambdaQueryWrapper<AdPricingReviveRegion>()
-                .eq(AdPricingReviveRegion::getPricingId, id));
-    }
-
-    /* ==================== 内部方法 ==================== */
-
-    private AdPricingRevive require(Long id) {
-        AdPricingRevive entity = pricingMapper.selectById(id);
-        if (entity == null) {
-            throw new BusinessException("计价配置不存在");
-        }
-        return entity;
-    }
-
-    private AdAlgorithm requireAlgorithm(Long algoId) {
-        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
-        if (algorithm == null) {
-            throw new BusinessException("关联算法不存在");
-        }
-        return algorithm;
-    }
-
-    private void applyRequest(AdPricingRevive entity, AdPricingReviveRequest request, AdAlgorithm algorithm) {
         entity.setAlgoId(algorithm.getId());
         entity.setAlgoName(algorithm.getAlgoName());
         entity.setBrand(StringUtils.hasText(request.getBrand()) ? request.getBrand() : algorithm.getBrand());
@@ -164,6 +133,37 @@ public class AdPricingReviveServiceImpl implements AdPricingReviveService {
             entity.setStatus(request.getStatus());
         }
         entity.setRemark(request.getRemark());
+    }
+
+    @Override
+    protected void saveChildren(Long pricingId, AdPricingReviveRequest request) {
+        saveRegionPrices(pricingId, request);
+    }
+
+    @Override
+    protected void deleteChildren(Long pricingId) {
+        regionMapper.delete(new LambdaQueryWrapper<AdPricingReviveRegion>()
+                .eq(AdPricingReviveRegion::getPricingId, pricingId));
+    }
+
+    /* ==================== 实体 Hook（一行实现） ==================== */
+
+    @Override protected AdPricingRevive newEntity() { return new AdPricingRevive(); }
+    @Override protected void setPricingNo(AdPricingRevive e, String no) { e.setPricingNo(no); }
+    @Override protected Integer getStatus(AdPricingRevive e) { return e.getStatus(); }
+    @Override protected void setStatus(AdPricingRevive e, Integer s) { e.setStatus(s); }
+    @Override protected void setUpdatedBy(AdPricingRevive e, String u) { e.setUpdatedBy(u); }
+    @Override protected void setDeleted(AdPricingRevive e, int d) { e.setDeleted(d); }
+    @Override protected Long getId(AdPricingRevive e) { return e.getId(); }
+
+    /* ==================== 内部方法 ==================== */
+
+    private AdAlgorithm requireAlgorithm(Long algoId) {
+        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
+        if (algorithm == null) {
+            throw new BusinessException("关联算法不存在");
+        }
+        return algorithm;
     }
 
     private void saveRegionPrices(Long pricingId, AdPricingReviveRequest request) {
@@ -188,22 +188,5 @@ public class AdPricingReviveServiceImpl implements AdPricingReviveService {
             region.setDeleted(0);
             regionMapper.insert(region);
         }
-    }
-
-    private AdPricingReviveVO toVO(AdPricingRevive entity) {
-        AdPricingReviveVO vo = AdPricingReviveVO.from(entity);
-        List<AdPricingReviveRegion> regions = regionMapper.selectList(
-                new LambdaQueryWrapper<AdPricingReviveRegion>()
-                        .eq(AdPricingReviveRegion::getPricingId, entity.getId())
-                        .orderByAsc(AdPricingReviveRegion::getRegion));
-        for (AdPricingReviveRegion region : regions) {
-            AdPricingReviveVO.RegionPriceItem item = new AdPricingReviveVO.RegionPriceItem();
-            item.setId(region.getId());
-            item.setRegion(region.getRegion());
-            item.setDailyPrice(region.getDailyPrice());
-            item.setDailySalesLimit(region.getDailySalesLimit() == null ? 1 : region.getDailySalesLimit());
-            vo.getRegionPrices().add(item);
-        }
-        return vo;
     }
 }

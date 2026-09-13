@@ -7,6 +7,8 @@ import com.mftb.admin.dto.UserInfoVO;
 import com.mftb.admin.entity.SysUser;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.List;
+
 /**
  * 认证服务
  */
@@ -27,4 +29,25 @@ public interface AuthService {
      * @param user     用户实体（Filter 已查询则传入，否则内部查询）
      */
     SessionCheckResult checkSession(String token, String username, SysUser user);
+
+    /** 节流更新用户最后活跃时间 */
+    void throttleUpdateLastActive(String username, long throttleMs, java.util.concurrent.ConcurrentHashMap<String, Long> cache);
+
+    /** 更新用户头像 */
+    void updateAvatar(String username, String avatar);
+
+    /** 获取用户快捷入口 */
+    List<String> getQuickFavorites(String username);
+
+    /** 保存用户快捷入口 */
+    void saveQuickFavorites(String username, String json);
+
+    /** 保存用户在线头像 URL（含 fallback） */
+    void saveAvatarUrl(String username, String avatarUrl);
+
+    /** 获取用户在线头像 URL（含 fallback） */
+    String getAvatarUrl(String username);
+
+    /** 根据用户名查询用户实体 */
+    SysUser findByUsername(String username);
 }

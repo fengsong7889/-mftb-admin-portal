@@ -14,9 +14,7 @@ import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -28,16 +26,24 @@ import java.util.Set;
  * 人气商家销售定价服务实现
  */
 @Service
-@RequiredArgsConstructor
-public class AdPricingHotServiceImpl implements AdPricingHotService {
+public class AdPricingHotServiceImpl extends
+        AbstractAdPricingService<AdPricingHot, AdPricingHotVO, AdPricingHotRequest, AdPricingHotMapper>
+        implements AdPricingHotService {
 
     /** 预售天数缺省值（人气商家默认 30 天） */
     private static final int DEFAULT_PRESALE_DAYS = 30;
 
-    private final AdPricingHotMapper pricingMapper;
     private final AdPricingHotSkinMapper skinMapper;
-    private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+
+    public AdPricingHotServiceImpl(AdPricingHotMapper pricingMapper, OperatorResolver operatorResolver,
+                                   AdPricingHotSkinMapper skinMapper, BizSeqService bizSeqService) {
+        super(pricingMapper, operatorResolver);
+        this.skinMapper = skinMapper;
+        this.bizSeqService = bizSeqService;
+    }
+
+    /* ==================== 接口方法 — 签名各异不能提至基类 ==================== */
 
     @Override
     public PageResult<AdPricingHotVO> page(long page, long size, Long algoId, String brand, Integer status) {
@@ -57,11 +63,6 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
     }
 
     @Override
-    public AdPricingHotVO detail(Long id) {
-        return toVO(require(id));
-    }
-
-    @Override
     public AdPricingHotVO activeByAlgo(Long algoId) {
         AdPricingHot pricing = pricingMapper.selectOne(
                 new LambdaQueryWrapper<AdPricingHot>()
@@ -72,69 +73,36 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
         return pricing == null ? null : toVO(pricing);
     }
 
+    /* ==================== 抽象方法实现 ==================== */
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingHotVO create(AdPricingHotRequest request) {
-        AdPricingHot entity = new AdPricingHot();
-        // 定价编号：按编号生成规则 config_pricing_hot（DJRQ + YYYYMMDD + 3位）
-        entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_HOT));
-        applyRequest(entity, request);
-        if (entity.getStatus() == null) {
-            entity.setStatus(1);
+    protected AdPricingHotVO toVO(AdPricingHot entity) {
+        AdPricingHotVO vo = AdPricingHotVO.from(entity);
+        List<AdPricingHotSkin> skins = skinMapper.selectList(
+                new LambdaQueryWrapper<AdPricingHotSkin>()
+                        .eq(AdPricingHotSkin::getPricingId, entity.getId())
+                        .orderByAsc(AdPricingHotSkin::getId));
+        for (AdPricingHotSkin skin : skins) {
+            AdPricingHotVO.SkinPriceItem item = new AdPricingHotVO.SkinPriceItem();
+            item.setId(skin.getId());
+            item.setSkinName(skin.getSkinName());
+            item.setPrice(skin.getPrice());
+            item.setBorderType(skin.getBorderType());
+            item.setBorderColor(skin.getBorderColor());
+            item.setDishLayout(skin.getDishLayout());
+            item.setTier(skin.getTier());
+            vo.getSkins().add(item);
         }
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        entity.setDeleted(0);
-        pricingMapper.insert(entity);
-
-        saveSkinPrices(entity.getId(), request);
-        return detail(entity.getId());
+        return vo;
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingHotVO update(Long id, AdPricingHotRequest request) {
-        AdPricingHot entity = require(id);
-        applyRequest(entity, request);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-
-        // 皮肤计价整体替换：旧明细逻辑删除后写入新明细
-        skinMapper.delete(new LambdaQueryWrapper<AdPricingHotSkin>()
-                .eq(AdPricingHotSkin::getPricingId, id));
-        saveSkinPrices(id, request);
-        return detail(id);
+    protected String nextPricingNo() {
+        return bizSeqService.next(BizSeqService.RULE_PRICING_HOT);
     }
 
     @Override
-    public void updateStatus(Long id, Integer status) {
-        if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
-        }
-        AdPricingHot entity = require(id);
-        entity.setStatus(status);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-    }
-
-    @Override
-    public void delete(Long id) {
-        require(id);
-        pricingMapper.deleteById(id);
-        skinMapper.delete(new LambdaQueryWrapper<AdPricingHotSkin>()
-                .eq(AdPricingHotSkin::getPricingId, id));
-    }
-
-    /* ==================== 内部方法 ==================== */
-
-    private AdPricingHot require(Long id) {
-        AdPricingHot entity = pricingMapper.selectById(id);
-        if (entity == null) {
-            throw new BusinessException("计价配置不存在");
-        }
-        return entity;
-    }
-
-    private void applyRequest(AdPricingHot entity, AdPricingHotRequest request) {
+    protected void applyRequest(AdPricingHot entity, AdPricingHotRequest request) {
         // 解耦算法库：人气名称、品牌、频道均从请求直接获取
         if (request.getAlgoId() != null) {
             entity.setAlgoId(request.getAlgoId());
@@ -155,6 +123,29 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
         }
         entity.setRemark(request.getRemark());
     }
+
+    @Override
+    protected void saveChildren(Long pricingId, AdPricingHotRequest request) {
+        saveSkinPrices(pricingId, request);
+    }
+
+    @Override
+    protected void deleteChildren(Long pricingId) {
+        skinMapper.delete(new LambdaQueryWrapper<AdPricingHotSkin>()
+                .eq(AdPricingHotSkin::getPricingId, pricingId));
+    }
+
+    /* ==================== 实体 Hook（一行实现） ==================== */
+
+    @Override protected AdPricingHot newEntity() { return new AdPricingHot(); }
+    @Override protected void setPricingNo(AdPricingHot e, String no) { e.setPricingNo(no); }
+    @Override protected Integer getStatus(AdPricingHot e) { return e.getStatus(); }
+    @Override protected void setStatus(AdPricingHot e, Integer s) { e.setStatus(s); }
+    @Override protected void setUpdatedBy(AdPricingHot e, String u) { e.setUpdatedBy(u); }
+    @Override protected void setDeleted(AdPricingHot e, int d) { e.setDeleted(d); }
+    @Override protected Long getId(AdPricingHot e) { return e.getId(); }
+
+    /* ==================== 内部方法 ==================== */
 
     private void saveSkinPrices(Long pricingId, AdPricingHotRequest request) {
         List<AdPricingHotRequest.SkinPrice> skins = request.getSkins();
@@ -180,25 +171,5 @@ public class AdPricingHotServiceImpl implements AdPricingHotService {
             entity.setDeleted(0);
             skinMapper.insert(entity);
         }
-    }
-
-    private AdPricingHotVO toVO(AdPricingHot entity) {
-        AdPricingHotVO vo = AdPricingHotVO.from(entity);
-        List<AdPricingHotSkin> skins = skinMapper.selectList(
-                new LambdaQueryWrapper<AdPricingHotSkin>()
-                        .eq(AdPricingHotSkin::getPricingId, entity.getId())
-                        .orderByAsc(AdPricingHotSkin::getId));
-        for (AdPricingHotSkin skin : skins) {
-            AdPricingHotVO.SkinPriceItem item = new AdPricingHotVO.SkinPriceItem();
-            item.setId(skin.getId());
-            item.setSkinName(skin.getSkinName());
-            item.setPrice(skin.getPrice());
-            item.setBorderType(skin.getBorderType());
-            item.setBorderColor(skin.getBorderColor());
-            item.setDishLayout(skin.getDishLayout());
-            item.setTier(skin.getTier());
-            vo.getSkins().add(item);
-        }
-        return vo;
     }
 }

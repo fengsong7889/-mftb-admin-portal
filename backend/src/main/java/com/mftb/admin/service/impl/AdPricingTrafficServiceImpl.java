@@ -15,7 +15,6 @@ import com.mftb.admin.mapper.AdPricingTrafficTierMapper;
 import com.mftb.admin.service.AdPricingTrafficService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,18 +30,28 @@ import java.util.List;
  * 每个频道可配置预设档位（流量包套餐）+ 自定义阶梯单价。
  */
 @Service
-@RequiredArgsConstructor
-public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
+public class AdPricingTrafficServiceImpl extends
+        AbstractAdPricingService<AdPricingTraffic, AdPricingTrafficVO, AdPricingTrafficRequest, AdPricingTrafficMapper>
+        implements AdPricingTrafficService {
 
     /** 自定义购买缺省起购量/步长 */
     private static final int DEFAULT_CUSTOM_MIN_QTY = 100;
     private static final int DEFAULT_CUSTOM_STEP = 100;
 
-    private final AdPricingTrafficMapper pricingMapper;
     private final AdPricingTrafficTierMapper tierMapper;
     private final AdPricingTrafficLadderMapper ladderMapper;
-    private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+
+    public AdPricingTrafficServiceImpl(AdPricingTrafficMapper pricingMapper, OperatorResolver operatorResolver,
+                                       AdPricingTrafficTierMapper tierMapper, AdPricingTrafficLadderMapper ladderMapper,
+                                       BizSeqService bizSeqService) {
+        super(pricingMapper, operatorResolver);
+        this.tierMapper = tierMapper;
+        this.ladderMapper = ladderMapper;
+        this.bizSeqService = bizSeqService;
+    }
+
+    /* ==================== 接口方法 — 签名各异不能提至基类 ==================== */
 
     @Override
     public PageResult<AdPricingTrafficVO> page(long page, long size, Long algoId, String brand,
@@ -61,11 +70,6 @@ public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
                 .map(this::toVO)
                 .toList();
         return new PageResult<>(records, result.getTotal());
-    }
-
-    @Override
-    public AdPricingTrafficVO detail(Long id) {
-        return toVO(require(id));
     }
 
     @Override
@@ -98,9 +102,10 @@ public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
         return count != null && count > 0;
     }
 
+    /* ==================== 创建/更新前校验钩子 ==================== */
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingTrafficVO create(AdPricingTrafficRequest request) {
+    protected void preCreate(AdPricingTrafficRequest request) {
         validateBizChannel(request.getBizChannel());
         // 同一算法同一业务频道仅允许一条配置（前端按频道分开配置）
         Long exists = pricingMapper.selectCount(new LambdaQueryWrapper<AdPricingTraffic>()
@@ -109,26 +114,10 @@ public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
         if (exists != null && exists > 0) {
             throw new BusinessException("該算法在此業務頻道已存在定價配置，請直接編輯");
         }
-
-        AdPricingTraffic entity = new AdPricingTraffic();
-        // 定价编号：按编号生成规则 config_pricing_traffic（DJTL + YYYYMMDD + 3位）
-        entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_TRAFFIC));
-        applyRequest(entity, request);
-        if (entity.getStatus() == null) {
-            entity.setStatus(1);
-        }
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        entity.setDeleted(0);
-        pricingMapper.insert(entity);
-
-        saveTiers(entity.getId(), request);
-        saveLadder(entity.getId(), request);
-        return detail(entity.getId());
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingTrafficVO update(Long id, AdPricingTrafficRequest request) {
+    protected void preUpdate(Long id, AdPricingTrafficRequest request) {
         AdPricingTraffic entity = require(id);
         // 算法与业务频道为配置主键维度，编辑时不允许变更
         if (request.getAlgoId() != null && !request.getAlgoId().equals(entity.getAlgoId())) {
@@ -137,59 +126,56 @@ public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
         if (request.getBizChannel() != null && !request.getBizChannel().equals(entity.getBizChannel())) {
             throw new BusinessException("不允許變更業務頻道");
         }
-        applyRequest(entity, request);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
+    }
 
-        // 档位/阶梯整体替换：旧明细逻辑删除后写入新明细
-        tierMapper.delete(new LambdaQueryWrapper<AdPricingTrafficTier>()
-                .eq(AdPricingTrafficTier::getPricingId, id));
-        ladderMapper.delete(new LambdaQueryWrapper<AdPricingTrafficLadder>()
-                .eq(AdPricingTrafficLadder::getPricingId, id));
-        saveTiers(id, request);
-        saveLadder(id, request);
-        return detail(id);
+    /* ==================== 抽象方法实现 ==================== */
+
+    @Override
+    protected AdPricingTrafficVO toVO(AdPricingTraffic entity) {
+        AdPricingTrafficVO vo = AdPricingTrafficVO.from(entity);
+        List<AdPricingTrafficTier> tiers = tierMapper.selectList(
+                new LambdaQueryWrapper<AdPricingTrafficTier>()
+                        .eq(AdPricingTrafficTier::getPricingId, entity.getId())
+                        .orderByAsc(AdPricingTrafficTier::getSort)
+                        .orderByAsc(AdPricingTrafficTier::getId));
+        for (AdPricingTrafficTier tier : tiers) {
+            AdPricingTrafficVO.TierItem item = new AdPricingTrafficVO.TierItem();
+            item.setId(tier.getId());
+            item.setTierName(tier.getTierName());
+            item.setImpressions(tier.getImpressions());
+            item.setPrice(tier.getPrice());
+            item.setValidityDays(tier.getValidityDays());
+            item.setOnSale(tier.getOnSale());
+            item.setSort(tier.getSort());
+            item.setDiscountEnabled(tier.getDiscountEnabled());
+            item.setDiscount(tier.getDiscount());
+            item.setDiscountTimeMode(tier.getDiscountTimeMode());
+            item.setDiscountStartDate(tier.getDiscountStartDate());
+            item.setDiscountEndDate(tier.getDiscountEndDate());
+            vo.getTiers().add(item);
+        }
+        List<AdPricingTrafficLadder> ladder = ladderMapper.selectList(
+                new LambdaQueryWrapper<AdPricingTrafficLadder>()
+                        .eq(AdPricingTrafficLadder::getPricingId, entity.getId())
+                        .orderByAsc(AdPricingTrafficLadder::getMinQty));
+        for (AdPricingTrafficLadder row : ladder) {
+            AdPricingTrafficVO.LadderItem item = new AdPricingTrafficVO.LadderItem();
+            item.setId(row.getId());
+            item.setMinQty(row.getMinQty());
+            item.setMaxQty(row.getMaxQty());
+            item.setUnitPrice(row.getUnitPrice());
+            vo.getLadder().add(item);
+        }
+        return vo;
     }
 
     @Override
-    public void updateStatus(Long id, Integer status) {
-        if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
-        }
-        AdPricingTraffic entity = require(id);
-        entity.setStatus(status);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
+    protected String nextPricingNo() {
+        return bizSeqService.next(BizSeqService.RULE_PRICING_TRAFFIC);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
-        require(id);
-        pricingMapper.deleteById(id);
-        tierMapper.delete(new LambdaQueryWrapper<AdPricingTrafficTier>()
-                .eq(AdPricingTrafficTier::getPricingId, id));
-        ladderMapper.delete(new LambdaQueryWrapper<AdPricingTrafficLadder>()
-                .eq(AdPricingTrafficLadder::getPricingId, id));
-    }
-
-    /* ==================== 内部方法 ==================== */
-
-    private AdPricingTraffic require(Long id) {
-        AdPricingTraffic entity = pricingMapper.selectById(id);
-        if (entity == null) {
-            throw new BusinessException("计价配置不存在");
-        }
-        return entity;
-    }
-
-    private void validateBizChannel(Integer bizChannel) {
-        if (bizChannel == null || bizChannel < 1 || bizChannel > 3) {
-            throw new BusinessException("非法的業務頻道: " + bizChannel);
-        }
-    }
-
-    private void applyRequest(AdPricingTraffic entity, AdPricingTrafficRequest request) {
+    protected void applyRequest(AdPricingTraffic entity, AdPricingTrafficRequest request) {
         entity.setAlgoId(request.getAlgoId());
         if (StringUtils.hasText(request.getAlgoName())) {
             entity.setAlgoName(request.getAlgoName());
@@ -206,6 +192,38 @@ public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
             entity.setStatus(request.getStatus());
         }
         entity.setRemark(request.getRemark());
+    }
+
+    @Override
+    protected void saveChildren(Long pricingId, AdPricingTrafficRequest request) {
+        saveTiers(pricingId, request);
+        saveLadder(pricingId, request);
+    }
+
+    @Override
+    protected void deleteChildren(Long pricingId) {
+        tierMapper.delete(new LambdaQueryWrapper<AdPricingTrafficTier>()
+                .eq(AdPricingTrafficTier::getPricingId, pricingId));
+        ladderMapper.delete(new LambdaQueryWrapper<AdPricingTrafficLadder>()
+                .eq(AdPricingTrafficLadder::getPricingId, pricingId));
+    }
+
+    /* ==================== 实体 Hook（一行实现） ==================== */
+
+    @Override protected AdPricingTraffic newEntity() { return new AdPricingTraffic(); }
+    @Override protected void setPricingNo(AdPricingTraffic e, String no) { e.setPricingNo(no); }
+    @Override protected Integer getStatus(AdPricingTraffic e) { return e.getStatus(); }
+    @Override protected void setStatus(AdPricingTraffic e, Integer s) { e.setStatus(s); }
+    @Override protected void setUpdatedBy(AdPricingTraffic e, String u) { e.setUpdatedBy(u); }
+    @Override protected void setDeleted(AdPricingTraffic e, int d) { e.setDeleted(d); }
+    @Override protected Long getId(AdPricingTraffic e) { return e.getId(); }
+
+    /* ==================== 内部方法 ==================== */
+
+    private void validateBizChannel(Integer bizChannel) {
+        if (bizChannel == null || bizChannel < 1 || bizChannel > 3) {
+            throw new BusinessException("非法的業務頻道: " + bizChannel);
+        }
     }
 
     /** 预设档位保存（名称/曝光/价格必填，与前端套餐包完整性校验一致） */
@@ -277,43 +295,5 @@ public class AdPricingTrafficServiceImpl implements AdPricingTrafficService {
             entity.setDeleted(0);
             ladderMapper.insert(entity);
         }
-    }
-
-    private AdPricingTrafficVO toVO(AdPricingTraffic entity) {
-        AdPricingTrafficVO vo = AdPricingTrafficVO.from(entity);
-        List<AdPricingTrafficTier> tiers = tierMapper.selectList(
-                new LambdaQueryWrapper<AdPricingTrafficTier>()
-                        .eq(AdPricingTrafficTier::getPricingId, entity.getId())
-                        .orderByAsc(AdPricingTrafficTier::getSort)
-                        .orderByAsc(AdPricingTrafficTier::getId));
-        for (AdPricingTrafficTier tier : tiers) {
-            AdPricingTrafficVO.TierItem item = new AdPricingTrafficVO.TierItem();
-            item.setId(tier.getId());
-            item.setTierName(tier.getTierName());
-            item.setImpressions(tier.getImpressions());
-            item.setPrice(tier.getPrice());
-            item.setValidityDays(tier.getValidityDays());
-            item.setOnSale(tier.getOnSale());
-            item.setSort(tier.getSort());
-            item.setDiscountEnabled(tier.getDiscountEnabled());
-            item.setDiscount(tier.getDiscount());
-            item.setDiscountTimeMode(tier.getDiscountTimeMode());
-            item.setDiscountStartDate(tier.getDiscountStartDate());
-            item.setDiscountEndDate(tier.getDiscountEndDate());
-            vo.getTiers().add(item);
-        }
-        List<AdPricingTrafficLadder> ladder = ladderMapper.selectList(
-                new LambdaQueryWrapper<AdPricingTrafficLadder>()
-                        .eq(AdPricingTrafficLadder::getPricingId, entity.getId())
-                        .orderByAsc(AdPricingTrafficLadder::getMinQty));
-        for (AdPricingTrafficLadder row : ladder) {
-            AdPricingTrafficVO.LadderItem item = new AdPricingTrafficVO.LadderItem();
-            item.setId(row.getId());
-            item.setMinQty(row.getMinQty());
-            item.setMaxQty(row.getMaxQty());
-            item.setUnitPrice(row.getUnitPrice());
-            vo.getLadder().add(item);
-        }
-        return vo;
     }
 }

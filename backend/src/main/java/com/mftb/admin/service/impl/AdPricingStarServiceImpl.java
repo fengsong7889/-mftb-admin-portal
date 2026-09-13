@@ -16,9 +16,7 @@ import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -27,20 +25,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 /**
  * 无敌星星销售定价服务实现
  */
 @Service
-@RequiredArgsConstructor
-public class AdPricingStarServiceImpl implements AdPricingStarService {
+public class AdPricingStarServiceImpl extends
+        AbstractAdPricingService<AdPricingStar, AdPricingStarVO, AdPricingStarRequest, AdPricingStarMapper>
+        implements AdPricingStarService {
 
-    private final AdPricingStarMapper pricingMapper;
     private final AdPricingStarRegionMapper regionMapper;
     private final AdAlgorithmMapper algorithmMapper;
-    private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+
+    public AdPricingStarServiceImpl(AdPricingStarMapper pricingMapper, OperatorResolver operatorResolver,
+                                    AdPricingStarRegionMapper regionMapper, AdAlgorithmMapper algorithmMapper,
+                                    BizSeqService bizSeqService) {
+        super(pricingMapper, operatorResolver);
+        this.regionMapper = regionMapper;
+        this.algorithmMapper = algorithmMapper;
+        this.bizSeqService = bizSeqService;
+    }
+
+    /* ==================== 接口方法 — 签名各异不能提至基类 ==================== */
 
     @Override
     public PageResult<AdPricingStarVO> page(long page, long size, Long algoId, String brand, Integer status) {
@@ -60,11 +67,6 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
     }
 
     @Override
-    public AdPricingStarVO detail(Long id) {
-        return toVO(require(id));
-    }
-
-    @Override
     public AdPricingStarVO activeByAlgo(Long algoId) {
         AdPricingStar pricing = pricingMapper.selectOne(
                 new LambdaQueryWrapper<AdPricingStar>()
@@ -75,80 +77,46 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
         return pricing == null ? null : toVO(pricing);
     }
 
+    /* ==================== 创建/更新前校验钩子 ==================== */
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingStarVO create(AdPricingStarRequest request) {
+    protected void preCreate(AdPricingStarRequest request) {
+        requireAlgorithm(request.getAlgoId());
+    }
+
+    @Override
+    protected void preUpdate(Long id, AdPricingStarRequest request) {
+        requireAlgorithm(request.getAlgoId());
+    }
+
+    /* ==================== 抽象方法实现 ==================== */
+
+    @Override
+    protected AdPricingStarVO toVO(AdPricingStar entity) {
+        AdPricingStarVO vo = AdPricingStarVO.from(entity);
+        List<AdPricingStarRegion> regions = regionMapper.selectList(
+                new LambdaQueryWrapper<AdPricingStarRegion>()
+                        .eq(AdPricingStarRegion::getPricingId, entity.getId())
+                        .orderByAsc(AdPricingStarRegion::getRegion));
+        for (AdPricingStarRegion region : regions) {
+            AdPricingStarVO.RegionPriceItem item = new AdPricingStarVO.RegionPriceItem();
+            item.setId(region.getId());
+            item.setRegion(region.getRegion());
+            item.setDailyPrice(region.getDailyPrice());
+            item.setDailySalesLimit(region.getDailySalesLimit() == null ? 1 : region.getDailySalesLimit());
+            vo.getRegionPrices().add(item);
+        }
+        return vo;
+    }
+
+    @Override
+    protected String nextPricingNo() {
+        return bizSeqService.next(BizSeqService.RULE_PRICING_STAR);
+    }
+
+    @Override
+    protected void applyRequest(AdPricingStar entity, AdPricingStarRequest request) {
         AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
-
-        AdPricingStar entity = new AdPricingStar();
-        // 定价编号：按编号生成规则 config_pricing_star（DJWD + YYYYMMDD + 3位）
-        entity.setPricingNo(bizSeqService.next(BizSeqService.RULE_PRICING_STAR));
-        applyRequest(entity, request, algorithm);
-        if (entity.getStatus() == null) {
-            entity.setStatus(1);
-        }
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        entity.setDeleted(0);
-        pricingMapper.insert(entity);
-
-        saveRegionPrices(entity.getId(), request);
-        return detail(entity.getId());
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public AdPricingStarVO update(Long id, AdPricingStarRequest request) {
-        AdPricingStar entity = require(id);
-        AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
-        applyRequest(entity, request, algorithm);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-
-        // 商圈日单价整体替换：旧明细逻辑删除后写入新明细
-        regionMapper.delete(new LambdaQueryWrapper<AdPricingStarRegion>()
-                .eq(AdPricingStarRegion::getPricingId, id));
-        saveRegionPrices(id, request);
-        return detail(id);
-    }
-
-    @Override
-    public void updateStatus(Long id, Integer status) {
-        if (status == null || (status != 1 && status != 2)) {
-            throw new BusinessException("非法的服务状态: " + status);
-        }
-        AdPricingStar entity = require(id);
-        entity.setStatus(status);
-        entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        pricingMapper.updateById(entity);
-    }
-
-    @Override
-    public void delete(Long id) {
-        require(id);
-        pricingMapper.deleteById(id);
-        regionMapper.delete(new LambdaQueryWrapper<AdPricingStarRegion>()
-                .eq(AdPricingStarRegion::getPricingId, id));
-    }
-
-    /* ==================== 内部方法 ==================== */
-
-    private AdPricingStar require(Long id) {
-        AdPricingStar entity = pricingMapper.selectById(id);
-        if (entity == null) {
-            throw new BusinessException("计价配置不存在");
-        }
-        return entity;
-    }
-
-    private AdAlgorithm requireAlgorithm(Long algoId) {
-        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
-        if (algorithm == null) {
-            throw new BusinessException("关联算法不存在");
-        }
-        return algorithm;
-    }
-
-    private void applyRequest(AdPricingStar entity, AdPricingStarRequest request, AdAlgorithm algorithm) {
         entity.setAlgoId(algorithm.getId());
         entity.setAlgoName(algorithm.getAlgoName());
         entity.setBrand(StringUtils.hasText(request.getBrand()) ? request.getBrand() : algorithm.getBrand());
@@ -167,6 +135,37 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
             entity.setStatus(request.getStatus());
         }
         entity.setRemark(request.getRemark());
+    }
+
+    @Override
+    protected void saveChildren(Long pricingId, AdPricingStarRequest request) {
+        saveRegionPrices(pricingId, request);
+    }
+
+    @Override
+    protected void deleteChildren(Long pricingId) {
+        regionMapper.delete(new LambdaQueryWrapper<AdPricingStarRegion>()
+                .eq(AdPricingStarRegion::getPricingId, pricingId));
+    }
+
+    /* ==================== 实体 Hook（一行实现） ==================== */
+
+    @Override protected AdPricingStar newEntity() { return new AdPricingStar(); }
+    @Override protected void setPricingNo(AdPricingStar e, String no) { e.setPricingNo(no); }
+    @Override protected Integer getStatus(AdPricingStar e) { return e.getStatus(); }
+    @Override protected void setStatus(AdPricingStar e, Integer s) { e.setStatus(s); }
+    @Override protected void setUpdatedBy(AdPricingStar e, String u) { e.setUpdatedBy(u); }
+    @Override protected void setDeleted(AdPricingStar e, int d) { e.setDeleted(d); }
+    @Override protected Long getId(AdPricingStar e) { return e.getId(); }
+
+    /* ==================== 内部方法 ==================== */
+
+    private AdAlgorithm requireAlgorithm(Long algoId) {
+        AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
+        if (algorithm == null) {
+            throw new BusinessException("关联算法不存在");
+        }
+        return algorithm;
     }
 
     private void saveRegionPrices(Long pricingId, AdPricingStarRequest request) {
@@ -191,23 +190,6 @@ public class AdPricingStarServiceImpl implements AdPricingStarService {
             region.setDeleted(0);
             regionMapper.insert(region);
         }
-    }
-
-    private AdPricingStarVO toVO(AdPricingStar entity) {
-        AdPricingStarVO vo = AdPricingStarVO.from(entity);
-        List<AdPricingStarRegion> regions = regionMapper.selectList(
-                new LambdaQueryWrapper<AdPricingStarRegion>()
-                        .eq(AdPricingStarRegion::getPricingId, entity.getId())
-                        .orderByAsc(AdPricingStarRegion::getRegion));
-        for (AdPricingStarRegion region : regions) {
-            AdPricingStarVO.RegionPriceItem item = new AdPricingStarVO.RegionPriceItem();
-            item.setId(region.getId());
-            item.setRegion(region.getRegion());
-            item.setDailyPrice(region.getDailyPrice());
-            item.setDailySalesLimit(region.getDailySalesLimit() == null ? 1 : region.getDailySalesLimit());
-            vo.getRegionPrices().add(item);
-        }
-        return vo;
     }
 
     /**

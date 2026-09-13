@@ -9,6 +9,8 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RechargeApplyDTO;
 import com.mftb.admin.dto.TransferApplyDTO;
 
+import java.util.Map;
+
 /**
  * 财务审批流程服务（申请提交 + 三级审批流转）
  */
@@ -40,4 +42,7 @@ public interface FinApprovalService {
 
     /** 撤销申请（仅审批中流程可撤销） */
     void cancel(String flowNo);
+
+    /** 诊断接口：查看审批记录原始 extra 数据 */
+    Map<String, Object> debugExtra(String flowNo);
 }

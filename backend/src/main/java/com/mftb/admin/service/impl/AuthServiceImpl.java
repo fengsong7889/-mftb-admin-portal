@@ -233,4 +233,102 @@ public class AuthServiceImpl implements AuthService {
             loginAttemptMap.entrySet().removeIf(e -> e.getValue().firstFailTime < threshold);
         }
     }
+
+    @Override
+    public void throttleUpdateLastActive(String username, long throttleMs, ConcurrentHashMap<String, Long> cache) {
+        long now = System.currentTimeMillis();
+        Long lastUpdate = cache.get(username);
+        if (lastUpdate == null || now - lastUpdate > throttleMs) {
+            sysUserMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                            .eq(SysUser::getUsername, username)
+                            .set(SysUser::getLastActiveAt, LocalDateTime.now()));
+            cache.put(username, now);
+        }
+        if (cache.size() > 500) {
+            long threshold = now - throttleMs * 2;
+            cache.entrySet().removeIf(e -> e.getValue() < threshold);
+        }
+    }
+
+    @Override
+    public void updateAvatar(String username, String avatar) {
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .set(SysUser::getAvatar, avatar));
+    }
+
+    @Override
+    public List<String> getQuickFavorites(String username) {
+        SysUser user = sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .select(SysUser::getQuickFavorites));
+        String json = user != null ? user.getQuickFavorites() : null;
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return com.mftb.admin.util.JsonUtils.parseStringList(json);
+        } catch (Exception e) {
+            log.warn("解析 quick_favorites 失败: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    @Override
+    public void saveQuickFavorites(String username, String json) {
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .set(SysUser::getQuickFavorites, json));
+    }
+
+    @Override
+    public void saveAvatarUrl(String username, String avatarUrl) {
+        try {
+            sysUserMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                            .eq(SysUser::getUsername, username)
+                            .set(SysUser::getAvatarUrl, avatarUrl));
+            log.info("成功保存 avatar_url for user: {}", username);
+        } catch (Exception e1) {
+            log.warn("save avatar_url failed: {}, trying fallback to avatar field", e1.getMessage());
+            try {
+                sysUserMapper.update(null,
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                                .eq(SysUser::getUsername, username)
+                                .set(SysUser::getAvatar, avatarUrl));
+                log.info("成功 fallback 保存到 avatar field for user: {}", username);
+            } catch (Exception e2) {
+                log.error("Fallback save also failed: {}", e2.getMessage());
+                throw new BusinessException("保存头像URL失败: " + e2.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public String getAvatarUrl(String username) {
+        try {
+            SysUser user = sysUserMapper.selectOne(
+                    new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+            if (user == null) return null;
+            String avatarUrl = user.getAvatarUrl();
+            if (avatarUrl != null && !avatarUrl.isEmpty()) return avatarUrl;
+            String avatar = user.getAvatar();
+            if (avatar != null && !avatar.isEmpty() &&
+                    (avatar.startsWith("https://") || avatar.startsWith("data:"))) {
+                return avatar;
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("获取 avatar_url 失败：{}", e.getMessage());
+            return null;
+        }
+    }
+
+    @Override
+    public SysUser findByUsername(String username) {
+        return sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+    }
 }

@@ -10,14 +10,10 @@ import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
 import { pinyin } from 'pinyin-pro'
 import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
-import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '../../api/agent'
-import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth } from '../../api/agent'
-import { fetchMyQuotaUsage, fetchMyModels, fetchQuotaCheck, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
-import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource, QuotaCheckResult } from '../../api/aiMyCenter'
-import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation } from '../../api/aiConversation'
-import type { AiConversation } from '../../api/aiConversation'
-import type { Conversation } from '../../api/aiConversation'
-import aiLogo from '../../assets/ai-logo.png'
+import AiLogo from '../../components/AiLogo'
+import ContextUsageIndicator from './ContextUsageIndicator'
+import { FAV_KEY, loadFavorites, defaultFavorites, chineseNameToPinyinEnglish, getGreeting, formatAiText, collectMenuNames, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import type { AiBlockReason } from './homeUtils'
 import {
   SearchOutlined,
   PlusOutlined,
@@ -50,12 +46,14 @@ import {
   UndoOutlined,
   CompressOutlined,
 } from '@ant-design/icons'
+import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '../../api/agent'
+import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth } from '../../api/agent'
+import { fetchMyQuotaUsage, fetchMyModels, fetchQuotaCheck, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
+import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource, QuotaCheckResult } from '../../api/aiMyCenter'
+import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation } from '../../api/aiConversation'
+import type { AiConversation } from '../../api/aiConversation'
+import type { Conversation } from '../../api/aiConversation'
 import './index.css'
-
-/** AI 標誌圖標（幾何拼色 Ai Logo） */
-const AiLogo = ({ size = 40 }: { size?: number }) => (
-  <img src={aiLogo} alt="AI" width={size} height={size} className="home-ai-logo" />
-)
 
 /** 菜单分组英文名（英文模式查映射） */
 const GROUP_NAME_EN: Record<string, string> = {
@@ -96,51 +94,7 @@ const allMenus = [
   { key: 'promotion-report-compare', label: '推薦類型對比', icon: <LineChartOutlined />, path: '/promotion-report-compare', group: '推广通' },
 ]
 
-/** 默认常用菜单 */
-const defaultFavorites = [
-  'account-balance',
-  'batch-query',
-  'detail-query',
-  'approval-center',
-]
 
-/** localStorage key（按用戶隔離） */
-const FAV_KEY = (username: string) => `home_favorites:${username}`
-
-/** 从 localStorage 读取已保存的快捷入口 */
-const loadFavorites = (username: string): string[] => {
-  try {
-    const raw = localStorage.getItem(FAV_KEY(username))
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch { /* 数据损坏则回退默认 */ }
-  return defaultFavorites
-}
-
-/** 快捷提问（模块级常量已废弃，组件内有翻译后的版本） */
-// const quickQuestions = [...]  // 已移至组件内
-
-/** 中文姓名转英文拼音格式：名在前、姓在后，首字母大写 */
-const chineseNameToPinyinEnglish = (name: string): string => {
-  if (!name) return ''
-  if (!/[\u4e00-\u9fa5]/.test(name)) return name
-  const py = pinyin(name, { toneType: 'none', type: 'array' })
-  if (py.length <= 1) return name
-  const surname = py[0]
-  const givenName = py.slice(1).join('')
-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
-  return `${capitalize(givenName)} ${capitalize(surname)}`
-}
-
-/** 时段问候 */
-const getGreeting = (hour: number, t: (key: string) => string) => {
-  if (hour >= 5 && hour < 11) return t('home.greetingMorning')
-  if (hour >= 11 && hour < 13) return t('home.greetingNoon')
-  if (hour >= 13 && hour < 18) return t('home.greetingAfternoon')
-  return t('home.greetingEvening')
-}
 
 /** 引擎模型 ID → 展示縮寫（膠囊位窄，只顯示供應商縮寫，完整名在下拉菜單） */
 const ENGINE_LABELS: Record<string, string> = {
@@ -150,93 +104,7 @@ const ENGINE_LABELS: Record<string, string> = {
   'deepseek-v4-pro': 'DS Pro',
 }
 
-/** 額度維度來源 → Tag 顏色（員工/部門/職位/角色四維度 + 審批授予視覺區分） */
-const DIM_SOURCE_COLOR: Record<QuotaSource, string> = {
-  employee: '#722ED1',
-  department: '#1890FF',
-  position: '#E8720C',
-  role: '#13C2C2',
-  grant: '#52C41A',
-}
 
-/** 額度維度來源 → i18n key */
-const DIM_SOURCE_LABEL_KEY: Record<QuotaSource, string> = {
-  employee: 'home.usageDimSourceEmployee',
-  department: 'home.usageDimSourceDepartment',
-  position: 'home.usageDimSourcePosition',
-  role: 'home.usageDimSourceRole',
-  grant: 'home.usageDimSourceGrant',
-}
-
-/** 上下文窗口使用率：醒目的胶囊按钮 + Popover 面板 */
-const ContextUsageIndicator = ({
-  usedTokens,
-  contextWindow,
-  onCompress,
-  onNewChat,
-  t,
-}: {
-  usedTokens: number
-  contextWindow: number | undefined
-  onCompress: () => void
-  onNewChat: () => void
-  t: (key: string) => string
-}) => {
-  if (!contextWindow || contextWindow <= 0) return null
-  const ratio = Math.min(1, usedTokens / contextWindow)
-  const percent = Math.round(ratio * 100)
-  const usedLabel = usedTokens >= 1_000_000
-    ? `${(usedTokens / 1_000_000).toFixed(1)}M`
-    : `${Math.round(usedTokens / 1_000)}k`
-  const limitLabel = contextWindow >= 1_000_000
-    ? `${Math.round(contextWindow / 1_000_000)}M`
-    : `${Math.round(contextWindow / 1_000)}k`
-  const color = ratio < 0.5 ? '#52C41A' : ratio < 0.8 ? '#FAAD14' : '#FF4D4F'
-  const bg = ratio < 0.5 ? '#F6FFED' : ratio < 0.8 ? '#FFFBE6' : '#FFF1F0'
-  const border = ratio < 0.5 ? '#B7EB8F' : ratio < 0.8 ? '#FFE58F' : '#FFA39E'
-
-  return (
-    <Popover
-      trigger="click"
-      placement="topRight"
-      arrow={false}
-      overlayInnerStyle={{ padding: 0 }}
-      content={
-        <div className="home-ctx-popover">
-          <div className="home-ctx-popover-header">
-            <CompressOutlined className="home-ctx-popover-icon" />
-            <span>{t('home.ctxPopoverTitle')}</span>
-          </div>
-          <div className="home-ctx-popover-stats">
-            <span className="home-ctx-popover-pct" style={{ color }}>{percent}%</span>
-            <span className="home-ctx-popover-tokens">{usedLabel} / {limitLabel}</span>
-            <span className="home-ctx-popover-label">{t('home.ctxUsageLabel')}</span>
-          </div>
-          <div className="home-ctx-popover-bar-track">
-            <div className="home-ctx-popover-bar-fill" style={{ width: `${percent}%`, background: color }} />
-          </div>
-          <div className="home-ctx-popover-actions">
-            <button type="button" className="home-ctx-popover-btn home-ctx-popover-btn--compress" onClick={() => { onCompress() }}>
-              <CompressOutlined /> {t('home.convCompress')}
-            </button>
-            <button type="button" className="home-ctx-popover-btn home-ctx-popover-btn--new" onClick={() => { onNewChat() }}>
-              <PlusOutlined /> {t('home.convNew')}
-            </button>
-          </div>
-        </div>
-      }
-    >
-      <button type="button" className="home-ctx-capsule" style={{ background: bg, borderColor: border }} title={`${percent}% ${t('home.ctxUsageLabel')}`}>
-        <span className="home-ctx-capsule-dot" style={{ background: color }} />
-        <span className="home-ctx-capsule-pct" style={{ color }}>{percent}%</span>
-        <span className="home-ctx-capsule-tokens">{usedLabel}/{limitLabel}</span>
-      </button>
-    </Popover>
-  )
-}
-
-/** AI 助手未開通原因：無模型權限 / 無額度 / 兩者皆無 / 額度已用完(拒絕) / 需審批 */
-type AiBlockReason = 'no-models' | 'no-quota' | 'no-both' | 'quota-exhausted' | 'needs-approval'
 
 /** 未開通原因 → Hero 引導卡標題 i18n key（標題直接突出缺失項） */
 const BLOCKED_TITLE_KEY: Record<AiBlockReason, string> = {
@@ -272,20 +140,7 @@ const ENGINE_PANEL_DESC_KEY: Record<AiBlockReason, string> = {
   'needs-approval': 'home.aiNeedsApprovalDesc',
 }
 
-/** 將 AI 回覆中的字面 \n 轉為真正換行（CSS white-space: pre-wrap 負責渲染） */
-const formatAiText = (text: string) => text.replace(/\\n/g, '\n')
 
-/** 递归收集菜单 key → 名称映射 */
-const collectMenuNames = (menus: MenuVO[], map: Record<string, string>) => {
-  menus.forEach((m) => {
-    map[m.menuKey] = m.name
-    if (m.children?.length) collectMenuNames(m.children, map)
-  })
-}
-
-/** 文件大小限制（模块级常量） */
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024  // 10MB
-const MAX_FILE_SIZE = 5 * 1024 * 1024    // 5MB
 
 export default function Home() {
   const navigate = useNavigate()
