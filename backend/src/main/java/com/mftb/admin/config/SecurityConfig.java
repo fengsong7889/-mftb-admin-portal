@@ -54,6 +54,7 @@ public class SecurityConfig {
     private static final String[] WHITE_LIST = {
             "/api/auth/login",
             "/api/auth/logout",
+            "/api/auth/captcha",  // 滑块安全验证 Token 签发（登录前调用）
             "/api/auth/check",  // 前端轮询会话状态（内部自行校验 Token）
             "/error"
     };

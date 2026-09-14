@@ -75,6 +75,9 @@ public abstract class SecurityTestBase {
     protected AuthService authService;
 
     @MockBean
+    protected CaptchaService captchaService;
+
+    @MockBean
     protected PermissionService permissionService;
 
     // ── 所有 Controller 可能依赖的 Service Mock（@WebMvcTest 要求所有构造器参数均有 Bean） ──

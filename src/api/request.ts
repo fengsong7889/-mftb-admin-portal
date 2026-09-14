@@ -134,7 +134,10 @@ request.interceptors.response.use(
     if (!silent) {
       message.error(res.message || '请求失败')
     }
-    return Promise.reject(new Error(res.message || '请求失败'))
+    // 携带业务码抛出，便于调用方按 code 做精细化处理（如登录滑块验证 1005）
+    const bizError = new Error(res.message || '请求失败') as Error & { code?: number }
+    bizError.code = res.code
+    return Promise.reject(bizError)
   },
   (error) => {
     // HTTP 层错误

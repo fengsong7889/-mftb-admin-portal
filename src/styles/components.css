@@ -1567,10 +1567,10 @@
 
 /* 登錄卡片 - 玻璃半透明效果 */
 .login-card-v2 {
-  width: 400px;
+  width: 430px;
   background: rgba(255, 255, 255, 0.15); /* 玻璃半透明 */
   border-radius: 18px;
-  padding: 36px 34px 30px;
+  padding: 68px 40px 36px; /* 顶部加高，避开右上角国家/语言选择器 */
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(20px) saturate(180%); /* 毛玻璃效果 */
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -1581,49 +1581,90 @@
 /* 登录页右上角国家 & 语言选择器 */
 .login-locale-corner {
   position: absolute;
-  top: 12px;
-  right: 14px;
+  top: 16px;
+  right: 18px;
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
   z-index: 10;
 }
 .login-locale-corner .login-locale-select .ant-select-selector {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 6px !important;
-  color: rgba(255, 255, 255, 0.75) !important;
-  font-size: 11px !important;
-  height: 26px !important;
-  min-width: 70px;
-  padding: 0 6px !important;
+  /* 玻璃渐变底 + 顶部内高光，营造立体感 */
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.14)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  height: 38px !important;
+  min-width: 78px;
+  padding: 0 32px 0 12px !important; /* 右侧预留图标位，防止文字与箭头/地球图标重叠 */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 10px rgba(0, 0, 0, 0.15);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.login-locale-corner .login-locale-select .ant-select-selector:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
+/* hover 作用于整个 Select（含箭头区域），反馈更明显 */
+.login-locale-corner .login-locale-select:hover .ant-select-selector {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.24)) !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
 }
 .login-locale-corner .login-locale-select .ant-select-selection-item {
-  color: rgba(255, 255, 255, 0.75) !important;
-  font-size: 11px !important;
-  line-height: 24px !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 600;
+  line-height: 36px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* 亮橙底上保障白字可读性 */
+  /* 长国家名截断保护，防止延伸到右侧图标区 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+/* 搜索输入框与文字区域对齐，避免 focus 时重叠 */
+.login-locale-corner .login-locale-select .ant-select-selection-search {
+  inset-inline-start: 12px;
+  inset-inline-end: 32px;
+}
+/* 展开进入搜索态时隐藏已选文字（选项在下拉列表中展示），胶囊内保持干净输入框 */
+.login-locale-corner .login-locale-select.ant-select-open .ant-select-selection-item {
+  visibility: hidden;
+}
+/* 搜索输入文字与选中项同款白色风格 */
+.login-locale-corner .login-locale-select .ant-select-selection-search-input {
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  caret-color: #F39C12; /* 品牌橙光标 */
 }
 .login-locale-corner .login-locale-select .ant-select-arrow {
-  color: rgba(255, 255, 255, 0.4) !important;
-  font-size: 10px;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 13px;
+  /* 垂直居中：撑满高度 + flex 居中，不依赖 antd 负 margin 计算 */
+  top: 0 !important;
+  bottom: 0;
+  height: auto !important;
+  margin-top: 0 !important;
+  display: flex;
+  align-items: center;
+  right: 12px; /* 固定箭头位置，与文字区域分隔 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
-.login-locale-corner .login-locale-select .ant-select-open .ant-select-selector {
-  background: rgba(255, 255, 255, 0.22) !important;
-  border-color: rgba(243, 156, 18, 0.5) !important;
+/* 展开状态：.ant-select-open 与 .login-locale-select 在同一元素上 */
+.login-locale-corner .login-locale-select.ant-select-open .ant-select-selector {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.24)) !important;
+  border-color: rgba(243, 156, 18, 0.8) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 0 0 3px rgba(243, 156, 18, 0.25);
 }
 .login-title-v2 {
   text-align: center;
-  margin-bottom: 22px;
+  margin-bottom: 28px;
 }
 /* 登錄卡頂部品牌 Logo 徽章：毛玻璃圓形底 + 橙色光暈呼吸 */
 .login-brand-badge {
   width: 72px;
   height: 72px;
-  margin: 0 auto 14px;
+  margin: 0 auto 20px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1644,7 +1685,7 @@
   }
 }
 .login-title-v2 h2 {
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 600;
   color: #fff; /* 白色文字，适配玻璃背景 */
   margin: 0;
@@ -1704,43 +1745,82 @@
 .login-form-v2 {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
 }
 .login-field-v2 {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 .login-field-v2 label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9); /* 白色半透明标签 */
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
-.login-field-v2 .ant-input-affix-wrapper,
-.login-field-v2 .ant-input {
+/* 自定义登录输入框 — 原生 input，完全掌控样式 */
+.login-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border-radius: 10px;
-  height: 44px;
-  border: 1.5px solid rgba(255, 255, 255, 0.3); /* 白色半透明边框 */
-  background: rgba(255, 255, 255, 0.15); /* 半透明白色 */
+  height: 48px;
+  padding: 0 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
   transition: all 0.3s;
+  overflow: hidden;
+  cursor: text;
+}
+.login-input-wrap:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.login-input-wrap:focus-within {
+  border-color: #F39C12;
+  box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.2);
+}
+.login-input-wrap.has-error {
+  border-color: #FF4D4F;
+}
+.login-input-icon {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+.login-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #fff;
+  padding: 0;
+}
+.login-input::placeholder {
   font-size: 13px;
-  color: #fff; /* 白色文字 */
+  color: rgba(255, 255, 255, 0.6);
 }
-.login-field-v2 .ant-input::placeholder,
-.login-field-v2 .ant-input-affix-wrapper input::placeholder {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6); /* 半透明白色占位符 */
+/* 浏览器自动填充：覆盖 Chrome/Safari 强制绘制的浅色实心底，保持毛玻璃透明风格 */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus,
+.login-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #fff; /* 填充后文字保持白色（默认会被强制变黑） */
+  caret-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px transparent inset;
+  transition: background-color 99999s ease-in-out 0s; /* 无限延迟自动填充背景色，视觉上永不生效 */
 }
-.login-field-v2 .ant-input-affix-wrapper:hover,
-.login-field-v2 .ant-input:hover {
-  border-color: rgba(255, 255, 255, 0.5); /* 白色边框 */
+.login-input-wrap .pwd-toggle {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 0.2s;
+  font-size: 16px;
+  flex-shrink: 0;
 }
-.login-field-v2 .ant-input-affix-wrapper:focus,
-.login-field-v2 .ant-input-affix-wrapper-focused,
-.login-field-v2 .ant-input:focus {
-  border-color: #F39C12; /* 橙色焦点 */
-  box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.2); /* 橙色阴影 */
+.login-input-wrap .pwd-toggle:hover {
+  color: #00f0ff;
 }
 
 .pwd-toggle {
@@ -1999,6 +2079,144 @@
 .login-btn-v2:disabled:hover {
   transform: none !important;
   box-shadow: none !important;
+}
+
+/* ===== 登录滑块安全验证码 ===== */
+.slider-captcha-modal .ant-modal-content {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.slider-captcha {
+  width: 320px;
+  margin: 0 auto;
+}
+.slider-captcha-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.slider-captcha-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+.slider-captcha-header-actions {
+  display: flex;
+  gap: 2px;
+}
+.slider-captcha-icon-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #8c8c8c;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.slider-captcha-icon-btn:hover {
+  color: #E8720C;
+  background: rgba(232, 114, 12, 0.08);
+}
+.slider-captcha-canvas-wrap {
+  position: relative;
+  width: 320px;
+  height: 160px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.slider-captcha-canvas-wrap.is-fail {
+  animation: tipShake 0.3s ease; /* 复用全局抖动动画 */
+}
+.slider-captcha-bg {
+  display: block;
+  width: 320px;
+  height: 160px;
+}
+.slider-captcha-piece {
+  position: absolute;
+  width: 47px;
+  height: 47px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+.slider-captcha-track {
+  position: relative;
+  width: 320px;
+  height: 42px;
+  margin-top: 14px;
+  border-radius: 21px;
+  background: #f0f2f5;
+  border: 1px solid #e4e7eb;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+.slider-captcha-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 21px;
+  background: linear-gradient(90deg, rgba(232, 114, 12, 0.22), rgba(243, 156, 18, 0.35));
+  transition: background 0.2s;
+}
+.slider-captcha-track.is-success .slider-captcha-fill {
+  background: linear-gradient(90deg, rgba(82, 196, 26, 0.3), rgba(82, 196, 26, 0.45));
+}
+.slider-captcha-track.is-fail .slider-captcha-fill {
+  background: linear-gradient(90deg, rgba(255, 77, 79, 0.3), rgba(255, 77, 79, 0.45));
+}
+.slider-captcha-tip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #8c8c8c;
+  pointer-events: none;
+}
+.slider-captcha-track.is-success .slider-captcha-tip {
+  color: #52c41a;
+  font-weight: 500;
+}
+.slider-captcha-track.is-fail .slider-captcha-tip {
+  color: #ff4d4f;
+}
+.slider-captcha-handle {
+  position: absolute;
+  top: -1px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #E8720C, #F39C12); /* 品牌橙渐变 */
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: grab;
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.4);
+  touch-action: none;
+}
+.slider-captcha-handle:active {
+  cursor: grabbing;
+}
+.slider-captcha-track.is-success .slider-captcha-handle {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  box-shadow: 0 2px 8px rgba(82, 196, 26, 0.4);
+}
+.slider-captcha-track.is-fail .slider-captcha-handle {
+  background: linear-gradient(135deg, #ff4d4f, #ff7875);
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.4);
 }
 
 /* ========================================================================

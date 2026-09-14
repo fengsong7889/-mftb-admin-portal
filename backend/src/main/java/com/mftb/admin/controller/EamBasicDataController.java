@@ -199,7 +199,7 @@ public class EamBasicDataController {
 
     /** 参数类型分页列表 */
     @GetMapping("/param-types")
-    @RequirePermission(menu = "asset-param-library")
+    @RequirePermission(menu = "param-library")
     public Result<PageResult<Map<String, Object>>> pageParamTypes(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -212,14 +212,14 @@ public class EamBasicDataController {
 
     /** 新增参数类型 */
     @PostMapping("/param-types")
-    @RequirePermission(menu = "asset-param-library", action = "edit")
+    @RequirePermission(menu = "param-library", action = "edit")
     public Result<Long> createParamType(@RequestBody EamParamTypeSaveDTO dto) {
         return Result.success(basicDataService.createParamType(dto));
     }
 
     /** 更新参数类型 */
     @PutMapping("/param-types/{id}")
-    @RequirePermission(menu = "asset-param-library", action = "edit")
+    @RequirePermission(menu = "param-library", action = "edit")
     public Result<Void> updateParamType(@PathVariable long id, @RequestBody EamParamTypeSaveDTO dto) {
         basicDataService.updateParamType(id, dto);
         return Result.success();
@@ -227,7 +227,7 @@ public class EamBasicDataController {
 
     /** 删除参数类型 */
     @DeleteMapping("/param-types/{id}")
-    @RequirePermission(menu = "asset-param-library", action = "delete")
+    @RequirePermission(menu = "param-library", action = "delete")
     public Result<Void> deleteParamType(@PathVariable long id) {
         basicDataService.deleteParamType(id);
         return Result.success();
@@ -235,14 +235,14 @@ public class EamBasicDataController {
 
     /** 根据参数类型编码查询参数值 */
     @GetMapping("/param-types/{paramTypeCode}/values")
-    @RequirePermission(menu = "asset-param-library")
+    @RequirePermission(menu = "param-library")
     public Result<List<Map<String, Object>>> listParamValuesByType(@PathVariable String paramTypeCode) {
         return Result.success(basicDataService.listParamValuesByType(paramTypeCode));
     }
 
     /** 参数值分页列表 */
     @GetMapping("/param-values")
-    @RequirePermission(menu = "asset-param-library")
+    @RequirePermission(menu = "param-library")
     public Result<PageResult<Map<String, Object>>> pageParamValues(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -253,14 +253,14 @@ public class EamBasicDataController {
 
     /** 新增参数值 */
     @PostMapping("/param-values")
-    @RequirePermission(menu = "asset-param-library", action = "edit")
+    @RequirePermission(menu = "param-library", action = "edit")
     public Result<Long> createParamValue(@RequestBody EamParamValueSaveDTO dto) {
         return Result.success(basicDataService.createParamValue(dto));
     }
 
     /** 更新参数值 */
     @PutMapping("/param-values/{id}")
-    @RequirePermission(menu = "asset-param-library", action = "edit")
+    @RequirePermission(menu = "param-library", action = "edit")
     public Result<Void> updateParamValue(@PathVariable long id, @RequestBody EamParamValueSaveDTO dto) {
         basicDataService.updateParamValue(id, dto);
         return Result.success();
@@ -268,7 +268,7 @@ public class EamBasicDataController {
 
     /** 删除参数值 */
     @DeleteMapping("/param-values/{id}")
-    @RequirePermission(menu = "asset-param-library", action = "delete")
+    @RequirePermission(menu = "param-library", action = "delete")
     public Result<Void> deleteParamValue(@PathVariable long id) {
         basicDataService.deleteParamValue(id);
         return Result.success();

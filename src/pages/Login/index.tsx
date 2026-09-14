@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Button, Tooltip, message, Modal, Select } from 'antd'
+import { Button, Tooltip, message, Modal, Select } from 'antd'
 import {
   UserOutlined,
   LockOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
-  GlobalOutlined,
   WechatOutlined,
   AlipayCircleOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { fetchCaptchaToken } from '../../api/auth'
 import BrandLogo from '../../components/BrandLogo'
+import SliderCaptcha from '../../components/SliderCaptcha'
 import { useTranslation } from 'react-i18next'
 import { changeAppLanguage, SUPPORTED_LANGUAGES } from '../../i18n'
 import type { AppLanguage } from '../../i18n'
@@ -29,6 +30,12 @@ import '../../styles/components.css'
 const LOCAL_VIDEO = `${import.meta.env.BASE_URL}MFTB.mp4`
 // 备用远程视频(阿里云OSS)
 const REMOTE_VIDEO = 'https://mftb-video-song.oss-cn-shenzhen.aliyuncs.com/%E9%80%81%E5%A4%96%E5%8D%96%E8%A7%86%E9%A2%91.mp4'
+
+/* ---- 登录安全验证配置 ---- */
+/** 连续登录失败多少次后触发滑块验证 */
+const FAIL_THRESHOLD = 3
+/** 失败计数 localStorage 键 */
+const FAIL_COUNT_KEY = 'login_fail_count'
 
 /* ---- 左侧视频背景组件 ---- */
 function VideoBackground() {
@@ -128,6 +135,12 @@ export default function Login() {
   /** 账号被停用弹窗状态 */
   const [accountDisabledVisible, setAccountDisabledVisible] = useState(false)
 
+  /* ---- 登录安全验证（防暴力破解） ----
+     前端 localStorage 计数用于即时弹滑块（体验优化）；
+     后端按账号统计失败次数：≥3 次强制 captchaToken（一次性），≥5 次锁定 15 分钟 */
+  const [failCount, setFailCount] = useState(() => Number(localStorage.getItem(FAIL_COUNT_KEY) || 0))
+  const [captchaOpen, setCaptchaOpen] = useState(false)
+
   const { login } = useAuth()
   const navigate = useNavigate()
 
@@ -168,6 +181,41 @@ export default function Login() {
     applyLoginLanguage(lang)
   }
 
+  /** 执行登录请求（captchaToken：滑块验证通过后由后端签发的一次性凭证） */
+  const doLogin = (captchaToken?: string) => {
+    // 将登录页选择的国家/语言同步到首页键，进入系统后直接使用
+    localStorage.setItem('selected_country', loginCountry)
+    localStorage.setItem('app_language', loginLanguage)
+
+    setLoading(true)
+    setTimeout(async () => {
+      const result = await login(username, password, captchaToken)
+      setLoading(false)
+      if (result.success) {
+        // 登录成功 → 清零失败计数
+        setFailCount(0)
+        localStorage.removeItem(FAIL_COUNT_KEY)
+        message.success(t('login.success'))
+        navigate('/', { replace: true })
+      } else if (result.accountDisabled) {
+        // 账号被停用: 弹窗提醒（不显示 toast、不计入失败次数）
+        setAccountDisabledVisible(true)
+      } else if (result.captchaRequired) {
+        // 后端要求安全验证（本地计数与后端不一致时兜底）→ 直接弹滑块
+        setCaptchaOpen(true)
+      } else {
+        // 登录失败 → 累计失败次数，达到阈值提示需安全验证
+        const next = failCount + 1
+        setFailCount(next)
+        localStorage.setItem(FAIL_COUNT_KEY, String(next))
+        message.error(result.message || t('login.failed'))
+        if (next >= FAIL_THRESHOLD) {
+          message.warning('為保護賬號安全，下次登錄需先完成滑塊安全驗證')
+        }
+      }
+    }, 600)
+  }
+
   /** 登录 */
   const handleLogin = () => {
     let hasError = false
@@ -179,24 +227,25 @@ export default function Login() {
 
     if (hasError) return
 
-    // 将登录页选择的国家/语言同步到首页键，进入系统后直接使用
-    localStorage.setItem('selected_country', loginCountry)
-    localStorage.setItem('app_language', loginLanguage)
+    // 连续失败达到阈值 → 先弹出滑块安全验证
+    if (failCount >= FAIL_THRESHOLD) {
+      setCaptchaOpen(true)
+      return
+    }
 
-    setLoading(true)
-    setTimeout(async () => {
-      const result = await login(username, password)
-      setLoading(false)
-      if (result.success) {
-        message.success(t('login.success'))
-        navigate('/', { replace: true })
-      } else if (result.accountDisabled) {
-        // 账号被停用: 弹窗提醒（不显示 toast）
-        setAccountDisabledVisible(true)
-      } else {
-        message.error(result.message || t('login.failed'))
-      }
-    }, 600)
+    doLogin()
+  }
+
+  /** 滑块验证通过 → 获取后端一次性 captchaToken 并继续登录 */
+  const handleCaptchaSuccess = async () => {
+    try {
+      const { token } = await fetchCaptchaToken()
+      setCaptchaOpen(false)
+      doLogin(token)
+    } catch {
+      setCaptchaOpen(false)
+      message.error('驗證服務暫時不可用，請稍後重試')
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -238,7 +287,6 @@ export default function Login() {
                 value: opt.value,
                 label: `${opt.flag} ${opt.label}`,
               }))}
-              suffixIcon={<GlobalOutlined style={{ color: 'rgba(255,255,255,0.6)' }} />}
             />
             <Select
               value={loginLanguage}
@@ -263,41 +311,44 @@ export default function Login() {
             <h2>{t('login.welcomeTitle')}</h2>
           </div>
 
-          {/* 账号密码登录表单 */}
+          {/* 账号密码登录表单 — 自定义原生 input，完全掌控样式 */}
           <div className="login-form-v2">
             {/* 账号输入 */}
             <div className="login-field-v2">
               <label>{t('login.empIdLabel')}</label>
-              <Input
-                size="large"
-                placeholder={t('login.empIdPlaceholder')}
-                prefix={<UserOutlined style={{ color: '#5a5080' }} />}
-                value={username}
-                onChange={e => { setUsername(e.target.value); setUsernameError('') }}
-                onKeyDown={handleKeyDown}
-                status={usernameError ? 'error' : undefined}
-              />
+              <div className={`login-input-wrap${usernameError ? ' has-error' : ''}`}>
+                <UserOutlined className="login-input-icon" />
+                <input
+                  className="login-input"
+                  type="text"
+                  autoComplete="username"
+                  placeholder={t('login.empIdPlaceholder')}
+                  value={username}
+                  onChange={e => { setUsername(e.target.value); setUsernameError('') }}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
               {usernameError && <div className="field-error-tip">{usernameError}</div>}
             </div>
 
             {/* 密码输入 */}
             <div className="login-field-v2">
               <label>{t('login.pwdLabel')}</label>
-              <Input
-                size="large"
-                placeholder={t('login.pwdPlaceholder')}
-                prefix={<LockOutlined style={{ color: '#5a5080' }} />}
-                type={showPwd ? 'text' : 'password'}
-                value={password}
-                onChange={e => { setPassword(e.target.value); setPasswordError('') }}
-                onKeyDown={handleKeyDown}
-                status={passwordError ? 'error' : undefined}
-                suffix={
-                  <span className="pwd-toggle" onClick={() => setShowPwd(!showPwd)}>
-                    {showPwd ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-                  </span>
-                }
-              />
+              <div className={`login-input-wrap${passwordError ? ' has-error' : ''}`}>
+                <LockOutlined className="login-input-icon" />
+                <input
+                  className="login-input"
+                  type={showPwd ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder={t('login.pwdPlaceholder')}
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setPasswordError('') }}
+                  onKeyDown={handleKeyDown}
+                />
+                <span className="pwd-toggle" onClick={() => setShowPwd(!showPwd)}>
+                  {showPwd ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                </span>
+              </div>
               {passwordError && <div className="field-error-tip">{passwordError}</div>}
             </div>
 
@@ -358,6 +409,20 @@ export default function Login() {
             {t('login.accountDisabledDesc')}
           </p>
         </div>
+      </Modal>
+
+      {/* 滑块安全验证弹窗（连续失败 3 次后触发） */}
+      <Modal
+        open={captchaOpen}
+        centered
+        closable={false}
+        maskClosable={false}
+        footer={null}
+        width={360}
+        className="slider-captcha-modal"
+        destroyOnClose
+      >
+        <SliderCaptcha onSuccess={handleCaptchaSuccess} onClose={() => setCaptchaOpen(false)} />
       </Modal>
     </div>
   )

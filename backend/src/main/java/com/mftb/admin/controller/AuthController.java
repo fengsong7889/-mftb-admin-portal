@@ -9,6 +9,7 @@ import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.SessionCheckResult;
 import com.mftb.admin.dto.UserInfoVO;
 import com.mftb.admin.service.AuthService;
+import com.mftb.admin.service.CaptchaService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.util.FileValidator;
 import com.mftb.admin.util.JwtUtil;
@@ -46,6 +47,7 @@ public class AuthController {
     private final AuthService authService;
     private final LoginLogService loginLogService;
     private final JwtUtil jwtUtil;
+    private final CaptchaService captchaService;
 
     /** 活跃时间更新节流间隔（毫秒），与 JwtAuthenticationFilter 保持一致 5 分钟 */
     private static final long UPDATE_THROTTLE_MS = 5 * 60 * 1000L;
@@ -56,6 +58,14 @@ public class AuthController {
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         return Result.success("登錄成功", authService.login(request, httpRequest));
+    }
+
+    /** 签发滑块安全验证 Token（5 分钟有效，一次性使用，登录时随 captchaToken 提交） */
+    @GetMapping("/captcha")
+    public Result<Map<String, Object>> issueCaptchaToken() {
+        return Result.success(Map.of(
+                "token", captchaService.issueToken(),
+                "expireSeconds", 300));
     }
 
     /** 登出 */

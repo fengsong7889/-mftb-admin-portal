@@ -11,6 +11,7 @@ import com.mftb.admin.dto.UserInfoVO;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AuthService;
+import com.mftb.admin.service.CaptchaService;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.LoginLogService;
 import com.mftb.admin.service.RoleService;
@@ -47,10 +48,13 @@ public class AuthServiceImpl implements AuthService {
     private final DepartmentService departmentService;
     private final LoginLogService loginLogService;
     private final SysConfigService sysConfigService;
+    private final CaptchaService captchaService;
 
     /** 登录失败频率限制: 同一账号 15 分钟内最多 5 次失败 */
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCK_DURATION_MS = 15 * 60 * 1000L;
+    /** 滑块验证码门槛: 连续失败达到此次数后，登录必须携带有效 captchaToken */
+    private static final int CAPTCHA_THRESHOLD = 3;
     private final ConcurrentHashMap<String, LoginAttempt> loginAttemptMap = new ConcurrentHashMap<>();
 
     /** 登录失败记录 */
@@ -61,8 +65,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
-        // 登录频率限制校验
+        // 登录频率限制校验（失败 5 次锁定 15 分钟）
         checkLoginRateLimit(request.getUsername());
+        // 滑块验证码门槛（失败 3 次后必须先通过安全验证）
+        checkCaptchaRequired(request.getUsername(), request.getCaptchaToken());
 
         // 查询用户
         SysUser user = sysUserMapper.selectOne(
@@ -210,7 +216,29 @@ public class AuthServiceImpl implements AuthService {
         }
         if (attempt.count.get() >= MAX_LOGIN_ATTEMPTS) {
             long remainMinutes = (LOCK_DURATION_MS - elapsed) / 60000 + 1;
-            throw new BusinessException("登錄失敗次數過多，請 " + remainMinutes + " 分钟后再试");
+            throw new BusinessException("登錄失敗次數過多，賬號暫時鎖定，請 " + remainMinutes + " 分鐘後再試");
+        }
+    }
+
+    /** 当前锁定窗口内的连续失败次数（窗口外视为 0） */
+    private int currentFailCount(String username) {
+        LoginAttempt attempt = loginAttemptMap.get(username);
+        if (attempt == null) {
+            return 0;
+        }
+        if (System.currentTimeMillis() - attempt.firstFailTime > LOCK_DURATION_MS) {
+            return 0;
+        }
+        return attempt.count.get();
+    }
+
+    /** 失败次数达到阈值 → 强制要求有效的一次性滑块验证 Token */
+    private void checkCaptchaRequired(String username, String captchaToken) {
+        if (currentFailCount(username) < CAPTCHA_THRESHOLD) {
+            return;
+        }
+        if (!captchaService.verifyAndConsume(captchaToken)) {
+            throw new BusinessException(ResultCode.CAPTCHA_REQUIRED);
         }
     }
 

@@ -131,6 +131,32 @@ cd backend && mvn test -B      # 单元测试
 
 约束：不要在没有明确需求时主动调用 MCP；Figma 仅在设计相关任务中使用。
 
+## 编码规范
+
+### 架构设计
+- 采用组件化开发，页面 UI 与业务逻辑分离，业务逻辑优先抽取为自定义 Hooks
+- 统一 API 请求层，所有接口请求需经过统一封装的请求实例处理，并统一拦截处理错误提示
+- 路由配置需支持按需加载/懒加载，优化首屏加载性能
+
+### TypeScript 规范
+- 严格模式开发，禁止滥用 `any` 类型，尽量使用具体类型或泛型
+- 所有 API 的请求参数和响应数据必须定义明确的 Interface 或 Type
+- 涉及状态、类型等字段需使用常量对象或 TS Enum 定义，代码中严禁出现魔法数字
+
+### 命名与代码风格
+- React 组件文件名使用 PascalCase（如 `UserManage.tsx`），工具类或 Hooks 文件名使用 camelCase（如 `useAuth.ts`）
+- 样式文件使用原生 CSS（如 `index.css`），通过全局类名隔离
+- 事件处理函数命名以 `handle` 开头（如 `handleSubmit`），异步请求函数以 `fetch` 或 `request` 开头
+
+### 第三方组件库
+
+| 库 | 版本 | 用途 |
+|---|---|---|
+| Ant Design (antd) | ^5.22.0 | 主 UI 组件库 |
+| @ant-design/icons | ^5.5.1 | 图标库 |
+| @ant-design/charts | ^2.6.7 | 图表组件库 |
+| @xyflow/react | ^12.11.1 | 流程图组件库（React Flow v12） |
+
 # 前端 UI/UX 设计规范（强制）
 
 版本：1.0
@@ -139,6 +165,17 @@ cd backend && mvn test -B      # 单元测试
 基准来源：`.qoder/rules/form-page-style.md`、`src/styles/components.css`、`src/styles/global.css`、`src/hooks/useColumnConfig.tsx`、`src/api/request.ts`。
 
 > **AI 元规则**：每次涉及新界面 / 新交互 / 新提醒 / 新样式，必须先阅读本章；开发完成后必须逐条自检 §L「前端 UI 检查清单」，未通过不得提交。
+
+### 页面类型速查（所有二级菜单页面）
+
+| 类型 | 用途 | 全局 CSS 类 |
+|------|------|------------|
+| **列表页** | 搜索 + 表格 + 操作 | `.search-section` + `.action-section` + Table |
+| **详情页** | 只读展示 | `DetailPageHeader` 组件 + `.content-area` |
+| **表单页（新增/编辑）** | 表单输入 | `.content-area` + `.form-footer` |
+| **独立页（定价等）** | 复杂业务页 | 参考同类型已有页面 |
+
+> ️ **独立页面优先原则**：新增/编辑/详情必须使用独立页面，**禁止使用 Modal 弹窗**（详见 §9.1）。
 
 ---
 
@@ -176,6 +213,31 @@ cd backend && mvn test -B      # 单元测试
 | 页面底部按钮 `.form-footer` | `8px` | — | `0 28px` | — |
 | Modal 二次确认 | `16px` | antd 默认 | `28px 32px 24px` | — |
 | 图标色块（模块标题） | `6px` | — | 28×28 | — |
+
+**阴影规范**
+
+| 场景 | 阴影 |
+|------|------|
+| 侧边栏 | `2px 0 12px rgba(0,0,0,0.15)` |
+| 顶部导航 | `0 2px 8px rgba(0,0,0,0.06)` |
+| 卡片默认 | `0 2px 8px rgba(0,0,0,0.04~0.06)` |
+| 按钮 hover | `0 2px 6px rgba(0,0,0,0.1)` |
+| 按钮 active | `0 4px 12px rgba(0,0,0,0.12)` |
+| 主色按钮 | `0 2px 4px rgba(232,114,12,0.25)` |
+| 主色按钮 hover | `0 4px 10px rgba(232,114,12,0.35)` |
+| 下拉框 | `0 6px 24px rgba(0,0,0,0.12)` |
+
+**间距规范**
+
+| 场景 | 间距 |
+|------|------|
+| 页面内边距 | `20px 24px` |
+| 搜索区 Grid gap | `16px 12px`（行 16px，列 12px） |
+| 搜索区底部 margin | `16px` |
+| 按钮间距 | `8px`（搜索区）/ `12px`（页面底部） |
+| 卡片间距 | `16px` |
+| 首页板块间距 | `20px` |
+| 表单 label 底部 | `4px` |
 
 ### A.3 字体
 
@@ -221,6 +283,30 @@ cd backend && mvn test -B      # 单元测试
 - 表格链接按钮 hover：`scale(1.05)` + 浅色背景
 - **禁用态无动效**：`.ant-btn[disabled]:hover { transform: none !important; box-shadow: none !important; }`
 - 按钮图标与文字间距：`.ant-btn .anticon + span { margin-left: 6px; }`
+
+**Hover 交互效果汇总**
+
+| 组件 | hover 效果 | 过渡时间 |
+|------|-----------|--------|
+| 按钮 | `translateY(-1px)` + 阴影加深 | `0.25s` |
+| 侧边栏菜单项 | 白色半透明背景 | `0.25s` |
+| 侧边栏图标 | `scale(1.15)` | `0.2s` |
+| 表格 link 按钮 | 背景微亮 + `scale(1.05)` | `0.2s` |
+| 首页收藏卡片 | `translateY(-2px)` + 阴影 | `0.2s` |
+| 首页收藏删除按钮 | `opacity: 0→1` | `0.2s` |
+| 统计卡片 | `translateY(-2px)` + 阴影加深 | `0.2s` |
+| 数据指标统计卡 | `translateY(-4px)` + 阴影 `0 8px 24px rgba(0,0,0,0.1)` | `0.35s` |
+| 通知项 | 背景变深 | `0.15s` |
+| 搜索下拉项 | 背景 `#F5F5F5` | `0.15s` |
+| 顶部图标 | 背景 `#F0F0F0` + 变橙色 | `0.25s` |
+| 用户信息区 | 背景 `#F5F5F5` + 阴影 | `0.25s` |
+| 社交登录按钮 | `translateY(-3px)` + 图标 `scale(1.08)` | `0.25s` |
+| 验证码复选框 | 边框变色 + 背景微亮 | `0.3s` |
+| 验证码选项 | `translateY(-2px)` + 边框变色 | `0.2s` |
+| 登录页三角切换 | 渐变变色 + 图标 `scale(1.1)` | `0.3s` |
+| 返回账号按钮 | 文字变色 + 背景微亮 | `0.2s` |
+| 欠款统计卡片 | `translateY(-2px)` + 阴影加深 | `0.2s` |
+| 收藏添加按钮 | 边框变色 + 背景变色 | `0.2s` |
 
 ### B.3 Modal 二次确认（`custom-confirm-modal`）
 
@@ -278,6 +364,27 @@ Modal.confirm({
 | 提交申请类按钮 | `Modal.confirm` + `custom-confirm-modal` | 直接调 API / `window.confirm` |
 | 模块分组卡片 | 白色 `div` + 内联样式 | antd `Card title=... headStyle=...` 彩色标题头 |
 | 富文本渲染 | 必须净化（DOMPurify 等） | `dangerouslySetInnerHTML` 直传 |
+
+### B.7 数据指标统计卡片标准（动效统计卡） ⚠️ 强制标准
+
+> 适用范围：页面/详情/Tab 内的「4 格数据指标概览卡」（如订单详情推广数据、新店剩余推广天数、赠送明细统计等）。
+> 往后所有新增同类统计卡片**必须**遵循此标准，参考实现：订单详情「推广数据」Tab 四卡（`src/pages/OrderDetail/index.tsx`）。
+
+- **卡片结构**（上→下三段式，居中对齐）：图标 `20px` 同色系 → 数值 `22px/700` 同色系 → 标签 `12px` `#8C8C8C`
+- **容器样式**：圆角 `12px`，padding `16px`，背景用淡色底，描边 `1px solid ${color}22`（主色 + 13% 透明度），`text-align: center`，`position: relative; overflow: hidden`
+- **配色色板**（主色/底色，按语义取色）：
+
+  | 语义 | 主色 | 底色 |
+  |------|------|------|
+  | 信息/总量 | `#1890FF` | `#E6F7FF` |
+  | 成功/剩余 | `#52C41A` | `#F6FFED` |
+  | 品牌/已用 | `#E8720C` | `#FFF7E6` |
+  | 系统/时间 | `#722ED1` | `#F9F0FF` |
+
+- **hover 动效**（必须）：移入 `translateY(-4px)` + 阴影 `0 8px 24px rgba(0,0,0,0.1)`，移出恢复；过渡 `all 0.35s cubic-bezier(0.4, 0, 0.2, 1)`，`cursor: default`
+- **数字加载动画**（必须）：数值使用 `useCountUp` Hook + `AnimatedNumber` 组件（`requestAnimationFrame` 实现，时长 `1200ms`，缓动 `1 - Math.pow(2, -10 * progress)`，`toLocaleString()` 千分位）；日期/百分比等非计数字段可不做计数动画；切换查询对象时通过网格容器 `key` 重新触发动画
+- **布局**：`display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px`
+- **禁止**：不得再使用旧式静态统计卡（无 hover/无计数动画、`#E3F2FD`/`#FFF3E0` 深色文字方案）新建数据指标卡；既有页面遇修改时顺带对齐此标准
 
 ---
 
@@ -376,22 +483,161 @@ Modal.confirm({
 - 详情只读模式必须隐藏底部按钮
 - **禁止**写内联样式覆盖 `.form-footer` 全局类
 
+### C.6 表单页完整结构模板
+
+```tsx
+<div className="content-area">
+  {/* 顶部标题栏（橙色渐变顶条，对齐定价页规范） */}
+  <div style={{
+    position: 'relative', background: '#fff', marginBottom: 16,
+    borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+    overflow: 'hidden',
+  }}>
+    {/* ⚠️ 橙色渐变顶条（必须） */}
+    <div style={{
+      height: 3,
+      background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+      backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+    }} />
+    <div style={{
+      padding: '16px 24px', display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
+          style={{
+            backgroundColor: '#E8720C', borderColor: '#E8720C',
+            borderRadius: 8, height: 36, padding: '0 16px',
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+          }}
+        >返回</Button>
+        <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+          頁面標題
+        </h2>
+      </div>
+    </div>
+  </div>
+
+  {/* 卡片模块（可多个） */}
+  <div style={cardStyle}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon style={{ fontSize: 14, color: '#1890ff' }} />
+      </div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模块标题</span>
+      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+    </div>
+    <div style={{ padding: '0' }}>
+      {/* 表单字段 */}
+    </div>
+  </div>
+
+  {/* 底部操作栏 */}
+  <div className="form-footer">
+    <Button onClick={onBack}>取消</Button>
+    <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>保存</Button>
+  </div>
+</div>
+```
+
+**关键约束**：
+- ⚠️ 顶部必须有**橙色渐变顶条**（3px，`headerGradientShift` 动画）
+- 容器 borderRadius: **12**（不是 8），boxShadow: `0 2px 12px`
+- 底部按钮统一为「取消 + 保存」，取消无图标，保存用 `SaveOutlined`
+- 返回按钮为 `type="primary"` 实心橙色 + boxShadow
+- 标题颜色为 `#1890ff`（蓝色）
+
+**参考实现**：`src/pages/Recommend/WaterfallAdd/index.tsx`（add/edit mode）、`GoldenSignboardPricing.tsx`、`PopularSkinPricing.tsx`
+
 ---
 
 ## D. 详情界面规范
 
-### D.1 详情页头部 `.detail-header`
+### D.1 详情页头部 —— `DetailPageHeader` 组件
 
-- 白底 / 圆角 8px / padding `20px 24px` / 阴影 `0 2px 8px rgba(0,0,0,0.06)`
-- 标题行 flex space-between，标题 `17px / 600 / #262626`
-- **详情页为只读模式，顶部不放操作按钮**（需要时放 Descriptions 内或独立区块）
-- 副标题 `.detail-header-subtitle`：`13px / #595959`，顶部 `1px dashed rgba(0,0,0,0.08)`
+> ️ `.detail-header` CSS 类已过时，**必须使用 `DetailPageHeader` 组件**（`src/components/DetailPageHeader.tsx`）。
+
+**组件 API**：
+```tsx
+import DetailPageHeader from '../../../components/DetailPageHeader'
+
+<DetailPageHeader
+  title="頁面標題"
+  meta={<>{model.code} · {model.name}</>}   // 可选，副标题行
+  onBack={onBack}                            // 必填，返回回调
+  onEdit={() => navigate(`/edit?id=${id}`)}  // 可选，编辑按钮
+  menuKey="menu-key"                         // 可选，权限门控
+/>
+```
+
+**组件样式**：
+- 紫色渐变顶条（3px，流动动画）
+- 白底容器，borderRadius: 12, boxShadow
+- 橙色返回按钮（type="primary", #E8720C）
+- 分隔线 → 蓝色标题（#1890ff, 18px/700）
+- 可选 meta 行（12px, #8C8C8C）
+- 右侧可选编辑按钮（紫色 #722ED1，按菜单权限门控）
+
+**禁止项**：
+- ❌ 不使用 `.detail-header` CSS 类（已过时）
+- ❌ 不自己手写返回按钮 + 标题的 inline style
+- ❌ 不添加底部操作栏（取消/保存）
+
+**参考实现**：`src/pages/Recommend/WaterfallAdd/index.tsx`（详情模式）、`GoldenSignboardPricing.tsx`、`PopularSkinPricing.tsx`
 
 ### D.2 详情内容卡片 `.detail-card`
 
 白底 / 圆角 8px / padding `20px 24px` / margin-bottom 16 / 阴影 `0 2px 8px rgba(0,0,0,0.06)`。
 
-### D.3 操作记录模块（跨模块强制统一）
+### D.3 详情页完整结构模板
+
+```tsx
+import DetailPageHeader from '../../../components/DetailPageHeader'
+
+<div className="content-area">
+  {/* 顶部标题栏 —— 必须使用 DetailPageHeader 组件 */}
+  <DetailPageHeader
+    title="頁面標題"
+    meta={<>{model.code} · {model.name}</>}
+    onBack={onBack}
+    onEdit={() => navigate(`/edit?id=${id}`)}  // 可选
+    menuKey="menu-key"                        // 可选，权限门控
+  />
+
+  {/* 信息卡片（可多个）—— 定价页卡片样式 */}
+  <div style={cardStyle}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon style={{ fontSize: 14, color: '#1890ff' }} />
+      </div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>卡片标题</span>
+      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+    </div>
+    <Descriptions column={3} size="middle" bordered>
+      {/* 字段... */}
+    </Descriptions>
+  </div>
+
+  {/* ⚠️ 无底部操作栏（详情页规范） */}
+</div>
+```
+
+**卡片样式常量**（对齐定价页规范）：
+```ts
+const cardStyle: React.CSSProperties = {
+  border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+  padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+}
+```
+
+**卡片标题样式**（图标方块 + 文字 + 分隔线）：
+- 图标方块：28x28, borderRadius: 6, 淡色背景, 图标 14px
+- 文字：15px, fontWeight: 600, color: #262626
+- 分隔线：flex: 1, height: 1, background: #f0f0f0
+
+### D.4 操作记录模块（跨模块强制统一）
 
 **所有详情页底部必须**添加「操作记录」模块：
 
@@ -403,18 +649,54 @@ Modal.confirm({
 
 已应用页面：`AssetDetail`、`AlgorithmAdd`、`WaterfallAdd`、`PricingAdd`、采购申请详情等。
 
-### D.4 OA 工作流审批节点懒加载
+### D.5 OA 工作流审批节点懒加载
 
 - **draft 状态**：右侧审批节点模块只展示「流程创建」
 - **pending 状态**：只展示下一个待审批节点；当前节点审完才请求下一节点审批人
 - 时间轴渲染：只显示「流程创建」+ 已完成节点 + 当前待审节点，**不显示未来节点**
 
-### D.5 采购申请详情页专项
+### D.6 采购申请详情页专项
 
 - 待提交（draft）状态必须支持删除操作
 - 流程状态必须显示中文（`draft` → `待提交`）
 - 采购明细表格必须完整显示：资产分类、品牌、参数信息、资产名称、数量、备注
 - 申请部门字段必须在审批详情页中正确显示
+
+### D.7 登录页规范
+
+- 视频背景 + 渐变降级色 `linear-gradient(135deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe)`
+- 降级背景动画：`gradientShift 15s ease infinite`，`background-size: 400% 400%`
+- 视频遮罩层：渐变半透明 `rgba(255,248,225,0.15~0.25)`
+- 登录卡片：毛玻璃效果 `backdrop-filter: blur(20px) saturate(180%)`
+  - 宽度 `400px`，圆角 `18px`，padding `36px 34px 30px`
+  - 背景 `rgba(255,255,255,0.15)`，边框 `1px solid rgba(255,255,255,0.3)`
+  - 阴影 `0 8px 32px rgba(0,0,0,0.2)`
+- 输入框：半透明白底 `rgba(255,255,255,0.15)` + 白色边框 `rgba(255,255,255,0.3)`
+  - 圆角 `10px`，高 `44px`
+  - focus：橙色边框 `#F39C12` + 橙色阴影 `0 0 0 3px rgba(243,156,18,0.2)`
+  - placeholder：`rgba(255,255,255,0.6)`
+- 登录按钮：橙色渐变 `linear-gradient(135deg, #E8720C, #F39C12)`
+  - 高 `46px`，圆角 `10px`，字号 `16px`，字重 `600`
+  - 阴影 `0 4px 15px rgba(232,114,12,0.35)`
+  - hover：上浮 `translateY(-2px)` + 阴影加深
+  - disabled：灰色半透明 `rgba(200,200,200,0.6)`，无动效
+- 右上角三角切换：QR/密码模式切换动画
+  - 尺寸 `70x70px`，`clip-path` 三角形
+  - 渐变背景 `linear-gradient(135deg, #00f0ff, #b060ff)`
+  - hover：渐变变色 + 图标 `scale(1.1)`
+- 社交登录按钮：圆形 `50%`，图标 `48x48px`
+  - 微信：绿色渐变 `#07C160→#06AD56`
+  - 支付宝：蓝色渐变 `#1677FF→#0958D9`
+  - hover：上浮 `translateY(-3px)` + 图标 `scale(1.08)` + 阴影加深
+- 验证码组件：
+  - 复选框：圆角 `10px`，边框 `rgba(176,96,255,0.2)`
+  - hover：边框变 `#00f0ff` + 背景 `rgba(0,240,255,0.05)`
+  - 已验证：边框 `#00ff88` + 背景 `rgba(0,255,136,0.08)`
+  - 动物选择面板：滑入动画 `captchaSlideIn 0.3s`
+  - 选项 hover：上浮 `translateY(-2px)` + 边框 `#00f0ff`
+  - 正确/错误：绿色 `#00ff88` / 红色 `#ff4060` 边框 + 背景
+- 返回账号按钮：hover 变色 `#00f0ff` + 背景 `rgba(0,240,255,0.05)`
+- 品牌文字：`text-shadow: 0 0 20px rgba(232,114,12,0.8)`，霓虹效果
 
 ---
 
@@ -478,6 +760,59 @@ pagination={{
 - 横向滚动：`scroll={{ x: 'max-content' }}` 或明确宽度 `scroll={{ x: 1400 }}`
 - 纵向滚动：`scroll={{ y: 360 }}`（用于弹窗内表格）
 - 审批表头分组着色：业务主管蓝 `#E3F2FD/#1565C0`、运营主管橙 `#FFF3E0/#E65100`、财务主管红 `#FFEBEE/#C62828`
+- 分组表头：居中对齐，字重 `600`
+
+### E.6 React Flow 流程图规范
+
+- 5 种自定义节点类型：
+  - `terminal`：开始/结束，胶囊形（r24），绿色/红色渐变
+  - `stage`：阶段标题，色带形（左侧 6px 粗边框）
+  - `process`：流程步骤，白底矩形（r6），彩色边框 + 阴影
+  - `decision`：决策判断，渐变背景 + 右上角「判断」角标
+  - `system`：系统处理，紫色虚线边框 + ⚙️ 图标
+- 连线：`strokeWidth: 2`，阶段间动画连线（`animated: true`）+ 标签文字
+- 编辑模式：左侧节点面板拖拽添加、双击编辑、Delete 键删除
+- 位置持久化：localStorage 存储，支持保存/重置
+
+### E.7 列表页完整结构模板
+
+```tsx
+<div className="content-area">
+  {/* 搜索区 */}
+  <div className="search-section">
+    <Form layout="inline">
+      {/* 搜索字段... */}
+      <Form.Item>
+        <div className="search-actions">
+          <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
+          <Button icon={<ReloadOutlined />}>重置</Button>
+        </div>
+      </Form.Item>
+    </Form>
+  </div>
+
+  {/* 操作区 */}
+  <div className="action-section">
+    <div className="action-section-left">
+      {/* 導出、批量操作等 */}
+    </div>
+    <div className="action-section-right">
+      <Button type="primary" icon={<PlusOutlined />}>新增</Button>
+      {configComponent}  {/* 字段設置 */}
+    </div>
+  </div>
+
+  {/* 表格 */}
+  <Table ... />
+</div>
+```
+
+**关键约束**：
+- 搜索区不用 Card 包裹，用 `.search-section`
+- 表格不用 Card 包裹
+- 操作列按钮**禁止使用图标**，仅文字
+- 操作列按钮间距用 `action-split` 分隔符 `|`
+- 字段设置用 `useColumnConfig` hook
 
 ---
 
@@ -648,6 +983,25 @@ try {
 
 复杂组件必须独立 CSS 文件，禁止污染全局：`MenuTabs.css`、`PetMascot.css`、`TableColumnConfig.css`、`PRDEditor.css`。
 
+### K.4 卡片组件与首页工作台规范
+
+- 内容区 `.content-area`：白底，圆角 `8px`，padding `20px 24px`
+- 首页区块 `.home-section`：白底，圆角 `12px`，padding `20px 24px`，阴影 `0 2px 8px rgba(0,0,0,0.04)`
+- 统计卡片：圆角 `10px`，彩色背景（蓝 `#E3F2FD`、绿 `#E8F5E9`、橙 `#FFF3E0`、红 `#FFEBEE`）
+- 统计数字：`28px` 粗体，对应色系的深色文字
+- 首页欢迎横幅：渐变背景 `linear-gradient(135deg, #E8720C, #F39C12)`，圆角 `12px`，padding `28px 32px`
+- 常用菜单卡片：4 列 Grid，hover 上浮 `translateY(-2px)` + 蓝色阴影
+- 收藏卡片 hover 显示删除按钮（`opacity: 0 → 1`）
+- 待办事项：灰底卡片 `#FAFAFA`，hover 变深 `#F0F0F0`
+- 通知项：未读左边框 `3px solid #FFA000` + 浅黄背景 `#FFF8E1`
+- 报表/统计卡片：圆角 `12px`，padding `20px`，阴影 `0 2px 8px rgba(0,0,0,0.06)`
+  - 卡片标题区：底部虚线分隔 `1px dashed rgba(0,0,0,0.08)`
+  - 余额网格：`repeat(2, 1fr)`，gap `16px`
+  - 统计行网格：`repeat(4, 1fr)`，gap `16px`
+  - 指标数值：`20px` 粗体，子指标 `16px` 半粗体
+  - 欠款统计卡片：渐变背景（红 `#FFEBEE→#FFCDD2`、绿 `#E8F5E9→#C8E6C9`、紫 `#F3E5F5→#E1BEE7`）
+  - 欠款卡片 hover：`translateY(-2px)` + 阴影加深
+
 ---
 
 ## L. 前端 UI 检查清单（每次开发前后必对）
@@ -662,6 +1016,17 @@ try {
 - [ ] 是否需要列配置（列表页）？
 - [ ] 部门选择是否用 TreeSelect？
 - [ ] i18n key 是否已在 zh-TW.json + en.json 同步登记？
+
+**界面设计前速查（每次新增/修改界面前必对）**：
+1. ☐ 确定页面类型（列表 / 详情 / 表单）
+2. ☐ 查閱本章对应类型的标准结构（§C.6 / §D.3 / §E.7）
+3. ☐ 详情页：使用 `DetailPageHeader` 组件（非 CSS 类），含右侧编辑按钮（onEdit prop）
+4. ☐ 表单页：顶部有**橙色渐变顶条**（3px，`headerGradientShift` 动画），容器 borderRadius: 12
+5. ☐ 标题颜色：详情页和表单页均为 `#1890ff`（蓝色）
+6. ☐ 卡片标题：图标方块(28x28) + 文字 + 分隔线模式
+7. ☐ 底部操作栏：详情页无，表单页有「取消+保存」
+8. ☐ 新增/编辑/详情使用**独立页面**，不使用弹窗（Modal）
+9.  参考同类型的已有实现页面
 
 ### L.2 开发中（编码阶段）
 
@@ -678,7 +1043,7 @@ try {
 - [ ] 详情模式隐藏底部按钮？
 
 **详情页**：
-- [ ] 头部用 `.detail-header` 类？
+- [ ] 头部用 `DetailPageHeader` 组件（非 `.detail-header` CSS 类）？
 - [ ] 顶部**没有**操作按钮？
 - [ ] 内容卡片用 `.detail-card` 类？
 - [ ] 底部有「操作记录」模块（仅最后更新人+最后更新时间，EditOutlined 图标）？
@@ -1078,6 +1443,9 @@ AI 禁止：
 - 禁止随意引入 §A.1 之外的新色值。
 - 禁止按钮不用语义化 class（`.btn-export` / `.btn-import` / `.ant-btn-dangerous`）。
 - 禁止用内联样式覆盖 `.form-footer` / `.detail-header` / `.detail-card` 全局类。
+- 禁止新增/编辑/详情使用 Modal 弹窗（必须使用独立页面，路由跳转 `/add`、`/edit?id=xxx`、`/detail?id=xxx`）。
+  - 仅以下简单操作允许使用 Modal：确认删除/批量操作等二次确认弹窗（`Modal.confirm`）、简单设置面板（如列配置 `ColumnConfig`）、纯展示型信息提示（`Modal.info` / `Modal.success`）。
+  - 原因：独立页面信息承载力更强、URL 可分享可刷新、支持浏览器前进后退、复杂表单空间充裕。
 - 禁止代码注释用繁体中文或英文（必须简体中文）。
 
 ---
@@ -1161,3 +1529,56 @@ AI 开发后必须输出：
 - CI 必须拦截高危问题。
 - 每次线上事故必须反补规则、测试和门禁。
 - 每次 UI 规范例外必须按 §M 记录并设定到期时间。
+
+---
+
+# 业务数据字典
+
+> 以下字段枚举值为系统级常量，前端使用常量对象或 TS Enum 定义，后端使用对应整型存储。
+
+| 字段 | 枚举值 |
+|------|--------|
+| 所属品牌 | 1.闪蜂, 2.mFood |
+| 业务类型 | 1.外卖到家, 2.团购到店 |
+| 业务频道 | 1.美食外卖, 2.超市百货, 3.团购到店 |
+| 设备类型 | 1.iOS, 2.安卓, 3.鸿蒙 |
+| 展示端口 | 1.APP, 2.小程序, 3.支付宝H5, 4.Mpay, 5.H5工银 |
+| 所属区域 | 1.澳门, 2.氹仔, 3.珠海 |
+| 广告状态 | 1.上线, 2.暂停, 3.下线 |
+| 活动状态 | 1.启用, 2.暂停, 3.停止 |
+| 服务状态 | 1.可用, 2.停用 |
+| 审批状态 | 1.未审批, 2.已审批, 3.驳回 |
+| 账单状态 | 1.未确认, 2.已确认, 3.驳回 |
+| 跳转地址 | 1.h5链接, 2.综合首页, 3.外卖首页, 4.超市首页, 5.我的 |
+
+---
+
+# 高效开发模式 ⚠️ 强制标准（优先级最高）
+
+> 核心原则：**界面调整与业务逻辑解耦，分阶段交付，快速迭代**
+
+## 第一阶段：前端界面快速交付（必须严格执行）
+
+- **仅聚焦静态界面**：只调整 UI 结构、样式（inline style / CSS 类名）和交互逻辑（事件处理、状态切换），确保界面快速生成并可视觉化
+- **暂缓以下修改**：
+  - ❌ 不修改 i18n 翻译文件（zh-TW.json / en.json）——使用现有翻译键或硬编码中文临时文字
+  - ❌ 不修改后端 API 调用逻辑、数据库操作
+  - ❌ 不修改 TSX 中的业务逻辑层（如数据转换、接口适配）
+  - ❌ 不执行 `npm run build` 重新构建前端
+- **交付物**：修改后的 TSX/CSS 文件，用户可直接在浏览器中查看界面效果
+- **用户确认**：界面交给用户查看，用户可快速提出调整意见，在前端即时修改
+
+## 第二阶段：界面确认后的完善工作
+
+- 待用户确认界面无误后，再统一执行：
+  - ✅ 补充/更新 i18n 翻译键
+  - ✅ 对接后端 API、实现业务逻辑
+  - ✅ 数据库表结构调整与种子数据更新
+  - ✅ 前端构建与部署
+
+## 执行纪律
+
+- 涉及界面调整时，**禁止**一开始就前后端、数据库、i18n 同时改动
+- 每次界面修改的回应应精简、快速，避免冗长的诊断和无关文件读取
+- 若现有翻译键已能表达含义，直接复用，不新增翻译键
+- 若无现有键可用，临时使用中文硬编码文字，第二阶段再替换为 `t()` 调用

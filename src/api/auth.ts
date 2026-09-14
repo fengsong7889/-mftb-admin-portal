@@ -6,6 +6,8 @@ import type { MenuPermission } from '../pages/Permission/types'
 export interface LoginParams {
   username: string
   password: string
+  /** 滑块安全验证 Token（连续失败 3 次后必填，后端签发、一次性使用） */
+  captchaToken?: string
 }
 
 /** 后端返回的用户信息 */
@@ -38,6 +40,13 @@ export interface LoginResult {
 /** 登录 */
 export function login(params: LoginParams) {
   return request.post<unknown, LoginResult>('/auth/login', params)
+}
+
+/** 签发滑块安全验证 Token（静默：失败由登录页自行提示） */
+export function fetchCaptchaToken() {
+  return request.get<unknown, { token: string; expireSeconds: number }>('/auth/captcha', {
+    headers: { [SILENT_HEADER]: '1' },
+  })
 }
 
 /** 登出 */

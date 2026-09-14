@@ -30,7 +30,7 @@ export interface UserInfo {
 interface AuthContextType {
   isAuthenticated: boolean
   user: UserInfo | null
-  login: (username: string, password: string) => Promise<{ success: boolean; message?: string; redirectPath?: string; accountDisabled?: boolean }>
+  login: (username: string, password: string, captchaToken?: string) => Promise<{ success: boolean; message?: string; redirectPath?: string; accountDisabled?: boolean; captchaRequired?: boolean; code?: number }>
   logout: () => void
   updateAvatar: (avatar: string) => void
   hasPermission: (permission: string) => boolean // 权限检查方法（支持 'action' 或 'menuKey:action'）
@@ -307,10 +307,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated])
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string, captchaToken?: string) => {
     try {
       // 调用后端登录接口，所有认证必须经过后端数据库验证
-      const result = await loginApi({ username, password })
+      const result = await loginApi({ username, password, captchaToken })
       
       // 后端返回异常时直接报错，不降级 mock 登录（安全边界：禁止前端自授 admin 权限）
       if (!result || !result.userInfo) {
@@ -351,7 +351,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const msg = err instanceof Error && err.message ? err.message : '登錄失敗'
       // 账号被停用时返回特定标记，由登录页弹窗展示
       const isAccountDisabled = msg.includes('账号已被停用') || msg.includes('已被禁用')
-      return { success: false, message: msg, accountDisabled: isAccountDisabled }
+      // 后端业务码（1005 = 需先完成滑块安全验证）
+      const code = (err as { code?: number }).code
+      return { success: false, message: msg, accountDisabled: isAccountDisabled, captchaRequired: code === 1005, code }
     }
   }, [])
 
