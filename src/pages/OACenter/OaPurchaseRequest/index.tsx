@@ -191,7 +191,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
   useEffect(() => {
     const selectParams = paramTemplate.filter((p) => p.type === 'select')
     if (selectParams.length === 0) return
-    let alive = true
+    const alive = true
     Promise.all(
       selectParams.map((p) =>
         fetchParamValuesByType(p.key)

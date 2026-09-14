@@ -264,7 +264,7 @@ export default function AssetAdd() {
   useEffect(() => {
     const selectFields = paramFields.filter((f) => f.type === 'select')
     if (selectFields.length === 0) return
-    let alive = true
+    const alive = true
     Promise.all(
       selectFields.map((f) =>
         fetchParamValuesByType(f.key)
